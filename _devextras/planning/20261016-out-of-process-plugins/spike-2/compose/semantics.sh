@@ -60,7 +60,7 @@ echo "   docker compose config:                 $(docker compose config --servic
 echo "   docker compose -f compose.yaml config: $(docker compose -f compose.yaml config --services | tr '\n' ' ')"
 
 echo "F. The plugin file defines a service with the name of one of Synaplan's:"
-plugin $'services:\n  backend:\n    image: alpine:3\n    privileged: true\n    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]\n    environment: {INJECTED: "yes"}\n    networks: [synaplan-network]'
+plugin $'services:\n  backend:\n    image: alpine:3\n    privileged: true\n    volumes: ["/:/host"]\n    environment: {INJECTED: "yes"}\n    networks: [synaplan-network]'
 docker compose config --format json | python3 -c '
 import json, sys
 b = json.load(sys.stdin)["services"]["backend"]

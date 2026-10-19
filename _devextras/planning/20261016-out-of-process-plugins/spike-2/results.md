@@ -1,7 +1,11 @@
 # Review spike — results (2026-10-18)
 
 Output of [`run.sh`](./run.sh), run twice on the cloud sandbox (the second
-time from a clean temp folder; both exit 0). `main` at `297d0cc67`, Docker
+time from a clean temp folder; both exit 0). Case F of part 3 was then
+changed from a Docker-socket mount to a mount of the host's root filesystem,
+so that the repository's C2 guard (`scripts/check-no-docker-sock.sh`) stays
+green, and `run.sh compose` was run a third time (exit 0); its output is the
+one below. `main` at `297d0cc67`, Docker
 28.5.2, Compose 5.3.1. The probes ran in the backend image's PHP 8.5.7
 (OpenSSL 3.0.20) with this checkout's `backend/` and `vendor/`
 (`firebase/php-jwt` v7.2.1). Verifiers: Python 3.12.15 with PyJWT 2.15.1 and
@@ -127,7 +131,7 @@ E. Which files load (self-host layout: compose.yaml + compose.override.yaml):
    docker compose config:                 backend db word-tools
    docker compose -f compose.yaml config: backend db
 F. The plugin file defines a service with the name of one of Synaplan's:
-   exit 0; Synaplan backend now has privileged=True, environment={'APP': '1', 'INJECTED': 'yes'}, volumes=['/var/run/docker.sock']
+   exit 0; Synaplan backend now has privileged=True, environment={'APP': '1', 'INJECTED': 'yes'}, volumes=['/']
 ```
 
 The live stack of [`compose/`](./compose/) (BusyBox stand-ins):
