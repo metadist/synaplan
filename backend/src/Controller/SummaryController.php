@@ -61,9 +61,9 @@ class SummaryController extends AbstractController
                 new OA\Property(
                     property: 'summaryType',
                     type: 'string',
-                    enum: ['abstractive', 'extractive', 'bullet-points'],
+                    enum: ['abstractive', 'extractive', 'bullet-points', 'translation'],
                     example: 'abstractive',
-                    description: 'Type of summary to generate'
+                    description: 'Type of summary to generate. translation returns the whole document in outputLanguage, nothing left out or added; length and focusAreas do not apply.'
                 ),
                 new OA\Property(
                     property: 'length',
@@ -159,8 +159,7 @@ class SummaryController extends AbstractController
                 return $this->json(['success' => false, 'error' => 'Summary service not configured. Please load fixtures.'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
-            // A lower temperature keeps summaries consistent.
-            $result = $this->summarizer->summarize($user, new SummaryCall($systemPrompt->getPrompt(), $summaryRequest->message($text), 0.5, 'DOC_SUMMARY', $text, $startTime));
+            $result = $this->summarizer->summarize($user, new SummaryCall($summaryRequest->systemPrompt($systemPrompt->getPrompt()), $summaryRequest->message($text), $summaryRequest->temperature(), 'DOC_SUMMARY', $text, $startTime));
 
             return $this->json($this->summaryPayload($summaryRequest, $text, $result, $startTime, (int) $user->getId()));
         } catch (\Throwable $e) {

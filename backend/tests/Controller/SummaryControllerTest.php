@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Summary\SummaryRequest;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -227,6 +228,33 @@ class SummaryControllerTest extends WebTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
         $this->assertSame(self::MOCK_SUMMARY, $data['summary']);
+    }
+
+    public function testTranslationSendsTheWholeDocumentToATranslator(): void
+    {
+        $text = 'Restores took up to six hours instead of two.';
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->with(
+                $this->callback(fn (array $messages): bool => 'system' === $messages[0]['role']
+                    && SummaryRequest::TRANSLATION_PROMPT === $messages[0]['content']
+                    && $this->userMessageContains($messages, "Target language: de\n\nDocument to translate:\n\n".$text)
+                    && !$this->userMessageContains($messages, 'Summary Type')),
+                $this->anything(),
+                $this->callback(fn (array $options): bool => 0.2 === $options['temperature']),
+            )
+            ->willReturn($this->mockChatResponse());
+
+        $this->postSummary([
+            'text' => $text,
+            'summaryType' => 'translation',
+            'outputLanguage' => 'de',
+        ]);
+
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame(self::MOCK_SUMMARY, json_decode($this->client->getResponse()->getContent(), true)['summary']);
     }
 
     public function testFileIdHappyPath(): void

@@ -13,6 +13,12 @@ namespace App\Service\Summary;
  */
 final readonly class SummaryRequest
 {
+    public const TRANSLATION_PROMPT = <<<'PROMPT'
+        You are a professional translator. Translate the document the user sends into the target language they name.
+        Translate all of it, in its order, and keep headings, lists, tables, numbers, dates, names and links.
+        Do not summarize, shorten, explain, judge or add anything. Reply with the translation only.
+        PROMPT;
+
     private function __construct(
         public ?string $text,
         public ?int $fileId,
@@ -71,11 +77,33 @@ final readonly class SummaryRequest
         return null;
     }
 
+    public function isTranslation(): bool
+    {
+        return 'translation' === $this->summaryType;
+    }
+
+    public function systemPrompt(string $summaryPrompt): string
+    {
+        return $this->isTranslation() ? self::TRANSLATION_PROMPT : $summaryPrompt;
+    }
+
+    /**
+     * Low temperatures keep summaries consistent and translations literal.
+     */
+    public function temperature(): float
+    {
+        return $this->isTranslation() ? 0.2 : 0.5;
+    }
+
     /**
      * The message that hands the model the options and the document.
      */
     public function message(string $document): string
     {
+        if ($this->isTranslation()) {
+            return "Target language: {$this->outputLanguage}\n\nDocument to translate:\n\n{$document}";
+        }
+
         $targetWordCount = match ($this->length) {
             'short' => '50-150',
             'long' => '500-1000',
