@@ -257,6 +257,30 @@ class SummaryControllerTest extends WebTestCase
         self::assertSame(self::MOCK_SUMMARY, json_decode($this->client->getResponse()->getContent(), true)['summary']);
     }
 
+    public function testACutOffTranslationIsNotReportedAsSuccess(): void
+    {
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Nur der Anfang.',
+            'finish_reason' => 'length',
+            'provider' => 'groq',
+            'model' => 'llama',
+            'usage' => ['total_tokens' => 9],
+        ]);
+
+        $this->postSummary([
+            'text' => 'Restores took six hours instead of two.',
+            'summaryType' => 'translation',
+            'outputLanguage' => 'de',
+        ]);
+
+        $response = $this->client->getResponse();
+        self::assertSame(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        self::assertFalse($data['success']);
+        self::assertStringContainsString('too long', $data['error']);
+        self::assertArrayNotHasKey('summary', $data);
+    }
+
     public function testFileIdHappyPath(): void
     {
         $fileText = 'The quick brown fox jumps over the lazy dog. '

@@ -440,6 +440,8 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                     $result['finish_reason'] = 'tool_calls';
                 } elseif ('tool_use' === ($data['stop_reason'] ?? null)) {
                     $result['finish_reason'] = 'tool_calls';
+                } elseif ('max_tokens' === ($data['stop_reason'] ?? null)) {
+                    $result['finish_reason'] = 'length';
                 }
             }
 

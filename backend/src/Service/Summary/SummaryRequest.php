@@ -19,6 +19,12 @@ final readonly class SummaryRequest
         Do not summarize, shorten, explain, judge or add anything. Reply with the translation only.
         PROMPT;
 
+    /**
+     * Room for a full translation. Providers default to 4,096 output tokens,
+     * which cuts a long document off. A still-cut-off answer is refused.
+     */
+    public const TRANSLATION_MAX_TOKENS = 8192;
+
     private function __construct(
         public ?string $text,
         public ?int $fileId,
@@ -93,6 +99,20 @@ final readonly class SummaryRequest
     public function temperature(): float
     {
         return $this->isTranslation() ? 0.2 : 0.5;
+    }
+
+    public function toCall(string $summaryPrompt, string $document, float $startedAt): SummaryCall
+    {
+        return new SummaryCall(
+            $this->systemPrompt($summaryPrompt),
+            $this->message($document),
+            $this->temperature(),
+            'DOC_SUMMARY',
+            $document,
+            $startedAt,
+            $this->isTranslation(),
+            $this->isTranslation() ? self::TRANSLATION_MAX_TOKENS : null,
+        );
     }
 
     /**

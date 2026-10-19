@@ -103,6 +103,8 @@ final class GoogleChat
             if ([] !== $toolCalls) {
                 $result['tool_calls'] = $toolCalls;
                 $result['finish_reason'] = 'tool_calls';
+            } elseif ('MAX_TOKENS' === ($data['candidates'][0]['finishReason'] ?? null)) {
+                $result['finish_reason'] = 'length';
             }
 
             return $result;
