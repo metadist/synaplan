@@ -113,6 +113,34 @@ class FileLifecycleControllerTest extends WebTestCase
         self::assertSame('etag-2', $rows[0]->getSourceEtag());
     }
 
+    public function testOverwriteLeavesIncomingOnlyWhenItNamesAKnowledgeFolder(): void
+    {
+        $upload = fn (string $groupKey): array => $this->upload('plan.txt', 'Plan '.$groupKey, [
+            'source' => 'nextcloud',
+            'source_id' => 'nc-plan',
+            'group_key' => $groupKey,
+            'process_level' => 'extract',
+            'overwrite' => '1',
+        ]);
+        $incoming = function (int $id): bool {
+            $this->em->clear();
+
+            return $this->em->getRepository(File::class)->find($id)->isIncoming();
+        };
+
+        $id = $upload('DEFAULT')['files'][0]['id'];
+        self::assertTrue($incoming($id), 'without a folder the upload waits in Incoming');
+
+        self::assertSame($id, $upload('DEFAULT')['files'][0]['id']);
+        self::assertTrue($incoming($id), 'an update without a folder keeps it there');
+
+        $upload('Contracts');
+        self::assertFalse($incoming($id), 'an update into a knowledge folder files it');
+
+        $upload('DEFAULT');
+        self::assertFalse($incoming($id), 'a later update without a folder does not bring it back');
+    }
+
     public function testMarkStaleSetsMarker(): void
     {
         $data = $this->upload('stale.txt', 'Some content.', [

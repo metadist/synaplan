@@ -69,15 +69,14 @@ class File
 
     public static function arrivesIncoming(string $source, ?string $groupKey): bool
     {
-        if (!in_array($source, self::INCOMING_SOURCES, true)) {
-            return false;
-        }
+        return in_array($source, self::INCOMING_SOURCES, true)
+            && !self::namesKnowledgeFolder($source, $groupKey);
+    }
 
-        if (!in_array($source, self::KNOWLEDGE_INTAKE_SOURCES, true)) {
-            return true;
-        }
-
-        return null === $groupKey || '' === $groupKey || 'DEFAULT' === $groupKey;
+    public static function namesKnowledgeFolder(string $source, ?string $groupKey): bool
+    {
+        return in_array($source, self::KNOWLEDGE_INTAKE_SOURCES, true)
+            && null !== $groupKey && '' !== $groupKey && 'DEFAULT' !== $groupKey;
     }
 
     /**

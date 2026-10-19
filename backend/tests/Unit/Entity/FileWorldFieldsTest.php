@@ -130,6 +130,15 @@ final class FileWorldFieldsTest extends TestCase
         yield 'web upload without a folder' => ['web_upload', null, false];
     }
 
+    public function testNamesKnowledgeFolderOnlyForCloudAppsWithARealFolder(): void
+    {
+        self::assertTrue(File::namesKnowledgeFolder('owncloud', 'Contracts'));
+        self::assertFalse(File::namesKnowledgeFolder('nextcloud', 'DEFAULT'));
+        self::assertFalse(File::namesKnowledgeFolder('opencloud', null));
+        self::assertFalse(File::namesKnowledgeFolder('outlook', 'Contracts'));
+        self::assertFalse(File::namesKnowledgeFolder('web_upload', 'Contracts'));
+    }
+
     public function testIsMediaForImageType(): void
     {
         $file = new File();
