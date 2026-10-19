@@ -1,6 +1,6 @@
 # Synaplan roadmap
 
-**Status:** Live, 2026-10-17. **This is the only roadmap file.** It is
+**Status:** Live, 2026-10-18. **This is the only roadmap file.** It is
 edited in place; a change of order is a dated row in §6, not a new dated
 file. Earlier roadmaps are frozen under
 [`2026-archive/`](./2026-archive/readme.txt) (2026-09-03, 09-10, 09-17,
@@ -21,7 +21,7 @@ State verified against `main` on 2026-10-15. "Shipped" means merged on
 `main`; "walked" means a dated browser walk entry exists in the track's
 STATUS.
 
-### Now — the feature window is open (2026-10-15)
+### Now — the feature window is open (2026-10-18)
 
 **The cleanup window is closed.** Code cleanup V1 (C1–C9,
 [#2478](https://github.com/metadist/synaplan/pull/2478)–[#2486](https://github.com/metadist/synaplan/pull/2486))
@@ -29,31 +29,26 @@ and V2 (G1–G10, [#2492](https://github.com/metadist/synaplan/pull/2492),
 [#2496](https://github.com/metadist/synaplan/pull/2496)–[#2500](https://github.com/metadist/synaplan/pull/2500))
 met their exits on 2026-10-14/15 and are archived (§4), together with the
 UX overhaul, which shipped in [#2431](https://github.com/metadist/synaplan/pull/2431).
-Rows 1–3 therefore left the tables below; every other row keeps its number,
-because other plans cite it. Feature work resumes with row 8, the
-prompting flow, which lands on the chat pipeline V2 extracted (the
-`ChatHandler` stages and `ChatStreamOrchestrator`).
-
-**Code cleanup V3** (row 17) took the rest of the chat path the prompting
-flow also lands on — `MessageProcessor` and `FileAnalysisHandler` below
-the orchestrator — and the two 36-dependency list classes. It merged on
-2026-10-16 and is archived (§4). The twelve findings it deliberately left
-are **code cleanup V4** (row 19, decision 2026-10-16, §6). V4's first
-sprint is a privacy fix: account deletion leaves 12 user-owned tables
-behind. Its second, the chat view's stream handling, lands before row 8
-grows that file further. V4 does not reopen the window. Where S2–S11 sit
-against rows 8–11 is the owner's call.
-
-| # | Track | Plan | State | Exit |
-| - | ----- | ---- | ----- | ---- |
-| 19 | **Code cleanup V4** — the twelve findings V3 left (V3 §7), one sprint each: erase every user-owned table with the account; a frontend size ratchet and one stream handler for the chat view; align the buffered and streamed turn; one topic / intent rule; channel turns, media turn, classifier and system-settings schema as stages; one MIME map; a thin-controller gate; Google / OpenAI providers per capability; strict types on the message turn | [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | Plan written 2026-10-16 from a re-measurement of `main` (`9ca56ccb1`). D1–D3 ticked as proposed; one stacked chain, the last pull request carries every sprint (owner, 2026-10-16). S0 (account erasure, [#2534](https://github.com/metadist/synaplan/pull/2534)), S1a (frontend size ratchet, [#2535](https://github.com/metadist/synaplan/pull/2535)), S1b (one stream handler for the chat view, [#2536](https://github.com/metadist/synaplan/pull/2536)), S2 (one buffered and streamed turn, [#2538](https://github.com/metadist/synaplan/pull/2538)), S3 (one topic and intent rule, [#2539](https://github.com/metadist/synaplan/pull/2539)), S4a (the widget turn as named stages, [#2543](https://github.com/metadist/synaplan/pull/2543)) and S4b (the inbound email turn as named stages, [#2545](https://github.com/metadist/synaplan/pull/2545)) merged; S4c (the WhatsApp turn as named stages, [#2546](https://github.com/metadist/synaplan/pull/2546)), S5 (the media generation turn as stages, [#2547](https://github.com/metadist/synaplan/pull/2547)), S6 (the classifier as a cascade of steps, [#2548](https://github.com/metadist/synaplan/pull/2548)), S7 (the system settings as one class per tab, [#2550](https://github.com/metadist/synaplan/pull/2550)), S8 (one MIME-to-extension map, [#2551](https://github.com/metadist/synaplan/pull/2551)), S9 (thin controllers as a gate, [#2552](https://github.com/metadist/synaplan/pull/2552)), S10a (the Google provider per capability, [#2553](https://github.com/metadist/synaplan/pull/2553)), S10b (the OpenAI provider per capability, [#2554](https://github.com/metadist/synaplan/pull/2554)) and S11 (strict types on the message turn, [#2555](https://github.com/metadist/synaplan/pull/2555)) in review — all twelve sprints delivered. | All twelve sprints merged; `NOT_ERASED_YET` deleted; plan archived. |
-| 20 | **Six open issues** — confirm #2459, #2460, #2461 (already implemented on `main`); fix widget visitor sources (#2519); Playwright for the visitor chrome (#2504); owner-only "what was sent" on a reply (#2515) | [`20261016_6-issues/`](./20261016_6-issues/00_master_plan.md) | Plan written 2026-10-16. No product code yet. Stack merges one pull request at a time; Copilot and green CI are part of each code sprint. | All six issues closed or fixed; plan archived. |
+**Code cleanup V3** (row 17) merged on 2026-10-16 and is archived (§4).
+**Code cleanup V4** (row 19) merged on 2026-10-18
+([#2534](https://github.com/metadist/synaplan/pull/2534)–[#2536](https://github.com/metadist/synaplan/pull/2536),
+[#2538](https://github.com/metadist/synaplan/pull/2538),
+[#2539](https://github.com/metadist/synaplan/pull/2539),
+[#2543](https://github.com/metadist/synaplan/pull/2543),
+[#2545](https://github.com/metadist/synaplan/pull/2545)–[#2548](https://github.com/metadist/synaplan/pull/2548),
+[#2550](https://github.com/metadist/synaplan/pull/2550)–[#2555](https://github.com/metadist/synaplan/pull/2555))
+and is archived (§4). The **six-issue sprint** (row 20) is implemented and
+archived the same day. Rows 1–3, 17, 19 and 20 therefore left the tables
+below; every other row keeps its number, because other plans cite it.
+Feature work resumes with row 8, the prompting flow, which lands on the
+chat pipeline V2 extracted (the `ChatHandler` stages and
+`ChatStreamOrchestrator`).
 
 Still finishing from before the window:
 
 | # | Track | Plan | State | Exit |
 | - | ----- | ---- | ----- | ---- |
-| 16 | **Live voice conversations** — speech-to-speech sidecar, delegation into chat, created media shown in the chat | [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | LV0–LV6 and LV9 on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), follow-ups [#2503](https://github.com/metadist/synaplan/pull/2503), [#2507](https://github.com/metadist/synaplan/pull/2507)); the sidecar joined the production web compose on 2026-10-15 (`synaplan-platform`). **LV7–LV8** (native capability, CarPlay live path) sit on branch `feat/live-voice` in `synaplan-apps` with no pull request yet. Not in STATUS: J-LV-1…J-LV-5 against a provider (the #2477 description walks one spoken image request), J-LV-6 / J-LV-7 on devices, a self-hosted model on a GPU. | LV7–LV8 merged in `synaplan-apps`; the provider walks entered in STATUS; plan archived. |
+| 16 | **Live voice conversations** — speech-to-speech sidecar, delegation into chat, created media shown in the chat | [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | LV0–LV6 and LV9 on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), follow-ups [#2503](https://github.com/metadist/synaplan/pull/2503), [#2507](https://github.com/metadist/synaplan/pull/2507)); the sidecar joined the production web compose on 2026-10-15 (`synaplan-platform`). **LV7–LV8** (native capability, CarPlay live path) merged in `synaplan-apps` [#122](https://github.com/metadist/synaplan-apps/pull/122) on 2026-10-17. Not in STATUS: J-LV-1…J-LV-5 against a provider (the #2477 description walks one spoken image request), J-LV-6 / J-LV-7 on devices, a self-hosted model on a GPU. | LV7–LV8 merged in `synaplan-apps`; the provider walks entered in STATUS; plan archived. |
 
 ### Paused before the window — resume in this order
 
@@ -124,13 +119,11 @@ listed. The last row is the cleanup window, which shipped as `refactor:` /
 Everything in this directory, one line each. The README of this directory
 mirrors this table.
 
-| Path | What | State 2026-10-15 |
+| Path | What | State 2026-10-18 |
 | ---- | ---- | ---------------- |
 | [`ROADMAP.md`](./ROADMAP.md) | This file | live |
 | [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs, Perfect-UX bar, Q-list | binding; Q2–Q9 open |
-| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat | finishing (row 16) — web and backend on `main`, LV7–LV8 unmerged in `synaplan-apps` |
-| [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | Twelve sprints S0–S11 from V3 §7, one branch chain; sprint test and chore per sprint | in progress (row 19) — S0, S1a, S1b, S2, S3, S4a and S4b merged; S4c, S5, S6, S7, S8, S9, S10a, S10b and S11 in review; D1–D3 ticked |
-| [`20261016_6-issues/`](./20261016_6-issues/00_master_plan.md) | Six newest product issues: three confirmations, widget sources, widget chrome tests, prompt transcript | plan only (row 20), 2026-10-16 |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat | finishing (row 16) — web, backend and `synaplan-apps` #122 on their mains; provider and device walks not in STATUS |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | 5.2.0 external test triage, 50 issue drafts | paused (row 4); waves 4–6 open |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder | paused (row 5) |
 | [`20261001-single-scheduler/`](./20261001-single-scheduler/00_master_plan.md) | One scheduler; P3 production rollout | ops (row 6) |
@@ -153,6 +146,13 @@ mirrors this table.
 Moved to [`2026-archive/`](./2026-archive/readme.txt) with a dated note at
 the top of each. Archived means shipped or superseded, not closed for
 corrections — STATUS files there still take walk entries.
+
+### 2026-10-18
+
+| Path | Why | Evidence |
+| ---- | --- | -------- |
+| `20261016-code-cleanup-V4/` | S0–S11 merged: account erasure, the chat-view stream handler, one buffered and streamed turn, one topic / intent rule, the widget, email and WhatsApp turns, the media turn, the classifier cascade, system settings per tab, one MIME map, the thin-controller gate, the Google and OpenAI provider splits, strict types on the message turn. Ledger 50 / 65 / 126 | [#2534](https://github.com/metadist/synaplan/pull/2534)–[#2536](https://github.com/metadist/synaplan/pull/2536), [#2538](https://github.com/metadist/synaplan/pull/2538), [#2539](https://github.com/metadist/synaplan/pull/2539), [#2543](https://github.com/metadist/synaplan/pull/2543), [#2545](https://github.com/metadist/synaplan/pull/2545)–[#2548](https://github.com/metadist/synaplan/pull/2548), [#2550](https://github.com/metadist/synaplan/pull/2550)–[#2555](https://github.com/metadist/synaplan/pull/2555) |
+| `20261016_6-issues/` | The six issues are implemented. #2459 and #2461 confirmed and closed. Widget sources, visitor-chrome tests and "what was sent" merged. Two leftovers, recorded on the archive note: #2504 is still open on GitHub, and the #2460 CI-image repeat was never run | [#2525](https://github.com/metadist/synaplan/pull/2525)–[#2527](https://github.com/metadist/synaplan/pull/2527), [#2529](https://github.com/metadist/synaplan/pull/2529), [#2531](https://github.com/metadist/synaplan/pull/2531) |
 
 ### 2026-10-16
 
@@ -226,3 +226,6 @@ This file is the overview. It does not replace track STATUS files.
 | 2026-10-16 | **Code cleanup V3 archived; code cleanup V4 added as row 19.** #2512–#2514 merged in order the same morning. At the owner's request the twelve V3 §7 findings become one plan of twelve sprints (S0–S11), in V3's order, on one branch chain that merges one pull request at a time. Each sprint ends with a sprint test (proof, regression, journey) and a chore that answers the Copilot review and turns CI green. S0 (account deletion leaves 12 tables behind) is privacy work and goes first. Row 18 is out-of-process plugins ([#2518](https://github.com/metadist/synaplan/pull/2518)), so V4 is row 19. |
 | 2026-10-16 | **Six-issue sprint added as row 20.** The six newest product issues get one plan (`20261016_6-issues/`, the owner's folder name). #2459 and #2461 are confirm-and-close against `main` at `9ca56ccb1`; #2460 stays open until a CI-image repeat names a cause. #2519, #2504 and #2515 are a stacked branch chain. Row 18 stays with out-of-process plugins ([#2518](https://github.com/metadist/synaplan/pull/2518)) and row 19 with code cleanup V4 ([#2521](https://github.com/metadist/synaplan/pull/2521)). Other rows were not re-verified. |
 | 2026-10-17 | **Research quality registered as row 21** (not started) from the owner's question whether Synaplan Desktop can reach the research quality of an IDE agent with agentic looping, better prompting and a combination of models. Finding: yes for research — the gap is the harness, not the models: the gateway caps web research at two searches and a two-sentence answer, reads pages only on Anthropic routes, Desktop sees five knowledge passages per turn, and nothing re-plans. The plan measures first, removes those ceilings, then builds one server-side research run for Desktop and later the web chat, with cheap fast models for reading and sorting and frontier models for thinking, writing and a second-provider fact-check. Position among rows 8–20 is the owner's call; with row 8 (prompting flow) it shares the result pane and per-folder instructions instead of building them twice. Other rows were not re-verified. |
+| 2026-10-18 | **Code cleanup V4 archived** (row 19). S0–S11 merged the same morning ([#2534](https://github.com/metadist/synaplan/pull/2534)–[#2555](https://github.com/metadist/synaplan/pull/2555), skipping the dependency pulls). `NOT_ERASED_YET` is gone. The folder moved to `2026-archive/`. |
+| 2026-10-18 | **Six-issue sprint archived** (row 20). The product is on `main` ([#2525](https://github.com/metadist/synaplan/pull/2525)–[#2527](https://github.com/metadist/synaplan/pull/2527), [#2529](https://github.com/metadist/synaplan/pull/2529), [#2531](https://github.com/metadist/synaplan/pull/2531)). Same treatment as early intake: the shipped folder leaves, the leftovers stay named. [#2504](https://github.com/metadist/synaplan/issues/2504) is still open because its test pull request did not use a closing keyword. #2460 was closed by the merge of #2525 before the CI-image 20-repeat the plan required. |
+| 2026-10-18 | **Live voice stays live** (row 16). LV7–LV8 merged in `synaplan-apps` [#122](https://github.com/metadist/synaplan-apps/pull/122). The 2026-10-15 exit still wants the provider walks and J-LV-6 / J-LV-7 in STATUS; those lines say the walks were not done. |

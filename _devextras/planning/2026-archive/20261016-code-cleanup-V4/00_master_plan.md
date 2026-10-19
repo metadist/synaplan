@@ -1,16 +1,17 @@
 # Code cleanup V4 — twelve sprints, one branch chain
 
-**Status:** In progress, 2026-10-16. Drafted from a re-measurement of `main` at
+**Status:** Archived 2026-10-18. S0–S11 merged; the close is in
+[`STATUS.md`](./STATUS.md). Drafted from a re-measurement of `main` at
 `9ca56ccb1`, the morning V3 merged ([#2512](https://github.com/metadist/synaplan/pull/2512) →
 [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514)).
 The owner ticked D1–D3 as proposed and amended decision #2 (one stacked
-chain, no intermediate merges). Progress is in [`STATUS.md`](./STATUS.md).
-**Priority:** Row 19 of [`../ROADMAP.md`](../ROADMAP.md). S0 is a security /
+chain, no intermediate merges).
+**Priority:** Row 19 of [`../../ROADMAP.md`](../../ROADMAP.md). S0 is a security /
 privacy fix: account deletion leaves 12 user-owned tables behind. It starts
 first. S1 lands before row 8, the prompting flow, grows `ChatView.vue`
 further.
 **Goal:** Work the twelve findings V3 deliberately left
-([V3 §7](../2026-archive/20261015-code-cleanup-V3/00_master_plan.md)), one
+([V3 §7](../20261015-code-cleanup-V3/00_master_plan.md)), one
 sprint each, in that order. Every sprint ends with a test that proves the
 change works and that nothing else moved, and with a reviewed pull request
 whose CI is green.

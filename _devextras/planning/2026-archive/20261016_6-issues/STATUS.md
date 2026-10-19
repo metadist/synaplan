@@ -1,5 +1,18 @@
 # Status — six issues, 2026-10-16
 
+> **Archived 2026-10-18.** The six issues are implemented on `main`.
+> #2459 and #2461 closed with no product diff. #2460's settled-list test
+> is [#2525](https://github.com/metadist/synaplan/pull/2525) (`a74f8c2c9`).
+> Widget sources: [#2526](https://github.com/metadist/synaplan/pull/2526)
+> (`596a72781`). Visitor-chrome tests:
+> [#2527](https://github.com/metadist/synaplan/pull/2527) (`1f400c619`).
+> "What was sent": [#2529](https://github.com/metadist/synaplan/pull/2529)
+> (`dd72649c3`) and [#2531](https://github.com/metadist/synaplan/pull/2531)
+> (`dcd3f0611`). Two leftovers stay outside this folder: GitHub
+> [#2504](https://github.com/metadist/synaplan/issues/2504) is still open
+> because #2527 did not use a closing keyword, and the CI-image 20-repeat
+> for #2460 was never run — #2525 closed that issue on merge anyway.
+
 A line here is the record. Chat is not.
 
 | When | Step | Result |

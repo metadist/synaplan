@@ -31,14 +31,14 @@ log. It is edited in place — no new dated roadmap files, no redirect stubs.
 
 Same order as `ROADMAP.md` §1. **The cleanup window closed on
 2026-10-15:** code cleanup V1 and V2 met their exits and moved to the
-archive with the UX overhaul; feature tracks resume with the prompting flow. Code cleanup V3
-merged on 2026-10-16 and is archived; its §7 is code cleanup V4.
+archive with the UX overhaul. Code cleanup V3 merged on 2026-10-16 and is
+archived. Code cleanup V4 (its §7) and the six-issue sprint merged and
+moved to the archive on 2026-10-18. Feature tracks resume with the
+prompting flow.
 
-| Path | What | State 2026-10-16 |
+| Path | What | State 2026-10-18 |
 | ---- | ---- | ---------------- |
-| [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | The twelve findings V3 left, one sprint each (S0–S11) on one branch chain: account deletion that leaves no table behind first, then the chat view's stream handling, the turn alignment, one topic / intent rule, the channel, media, classifier and settings splits, one MIME map, a thin-controller gate, the provider split, strict types. Each sprint closes with a sprint test and its chore (Copilot answered, CI green) | in progress — S0, S1a, S1b, S2, S3, S4a and S4b merged; S4c, S5, S6, S7, S8, S9, S10a, S10b and S11 in review; D1–D3 ticked |
-| [`20261016_6-issues/`](./20261016_6-issues/00_master_plan.md) | Six newest product issues. Confirm #2459, #2460, #2461. Then a stacked fix: widget sources (#2519), visitor-chrome Playwright (#2504), owner-only transcript on a reply (#2515). | plan only (row 20) — no product code yet |
-| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | finishing — web, backend and sidecar on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); LV7–LV8 on `synaplan-apps` branch `feat/live-voice`, no PR yet |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | finishing — web, backend and sidecar on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); LV7–LV8 merged in `synaplan-apps` [#122](https://github.com/metadist/synaplan-apps/pull/122); provider and device walks not in STATUS |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49), six fixing waves, 50 issue drafts in `issues/` | paused — waves 1–3 shipped; waves 4–6 open, drafts not filed on GitHub |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder (egress, gVisor node, run images, docs, staging) | paused |
 | [`20261001-single-scheduler/`](./20261001-single-scheduler/00_master_plan.md) | One scheduler; P1/P2/P4 shipped, P3 production rollout open (`synaplan-platform`) | ops |
@@ -59,7 +59,7 @@ merged on 2026-10-16 and is archived; its §7 is code cleanup V4.
 Everything else — the frozen roadmaps (2026-09-03, 09-10, 09-17, 09-25),
 the completed August–October tracks (IAM, tools, plugs, agent builder,
 feature modules, navigation consolidation, smart search, early intake,
-desktop Phase A, code cleanup V1 and V2, UX overhaul, …), and the April/May
-topical dump (`2026-archive/2026-04-05-topic-docs/`) — lives under
-`2026-archive/` with its dated name. The 2026-10-14 and 2026-10-15
-housekeeping is listed in `ROADMAP.md` §4.
+desktop Phase A, code cleanup V1–V4, the six-issue sprint, UX overhaul, …),
+and the April/May topical dump (`2026-archive/2026-04-05-topic-docs/`) —
+lives under `2026-archive/` with its dated name. The 2026-10-14, 2026-10-15,
+2026-10-16 and 2026-10-18 housekeeping is listed in `ROADMAP.md` §4.

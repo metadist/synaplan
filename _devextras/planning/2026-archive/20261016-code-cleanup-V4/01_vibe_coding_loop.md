@@ -5,12 +5,12 @@ reaches `main` that a test has not proven, a reviewer has not read and CI
 has not passed. This file is the procedure. The sprint files say *what*
 changes; this file says *how*, and it is the same for all twelve.
 
-Binding underneath: [`AGENTS.md`](../../../AGENTS.md) (gates, Git rules,
-commit types, red flags), [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md),
-[`docs/PHP_CONVENTIONS.md`](../../../docs/PHP_CONVENTIONS.md),
-[`docs/FRONTEND_CONVENTIONS.md`](../../../docs/FRONTEND_CONVENTIONS.md),
-[`docs/E2E_TESTING.md`](../../../docs/E2E_TESTING.md), and for S1
-[`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md).
+Binding underneath: [`AGENTS.md`](../../../../AGENTS.md) (gates, Git rules,
+commit types, red flags), [`docs/ARCHITECTURE.md`](../../../../docs/ARCHITECTURE.md),
+[`docs/PHP_CONVENTIONS.md`](../../../../docs/PHP_CONVENTIONS.md),
+[`docs/FRONTEND_CONVENTIONS.md`](../../../../docs/FRONTEND_CONVENTIONS.md),
+[`docs/E2E_TESTING.md`](../../../../docs/E2E_TESTING.md), and for S1
+[`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md).
 
 ---
 
@@ -64,7 +64,7 @@ git switch -c <sprint-branch> <parent-branch>   # the previous sprint's branch, 
 | 5 | **Implement** in small commits, one logical change each. Each commit is green on the per-commit gate (§5). | The sprint file's steps are all committed |
 | 6 | **Sprint test** (§4). | Proof, regression and journey are recorded in STATUS |
 | 7 | **Document.** The `docs/ARCHITECTURE.md` section for every new seam; a docblock on every new class; the sprint file's "As delivered" note when the result differs from the plan. | Docs are in the same pull request, not a follow-up |
-| 8 | **Full gate** (§5, before push), unfiltered. | Every command green, or each failure matched by name to the [known local-only list](../../../docs/E2E_TESTING.md#known-local-only-failures) |
+| 8 | **Full gate** (§5, before push), unfiltered. | Every command green, or each failure matched by name to the [known local-only list](../../../../docs/E2E_TESTING.md#known-local-only-failures) |
 | 9 | **Push and open the pull request** (§6), non-draft. | Pull-request link in STATUS |
 | 10 | **Copilot review** (§8): every thread answered, a re-review after the fixes. | No unanswered thread; the re-review has no new actionable finding |
 | 11 | **CI** (§9): All Checks Passed on the head commit. | Green, or the pull request waits for its parent (stacked) |
@@ -147,7 +147,7 @@ repository template:
 ```markdown
 ## Summary
 <One sentence: what changed and why.> Sprint S<n> of code cleanup V4
-(_devextras/planning/20261016-code-cleanup-V4/S<nn>_….md).
+(_devextras/planning/2026-archive/20261016-code-cleanup-V4/S<nn>_….md).
 
 ## Changes
 - <one line per commit that matters>
