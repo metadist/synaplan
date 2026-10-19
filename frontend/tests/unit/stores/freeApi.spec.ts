@@ -18,9 +18,10 @@ vi.mock('@/stores/config', () => ({ useConfigStore: () => ({ reload }) }))
 vi.mock('@/stores/aiConfig', () => ({ useAiConfigStore: () => ({ loadModels, loadDefaults }) }))
 vi.mock('@/services/api/httpClient', () => ({ getConfigSync: () => getConfigSync() }))
 
+import type { FreeApiStatus } from '@/services/api/freeApiApi'
 import { useFreeApiStore } from '@/stores/freeApi'
 
-const activeStatus = { active: true, server: 'web.synaplan.com' }
+const activeStatus = { active: true, server: 'web.synaplan.com' } as unknown as FreeApiStatus
 
 describe('freeApi store', () => {
   beforeEach(() => {
