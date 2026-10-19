@@ -21,6 +21,10 @@ parameters:
     # passes it through; elestio.yml sets it to 'elestio'.
     env(SYNAPLAN_PLATFORM): 'selfhost'
 
+    # Set by Kubernetes in every pod. The service readiness list never names a
+    # docker compose command on such an install.
+    env(KUBERNETES_SERVICE_HOST): ''
+
     # OIDC admin role claim values (comma-separated, case-insensitive)
     env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
 
@@ -1278,6 +1282,18 @@ services:
     App\Service\FreeApi\FreeApiInstallFacts:
         arguments:
             $appUrl: '%env(APP_URL)%'
+
+    App\Service\Config\Readiness\ServiceReadinessProbes:
+        arguments:
+            $qdrantUrl: '%env(QDRANT_URL)%'
+            $realtimeEnabled: '%env(bool:REALTIME_ENABLED)%'
+            $realtimeApiUrl: '%env(REALTIME_API_URL)%'
+
+    App\Service\Config\Readiness\ServiceReadinessReporter:
+        arguments:
+            $environment: '%kernel.environment%'
+            $platform: '%env(string:SYNAPLAN_PLATFORM)%'
+            $kubernetesHost: '%env(string:KUBERNETES_SERVICE_HOST)%'
 
     # Per-call headers for OpenAI-compatible endpoints; only the Demo endpoint gets any.
     App\AI\Provider\OpenAiCompatibleRequestHeaders: '@App\Service\FreeApi\FreeApiRequestHeaders'
