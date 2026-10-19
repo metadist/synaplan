@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Service\FreeApi\FreeApiCallContext;
 use App\Service\FreeApi\FreeApiRequestHeaders;
 use App\Service\FreeApi\FreeApiState;
+use App\Service\FreeApi\FreeApiStatusReader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -47,6 +48,22 @@ final class FreeApiRequestHeadersTest extends TestCase
         $this->assertSame(['X-Synaplan-Surface' => 'task'], $this->headers(userId: null, path: null)->forCall('synaplan-demo', []));
     }
 
+    public function testADemoCallDropsTheCachedStatus(): void
+    {
+        $status = $this->createMock(FreeApiStatusReader::class);
+        $status->expects(self::once())->method('forget');
+
+        $this->headers(userId: 7, path: '/api/v1/messages/stream', status: $status)->forCall('synaplan-demo', []);
+    }
+
+    public function testOtherEndpointsKeepTheCachedStatus(): void
+    {
+        $status = $this->createMock(FreeApiStatusReader::class);
+        $status->expects(self::never())->method('forget');
+
+        $this->headers(userId: 7, path: '/api/v1/messages/stream', status: $status)->forCall('localai', []);
+    }
+
     public function testResetForgetsThePreviousRequest(): void
     {
         $context = $this->context(7, '/v1/chat/completions');
@@ -77,12 +94,17 @@ final class FreeApiRequestHeadersTest extends TestCase
         $this->assertSame($surface, FreeApiCallContext::surfaceFor($path));
     }
 
-    private function headers(?int $userId, ?string $path, string $secret = 'test-secret'): FreeApiRequestHeaders
+    private function headers(?int $userId, ?string $path, string $secret = 'test-secret', ?FreeApiStatusReader $status = null): FreeApiRequestHeaders
     {
         $state = $this->createStub(FreeApiState::class);
         $state->method('existingInstallId')->willReturn(self::INSTALL_ID);
 
-        return new FreeApiRequestHeaders(null === $path ? $this->context(null, null) : $this->context($userId, $path), $state, $secret);
+        return new FreeApiRequestHeaders(
+            null === $path ? $this->context(null, null) : $this->context($userId, $path),
+            $state,
+            $status ?? $this->createStub(FreeApiStatusReader::class),
+            $secret,
+        );
     }
 
     private function context(?int $userId, ?string $path): FreeApiCallContext
