@@ -126,6 +126,37 @@ describe('AdminAttentionPanel', () => {
     )
   })
 
+  it('lists a stopped Piper service once, not also its provider feature', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: { piper: feature('piper', true, 'unhealthy') },
+      modules: [{ id: 'piper_tts', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [service('tts', 'unavailable', 'Spoken answers are off.')],
+    })
+    const wrapper = await mountPanel()
+
+    const items = wrapper.findAll('[data-testid="item-needs-attention"]')
+    expect(items.map((item) => item.text())).toEqual([
+      expect.stringContaining('Piper (spoken answers) is not reachable. Spoken answers are off.'),
+    ])
+  })
+
+  it('does not flag a feature or module while its service is starting or downloading', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: {
+        tika: feature('tika', true, 'unhealthy'),
+        ollama: feature('ollama', true, 'unhealthy'),
+      },
+      modules: [{ id: 'local_ai', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [
+        service('tika', 'starting', 'PDFs and Office files cannot be read.'),
+        service('ollama', 'downloading', 'Local AI models are not available.'),
+      ],
+    })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-testid="attention-all-good"]').exists()).toBe(true)
+  })
+
   it('does not report a sidecar as broken when its container is switched off', async () => {
     getFeaturesStatus.mockResolvedValue({
       features: { docling: feature('docling', true, 'unhealthy') },

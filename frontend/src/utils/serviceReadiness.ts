@@ -30,16 +30,29 @@ export function servicesNeedingAttention(services: ServiceReadiness[] | undefine
 const SERVICE_ALIASES: Record<string, string[]> = {
   ollama: ['local_ai', 'local-ai'],
   qdrant: ['memory-service'],
-  tts: ['piper_tts', 'piper-tts'],
+  // Provider feature id is `piper`; the module id is `piper_tts`.
+  tts: ['piper', 'piper_tts', 'piper-tts'],
   collabora: ['office_convert', 'office-convert'],
 }
 
+/** Progress and "you switched this off" are already on the service list. */
+const SPOKEN_FOR_WITHOUT_A_PROBLEM = new Set<ServiceReadinessState>([
+  'off',
+  'starting',
+  'downloading',
+])
+
 /**
  * Feature/module ids the service list already speaks for: a service that needs
- * attention has its own row, and a switched-off one is not a problem at all.
+ * attention has its own row, a switched-off one is not a problem, and a
+ * starting or downloading one is progress already shown there.
  */
 export function idsCoveredByServices(services: ServiceReadiness[] | undefined): Set<string> {
-  return idsOf((services ?? []).filter((s) => serviceNeedsAttention(s) || s.state === 'off'))
+  return idsOf(
+    (services ?? []).filter(
+      (s) => serviceNeedsAttention(s) || SPOKEN_FOR_WITHOUT_A_PROBLEM.has(s.state)
+    )
+  )
 }
 
 /** Feature/module ids whose outage already has its own service row. */
