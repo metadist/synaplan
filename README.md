@@ -9,6 +9,7 @@ Open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG ove
 [Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iOS](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) &nbsp;·&nbsp; [Desktop](https://github.com/metadist/synaplan-desktop) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/metadist/synaplan?style=flat&logo=github)](https://github.com/metadist/synaplan/stargazers)
 [![Docker](https://img.shields.io/badge/Docker-one%20command-2496ED?logo=docker&logoColor=white)](#quickstart)
 [![Download on the App Store](https://img.shields.io/badge/App%20Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/id6784278288?ct=github-readme)
 [![Get it on Google Play](https://img.shields.io/badge/Google%20Play-Download-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme)
@@ -19,9 +20,15 @@ Open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG ove
 
 ---
 
-## Quickstart
+<p align="center">If Synaplan is useful to you, a star helps the next person find it.</p>
 
-### On this machine
+<p align="center">
+  <img src="docs/images/synaplan-admin-tour.gif" alt="A thirty-second tour of Synaplan: a chat answer and its cost, default models with cost badges, the file library, generated images and audio, and connected apps" width="100%">
+</p>
+
+<p align="center"><sub>Chat, what each answer cost, your files, generated media, and the apps you can connect. About 30 seconds.</sub></p>
+
+## Quickstart
 
 ```bash
 git clone https://github.com/metadist/synaplan.git
@@ -29,80 +36,22 @@ cd synaplan
 make up
 ```
 
-Open **<http://localhost:5173>**. A status screen is up within seconds and lists every boot step, then switches to the app when it is ready. First start: 5–15 minutes. Later starts: seconds.
+Open **<http://localhost:5173>**. Log in as `admin@synaplan.com` / `admin123` and paste one provider key. Free: [Groq](https://console.groq.com).
 
-`make up` answers on `:5173` before the rest of the images finish pulling. `docker compose up -d` starts the same stack; `:5173` stays quiet until those pulls finish.
+A published image, a Docker GUI, a closed network, or a Linux server: [More ways to install](#more-ways-to-install).
 
-1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
-2. Paste one provider key. Free: [Groq](https://console.groq.com). The app opens **AI provider setup** until a key is in place. You do not edit a config file for that.
-3. Same notes in the terminal: `docker compose logs -f startup-notes`.
+## How it compares
 
-No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pulls a local chat model (`gpt-oss:20b`, ~14 GB). Chat starts when the download finishes.
+People usually arrive comparing Synaplan with a chat window or an app builder. This is what each project is for. It is not a scoreboard.
 
-### Published image, no git checkout
+| | Synaplan | Open WebUI | LibreChat | Dify |
+| --- | --- | --- | --- | --- |
+| What it is | A team platform: chat, your files as knowledge, a site widget, and the same assistant on WhatsApp and email | A chat interface for local and cloud models | A chat app for many providers | A builder for AI apps and workflows |
+| First run | Several containers, about 4 GB | One container | A Compose stack | A Compose stack, and a hosted cloud |
+| Cost of an answer | Shown on the answer | Not on the answer | Not on the answer | In the builder's usage logs, not on the chat answer |
+| Same assistant on your site, WhatsApp and email | Yes | No | No | Site widget yes. WhatsApp and email are not built in |
 
-One file is enough. A `.env` beside it is optional.
-
-```bash
-mkdir synaplan && cd synaplan
-curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/quickstart/compose.yaml
-docker compose up -d
-```
-
-Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
-
-**Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. When the GUI runs on another machine (a NAS or a server), add `SYNAPLAN_HTTP_BIND=0.0.0.0` and `SYNAPLAN_URL=http://<that machine's IP>:8000`; without them Synaplan only opens on that machine itself. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
-
-**Settings** go into `.env`, then `docker compose up -d` again (in a GUI: the stack's variables, then redeploy):
-
-- `SYNAPLAN_VERSION` picks a release tag from the [releases page](https://github.com/metadist/synaplan/releases). Empty means the release this file was published with. Never `latest`.
-- `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected. Over plain `http://` on a network address, browsers block the microphone and copying to the clipboard; chat and files work. For those two, use [Closed network](#closed-network) HTTPS.
-- Provider keys, a bootstrap administrator and mail are listed in the example with one line each.
-
-**Data** lives in named Docker volumes — the database, uploads, vectors and the generated secrets. Keep them together: a database without its `secrets` volume does not start. `docker compose down` keeps everything; `docker compose down -v` deletes it all.
-
-**Change the release:** back up the volumes, set `SYNAPLAN_VERSION`, run `docker compose up -d` (or redeploy the stack in the GUI). Going back to an older tag after a newer one migrated the database means restoring that backup. The steps are in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#quickstart-volumes).
-
-Office documents, local AI, file work, closed-network TLS and scripted backups use the full [`deploy/compose.yaml`](deploy/compose.yaml) with [`deploy/selfhost.env.example`](deploy/selfhost.env.example) instead.
-
-### Closed network
-
-Opt-in. The default stays `http://127.0.0.1:8000` on this machine.
-
-Turn it on when the network has **no route to the public internet** and people open Synaplan by the machine's address. Chat needs `https://<address>/`. The machine creates the certificate. The browser warns once.
-
-Any IPv4 address on that network works, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and `169.254.0.0/16`, plus a block you assigned and do not announce.
-
-```bash
-cp deploy/selfhost.env.example deploy/.env
-# Set SYNAPLAN_VERSION. Leave SYNAPLAN_HTTP_BIND at 127.0.0.1.
-deploy/scripts/local-tls.sh 10.0.0.15
-deploy/scripts/prepare.sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml pull
-deploy/scripts/validate-release.sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
-```
-
-Colleagues open **https://10.0.0.15/**. Ports 80 and 443 must be free. The app itself stays on `127.0.0.1:8000`. A second interface is another argument: `deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`. A public name keeps your own HTTPS proxy and leaves this off.
-
-Details: [docs.synaplan.com/local-network](https://docs.synaplan.com/local-network) · [deploy/README.md](deploy/README.md#local-network).
-
-### On a server
-
-The commands above are the development stack (source build, Vite, MailHog, phpMyAdmin) or the published image. For a Linux server, the installer writes `deploy/.env`, pins the latest release, and runs prepare → pull → validate → start → smoke-test. Secrets land in `deploy/data/secrets.env`.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
-  bash -s -- --mode server --domain https://ai.example.com
-```
-
-The same steps by hand are in [Installation](docs/INSTALLATION.md) and [deploy/README.md](deploy/README.md). Flags: `bash install.sh --help`.
-
-One-liner for the development stack, if you would rather not clone by hand:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
-```
+If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ---
 
@@ -183,6 +132,90 @@ Click any screenshot to see it full size.
 
 ---
 
+## More ways to install
+
+The [quickstart](#quickstart) is a local checkout. The variants below are a published image, a machine with no route to the public internet, and a Linux server.
+
+### On this machine
+
+The [quickstart](#quickstart) is this path. Open **<http://localhost:5173>**. A status screen is up within seconds and lists every boot step, then switches to the app when it is ready. First start: 5–15 minutes. Later starts: seconds.
+
+`make up` answers on `:5173` before the rest of the images finish pulling. `docker compose up -d` starts the same stack; `:5173` stays quiet until those pulls finish.
+
+1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
+2. Paste one provider key. Free: [Groq](https://console.groq.com). The app opens **AI provider setup** until a key is in place. You do not edit a config file for that.
+3. Same notes in the terminal: `docker compose logs -f startup-notes`.
+
+No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pulls a local chat model (`gpt-oss:20b`, ~14 GB). Chat starts when the download finishes.
+
+### Published image, no git checkout
+
+One file is enough. A `.env` beside it is optional.
+
+```bash
+mkdir synaplan && cd synaplan
+curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/quickstart/compose.yaml
+docker compose up -d
+```
+
+Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
+
+**Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. When the GUI runs on another machine (a NAS or a server), add `SYNAPLAN_HTTP_BIND=0.0.0.0` and `SYNAPLAN_URL=http://<that machine's IP>:8000`; without them Synaplan only opens on that machine itself. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
+
+**Settings** go into `.env`, then `docker compose up -d` again (in a GUI: the stack's variables, then redeploy):
+
+- `SYNAPLAN_VERSION` picks a release tag from the [releases page](https://github.com/metadist/synaplan/releases). Empty means the release this file was published with. Never `latest`.
+- `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected. Over plain `http://` on a network address, browsers block the microphone and copying to the clipboard; chat and files work. For those two, use [Closed network](#closed-network) HTTPS.
+- Provider keys, a bootstrap administrator and mail are listed in the example with one line each.
+
+**Data** lives in named Docker volumes — the database, uploads, vectors and the generated secrets. Keep them together: a database without its `secrets` volume does not start. `docker compose down` keeps everything; `docker compose down -v` deletes it all.
+
+**Change the release:** back up the volumes, set `SYNAPLAN_VERSION`, run `docker compose up -d` (or redeploy the stack in the GUI). Going back to an older tag after a newer one migrated the database means restoring that backup. The steps are in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#quickstart-volumes).
+
+Office documents, local AI, file work, closed-network TLS and scripted backups use the full [`deploy/compose.yaml`](deploy/compose.yaml) with [`deploy/selfhost.env.example`](deploy/selfhost.env.example) instead.
+
+### Closed network
+
+Opt-in. The default stays `http://127.0.0.1:8000` on this machine.
+
+Turn it on when the network has **no route to the public internet** and people open Synaplan by the machine's address. Chat needs `https://<address>/`. The machine creates the certificate. The browser warns once.
+
+Any IPv4 address on that network works, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and `169.254.0.0/16`, plus a block you assigned and do not announce.
+
+```bash
+cp deploy/selfhost.env.example deploy/.env
+# Set SYNAPLAN_VERSION. Leave SYNAPLAN_HTTP_BIND at 127.0.0.1.
+deploy/scripts/local-tls.sh 10.0.0.15
+deploy/scripts/prepare.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml pull
+deploy/scripts/validate-release.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+Colleagues open **https://10.0.0.15/**. Ports 80 and 443 must be free. The app itself stays on `127.0.0.1:8000`. A second interface is another argument: `deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`. A public name keeps your own HTTPS proxy and leaves this off.
+
+Details: [docs.synaplan.com/local-network](https://docs.synaplan.com/local-network) · [deploy/README.md](deploy/README.md#local-network).
+
+### On a server
+
+The commands above are the development stack (source build, Vite, MailHog, phpMyAdmin) or the published image. For a Linux server, the installer writes `deploy/.env`, pins the latest release, and runs prepare → pull → validate → start → smoke-test. Secrets land in `deploy/data/secrets.env`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
+  bash -s -- --mode server --domain https://ai.example.com
+```
+
+The same steps by hand are in [Installation](docs/INSTALLATION.md) and [deploy/README.md](deploy/README.md). Flags: `bash install.sh --help`.
+
+One-liner for the development stack, if you would rather not clone by hand:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
+```
+
+
+---
+
 ## One AI, everywhere you work
 
 The same assistant, the same knowledge base, the same model policy — on every channel your team already uses. Connect a system once under **Channels**; the planner can then read from it and deliver results into it.
@@ -241,7 +274,7 @@ Everything below is the same platform, packaged for different homes. Pick what f
 - **Git** (the one-line installer also works with `curl` + `tar` when git is missing)
 - **8 GB RAM** minimum (16 GB recommended once you add the `local-ai` profile)
 - **~4 GB free disk** for the standard install (includes file work + spoken answers; +~1 GB for `local-ai`, +~14 GB if you also enable the local chat model)
-- Free TCP ports `5173`, `8000`, `8082`, `8025` (+ `1025` SMTP), `3307`, `6333`, `9999`, `11435` (`local-ai` profile only), `10200` (TTS, localhost-only, `SYNAPLAN_TTS_PORT`), `8080`/`8443` (`oidc` profile only). If one is taken, change that `SYNAPLAN_*_PORT` in `.env` (see `.env.example`) instead of the YAML.
+- A few host ports must be free. The list, and how to change one without editing the Compose file, is in [Installation — Port conflicts](docs/INSTALLATION.md#port-conflicts).
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `make up` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. (The published `ghcr.io/metadist/synaplan` image is multi-arch too, so pulling it also runs natively.) The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
 
@@ -274,17 +307,7 @@ make up
 
 ## Access
 
-| Service | URL |
-|---------|-----|
-| App | http://localhost:5173 |
-| API | http://localhost:8000 |
-| API Docs | http://localhost:8000/api/doc |
-| phpMyAdmin | http://localhost:8082 |
-| MailHog | http://localhost:8025 (SMTP on `:1025`) |
-| Qdrant | http://localhost:6333 |
-| Tika | http://localhost:9999 |
-| Ollama | http://localhost:11435 (`local-ai` profile only) |
-| TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`; host port is `SYNAPLAN_TTS_PORT`) |
+Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API docs at <http://localhost:8000/api/doc>. phpMyAdmin, MailHog, Qdrant, Tika, Ollama and TTS: [Installation — Development service URLs](docs/INSTALLATION.md#development-service-urls).
 
 **Default Login Credentials:**
 
@@ -365,10 +388,10 @@ Synaplan is provider-neutral: connect the providers you want in **Operate → AI
 | **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
 | **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false make up` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
 | **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
-| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](#office-documents-optional-collabora-code) | **off** | `docker compose --profile office up -d` |
+| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](docs/INSTALLATION.md#optional-office-conversion-collabora) | **off** | `docker compose --profile office up -d` |
 | **Docling** (`docling`) | Layout-aware extraction (tables, headings) in front of Tika — [module](https://docs.synaplan.com/modules/docling) | **off** | `docker compose --profile docling up -d` |
 | **SearXNG** (`searxng`) | Self-hosted web search so queries stay on your network — [module](https://docs.synaplan.com/modules/searxng) | **off** | `docker compose --profile searxng up -d` |
-| **File work** (`compute`) | Short Python / Node jobs on copies of files you pick — [details](#file-work) | **on** | `COMPUTE_URL=disabled make up` |
+| **File work** (`compute`) | Short Python / Node jobs on copies of files you pick — [details](docs/INSTALLATION.md#file-work-secure-compute) | **on** | `COMPUTE_URL=disabled make up` |
 | **Text-to-speech** (`tts`) | Spoken answers, five built-in voices — [details](#text-to-speech) | **on** | `docker compose stop tts` |
 | **Keycloak** (`keycloak`) | SSO test realm for OIDC development ([configuration](docs/CONFIGURATION.md)) | **off** | `docker compose --profile oidc up -d` |
 
@@ -414,72 +437,15 @@ The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://tts:10200`).
 
 ---
 
-## Office documents (Optional Collabora CODE)
+## Office documents
 
-Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
-legacy / Apple format conversion, and “Combine as PDF” need a **Collabora CODE**
-sidecar (`collabora/code`). Chat, Tika RAG and officemaker DOCX / XLSX / PPTX
-work without it. The sidecar is **off by default** (`--profile office`) so
-`make up` does not pull the image or spend the extra ~2 GB RAM.
-
-```bash
-# Dev / minimal — compose already defaults OFFICE_CONVERT_URL to http://collabora:9980
-docker compose --profile office up -d
-
-# Production (deploy/) — env, not backend/.env
-# in deploy/.env:  COMPOSE_PROFILES=office
-docker compose --env-file deploy/.env -f deploy/compose.yaml --profile office up -d
-
-# Already running CODE (Nextcloud, OpenCloud, another compose)
-OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 make up
-```
-
-Do **not** put `OFFICE_CONVERT_URL` in `backend/.env`: Compose injects the
-variable, so the file cannot override it. Deployments set the env on the host
-or in compose. `OFFICE_CONVERT_URL=disabled` turns the engine off.
-
-**Collabora never sees Synaplan users.** Convert-to is a server-to-server POST
-of a file; identity stays in Synaplan (login + file ownership). No Collabora
-accounts, no WOPI token on this path. HTTP 403 is usually CODE’s
-`net.post_allow.host` rejecting the compose subnet.
-
-Full operator guide: [docs.synaplan.com/office-documents](https://docs.synaplan.com/index.php/office-documents).
-Kubernetes / reuse in other projects:
-[synaplan-charts `docs/collabora-office-engine.md`](https://github.com/metadist/synaplan-charts/blob/docs/collabora-office-engine/docs/collabora-office-engine.md).
+Thumbnails, PDF export, inline preview and “Combine as PDF” need an optional Collabora CODE sidecar. It is off by default, so `make up` does not pull it. Chat and DOCX / XLSX / PPTX generation work without it. Setup, including why `OFFICE_CONVERT_URL` does not belong in `backend/.env`: [Installation — Optional office conversion](docs/INSTALLATION.md#optional-office-conversion-collabora).
 
 ---
 
 ## File work
 
-The assistant can run a **short Python or Node program** on *copies* of files
-you already picked and hand the result back as files — a chart from a CSV, a
-merged spreadsheet, a renamed folder of PDFs. The program runs in an isolated
-sidecar. PHP never talks to Docker.
-
-`git clone` and `make up` start it. Compose builds the sidecar and
-the Python/Node runtimes from this repo, wires a local token, and turns the
-feature on. No profile, no image pin, no extra `.env`.
-
-The local token is fixed. Do not change it:
-
-```text
-synaplan-dev-compute-token-change-me-32b
-```
-
-Compose uses that value for the app and the sidecar whenever `COMPUTE_TOKEN`
-is unset, and the nightly load uses the same value. A developer install
-must not depend on a newly generated secret. A production or shared host
-sets its own `COMPUTE_TOKEN` (`openssl rand -hex 32` in `deploy/.env`).
-`prepare.sh` writes one when that value is empty. Never reuse the demo
-token there, and never publish port `8080`.
-
-To hide it: `COMPUTE_URL=disabled make up` (or
-`FEATURE_COMPUTE_ENABLED=false`). Production self-host adds `compute` to
-`COMPOSE_PROFILES` in `deploy/.env`. Cloud uses a **separate** gVisor box,
-not this T1 sidecar on the web nodes.
-
-Full guide: [docs/COMPUTE.md](docs/COMPUTE.md) ·
-[docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
+The assistant can run a short Python or Node program on copies of files you already picked. `make up` starts it. The dev token, and how to turn the sidecar off, are in [Installation — File work](docs/INSTALLATION.md#file-work-secure-compute).
 
 ---
 
@@ -564,6 +530,16 @@ synaplan/
 ```
 
 ---
+
+## Star history
+
+<a href="https://star-history.com/#metadist/synaplan&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" />
+   <img alt="Star history of metadist/synaplan" src="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" width="720">
+ </picture>
+</a>
 
 ## Community & Support
 
