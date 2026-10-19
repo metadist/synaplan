@@ -119,6 +119,48 @@ test.describe('@ci System status', () => {
     )
   })
 
+  test('shows each service state and lists only a stopped one under Needs attention', async ({
+    page,
+  }) => {
+    await mockServices(page)
+    await page.goto('/admin/features')
+
+    const section = page.locator(selectors.featureStatus.servicesSection)
+    await expect(section).toBeVisible({ timeout: TIMEOUTS.EXTREME })
+    const row = (id: string) =>
+      section.locator(`${selectors.featureStatus.serviceItem}[data-service="${id}"]`)
+
+    await expect(row('qdrant').locator(selectors.featureStatus.serviceEffect)).toHaveText(
+      'Memories are paused.'
+    )
+    await expect(row('qdrant').locator(selectors.featureStatus.serviceCommand)).toHaveText([
+      'docker compose logs qdrant',
+      'docker compose restart qdrant',
+    ])
+    await expect(row('ollama').locator(selectors.featureStatus.serviceStateBadge)).toHaveText(
+      'Downloading · 42 %'
+    )
+    await expect(row('ollama').locator(selectors.featureStatus.serviceProgress)).toHaveText(
+      'gpt-oss:20b · about 6 min left'
+    )
+    await expect(row('collabora').locator(selectors.featureStatus.serviceEffect)).toHaveCount(0)
+    await expect(page.locator(selectors.featureStatus.servicesNeedAttention)).toHaveText(
+      '1 service needs attention.'
+    )
+
+    await page.goto('/admin')
+    const attention = page
+      .locator(selectors.featureStatus.attentionItem)
+      .filter({ hasText: 'Qdrant' })
+    await expect(attention).toHaveCount(1, { timeout: TIMEOUTS.EXTREME })
+    await expect(attention).toContainText('Qdrant (memories) is not reachable. Memories are paused.')
+    await expect(
+      page.locator(selectors.featureStatus.attentionItem).filter({ hasText: 'Ollama' })
+    ).toHaveCount(0)
+    await attention.getByRole('link').click()
+    await expect(page).toHaveURL(/\/admin\/features/)
+  })
+
   test('shows a running sentence and no sidebar hint', async ({ page }) => {
     await mockSchedulerStatus(page, 'running')
     await page.goto('/admin/features')
@@ -132,6 +174,45 @@ test.describe('@ci System status', () => {
     ).toHaveCount(0)
   })
 })
+
+/** Keeps the real feature status and swaps in one downloading, one stopped and one switched-off service. */
+async function mockServices(page: Page): Promise<void> {
+  const service = (id: string, state: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    name: id,
+    state,
+    unlocks: '',
+    effect: null,
+    recovery: null,
+    since: null,
+    percent: null,
+    model: null,
+    minutes_left: null,
+    profile: null,
+    docs_anchor: null,
+    ...extra,
+  })
+  await page.route('**/api/v1/config/features', async (route) => {
+    const response = await route.fetch()
+    const body = (await response.json()) as Record<string, unknown>
+    body.services = [
+      service('ollama', 'downloading', {
+        effect: 'Local AI models are not available.',
+        percent: 42,
+        model: 'gpt-oss:20b',
+        minutes_left: 6,
+      }),
+      service('qdrant', 'unavailable', {
+        effect: 'Memories are paused.',
+        recovery:
+          'Run `docker compose logs qdrant` to see why; `docker compose restart qdrant` brings it back.',
+      }),
+      service('collabora', 'off', { effect: 'Office files open read-only.', profile: 'office' }),
+      service('tika', 'ready'),
+    ]
+    await route.fulfill({ response, json: body })
+  })
+}
 
 async function mockSchedulerStatus(page: Page, state: 'stale' | 'running'): Promise<void> {
   const now = Math.floor(Date.now() / 1000)
