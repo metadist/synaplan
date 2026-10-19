@@ -59,22 +59,18 @@
           <!-- Summary Card -->
           <div
             class="surface-card p-6 border-l-4"
-            :class="
-              featuresStatus.summary.all_ready
-                ? 'border-[var(--status-success)]'
-                : 'border-[var(--status-warning)]'
-            "
+            :class="allReady ? 'border-[var(--status-success)]' : 'border-[var(--status-warning)]'"
             data-testid="section-features-summary"
           >
             <div class="flex items-center justify-between gap-4">
               <div class="flex items-center gap-4">
                 <div class="text-4xl">
-                  {{ featuresStatus.summary.all_ready ? '✅' : '⚠️' }}
+                  {{ allReady ? '✅' : '⚠️' }}
                 </div>
                 <div>
                   <h3 class="text-xl font-bold txt-primary mb-1">
                     {{
-                      featuresStatus.summary.all_ready
+                      allReady
                         ? $t('settings.features.allOperational')
                         : $t('settings.features.title')
                     }}
@@ -87,25 +83,41 @@
                       })
                     }}
                   </p>
+                  <p
+                    v-if="servicesDown > 0"
+                    class="text-sm text-red-600 dark:text-red-400"
+                    data-testid="text-services-need-attention"
+                  >
+                    {{
+                      $t(
+                        'settings.features.services.needAttention',
+                        { count: servicesDown },
+                        servicesDown
+                      )
+                    }}
+                  </p>
                 </div>
               </div>
 
               <div
                 :class="[
                   'px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm',
-                  featuresStatus.summary.all_ready
+                  allReady
                     ? 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
                     : 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]',
                 ]"
               >
                 {{
-                  featuresStatus.summary.all_ready
-                    ? $t('settings.features.ready')
-                    : $t('settings.features.issuesDetected')
+                  allReady ? $t('settings.features.ready') : $t('settings.features.issuesDetected')
                 }}
               </div>
             </div>
           </div>
+
+          <ServiceReadinessSection
+            v-if="featuresStatus.services && featuresStatus.services.length > 0"
+            :services="featuresStatus.services"
+          />
 
           <!-- Declared feature modules (absent on a backend without the module registry) -->
           <FeatureModulesSection
@@ -249,7 +261,10 @@ import AccordionStack from '@/components/AccordionStack.vue'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
 import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
+import ServiceReadinessSection from '@/components/admin/ServiceReadinessSection.vue'
+import { servicesNeedingAttention } from '@/utils/serviceReadiness'
 import { useAccordion } from '@/composables/useAccordion'
+import { setServicesNeedingAttention } from '@/composables/useNavItems'
 import {
   getFeaturesStatus,
   FeatureStatusForbiddenError,
@@ -259,6 +274,11 @@ import {
 const featuresStatus = ref<FeaturesStatus | null>(null)
 const isLoadingFeatures = ref(false)
 const isDevOnly = ref(false)
+
+const servicesDown = computed(() => servicesNeedingAttention(featuresStatus.value?.services))
+const allReady = computed(
+  () => !!featuresStatus.value?.summary.all_ready && servicesDown.value === 0
+)
 
 // Group features by category with custom ordering
 const featuresByCategory = computed(() => {
@@ -339,6 +359,7 @@ const loadFeatures = async () => {
   try {
     const data = await getFeaturesStatus()
     featuresStatus.value = data
+    setServicesNeedingAttention(servicesNeedingAttention(data.services))
   } catch (error) {
     if (error instanceof FeatureStatusForbiddenError) {
       isDevOnly.value = true

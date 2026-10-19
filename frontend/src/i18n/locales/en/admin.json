@@ -581,7 +581,9 @@
         "featuresHint": "Switched off or not set up",
         "models": "Models to check",
         "modelsHint": "Offline, failing or retired"
-      }
+      },
+      "serviceDown": "{name} is not reachable. {effect}",
+      "serviceFailed": "{name} did not finish starting. {effect}"
     }
   },
   "statistics": {

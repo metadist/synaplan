@@ -90,7 +90,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { getFeaturesStatus, type FeaturesStatus } from '@/services/featuresService'
 import { modelStatusApi } from '@/services/api/adminModelStatusApi'
-import { setModelsNeedingAttention } from '@/composables/useNavItems'
+import { setModelsNeedingAttention, setServicesNeedingAttention } from '@/composables/useNavItems'
+import { idsCoveredByServices, serviceCopy, serviceNeedsAttention } from '@/utils/serviceReadiness'
 
 const props = defineProps<{
   totalUsers: number | null
@@ -135,6 +136,7 @@ async function load(): Promise<void> {
     features.value = featureStatus
     modelsNeedingAttention.value = modelStatus.summary.needsAttention
     setModelsNeedingAttention(modelStatus.summary.needsAttention)
+    setServicesNeedingAttention((featureStatus.services ?? []).filter(serviceNeedsAttention).length)
   } catch {
     loadFailed.value = true
   } finally {
@@ -191,7 +193,24 @@ const problems = computed<Problem[]>(() => {
       to: HEALTH_PATH,
     })
   }
+  // Starting and downloading are progress, not problems.
+  const coveredByServices = idsCoveredByServices(features.value?.services)
+  for (const service of (features.value?.services ?? []).filter(serviceNeedsAttention)) {
+    const copy = serviceCopy(service, t, te)
+    list.push({
+      id: `service-${service.id}`,
+      text: t(
+        service.state === 'failed'
+          ? 'admin.attention.serviceFailed'
+          : 'admin.attention.serviceDown',
+        { name: copy.name, effect: copy.effect ?? '' }
+      ),
+      action: t('admin.attention.openStatus'),
+      to: FEATURES_PATH,
+    })
+  }
   for (const feature of Object.values(features.value?.features ?? {})) {
+    if (coveredByServices.has(feature.id)) continue
     if (feature.enabled && feature.status === 'unhealthy') {
       list.push({
         id: `feature-${feature.id}`,
@@ -205,6 +224,7 @@ const problems = computed<Problem[]>(() => {
   const listedFeatures = new Set(list.map((problem) => problem.id))
   for (const module of features.value?.modules ?? []) {
     if (module.state !== 'needs_setup') continue
+    if (coveredByServices.has(module.id)) continue
     if (listedFeatures.has(`feature-${module.id.replaceAll('_', '-')}`)) continue
     const name = te(module.label_key) ? t(module.label_key) : module.id
     list.push({

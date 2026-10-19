@@ -581,7 +581,9 @@
         "featuresHint": "Désactivées ou non configurées",
         "models": "Modèles à vérifier",
         "modelsHint": "Hors ligne, en échec ou retirés"
-      }
+      },
+      "serviceDown": "{name} est injoignable. {effect}",
+      "serviceFailed": "{name} n’a pas fini de démarrer. {effect}"
     }
   },
   "statistics": {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { GetApiConfigFeaturesStatusResponseSchema } from '@/generated/api-schemas'
 import { api } from './apiService'
 
 const FeatureEnvVarSchema = z.object({
@@ -86,6 +87,8 @@ const FeaturesStatusSchema = z.object({
   }),
   modules: z.array(FeatureModuleSchema).optional(),
   compute: ComputeStatusSchema.optional(),
+  // Optional so a backend without the readiness list still renders the page.
+  services: GetApiConfigFeaturesStatusResponseSchema.shape.services,
 })
 
 export type FeatureEnvVar = z.infer<typeof FeatureEnvVarSchema>
@@ -93,6 +96,8 @@ export type Feature = z.infer<typeof FeatureSchema>
 export type FeatureModule = z.infer<typeof FeatureModuleSchema>
 export type ComputeStatus = z.infer<typeof ComputeStatusSchema>
 export type FeaturesStatus = z.infer<typeof FeaturesStatusSchema>
+export type ServiceReadiness = NonNullable<FeaturesStatus['services']>[number]
+export type ServiceReadinessState = ServiceReadiness['state']
 
 /** Thrown when `/api/v1/config/features` returns 403 (non-admin caller). */
 export class FeatureStatusForbiddenError extends Error {

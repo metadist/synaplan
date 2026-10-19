@@ -797,6 +797,76 @@
           "syncPrices": "model fiyat senkronizasyonu",
           "modelHealth": "model sağlık kontrolü"
         }
+      },
+      "services": {
+        "title": "Servisler",
+        "subtitle": "Bu kurulumun arka planda çalıştırdığı container’lar. Sohbet onlarsız da çalışır; her biri bir yetenek ekler.",
+        "summary": "Çalışan {total} servisten {ready} tanesi hazır",
+        "needAttention": "{count} servis ilgi bekliyor. | {count} servis ilgi bekliyor.",
+        "guide": "Kılavuz",
+        "downloadingPercent": "İndiriliyor · %{percent}",
+        "minutesLeft": "yaklaşık {count} dk kaldı",
+        "state": {
+          "starting": "Başlatılıyor",
+          "downloading": "İndiriliyor",
+          "ready": "Hazır",
+          "off": "Kapalı",
+          "unavailable": "Erişilemiyor",
+          "failed": "Başarısız"
+        },
+        "recovery": {
+          "offProfile": "\"{profile}\" Compose profiliyle açın:",
+          "unavailable": "Yanıt vermeyi bıraktı. İlk komut nedenini gösterir, ikincisi geri getirir.",
+          "failed": "Başlatma tamamlanmadı. İlk komut nedenini gösterir, ikincisi yeniden başlatır.",
+          "failedOllama": "Başlatma tamamlanmadı. İlk komut nedenini gösterir, ikincisi model indirmesini sürdürür."
+        },
+        "items": {
+          "ollama": {
+            "name": "Ollama (yerel AI)",
+            "unlocks": "Bu makinede özel sohbet ve embedding.",
+            "effect": "Yerel AI modelleri kullanılamıyor."
+          },
+          "qdrant": {
+            "name": "Qdrant (anılar)",
+            "unlocks": "Sohbetler arası anılar.",
+            "effect": "Anılar duraklatıldı."
+          },
+          "whisper": {
+            "name": "Whisper (dikte)",
+            "unlocks": "Dikte ve sesli mesajlar.",
+            "effect": "Dikte kapalı."
+          },
+          "tts": {
+            "name": "Piper (sesli yanıtlar)",
+            "unlocks": "Sesli yanıtlar.",
+            "effect": "Sesli yanıtlar kapalı."
+          },
+          "tika": {
+            "name": "Tika (belgeler)",
+            "unlocks": "PDF ve Office dosyalarını okuma.",
+            "effect": "PDF ve Office dosyaları okunamıyor."
+          },
+          "docling": {
+            "name": "Docling (belge düzeni)",
+            "unlocks": "Taranmış ve karmaşık belgelerden tablolar ve düzen.",
+            "effect": "Karmaşık belgeler düz metin olarak okunuyor."
+          },
+          "searxng": {
+            "name": "SearXNG (web araması)",
+            "unlocks": "API anahtarı olmadan web araması.",
+            "effect": "Web araması kapalı."
+          },
+          "collabora": {
+            "name": "Collabora (Office dosyaları)",
+            "unlocks": "Office dosyalarını düzenleme ve dönüştürme.",
+            "effect": "Office dosyaları salt okunur açılıyor."
+          },
+          "centrifugo": {
+            "name": "Centrifugo (canlı güncellemeler)",
+            "unlocks": "Canlı güncellemeler ve widget sohbetlerinin canlı devralınması.",
+            "effect": "Widget sohbetlerinin canlı devralınması kapalı."
+          }
+        }
       }
     },
     "notLoggedIn": "Oturum açılmadı"

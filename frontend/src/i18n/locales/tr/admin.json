@@ -577,7 +577,9 @@
         "featuresHint": "Kapalı veya kurulmamış",
         "models": "Kontrol edilecek modeller",
         "modelsHint": "Çevrimdışı, hatalı veya kullanımdan kalkmış"
-      }
+      },
+      "serviceDown": "{name} erişilemiyor. {effect}",
+      "serviceFailed": "{name} başlatmayı tamamlamadı. {effect}"
     }
   },
   "statistics": {

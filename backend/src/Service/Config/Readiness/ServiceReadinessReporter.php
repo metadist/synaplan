@@ -114,7 +114,7 @@ final readonly class ServiceReadinessReporter
 
         return match ($state) {
             ServiceReadiness::OFF => $dev && null !== $profile
-                ? sprintf('Turn it on with the "%1$s" Compose profile: COMPOSE_PROFILES=%1$s make up', $profile)
+                ? sprintf('Turn it on with the "%1$s" Compose profile: `COMPOSE_PROFILES=%1$s make up`', $profile)
                 : null,
             ServiceReadiness::UNAVAILABLE => sprintf('Run `docker compose logs %1$s` to see why; `docker compose restart %1$s` brings it back.', $compose),
             ServiceReadiness::FAILED => 'ollama' === $id

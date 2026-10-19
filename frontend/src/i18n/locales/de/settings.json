@@ -818,6 +818,76 @@
           "syncPrices": "Modellpreise abgleichen",
           "modelHealth": "Prüfung der Modellgesundheit"
         }
+      },
+      "services": {
+        "title": "Dienste",
+        "subtitle": "Die Container, die diese Installation im Hintergrund betreibt. Chat funktioniert ohne sie; jeder fügt eine Fähigkeit hinzu.",
+        "summary": "{ready} von {total} laufenden Diensten bereit",
+        "needAttention": "{count} Dienst braucht Aufmerksamkeit. | {count} Dienste brauchen Aufmerksamkeit.",
+        "guide": "Anleitung",
+        "downloadingPercent": "Lädt herunter · {percent} %",
+        "minutesLeft": "noch etwa {count} Min.",
+        "state": {
+          "starting": "Startet",
+          "downloading": "Lädt herunter",
+          "ready": "Bereit",
+          "off": "Aus",
+          "unavailable": "Nicht erreichbar",
+          "failed": "Fehlgeschlagen"
+        },
+        "recovery": {
+          "offProfile": "Mit dem Compose-Profil „{profile}“ einschalten:",
+          "unavailable": "Der Dienst antwortet nicht mehr. Der erste Befehl zeigt den Grund, der zweite startet ihn neu.",
+          "failed": "Der Dienst ist nicht fertig gestartet. Der erste Befehl zeigt den Grund, der zweite startet ihn erneut.",
+          "failedOllama": "Der Dienst ist nicht fertig gestartet. Der erste Befehl zeigt den Grund, der zweite setzt den Modell-Download fort."
+        },
+        "items": {
+          "ollama": {
+            "name": "Ollama (lokale KI)",
+            "unlocks": "Privater Chat und Embeddings auf diesem Rechner.",
+            "effect": "Lokale KI-Modelle sind nicht verfügbar."
+          },
+          "qdrant": {
+            "name": "Qdrant (Erinnerungen)",
+            "unlocks": "Erinnerungen über Chats hinweg.",
+            "effect": "Erinnerungen sind pausiert."
+          },
+          "whisper": {
+            "name": "Whisper (Diktat)",
+            "unlocks": "Diktat und Sprachnachrichten.",
+            "effect": "Diktat ist aus."
+          },
+          "tts": {
+            "name": "Piper (gesprochene Antworten)",
+            "unlocks": "Gesprochene Antworten.",
+            "effect": "Gesprochene Antworten sind aus."
+          },
+          "tika": {
+            "name": "Tika (Dokumente)",
+            "unlocks": "PDFs und Office-Dateien lesen.",
+            "effect": "PDFs und Office-Dateien können nicht gelesen werden."
+          },
+          "docling": {
+            "name": "Docling (Dokumentlayout)",
+            "unlocks": "Tabellen und Layout aus gescannten und komplexen Dokumenten.",
+            "effect": "Komplexe Dokumente werden als reiner Text gelesen."
+          },
+          "searxng": {
+            "name": "SearXNG (Websuche)",
+            "unlocks": "Websuche ohne API-Schlüssel.",
+            "effect": "Websuche ist aus."
+          },
+          "collabora": {
+            "name": "Collabora (Office-Dateien)",
+            "unlocks": "Office-Dateien bearbeiten und umwandeln.",
+            "effect": "Office-Dateien öffnen nur zum Lesen."
+          },
+          "centrifugo": {
+            "name": "Centrifugo (Live-Updates)",
+            "unlocks": "Live-Updates und Live-Übernahme von Widget-Chats.",
+            "effect": "Live-Übernahme von Widget-Chats ist aus."
+          }
+        }
       }
     },
     "notLoggedIn": "Nicht angemeldet"
