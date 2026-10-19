@@ -123,11 +123,15 @@ const { success, error } = useNotification()
 
 const closeRef = ref<HTMLButtonElement | null>(null)
 const isOpen = computed(() => props.open)
+const confirmingLeave = ref(false)
 
 const status = computed(() => freeApi.status)
 const rows = computed(() => (status.value ? freeApiCardRows(status.value, t, locale.value) : []))
 
-useEscapeKey(() => emit('close'), isOpen)
+useEscapeKey(() => {
+  if (confirmingLeave.value) return
+  emit('close')
+}, isOpen)
 
 watch(isOpen, async (open) => {
   if (!open) return
@@ -136,20 +140,24 @@ watch(isOpen, async (open) => {
 })
 
 async function leave(): Promise<void> {
+  confirmingLeave.value = true
   const confirmed = await confirm({
     title: t('freeApi.leave.confirmTitle'),
     message: t('freeApi.leave.confirmMessage'),
     confirmText: t('freeApi.leave.confirm'),
     cancelText: t('freeApi.leave.cancel'),
     danger: true,
+  }).finally(() => {
+    confirmingLeave.value = false
   })
   if (!confirmed) return
   try {
     const result = await freeApi.leave()
     emit('close')
-    const done = configStore.setup.chatReady
-      ? t('freeApi.leave.doneReady')
-      : t('freeApi.leave.done')
+    const done =
+      result.configRefreshed && configStore.setup.chatReady
+        ? t('freeApi.leave.doneReady')
+        : t('freeApi.leave.done')
     success(result.keyRevoked ? done : `${done} ${t('freeApi.leave.revokeLater')}`)
   } catch {
     error(t('freeApi.leave.failed'))

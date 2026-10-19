@@ -89,13 +89,24 @@ describe('FreeApiCard', () => {
   it('says chat keeps working when an own provider takes over', async () => {
     store.leave.mockImplementation(async () => {
       configStore.setup.chatReady = true
-      return { keyRevoked: true }
+      return { keyRevoked: true, configRefreshed: true }
     })
     const wrapper = mountCard()
     await wrapper.get('[data-testid="freeapi-card-leave"]').trigger('click')
     await flushPromises()
 
     expect(success).toHaveBeenCalledWith(t('freeApi.leave.doneReady'))
+    wrapper.unmount()
+  })
+
+  it('does not say chat keeps working when the config refresh after leaving failed', async () => {
+    configStore.setup.chatReady = true
+    store.leave.mockResolvedValue({ keyRevoked: true, configRefreshed: false })
+    const wrapper = mountCard()
+    await wrapper.get('[data-testid="freeapi-card-leave"]').trigger('click')
+    await flushPromises()
+
+    expect(success).toHaveBeenCalledWith(t('freeApi.leave.done'))
     wrapper.unmount()
   })
 
@@ -148,6 +159,28 @@ describe('FreeApiCard', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
 
     expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('stays open when Escape cancels the leave confirmation', async () => {
+    let settle: (value: boolean) => void = () => {}
+    confirm.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        settle = resolve
+      })
+    )
+    const wrapper = mountCard()
+    const pending = wrapper.get('[data-testid="freeapi-card-leave"]').trigger('click')
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(wrapper.emitted('close')).toBeUndefined()
+
+    settle(false)
+    await pending
+    await flushPromises()
+
+    expect(store.leave).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toBeUndefined()
     wrapper.unmount()
   })
 

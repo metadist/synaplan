@@ -85,7 +85,44 @@ describe('freeApi store', () => {
     const result = await store.leave()
 
     expect(result.wasActive).toBe(true)
+    expect(result.configRefreshed).toBe(true)
     expect(store.status).toEqual(inactive)
     expect(reload).toHaveBeenCalled()
+  })
+
+  it('keeps a known status when the status request fails', async () => {
+    api.getFreeApiStatus.mockRejectedValueOnce(new Error('unavailable'))
+    const store = useFreeApiStore()
+    store.status = activeStatus
+
+    await store.load()
+
+    expect(store.status).toEqual(activeStatus)
+  })
+
+  it('trusts chat readiness when only the model refresh fails', async () => {
+    const inactive = { active: false, server: 'web.synaplan.com' }
+    api.leaveFreeApi.mockResolvedValue({ wasActive: true, status: inactive })
+    loadModels.mockRejectedValueOnce(new Error('models unavailable'))
+    const store = useFreeApiStore()
+
+    const result = await store.leave()
+
+    expect(result.configRefreshed).toBe(true)
+    expect(store.busy).toBe(false)
+  })
+
+  it('reports a stale config when the refresh after leaving fails', async () => {
+    const inactive = { active: false, server: 'web.synaplan.com' }
+    api.leaveFreeApi.mockResolvedValue({ wasActive: true, keyRevoked: true, status: inactive })
+    reload.mockRejectedValue(new Error('config unavailable'))
+    const store = useFreeApiStore()
+
+    const result = await store.leave()
+
+    expect(result.configRefreshed).toBe(false)
+    expect(store.status).toEqual(inactive)
+    expect(loadModels).not.toHaveBeenCalled()
+    expect(store.busy).toBe(false)
   })
 })

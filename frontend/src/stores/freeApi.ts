@@ -34,7 +34,8 @@ export const useFreeApiStore = defineStore('freeApi', () => {
     try {
       status.value = await getFreeApiStatus()
     } catch {
-      status.value = null
+      // Keep the status already shown. A failed refresh must not look like
+      // the Demo turned off; the next successful load replaces it.
     }
   }
 
@@ -49,13 +50,13 @@ export const useFreeApiStore = defineStore('freeApi', () => {
     }
   }
 
-  async function leave(): Promise<FreeApiLeaveResult> {
+  async function leave(): Promise<FreeApiLeaveResult & { configRefreshed: boolean }> {
     busy.value = true
     try {
       const result = await leaveFreeApi()
       status.value = result.status
-      await refreshAfterChange()
-      return result
+      const configRefreshed = await refreshAfterChange()
+      return { ...result, configRefreshed }
     } finally {
       busy.value = false
     }
@@ -64,15 +65,21 @@ export const useFreeApiStore = defineStore('freeApi', () => {
   /**
    * Never throws: the change itself already happened, and a failed refresh
    * must not read as "nothing was changed". A page reload shows the new state.
+   *
+   * True only after the runtime config reloaded, so chat readiness is the
+   * state after the change. Model-list failures still count as refreshed.
    */
-  async function refreshAfterChange(): Promise<void> {
+  async function refreshAfterChange(): Promise<boolean> {
+    let configRefreshed = false
     try {
       await useConfigStore().reload()
+      configRefreshed = true
       const aiConfig = useAiConfigStore()
       await Promise.all([aiConfig.loadModels(), aiConfig.loadDefaults()])
     } catch {
       // Deliberately ignored, see above.
     }
+    return configRefreshed
   }
 
   return { status, busy, isAvailable, load, start, leave }
