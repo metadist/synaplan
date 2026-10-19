@@ -231,7 +231,9 @@ final readonly class FreeApiActivator
                 $this->state->clearPendingRevoke();
             }
         } catch (\Throwable $e) {
-            $clean = $this->rollBack($snapshotTaken);
+            // A snapshot left by a crash before markActive() must be restored too.
+            // Otherwise this retry hides the Demo rows the defaults still point at.
+            $clean = $this->rollBack($snapshotTaken || !$this->state->isActive());
             if ($e instanceof FreeApiException && $clean) {
                 throw $e;
             }
@@ -250,12 +252,14 @@ final readonly class FreeApiActivator
     }
 
     /**
+     * @param bool $restoreSnapshot put the stored pre-Demo bindings back, then drop the snapshot
+     *
      * @return bool false when the rollback itself failed and settings may still point at the Demo
      */
-    private function rollBack(bool $snapshotTaken): bool
+    private function rollBack(bool $restoreSnapshot): bool
     {
         try {
-            if ($snapshotTaken) {
+            if ($restoreSnapshot) {
                 $this->binder->restore($this->state->snapshot() ?? []);
                 $this->state->clearSnapshot();
             }

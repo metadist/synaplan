@@ -80,14 +80,13 @@ final readonly class FreeApiRepository
     }
 
     /**
-     * True once any document or active memory has been embedded. BFILES and
-     * BUSERMEMORIES are read rather than BRAG, which stays empty when Qdrant
-     * holds the vectors.
+     * True once any document has been embedded. BFILES.BCHUNKCOUNT is the
+     * chunk cache for vectors stored in Qdrant, where BRAG stays empty; BRAG
+     * is the MariaDB copy. An active BUSERMEMORIES row is text only.
      */
     public function hasStoredVectors(): bool
     {
         return false !== $this->connection->fetchOne('SELECT 1 FROM BFILES WHERE BCHUNKCOUNT > 0 LIMIT 1')
-            || false !== $this->connection->fetchOne('SELECT 1 FROM BRAG LIMIT 1')
-            || false !== $this->connection->fetchOne('SELECT 1 FROM BUSERMEMORIES WHERE BACTIVE = 1 LIMIT 1');
+            || false !== $this->connection->fetchOne('SELECT 1 FROM BRAG LIMIT 1');
     }
 }

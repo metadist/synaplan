@@ -214,6 +214,62 @@ final class FreeApiActivatorTest extends KernelTestCase
         $this->assertSame([], $this->requests);
     }
 
+    public function testAFailedRetryRestoresBindingsLeftByACrashedInstall(): void
+    {
+        $before = $this->globalBindings();
+        $activator = $this->activator();
+        $activator->activate();
+        // Crash window: snapshot and Demo bindings are stored, ACTIVE is not.
+        $this->state->markInactive();
+        $this->issueWithoutAliases = true;
+
+        try {
+            $activator->activate();
+            $this->fail('an issuance without a chat alias must be refused');
+        } catch (FreeApiException $e) {
+            $this->assertSame(FreeApiException::INVALID_RESPONSE, $e->errorCode);
+            $this->assertSame($before, $this->globalBindings());
+            $this->assertNull($this->endpoints->getEndpoint(FreeApiConfig::ENDPOINT_NAME));
+            $this->assertFalse($this->state->isActive());
+            $this->assertNull($this->state->snapshot());
+            $this->assertSame(0, $this->demoModel('free-chat', 'chat')->getActive());
+        } finally {
+            $this->activator()->leave();
+        }
+    }
+
+    public function testAnActiveMemoryDoesNotKeepDocumentSearchOffTheDemo(): void
+    {
+        if (false !== $this->db->fetchOne('SELECT 1 FROM BFILES WHERE BCHUNKCOUNT > 0 LIMIT 1')
+            || false !== $this->db->fetchOne('SELECT 1 FROM BRAG LIMIT 1')) {
+            $this->markTestSkipped('This database already has a document index.');
+        }
+
+        $memoryId = 9900000000001;
+        $now = time();
+        $this->db->executeStatement(
+            'INSERT INTO BUSERMEMORIES (BID, BUSERID, BCATEGORY, BKEY, BVALUE, BSOURCE, BACTIVE, BCREATED, BUPDATED) VALUES (:id, 1, :category, :key, :value, :source, 1, :created, :updated)',
+            [
+                'id' => $memoryId,
+                'category' => 'preferences',
+                'key' => 'tone',
+                'value' => 'brief',
+                'source' => 'user_created',
+                'created' => $now,
+                'updated' => $now,
+            ],
+        );
+
+        try {
+            $activation = $this->activator()->activate();
+            $this->assertContains('VECTORIZE', $activation->boundCapabilities);
+            $this->assertFalse($activation->vectorizeKept);
+        } finally {
+            $this->db->executeStatement('DELETE FROM BUSERMEMORIES WHERE BID = :id', ['id' => $memoryId]);
+            $this->activator()->leave();
+        }
+    }
+
     public function testAFailedSetupLeavesNothingBehind(): void
     {
         $before = $this->globalBindings();
