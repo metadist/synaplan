@@ -1626,6 +1626,7 @@ class FileController extends AbstractController
                                     new OA\Property(property: 'status', type: 'string', enum: ['current', 'stale', 'missing'], example: 'stale'),
                                     new OA\Property(property: 'file_id', type: 'integer', nullable: true, example: 42),
                                     new OA\Property(property: 'stored_etag', type: 'string', nullable: true, example: 'a1b2c3'),
+                                    new OA\Property(property: 'vector_state', type: 'string', enum: File::VECTOR_STATES, nullable: true, example: 'vectorized', description: 'Search index state of the stored file; null when Synaplan does not hold it.'),
                                 ],
                                 type: 'object',
                             ),
@@ -1684,12 +1685,14 @@ class FileController extends AbstractController
                 $status = 'missing';
                 $fileId = null;
                 $storedEtag = null;
+                $vectorState = null;
             } else {
                 $storedEtag = $file->getSourceEtag();
                 $drifted = $file->isStale()
                     || (null !== $reportedEtag && null !== $storedEtag && $reportedEtag !== $storedEtag);
                 $status = $drifted ? 'stale' : 'current';
                 $fileId = (int) $file->getId();
+                $vectorState = $file->getVectorState();
             }
 
             ++$counts[$status];
@@ -1698,6 +1701,7 @@ class FileController extends AbstractController
                 'status' => $status,
                 'file_id' => $fileId,
                 'stored_etag' => $storedEtag,
+                'vector_state' => $vectorState,
             ];
         }
 
