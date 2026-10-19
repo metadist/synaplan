@@ -89,8 +89,8 @@ sidecar).
   `index.html` is injected with `innerHTML` — its scripts never run.
 - **Where a person finds it.** Runtime config lists installed plugins
   (`ModulesRuntimeConfig`: name, version, description, capabilities,
-  chatCommands); `useNavItems.ts` adds a Plugins entry, `AppsView.vue` an
-  "Extensions" section.
+  chatCommands); `useNavItems.ts` adds a Plugins entry, `AppsView.vue` a
+  section with the id `extensions`, labelled "Plugins" in every locale.
 - **Slash commands.** `frontend/src/stores/commands.ts::pluginCommands()` adds each
   `chatCommands[]` entry to the composer; `ChatView.vue::runPluginChatCommand()`
   posts `{ message, chatId: 'webchat', lang }` to
@@ -362,6 +362,8 @@ views of C. D and distribution later (`00` §9).
 
 ## 9. The question, answered per phase
 
+The 2026-10-16 phases; the review renumbered them (§10.3).
+
 | Can a Python, Node.js or Go developer… | Today | After Phase 1 | After Phase 2 | After Phase 3 |
 | -------------------------------------- | ----- | ------------- | ------------- | ------------- |
 | give the AI a tool for chat, Saved Tasks, assistants and `/v1` | Yes, if the server has a public HTTPS address and each person connects it | Yes, an administrator adds it once for everyone, also on the internal network; calls are signed | Also declared by a plugin | Same |
@@ -370,3 +372,57 @@ views of C. D and distribution later (`00` §9).
 | add a web search, extraction or rerank provider | No | No | Yes, over HTTP | Same |
 | add chat context | No | No | Yes, over HTTP | Same |
 | show the tool's own view in a chat | No | No | No | Yes (MCP Apps) |
+
+---
+
+## 10. What changed by 2026-10-18
+
+The plan review ([`05_review.md`](./05_review.md)) re-checked this write-up
+against the code on `main` at `297d0cc67`, the MCP specification of
+2026-10-18 and a second spike ([`spike-2/`](./spike-2/README.md)). The facts
+above stand except where this section says otherwise.
+
+### 10.1 The protocol moved
+
+- **MCP 2026-07-28** is the current revision: no `initialize` handshake, no
+  `Mcp-Session-Id`, a required `server/discover`, per-request `_meta`,
+  required `Mcp-Method` / `Mcp-Name` headers, `ttlMs` / `cacheScope` on list
+  results, `resultType` on every result, Multi Round-Trip Requests instead of
+  server-to-client requests, and a deprecation window of at least twelve
+  months. §2.1 describes the 2025-11-25 client Synaplan still is.
+- **Ten official SDK languages** (modelcontextprotocol.io/docs/sdk): Tier 1
+  TypeScript, Python, C#, Go, Rust, Ruby; Tier 2 Java; Tier 3 Swift, PHP,
+  Kotlin. The TypeScript SDK's current line is `@modelcontextprotocol/server`
+  2.x (`createMcpHandler`); §5's Node.js server uses the v1 package.
+- **Measured:** Python 2.3.0, Go v1.8.0 and TypeScript v2 in its default
+  posture still answer Synaplan's handshake; TypeScript v2 with
+  `legacy: 'reject'` refuses it (`-32022`); TypeScript v1 and the
+  `supergateway` 4.2.0 bridge refuse modern requests. An existing stdio-only
+  server (`server-everything` 1.0.0) works behind the bridge.
+- **MCP Apps** (`io.modelcontextprotocol/ui`) is stable in its 2026-01-26
+  revision and requires web hosts to use a sandbox proxy on a different
+  origin, with `allow-scripts allow-same-origin` (§5.4 assumed the
+  `ArtifactPanel` frame would do).
+
+### 10.2 Gaps this write-up did not list
+
+| # | Gap | Where |
+| - | --- | ----- |
+| G9 | A self-hosted install cannot receive a plugin folder: `deploy/compose.yaml` mounts none, plugins are baked into the image | `_docker/backend/Dockerfile` (`COPY plugins/ /plugins/`) |
+| G10 | Nothing starts a plugin's service with Synaplan; an included compose file lands on `<project>_default`, and a same-named service is merged into Synaplan's own | `docker-compose.yml`, `deploy/compose.yaml`, `deploy/scripts/lib.sh` |
+| G11 | A failed tool discovery is not cached, so a hanging server is retried on every catalog build; `McpClient` sets an idle `timeout` but no `max_duration` | `McpToolRegistry::toolsFor()`, `McpClient::post()` |
+| G12 | The 2026-10-16 identity draft: the pseudonym is reversible by the service, and the signature does not bind method, path or audience | draft `02` §3 (replaced) |
+
+G6 stays half open: the call token tells a service who is calling; a scoped
+way back into Synaplan is `00` §9 Later #7.
+
+### 10.3 The question, answered per phase, after the review
+
+| Can a developer in any language… | Today | Phase 1 | Phase 2 (start together) | Phase 3 | Phase 4 |
+| -------------------------------- | ----- | ------- | ------------------------ | ------- | ------- |
+| give the AI a tool for chat, Saved Tasks, assistants and `/v1` | Yes, with a public HTTPS address, connected by each person | An administrator adds it once for everyone, also on the internal network; calls carry a token | An operator drops a folder and adds one `include:` line; it starts with Synaplan | Same | Same |
+| run an existing stdio-only tool | No | Behind a bridge, added by an administrator | Shipped as a plugin folder with the bridge | Same | Same |
+| add a page to the web interface | Only as a JS module served by a PHP plugin | Same | Same | A settings page from a schema; a JS page can reach the service through the checked route | The service's own page, isolated |
+| add a slash command | Only through a PHP route | Same | Same | Yes, through `/svc/…` | Same |
+| add a web search, extraction or rerank provider, or chat context | No | No | No | Yes, over HTTP | Same |
+| show the tool's own view in a chat | No | No | No | No | Yes (MCP Apps) |

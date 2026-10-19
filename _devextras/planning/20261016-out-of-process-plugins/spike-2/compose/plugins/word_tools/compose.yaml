@@ -1,0 +1,12 @@
+# The plugin's own compose file, shipped in its folder next to manifest.json.
+# It names only the `plugins` network, so the same file works in the dev stack
+# and in a self-hosted install. Nothing secret: the service trusts Synaplan's
+# published keys and checks that each call was made for its own address.
+services:
+  word-tools:
+    image: alpine:3
+    command: ["sh", "-c", "while true; do printf 'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nword-tools\n' | nc -l -p 8000 >/dev/null; done"]
+    environment:
+      SYNAPLAN_JWKS_URL: http://synaplan/.well-known/synaplan-jwks.json
+      SYNAPLAN_AUDIENCE: http://word-tools:8000/mcp
+    networks: [plugins]

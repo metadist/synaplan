@@ -1,0 +1,4 @@
+# What an operator adds to start a plugin together with Synaplan: one line per
+# plugin. Compose loads this file automatically next to docker-compose.yml.
+include:
+  - plugins/word_tools/compose.yaml

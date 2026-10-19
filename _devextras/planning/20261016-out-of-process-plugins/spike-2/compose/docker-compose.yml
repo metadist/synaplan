@@ -1,0 +1,25 @@
+# Review spike (2026-10-18) — not product code. A stand-in for Synaplan's compose
+# file: `backend` plays the PHP services, `db` the database. The point is the
+# `plugins` network: the backend joins it under the alias `synaplan`, the
+# database does not. Run by ../run.sh.
+name: op-review-compose
+
+services:
+  backend:
+    image: alpine:3
+    command: ["sh", "-c", "while true; do printf 'HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n\r\n{\"keys\":[]}\n' | nc -l -p 80 >/dev/null; done"]
+    networks:
+      synaplan-network: {}
+      plugins:
+        aliases: [synaplan]
+
+  db:
+    image: alpine:3
+    command: ["sh", "-c", "while true; do printf 'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\ndb\n' | nc -l -p 3306 >/dev/null; done"]
+    networks: [synaplan-network]
+
+networks:
+  synaplan-network:
+    driver: bridge
+  plugins:
+    driver: bridge
