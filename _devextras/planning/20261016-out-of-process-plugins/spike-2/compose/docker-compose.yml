@@ -6,7 +6,7 @@ name: op-review-compose
 
 services:
   backend:
-    image: alpine:3
+    image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     command: ["sh", "-c", "while true; do printf 'HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n\r\n{\"keys\":[]}\n' | nc -l -p 80 >/dev/null; done"]
     networks:
       synaplan-network: {}
@@ -14,7 +14,7 @@ services:
         aliases: [synaplan]
 
   db:
-    image: alpine:3
+    image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     command: ["sh", "-c", "while true; do printf 'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\ndb\n' | nc -l -p 3306 >/dev/null; done"]
     networks: [synaplan-network]
 
