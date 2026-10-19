@@ -9,6 +9,7 @@ use App\AI\Exception\ChatFailureReason;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\UpstreamRefusal;
 use App\Model\AccountLanguage;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -34,6 +35,7 @@ final readonly class ChatErrorPresenter
     public function __construct(
         private TranslatorInterface $translator,
         private ChatFailureClassifier $classifier,
+        private AuthorizationCheckerInterface $authorization,
     ) {
     }
 
@@ -45,7 +47,16 @@ final readonly class ChatErrorPresenter
 
         $refusal = UpstreamRefusal::codeOf($e);
         if (null !== $refusal) {
-            return new ChatErrorView($reason, $this->refusalText($refusal, $locale, $includeDiagnostics), $adminDetail, false, $e->getMessage());
+            // Recovery follows the caller's role. Diagnostics are separate:
+            // a webhook or tool result can tell an admin to add a provider
+            // without attaching the raw upstream error.
+            return new ChatErrorView(
+                $reason,
+                $this->refusalText($refusal, $locale, $this->authorization->isGranted('ROLE_ADMIN')),
+                $adminDetail,
+                false,
+                $e->getMessage(),
+            );
         }
 
         $userText = $this->translator->trans($reason->translationKey(), [], self::DOMAIN, $locale);

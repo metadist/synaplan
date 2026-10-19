@@ -14,6 +14,7 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
 use App\Tests\Support\FileAnalysisHandlerFactory;
+use App\Tests\Support\FixedAuthorizationChecker;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -47,7 +48,7 @@ class FileAnalysisHandlerFollowUpTest extends TestCase
             null,
             null,
             new ChatFailureClassifier(),
-            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier()),
+            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier(), new FixedAuthorizationChecker(false)),
         );
 
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
@@ -168,7 +169,7 @@ class FileAnalysisHandlerFollowUpTest extends TestCase
             null,
             null,
             new ChatFailureClassifier(),
-            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier()),
+            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier(), new FixedAuthorizationChecker(false)),
             null,
             new ConversationFileCatalog($repository, $this->uploadDir),
         );
