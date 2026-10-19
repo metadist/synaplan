@@ -15,24 +15,13 @@ import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
+import {
+  ConversationFileRowSchema,
+  GetConversationFilesResponseSchema,
+  type ConversationFileRow,
+} from './conversationFileSchema'
 
-export const ConversationFileRowSchema = z.object({
-  id: z.number().int().nullable(),
-  reference: z.string(),
-  name: z.string(),
-  category: z.enum(['image', 'document', 'audio', 'video', 'other']),
-  origin: z.enum(['attached', 'uploaded', 'generated']),
-  fileType: z.string(),
-  messageId: z.number().int().nullable(),
-  hasText: z.boolean(), mime: z.string().optional(),
-})
-
-export const GetConversationFilesResponseSchema = z.object({
-  success: z.boolean(),
-  files: z.array(ConversationFileRowSchema),
-})
-
-export type ConversationFileRow = z.infer<typeof ConversationFileRowSchema>
+export { ConversationFileRowSchema, GetConversationFilesResponseSchema, type ConversationFileRow }
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
 /**
