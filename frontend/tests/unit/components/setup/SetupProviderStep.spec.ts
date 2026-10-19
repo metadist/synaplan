@@ -3,9 +3,13 @@ import { mount, flushPromises } from '@vue/test-utils'
 import SetupProviderStep from '@/components/setup/SetupProviderStep.vue'
 
 const listProviderKeys = vi.fn()
+const { demoAvailable } = vi.hoisted(() => ({ demoAvailable: { value: false } }))
 
 vi.mock('@/services/api/providerKeysApi', () => ({
   listProviderKeys: () => listProviderKeys(),
+}))
+vi.mock('@/stores/freeApi', () => ({
+  useFreeApiStore: () => ({ isAvailable: () => demoAvailable.value }),
 }))
 
 const provider = (name: string, overrides: Record<string, unknown> = {}) => ({
@@ -35,6 +39,11 @@ const mountStep = () =>
           template: '<div class="key-form" />',
           props: ['provider', 'isDefaultChat'],
         },
+        SetupFreeApiCard: {
+          name: 'SetupFreeApiCard',
+          template: '<div class="demo-card" />',
+          emits: ['started'],
+        },
       },
     },
   })
@@ -42,6 +51,7 @@ const mountStep = () =>
 describe('SetupProviderStep', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    demoAvailable.value = false
     listProviderKeys.mockResolvedValue({
       providers: [
         provider('anthropic', { recommended: true }),
@@ -150,6 +160,35 @@ describe('SetupProviderStep', () => {
     await wrapper.get('[data-testid="setup-provider-continue"]').trigger('click')
 
     expect(wrapper.emitted('next')).toHaveLength(1)
+  })
+
+  it('offers no Synaplan Demo while its module is off', async () => {
+    const wrapper = mountStep()
+    await flushPromises()
+
+    expect(wrapper.find('.demo-card').exists()).toBe(false)
+  })
+
+  it('offers the Synaplan Demo first and moves on once it started', async () => {
+    demoAvailable.value = true
+    const wrapper = mountStep()
+    await flushPromises()
+
+    wrapper.getComponent({ name: 'SetupFreeApiCard' }).vm.$emit('started')
+
+    expect(wrapper.emitted('next')).toHaveLength(1)
+  })
+
+  it('offers no Synaplan Demo once a chat provider of its own is connected', async () => {
+    demoAvailable.value = true
+    listProviderKeys.mockResolvedValue({
+      providers: [provider('groq', { configured: true })],
+      defaultChatProvider: 'groq',
+    })
+    const wrapper = mountStep()
+    await flushPromises()
+
+    expect(wrapper.find('.demo-card').exists()).toBe(false)
   })
 
   it('stays skippable when the provider list cannot be loaded', async () => {

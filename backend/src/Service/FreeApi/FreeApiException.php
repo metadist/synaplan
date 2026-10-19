@@ -9,7 +9,7 @@ namespace App\Service\FreeApi;
  * contract's `freeapi_*` codes, or a local one: `freeapi_unreachable`,
  * `freeapi_invalid_response`, `freeapi_invalid_key`, `freeapi_not_configured`,
  * `freeapi_not_active`, `freeapi_own_endpoint`, `freeapi_already_active`,
- * `freeapi_chat_ready`.
+ * `freeapi_chat_ready`, `freeapi_setup_incomplete`.
  *
  * The message is plain English for the console and the log; the UI renders
  * its own copy per code.
@@ -25,6 +25,8 @@ final class FreeApiException extends \RuntimeException
     public const OWN_ENDPOINT = 'freeapi_own_endpoint';
     public const ALREADY_ACTIVE = 'freeapi_already_active';
     public const CHAT_READY = 'freeapi_chat_ready';
+    /** Setup failed and so did the rollback: some defaults may still point at the Demo. */
+    public const SETUP_INCOMPLETE = 'freeapi_setup_incomplete';
 
     public function __construct(
         string $message,

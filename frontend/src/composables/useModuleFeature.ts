@@ -32,6 +32,7 @@ export type ModuleId =
   | 'mobile_iap'
   | 'whatsapp'
   | 'telegram'
+  | 'freeapi'
 
 type RuntimeModules = NonNullable<
   z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>['modules']
@@ -45,6 +46,15 @@ function moduleState(id: string): RuntimeModules[string] | undefined {
 export function isModuleConfigured(id: ModuleId | string): boolean {
   const configured = moduleState(id)?.configured
   return typeof configured === 'boolean' ? configured : true
+}
+
+/**
+ * True only when the backend explicitly reports the module as configured. For
+ * surfaces that are new together with their module: a server that predates the
+ * module must not render a control that can only fail.
+ */
+export function isModuleExplicitlyConfigured(id: ModuleId | string): boolean {
+  return moduleState(id)?.configured === true
 }
 
 /** True only when the backend explicitly reports the module's gate as on. */
