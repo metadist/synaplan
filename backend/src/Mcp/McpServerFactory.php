@@ -1032,7 +1032,7 @@ final class McpServerFactory
                 throw new ToolCallException($vector['error'] ?? 'Vectorization failed.');
             }
 
-            $file->setStatus('vectorized');
+            $file->markVectorized();
             $this->em->flush();
 
             $this->rateLimit->recordFileAnalysisOnce($user, (int) $file->getId(), [

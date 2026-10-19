@@ -108,6 +108,17 @@ final class FileWorldFieldsTest extends TestCase
         }
     }
 
+    public function testMarkVectorizedMakesTheFileSearchableAtOnce(): void
+    {
+        $file = new File();
+        self::assertSame(File::VECTOR_STATE_NONE, $file->getVectorState());
+
+        $file->markVectorized();
+
+        self::assertSame('vectorized', $file->getStatus());
+        self::assertSame(File::VECTOR_STATE_VECTORIZED, $file->getVectorState());
+    }
+
     public function testIsMediaForImageType(): void
     {
         $file = new File();
