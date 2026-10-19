@@ -8,14 +8,26 @@
 # What each group checks: _devextras/planning/20261013-cloud-file-sharing/10_local_environments.md §5
 set -uo pipefail
 
+usage_error() { echo "$1 (see --help)" >&2; exit 2; }
+
 CLOUDS=() OIDC=0 COMPUTE=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --cloud) IFS=, read -ra more <<<"${2:?--cloud needs nextcloud, opencloud, owncloud or all}"; CLOUDS+=("${more[@]}"); shift 2 ;;
+    --cloud)
+      [[ -n ${2:-} ]] || usage_error "--cloud needs nextcloud, opencloud, owncloud or all"
+      IFS=, read -ra more <<<"$2"
+      for cloud in "${more[@]}"; do
+        case "$cloud" in
+          nextcloud | opencloud | owncloud | all) CLOUDS+=("$cloud") ;;
+          *) usage_error "unknown cloud: '$cloud'" ;;
+        esac
+      done
+      shift 2
+      ;;
     --oidc) OIDC=1; shift ;;
     --compute) COMPUTE=1; shift ;;
     -h | --help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
+    *) usage_error "unknown option: $1" ;;
   esac
 done
 [[ " ${CLOUDS[*]} " == *" all "* ]] && CLOUDS=(nextcloud opencloud owncloud)
@@ -64,13 +76,14 @@ done
 check "Synaplan API answers ($BASE)" http_is 200 "$BASE/api/v1/config/runtime"
 check "PLATFORM_LINKS.ENABLED = 1" test "$(db "SELECT BVALUE FROM BCONFIG WHERE BOWNERID = 0 AND BGROUP = 'PLATFORM_LINKS' AND BSETTING = 'ENABLED'")" = 1
 check "MailHog API answers (http://localhost:8025)" http_is 200 "http://localhost:8025/api/v2/messages?limit=1"
-check "login as $EMAIL" http_is 200 -X POST "$BASE/api/v1/auth/login" -H 'content-type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}"
+login_body=$(python3 -c 'import json, sys; print(json.dumps({"email": sys.argv[1], "password": sys.argv[2]}))' "$EMAIL" "$PASSWORD")
+check "login as $EMAIL" http_is 200 -X POST "$BASE/api/v1/auth/login" -H 'content-type: application/json' -d "$login_body"
 
 if ((COMPUTE)); then
   compute_url=$(docker exec synaplan-backend printenv COMPUTE_URL 2>/dev/null)
-  check "COMPUTE_URL set on the backend" test -n "$compute_url"
-  check "the backend reaches the compute sidecar" test "$(docker exec synaplan-backend curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$compute_url" 2>/dev/null)" != 000
+  check "COMPUTE_URL set on the backend" test -n "$compute_url" -a "$compute_url" != disabled
+  check "compute sidecar healthy ($compute_url/v1/health)" test \
+    "$(docker exec synaplan-backend curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$compute_url/v1/health" 2>/dev/null)" = 200
 fi
 
 if ((OIDC)); then
