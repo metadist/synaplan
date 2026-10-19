@@ -40,7 +40,6 @@ use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 /**
  * OpenAI-compatible API endpoints.
- *
  * Allows any OpenAI SDK to use Synaplan as a drop-in replacement
  * by pointing the base_url to this server's /v1/ path.
  */
@@ -188,7 +187,7 @@ class OpenAICompatibleController extends AbstractController
             return $e->toResponse();
         }
 
-        return $this->dispatchChatCompletion($user, $parsed);
+        return $this->dispatchChatCompletion($user, $parsed, \App\Security\FreeApiGatewayGuard::isGated($request));
     }
 
     #[Route('/v1/models', name: 'openai_list_models', methods: ['GET'])]
@@ -258,7 +257,7 @@ class OpenAICompatibleController extends AbstractController
         ]);
     }
 
-    private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed): Response
+    private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed, bool $demoHourlyCapWaived = false): Response
     {
         $messages = $parsed->messages;
         $optionsProfile = null;
@@ -320,6 +319,7 @@ class OpenAICompatibleController extends AbstractController
         }
         if ($gateAllows && 'none' !== $parsed->toolChoice) {
             $options['server_tool_loop'] = true;
+            $options[OpenAiGatewayToolLoop::DEMO_HOURLY_CAP_WAIVED] = $demoHourlyCapWaived;
         }
         if (null !== $parsed->temperature) {
             $options['temperature'] = $parsed->temperature;
