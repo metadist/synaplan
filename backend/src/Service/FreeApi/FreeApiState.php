@@ -26,6 +26,7 @@ final readonly class FreeApiState
     private const PENDING_REVOKE = 'PENDING_REVOKE';
     private const PENDING_REVOKE_UNTIL = 'PENDING_REVOKE_UNTIL';
     private const ACTIVATED_AT = 'ACTIVATED_AT';
+    private const ACTIVATED_BY = 'ACTIVATED_BY';
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -62,18 +63,23 @@ final readonly class FreeApiState
     /**
      * @param array<string, int|float> $limits
      */
-    public function markActive(int $keyId, int $expiresAt, array $limits, int $now): void
+    public function markActive(int $keyId, int $expiresAt, array $limits, int $now, ?int $activatedBy = null): void
     {
         $this->write(self::KEY_ID, (string) $keyId);
         $this->write(self::EXPIRES_AT, (string) $expiresAt);
         $this->write(self::LIMITS, json_encode($limits, \JSON_THROW_ON_ERROR));
         $this->write(self::ACTIVATED_AT, (string) $now);
+        if (null === $activatedBy) {
+            $this->configRepository->deleteValue(0, FreeApiConfig::GROUP, self::ACTIVATED_BY);
+        } else {
+            $this->write(self::ACTIVATED_BY, (string) $activatedBy);
+        }
         $this->write(self::ACTIVE, '1');
     }
 
     public function markInactive(): void
     {
-        foreach ([self::ACTIVE, self::KEY_ID, self::EXPIRES_AT, self::LIMITS, self::ACTIVATED_AT] as $setting) {
+        foreach ([self::ACTIVE, self::KEY_ID, self::EXPIRES_AT, self::LIMITS, self::ACTIVATED_AT, self::ACTIVATED_BY] as $setting) {
             $this->configRepository->deleteValue(0, FreeApiConfig::GROUP, $setting);
         }
     }
@@ -88,6 +94,14 @@ final readonly class FreeApiState
     public function activatedAt(): ?int
     {
         $stored = $this->read(self::ACTIVATED_AT);
+
+        return null !== $stored && ctype_digit($stored) ? (int) $stored : null;
+    }
+
+    /** The user id of the admin who started it; null when it was started from the console. */
+    public function activatedBy(): ?int
+    {
+        $stored = $this->read(self::ACTIVATED_BY);
 
         return null !== $stored && ctype_digit($stored) ? (int) $stored : null;
     }

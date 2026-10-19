@@ -7,7 +7,9 @@ namespace App\Service\Message;
 use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Exception\ChatFailureReason;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\UpstreamRefusal;
 use App\Model\AccountLanguage;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -18,9 +20,22 @@ final readonly class ChatErrorPresenter
 {
     private const DOMAIN = 'ai_errors';
 
+    /** Synaplan Demo refusal codes with a sentence of their own; any other `freeapi_*` code gets `freeapi.unavailable`. */
+    private const REFUSALS = [
+        'freeapi_throttled' => 'freeapi.throttled',
+        'freeapi_limit_reached' => 'freeapi.limit_reached',
+        'freeapi_full_today' => 'freeapi.full_today',
+        'freeapi_expired' => 'freeapi.expired',
+        'freeapi_paused' => 'freeapi.paused',
+        'freeapi_blocked' => 'freeapi.blocked',
+        'freeapi_upgrade_required' => 'freeapi.upgrade_required',
+        'freeapi_not_included' => 'freeapi.not_included',
+    ];
+
     public function __construct(
         private TranslatorInterface $translator,
         private ChatFailureClassifier $classifier,
+        private AuthorizationCheckerInterface $authorization,
     ) {
     }
 
@@ -28,13 +43,26 @@ final readonly class ChatErrorPresenter
     {
         $locale = $this->normalizeLocale($lang);
         $reason = $this->classifier->classify($e);
-        $userText = $this->translator->trans($reason->translationKey(), [], self::DOMAIN, $locale);
+        $adminDetail = $includeDiagnostics ? $this->buildAdminDiagnostics($e, $locale) : null;
 
+        $refusal = UpstreamRefusal::codeOf($e);
+        if (null !== $refusal) {
+            // Recovery follows the caller's role. Diagnostics are separate:
+            // a webhook or tool result can tell an admin to add a provider
+            // without attaching the raw upstream error.
+            return new ChatErrorView(
+                $reason,
+                $this->refusalText($refusal, $locale, $this->authorization->isGranted('ROLE_ADMIN')),
+                $adminDetail,
+                false,
+                $e->getMessage(),
+            );
+        }
+
+        $userText = $this->translator->trans($reason->translationKey(), [], self::DOMAIN, $locale);
         if ($reason->suggestsOtherModel()) {
             $userText .= "\n\n".$this->translator->trans('hint.retry_other_model', [], self::DOMAIN, $locale);
         }
-
-        $adminDetail = $includeDiagnostics ? $this->buildAdminDiagnostics($e, $locale) : null;
 
         return new ChatErrorView(
             $reason,
@@ -43,6 +71,19 @@ final readonly class ChatErrorPresenter
             $reason->suggestsOtherModel(),
             $e->getMessage(),
         );
+    }
+
+    /**
+     * A refusal is final for the turn, so another model of the same gateway
+     * would fail alike; the recovery is an own provider, which only admins
+     * can add.
+     */
+    private function refusalText(string $code, string $locale, bool $isAdmin): string
+    {
+        $key = self::REFUSALS[$code] ?? 'freeapi.unavailable';
+        $recovery = $this->translator->trans($isAdmin ? 'freeapi.recovery.admin' : 'freeapi.recovery.user', [], self::DOMAIN, $locale);
+
+        return $this->translator->trans($key, [], self::DOMAIN, $locale).' '.$recovery;
     }
 
     /**

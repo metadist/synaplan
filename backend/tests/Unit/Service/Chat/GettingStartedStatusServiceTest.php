@@ -11,6 +11,7 @@ use App\Repository\FileRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Chat\ConnectedAppProbe;
 use App\Service\Chat\GettingStartedStatusService;
+use App\Service\FreeApi\FreeApiState;
 use PHPUnit\Framework\TestCase;
 
 final class GettingStartedStatusServiceTest extends TestCase
@@ -78,14 +79,36 @@ final class GettingStartedStatusServiceTest extends TestCase
         self::assertSame([], $items);
     }
 
+    public function testTheProviderStepStaysOpenWhileTheDemoAnswersChat(): void
+    {
+        $readiness = $this->createStub(ChatReadinessService::class);
+        $readiness->method('isChatReady')->willReturn(true);
+        $demo = $this->createStub(FreeApiState::class);
+        $demo->method('isActive')->willReturn(true);
+        $agentConfig = $this->createStub(AgentConfig::class);
+        $agentConfig->method('isEnabled')->willReturn(false);
+
+        $items = $this->service(
+            $this->createStub(FileRepository::class),
+            $this->createStub(AgentRepository::class),
+            $agentConfig,
+            $readiness,
+            $this->createStub(ConnectedAppProbe::class),
+            $demo,
+        )->items($this->user(3, true));
+
+        self::assertFalse($items['provider']);
+    }
+
     private function service(
         FileRepository $files,
         AgentRepository $agents,
         AgentConfig $agentConfig,
         ChatReadinessService $readiness,
         ConnectedAppProbe $apps,
+        ?FreeApiState $demo = null,
     ): GettingStartedStatusService {
-        return new GettingStartedStatusService($files, $agents, $agentConfig, $readiness, $apps);
+        return new GettingStartedStatusService($files, $agents, $agentConfig, $readiness, $apps, $demo);
     }
 
     private function user(int $id, bool $admin): User
