@@ -13,7 +13,7 @@ const mapGo = join(root, 'sidecars/synaplan-compute/internal/images/map.go')
 const makefile = join(root, 'sidecars/synaplan-compute/Makefile')
 const nightly = join(root, '.github/workflows/compute-nightly.yml')
 const compose = join(root, 'docker-compose.yml')
-const readme = join(root, 'README.md')
+const installGuide = join(root, 'docs/INSTALLATION.md')
 
 const DEMO_TOKEN = 'synaplan-dev-compute-token-change-me-32b'
 
@@ -68,11 +68,13 @@ test('nightly uses the fixed demo token and :local images, not a fresh pin', () 
     4,
     'app, worker, and sidecar must share the same demo token default'
   )
+  const guide = readFileSync(installGuide, 'utf8')
   assert.match(
-    readFileSync(readme, 'utf8'),
+    guide,
     new RegExp(DEMO_TOKEN),
-    'README must name the demo token and tell production to replace it'
+    'the installation guide must name the demo token and tell production to replace it'
   )
+  assert.match(guide, /Never reuse the demo\s+token/)
 })
 
 test('current map.go is rewritable (catches another digest-form drift)', () => {
