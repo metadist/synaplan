@@ -108,6 +108,28 @@ final class FileWorldFieldsTest extends TestCase
         }
     }
 
+    #[DataProvider('incomingCases')]
+    public function testArrivesIncoming(string $source, ?string $groupKey, bool $expected): void
+    {
+        self::assertSame($expected, File::arrivesIncoming($source, $groupKey));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: ?string, 2: bool}>
+     */
+    public static function incomingCases(): iterable
+    {
+        foreach (['nextcloud', 'opencloud'] as $source) {
+            yield "$source into a knowledge folder" => [$source, 'Contracts', false];
+            yield "$source into DEFAULT" => [$source, 'DEFAULT', true];
+            yield "$source without a folder" => [$source, null, true];
+            yield "$source with an empty folder" => [$source, '', true];
+        }
+        yield 'outlook into a knowledge folder' => ['outlook', 'Contracts', true];
+        yield 'web upload into a knowledge folder' => ['web_upload', 'Contracts', false];
+        yield 'web upload without a folder' => ['web_upload', null, false];
+    }
+
     public function testIsMediaForImageType(): void
     {
         $file = new File();

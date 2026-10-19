@@ -397,10 +397,10 @@ final readonly class FileUploadService
         $file->setGroupKey($groupKey);
         $file->setStatus('uploaded');
         $file->setSource($options->source);
-        // External pushes (Outlook/Nextcloud/OpenCloud) land in the Incoming
-        // inbox for the user to triage before they join the curated library
-        // (03_file-management.md §3.3). Web uploads are never incoming.
-        $file->setIncoming(in_array($options->source, File::INCOMING_SOURCES, true));
+        // External pushes land in the Incoming inbox for the user to triage
+        // (03_file-management.md §3.3), unless a cloud app already filed them
+        // into a knowledge folder. Web uploads are never incoming.
+        $file->setIncoming(File::arrivesIncoming($options->source, $groupKey));
         // Preserve the original ".heic" filename for provenance when we
         // transcoded the upload and the caller didn't supply its own.
         $file->setOriginalName($options->originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : null));
