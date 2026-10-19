@@ -64,6 +64,22 @@ no surface links to them (U11). "Get your own keys" and "Run Ollama locally"
 open the matching section of `/admin/setup` for admins; members get the
 details only.
 
+The Demo row in Quick model setup is listed only while the Demo is active
+(for members too) and applies the Demo models like any mix. The plan's
+"not active, admin: consent inline, then activation" row is left out on
+purpose: activation refuses while an own chat provider works, and without
+one the welcome screen already replaces the chat, so that row could never
+be clicked (U11). The row matches only models of the `synaplan-demo`
+endpoint (`endpoint` on `/api/v1/config/models`).
+
+Auto-leave copy follows what the save actually did: "Your {provider} models
+answer chat now" only when that provider's defaults were applied, otherwise
+"{provider} is connected, so the Synaplan Demo was left. Your previous AI
+settings are back." Undo starts the Demo again with `force`. An own
+OpenAI-compatible endpoint gets no Undo: the activator never runs the Demo
+beside one (older imports route to "the only endpoint"), so that toast says
+the Demo only runs while no own endpoint is set up.
+
 ## Exit criteria (UX contract §6)
 
 1. J-DEMO-1, J-DEMO-2 and J-DEMO-3 walked in the browser against the fake
@@ -75,5 +91,5 @@ details only.
 4. Empty, error and flag-off states: welcome screen, refusal sentences,
    start failures; flag off ⇒ no tile, banner, pill, card or row, and the
    routes answer 404 `feature_not_configured`.
-5. Dark, V2 and 320 px checked for the welcome screen, banner, pill and
-   card.
+5. Dark, V2 and 320 px checked for the welcome screen, banner, pill,
+   card, the Demo mix row and the auto-leave toast.

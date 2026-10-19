@@ -92,6 +92,19 @@ export const useModelMixStore = defineStore('modelMix', () => {
     }
   }
 
+  /**
+   * Drop a remembered mix that no longer answers, e.g. the Demo after it was
+   * left: the server already moved the person back to the install defaults.
+   */
+  const forgetMix = (id: ModelMixId) => {
+    try {
+      if (localStorage.getItem(storageKey()) === id) localStorage.setItem(storageKey(), 'default')
+    } catch {
+      // Storage unavailable: the in-memory selection below is enough.
+    }
+    if (activeMixId.value === id) activeMixId.value = 'default'
+  }
+
   return {
     activeMixId,
     activeMix,
@@ -100,5 +113,6 @@ export const useModelMixStore = defineStore('modelMix', () => {
     inlinePanelVisible,
     ensureLoaded,
     applyMix,
+    forgetMix,
   }
 })

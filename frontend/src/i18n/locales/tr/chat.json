@@ -20,6 +20,7 @@
     "buttonLabel": "Model karışımı",
     "activeLabel": "Etkin model karışımı: {name}",
     "mixes": {
+      "demo": "Synaplan Demo",
       "default": "Varsayılan Model Karışımı",
       "openai": "ChatGPT Sol Karışımı",
       "anthropic": "Claude Fable Karışımı",
@@ -31,7 +32,8 @@
     "defaultDescription": "Bu kurulumun önerdiği modeller",
     "unavailable": "Bu sunucuda uygun bir sağlayıcı yapılandırılmamış",
     "applied": "{name} artık yeni yanıtlar için etkin",
-    "applyError": "Model karışımı değiştirilemedi. Lütfen tekrar deneyin."
+    "applyError": "Model karışımı değiştirilemedi. Lütfen tekrar deneyin.",
+    "demoSubtitle": "{model} · bugün {limit} mesajdan {left} kaldı"
   },
   "selfAware": {
     "emptyHint": "Burada neler mümkün olduğundan emin değil misiniz? Bana neler yapabileceğimi sorun.",

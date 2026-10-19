@@ -20,6 +20,7 @@
     "buttonLabel": "Modell-Mix",
     "activeLabel": "Aktiver Modell-Mix: {name}",
     "mixes": {
+      "demo": "Synaplan Demo",
       "default": "Standard-Modell-Mix",
       "openai": "ChatGPT Sol Mix",
       "anthropic": "Claude Fable Mix",
@@ -31,7 +32,8 @@
     "defaultDescription": "Die von dieser Installation empfohlenen Modelle",
     "unavailable": "Auf diesem Server ist kein passender Anbieter eingerichtet",
     "applied": "{name} ist jetzt für neue Antworten aktiv",
-    "applyError": "Der Modell-Mix konnte nicht gewechselt werden. Bitte versuche es erneut."
+    "applyError": "Der Modell-Mix konnte nicht gewechselt werden. Bitte versuche es erneut.",
+    "demoSubtitle": "{model} · noch {left} von {limit} Nachrichten heute"
   },
   "selfAware": {
     "emptyHint": "Nicht sicher, was hier möglich ist? Frag mich, was ich tun kann.",

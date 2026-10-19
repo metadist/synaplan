@@ -24,6 +24,11 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ success: notifications.success, error: notifications.error }),
 }))
 
+const announceAutoLeave = vi.hoisted(() => vi.fn())
+vi.mock('@/composables/useFreeApiAutoLeave', () => ({
+  useFreeApiAutoLeave: () => ({ announce: announceAutoLeave }),
+}))
+
 const provider = (overrides: Partial<ProviderKeyStatus> = {}): ProviderKeyStatus =>
   ({
     name: 'groq',
@@ -53,6 +58,22 @@ describe('ProviderKeyCard', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    announceAutoLeave.mockResolvedValue(false)
+  })
+
+  it('lets the Demo toast replace "saved" when saving left the Synaplan Demo', async () => {
+    const result = { success: true, provider: 'groq', defaultsApplied: true, demoLeft: true }
+    saveProviderKey.mockResolvedValue(result)
+    announceAutoLeave.mockResolvedValue(true)
+    const wrapper = mountCard()
+
+    await wrapper.find('[data-testid="provider-key-input-groq"]').setValue('gsk_new_key')
+    await wrapper.find('[data-testid="provider-key-save-groq"]').trigger('click')
+    await flushPromises()
+
+    expect(announceAutoLeave).toHaveBeenCalledWith(result, 'Groq')
+    expect(notifications.success).not.toHaveBeenCalled()
+    expect(wrapper.emitted('changed')).toHaveLength(1)
   })
 
   it('saves the entered key and reports that defaults were applied', async () => {

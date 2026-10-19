@@ -856,6 +856,10 @@
         "app": {
           "title": "Connecter une app",
           "where": "Les apps connectées figurent sous Apps › Connectées"
+        },
+        "providerDemo": {
+          "title": "Ajouter votre propre fournisseur d’IA",
+          "where": "Vous utilisez Synaplan Demo"
         }
       }
     }

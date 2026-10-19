@@ -15,6 +15,11 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ success: notifySuccess, error: notifyError }),
 }))
 
+const announceAutoLeave = vi.hoisted(() => vi.fn())
+vi.mock('@/composables/useFreeApiAutoLeave', () => ({
+  useFreeApiAutoLeave: () => ({ announce: announceAutoLeave }),
+}))
+
 const provider = (overrides: Partial<ProviderKeyStatus> = {}): ProviderKeyStatus => ({
   name: 'groq',
   displayName: 'Groq',
@@ -43,6 +48,23 @@ describe('SetupProviderKeyForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     saveProviderKey.mockResolvedValue({ defaultsApplied: true })
+    announceAutoLeave.mockResolvedValue(false)
+  })
+
+  it('lets the Demo toast replace "saved" when saving left the Synaplan Demo', async () => {
+    saveProviderKey.mockResolvedValue({ defaultsApplied: true, demoLeft: true })
+    announceAutoLeave.mockResolvedValue(true)
+    const wrapper = mountForm()
+    await wrapper.get('[data-testid="setup-provider-key-input-groq"]').setValue('gsk_test')
+    await wrapper.get('[data-testid="setup-provider-save"]').trigger('click')
+    await flushPromises()
+
+    expect(announceAutoLeave).toHaveBeenCalledWith(
+      { defaultsApplied: true, demoLeft: true },
+      'Groq'
+    )
+    expect(notifySuccess).not.toHaveBeenCalled()
+    expect(wrapper.emitted('saved')).toHaveLength(1)
   })
 
   it('keeps the save button unusable until a key is typed', async () => {

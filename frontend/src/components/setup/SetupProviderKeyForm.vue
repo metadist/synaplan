@@ -81,6 +81,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
+import { useFreeApiAutoLeave } from '@/composables/useFreeApiAutoLeave'
 import { useNotification } from '@/composables/useNotification'
 import { saveProviderKey, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
 import { providerHelpByName } from '@/utils/providerHelp'
@@ -96,6 +97,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { success, error: showError } = useNotification()
+const { announce: announceAutoLeave } = useFreeApiAutoLeave()
 
 const keyInput = ref('')
 const saving = ref(false)
@@ -143,11 +145,13 @@ const save = async (): Promise<void> => {
       applyDefaults: !props.isDefaultChat,
     })
     keyInput.value = ''
-    success(
-      result.defaultsApplied
-        ? t('adminSetup.savedWithDefaults', { provider: props.provider.displayName })
-        : t('adminSetup.saved', { provider: props.provider.displayName })
-    )
+    if (!(await announceAutoLeave(result, props.provider.displayName))) {
+      success(
+        result.defaultsApplied
+          ? t('adminSetup.savedWithDefaults', { provider: props.provider.displayName })
+          : t('adminSetup.saved', { provider: props.provider.displayName })
+      )
+    }
     emit('saved')
   } catch (err) {
     showError(err instanceof Error ? err.message : t('adminSetup.saveFailed'))

@@ -8,7 +8,7 @@
     </p>
 
     <button
-      v-for="mix in mixStore.resolvedMixes"
+      v-for="mix in visibleMixes"
       :key="mix.id"
       type="button"
       class="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-colors"
@@ -64,13 +64,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import ModelMixIcon from '@/components/chat/ModelMixIcon.vue'
+import { useFreeApiStore } from '@/stores/freeApi'
 import { useModelMixStore } from '@/stores/modelMix'
 import { useNotification } from '@/composables/useNotification'
-import type { ModelMixId, ResolvedModelMix } from '@/utils/modelMixes'
+import { DEMO_MIX_ID, type ModelMixId, type ResolvedModelMix } from '@/utils/modelMixes'
 
 /**
  * The speed-config list: six model mixes, each with the provider logo, the
@@ -82,18 +83,35 @@ const emit = defineEmits<{ select: [id: ModelMixId] }>()
 
 const { t } = useI18n()
 const mixStore = useModelMixStore()
+const freeApi = useFreeApiStore()
 const { success, error } = useNotification()
 
 /** Which row is being applied, so only that row shows the spinner. */
 const pendingId = ref<ModelMixId | null>(null)
 
+/** The Demo row exists only while the Demo answers; starting it is the welcome screen's job. */
+const visibleMixes = computed(() =>
+  mixStore.resolvedMixes.filter(
+    (mix) => mix.id !== DEMO_MIX_ID || (freeApi.status?.active === true && mix.available)
+  )
+)
+
 onMounted(() => {
   void mixStore.ensureLoaded()
+  if (freeApi.status === null) void freeApi.load()
 })
 
 const subtitle = (mix: ResolvedModelMix): string => {
   if (mix.resetsToRecommended) return t('modelMix.defaultDescription')
   if (!mix.available) return t('modelMix.unavailable')
+  const today = freeApi.status?.today
+  if (mix.id === DEMO_MIX_ID && today) {
+    return t('modelMix.demoSubtitle', {
+      model: mix.modelNames[0],
+      left: today.messagesRemaining,
+      limit: today.messagesLimit,
+    })
+  }
   return mix.modelNames.join(' · ')
 }
 

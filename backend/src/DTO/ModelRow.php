@@ -29,6 +29,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per input unit of this model, e.g. 1M tokens for a text model. The image dropdowns badge from capabilityPrices when a row has it.'),
         new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per output unit of this model: 1M tokens for a text model, one image for an image model. The image dropdowns badge from capabilityPrices when a row has it.'),
         new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the model was imported from a listing that published no price. The menu then says "price unknown" instead of "Free".'),
+        new OA\Property(property: 'endpoint', type: 'string', nullable: true, example: 'synaplan-demo', description: 'Name of the OpenAI-compatible endpoint that serves this model. Absent for every other provider.'),
     ]
 )]
 final class ModelRow

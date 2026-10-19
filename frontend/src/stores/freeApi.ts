@@ -10,6 +10,8 @@ import {
 } from '@/services/api/freeApiApi'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useConfigStore } from '@/stores/config'
+import { useModelMixStore } from '@/stores/modelMix'
+import { DEMO_MIX_ID } from '@/utils/modelMixes'
 
 export const FREEAPI_MODULE_ID = 'freeapi'
 
@@ -21,29 +23,40 @@ export const FREEAPI_MODULE_ID = 'freeapi'
 export const useFreeApiStore = defineStore('freeApi', () => {
   const status = ref<FreeApiStatus | null>(null)
   const busy = ref(false)
+  let pendingLoad: Promise<void> | null = null
 
   function isAvailable(): boolean {
     return isModuleExplicitlyConfigured(FREEAPI_MODULE_ID)
   }
 
-  async function load(): Promise<void> {
+  function setStatus(next: FreeApiStatus | null): void {
+    status.value = next
+    if (next?.active === false) useModelMixStore().forgetMix(DEMO_MIX_ID)
+  }
+
+  /** Surfaces mounted together share one request. */
+  function load(): Promise<void> {
     if (!isAvailable()) {
       status.value = null
-      return
+      return Promise.resolve()
     }
-    try {
-      status.value = await getFreeApiStatus()
-    } catch {
-      // Keep the status already shown. A failed refresh must not look like
-      // the Demo turned off; the next successful load replaces it.
-    }
+    pendingLoad ??= getFreeApiStatus()
+      .then(setStatus)
+      .catch(() => {
+        // Keep the status already shown. A failed refresh must not look like
+        // the Demo turned off; the next successful load replaces it.
+      })
+      .finally(() => {
+        pendingLoad = null
+      })
+    return pendingLoad
   }
 
   /** Throws the API error, so the surface can say why nothing was started. */
   async function start(locale: string, force = false): Promise<void> {
     busy.value = true
     try {
-      status.value = await activateFreeApi({ consent: true, locale, force })
+      setStatus(await activateFreeApi({ consent: true, locale, force }))
       await refreshAfterChange()
     } finally {
       busy.value = false
@@ -54,12 +67,18 @@ export const useFreeApiStore = defineStore('freeApi', () => {
     busy.value = true
     try {
       const result = await leaveFreeApi()
-      status.value = result.status
+      setStatus(result.status)
       const configRefreshed = await refreshAfterChange()
       return { ...result, configRefreshed }
     } finally {
       busy.value = false
     }
+  }
+
+  /** The server left the Demo on its own (an own provider was connected). */
+  async function syncAfterAutoLeave(): Promise<void> {
+    await load()
+    await refreshAfterChange()
   }
 
   /**
@@ -82,5 +101,5 @@ export const useFreeApiStore = defineStore('freeApi', () => {
     return configRefreshed
   }
 
-  return { status, busy, isAvailable, load, start, leave }
+  return { status, busy, isAvailable, load, start, leave, syncAfterAutoLeave }
 })

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-const { api, reload, loadModels, loadDefaults, getConfigSync } = vi.hoisted(() => ({
+const { api, reload, loadModels, loadDefaults, getConfigSync, forgetMix } = vi.hoisted(() => ({
   api: {
     getFreeApiStatus: vi.fn(),
     activateFreeApi: vi.fn(),
@@ -11,11 +11,13 @@ const { api, reload, loadModels, loadDefaults, getConfigSync } = vi.hoisted(() =
   loadModels: vi.fn(),
   loadDefaults: vi.fn(),
   getConfigSync: vi.fn(),
+  forgetMix: vi.fn(),
 }))
 
 vi.mock('@/services/api/freeApiApi', () => api)
 vi.mock('@/stores/config', () => ({ useConfigStore: () => ({ reload }) }))
 vi.mock('@/stores/aiConfig', () => ({ useAiConfigStore: () => ({ loadModels, loadDefaults }) }))
+vi.mock('@/stores/modelMix', () => ({ useModelMixStore: () => ({ forgetMix }) }))
 vi.mock('@/services/api/httpClient', () => ({ getConfigSync: () => getConfigSync() }))
 
 import type { FreeApiStatus } from '@/services/api/freeApiApi'
@@ -78,7 +80,7 @@ describe('freeApi store', () => {
     expect(store.busy).toBe(false)
   })
 
-  it('takes the status from the leave result', async () => {
+  it('takes the status from the leave result and forgets the Demo mix', async () => {
     const inactive = { active: false, server: 'web.synaplan.com' }
     api.leaveFreeApi.mockResolvedValue({ wasActive: true, status: inactive })
     const store = useFreeApiStore()
@@ -89,6 +91,41 @@ describe('freeApi store', () => {
     expect(result.configRefreshed).toBe(true)
     expect(store.status).toEqual(inactive)
     expect(reload).toHaveBeenCalled()
+    expect(forgetMix).toHaveBeenCalledWith('demo')
+  })
+
+  it('lets surfaces mounted together share one status request', async () => {
+    api.getFreeApiStatus.mockResolvedValue(activeStatus)
+    const store = useFreeApiStore()
+
+    await Promise.all([store.load(), store.load()])
+
+    expect(api.getFreeApiStatus).toHaveBeenCalledTimes(1)
+    expect(store.status).toEqual(activeStatus)
+    expect(forgetMix).not.toHaveBeenCalled()
+  })
+
+  // A failed request says nothing about the Demo; the person's mix stays.
+  it('keeps the remembered mix when the status cannot be read', async () => {
+    api.getFreeApiStatus.mockRejectedValue(new Error('offline'))
+    const store = useFreeApiStore()
+
+    await store.load()
+
+    expect(store.status).toBeNull()
+    expect(forgetMix).not.toHaveBeenCalled()
+  })
+
+  it('reads the new state and refreshes the models after an auto-leave', async () => {
+    api.getFreeApiStatus.mockResolvedValue({ active: false, server: 'web.synaplan.com' })
+    const store = useFreeApiStore()
+
+    await store.syncAfterAutoLeave()
+
+    expect(store.status?.active).toBe(false)
+    expect(forgetMix).toHaveBeenCalledWith('demo')
+    expect(loadModels).toHaveBeenCalled()
+    expect(loadDefaults).toHaveBeenCalled()
   })
 
   it('keeps a known status when the status request fails', async () => {

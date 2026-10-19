@@ -43,6 +43,17 @@ final class ModelListingServiceTest extends TestCase
         self::assertSame([4], array_column($payload['models']['CHAT'], 'id'));
     }
 
+    public function testAnEndpointModelNamesItsEndpoint(): void
+    {
+        $demo = $this->model(5, 'OpenAICompatible', 'chat')->setJson(['endpoint' => 'synaplan-demo']);
+        $service = $this->listing([$demo, $this->model(6, 'openai', 'chat')]);
+
+        $rows = $service->forUser($this->user(), includeUnavailable: false, applyGroupPolicy: false)['models']['CHAT'];
+
+        self::assertSame('synaplan-demo', $rows[0]['endpoint']);
+        self::assertArrayNotHasKey('endpoint', $rows[1]);
+    }
+
     public function testALockedDefaultStaysVisibleBehindTheAllowList(): void
     {
         $policy = $this->createStub(GroupPolicyService::class);

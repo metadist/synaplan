@@ -323,6 +323,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFreeApiAutoLeave } from '@/composables/useFreeApiAutoLeave'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import {
@@ -341,6 +342,7 @@ const emit = defineEmits<{ changed: [] }>()
 const { t } = useI18n()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
+const { announce: announceAutoLeave } = useFreeApiAutoLeave()
 
 const endpoints = ref<OpenAiEndpoint[]>([])
 const availableCapabilities = ref<string[]>(['chat', 'vectorize', 'pic2text', 'text2pic', 'rerank'])
@@ -517,7 +519,9 @@ async function save() {
       capabilities: form.value.capabilities,
     })
     endpoints.value = res.endpoints
-    success(t('config.openaiEndpoints.saved'))
+    if (!(await announceAutoLeave(res, form.value.label.trim() || name, { undo: false }))) {
+      success(t('config.openaiEndpoints.saved'))
+    }
     resetForm()
     emit('changed')
   } catch (e: unknown) {

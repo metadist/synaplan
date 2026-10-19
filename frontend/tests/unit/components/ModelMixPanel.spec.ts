@@ -13,9 +13,23 @@ import type { AIModel } from '@/types/ai-models'
 const notifySuccess = vi.fn()
 const notifyError = vi.fn()
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key, locale: { value: 'en' } }),
+const freeApi = vi.hoisted(() => ({
+  status: null as null | {
+    active: boolean
+    today: { messagesRemaining: number; messagesLimit: number } | null
+  },
+  load: vi.fn(),
 }))
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key} ${JSON.stringify(params)}` : key,
+    locale: { value: 'en' },
+  }),
+}))
+
+vi.mock('@/stores/freeApi', () => ({ useFreeApiStore: () => freeApi }))
 
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ success: notifySuccess, error: notifyError }),
@@ -60,8 +74,16 @@ describe('ModelMixPanel', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     localStorage.clear()
+    freeApi.status = null
     useAiConfigStore().models = {
       CHAT: [
+        model({
+          id: 400,
+          service: 'OpenAICompatible',
+          providerId: 'free-chat',
+          name: 'Synaplan Demo · GPT OSS 120B',
+          endpoint: 'synaplan-demo',
+        }),
         model({
           id: 240,
           service: 'Anthropic',
@@ -116,6 +138,34 @@ describe('ModelMixPanel', () => {
     })
     expect(notifySuccess).toHaveBeenCalled()
     expect(wrapper.emitted('select')?.[0]).toEqual(['xai'])
+  })
+
+  it('lists no Demo row while the Demo is not active', () => {
+    freeApi.status = { active: false, today: null }
+    const wrapper = mountPanel()
+
+    expect(wrapper.find('[data-testid="btn-model-mix-demo"]').exists()).toBe(false)
+  })
+
+  it('lists the active Demo first with the model and the messages left today', async () => {
+    freeApi.status = { active: true, today: { messagesRemaining: 27, messagesLimit: 40 } }
+    const wrapper = mountPanel()
+
+    const rows = wrapper.findAll('[data-testid^="btn-model-mix-"]')
+    expect(rows[0].attributes('data-testid')).toBe('btn-model-mix-demo')
+    expect(rows[0].text()).toContain(
+      'modelMix.demoSubtitle {"model":"GPT OSS 120B","left":27,"limit":40}'
+    )
+
+    await rows[0].trigger('click')
+    await vi.waitFor(() => expect(wrapper.emitted('select')).toBeTruthy())
+    expect(configApi.saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 400 } })
+  })
+
+  it('asks for the Demo state once when nothing loaded it yet', () => {
+    mountPanel()
+
+    expect(freeApi.load).toHaveBeenCalledTimes(1)
   })
 
   it('shows an error toast and keeps the panel open when applying fails', async () => {

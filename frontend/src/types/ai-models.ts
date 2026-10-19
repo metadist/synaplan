@@ -54,6 +54,8 @@ export interface AIModel {
   /** Only false in admin views requested with includeUnavailable; regular responses contain available models only. */
   available?: boolean
   unavailableReason?: ModelUnavailableReason | null
+  /** OpenAI-compatible endpoint that serves the model. Absent for every other provider. */
+  endpoint?: string
 }
 
 /** Per-provider availability of this installation, from /config/models. */

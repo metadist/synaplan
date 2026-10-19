@@ -46,11 +46,11 @@
               class="block text-sm font-medium txt-primary"
               :class="item.done && 'line-through opacity-70'"
             >
-              {{ $t(`tours.checklist.items.${item.id}.title`) }}
+              {{ $t(`tours.checklist.items.${item.copy}.title`) }}
               <span v-if="item.done" class="sr-only">{{ $t('tours.checklist.doneLabel') }}</span>
             </span>
             <span class="block text-xs txt-secondary">
-              {{ $t(`tours.checklist.items.${item.id}.where`) }}
+              {{ $t(`tours.checklist.items.${item.copy}.where`) }}
             </span>
           </span>
         </RouterLink>
@@ -64,6 +64,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useTour } from '@/composables/useTour'
+import { useFreeApiStore } from '@/stores/freeApi'
 import { CHECKLIST_SEEN_ID } from '@/tours'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiGettingStartedShowResponseSchema } from '@/generated/api-schemas'
@@ -72,6 +73,8 @@ type ItemId = 'provider' | 'file' | 'assistant' | 'app'
 
 interface Item {
   id: ItemId
+  /** Key under tours.checklist.items; differs from id only for the Demo wording. */
+  copy: string
   to: string
   done: boolean
 }
@@ -84,14 +87,24 @@ const ITEM_TARGETS: Record<ItemId, string> = {
 }
 
 const { seen, ensureLoaded, markSeen } = useTour()
+const freeApi = useFreeApiStore()
 
 const loaded = ref(false)
 const status = ref<Partial<Record<ItemId, boolean>>>({})
 
+/** While the Demo answers, the step asks for a provider of the install's own and says why. */
+const copyKey = (id: ItemId): string =>
+  id === 'provider' && freeApi.status?.active === true ? 'providerDemo' : id
+
 const items = computed<Item[]>(() =>
   (Object.keys(ITEM_TARGETS) as ItemId[])
     .filter((id) => status.value[id] !== undefined)
-    .map((id) => ({ id, to: ITEM_TARGETS[id], done: status.value[id] === true }))
+    .map((id) => ({
+      id,
+      copy: copyKey(id),
+      to: ITEM_TARGETS[id],
+      done: status.value[id] === true,
+    }))
 )
 
 const doneCount = computed(() => items.value.filter((item) => item.done).length)
@@ -121,6 +134,7 @@ onMounted(async () => {
       if (typeof value === 'boolean') next[id] = value
     }
     status.value = next
+    if (next.provider === false && freeApi.status === null) await freeApi.load()
   } catch {
     // An unknown checklist stays hidden. It is never shown as all open.
   }

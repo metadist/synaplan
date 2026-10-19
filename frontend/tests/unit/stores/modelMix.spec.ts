@@ -113,6 +113,20 @@ describe('modelMix store', () => {
     expect(store.activeMixId).toBe('anthropic')
   })
 
+  it('forgets a remembered mix that no longer answers, and only that one', async () => {
+    signIn(7)
+    localStorage.setItem('synaplan_model_mix_7', 'demo')
+    const store = useModelMixStore()
+    await store.ensureLoaded()
+
+    store.forgetMix('anthropic')
+    expect(store.activeMixId).toBe('demo')
+
+    store.forgetMix('demo')
+    expect(store.activeMixId).toBe('default')
+    expect(localStorage.getItem('synaplan_model_mix_7')).toBe('default')
+  })
+
   it('ignores a stored value that is not a mix id', async () => {
     signIn(7)
     serveAnthropicChat()
