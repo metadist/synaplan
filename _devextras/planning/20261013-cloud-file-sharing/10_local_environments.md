@@ -304,6 +304,15 @@ reason — then a summary; exit code 1 if any `FAIL`. Checks never change state.
 
 ## 6. Known constraints
 
+- **The dev backend keeps its compiled service container.** After a change to
+  service wiring (a new service, a new controller argument), restart it
+  (`docker compose restart backend worker`); until then the new route answers
+  500 "Could not resolve argument". Method bodies reload without a restart.
+- **Walk the integration of what will ship.** A feature branch cut before
+  another fix merged lacks that fix: the AI walk briefly ran on CF0.4's branch,
+  which predates CF0.1, and the linked key got `insufficient_scope` again. Walk
+  on `main` merged with the open branches.
+
 - **Cursor cloud sandbox** (`AGENTS.md`): `frontend-widgets` cannot start
   (cgroup), local Ollama chat segfaults — use a cloud provider key for chat
   steps; embeddings work, so Make-searchable and the bird can be tested there.
