@@ -35,7 +35,7 @@ not a chat message.
 | CF1.2 ownCloud.online tests, CI, AGENTS.md, local stack | `synaplan-owncloud-online` | P3 | planned | after CF-S4 |
 | CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | planned | D21; app release 1.6.1; row 47 agreed |
 | CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | planned | `11` §3.1; dev dependencies ask first (A2) |
-| CF1.3c Per-user keys encrypted | `synaplan-nextcloud` | P1 (M1) | planned | D4; app release 1.7.0 |
+| CF1.3c Keys encrypted at rest (per-user, admin, shared) | `synaplan-nextcloud` | P1 (M1) | planned | D4; Nextcloud's sensitive config; app release 1.7.0 |
 | CF1.3d Release from CI | `synaplan-nextcloud` | P1 (M1) | planned | owner stores two repository secrets (A6) |
 | CF1.4-nc Five locales, core words — Nextcloud | `synaplan-nextcloud` | P1 | planned |  |
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
@@ -437,3 +437,19 @@ Findings, fixed in the stacks and written into `10`:
 6. The `keycloak_setup` script as a whole cannot run twice (it creates the
    realm unconditionally); the new "Cloud apps" block can, and was checked
    twice.
+
+**2026-10-19 (survey cross-check).** Three read-only surveys of
+`synaplan-opencloud`, `synaplan-charts` and `synaplan-nextcloud` were checked
+against `11` and re-verified in the code. Changed: `11` §3.2 — CI deploys only
+the `standalone` environment into k3d, and the openDesk Keycloak piece is a
+fragment operators add to openDesk's environment (not rendered by `make
+check`); new defect **D22** (chart installs run `doctrine:schema:update --force`
+before the migrations, so a fresh chart install marks every migration as
+applied without running it) with its consequence for P1 in `11` §3.2 item 4;
+D4 widened to Nextcloud's admin and shared keys, and CF1.3c now uses
+Nextcloud's sensitive `IUserConfig` / `IAppConfig` values, which Nextcloud 33
+and 35 encrypt, instead of an own `enc:` scheme. Confirmed unchanged: the gate
+job, the Synaplan pins and Renovate managers, the client generation from the
+pinned image, the three HTTP helpers the contract test covers, the controller
+attributes. `ci-local` is the house convention, not `synaplan-opencloud`'s
+(it relies on CI alone); `11` §3.1 says so.

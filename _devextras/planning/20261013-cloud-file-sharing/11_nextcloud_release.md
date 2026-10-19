@@ -14,7 +14,7 @@ is a bug.
 | **Scope** | The Synaplan core and the Nextcloud app (`synaplan_integration`) through CF0–CF5: the whole Nextcloud column of `00` §5, with contract v1 frozen (row 44) |
 | **Ends with** | A Synaplan release and Nextcloud app **2.0.0** in the App Store, `cloud_files` switched on (row 46) — then the **break** (§1) |
 | **Not in P1** | OpenCloud and ownCloud.online app work (P2, P3), CF2.11, CF6 — §7 |
-| **Checked** | 2026-10-19 against `synaplan` `297d0cc67` (after 5.5.0), `synaplan-nextcloud` `a80e2d8` (1.6.0), `synaplan-opencloud` `5cc1351`, `synaplan-charts` `7c919d1`: D1–D3 and D18–D20 still hold; D21 is new (`01` §4) |
+| **Checked** | 2026-10-19 against `synaplan` `297d0cc67` (after 5.5.0), `synaplan-nextcloud` `a80e2d8` (1.6.0), `synaplan-opencloud` `5cc1351`, `synaplan-charts` `7c919d1`: D1–D3 and D18–D20 still hold; D21 and D22 are new (`01` §4) |
 
 ---
 
@@ -83,7 +83,7 @@ keeps its own gate (`AGENTS.md`).
 
 | Rule | `synaplan-opencloud` | `synaplan-nextcloud` |
 | ---- | -------------------- | -------------------- |
-| One way in | `Makefile` targets; `AGENTS.md` says to prefer them over raw tools | `make lint`, `test`, `typecheck`, `test-unit-js`, `test-e2e`, `ci-local` (every CI job but e2e), `dev-up`, `dev-reset`, `dev-occ` |
+| One way in | `Makefile` targets; `AGENTS.md` says to prefer them over raw tools | `make lint`, `test`, `typecheck`, `test-unit-js`, `test-e2e`, `dev-up`, `dev-reset`, `dev-occ`, plus `ci-local` (every CI job but e2e) — the house convention of `synaplan`, Synamail and `synaplan-desktop`; `synaplan-opencloud` relies on CI alone |
 | One workflow, one gate | `.github/workflows/ci.yml`: frontend, backend, docker-build, e2e, docker-push → **All Checks Passed** (`needs` every job, `if: always()`, red on `failure` or `cancelled`) | `ci.yml`: **php** (php-cs-fixer, PHPStan, PHPUnit with `nextcloud/ocp` `dev-stable33` and `dev-stable35`), **frontend** (eslint, prettier, vue-tsc, Vitest, build), **e2e** (`nextcloud:33-apache` and `nextcloud:35-apache`), **package** (unsigned tarball as artifact) → **All Checks Passed**, required on `main` |
 | Actions pinned | by commit SHA, version as a comment | same |
 | Synaplan pinned in one place | `SYNAPLAN_REF` (git SHA) and `SYNAPLAN_IMAGE_DIGEST` in `ci.yml`; two Renovate custom managers bump both in one "Synaplan" PR | same two lines, same managers |
@@ -97,22 +97,33 @@ keeps its own gate (`AGENTS.md`).
 
 There, every version is pinned and bumped by Renovate, environments are code
 (`helmfile/environments/{default,standalone,opendesk}`), CI renders every
-environment and deploys it into a throwaway k3d cluster with a Playwright
-suite, generated docs are never edited by hand, and secrets derive from
-`MASTER_PASSWORD` instead of living in values. For P1:
+environment and deploys `standalone` into a throwaway k3d cluster with a
+Playwright suite, generated docs are never edited by hand, and secrets derive
+from `MASTER_PASSWORD` instead of living in values. For P1:
 
 1. **A core switch is a chart value in the same milestone.**
    `features.platformLinks` (`FEATURE_PLATFORM_LINKS_ENABLED`) exists. M3 adds
    `features.cloudFiles` → `CLOUD_FILES_ENABLED` with CF4.1: an entry in
    `synaplan.featurePinMap`, the `values.yaml` comment, `make docs`, a case in
    `charts/synaplan/tests/env_test.yaml`, `make all` green.
-2. **Organisation login in openDesk** (only if CF-S2 says yes): the
-   token-exchange permission for openDesk's Nextcloud client goes into
-   `helmfile/opendesk/` beside `synaplan-client.yaml.gotmpl`, rendered by
-   `make check`. No secret in a values file.
+2. **Organisation login in openDesk** (only if CF-S2 says yes): whatever
+   openDesk's Keycloak needs so that Nextcloud can obtain a Synaplan token
+   ships the way `helmfile/opendesk/synaplan-client.yaml.gotmpl` does — a
+   fragment the operator adds to openDesk's own environment. CF-S2 records
+   whether openDesk's Keycloak bootstrap can express it. No secret in a values
+   file.
 3. **Each release names its chart.** The chart's `appVersion` (5.4.1 today)
    follows the milestone's Synaplan release; the STATUS release entry names
    the chart version.
+4. **Migrations on chart installs (D22).** The chart's web init runs
+   `doctrine:schema:update --force` before the image's
+   `doctrine:migrations:migrate`. On a fresh install the bootstrap then marks
+   every migration as applied without running it; on an upgrade the new
+   migrations still run after the schema update. So P1 keeps every default
+   for new installs in seeders or env defaults, never only in a migration —
+   row 46's "on for new installs" included — and CI's `doctrine:schema:validate`
+   keeps the entity mapping equal to what the migrations build. Taking the
+   schema update out of the chart is a `synaplan-charts` PR for its owner.
 
 ### 3.3 Rules that keep the code small
 
@@ -132,7 +143,8 @@ suite, generated docs are never edited by hand, and secrets derive from
   the highest that passes after fixing real findings, without a baseline
   file; no later PR lowers it.
 - **Nextcloud idioms.** PHP attributes instead of docblock annotations;
-  `IClientService`, `ICrypto`, `IJobList`, `IL10N`; `declare(strict_types=1)`,
+  secrets as sensitive `IAppConfig` / `IUserConfig` values, which Nextcloud
+  encrypts; `IClientService`, `IJobList`, `IL10N`; `declare(strict_types=1)`,
   `final`, typed properties; `<script setup lang="ts">` with `@nextcloud/vue`;
   every string through `t()` / `n()` in five locales.
 - **Nothing generated is committed**: not the spec, not `js/`, not a tarball.
@@ -196,7 +208,8 @@ The full set per sprint is `09` §7. These seven are the ones no release skips:
 
 **Synaplan:** `make ci-local && make test-e2e` on `main`; `Cut Release Tag`
 (a `feat` commit since the last tag raises the minor version); release CI
-green; chart values for new switches merged and `appVersion` bumped.
+green; chart values for new switches merged, and the `synaplan-charts` PR that
+moves `appVersion` to the release green (`make all`, k3d `standalone`).
 
 **Nextcloud app:**
 
@@ -254,17 +267,17 @@ PR has one purpose. CF1.4-nc follows CF1.3c.
 | Depends on | CF1.3a; **ask first (A2):** the dev dependencies `phpstan/phpstan`, `vitest`, `@vue/test-utils`, `happy-dom`, `vue-tsc` and `@playwright/test` (at the version `synaplan/frontend` pins) |
 | Touches | `.github/workflows/ci.yml`, `renovate.json5`, `AGENTS.md`, `Makefile`, `scripts/synaplan-openapi.sh`, `tests/Contract/`, `phpstan.neon`, `package.json` (scripts `check:types`, `test:unit`, `test:e2e`), `vitest.config.ts`, `tests/unit/`, `playwright.config.ts`, `tests/e2e/`, `docker-compose.ci.yml`, `README.md` (Development) |
 | Build | §3.1 row by row; the journeys of §5 item 1; Vitest specs for the pure helpers in `src/` (MIME filters, kind folders) — later briefs add specs for what they touch |
-| Acceptance | CI green on the PR, e2e on both images; `make ci-local` green; after the merge the owner makes **All Checks Passed** required on `main` and Renovate opens its onboarding PR |
+| Acceptance | CI green on the PR, e2e on both images; `make ci-local` green; after the merge the owner makes **All Checks Passed** required on `main`; Renovate, which already opens PRs on this repo, follows `renovate.json5` from its next run |
 
-### CF1.3c — Per-user keys encrypted (D4)
+### CF1.3c — Keys encrypted at rest (D4)
 
 | | |
 | - | - |
 | Repo · class · type | `synaplan-nextcloud` (P1, M1) · app release 1.7.0 · `feat(app)` |
 | Branch | `feat/cf1-3c-encrypted-keys` |
 | Depends on | CF1.3b |
-| Build | The user preference `synaplan_user_api_key` is stored as `enc:` + `ICrypto::encrypt()`. A value without the prefix is read once as plaintext and saved encrypted. A value that does not decrypt counts as no key — the person sees the Connect card — and writes one log line without the value |
-| Tests | `KeyStorageTest` (encrypt, plaintext migration, undecryptable value); `cf1-keys.sh` |
+| Build | The per-user key `synaplan_user_api_key` becomes a sensitive user config value (`IUserConfig`, `FLAG_SENSITIVE`), the admin and shared keys `api_key` and `api_key_local` sensitive app config values (`IAppConfig`, `sensitive: true`). Nextcloud encrypts both on write (`$UserConfigEncryption$`, `$AppConfigEncryption$` — checked on 33 and 35). A value still stored in plain text is read once, deleted and saved again as sensitive. A value that does not decrypt counts as no key — the person sees the Connect card — and writes one log line without the value |
+| Tests | `KeyStorageTest` (stored sensitive, plaintext migration, undecryptable value); `cf1-keys.sh` |
 | Acceptance | `09` §2 L3 row 6 on Nextcloud 35: a link made with 1.6.x keeps working after the upgrade without connecting again (C2) |
 
 ### CF1.3d — Release from CI

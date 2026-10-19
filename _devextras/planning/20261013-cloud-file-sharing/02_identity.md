@@ -433,9 +433,10 @@ Raw idempotent `ADD COLUMN IF NOT EXISTS`; no Schema API (Galera rule 2).
   with the *linked platform* badge, and revoked with the identity.
 - Scope additions are exact paths; `ApiKeyScopeTest` pins allows and denials
   (C3).
-- Per-user keys in Nextcloud and ownCloud.online are encrypted with
-  `ICrypto` (CF1.1 / CF1.3c); reading an old plaintext value re-saves it
-  encrypted.
+- Nextcloud stores its per-user, admin and shared keys as sensitive config
+  values, which Nextcloud encrypts (CF1.3c); ownCloud.online encrypts its
+  per-user keys with `ICrypto` (CF1.1). Reading an old plaintext value
+  re-saves it encrypted.
 - Consent is the bind (organisation login) or the stored consent preference
   (other modes); no Synaplan account is created by a file action without it.
 - Every bind, background-key mint, lifecycle event and turn-off writes an

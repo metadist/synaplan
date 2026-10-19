@@ -17,7 +17,7 @@ walked; every "by code reading" claim is re-checked in the first walk (CF0.7).
 **Re-checked 2026-10-19** at `synaplan` `297d0cc67` (225 commits later,
 after 5.5.0) and `synaplan-nextcloud` `a80e2d8`: D1–D3 and D18–D20 hold
 unchanged; the classes this plan names are where it says (the service moves
-since 5.4.0 did not touch them). New: D21.
+since 5.4.0 did not touch them). New: D21, and D22 in `synaplan-charts`.
 
 ---
 
@@ -109,7 +109,7 @@ since 5.4.0 did not touch them). New: D21.
 | **D1** | Platform keys (`chat files rag [memories]`) are restricted keys. The scope map has no branch for `/api/v1/summary/*`, `/api/v1/media/*` or `/api/v1/config/memory-service/*`, and `/v1/*` requires `desktop:messages`. The Nextcloud and ownCloud.online apps call exactly those paths for summarize, translate, chat about a file, research chat and media. By code reading: `403 insufficient_scope` in the provision and link modes. #1936 mapped `/api/v1/messages`, `/chats`, `/files`, `/rag`, `/config/models` — not the paths the apps use. | `ApiKeyScope::requiredScopesForPath()`; `ApiKeyScopeTest::platformLinkProductPaths()`; app clients `lib/Service/SynaplanClient.php`, `lib/Controller/ChatController.php` | CF0.1 |
 | **D2** | `File::SOURCES` lacks `owncloud`. `FileController::upload` rewrites unknown sources to `web_upload`; `check-stale` filters by source → every ownCloud.online status is "missing"; the Library shows these files as web uploads. | `backend/src/Entity/File.php` (`SOURCES`), `FileController.php` (source whitelist, `findByUserSourceIds`) | CF0.2 |
 | **D3** | Every `nextcloud` / `opencloud` / `outlook` upload sets `BINCOMING = 1`, also when the caller named a knowledge folder. A synced folder would put hundreds of files into Incoming. | `backend/src/Service/File/FileUploadService.php` (`setIncoming(in_array($options->source, File::INCOMING_SOURCES))`) | CF0.3 |
-| **D4** | Nextcloud and ownCloud.online keep per-user keys in plain user preferences; only the instance secret is encrypted. Watches make these keys work while the person is away. | `UserAccountService.php` (both apps), `PlatformLinkService.php` (NC) | CF1.3c / CF1.1 |
+| **D4** | Nextcloud and ownCloud.online keep per-user keys in plain user preferences, and Nextcloud its admin and shared keys (`api_key`, `api_key_local`) in plain app config; only the instance secret is encrypted. Watches make these keys work while the person is away. | `UserAccountService.php` (both apps), `PlatformLinkService.php` (NC) | CF1.3c / CF1.1 |
 | **D5** | ownCloud.online asks for consent only in the chat panel. | `src/components/ChatPanel.vue`; modals without a gate | CF1.1 |
 | **D6** | ownCloud.online registers its actions for every MIME type. | `src/files-init.ts` (`mime: 'all'`) | CF1.1 |
 | **D7** | OpenCloud saves only text (2 MiB) into the space; generated images, audio and Office files cannot be saved. | `backend/internal/handler/files.go` | CF1.5 / CF3.5 |
@@ -127,6 +127,7 @@ since 5.4.0 did not touch them). New: D21.
 | **D19** | Disconnect deletes the identity row (`PlatformLinkExchangeService::disconnect()` calls `remove($identity)`), so nothing is left to resume: watches would lose their owner link, and "Resume 2 watched folders?" (C9) could not be offered. Found in the third review. | `backend/src/Service/PlatformLink/PlatformLinkExchangeService.php` | CF2.5 |
 | **D20** | The ephemeral reaper deletes hidden files after 24 hours (`ReapEphemeralFilesCommand::DEFAULT_TTL_HOURS`), but working copies of watch runs must stay 7 days for retries (decision 20). Found in the third review. | `backend/src/Command/ReapEphemeralFilesCommand.php` | CF5.1 |
 | **D21** | The Nextcloud app declares Nextcloud 30–34. Nextcloud 35.0.0 shipped on 2026-09-15 and is `nextcloud:latest`, so the App Store does not offer the app there; 30–32 get no maintenance releases any more (32.0.15 on 2026-09-10 was the last). Six controllers rely only on docblock annotations, which Nextcloud deprecated in favour of attributes (`LinkController` carries both), and `nextcloud/ocp` is required as `dev-master`. Found in the fourth review. | `appinfo/info.xml` (`<nextcloud min-version="30" max-version="34"/>`), `lib/Controller/*.php`, `composer.json` | CF1.3a |
+| **D22** | Chart installs do not run the migrations the way the image does. `synaplan-charts`' web init runs `doctrine:schema:update --force` (marked FIXME) before the image's `doctrine:migrations:migrate`; on a fresh install the migrations bootstrap then marks every migration as applied without running it, on an upgrade the new migrations run after the schema update. It also contradicts the house rule never to run `schema:update` against a shared database. Found in the fourth review. | `synaplan-charts`: `charts/synaplan/templates/init-scripts-configmap.yaml` (`51-init-models.sh`); `_docker/backend/lib/migrations-bootstrap.sh` ("Fresh schema detected — marking all migrations as applied") | `11` §3.2 item 4; the chart fix is a `synaplan-charts` PR |
 
 ---
 
@@ -148,7 +149,7 @@ exist and is confirmed in the named spike before a sprint depends on it.
 | Notifications | Notifications app (spike CF-S5) | Notifications app (spike CF-S4) | User log / notifications service (spike CF-S1) |
 | Private link to a file | `/f/<fileid>` (spike CF-S5) | `/f/<fileid>` (spike CF-S4) | `/f/<resource id>` (spike CF-S1) |
 | Organisation login token for the app | `user_oidc` token events (spike CF-S2) | `openidconnect` app — not pursued in v1 | Verified (token exchange in the Go service) |
-| Per-user key storage | User preferences (verified), encrypt with `ICrypto` | User preferences (verified), encrypt | None today; persistent store (spike CF-S3) |
+| Per-user key storage | User preferences (verified); sensitive `IUserConfig` values, which Nextcloud 33–35 encrypt (CF1.3c) | User preferences (verified), encrypt | None today; persistent store (spike CF-S3) |
 
 ### 5.2 Gaps a platform may keep
 
