@@ -1,0 +1,29 @@
+{
+  "method": "POST",
+  "path": "/v1/free/keys",
+  "auth": "public",
+  "idempotent": "The same install_id returns the same active key. A dropped response can be retried without minting a second key.",
+  "request": {
+    "install_id": "uuid v4",
+    "platform": ["dev", "minimal", "quickstart", "lite", "selfhost", "helm"],
+    "version": "string, max 32",
+    "protocol": "integer >= 1",
+    "terms_version": "string, max 32",
+    "locale": "string, max 16",
+    "host_kind": ["localhost", "private", "public"],
+    "host_hash": "64 hex characters",
+    "pow_nonce": "string, max 128. sha256(install_id + ':' + nonce) has pow_bits leading zero bits",
+    "contact_email": "optional"
+  },
+  "response": [
+    "key",
+    "expires_at",
+    "limits",
+    "aliases",
+    "terms_url",
+    "base_url",
+    "protocol_min",
+    "key_id"
+  ],
+  "scopes": ["freeapi"]
+}

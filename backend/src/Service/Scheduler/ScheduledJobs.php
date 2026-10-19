@@ -37,6 +37,7 @@ final class ScheduledJobs
             'app:files:reap-ephemeral',
             'app:approvals:expire',
             'app:models:discover',
+            'app:freeapi:maintain',
         ],
         self::LANE_DAILY => [
             'app:updates:check',

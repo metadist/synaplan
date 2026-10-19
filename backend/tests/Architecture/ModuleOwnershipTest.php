@@ -53,6 +53,7 @@ final class ModuleOwnershipTest extends TestCase
         'opendesk_stt',
         'live_voice',
         'chat_artifacts',
+        'freeapi',
     ];
 
     /**
@@ -197,6 +198,10 @@ final class ModuleOwnershipTest extends TestCase
         'messages_gateway' => [
             'MESSAGES_GATEWAY_UPSTREAM_URL',
         ],
+        // Set by every CI runner, not by operators; only keeps automated runs off real servers.
+        'ci_runtime' => [
+            'CI',
+        ],
     ];
 
     /**
@@ -214,7 +219,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(18, self::MODULE_IDS);
+        $this->assertCount(19, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

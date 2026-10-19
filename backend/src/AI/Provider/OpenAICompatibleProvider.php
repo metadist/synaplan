@@ -47,15 +47,13 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
      */
     private const IMAGE_TIMEOUT_SECONDS = 180;
 
-    /** @var array<string, ClientContract> keyed by endpoint name */
-    private array $clients = [];
-
     public function __construct(
         private readonly OpenAiCompatibleEndpointRegistry $endpoints,
         private readonly LoggerInterface $logger,
         private readonly HttpClientInterface $httpClient,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private readonly OpenAiCompatibleClients $clients = new OpenAiCompatibleClients(),
     ) {
     }
 
@@ -584,36 +582,12 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
             throw new ProviderException('No OpenAI-compatible endpoint resolved for this model. Configure an endpoint in Admin and set "endpoint" in the model JSON.', $this->getName());
         }
 
-        return $endpoint;
+        return $this->clients->withCallHeaders($endpoint, $options);
     }
 
     private function clientForCall(array $options): ClientContract
     {
-        $endpoint = $this->endpointForCall($options);
-
-        $cacheKey = $endpoint['name'];
-        if (isset($this->clients[$cacheKey])) {
-            return $this->clients[$cacheKey];
-        }
-
-        $factory = \OpenAI::factory()
-            // Many gateways require SOME bearer token; send a harmless
-            // placeholder when the endpoint is unauthenticated (e.g. a
-            // localhost LocalAI) so the client still sets the header.
-            ->withApiKey('' !== $endpoint['api_key'] ? $endpoint['api_key'] : 'sk-no-key')
-            ->withBaseUri($endpoint['base_url']);
-
-        foreach ($endpoint['headers'] as $headerName => $headerValue) {
-            $factory = $factory->withHttpHeader($headerName, $headerValue);
-        }
-
-        $this->logger->info('OpenAI-compatible: using endpoint', [
-            'endpoint' => $endpoint['name'],
-            'base_url' => $endpoint['base_url'],
-            'model' => $options['model'] ?? null,
-        ]);
-
-        return $this->clients[$cacheKey] = $factory->make();
+        return $this->clients->clientFor($this->endpointForCall($options), is_string($options['model'] ?? null) ? $options['model'] : null);
     }
 
     /**
@@ -701,6 +675,16 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
     /**
      * @param array<string, mixed> $payload
      */
+    private function upstreamErrorCode(array $payload): ?string
+    {
+        $code = is_array($payload['error'] ?? null) ? ($payload['error']['code'] ?? null) : null;
+
+        return is_string($code) && '' !== $code ? $code : null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
     private function throwImageFailure(int $status, array $payload): never
     {
         $text = $this->upstreamErrorText($payload);
@@ -712,7 +696,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
             throw ProviderException::contentBlocked($this->getName(), 'SAFETY', substr($text, 0, 300));
         }
 
-        throw new ProviderException('OpenAI-compatible image generation failed: '.substr($text, 0, 300), $this->getName(), ['status_code' => $status], $status >= 400 && $status <= 599 ? $status : 0);
+        throw new ProviderException('OpenAI-compatible image generation failed: '.substr($text, 0, 300), $this->getName(), ['status_code' => $status, 'error_code' => $this->upstreamErrorCode($payload)], $status >= 400 && $status <= 599 ? $status : 0);
     }
 
     /**

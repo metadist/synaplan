@@ -11,6 +11,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\ProviderKeyValidator;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\FreeApi\FreeApiAutoLeave;
 use App\Service\SelfAware\CapabilityInventory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -38,6 +39,7 @@ final class AdminProviderKeysController extends AbstractController
         private readonly ConfigRepository $configRepository,
         private readonly ChatReadinessService $chatReadiness,
         private readonly ?CapabilityInventory $capabilityInventory = null,
+        private readonly ?FreeApiAutoLeave $freeApiAutoLeave = null,
     ) {
     }
 
@@ -123,13 +125,14 @@ final class AdminProviderKeysController extends AbstractController
         response: 200,
         description: 'Key stored (and defaults applied when requested)',
         content: new OA\JsonContent(
-            required: ['success', 'provider', 'maskedKey', 'defaultsApplied', 'tested'],
+            required: ['success', 'provider', 'maskedKey', 'defaultsApplied', 'tested', 'demoLeft'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'provider', type: 'string', example: 'groq'),
                 new OA\Property(property: 'maskedKey', type: 'string', example: 'gsk_••••••••••••abcd'),
                 new OA\Property(property: 'defaultsApplied', type: 'boolean', example: true),
                 new OA\Property(property: 'tested', type: 'boolean', description: 'False when the key was stored without a live check (validate=false or the provider is not testable)', example: true),
+                new OA\Property(property: 'demoLeft', type: 'boolean', description: 'True when the Synaplan Demo was active and was turned off because this provider now answers chat', example: false),
             ],
             type: 'object'
         )
@@ -184,23 +187,10 @@ final class AdminProviderKeysController extends AbstractController
         $this->chatReadiness->invalidate();
         $this->capabilityInventory?->forget();
 
-        $defaultsApplied = false;
-        if ($applyDefaults && ProviderDefaultsService::supports($provider)) {
-            $this->defaults->applyGlobalDefaults($provider);
-            $defaultsApplied = true;
-        } elseif (!$applyDefaults && ProviderDefaultsService::supports($provider)) {
-            // Key saved without the checkbox — still auto-flip when the current
-            // default chat provider is a cloud provider with no usable key
-            // (fresh Anthropic seed). A keyless default (Ollama, test provider)
-            // is a deliberate choice and is never overridden.
-            $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
-            $currentReady = '' !== $current
-                && (!ProviderKeyCatalog::has($current) || null !== $this->keyStore->getKey($current));
-            if (!$currentReady) {
-                $this->defaults->applyGlobalDefaults($provider);
-                $defaultsApplied = true;
-            }
-        }
+        // Leave first, so the defaults check below sees the bindings the Demo restored.
+        $demoLeft = ProviderKeyCatalog::servesChat($provider)
+            && true === $this->freeApiAutoLeave?->ownProviderConnected($provider);
+        $defaultsApplied = $this->applyDefaultsAfterSave($provider, $applyDefaults);
 
         return $this->json([
             'success' => true,
@@ -208,6 +198,7 @@ final class AdminProviderKeysController extends AbstractController
             'maskedKey' => ProviderKeyStore::mask($key),
             'defaultsApplied' => $defaultsApplied,
             'tested' => $tested,
+            'demoLeft' => $demoLeft,
         ]);
     }
 
@@ -378,6 +369,28 @@ final class AdminProviderKeysController extends AbstractController
         }
 
         return $providers;
+    }
+
+    private function applyDefaultsAfterSave(string $provider, bool $requested): bool
+    {
+        if (!ProviderDefaultsService::supports($provider)) {
+            return false;
+        }
+        if (!$requested) {
+            // Key saved without the checkbox — still auto-flip when the current
+            // default chat provider is a cloud provider with no usable key
+            // (fresh Anthropic seed). A keyless default (Ollama, test provider)
+            // is a deliberate choice and is never overridden.
+            $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
+            $currentReady = '' !== $current
+                && (!ProviderKeyCatalog::has($current) || null !== $this->keyStore->getKey($current));
+            if ($currentReady) {
+                return false;
+            }
+        }
+        $this->defaults->applyGlobalDefaults($provider);
+
+        return true;
     }
 
     private function requireAdmin(?User $user): ?JsonResponse

@@ -1,0 +1,23 @@
+{
+  "request": [
+    "Authorization",
+    "X-Synaplan-Install",
+    "X-Synaplan-Version",
+    "X-Synaplan-Protocol",
+    "X-Synaplan-End-User",
+    "X-Synaplan-Surface"
+  ],
+  "response": [
+    "x-ratelimit-limit-requests",
+    "x-ratelimit-remaining-requests",
+    "x-ratelimit-limit-images",
+    "x-ratelimit-remaining-images",
+    "x-ratelimit-reset",
+    "Retry-After"
+  ],
+  "notes": {
+    "X-Synaplan-End-User": "sha256 hex of install_id:user_id. Advisory. A mismatch never changes the key.",
+    "X-Synaplan-Install": "UUID of the install. If it does not match the key, it is logged and ignored.",
+    "X-Synaplan-Protocol": "Integer. Below the server minimum answers freeapi_upgrade_required."
+  }
+}

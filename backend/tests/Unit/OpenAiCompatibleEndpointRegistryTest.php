@@ -391,6 +391,14 @@ final class OpenAiCompatibleEndpointRegistryTest extends TestCase
         $this->assertSame('only', $resolved['name']);
     }
 
+    public function testTheDemoIsNeverTheFallbackForForeignModels(): void
+    {
+        $this->registry->saveEndpoint(OpenAiCompatibleEndpointRegistry::DEMO_ENDPOINT, 'https://only.example.com/v1', null);
+        $this->modelRepository->method('findByServiceAndProviderId')->willReturn(null);
+
+        $this->assertNull($this->registry->resolveForModel('unknown-model'));
+    }
+
     public function testResolveForModelReturnsNullWhenAmbiguous(): void
     {
         $this->registry->saveEndpoint('a', 'https://a.example.com/v1', null);

@@ -697,6 +697,10 @@ run_scheduler_hourly_lane() {
     # to Discord, never writes BMODELS. Hourly so a release is posted
     # within the hour; BCONFIG state keeps each id to one post.
     run_scheduler_job 900 bin/console --env="$env" app:models:discover --notify --no-interaction
+
+    # Synaplan Demo: delivers a key revoke the server missed when the admin
+    # left. A no-op (no network call) unless a revoke is pending.
+    run_scheduler_job 900 bin/console --env="$env" app:freeapi:maintain --no-interaction
 }
 
 # shellcheck disable=SC2317

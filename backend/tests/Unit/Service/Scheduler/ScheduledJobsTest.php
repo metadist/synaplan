@@ -27,6 +27,7 @@ final class ScheduledJobsTest extends TestCase
                 'app:files:reap-ephemeral',
                 'app:approvals:expire',
                 'app:models:discover',
+                'app:freeapi:maintain',
             ],
             'daily' => [
                 'app:updates:check',

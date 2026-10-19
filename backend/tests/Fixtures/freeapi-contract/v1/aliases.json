@@ -1,0 +1,51 @@
+{
+  "protocol": 1,
+  "term": "Synaplan Demo",
+  "aliases": [
+    {
+      "id": "free-chat",
+      "capability": "CHAT",
+      "route": "chat",
+      "label": "Synaplan Demo · GPT OSS 120B",
+      "counts_as": "message",
+      "max_tokens": 2048,
+      "reasoning_effort": null
+    },
+    {
+      "id": "free-sort",
+      "capability": "SORT",
+      "route": "chat",
+      "label": "Synaplan Demo · GPT OSS 120B",
+      "counts_as": "call",
+      "max_tokens": 512,
+      "reasoning_effort": "low"
+    },
+    {
+      "id": "free-vision",
+      "capability": "PIC2TEXT",
+      "route": "chat",
+      "label": "Synaplan Demo · Qwen 3.8 27B",
+      "counts_as": "call",
+      "max_tokens": 2048,
+      "reasoning_effort": null
+    },
+    {
+      "id": "free-embed",
+      "capability": "VECTORIZE",
+      "route": "embeddings",
+      "label": "Synaplan Demo · bge-m3",
+      "counts_as": "embed",
+      "max_tokens": 0,
+      "reasoning_effort": null
+    },
+    {
+      "id": "free-image",
+      "capability": "TEXT2PIC",
+      "route": "images",
+      "label": "Synaplan Demo · Image",
+      "counts_as": "image",
+      "max_tokens": 0,
+      "reasoning_effort": null
+    }
+  ]
+}
