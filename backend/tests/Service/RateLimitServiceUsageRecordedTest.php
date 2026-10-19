@@ -95,6 +95,7 @@ final class RateLimitServiceUsageRecordedTest extends TestCase
         self::assertSame('MESSAGES', $seen[0]->action);
         self::assertEqualsWithDelta(0.0042, $seen[0]->cost, 1e-9);
         self::assertSame(['provider' => 'test', 'model' => 'm', 'source' => 'OPENAI_API'], $seen[0]->metadata);
+        self::assertSame(110, $seen[0]->tokens);
     }
 
     public function testThrowingListenerIsSwallowed(): void

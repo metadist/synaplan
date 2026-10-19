@@ -487,7 +487,7 @@ final class RateLimitService implements ResetInterface
             'estimated' => $estimated,
         ]);
         try {
-            $this->eventDispatcher?->dispatch(new UsageRecorded($user, $action, (float) $costResult->totalCost, $storedMetadata));
+            $this->eventDispatcher?->dispatch(new UsageRecorded($user, $action, (float) $costResult->totalCost, $storedMetadata, (int) $totalTokens));
         } catch (\Throwable $e) {
             $this->logger->error('UsageRecorded listener failed', ['user_id' => $user->getId(), 'action' => $action, 'error' => $e->getMessage()]);
         }

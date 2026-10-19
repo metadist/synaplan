@@ -10,7 +10,9 @@ use Symfony\Contracts\EventDispatcher\Event;
 /**
  * Dispatched by {@see \App\Service\RateLimitService::recordUsage()} right after
  * the BUSELOG row is written. `$cost` is the raw provider cost in USD
- * (BUSELOG.BCOST, no markup); `$metadata` is exactly what was stored in
+ * (BUSELOG.BCOST, no markup) and `0` when the model has no price row;
+ * `$tokens` is BUSELOG.BTOKENS (measured or estimated), so a listener can
+ * still price an unpriced call. `$metadata` is exactly what was stored in
  * BMETADATA, so it never contains prompt or answer text.
  *
  * Listeners run synchronously inside the request that spent the money. A
@@ -28,6 +30,7 @@ final class UsageRecorded extends Event
         public readonly string $action,
         public readonly float $cost,
         public readonly array $metadata = [],
+        public readonly int $tokens = 0,
     ) {
     }
 }
