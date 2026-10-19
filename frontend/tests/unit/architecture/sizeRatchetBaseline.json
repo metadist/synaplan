@@ -12,7 +12,7 @@
   },
   "fileLines": {
     "src/components/ChatBrowser.vue": 999,
-    "src/components/ChatInput.vue": 2605,
+    "src/components/ChatInput.vue": 2543,
     "src/components/ChatMessage.vue": 2398,
     "src/components/FileSelectionModal.vue": 889,
     "src/components/MemoryGraphView.vue": 934,
