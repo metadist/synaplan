@@ -1,7 +1,7 @@
 {
     "_comment": "Size ratchet ledger (tests/Architecture/SizeRatchetTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
     "recorded": "2026-10-14",
-    "updated": "2026-10-17",
+    "updated": "2026-10-19",
     "limits": {
         "fileLines": 800,
         "constructorParams": 10,
@@ -30,7 +30,7 @@
         "src/Controller/AuthController.php": 1257,
         "src/Controller/ChatController.php": 1178,
         "src/Controller/FeedbackController.php": 837,
-        "src/Controller/FileController.php": 1930,
+        "src/Controller/FileController.php": 1887,
         "src/Controller/InboundEmailHandlerController.php": 824,
         "src/Controller/MessageController.php": 1131,
         "src/Controller/MessagesGatewayController.php": 832,

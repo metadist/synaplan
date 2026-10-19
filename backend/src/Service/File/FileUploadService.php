@@ -571,7 +571,7 @@ final readonly class FileUploadService
             );
 
             if ($vectorResult['success']) {
-                $file->setStatus('vectorized');
+                $file->markVectorized();
                 $this->em->flush();
                 $result['chunks_created'] = $vectorResult['chunks_created'];
                 $result['vectorized'] = true;
@@ -680,7 +680,7 @@ final readonly class FileUploadService
             );
 
             if ($vectorResult['success']) {
-                $file->setStatus('vectorized');
+                $file->markVectorized();
                 $this->em->flush();
 
                 // Dedup on (user_id, file_id) — issue #887 RAG double-count.
@@ -775,7 +775,7 @@ final readonly class FileUploadService
             );
 
             if ($vectorResult['success']) {
-                $file->setStatus('vectorized');
+                $file->markVectorized();
                 // Fresh vectors clear any prior "source changed" marker (CORE-4).
                 $file->setStale(false);
                 $this->em->flush();
@@ -923,7 +923,7 @@ final readonly class FileUploadService
         if ('' !== trim($groupKey) && 'DEFAULT' !== $groupKey) {
             $file->setGroupKey($groupKey);
         }
-        $file->setStatus('vectorized');
+        $file->markVectorized();
         $this->em->flush();
 
         $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
@@ -988,7 +988,7 @@ final readonly class FileUploadService
         if ('' !== trim($groupKey) && 'DEFAULT' !== $groupKey) {
             $file->setGroupKey($groupKey);
         }
-        $file->setStatus('vectorized');
+        $file->markVectorized();
         $this->em->flush();
 
         return [

@@ -208,6 +208,10 @@ class FileLifecycleControllerTest extends WebTestCase
         self::assertSame('stale', $byId['nc-B']['status']);
         self::assertSame('missing', $byId['nc-GONE']['status']);
         self::assertNull($byId['nc-GONE']['file_id']);
+
+        self::assertContains($byId['nc-A']['vector_state'], File::VECTOR_STATES);
+        self::assertContains($byId['nc-B']['vector_state'], File::VECTOR_STATES);
+        self::assertNull($byId['nc-GONE']['vector_state']);
     }
 
     /**

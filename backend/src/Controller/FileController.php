@@ -27,6 +27,7 @@ use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\ProcessModelHints;
+use App\Service\File\SourceStaleCheck;
 use App\Service\File\UploadOptions;
 use App\Service\Iam\KnowledgeFolderShareCleanup;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
@@ -1626,6 +1627,7 @@ class FileController extends AbstractController
                                     new OA\Property(property: 'status', type: 'string', enum: ['current', 'stale', 'missing'], example: 'stale'),
                                     new OA\Property(property: 'file_id', type: 'integer', nullable: true, example: 42),
                                     new OA\Property(property: 'stored_etag', type: 'string', nullable: true, example: 'a1b2c3'),
+                                    new OA\Property(property: 'vector_state', type: 'string', enum: File::VECTOR_STATES, nullable: true, example: 'vectorized', description: 'Search index state of the stored file; null when Synaplan does not hold it.'),
                                 ],
                                 type: 'object',
                             ),
@@ -1638,7 +1640,7 @@ class FileController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function checkStale(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    public function checkStale(Request $request, #[CurrentUser] ?User $user, SourceStaleCheck $sourceStaleCheck): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1658,54 +1660,9 @@ class FileController extends AbstractController
             return $this->json(['error' => 'items (array of {source_id, source_etag}) is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Preserve the caller's order and the first etag seen per id.
-        $requested = [];
-        foreach ($items as $item) {
-            if (!is_array($item) || !isset($item['source_id'])) {
-                continue;
-            }
-            $sid = trim((string) $item['source_id']);
-            if ('' === $sid || array_key_exists($sid, $requested)) {
-                continue;
-            }
-            $etag = isset($item['source_etag']) && '' !== trim((string) $item['source_etag'])
-                ? trim((string) $item['source_etag'])
-                : null;
-            $requested[$sid] = $etag;
-        }
+        $check = $sourceStaleCheck->check($user->getId(), $source, $items);
 
-        $found = $this->fileRepository->findByUserSourceIds($user->getId(), $source, array_keys($requested));
-
-        $results = [];
-        $counts = ['current' => 0, 'stale' => 0, 'missing' => 0];
-        foreach ($requested as $sid => $reportedEtag) {
-            $file = $found[$sid] ?? null;
-            if (null === $file) {
-                $status = 'missing';
-                $fileId = null;
-                $storedEtag = null;
-            } else {
-                $storedEtag = $file->getSourceEtag();
-                $drifted = $file->isStale()
-                    || (null !== $reportedEtag && null !== $storedEtag && $reportedEtag !== $storedEtag);
-                $status = $drifted ? 'stale' : 'current';
-                $fileId = (int) $file->getId();
-            }
-
-            ++$counts[$status];
-            $results[] = [
-                'source_id' => $sid,
-                'status' => $status,
-                'file_id' => $fileId,
-                'stored_etag' => $storedEtag,
-            ];
-        }
-
-        return $this->json([
-            'success' => true,
-            'results' => $results,
-            'counts' => $counts,
-        ]);
+        return $this->json(['success' => true, ...$check]);
     }
 
     #[Route('/{id}/mark-stale', name: 'mark_stale', methods: ['POST'])]

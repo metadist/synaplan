@@ -581,6 +581,18 @@ class File
         return $this;
     }
 
+    /**
+     * Fresh vectors were stored: the file is searchable now, not only after
+     * the Library's next fix-on-read (FileListService::syncVectorState).
+     */
+    public function markVectorized(): self
+    {
+        $this->status = 'vectorized';
+        $this->vectorState = self::VECTOR_STATE_VECTORIZED;
+
+        return $this;
+    }
+
     public function getChunkCount(): int
     {
         return $this->chunkCount;
