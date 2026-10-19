@@ -14,6 +14,9 @@ use App\AI\Provider\OpenAiCompatibleRequestHeaders;
  * The end-user value is keyed with a secret derived from APP_SECRET. The
  * install id travels on every call and user ids are small integers, so a
  * plain hash of the two could be reversed by the server.
+ *
+ * Every Demo call spends today's allowance, so the cached "left today" is
+ * dropped here and the chat banner shows the new count after the answer.
  */
 final readonly class FreeApiRequestHeaders implements OpenAiCompatibleRequestHeaders
 {
@@ -22,6 +25,7 @@ final readonly class FreeApiRequestHeaders implements OpenAiCompatibleRequestHea
     public function __construct(
         private FreeApiCallContext $context,
         private FreeApiState $state,
+        private FreeApiStatusReader $status,
         #[\SensitiveParameter]
         private string $appSecret,
     ) {
@@ -32,6 +36,8 @@ final readonly class FreeApiRequestHeaders implements OpenAiCompatibleRequestHea
         if (FreeApiConfig::ENDPOINT_NAME !== $endpointName) {
             return [];
         }
+
+        $this->status->forget();
 
         $headers = ['X-Synaplan-Surface' => $this->context->surface()];
         $userId = $this->context->userId();
