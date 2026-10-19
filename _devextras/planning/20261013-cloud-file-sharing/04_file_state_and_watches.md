@@ -99,7 +99,7 @@ language, `state` one of the B.2 states. Header `X-Synaplan-Cache: hit` or
 | - | --------- | --------------- | --------- |
 | Row glyph | Files action with inline rendering on each row, fed by the batcher; click opens the sidebar tab (CF-S5 checks 5 000-row folders) | `FileList` plugin decorates rows after render (CF-S4) | No row extension point known (CF-S1). v1: state in the sidebar panel and in the action label ("Searchable by AI — Update"); upstream request for a row indicator (CF4.5) |
 | Current folder | List header for a watched folder: "Synaplan watches this folder — new files are translated to English · Details" (CF-S5) | Header above the list (CF-S4) | Sidebar panel of the folder |
-| Sidebar | Files sidebar tab "Synaplan" (CF-S5: API across 30–34) | Detail tab "Synaplan" (CF-S4) | `sidebarPanel` "Synaplan" |
+| Sidebar | Files sidebar tab "Synaplan" (CF-S5: API across 33–35) | Detail tab "Synaplan" (CF-S4) | `sidebarPanel` "Synaplan" |
 
 ### A.5 Follow the source (decision 15)
 

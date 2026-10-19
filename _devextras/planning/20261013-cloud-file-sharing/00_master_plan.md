@@ -3,7 +3,7 @@
 | | |
 | - | - |
 | **Status** | Plan, 2026-10-13; second review the same day (agent briefs, functional tests, local environments — `08`–`10`); the six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467) folded in the same day; third review 2026-10-14 for the Nextcloud-first order (STATUS review log). **All 46 decision rows of §3 agreed 2026-10-14** (row 41 with lower caps). Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
-| **Delivery order** | Three phases, one cloud at a time (row 42): **P1** Synaplan core + Nextcloud through CF0–CF5, ending with the core API frozen as contract v1; **P2** OpenCloud; **P3** ownCloud.online. §6. |
+| **Delivery order** | Three phases, one cloud at a time (row 42): **P1** Synaplan core + Nextcloud through CF0–CF5, ending with the core API frozen as contract v1; **P2** OpenCloud; **P3** ownCloud.online. §6. P1 ships in four milestone releases and ends with the Nextcloud release, then a **break** until a dated "P2 go" (row 48, [`11`](./11_nextcloud_release.md), finalized 2026-10-19). |
 | **How it is built** | One brief per step for a coding agent ([`08`](./08_agent_briefs.md)), three test layers per sprint, run per phase ([`09`](./09_functional_tests.md)), pinned local stacks ([`10`](./10_local_environments.md)), a reference client that plays the app side of every protocol (row 45). Environment briefs E-1…E-4 and E-6 run before CF0.7, E-9 before CF2.1. |
 | **Repos** | `synaplan` (core API, Library, Tasks, Apps), `synaplan-nextcloud`, `synaplan-owncloud-online`, `synaplan-opencloud`, `synaplan-docs` |
 | **User-facing names** | **Searchable by AI** (bird) · **Watch with Synaplan** / **Watched folders** (bird with eyes) · **Copy to cloud** · **Organisation login** · **Connect your Synaplan account**. Full table in §11. |
@@ -24,6 +24,7 @@
 | [`08_agent_briefs.md`](./08_agent_briefs.md) | The work orders: rules for an agent, definition of done, one brief per spike and step (repo, branch, files, build list, tests, acceptance) |
 | [`09_functional_tests.md`](./09_functional_tests.md) | Three test layers per sprint: unit and contract, integration scripts, browser walks with expected results; fixtures, accounts, regression set |
 | [`10_local_environments.md`](./10_local_environments.md) | Local stacks for Synaplan, Keycloak, Nextcloud, OpenCloud, ownCloud.online: pins, requirements, inventory of what was found, cleanup, update briefs E-1…E-9, `env-check.sh` |
+| [`11_nextcloud_release.md`](./11_nextcloud_release.md) | P1 entry point: milestones M1–M4, engineering standard, test stacks, regression guards, release checklist, the break |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 ---
@@ -121,7 +122,8 @@ Defects that block the floor today (detail in `01` §4):
 All 46 rows agreed on 2026-10-14 by the product owner: rows 1–40 and 43–46
 as proposed, row 41 with lower caps (20 active watches per person, 1 000 per
 instance), row 42 (delivery order), and the adjustments row 42 made to rows
-33–35. A brief starts once the briefs it depends on are merged.
+33–35. A brief starts once the briefs it depends on are merged. Rows 47–49
+were added and agreed by the product owner on 2026-10-19.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
@@ -171,6 +173,9 @@ instance), row 42 (delivery order), and the adjustments row 42 made to rows
 | 44 | **Cloud-apps contract v1** | At the P1 exit the app-facing API is frozen as contract v1: every path, body, status and error code, capability name, notification format and limit, written as fixtures in `backend/tests/Fixtures/cloud-apps-contract/` (README with the source commit, notify test vectors) and vendored byte for byte into each app repo with a checksum test — the pattern of the desktop contract. `instances/self` answers `contract: 1`. Afterwards only optional fields and new capabilities may be added; anything else is a contract v2 decision. | yes (2026-10-14) |
 | 45 | **Reference client** | A small test app in `_devextras/testing/cloud-apps/fixture-app/` (PHP built-in server like `messages-gateway/fixture-upstream.php`, container `cloud-fixture` on the Synaplan network) plays the app side of every protocol in two profiles: `keyed` (per-user keys, numeric file ids, bare etags — like Nextcloud) and `sso` (OIDC bearer through Keycloak plus background key, OpenCloud-style ids `storage$space!node` of about 110 characters, quoted etags). Every core brief from CF2.1 on is accepted against it; journeys are walked in the app briefs. It proves in P1 the paths only OpenCloud and ownCloud.online use later. | yes (2026-10-14) |
 | 46 | **Switching on per phase** | Replaces the timing of row 22: `cloud_files` goes on for new installs, on web.synaplan.com and through the activation migration after the P1 exit — the core is complete then, surfaces follow each app's features (row 43), and older app releases are untouched (C1). P2 and P3 publish only their app releases. | yes (2026-10-14) |
+| 47 | **Nextcloud range of the P1 releases** | `min-version="33" max-version="35"`: the majors that got maintenance releases on 2026-10-15 (32's last was 32.0.15 on 2026-09-10). CI and walks run on 33 and 35. Installations on 30–32 keep 1.6.0, which the App Store still offers them (D21, CF1.3a). | yes (product owner, 2026-10-19) |
+| 48 | **Break after P1** | P1 ends with the Nextcloud release — milestone M4 of [`11`](./11_nextcloud_release.md) §2. Then the track pauses: Nextcloud fixes, Renovate updates and the compatibility check continue; OpenCloud and ownCloud.online work waits for a dated "P2 go" in STATUS. | yes (product owner, 2026-10-19) |
+| 49 | **Engineering and deployment standard** | Code follows `synaplan-opencloud`: Makefile entry points, one CI workflow with an `All Checks Passed` gate, Synaplan pinned by git ref and image digest, the contract checked against the pinned OpenAPI spec, E2E on the Synaplan test stack, Renovate, a short `AGENTS.md`, releases built by CI from a tag. Deployment follows `synaplan-charts`: pinned versions, environments as code, rendered and deployed in CI, generated docs, derived secrets. `11` §3. | yes (product owner, 2026-10-19) |
 
 ---
 
@@ -281,8 +286,8 @@ and parallel work: `08` §1; tests per phase: `09` §8.
 | Phase | Builds | Starts when | Exit |
 | ----- | ------ | ----------- | ---- |
 | **P0 — Ready** | Local stacks E-1…E-4 and E-6 (E-5 is P3) | The rows the first briefs cite are agreed | `env-check.sh --cloud nextcloud --oidc` green |
-| **P1 — Core + Nextcloud** | Every `synaplan` step of CF0–CF5 except CF2.11, and every `synaplan-nextcloud` step; the reference client E-9 before CF2.1; spikes CF-S2 and CF-S5 at the start, CF-S1, CF-S3 and CF-S4 answered before CF3.1 and CF5.1 merge | P0 exit | Nextcloud journeys walked; reference client green in both profiles; the current OpenCloud and ownCloud.online releases still work against the new core; contract v1 frozen (CF5.10) |
-| **P2 — OpenCloud** | Every `synaplan-opencloud` step and the OpenCloud Apps card (CF2.11) | P1 exit (CF1.5 may start earlier, row 34) | OpenCloud journeys walked against contract v1 |
+| **P1 — Core + Nextcloud** | Every `synaplan` step of CF0–CF5 except CF2.11, and every `synaplan-nextcloud` step; the reference client E-9 before CF2.1; spikes CF-S2 and CF-S5 at the start, CF-S1, CF-S3 and CF-S4 answered before CF3.1 and CF5.1 merge. Released in four milestones ([`11`](./11_nextcloud_release.md) §2) | P0 exit | Nextcloud journeys walked; reference client green in both profiles; the current OpenCloud and ownCloud.online releases still work against the new core; contract v1 frozen (CF5.10); then the Nextcloud release and the **break** (row 48) |
+| **P2 — OpenCloud** | Every `synaplan-opencloud` step and the OpenCloud Apps card (CF2.11) | P1 exit and a dated "P2 go" after the break (row 48); CF1.5 may start earlier (row 34) | OpenCloud journeys walked against contract v1 |
 | **P3 — ownCloud.online** | Every `synaplan-owncloud-online` step, on the E-5 stack | P2 exit | ownCloud.online journeys walked; §5 has no open cell |
 
 One cloud at a time. A core change in P2 or P3 is additive (row 44), needs a
@@ -353,9 +358,10 @@ each and end in a STATUS entry, never in merged code.
    `cloud_files` on for new installs and on web.synaplan.com with the
    activation migration for existing installs (row 46). The walks run on the
    stacks pinned in [`10`](./10_local_environments.md) with the `09` §7
-   regression set green.
-4. **P2 and P3** each end with their app release and the docs page for that
-   cloud; no core switch.
+   regression set green. Then the track pauses until a dated "P2 go" (row 48,
+   `11` §1).
+4. **P2 and P3** each start with a dated go and end with their app release
+   and the docs page for that cloud; no core switch.
 5. **Rollback:** flag off → capabilities disappear → apps hide watch, bird and
    copy surfaces. Copies already made, files already searchable and keys stay
    valid.
