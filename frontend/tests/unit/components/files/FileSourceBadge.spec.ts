@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 
 import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
-import type { FileSource } from '@/services/filesService'
+import { fileSourceSchema, type FileSource } from '@/services/filesService'
 
 const i18n = createI18n({
   legacy: false,
@@ -16,6 +16,7 @@ const i18n = createI18n({
           web_upload: 'Upload',
           generated: 'AI-generated',
           whatsapp: 'WhatsApp',
+          owncloud: 'ownCloud.online',
         },
       },
     },
@@ -48,5 +49,11 @@ describe('FileSourceBadge', () => {
     const wrapper = mountBadge('generated')
     expect(wrapper.find('[data-testid="file-source-badge"]').exists()).toBe(true)
     expect(wrapper.text()).toBe('AI-generated')
+  })
+
+  it('labels ownCloud.online uploads, which the API reports as owncloud', () => {
+    const wrapper = mountBadge(fileSourceSchema.parse('owncloud'))
+    expect(wrapper.find('[data-testid="file-source-badge"]').exists()).toBe(true)
+    expect(wrapper.text()).toBe('ownCloud.online')
   })
 })

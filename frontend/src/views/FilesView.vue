@@ -510,6 +510,7 @@
                       <option value="outlook">{{ $t('files.sourceLabel.outlook') }}</option>
                       <option value="nextcloud">{{ $t('files.sourceLabel.nextcloud') }}</option>
                       <option value="opencloud">{{ $t('files.sourceLabel.opencloud') }}</option>
+                      <option value="owncloud">{{ $t('files.sourceLabel.owncloud') }}</option>
                       <option value="whatsapp">{{ $t('files.sourceLabel.whatsapp') }}</option>
                       <option v-if="telegramSourceVisible" value="telegram">
                         {{ $t('files.sourceLabel.telegram') }}

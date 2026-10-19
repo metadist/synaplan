@@ -178,6 +178,7 @@ export const fileSourceSchema = z.enum([
   'outlook',
   'nextcloud',
   'opencloud',
+  'owncloud',
   'whatsapp',
   'telegram',
   'widget',
