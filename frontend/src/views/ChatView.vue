@@ -398,6 +398,11 @@
         :retrying="retryingConversationAccess"
         @retry="retryConversationAccess"
       />
+      <FreeApiChatBanner
+        v-if="!needsProviderSetup && canComposeSharedChat && !isGuestMode"
+        class="max-w-[70rem] mx-auto w-full px-4 mb-2"
+        :streaming="isStreaming"
+      />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -662,6 +667,7 @@ import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
 import FreeApiWelcome from '@/components/freeapi/FreeApiWelcome.vue'
+import FreeApiChatBanner from '@/components/freeapi/FreeApiChatBanner.vue'
 import { useFreeApiStore } from '@/stores/freeApi'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'

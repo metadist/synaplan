@@ -47,7 +47,8 @@ endpoint).
 | -- | ----- | ----- |
 | F4a | `GET /api/v1/freeapi/status`, `POST /api/v1/admin/freeapi/activate` (consent required), `POST /api/v1/admin/freeapi/leave`; who started it; refusal sentences per `freeapi_*` code on the chat turn (five locales); Getting-started `provider` item stays open while the Demo is active | backend-only (OpenAPI consumed by F4b) |
 | F4b | Welcome screen replacing the no-provider screen for admins, also the provider step of `/setup`; consent sentence; start errors in plain words | ota-candidate |
-| F4c | Banner → pill → card in the chat; Demo row in Quick model setup; auto-leave toast with Undo; Getting-started copy | ota-candidate |
+| F4c | Banner → pill → card in the chat; Leave the Demo from the card | ota-candidate |
+| F4d | Demo row in Quick model setup; auto-leave toast with Undo; Getting-started copy | ota-candidate |
 
 ## Copy
 
@@ -57,6 +58,11 @@ Usage counts and your install id are stored for 30 days."
 
 Refusal sentences say what did not happen and name a recovery; they carry
 no fixed numbers because the limits are tuned on the server.
+
+The docs pages `demo` and `own-ai-keys` (plan §12.6) do not exist yet, so
+no surface links to them (U11). "Get your own keys" and "Run Ollama locally"
+open the matching section of `/admin/setup` for admins; members get the
+details only.
 
 ## Exit criteria (UX contract §6)
 
