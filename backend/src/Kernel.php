@@ -22,6 +22,16 @@ class Kernel extends BaseKernel
     /** @var list<array{dir: string, namespace: string}>|null */
     private ?array $discoveredPlugins = null;
 
+    public function boot(): void
+    {
+        // A warm cache skips configureContainer(), the only other caller, and
+        // the dumped container loads just its own service classes. Without this
+        // every other plugin class (value objects, static factories) is unknown.
+        $this->getPlugins();
+
+        parent::boot();
+    }
+
     protected function configureContainer(ContainerConfigurator $container): void
     {
         // Absolute config dir (not '../config') so a test kernel subclass living
