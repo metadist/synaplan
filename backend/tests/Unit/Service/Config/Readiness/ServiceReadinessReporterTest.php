@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Config\Readiness;
 
+use App\Service\Config\Readiness\ComposeServiceLookup;
 use App\Service\Config\Readiness\ReadinessObservation;
 use App\Service\Config\Readiness\ServiceReadinessCatalog;
 use App\Service\Config\Readiness\ServiceReadinessProbes;
@@ -18,7 +19,7 @@ final class ServiceReadinessReporterTest extends TestCase
     /**
      * @param array<string, ReadinessObservation> $overrides
      */
-    private function reporter(array $overrides = [], string $environment = 'prod', string $platform = 'selfhost', string $kubernetesHost = ''): ServiceReadinessReporter
+    private function reporter(array $overrides = [], string $environment = 'prod', string $platform = 'selfhost', string $kubernetesHost = '', bool $containersExist = true): ServiceReadinessReporter
     {
         $observations = [];
         foreach (array_keys(ServiceReadinessCatalog::SERVICES) as $id) {
@@ -26,11 +27,14 @@ final class ServiceReadinessReporterTest extends TestCase
         }
         $probes = $this->createStub(ServiceReadinessProbes::class);
         $probes->method('observeAll')->willReturn($observations);
+        $lookup = $this->createStub(ComposeServiceLookup::class);
+        $lookup->method('exists')->willReturn($containersExist);
 
         return new ServiceReadinessReporter(
             $probes,
             new ServiceStateTracker(new ArrayAdapter(), new MockClock('2026-10-19 12:00:00 UTC')),
             new ArrayAdapter(),
+            $lookup,
             $environment,
             $platform,
             $kubernetesHost,
@@ -108,6 +112,26 @@ final class ServiceReadinessReporterTest extends TestCase
         self::assertNull($this->row($this->reporter($broken, platform: 'umbrel')->rows(), 'tika')['recovery']);
         self::assertNull($this->row($this->reporter($broken, platform: 'elestio')->rows(), 'tika')['recovery']);
         self::assertSame('PDFs and Office files cannot be read.', $this->row($this->reporter($broken, platform: 'umbrel')->rows(), 'tika')['effect']);
+    }
+
+    public function testADevSidecarWhoseProfileIsOffIsOffNotStarting(): void
+    {
+        $down = ['docling' => ReadinessObservation::down(), 'qdrant' => ReadinessObservation::down()];
+
+        $rows = $this->reporter($down, 'dev', containersExist: false)->rows();
+        $docling = $this->row($rows, 'docling');
+        self::assertSame('off', $docling['state']);
+        self::assertSame('docling', $docling['profile']);
+        self::assertSame('Turn it on with the "docling" Compose profile: COMPOSE_PROFILES=docling make up', $docling['recovery']);
+        self::assertSame('starting', $this->row($rows, 'qdrant')['state'], 'a default service without its container is still coming in wave 2');
+    }
+
+    public function testASidecarWhoseContainerExistsOrThatRunsOutsideDevIsStarting(): void
+    {
+        $down = ['docling' => ReadinessObservation::down()];
+
+        self::assertSame('starting', $this->row($this->reporter($down, 'dev')->rows(), 'docling')['state']);
+        self::assertSame('starting', $this->row($this->reporter($down, containersExist: false)->rows(), 'docling')['state']);
     }
 
     public function testADevOnlyServiceGetsACommandOnlyOnTheDevStack(): void

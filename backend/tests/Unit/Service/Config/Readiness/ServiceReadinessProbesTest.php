@@ -20,6 +20,7 @@ use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\Memory\UserMemoryService;
 use App\Service\Stt\SpeechFailure;
 use App\Service\Stt\WhisperService;
+use App\Service\VectorSearch\QdrantClientInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 
@@ -56,8 +57,10 @@ final class ServiceReadinessProbesTest extends TestCase
             $factories[$id] = static fn (): FeatureModuleInterface => $module;
         }
 
+        $qdrant = $this->createStub(QdrantClientInterface::class);
+        $qdrant->method('refreshHealth')->willReturn($qdrantReachable);
         $memory = $this->createStub(UserMemoryService::class);
-        $memory->method('isReachableNow')->willReturn($qdrantReachable);
+        $memory->method('getQdrantClient')->willReturn($qdrant);
         $whisper = $this->createStub(WhisperService::class);
         $whisper->method('unavailableReason')->willReturn($whisperReason);
         $whisper->method('isAvailable')->willReturn(null === $whisperReason);

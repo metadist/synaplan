@@ -101,7 +101,7 @@ final readonly class ServiceReadinessProbes
             return ReadinessObservation::off();
         }
 
-        return $this->memoryService->isReachableNow() ? ReadinessObservation::ready() : ReadinessObservation::down();
+        return $this->memoryService->getQdrantClient()->refreshHealth() ? ReadinessObservation::ready() : ReadinessObservation::down();
     }
 
     private function observeWhisper(): ReadinessObservation

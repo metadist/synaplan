@@ -27,6 +27,7 @@ final readonly class ServiceReadinessReporter
         private ServiceReadinessProbes $probes,
         private ServiceStateTracker $tracker,
         private CacheInterface $cache,
+        private ComposeServiceLookup $composeLookup,
         private string $environment,
         private string $platform,
         private string $kubernetesHost,
@@ -52,6 +53,7 @@ final readonly class ServiceReadinessReporter
     {
         $rows = [];
         foreach ($this->probes->observeAll() as $id => $observation) {
+            $observation = $this->withProfileOff($id, $observation);
             $tracked = $this->tracker->track($id, $observation);
             $state = $tracked['state'];
 
@@ -67,6 +69,21 @@ final readonly class ServiceReadinessReporter
         }
 
         return $rows;
+    }
+
+    /**
+     * The dev compose files point the backend at every profile service, so a
+     * sidecar whose profile is off looks configured but never answers. When
+     * its container does not exist it is off, not starting.
+     */
+    private function withProfileOff(string $id, ReadinessObservation $observation): ReadinessObservation
+    {
+        $service = ServiceReadinessCatalog::SERVICES[$id];
+        if (ReadinessObservation::DOWN !== $observation->kind || null === $service['profile'] || 'dev' !== $this->environment) {
+            return $observation;
+        }
+
+        return $this->composeLookup->exists($service['compose']) ? $observation : ReadinessObservation::off();
     }
 
     private function recovery(string $id, string $state): ?string
