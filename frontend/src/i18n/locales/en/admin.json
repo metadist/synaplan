@@ -82,6 +82,7 @@
     "retry": "Try again",
     "helpLine": "This window was opened by another app. It is safe to close.",
     "notYou": "Not you? Sign out",
+    "signedInAs": "Signed in to Synaplan as {email}",
     "errorMissingState": "This connection request is incomplete. Start again from the other app.",
     "errorOfficeNotReady": "Office.js is not available. This page must be opened from inside Outlook.",
     "errorNotSignedIn": "You are not signed in. Refresh the window and sign in again.",

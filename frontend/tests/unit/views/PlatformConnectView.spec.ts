@@ -141,6 +141,25 @@ describe('PlatformConnectView', () => {
     expect(wrapper.text()).toContain('Outlook')
   })
 
+  it('names the signed-in Synaplan account for a cloud app link', async () => {
+    getConfigSync.mockReturnValue({ features: { platformLinksEnabled: true } })
+    getPublicInstance.mockResolvedValue({ host: 'cloud.example.org' })
+    const { wrapper } = await mountAt(
+      '/connect/platform?client=nextcloud&instance_id=pi_1&external_id=ada&state=abc'
+    )
+    expect(wrapper.find('[data-testid="section-ready"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="signed-in-as"]').text()).toContain('demo@synaplan.com')
+    expect(wrapper.text()).toContain('ada')
+  })
+
+  it('does not repeat the account for Outlook, whose card already shows it', async () => {
+    const { wrapper } = await mountAt(
+      '/connect/platform?client=outlook&state=abc&label=Outlook&redirect=https://localhost/relay'
+    )
+    expect(wrapper.find('[data-testid="signed-in-as"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('demo@synaplan.com')
+  })
+
   it('does not call the network for an unknown client', async () => {
     const { wrapper } = await mountAt('/connect/platform?client=evil&state=abc')
     expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
