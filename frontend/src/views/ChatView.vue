@@ -390,7 +390,8 @@
           attachConversationFile({
             id: conversationPreview.id,
             name: conversationPreview.filename,
-            fileType: '',
+            fileType: conversationPreview.fileType,
+            mime: conversationPreview.mime,
           })
         "
       />
@@ -837,11 +838,26 @@ const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
 const { confirm: confirmDialog } = useDialog()
 
-const conversationPreview = ref<{ id: number; filename: string } | null>(null)
+const conversationPreview = ref<{
+  id: number
+  filename: string
+  fileType: string
+  mime?: string
+} | null>(null)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
-const previewConversationFile = (file: { id: number | null; name: string }) => {
+const previewConversationFile = (file: {
+  id: number | null
+  name: string
+  fileType?: string
+  mime?: string
+}) => {
   if (file.id == null) return
-  conversationPreview.value = { id: file.id, filename: file.name }
+  conversationPreview.value = {
+    id: file.id,
+    filename: file.name,
+    fileType: file.fileType || '',
+    mime: file.mime,
+  }
 }
 const downloadConversationPreview = async () => {
   const file = conversationPreview.value
@@ -849,7 +865,12 @@ const downloadConversationPreview = async () => {
   const { downloadFile } = await import('@/services/filesService')
   await downloadFile(file.id, file.filename)
 }
-const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
+const attachConversationFile = (file: {
+  id: number | null
+  name: string
+  fileType: string
+  mime?: string
+}) => {
   if (file.id === null) {
     return
   }
@@ -857,6 +878,7 @@ const attachConversationFile = (file: { id: number | null; name: string; fileTyp
     file_id: file.id,
     filename: file.name,
     file_type: file.fileType,
+    mime: file.mime,
   })
 }
 
@@ -3834,11 +3856,17 @@ async function editUserMessage(message: Message, text: string): Promise<void> {
   })
 }
 
-function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {
+function reattachMessageFile(file: {
+  id: number
+  filename: string
+  fileType?: string
+  fileMime?: string
+}): void {
   chatInputRef.value?.attachExistingFile({
     file_id: file.id,
     filename: file.filename,
     file_type: file.fileType || '',
+    mime: file.fileMime,
   })
 }
 

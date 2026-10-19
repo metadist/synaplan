@@ -446,7 +446,7 @@ final readonly class ConversationFileCatalog
 
         $relative = $this->normalizeRelativePath($file->getFilePath());
 
-        $entries[] = new ConversationFile(
+        $entry = new ConversationFile(
             null !== $id ? 'file:'.$id : 'attached:'.$attachmentIndex,
             $this->displayName($file),
             ConversationFile::categoryForPath($relative),
@@ -458,6 +458,8 @@ final readonly class ConversationFileCatalog
             $direction,
             $file->getFileText(),
         );
+        $entry->mime = $file->getFileMime();
+        $entries[] = $entry;
     }
 
     /**

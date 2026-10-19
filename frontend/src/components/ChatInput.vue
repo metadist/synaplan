@@ -1618,7 +1618,12 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
   success(`${selectedFiles.length} file(s) attached`)
 }
 
-const attachExistingFile = (file: { file_id: number; filename: string; file_type: string }) => {
+const attachExistingFile = (file: {
+  file_id: number
+  filename: string
+  file_type: string
+  mime?: string
+}) => {
   if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) {
     return
   }
@@ -1626,6 +1631,7 @@ const attachExistingFile = (file: { file_id: number; filename: string; file_type
     file_id: file.file_id,
     filename: file.filename,
     file_type: file.file_type,
+    mime: file.mime || undefined,
     processing: false,
   })
   success(t('chat.conversationFiles.attached', { name: file.filename }))
@@ -2432,7 +2438,12 @@ const startDictation = async (): Promise<boolean> => {
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
-  attachExistingFile: (file: { file_id: number; filename: string; file_type: string }) => void
+  attachExistingFile: (file: {
+    file_id: number
+    filename: string
+    file_type: string
+    mime?: string
+  }) => void
   setInputText: (text: string) => void
   submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>

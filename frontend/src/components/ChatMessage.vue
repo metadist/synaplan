@@ -1216,7 +1216,13 @@ import { isModuleConfigured } from '@/composables/useModuleFeature'
 const { t, te, locale } = useI18n()
 const guestStore = useGuestStore()
 const guestSessionId = computed(() => guestStore.sessionId)
-const previewFile = ref<{ id: number; filename: string; fileSize?: number } | null>(null)
+const previewFile = ref<{
+  id: number
+  filename: string
+  fileSize?: number
+  fileType: string
+  fileMime?: string
+} | null>(null)
 const fileReturnFocus = ref<HTMLElement | null>(null)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
 const ArtifactPanel = defineAsyncComponent(() => import('@/components/chat/ArtifactPanel.vue'))
@@ -1229,7 +1235,13 @@ const showOfficeActions = (file: MessageFile): boolean => {
 }
 
 const openPreview = (file: MessageFile) => {
-  previewFile.value = { id: file.id, filename: file.filename, fileSize: file.fileSize }
+  previewFile.value = {
+    id: file.id,
+    filename: file.filename,
+    fileSize: file.fileSize,
+    fileType: file.fileType,
+    fileMime: file.fileMime,
+  }
 }
 
 const openFileChip = (file: MessageFile, event: MouseEvent) => {
@@ -1259,9 +1271,10 @@ const reattachPreview = () => {
   emit('reattachFile', {
     id: file.id,
     filename: file.filename,
-    fileType: '',
+    fileType: file.fileType,
     filePath: '',
     fileSize: file.fileSize,
+    fileMime: file.fileMime,
   })
 }
 

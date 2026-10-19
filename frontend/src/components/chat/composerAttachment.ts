@@ -19,8 +19,19 @@ export function attachmentKey(file: UploadedFile, index: number): string {
   return `${file.filename || file.name || 'file'}-${index}`
 }
 
+/**
+ * Bare kinds (`image`, `png`) stay as stored. A filename (`shot.png`) — the
+ * fallback when reattach has no file type — is reduced to its extension, which
+ * is all the media helpers match.
+ */
+function typeOrExtension(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed.includes('.') || trimmed.includes('/')) return trimmed
+  return trimmed.split('.').pop() || trimmed
+}
+
 export function composerMediaKind(file: UploadedFile): 'image' | 'video' | null {
-  const type = file.file_type || file.filename || file.name || ''
+  const type = typeOrExtension(file.file_type || file.filename || file.name || '')
   if (isImageFileType(type, file.mime)) return 'image'
   if (isVideoFileType(type, file.mime)) return 'video'
   return null
