@@ -571,3 +571,24 @@ Findings:
 7. **Release secrets (A6)**: before the first tag the owner stores
    `APP_STORE_SIGNING_KEY` and `APP_STORE_TOKEN`. The local signing key
    matches the certificate the App Store holds for the app.
+8. **The integrated release candidate** (all eight branches merged locally in
+   the merge order above; no conflict):
+   - `make ci-local` passes: 200 PHPUnit, 7 contract, 326 Vitest tests.
+   - The ten journeys pass on Nextcloud 33 after an in-place `occ upgrade`
+     from 1.6.1.
+9. **Upgrade from the App Store version** (`11` §5 item 6, adapted): 1.5.0
+   has no link mode and stops at Nextcloud 34. So the check ran on Nextcloud
+   33:
+   - 1.5.0 from its release tarball, accounts created by the administrator,
+     carol activated, Summarize.
+   - The 1.7.0 package and `occ upgrade` ("Updated <synaplan_integration> to
+     1.7.0").
+   - Carol's next Summarize worked without activating again.
+   - Her plain-text key was stored encrypted after that first use, and the
+     admin key after the admin settings first read it.
+   - Caveat: right after files are swapped under a running server, PHP's
+     opcache may serve the old code for up to a minute. Keys stay readable
+     meanwhile and are encrypted on the next use.
+
+   A link made with 1.6.x surviving the upgrade was checked on the dev stack
+   when CF1.3c was built.
