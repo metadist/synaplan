@@ -209,26 +209,74 @@ default.
 
 ### Optional office conversion (Collabora)
 
-The optional `office` profile starts a Collabora CODE sidecar (~2 GB RAM) for
-office thumbnails, PDF export, preview, and combine. It is **off by default**
-so the official 8 GB Cloud-AI floor stays valid. Umbrel / AWS Marketplace /
-Elestio stay off unless you opt in.
+Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
+legacy / Apple format conversion, and “Combine as PDF” need a **Collabora CODE**
+sidecar (`collabora/code`). Chat, Tika RAG and officemaker DOCX / XLSX / PPTX
+work without it. The sidecar is **off by default** (`--profile office`) so
+`make up` does not pull the image or spend the extra ~2 GB RAM. The official
+8 GB Cloud-AI floor stays valid. Umbrel, AWS Marketplace and Elestio stay off
+unless you opt in.
 
 ```bash
-COMPOSE_PROFILES=office \
-  docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+# Dev / minimal — compose already defaults OFFICE_CONVERT_URL to http://collabora:9980
+docker compose --profile office up -d
+
+# Production (deploy/) — env, not backend/.env
+# in deploy/.env:  COMPOSE_PROFILES=office
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile office up -d
+
+# Already running CODE (Nextcloud, OpenCloud, another compose)
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 make up
 ```
 
 The deploy entrypoint sets `OFFICE_CONVERT_URL=http://collabora:9980` when
-`office` is in `COMPOSE_PROFILES`. See [Development Guide](DEVELOPMENT.md#office-conversion-optional).
+`office` is in `COMPOSE_PROFILES`.
+
+Do **not** put `OFFICE_CONVERT_URL` in `backend/.env`: Compose injects the
+variable, so the file cannot override it. Deployments set the env on the host
+or in compose. `OFFICE_CONVERT_URL=disabled` turns the engine off.
+
+**Collabora never sees Synaplan users.** Convert-to is a server-to-server POST
+of a file; identity stays in Synaplan (login + file ownership). No Collabora
+accounts, no WOPI token on this path. HTTP 403 is usually CODE’s
+`net.post_allow.host` rejecting the compose subnet.
+
+Full operator guide: [docs.synaplan.com/office-documents](https://docs.synaplan.com/index.php/office-documents).
+Development notes: [Development Guide](DEVELOPMENT.md#office-conversion-optional).
+Kubernetes / reuse in other projects:
+[synaplan-charts `docs/collabora-office-engine.md`](https://github.com/metadist/synaplan-charts/blob/docs/collabora-office-engine/docs/collabora-office-engine.md).
 
 ### File work (secure compute)
 
-The development stack starts the compute sidecar with a plain
-`make up`. Production `deploy/compose.yaml` adds it when
-`COMPOSE_PROFILES` includes `compute` — `prepare.sh` writes `COMPUTE_TOKEN`.
-See the [root README](../README.md#file-work) and [COMPUTE.md](COMPUTE.md).
-Never publish port `8080`.
+The assistant can run a **short Python or Node program** on *copies* of files
+you already picked and hand the result back as files — a chart from a CSV, a
+merged spreadsheet, a renamed folder of PDFs. The program runs in an isolated
+sidecar. PHP never talks to Docker.
+
+`git clone` and `make up` start it. Compose builds the sidecar and
+the Python/Node runtimes from this repo, wires a local token, and turns the
+feature on. No profile, no image pin, no extra `.env`.
+
+The local token is fixed. Do not change it:
+
+```text
+synaplan-dev-compute-token-change-me-32b
+```
+
+Compose uses that value for the app and the sidecar whenever `COMPUTE_TOKEN`
+is unset, and the nightly load uses the same value. A developer install
+must not depend on a newly generated secret. A production or shared host
+sets its own `COMPUTE_TOKEN` (`openssl rand -hex 32` in `deploy/.env`).
+`prepare.sh` writes one when that value is empty. Never reuse the demo
+token there, and never publish port `8080`.
+
+To hide it: `COMPUTE_URL=disabled make up` (or
+`FEATURE_COMPUTE_ENABLED=false`). Production `deploy/compose.yaml` adds the
+sidecar when `COMPOSE_PROFILES` includes `compute`. Cloud uses a **separate**
+gVisor box, not this T1 sidecar on the web nodes.
+
+Full guide: [COMPUTE.md](COMPUTE.md) ·
+[docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
 ### Evaluate on Elestio
 
@@ -496,11 +544,41 @@ docker compose exec backend uname -m   # expect: aarch64
   later start is a cache hit.
 
 ### Port conflicts
-Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama, `local-ai` profile only), 9999 (Tika), 10200 (TTS, localhost-only), 8080/8443 (Keycloak, `oidc` profile only). Each one is a `SYNAPLAN_*_PORT` value in `.env` (see `.env.example`). Spoken answers use `SYNAPLAN_TTS_PORT` and stay bound to 127.0.0.1.
+
+These host ports must be free for the development stack:
+
+| Port | Service |
+|------|---------|
+| `5173` | Frontend (Vite) |
+| `8000` | Backend API |
+| `8082` | phpMyAdmin |
+| `8025` and `1025` | MailHog web UI and SMTP |
+| `3307` | MariaDB |
+| `6333` | Qdrant |
+| `9999` | Apache Tika |
+| `11435` | Ollama, `local-ai` profile only |
+| `10200` | Text-to-speech, localhost only (`SYNAPLAN_TTS_PORT`) |
+| `8080` and `8443` | Keycloak, `oidc` profile only |
+
+Each one is a `SYNAPLAN_*_PORT` value in `.env` (see `.env.example`). Spoken answers stay bound to `127.0.0.1`.
 
 Redis, Centrifugo, the worker, and the scheduler are internal-only services — they expose no host ports and cannot conflict.
 
 Change a host port in `.env`. Do not edit the port mappings in `docker-compose.yml`.
+
+### Development service URLs
+
+| Service | URL |
+|---------|-----|
+| App | http://localhost:5173 |
+| API | http://localhost:8000 |
+| API Docs | http://localhost:8000/api/doc |
+| phpMyAdmin | http://localhost:8082 |
+| MailHog | http://localhost:8025 (SMTP on `:1025`) |
+| Qdrant | http://localhost:6333 |
+| Tika | http://localhost:9999 |
+| Ollama | http://localhost:11435 (`local-ai` profile only) |
+| TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`; host port is `SYNAPLAN_TTS_PORT`) |
 
 ### Worker / queue issues
 Async jobs (AI processing, document indexing) run in the `worker` container:

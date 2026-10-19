@@ -7,7 +7,7 @@ this HTTP API (protocol 1).
 **Go/no-go (A0):** own sidecar. See [docs/SPIKE.md](docs/SPIKE.md), [docs/API.md](docs/API.md), and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 Developers start this from the Synaplan checkout with a plain
-`docker compose up`. Details: [root README](../../README.md#file-work)
+`docker compose up`. Details: [Installation — File work](../../docs/INSTALLATION.md#file-work-secure-compute)
 and [docs/COMPUTE.md](../../docs/COMPUTE.md).
 
 ## Layout
@@ -38,7 +38,7 @@ make build
 
 A checkout started with `docker compose up` does not use that command. It
 uses the fixed demo token `synaplan-dev-compute-token-change-me-32b` (see
-the root README, File work). Leave that default alone. Set your own
+[Installation — File work](../../docs/INSTALLATION.md#file-work-secure-compute)). Leave that default alone. Set your own
 `COMPUTE_TOKEN` before any shared or production host.
 
 If dockerd is unreachable, **health still works**. Runs that pass validation fail with a clean status record (`docker_unavailable`) rather than taking down the process.
