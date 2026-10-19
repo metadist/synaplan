@@ -827,6 +827,22 @@
         "guide": "Guide",
         "downloadingPercent": "Téléchargement · {percent} %",
         "minutesLeft": "environ {count} min restantes",
+        "pill": {
+          "progress": "Configuration en cours · {ready} sur {total} prêts",
+          "attention": "{count} demande votre attention | {count} demandent votre attention"
+        },
+        "toast": {
+          "starting": "Vous pouvez déjà discuter. L’IA locale, la recherche de documents et les réponses vocales démarrent encore.",
+          "allReady": "Tout est prêt.",
+          "switchToLocal": "Passer à vos modèles locaux",
+          "switchedToLocal": "Vos modèles Ollama locaux répondent au chat maintenant. Vous avez quitté la Démo Synaplan.",
+          "switchFailed": "Le passage à vos modèles locaux ne s’est pas terminé. Réessayez dans Infrastructure d’IA."
+        },
+        "statusPage": {
+          "title": "Configuration de cet ordinateur",
+          "lead": "Vous pouvez déjà discuter.",
+          "leadDemo": "Vous pouvez déjà discuter — la Démo Synaplan répond pendant que le reste se charge."
+        },
         "state": {
           "starting": "Démarrage",
           "downloading": "Téléchargement",

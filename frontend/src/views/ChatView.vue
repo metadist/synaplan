@@ -18,6 +18,7 @@
         class="v2-desktop-chrome items-center gap-2 absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
+        <ServiceReadinessPill />
         <ModelMixControl />
         <IncognitoToggle />
       </div>
@@ -720,6 +721,7 @@ import {
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
+import ServiceReadinessPill from '@/components/chat/ServiceReadinessPill.vue'
 import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
 import type { StreamUpdatePayload } from '@/types/chatStream'

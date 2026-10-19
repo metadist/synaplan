@@ -1,7 +1,15 @@
 import type { ServiceReadiness, ServiceReadinessState } from '@/services/featuresService'
 
-type Translate = (key: string, params?: Record<string, unknown>) => string
+type Translate = (key: string, params?: Record<string, unknown>, plural?: number) => string
 type HasKey = (key: string) => boolean
+
+export interface ServiceReadinessPillSummary {
+  kind: 'progress' | 'attention'
+  /** Count shown at 320 px (`3/6` while setting up, `1` when something stopped). */
+  shortLabel: string
+  /** Full pill sentence for wider screens. */
+  label: string
+}
 
 export interface ServiceCopy {
   name: string
@@ -136,4 +144,60 @@ const STATE_RANK: Record<ServiceReadinessState, number> = {
 /** Problems first, then progress, then the calm rows. */
 export function sortServices(services: ServiceReadiness[]): ServiceReadiness[] {
   return [...services].sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state])
+}
+
+/** True while a service is still coming up or pulling a model. */
+export function serviceIsInProgress(service: ServiceReadiness): boolean {
+  return service.state === 'starting' || service.state === 'downloading'
+}
+
+/**
+ * The "Still setting up" pill next to Quick model setup (plan §5.10, C15).
+ *
+ * Counts only running optional services (`state !== 'off'`). When a service is
+ * `unavailable` or `failed`, the pill turns amber ("1 needs attention"). After
+ * the first session (`progressSeen === true`), `starting` and `downloading` no
+ * longer show the pill — only `unavailable` or `failed` bring it back.
+ */
+export function serviceReadinessPillSummary(
+  services: ServiceReadiness[] | undefined,
+  t: Translate,
+  progressSeen = false
+): ServiceReadinessPillSummary | null {
+  const running = (services ?? []).filter((s) => s.state !== 'off')
+  if (running.length === 0) return null
+
+  const attentionCount = running.filter(serviceNeedsAttention).length
+  if (attentionCount > 0) {
+    return {
+      kind: 'attention',
+      shortLabel: String(attentionCount),
+      label: t(`${BASE}.pill.attention`, { count: attentionCount }, attentionCount),
+    }
+  }
+
+  if (progressSeen) return null
+  const inProgress = running.some(serviceIsInProgress)
+  if (!inProgress) return null
+
+  const ready = running.filter((s) => s.state === 'ready').length
+  const total = running.length
+  return {
+    kind: 'progress',
+    shortLabel: `${ready}/${total}`,
+    label: t(`${BASE}.pill.progress`, { ready, total }),
+  }
+}
+
+/**
+ * Status badge for the Ollama tile on the welcome screen (plan §5.10, C15),
+ * read from the same `services` list as `/setup/status`.
+ */
+export function ollamaServiceBadge(
+  services: ServiceReadiness[] | undefined,
+  t: Translate
+): string | null {
+  const ollama = (services ?? []).find((s) => s.id === 'ollama')
+  if (!ollama || ollama.state === 'off') return null
+  return serviceStateLabel(ollama, t)
 }

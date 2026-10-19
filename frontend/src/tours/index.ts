@@ -3,6 +3,12 @@ import type { TourDefinition } from './types'
 /** Getting-started card on an empty chat. Dismissing it is stored like a tour. */
 export const CHECKLIST_SEEN_ID = 'checklist.dismissed'
 
+/** First-login toast while optional background services are still starting (C15). */
+export const SERVICES_STARTING_TOAST_SEEN_ID = 'services.starting.seen'
+
+/** All-ready toast when the last starting service finishes (C15); also suppresses progress pills in later sessions. */
+export const SERVICES_READY_TOAST_SEEN_ID = 'services.ready.seen'
+
 const definitions: TourDefinition[] = [
   {
     id: 'chats',

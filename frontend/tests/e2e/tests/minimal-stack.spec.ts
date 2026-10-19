@@ -94,6 +94,13 @@ test.describe('@minimal @ci Minimal stack', () => {
       await expect(row).toHaveAttribute('data-state', 'absent')
       expect(modules[id]?.configured, `runtime ${id} must be unconfigured`).toBe(false)
     }
+
+    await page.goto('/setup/status')
+    await expect(page.locator(selectors.pages.setupStatus)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.pages.setupStatus)).toContainText('You can chat already.')
+    await expect(page.locator(selectors.pages.setupStatus)).not.toContainText('Synaplan Demo')
   })
 
   test('Telegram webhook answers the uniform 404 and the card is absent', async ({

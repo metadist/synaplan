@@ -681,6 +681,17 @@ const router = createRouter({
         i18n: ['admin', 'config'],
       },
     },
+    {
+      path: '/setup/status',
+      name: 'setup-status',
+      component: () => import('@/views/SetupStatusView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.setupStatus',
+        i18n: ['settings'],
+      },
+    },
     // Model health is a tab of AI infrastructure (Operate topic regrouping).
     { path: '/admin/model-status', redirect: modelStatusRedirect },
     {
@@ -847,25 +858,12 @@ function detectRedirectLoop(targetPath: string): boolean {
 
 /**
  * Maps a route path to a backend feature-status key for the guest gate.
- *
- * CHECKPOINT (§4.6): the returned strings ('files', 'settings', 'memories',
- * 'statistics') are BACKEND feature-status keys (admin → Feature Status) and
- * MUST stay identical across URL migrations — a wrong key fails silently
- * (wrong or missing upsell). The new /channels/* and /ai/* prefixes map to
- * 'settings' exactly like the legacy /config/* and /tools/* paths they
- * replaced; /files/search inherits 'files' via the /files prefix.
+ * Must stay identical across URL migrations ('files', 'settings', 'memories', 'statistics').
  */
 function mapPathToFeatureKey(path: string): string {
   if (path.startsWith('/files')) return 'files'
   if (path.startsWith('/memories') || path.startsWith('/feedbacks')) return 'memories'
-  if (
-    path.startsWith('/config') ||
-    path.startsWith('/settings') ||
-    path.startsWith('/tools') ||
-    path.startsWith('/channels') ||
-    path.startsWith('/ai/')
-  )
-    return 'settings'
+  if (/^\/(config|settings|tools|channels|ai\/)/.test(path)) return 'settings'
   if (path.startsWith('/statistics')) return 'statistics'
   return 'general'
 }

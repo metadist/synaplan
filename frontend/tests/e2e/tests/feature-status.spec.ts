@@ -162,6 +162,82 @@ test.describe('@ci System status', () => {
     await attention.getByRole('link').click()
     await expect(page).toHaveURL(/\/admin\/features/)
     await expect(section).toBeVisible({ timeout: TIMEOUTS.EXTREME })
+
+    await page.goto('/')
+    const pill = page.locator(selectors.featureStatus.readinessPill).filter({ visible: true })
+    await expect(pill).toHaveCount(1, { timeout: TIMEOUTS.EXTREME })
+    await expect(pill).toHaveAttribute('data-kind', 'attention')
+    await expect(pill).toContainText('1 needs attention')
+    await pill.click()
+    await expect(page).toHaveURL(/\/setup\/status/)
+    await expect(page.locator(selectors.pages.setupStatus)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(
+      page
+        .locator(`${selectors.featureStatus.serviceItem}[data-service="ollama"]`)
+        .locator(selectors.featureStatus.serviceStateBadge)
+    ).toHaveText('Downloading · 42 %')
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
+  })
+
+  test('shows the progress pill while a service downloads and hides it when only off services remain', async ({
+    page,
+  }) => {
+    const service = (id: string, state: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      name: id,
+      state,
+      unlocks: '',
+      effect: null,
+      recovery: null,
+      since: null,
+      percent: null,
+      model: null,
+      minutes_left: null,
+      profile: null,
+      docs_anchor: null,
+      ...extra,
+    })
+    let services = [
+      service('ollama', 'downloading', {
+        effect: 'Local AI models are not available.',
+        percent: 42,
+        model: 'gpt-oss:20b',
+        minutes_left: 6,
+      }),
+      service('tika', 'ready'),
+      service('collabora', 'off', { profile: 'office' }),
+    ]
+    await page.route('**/api/v1/profile', async (route) => {
+      if (route.request().method() === 'PUT') {
+        await route.fulfill({ status: 200, json: { success: true } })
+        return
+      }
+      const response = await route.fetch()
+      const body = (await response.json()) as { profile?: { toursSeen?: string[] } }
+      if (body.profile) body.profile.toursSeen = []
+      await route.fulfill({ response, json: body })
+    })
+    await page.route('**/api/v1/config/features', async (route) => {
+      const response = await route.fetch()
+      const body = (await response.json()) as Record<string, unknown>
+      body.services = services
+      await route.fulfill({ response, json: body })
+    })
+
+    await page.evaluate(() => localStorage.removeItem('synaplan.toursSeen'))
+    await page.goto('/')
+    const pill = page.locator(selectors.featureStatus.readinessPill).filter({ visible: true })
+    await expect(pill).toHaveCount(1, { timeout: TIMEOUTS.EXTREME })
+    await expect(pill).toHaveAttribute('data-kind', 'progress')
+    await expect(pill).toContainText('Still setting up · 1 of 2 ready')
+
+    services = [service('collabora', 'off', { profile: 'office' })]
+    await page.goto('/')
+    await expect(
+      page.locator(selectors.featureStatus.readinessPill).filter({ visible: true })
+    ).toHaveCount(0)
     await page.unrouteAll({ behavior: 'ignoreErrors' })
   })
 

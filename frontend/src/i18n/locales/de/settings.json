@@ -827,6 +827,22 @@
         "guide": "Anleitung",
         "downloadingPercent": "Lädt herunter · {percent} %",
         "minutesLeft": "noch etwa {count} Min.",
+        "pill": {
+          "progress": "Wird noch eingerichtet · {ready} von {total} bereit",
+          "attention": "{count} braucht Aufmerksamkeit | {count} brauchen Aufmerksamkeit"
+        },
+        "toast": {
+          "starting": "Du kannst schon chatten. Lokale KI, Dokumentensuche und gesprochene Antworten starten noch.",
+          "allReady": "Alles ist bereit.",
+          "switchToLocal": "Auf lokale Modelle wechseln",
+          "switchedToLocal": "Deine lokalen Ollama-Modelle beantworten den Chat jetzt. Die Synaplan-Demo wurde verlassen.",
+          "switchFailed": "Der Wechsel auf deine lokalen Modelle wurde nicht abgeschlossen. Versuche es unter KI-Infrastruktur erneut."
+        },
+        "statusPage": {
+          "title": "Dieser Rechner wird eingerichtet",
+          "lead": "Du kannst schon chatten.",
+          "leadDemo": "Du kannst schon chatten — die Synaplan-Demo antwortet, während der Rest lädt."
+        },
         "state": {
           "starting": "Startet",
           "downloading": "Lädt herunter",

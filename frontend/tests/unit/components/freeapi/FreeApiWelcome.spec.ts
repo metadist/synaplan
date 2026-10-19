@@ -4,18 +4,24 @@ import FreeApiWelcome from '@/components/freeapi/FreeApiWelcome.vue'
 import { i18n } from '@/i18n'
 import { ApiError } from '@/services/api/httpClient'
 
-const { store, push, success } = vi.hoisted(() => ({
+const { store, readinessStore, push, success } = vi.hoisted(() => ({
   store: {
     status: null as { server: string } | null,
     busy: false,
     load: vi.fn(),
     start: vi.fn(),
   },
+  readinessStore: {
+    services: [] as unknown[],
+    acquire: vi.fn(),
+    release: vi.fn(),
+  },
   push: vi.fn(),
   success: vi.fn(),
 }))
 
 vi.mock('@/stores/freeApi', () => ({ useFreeApiStore: () => store }))
+vi.mock('@/stores/serviceReadiness', () => ({ useServiceReadinessStore: () => readinessStore }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 vi.mock('@/composables/useNotification', () => ({ useNotification: () => ({ success }) }))
 
@@ -28,6 +34,7 @@ describe('FreeApiWelcome', () => {
     store.status = { server: 'web.synaplan.com' }
     store.busy = false
     store.start.mockResolvedValue(undefined)
+    readinessStore.services = []
   })
 
   it('preselects the Demo and shows the consent sentence with the real server', async () => {
@@ -101,5 +108,30 @@ describe('FreeApiWelcome', () => {
     await wrapper.get('[data-testid="freeapi-choice-key"] input').setValue(true)
 
     expect(wrapper.find('[data-testid="freeapi-start-error"]').exists()).toBe(false)
+  })
+
+  it('shows the Ollama download progress on the Ollama tile from the readiness list', () => {
+    readinessStore.services = [
+      {
+        id: 'ollama',
+        name: 'Ollama (local AI)',
+        state: 'downloading',
+        unlocks: '',
+        effect: null,
+        recovery: null,
+        since: null,
+        percent: 42,
+        model: 'gpt-oss:20b',
+        minutes_left: 6,
+        profile: 'local-ai',
+        docs_anchor: 'modules/local-ai',
+      },
+    ]
+    const wrapper = mount(FreeApiWelcome)
+
+    expect(readinessStore.acquire).toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="freeapi-ollama-badge"]').text()).toBe('Downloading · 42 %')
+    wrapper.unmount()
+    expect(readinessStore.release).toHaveBeenCalled()
   })
 })

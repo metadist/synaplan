@@ -106,6 +106,7 @@
       v-if="showIncognitoToggle"
       class="v2-incognito-toggle v2-phone-chrome fixed right-3 z-40 flex items-center gap-2"
     >
+      <ServiceReadinessPill />
       <ModelMixControl />
       <IncognitoToggle />
     </div>
@@ -133,6 +134,7 @@ import TourHost from './help/TourHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 import IncognitoToggle from './IncognitoToggle.vue'
 import ModelMixControl from './chat/ModelMixControl.vue'
+import ServiceReadinessPill from './chat/ServiceReadinessPill.vue'
 
 const route = useRoute()
 const router = useRouter()
