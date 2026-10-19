@@ -12,7 +12,9 @@ use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\Policy\PolicyAllowList;
 use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\RecordedUsage;
+use App\Service\Usage\UsageRecorded;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Service\ResetInterface;
 
@@ -52,6 +54,7 @@ final class RateLimitService implements ResetInterface
         private SubscriptionRepository $subscriptionRepository,
         private TopupRepository $topupRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?EventDispatcherInterface $eventDispatcher = null,
     ) {
     }
 
@@ -245,18 +248,7 @@ final class RateLimitService implements ResetInterface
         // caller remembered to include it in `$metadata`.
         $metadata['file_id'] = $fileId;
 
-        // Trim transient fields the same way `recordUsage()` does so
-        // BMETADATA stays small and consistent across both code paths.
-        $storedMetadata = $metadata;
-        unset(
-            $storedMetadata['response_text'],
-            $storedMetadata['input_text'],
-            $storedMetadata['input_bytes'],
-            $storedMetadata['response_bytes'],
-            $storedMetadata['usage'],
-            $storedMetadata['model_id'],
-            $storedMetadata['media_usage'],
-        );
+        $storedMetadata = self::storableMetadata($metadata);
 
         $affectedRows = $this->em->getConnection()->executeStatement(
             <<<'SQL'
@@ -299,6 +291,18 @@ final class RateLimitService implements ResetInterface
         }
 
         return true;
+    }
+
+    /**
+     * BMETADATA without transient fields: texts, byte counts, usage, model id.
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
+     */
+    private static function storableMetadata(array $metadata): array
+    {
+        return array_diff_key($metadata, array_flip(['response_text', 'input_text', 'input_bytes', 'response_bytes', 'usage', 'model_id', 'media_usage']));
     }
 
     /**
@@ -442,16 +446,7 @@ final class RateLimitService implements ResetInterface
             );
         }
 
-        $storedMetadata = $metadata;
-        unset(
-            $storedMetadata['response_text'],
-            $storedMetadata['input_text'],
-            $storedMetadata['input_bytes'],
-            $storedMetadata['response_bytes'],
-            $storedMetadata['usage'],
-            $storedMetadata['model_id'],
-            $storedMetadata['media_usage'],
-        );
+        $storedMetadata = self::storableMetadata($metadata);
 
         $this->em->getConnection()->executeStatement(
             'INSERT INTO BUSELOG (BUSERID, BUNIXTIMES, BACTION, BPROVIDER, BMODEL, BTOKENS, 
@@ -491,6 +486,11 @@ final class RateLimitService implements ResetInterface
             'cost' => $costResult->totalCost,
             'estimated' => $estimated,
         ]);
+        try {
+            $this->eventDispatcher?->dispatch(new UsageRecorded($user, $action, (float) $costResult->totalCost, $storedMetadata));
+        } catch (\Throwable $e) {
+            $this->logger->error('UsageRecorded listener failed', ['user_id' => $user->getId(), 'action' => $action, 'error' => $e->getMessage()]);
+        }
 
         // Charged cost = raw provider cost + operator markup, consistent with
         // checkCostBudget() and the /statistics budget number.

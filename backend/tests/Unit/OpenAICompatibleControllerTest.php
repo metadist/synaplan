@@ -106,6 +106,7 @@ class OpenAICompatibleControllerTest extends TestCase
         $user = $this->createMockUser();
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
 
         // A resolvable model must exist — the controller no longer falls back
         // to a hardcoded gpt-4o (#1320). Resolve via the CHAT default.
@@ -172,6 +173,26 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->assertSame('rate_limit_exceeded', $data['error']['code']);
     }
 
+    public function testChatCompletionsWithAnExhaustedBudgetNeverReachesTheProvider(): void
+    {
+        $user = $this->createMockUser();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => false]);
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $body = json_encode([
+            'messages' => [['role' => 'user', 'content' => 'Hello!']],
+        ]);
+        $request = Request::create('/v1/chat/completions', 'POST', [], [], [], [], $body);
+
+        $response = $this->controller->chatCompletions($request, $user);
+
+        $this->assertSame(429, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertSame('insufficient_quota', $data['error']['code']);
+    }
+
     public function testListModelsRequiresAuth(): void
     {
         $response = $this->controller->listModels(null);
@@ -215,6 +236,7 @@ class OpenAICompatibleControllerTest extends TestCase
         $user = $this->createMockUser();
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
 
         // Resolve a model so the request reaches the provider call that throws
         // (the point of this test) rather than short-circuiting on model lookup.
@@ -249,6 +271,7 @@ class OpenAICompatibleControllerTest extends TestCase
         $user = $this->createMockUser();
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
         // No requested model matches and no CHAT default is configured: the
         // controller must 404 rather than silently route to a hardcoded model
         // and record usage with a null model_id (#1320).

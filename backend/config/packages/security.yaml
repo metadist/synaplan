@@ -64,6 +64,12 @@ security:
         # has no user cookie. Do not put these under the public API document.
         - { path: ^/internal/voice, roles: PUBLIC_ACCESS }
 
+        # Synaplan Demo key issuance. Only the private synafreeapi_server plugin
+        # defines this route (404 everywhere else); it applies proof of work
+        # and per-IP limits. SetupLockdownSubscriber still guards /v1 while
+        # first-run setup is unfinished.
+        - { path: ^/v1/free/keys$, methods: [POST], roles: PUBLIC_ACCESS }
+
         # OpenAI-compatible endpoints (require API key auth)
         - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
 
