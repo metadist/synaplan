@@ -166,7 +166,7 @@
           </template>
           <p class="text-sm txt-secondary">{{ $t('adminSetup.ownService.description') }}</p>
           <RouterLink
-            :to="{ path: '/ai/models', query: { tab: 'edit' } }"
+            :to="{ path: AI_INFRA_PATH, query: { tab: 'catalog' } }"
             class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[var(--brand)] hover:underline"
             data-testid="setup-own-service"
           >
@@ -202,7 +202,7 @@ import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
 import type { ResolvedConfigSection, SystemConfigHandle } from '@/composables/useSystemConfig'
-import type { ConfigSectionRef } from '@/constants/operateSettings'
+import { AI_INFRA_PATH, type ConfigSectionRef } from '@/constants/operateSettings'
 import { useConfigStore } from '@/stores/config'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
 import { adminModelsApi } from '@/services/api/adminModelsApi'
