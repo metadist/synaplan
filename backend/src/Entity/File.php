@@ -36,6 +36,7 @@ class File
         'outlook',
         'nextcloud',
         'opencloud',
+        'owncloud',
         'whatsapp',
         'telegram',
         'widget',
@@ -54,6 +55,7 @@ class File
         'outlook',
         'nextcloud',
         'opencloud',
+        'owncloud',
     ];
 
     /**

@@ -503,21 +503,9 @@
                       @change="onFilterChange"
                     >
                       <option value="">{{ $t('files.filter.source') }}</option>
-                      <option value="web_upload">{{ $t('files.sourceLabel.web_upload') }}</option>
-                      <option value="chat_attachment">
-                        {{ $t('files.sourceLabel.chat_attachment') }}
+                      <option v-for="source in sourceFilterOptions" :key="source" :value="source">
+                        {{ $t(`files.sourceLabel.${source}`) }}
                       </option>
-                      <option value="outlook">{{ $t('files.sourceLabel.outlook') }}</option>
-                      <option value="nextcloud">{{ $t('files.sourceLabel.nextcloud') }}</option>
-                      <option value="opencloud">{{ $t('files.sourceLabel.opencloud') }}</option>
-                      <option value="whatsapp">{{ $t('files.sourceLabel.whatsapp') }}</option>
-                      <option v-if="telegramSourceVisible" value="telegram">
-                        {{ $t('files.sourceLabel.telegram') }}
-                      </option>
-                      <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
-                      <option value="api">{{ $t('files.sourceLabel.api') }}</option>
-                      <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>
-                      <option value="compute">{{ $t('files.sourceLabel.compute') }}</option>
                     </select>
                   </div>
                   <div>
@@ -1634,6 +1622,7 @@ import filesService, {
   type UploadProgress,
   UploadBlockedError,
 } from '@/services/filesService'
+import { fileSourceSchema } from '@/services/fileSources'
 import {
   extensionOf,
   kindFromExtension,
@@ -1791,7 +1780,9 @@ const filterDateFrom = ref('')
 const filterDateTo = ref('')
 // Feature 2 (§4.4, §4.2, §4.5) — provenance / searchable / incoming filters.
 const filterSource = ref('')
-const telegramSourceVisible = computed(() => isModuleConfigured('telegram'))
+const sourceFilterOptions = computed(() =>
+  fileSourceSchema.options.filter((s) => s !== 'telegram' || isModuleConfigured('telegram'))
+)
 const filterVectorized = ref('')
 const filterIncoming = ref(false)
 const filterSharedWithMe = ref(false)

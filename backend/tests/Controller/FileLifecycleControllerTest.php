@@ -214,6 +214,41 @@ class FileLifecycleControllerTest extends WebTestCase
         self::assertNull($byId['nc-GONE']['vector_state']);
     }
 
+    public function testOwncloudUploadKeepsItsSourceAndIsFoundByCheckStale(): void
+    {
+        $data = $this->upload('oc.txt', 'From ownCloud.online.', [
+            'source' => 'owncloud',
+            'source_id' => 'oc-7',
+            'source_etag' => 'etag-oc',
+            'process_level' => 'extract',
+        ]);
+        $fileId = $data['files'][0]['id'];
+
+        $file = $this->em->getRepository(File::class)->find($fileId);
+        self::assertNotNull($file);
+        self::assertSame('owncloud', $file->getSource());
+        self::assertTrue($file->isIncoming());
+
+        $this->client->request('GET', '/api/v1/files', ['source' => 'owncloud'], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+        self::assertResponseIsSuccessful();
+        $listed = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertContains($fileId, array_column($listed['files'], 'id'));
+
+        $this->client->request('POST', '/api/v1/files/check-stale', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+            'CONTENT_TYPE' => 'application/json',
+        ], json_encode([
+            'source' => 'owncloud',
+            'items' => [['source_id' => 'oc-7', 'source_etag' => 'etag-oc']],
+        ]));
+        self::assertResponseIsSuccessful();
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame('current', $body['results'][0]['status']);
+        self::assertSame($fileId, $body['results'][0]['file_id']);
+    }
+
     /**
      * @param array<string, string> $params
      *
