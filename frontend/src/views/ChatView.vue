@@ -54,7 +54,8 @@
         data-testid="state-provider-setup"
       >
         <LocalAiDownloadCard class="mx-auto max-w-[70rem] w-full px-4 pt-4" />
-        <ProviderSetupBanner />
+        <FreeApiWelcome v-if="offerFreeApiWelcome" />
+        <ProviderSetupBanner v-else />
       </div>
 
       <div
@@ -660,6 +661,8 @@ import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
+import FreeApiWelcome from '@/components/freeapi/FreeApiWelcome.vue'
+import { useFreeApiStore } from '@/stores/freeApi'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import { useExtractedMemoryPoll } from '@/composables/useExtractedMemoryPoll'
@@ -1254,6 +1257,12 @@ const liveStage = computed(() => chatInputRef.value?.liveStage ?? null)
 // produce the cryptic HTTP 500 the old banner still allowed.
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
+// Only an admin can start the Synaplan Demo; everyone else keeps the tombstone.
+const freeApiStore = useFreeApiStore()
+const offerFreeApiWelcome = computed(
+  () => needsProviderSetup.value && authStore.isAdmin && freeApiStore.isAvailable()
 )
 
 // Empty start page: the self-aware question is the one suggested action in

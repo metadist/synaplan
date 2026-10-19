@@ -237,7 +237,10 @@ final readonly class FreeApiActivator
             if ($e instanceof FreeApiException && $clean) {
                 throw $e;
             }
-            throw new FreeApiException($clean ? 'The Synaplan Demo could not be set up on this server. Nothing was changed.' : 'The Synaplan Demo could not be set up, and some AI settings may still point at it. Run app:freeapi:leave to restore them.', $e instanceof FreeApiException ? $e->errorCode : FreeApiException::INVALID_RESPONSE, 0, null, $e);
+            if (!$clean) {
+                throw new FreeApiException('The Synaplan Demo could not be set up, and some AI settings may still point at it. Run app:freeapi:leave to restore them.', FreeApiException::SETUP_INCOMPLETE, 0, null, $e);
+            }
+            throw new FreeApiException('The Synaplan Demo could not be set up on this server. Nothing was changed.', FreeApiException::INVALID_RESPONSE, 0, null, $e);
         }
         $this->chatReadiness->invalidate();
         $this->logger->info('Synaplan Demo activated', ['bound' => $bound, 'expires_at' => $issued->expiresAt]);

@@ -6,7 +6,11 @@ vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => getConfigSync(),
 }))
 
-import { isModuleConfigured, isModuleGated } from '@/composables/useModuleFeature'
+import {
+  isModuleConfigured,
+  isModuleExplicitlyConfigured,
+  isModuleGated,
+} from '@/composables/useModuleFeature'
 
 describe('useModuleFeature', () => {
   beforeEach(() => {
@@ -39,6 +43,20 @@ describe('useModuleFeature', () => {
 
     expect(isModuleConfigured('not_a_module')).toBe(true)
     expect(isModuleGated('not_a_module')).toBe(false)
+  })
+
+  // A server that predates a module must not get a control that can only fail.
+  it('counts a module as explicitly configured only on a literal true', () => {
+    getConfigSync.mockReturnValue({
+      modules: { freeapi: { configured: true, gated: false }, whatsapp: { configured: 'yes' } },
+    })
+
+    expect(isModuleExplicitlyConfigured('freeapi')).toBe(true)
+    expect(isModuleExplicitlyConfigured('whatsapp')).toBe(false)
+    expect(isModuleExplicitlyConfigured('not_a_module')).toBe(false)
+
+    getConfigSync.mockReturnValue({ features: {} })
+    expect(isModuleExplicitlyConfigured('freeapi')).toBe(false)
   })
 
   it('only trusts explicit booleans', () => {
