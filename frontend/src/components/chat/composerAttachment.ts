@@ -15,6 +15,24 @@ export interface UploadedFile {
   previewUrl?: string
 }
 
+/** A file already stored on the server, reattached from a message or this chat. */
+export interface ExistingAttachment {
+  file_id: number
+  filename: string
+  file_type: string
+  mime?: string
+}
+
+export function existingUploadedFile(file: ExistingAttachment): UploadedFile {
+  return {
+    file_id: file.file_id,
+    filename: file.filename,
+    file_type: file.file_type,
+    mime: file.mime || undefined,
+    processing: false,
+  }
+}
+
 export function attachmentKey(file: UploadedFile, index: number): string {
   return `${file.filename || file.name || 'file'}-${index}`
 }

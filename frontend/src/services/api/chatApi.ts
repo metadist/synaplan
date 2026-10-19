@@ -24,9 +24,7 @@ export const ConversationFileRowSchema = z.object({
   origin: z.enum(['attached', 'uploaded', 'generated']),
   fileType: z.string(),
   messageId: z.number().int().nullable(),
-  hasText: z.boolean(),
-  /** Stored MIME. Distinguishes video/webm from audio/webm on reattach. */
-  mime: z.string().optional(),
+  hasText: z.boolean(), mime: z.string().optional(),
 })
 
 export const GetConversationFilesResponseSchema = z.object({

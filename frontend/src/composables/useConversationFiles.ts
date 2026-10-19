@@ -75,6 +75,28 @@ const attachmentMime = (file: HistoryAttachment): string => file.fileMime || fil
 const historyMessageId = (message: HistoryMessageLike): number | null =>
   message.backendMessageId ?? message.backend_message_id ?? null
 
+/** API rows win; a message row fills in a MIME the catalog does not have yet. */
+export function mergeConversationFileRows(lists: ConversationFileRow[][]): ConversationFileRow[] {
+  const indexByKey = new Map<string, number>()
+  const merged: ConversationFileRow[] = []
+
+  for (const row of lists.flat()) {
+    const key = row.id !== null ? `id:${row.id}` : row.reference
+    const existingIndex = indexByKey.get(key)
+    if (existingIndex === undefined) {
+      indexByKey.set(key, merged.length)
+      merged.push(row)
+      continue
+    }
+    const existing = merged[existingIndex]
+    if (existing && !existing.mime && row.mime) {
+      merged[existingIndex] = { ...existing, mime: row.mime }
+    }
+  }
+
+  return merged
+}
+
 const historyFileSignature = (messages: HistoryMessageLike[]): string =>
   messages
     .map((message) =>
@@ -123,26 +145,7 @@ export function useConversationFiles() {
     return rows
   })
 
-  const files = computed((): ConversationFileRow[] => {
-    const indexByKey = new Map<string, number>()
-    const merged: ConversationFileRow[] = []
-
-    for (const row of [...fromApi.value, ...fromMessages.value]) {
-      const key = row.id !== null ? `id:${row.id}` : row.reference
-      const existingIndex = indexByKey.get(key)
-      if (existingIndex === undefined) {
-        indexByKey.set(key, merged.length)
-        merged.push(row)
-        continue
-      }
-      const existing = merged[existingIndex]
-      if (existing && !existing.mime && row.mime) {
-        merged[existingIndex] = { ...existing, mime: row.mime }
-      }
-    }
-
-    return merged
-  })
+  const files = computed(() => mergeConversationFileRows([fromApi.value, fromMessages.value]))
 
   const refresh = async () => {
     const chatId = chatsStore.activeChatId

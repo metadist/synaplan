@@ -600,9 +600,11 @@ import {
   shouldRestoreDesktopJob,
 } from '@/utils/desktopJobCard'
 import {
+  existingUploadedFile,
   readyUploadedFile,
   stagedUploadPlaceholder,
   useComposerPreviewUrls,
+  type ExistingAttachment,
   type UploadedFile,
 } from './chat/composerAttachment'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
@@ -1618,22 +1620,9 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
   success(`${selectedFiles.length} file(s) attached`)
 }
 
-const attachExistingFile = (file: {
-  file_id: number
-  filename: string
-  file_type: string
-  mime?: string
-}) => {
-  if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) {
-    return
-  }
-  uploadedFiles.value.push({
-    file_id: file.file_id,
-    filename: file.filename,
-    file_type: file.file_type,
-    mime: file.mime || undefined,
-    processing: false,
-  })
+const attachExistingFile = (file: ExistingAttachment) => {
+  if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) return
+  uploadedFiles.value.push(existingUploadedFile(file))
   success(t('chat.conversationFiles.attached', { name: file.filename }))
 }
 
@@ -2438,12 +2427,7 @@ const startDictation = async (): Promise<boolean> => {
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
-  attachExistingFile: (file: {
-    file_id: number
-    filename: string
-    file_type: string
-    mime?: string
-  }) => void
+  attachExistingFile: (file: ExistingAttachment) => void
   setInputText: (text: string) => void
   submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>
