@@ -23,7 +23,7 @@ and P3. The phase exits are §8.
 | ----- | ---- | ----------- | -------------- |
 | **L1 Unit and contract** | The repo gates (`06` §0) plus the tests each brief names | the agent, before every commit | each repo's test suite |
 | **L2 Integration scripts** | Bash + curl against the local stacks, one script per feature, `PASS` / `FAIL` per assertion, non-zero exit on the first failure | the agent before the PR; everyone after each sprint | `synaplan/_devextras/testing/cloud-apps/` (E-6) |
-| **L3 Browser walks** | The journeys of `05` §1 clicked end to end on each cloud; Playwright where a stack supports it (Nextcloud from CF1.3, OpenCloud today), by hand where it does not (ownCloud.online) | a person for the sprint exit; agents may walk during development | checklists below; results in STATUS |
+| **L3 Browser walks** | The journeys of `05` §1 clicked end to end on each cloud; Playwright where a stack supports it (Nextcloud from CF1.3b, OpenCloud today), by hand where it does not (ownCloud.online) | a person for the sprint exit; agents may walk during development | checklists below; results in STATUS |
 
 A filtered L1 run, a single L2 script or one L3 journey is diagnostic. The
 sprint exit needs the unfiltered gates, the full L2 set of that sprint and
@@ -181,7 +181,7 @@ defect. In P2 and P3 the phase's cloud repeats the rows of its own column
 Preconditions: CF0 exit for the phase. P1: the Nextcloud rows (6, 7, 9 and
 the Nextcloud half of `cf1-keys.sh` / `cf1-locales.sh`); P2: the OpenCloud
 rows (7, 8, 9); P3: E-5 green and the ownCloud.online rows (1–5, 7). Each
-app's CI exists after its CF1 brief (CF1.3, CF1.2).
+app's CI exists after its CF1 brief (CF1.3b, CF1.2).
 
 ### L1
 
@@ -209,7 +209,7 @@ ownCloud.online PHPUnit suite mirrors Nextcloud's list of test classes
 | 6 | Nextcloud | Re-walk J-NC-1 after the key encryption release | Existing link keeps working without re-connecting (C2) |
 | 7 | each cloud | Switch the UI language to `de`, `es`, `fr`, `tr` | Consent card, Connect card, action names, dialog titles translated; "Make searchable by AI" wording (not "Add to AI Knowledge") in every locale |
 | 8 | OpenCloud (CF1.5, if in this sprint) | Chat about `spec.pdf`; research chat; generate an image; **Save to Files** | Streamed answer; image saved as a binary file under `Synaplan/Images` (open it — not a text file) |
-| 9 | Nextcloud, OpenCloud | Run the app's Playwright suite against the dev stack | Green; the J-NC-1 and Summarize specs exist (CF1.3) |
+| 9 | Nextcloud, OpenCloud | Run the app's Playwright suite against the dev stack | Green; the journeys of `11` §5 item 1 exist (CF1.3b) |
 
 Exit: the `01` §5.2 gap matrix has no unexplained cell below Nextcloud 1.6;
 five bullets of `06` §3 ticked per cloud.
@@ -423,8 +423,8 @@ in a scratch checkout) showing the flag on.
 | Platform links | `_devextras/testing/platform-links/fake-instance.sh` and `--flag-off` | all |
 | Reference client | every `cf*.sh` of the sprints finished so far with `CLOUD=fixture PROFILE=keyed` and `PROFILE=sso` | all |
 | Cloud apps L2 | every `cf*.sh` of the sprints finished so far with the phase's `CLOUD=`; in P2 also with `CLOUD=nextcloud`, in P3 also with `CLOUD=nextcloud` and `CLOUD=opencloud` (earlier phases must stay green) | all |
-| Compatibility check | after each Synaplan release in P1: OpenCloud v1.0.0 (organisation login: summarize, knowledge) and ownCloud.online 1.0.0 on the host install (provision: summarize, translate, knowledge status) behave as before or better — `09` §1 rows 8–9 (C1) | P1 |
-| Nextcloud app | `make lint && make test`; Playwright against `make dev-up` (from CF1.3) on the matrix images `nextcloud:30-apache` (floor) and `nextcloud:34-apache` (top) (`NC_IMAGE`) | all |
+| Compatibility check | after each Synaplan release in P1: the previous Nextcloud app release from the App Store (rows 1–3), OpenCloud v1.0.0 (organisation login: summarize, knowledge) and ownCloud.online 1.0.0 on the host install (provision: summarize, translate, knowledge status) behave as before or better — `09` §1 rows 1–3, 8–9 (C1); during the break too (`11` §1) | P1, break |
+| Nextcloud app | `make ci-local` and CI `All Checks Passed` (from CF1.3b): Playwright on the matrix images `nextcloud:33-apache` (floor) and `nextcloud:35-apache` (top) (`NC_IMAGE`, row 47) | all |
 | OpenCloud app | `make frontend-lint frontend-typecheck frontend-test-unit backend-test backend-lint && make frontend-test-e2e-dev` | P2, P3 |
 | ownCloud.online app | `make lint && make check-types && make test` (from CF1.2); L3 checklist of the last sprint by hand | P3 |
 | Contract | the core contract test, and the checksum test in every app repo that vendored the fixtures (C22) | after CF5.10 |
@@ -449,9 +449,10 @@ in a scratch checkout) showing the flag on.
    decision naming the frozen commit.
 5. The five spikes answered in STATUS; every core consequence merged.
 
-After the P1 exit (not part of it): the Synaplan release and the Nextcloud
-app release are published, the Nextcloud docs updated, and row 46
-applied to the flags (`00` §8).
+After the P1 exit (not part of it): the release checklist of
+[`11`](./11_nextcloud_release.md) §6 — the Synaplan release and Nextcloud
+2.0.0 published, the Nextcloud docs updated, row 46 applied to the flags
+(`00` §8) — and then the break (row 48).
 
 ### 8.2 P2 exit — OpenCloud
 

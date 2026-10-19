@@ -21,7 +21,9 @@ work order. Functional tests after each sprint are in
    Synaplan release answers the capability in `instances/self` (C1).
 3. The brief belongs to the current phase (§0.9), and `env-check.sh` (`10` §5)
    is green for that phase's profile.
-4. Read the sections in **Reads** completely. They are short on purpose.
+4. Read the sections in **Reads** completely. They are short on purpose. In
+   P1, read [`11`](./11_nextcloud_release.md) first: milestones, the
+   engineering standard and the regression guards apply to every P1 brief.
 5. Run the repo gate once on a clean checkout of `main` to know the baseline.
 6. Create the branch named in the brief from `main`.
 
@@ -163,7 +165,7 @@ etags).
 | Phase | Briefs an agent may take | Stack profile |
 | ----- | ------------------------ | ------------- |
 | P0 | E-1, E-2, E-3, E-4, E-6 (`10` §4) | `env-check.sh --cloud nextcloud --oidc` |
-| P1 | spikes CF-S2, CF-S5 (start), CF-S1, CF-S3, CF-S4 (before CF3.1 and CF5.1 merge); E-9 (before CF2.1); every `synaplan` brief except CF2.11; every `synaplan-nextcloud` brief (CF1.3, CF1.4-nc, CF2.6, CF2.10, CF3.3, CF3.8, CF4.3, CF5.4, CF5.9-nc, CF5.10); optionally CF1.5 (`00` row 34) | `env-check.sh --cloud nextcloud --oidc` |
+| P1 | spikes CF-S2, CF-S5 (start), CF-S1, CF-S3, CF-S4 (before CF3.1 and CF5.1 merge); E-9 (before CF2.1); every `synaplan` brief except CF2.11; every `synaplan-nextcloud` brief (CF1.3a–d, CF1.4-nc, CF2.6, CF2.10, CF3.3, CF3.8, CF4.3, CF5.4, CF5.9-nc, CF5.10); optionally CF1.5 (`00` row 34). Order and releases: `11` §2 | `env-check.sh --cloud nextcloud --oidc` |
 | P2 | every `synaplan-opencloud` brief (CF1.4-oc, CF1.5, CF2.7, CF3.5, CF3.10, CF4.5, CF5.6, CF5.9-oc) and CF2.11 | `env-check.sh --cloud opencloud --oidc` |
 | P3 | E-5; every `synaplan-owncloud-online` brief (CF1.1, CF1.2, CF1.4-oco, CF2.8, CF3.4, CF3.9, CF4.4, CF5.5, CF5.9-oco) | `env-check.sh --cloud owncloud --oidc` |
 
@@ -182,14 +184,14 @@ P1  CF-S2 ‖ CF-S5                          (start, 2 days each)
     CF0.0 → { CF0.1 ‖ CF0.2 ‖ CF0.3 ‖ CF0.4 } → CF0.7 (walks) → release
     E-9 (reference client) → CF2.1
             CF0.5 ‖ CF0.6 (docs, any time in CF0)
-    CF1.3 → CF1.4-nc
+    CF1.3a (fast lane, 1.6.1) → CF1.3b → { CF1.3c ‖ CF1.3d } → CF1.4-nc → release (Nextcloud 1.7.0)
     CF2.1 → CF2.2 → CF2.3 → CF2.4 → CF2.5 ;  CF2.2 → CF2.9
            → CF2.10 (Nextcloud identity basics) → CF2.6 (only if CF-S2 = yes) → release
     CF-S1 ‖ CF-S3 ‖ CF-S4  ─── must be answered before CF3.1 and CF5.1 merge
     CF3.1 → CF3.2 → CF3.3 ;  CF3.1 → CF3.6 → CF3.7 → CF3.8      (CF3.6 starts after CF3.1 is merged)
     CF4.1 → CF4.2 ;  CF3.3 + CF4.2 → CF4.3                      (CF4.1 may run beside CF3 core)
            → release
-    CF5.1 → CF5.2 → CF5.7 → CF5.8 → CF5.3 → CF5.4 → CF5.9-nc → CF5.10 (freeze) → release = P1 exit
+    CF5.1 → CF5.2 → CF5.7 → CF5.8 → CF5.3 → CF5.4 → CF5.9-nc → CF5.10 (freeze) → release = P1 exit → break (row 48)
 
 P2  CF1.5 → CF1.4-oc ;  CF2.11 ‖ CF2.7 → CF3.5 → CF3.10 ;  CF3.5 → CF4.5 → CF5.6 → CF5.9-oc → release
 
@@ -254,13 +256,13 @@ CF3.1 and CF5.1 merge. A spike answer that needs a core change becomes a
 | Questions | (1) FileList plugin to decorate rows? (2) Detail tab API? (3) New-file menu plugin? (4) File hooks / dispatcher events for create, write, rename, delete, restore? (5) Notifications app available on the hoster's installation? (6) Background jobs and cron-mode detection? (7) Request time budget for inline pickups? (8) Private link format? (9) User disabled / re-enabled events for `lifecycle`? (10) Which version does the hoster run (the app README says 11.0.10; the BW-Tech repository has tags up to `v11.0.13`), and can it give us a test tenant? (11) Watch index at the cap: an app table of 1 000 targets — first sync over 2 pages, incremental sync, matching cost per file event (`04` §B.8)? |
 | Blocks | CF1.2, CF2.8, CF3.4, CF3.9, CF4.4, CF5.5; the E-5 tag pin |
 
-### CF-S5 — Nextcloud Files APIs at scale (30–34)
+### CF-S5 — Nextcloud Files APIs at scale (33–35)
 
 | | |
 | - | - |
 | Repo | `synaplan-nextcloud` on both matrix images |
 | Reads | `06` §1 row S5; `04` §A.3, §A.4, §B.3 |
-| Questions | (1) Inline row rendering with one batched call on the 5 000-file `many/` folder (virtual scroll) — frame drops? (2) Sidebar tab API across 30–34 — one code path or two? (3) List header for the current folder? (4) New-file menu entry? (5) Node events for group folders, external storage, trash and restore? (6) Notifications API? (7) Private link `/f/<fileid>`? (8) Inline pickup budget inside a request; background-job latency with the `cron` container (9) Watch index at the cap: 1 000 targets synced over 2 pages and matched per node event — sync time, table size, matching cost on both images (`04` §B.8)? |
+| Questions | (1) Inline row rendering with one batched call on the 5 000-file `many/` folder (virtual scroll) — frame drops? (2) Sidebar tab API across 33–35 — one code path or two? (3) List header for the current folder? (4) New-file menu entry? (5) Node events for group folders, external storage, trash and restore? (6) Notifications API? (7) Private link `/f/<fileid>`? (8) Inline pickup budget inside a request; background-job latency with the `cron` container (9) Watch index at the cap: 1 000 targets synced over 2 pages and matched per node event — sync time, table size, matching cost on both images (`04` §B.8)? |
 | Blocks | CF3.3, CF3.8, CF4.3, CF5.4 |
 
 ---
@@ -414,17 +416,14 @@ Wave contract: `00` §5, `01` §5.2, `06` §3. Tests: `09` §2.
 
 **Acceptance** — CI green on the PR; `make ci-local` documented and green; `AGENTS.md` carries the house rules (English, Conventional Commits, no attribution, gate before commit, locales).
 
-### CF1.3 — Nextcloud: CI, AGENTS.md, encrypted keys, Playwright, disabled-user listener
+### CF1.3 — Nextcloud: split into CF1.3a–d (2026-10-19)
 
-| | |
-| - | - |
-| Repo · class · type | `synaplan-nextcloud` (P1) · app release · `feat(app)` (+ `chore(ci)` commits) |
-| Branch | `feat/cf1-3-ci-keys-e2e` |
-| Depends on | E-2; **ask first (A2):** `@playwright/test` is not a dependency of this repo yet — the PR adds it as a dev dependency at the version `synaplan/frontend` pins (1.63) |
-| Reads | `01` §4 D4; `02` §7 (disabled / enabled rows); `synaplan-opencloud/.github/`; `docs/E2E_TESTING.md` in `synaplan` for the Playwright conventions |
-| Touches | `.github/workflows/ci.yml` (`All Checks Passed`), `AGENTS.md`, `lib/Service/UserAccountService.php` + `SynaplanConfig.php` (key encryption with transparent migration of the user preference `synaplan_user_api_key`: values are stored as `enc:` + `ICrypto::encrypt()`, a value without the prefix is read as plaintext once and re-saved encrypted), new `lib/Listener/UserChangedListener.php` (enabled flag — CF2.10 turns it into a `lifecycle` call), `tests/e2e/` (Playwright: J-NC-1 link flow, Summarize), `Makefile` (`test-e2e`, runs against `make dev-up` on `:8081`) |
-
-**Acceptance** — `cf1-keys.sh` (Nextcloud); L3 rows 6 and 9; CI green.
+The briefs are in [`11`](./11_nextcloud_release.md) §8: **CF1.3a** Nextcloud
+33–35 (D21, fast lane 1.6.1), **CF1.3b** engineering baseline (CI gate,
+contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md` —
+no behaviour change), **CF1.3c** per-user keys encrypted (D4, 1.7.0),
+**CF1.3d** release workflow. The disabled / re-enabled listener moved to
+CF2.10, where it calls `lifecycle`.
 
 ### CF1.4 — Five locales and the core's words (one PR per app, in its phase)
 
@@ -432,7 +431,7 @@ Wave contract: `00` §5, `01` §5.2, `06` §3. Tests: `09` §2.
 | - | - |
 | Repo · class · type | `synaplan-nextcloud` (CF1.4-nc, P1), `synaplan-opencloud` (CF1.4-oc, P2), `synaplan-owncloud-online` (CF1.4-oco, P3) · app releases · `feat(i18n)` |
 | Branch | `feat/cf1-4-locales-core-words` in each |
-| Depends on | the app's other CF1 briefs, so it renames finished surfaces once: CF1.3 (Nextcloud); CF1.5 (OpenCloud); CF1.1 and CF1.2 (ownCloud.online — its CI exists only after CF1.2) |
+| Depends on | the app's other CF1 briefs, so it renames finished surfaces once: CF1.3c (Nextcloud); CF1.5 (OpenCloud); CF1.1 and CF1.2 (ownCloud.online — its CI exists only after CF1.2) |
 | Reads | `00` §11 (terms and banned words); `05` §3 (copy table); `frontend/src/i18n/locales/*/files.json` in `synaplan` for the exact core strings |
 | Touches | `l10n/{en,de,es,fr,tr}.json` (Nextcloud, ownCloud), `frontend/src/translations.json` or the per-locale files the OpenCloud SDK expects; every string literal in `src/` that still carries "Add to AI Knowledge" / "Add to knowledge…" → **Make searchable by AI**; a locale-parity test in each CI (Nextcloud / ownCloud: PHPUnit or a Node script; OpenCloud: Vitest) |
 
@@ -607,9 +606,9 @@ Wave contract: `02` (all), `05` W1, W2, W8, `06` §4. Tests: `09` §3.
 | - | - |
 | Repo · class · type | `synaplan-nextcloud` (P1) · app release · `feat(app)` |
 | Branch | `feat/cf2-10-identity-basics` |
-| Depends on | CF2.1–CF2.5 and CF2.9 merged; CF1.3 |
+| Depends on | CF2.1–CF2.5 and CF2.9 merged; CF1.3c |
 | Reads | `02` §2, §3.1, §7, §8, §8.1; `01` §4 D15, D16; `05` W8 |
-| Touches | `lib/Service/PlatformLinkService.php` (registration also in provision mode — decision 6; `PATCH instances/self` with `server_id` and `app_capabilities` on admin save), `lib/Service/UserAccountService.php` (provisioning and key minting with the instance credential; `deleteRemoteAccount()` replaced by `lifecycle(deleted)` — D16), new `lib/BackgroundJob/AdoptIdentitiesJob.php` (one-time, once registered and `capabilities` has `identity_adopt`: per user with a stored key → `identities/adopt` — D15), `lib/Listener/UserDeletedListener.php` + `UserChangedListener.php` → `lifecycle` calls, `lib/Settings/SynaplanAdmin.php` + `src/settings.ts` (the four-mode screen W8; the organisation-login row says "Needs the Nextcloud app user_oidc" until CF2.6), `l10n/` |
+| Touches | `lib/Service/PlatformLinkService.php` (registration also in provision mode — decision 6; `PATCH instances/self` with `server_id` and `app_capabilities` on admin save), `lib/Service/UserAccountService.php` (provisioning and key minting with the instance credential; `deleteRemoteAccount()` replaced by `lifecycle(deleted)` — D16), new `lib/BackgroundJob/AdoptIdentitiesJob.php` (one-time, once registered and `capabilities` has `identity_adopt`: per user with a stored key → `identities/adopt` — D15), `lib/Listener/UserDeletedListener.php` and a new `lib/Listener/UserChangedListener.php` (the `enabled` flag; moved here from CF1.3) → `lifecycle` calls, `lib/Settings/SynaplanAdmin.php` + `src/settings.ts` (the four-mode screen W8, after `AdminSettings.vue` is split per `11` §3.3; the organisation-login row says "Needs the Nextcloud app user_oidc" until CF2.6), `l10n/` |
 
 **Tests** — PHPUnit: adoption job (adopts, then a second run changes nothing; skips users without a key; stops on `403` with one log line), lifecycle calls on delete / disable / enable with a mocked client, provisioning sends the instance credential.
 
@@ -747,7 +746,7 @@ Wave contract: `04` §A, §E.1 (status, files, sources/events), `05` W5, `06` §
 | Branch | `feat/cf4-1-cloud-status-source-events` |
 | Depends on | CF0.4; CF2.2 (identity rows); CF2.9 (files carry their instance); `00` §3 row 40 agreed |
 | Reads | `04` §A.1 (state codes), §A.3 (request / answer fields), §A.5 (re-upload), §A.6, §E.1, §E.2 (`BFILES.BSOURCEDELETEDAT`, `BKEEPSYNCED`); `00` §3 rows 22 and 46; `Module/Federation/FederationModule.php`, `ModuleRegistry.php`, `backend/.env.minimal`, `docker-compose.minimal.yml`; `FileRepository::findByUserSourceIds`, the ephemeral reaper |
-| Touches | new `Module/CloudFiles/CloudFilesModule.php` (decisive env `CLOUD_FILES_ENABLED`, default off; drives runtime config block `cloud_files`, gate 404, `capabilities` `cloud_status`), `.env.minimal`, `docker-compose.minimal.yml`; migration `BSOURCEDELETEDAT`, `BKEEPSYNCED`; upload field `keep_synced`; new `Controller/CloudFileController.php` (`POST /api/v1/cloud/status` — the request and answer of `04` §A.3, 1–500 items, cache ≤ 60 s keyed by user + instance + ids hash, header `X-Synaplan-Cache: hit\|miss`; `GET /api/v1/cloud/files/{id}`), `PlatformLinkController` `POST sources/events` (body and answer of `04` §E.1; matching (instance, remote id) — C19; changed → stale, and the copies kept up to date are listed in `reupload`; moved → path update; deleted → `BSOURCEDELETEDAT`, hidden, vectors removed; restored → cleared, re-vectorized); reaper: delete after 7 days; dev command `app:cloud-files:reap --now=<date>` for the test; `capabilities` += `cloud_status`, `source_events`; OpenAPI, schemas; the reference client (status calls with long ids and quoted etags in the `sso` profile; source events and re-uploads); contract fixtures |
+| Touches | new `Module/CloudFiles/CloudFilesModule.php` (decisive env `CLOUD_FILES_ENABLED`, default off; drives runtime config block `cloud_files`, gate 404, `capabilities` `cloud_status`), `.env.minimal`, `docker-compose.minimal.yml`; migration `BSOURCEDELETEDAT`, `BKEEPSYNCED`; upload field `keep_synced`; new `Controller/CloudFileController.php` (`POST /api/v1/cloud/status` — the request and answer of `04` §A.3, 1–500 items, cache ≤ 60 s keyed by user + instance + ids hash, header `X-Synaplan-Cache: hit\|miss`; `GET /api/v1/cloud/files/{id}`), `PlatformLinkController` `POST sources/events` (body and answer of `04` §E.1; matching (instance, remote id) — C19; changed → stale, and the copies kept up to date are listed in `reupload`; moved → path update; deleted → `BSOURCEDELETEDAT`, hidden, vectors removed; restored → cleared, re-vectorized); reaper: delete after 7 days; dev command `app:cloud-files:reap --now=<date>` for the test; `capabilities` += `cloud_status`, `source_events`; OpenAPI, schemas; the reference client (status calls with long ids and quoted etags in the `sso` profile; source events and re-uploads); contract fixtures. In `synaplan-charts`, a PR in the same milestone: `features.cloudFiles` → `CLOUD_FILES_ENABLED` (`11` §3.2) |
 
 **Tests** — state matrix (each A.1 code), ids of 255 characters and quoted etags round-trip unchanged, cache, batch limit, each event type, `reupload` lists only copies with `BKEEPSYNCED = 1` and only that instance's people, reaper, gate (404 when off, no runtime block, capability absent).
 

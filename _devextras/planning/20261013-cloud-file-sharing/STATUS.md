@@ -9,12 +9,12 @@ not a chat message.
 
 | Step | Repo | Phase | State | Notes |
 | ---- | ---- | ----- | ----- | ----- |
-| E-1 Cleanup and baseline | workstation | P0 | **in progress** | §2.1 done 2026-10-13; §2.2 volumes and signing keys done 2026-10-14. Still open: scheduler container exited (127) |
-| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users `ada` / `bob` / `carol`) | `synaplan-nextcloud` | P0 | planned | after E-3; matrix `nextcloud:30-apache` and `:34-apache` |
-| E-3 Keycloak clients and users for the clouds | `synaplan` | P0 | planned | additive block in `_docker/keycloak/setup.sh` |
-| E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | P0 | planned | config volume removed 2026-10-14; fresh `init` is part of this step; needed in P1 for CF-S1, CF-S3 and the compatibility check |
+| E-1 Cleanup and baseline | workstation | P0 | **done** 2026-10-19 | §2.1 done 2026-10-13; §2.2 done 2026-10-14; scheduler running and healthy since 2026-10-17 (cause of the exit 127 not recorded — `10` §1.4) |
+| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users `ada` / `bob` / `carol`) | `synaplan-nextcloud` | P0 | **done** 2026-10-19, uncommitted on `chore/env-2-nextcloud-stack-v2` | 35.0.2 running, 33.0.10 checked; organisation login works on both |
+| E-3 Keycloak clients and users for the clouds | `synaplan` | P0 | **done** 2026-10-19, uncommitted | `_docker/keycloak/setup.sh` "Cloud apps" block, `docs/DEVELOPMENT.md`; local `backend/.env` OIDC values |
+| E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | P0 | **done** 2026-10-19 | fresh `init`, client regenerated, extension rebuilt; no file changed; E2E 10/10 with one worker |
 | E-5 ownCloud.online Docker stack | `synaplan-owncloud-online` | P3 | planned | port 8083, tag `v11.0.10` (`OCO_TAG`); first brief of P3 |
-| E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | planned | `_devextras/testing/cloud-apps/` |
+| E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` done 2026-10-19 (uncommitted); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open |
 | E-7 Developer docs | all | any | planned | after the stack it documents is green |
 | E-8 Refresh policy | STATUS | — | recurring | monthly or on `max-version` change |
 | E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | planned | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); extended by every core brief |
@@ -33,7 +33,10 @@ not a chat message.
 | CF0.7 First walks + compatibility check | all (walk) | P1 | planned | Nextcloud J-NC-1…3; current OpenCloud and ownCloud.online releases |
 | CF1.1 ownCloud.online link mode, consent, MIME, key encryption | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.2 ownCloud.online tests, CI, AGENTS.md, local stack | `synaplan-owncloud-online` | P3 | planned | after CF-S4 |
-| CF1.3 Nextcloud CI, AGENTS.md, key encryption, E2E | `synaplan-nextcloud` | P1 | planned | adds `@playwright/test` — ask first (A2) |
+| CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | planned | D21; app release 1.6.1; row 47 agreed |
+| CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | planned | `11` §3.1; dev dependencies ask first (A2) |
+| CF1.3c Per-user keys encrypted | `synaplan-nextcloud` | P1 (M1) | planned | D4; app release 1.7.0 |
+| CF1.3d Release from CI | `synaplan-nextcloud` | P1 (M1) | planned | owner stores two repository secrets (A6) |
 | CF1.4-nc Five locales, core words — Nextcloud | `synaplan-nextcloud` | P1 | planned |  |
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF1.4-oco Five locales, core words — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
@@ -76,6 +79,11 @@ not a chat message.
 | CF5.9-oc Dialog file sets and trial — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF5.9-oco Dialog file sets and trial — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF5.10 Contract v1 freeze | `synaplan`, `synaplan-nextcloud` | P1 (last) | planned | row 44; P1 exit |
+| M1 release: Synaplan + Nextcloud 1.7.0 | `synaplan`, `synaplan-nextcloud` | P1 | planned | `11` §2, §6; 1.6.1 may ship earlier (CF1.3a) |
+| M2 release: Synaplan + Nextcloud 1.8.0 | `synaplan`, `synaplan-nextcloud` | P1 | planned |  |
+| M3 release: Synaplan + Nextcloud 1.9.0, chart `features.cloudFiles` | `synaplan`, `synaplan-nextcloud`, `synaplan-charts` | P1 | planned |  |
+| M4 release: Synaplan + Nextcloud 2.0.0, contract v1 — the Nextcloud release | `synaplan`, `synaplan-nextcloud` | P1 exit | planned | then row 46 flags |
+| Break | — | after P1 | planned | row 48; ends with a dated "P2 go" |
 | CF6.x Beyond the apps | various | after P3 | optional |  |
 
 ## Decisions
@@ -90,6 +98,7 @@ not a chat message.
 | 2026-10-14 | Product owner: **Nextcloud first, then OpenCloud, then ownCloud.online** — "one complete Nextcloud run first with tests and logic, so we know the Synaplan side is ready with a clean API". Recorded as §3 row 42 (agreed); rows 33–35 amended in place to the phases. The conditions that make the order safe are proposed as rows 43 (Synaplan offers a cloud only for features its app reports), 44 (contract v1 frozen at the P1 exit), 45 (reference client with `keyed` and `sso` profiles) and 46 (switch `cloud_files` on after P1) — **not ticked**. |
 | 2026-10-14 | CF0.3 changed from an opt-in upload option (`intake=direct`) to an automatic rule: a `nextcloud` / `opencloud` / `owncloud` upload that names a knowledge folder other than `DEFAULT` skips Incoming. Reason: no released app sends the option, so the CF0.7 walk could not pass; the apps already send the folder the person picked. C10 unchanged in meaning; Outlook unchanged. |
 | 2026-10-14 | Product owner, in a click-through of the open rows: rows 37 (signed notifications), 38 (deleting a person in one cloud), 39 (provisioned identities), 40 (files remember their cloud), 43 (apps report their features), 44 (contract v1 at the end of P1), 45 (reference client) and 46 (switch `cloud_files` on after P1) agreed as proposed; row 41 agreed with **lower caps — 20 active watches per person, 1 000 per instance** (instead of 50 / 5 000); the adjustments of rows 33–35 to the Nextcloud-first order confirmed. All 46 rows are agreed. Row 46 replaces row 22's timing; row 11's signing clause is in force. Caps updated in `04` §B.7 / §B.8, CF5.1, the spikes and `cf5-index.sh`. |
+| 2026-10-19 | Product owner: reach Nextcloud releasability first and pause there; follow the code standard of `synaplan-opencloud` and the deployment approach of `synaplan-charts`. Recorded as rows 48 (break after P1) and 49 (standard), both agreed. P1 finalized in [`11`](./11_nextcloud_release.md): four milestone releases (M1–M4), the Nextcloud release at M4, then the break. CF1.3 split into CF1.3a–d; the disabled / re-enabled listener moved to CF2.10. Row 47 agreed in the same session: the P1 releases support Nextcloud 33–35; installations on 30–32 keep 1.6.0. |
 
 ## Review log
 
@@ -334,3 +343,97 @@ on:
 Each thread got a reply that names the fix. The fixes for the first five
 findings stand in the plan but take effect only when the product owner
 agrees rows 37–41.
+
+**2026-10-19 (fourth review — ready for vibe coding?).** The product owner
+asked whether the plan is professional and ready for coding agents, and to
+finalize it for the first Nextcloud release with a break there, local
+Nextcloud and OpenCloud stacks for the tests, and the standard of
+`synaplan-opencloud` and `synaplan-charts`.
+
+Verdict. The research is professional: every claim names its code, the
+decisions and invariants are explicit, and every step has tests. It was not
+ready for vibe coding, for six reasons:
+
+1. **Too much to hold.** 13 files, about 5 000 lines; a P1 brief needed four
+   to six files, each mixing P2 and P3 content the agent had to filter out.
+2. **No release before CF5.** P1 had about 35 PRs and its only named release
+   came after the watches — months of unreleased work.
+3. **The repo P1 lands in had none of the assumed standard.**
+   `synaplan-nextcloud` has no CI, no `AGENTS.md`, no static analysis, no
+   type check, no JS tests, no E2E, de/en only, plaintext per-user keys; and
+   CF1.3 bundled that baseline with a product change and a listener nothing
+   used yet.
+4. **No local test stack.** No Keycloak, Nextcloud or OpenCloud container
+   exists (`10` §1.4).
+5. **Pins drifted.** Nextcloud 35 shipped on 2026-09-15 and the app stops at
+   34 (D21); the matrix floor, 30, gets no maintenance releases.
+6. **No end.** P1 rolled into P2 without a stop.
+
+What changed: [`11`](./11_nextcloud_release.md) — one entry point for P1:
+four milestone releases with fast lanes for D1 and D21, the engineering
+standard mapped rule by rule from `synaplan-opencloud` and `synaplan-charts`,
+the test stacks with today's state, seven regression guards, a release
+checklist and the break. Rows 47–49; D21; CF1.3 split into CF1.3a–d; the
+Nextcloud matrix moved to 33 and 35 in `06`, `08`, `09` and `10`; E-1 closed;
+`10` §1.4.
+
+Verified on 2026-10-19: D1 (`ApiKeyScope::requiredScopesForPath()` has no
+branch for `/api/v1/summary`, `/api/v1/media`, `/api/v1/config/memory-service`;
+`/v1/*` needs `desktop:messages`), D2 (`File::SOURCES` has no `owncloud`), D3
+(`FileUploadService` line 403), D18 (`openai_compat` runs only
+`ApiKeyAuthenticator`), D19 (`PlatformLinkExchangeService::disconnect()`
+removes the identity), D20 (`DEFAULT_TTL_HOURS = 24`); the Nextcloud app
+still calls the four denied paths; Nextcloud, OpenCloud and `user_oidc`
+versions upstream; the CI, Renovate and client-generation set-up of
+`synaplan-opencloud`; the feature-pin map and the k3d E2E of
+`synaplan-charts`; the Synaplan test stack (`docker-compose.test.yml`,
+`--profile oidc`) the Nextcloud CI reuses.
+
+Not changed: decisions 1–46, the protocols, the P2 and P3 content. When P2
+starts it gets a file like `11`.
+
+**2026-10-19 (environments — E-1 to E-4, E-6 first part).** Built and checked
+on the maintainer workstation.
+
+```text
+env-check.sh --cloud nextcloud,opencloud --oidc → 45 passed, 1 warning, 0 failed, 1 skipped
+Synaplan   v5.5.0-2-g297d0cc67
+Keycloak   quay.io/keycloak/keycloak:26.8
+Nextcloud  35.0.2, app 1.6.0 (also checked: 33.0.10, 40 passed, no warning)
+user_oidc  8.11.0
+OpenCloud  8.1.0, app v1.0.0-9-g5cc1351
+```
+
+- The warning is Nextcloud 35 above the app's `max-version` 34; the dev stack
+  enables the app with `--force` until CF1.3a.
+- Organisation login, Nextcloud: an auth-code round trip with Keycloak's
+  `ada` ends signed in as the local `ada` on 35 and on 33.
+- Organisation login, OpenCloud: its Playwright suite passes 10 of 10
+  against the local Synaplan (sign-in, connection test, summarize and translate
+  for text and PDF, add to knowledge) with one worker.
+- **Verified `azp`** (`02` §3): Ada's token exchanged through
+  `synaplan-opencloud` for audience `synaplan-app` carries
+  `azp = synaplan-opencloud`, and Synaplan accepts it (`/api/v1/auth/me` → 200,
+  `ada@example.org`). The OpenCloud instance registers that value in CF2.7.
+
+Findings, fixed in the stacks and written into `10`:
+
+1. The plan's draft named the Nextcloud database `db` on the shared Synaplan
+   network, where `db` is Synaplan's own database. It is `nextcloud-db` on a
+   private network; Synaplan's `db` still resolves to `synaplan-db`.
+2. `user_oidc` refuses plain HTTP; the dev stack sets `allow_insecure_http`.
+   Folders and shares need HTTP, so they moved from the install hook to
+   `docker/dev-seed.sh`, which `make dev-up` runs on every start.
+3. Synaplan accepted no Keycloak token: `backend/.env` had no OIDC values. It
+   now carries the values of the test stack (`10` §3.1; the old file is kept as
+   `/tmp/synaplan-backend.env.bak-20261019`).
+4. This workstation's `docker` calls Docker Desktop's Windows `docker.exe`:
+   environment variables reach Compose only through `WSLENV`, so
+   `NC_IMAGE=…` was silently ignored until the Makefile exported it there.
+5. OpenCloud 8.1.0 crashes under parallel Playwright workers (`fatal error:
+   concurrent map read and map write`), and its compose service has no restart
+   policy. For `synaplan-opencloud`, not changed here: `restart:
+   unless-stopped` on `opencloud`, and an upstream report.
+6. The `keycloak_setup` script as a whole cannot run twice (it creates the
+   realm unconditionally); the new "Cloud apps" block can, and was checked
+   twice.

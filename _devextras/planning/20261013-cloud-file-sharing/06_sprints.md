@@ -16,10 +16,15 @@ its `09` section is green for the phase's cloud and its walks are in STATUS.
 ### 0.1 Three phases (`00` row 42)
 
 ```text
- P0 Ready ──► P1 Core + Nextcloud ───────────────────────────► P2 OpenCloud ──► P3 ownCloud.online ──► CF6 (optional)
-              CF0 → CF1 → CF2 → CF3 ‖ CF4 → CF5 → CF5.10 freeze   CF1 → … → CF5      CF1 → … → CF5
+ P0 Ready ──► P1 Core + Nextcloud ────────────────────────────────► break ──► P2 OpenCloud ──► P3 ownCloud.online ──► CF6 (optional)
+              CF0 → CF1 → CF2 → CF3 ‖ CF4 → CF5 → CF5.10 freeze    (P2 go)    CF1 → … → CF5    CF1 → … → CF5
+              released as M1 · M2 · M3 · M4 = the Nextcloud release (11 §2)
  spikes:      CF-S2, CF-S5 at the start · CF-S1, CF-S3, CF-S4 before CF3.1 and CF5.1 merge
 ```
+
+P1 is released in four milestones and ends with the Nextcloud release; then
+the track pauses until a dated "P2 go" in STATUS (`00` row 48,
+[`11`](./11_nextcloud_release.md) §1).
 
 A step's phase follows its repository: `synaplan` and `synaplan-nextcloud`
 steps are **P1**, `synaplan-opencloud` steps **P2**, `synaplan-owncloud-online`
@@ -30,8 +35,8 @@ name "all three apps" (CF1.4, CF5.9) run once per phase for that phase's app.
 | Phase | Steps | Gate before it starts | Exit |
 | ----- | ----- | --------------------- | ---- |
 | **P0** | E-1, E-2, E-3, E-6 (`10` §4); E-4 for the spikes and the compatibility check | The §3 rows the first briefs cite are agreed | `env-check.sh --cloud nextcloud --oidc` green |
-| **P1** | CF-S2, CF-S5 at the start; CF-S1, CF-S3, CF-S4 before CF3.1 and CF5.1 merge; E-9 before CF2.1; CF0.0–CF0.7; CF1.3, CF1.4 (Nextcloud); CF2.1–CF2.6, CF2.9, CF2.10; CF3.1–CF3.3, CF3.6–CF3.8; CF4.1–CF4.3; CF5.1–CF5.4, CF5.7, CF5.8, CF5.9 (Nextcloud), CF5.10 | P0 exit | `09` §8.1 |
-| **P2** | CF1.4 (OpenCloud), CF1.5, CF2.7, CF2.11, CF3.5, CF3.10, CF4.5, CF5.6, CF5.9 (OpenCloud) | P1 exit; E-4 green; CF-S1 and CF-S3 answered | `09` §8.2 |
+| **P1** | CF-S2, CF-S5 at the start; CF-S1, CF-S3, CF-S4 before CF3.1 and CF5.1 merge; E-9 before CF2.1; CF0.0–CF0.7; CF1.3a–d, CF1.4 (Nextcloud); CF2.1–CF2.6, CF2.9, CF2.10; CF3.1–CF3.3, CF3.6–CF3.8; CF4.1–CF4.3; CF5.1–CF5.4, CF5.7, CF5.8, CF5.9 (Nextcloud), CF5.10 — in milestones M1–M4 (`11` §2) | P0 exit | `09` §8.1, then the release (`11` §6) and the break |
+| **P2** | CF1.4 (OpenCloud), CF1.5, CF2.7, CF2.11, CF3.5, CF3.10, CF4.5, CF5.6, CF5.9 (OpenCloud) | P1 exit; the dated "P2 go" (row 48); E-4 green; CF-S1 and CF-S3 answered | `09` §8.2 |
 | **P3** | E-5; CF1.1, CF1.2, CF1.4 (ownCloud.online), CF2.8, CF3.4, CF3.9, CF4.4, CF5.5, CF5.9 (ownCloud.online) | P2 exit; CF-S4 answered | `09` §8.3 |
 
 Rules:
@@ -56,7 +61,7 @@ Rules:
 | Repo | Before every commit | Before every push / PR |
 | ---- | ------------------- | ---------------------- |
 | `synaplan` | `make ci-local` | `make test-e2e`; `make -C frontend test-e2e-layout` for nav or layout; after OpenAPI changes `make -C frontend generate-schemas` + `vue-tsc`; `node scripts/mobile-impact.mjs --base main --head HEAD` |
-| `synaplan-nextcloud` | `make lint && make test` | CI `All Checks Passed` (from CF1.3); Playwright against `make dev-up` (from CF1.3) |
+| `synaplan-nextcloud` | `make ci-local` (from CF1.3b; before that `make lint && make test`) | CI `All Checks Passed` with e2e on `nextcloud:33-apache` and `:35-apache` (from CF1.3b); `make test-e2e` against `make dev-up` |
 | `synaplan-owncloud-online` | `make lint && make check-types`; `make test` from CF1.2 | CI `All Checks Passed` (from CF1.2) |
 | `synaplan-opencloud` | `make frontend-lint frontend-typecheck frontend-test-unit backend-test backend-lint` | `make frontend-test-e2e-dev` (dev server `:9201`); CI `All Checks Passed` |
 | `synaplan-docs` | Render the changed page locally | — |
@@ -89,7 +94,7 @@ the cap) can change the core contract.
 | **CF-S2 — Nextcloud organisation login** | Can an app get the login token or an exchanged token from `user_oidc` (events, version floor, `store_login_token`)? Does the exchanged token carry `azp`? Refresh behaviour? Works with Keycloak and with openDesk's Nubus? | CF2.6 | Nextcloud stays on Connect / Accounts by administrator; organisation login moves to CF6 |
 | **CF-S3 — OpenCloud unattended access** | Service account or impersonation to list folders and read and write a user's files without a request (copies, pickups, whole-folder snapshots)? Event bus consumer for upload finished, move, trash, restore, user deleted — config and delivery guarantees? Unprotected proxy route for `/api/synaplan/inbound`? Persistent store for per-user keys (encryption)? Project spaces: events and writes? Memory and rebuild time of the in-memory watch index at the cap (1 000 watches, `04` §B.8)? | CF2.7, CF3.5, CF3.10, CF4.5, CF5.6 | Copies only through "From Synaplan"; no pickups from OpenCloud (attach in the chat instead); watches on OpenCloud reconcile-only; Connect mode to CF6; a lower instance cap for OpenCloud |
 | **CF-S4 — ownCloud 11 Files APIs** | FileList plugin to decorate rows? Detail tab? New-file menu plugin? File hooks or dispatcher events (create, write, rename, delete, restore)? Notifications app? Background jobs and cron mode detection? How long may a request run (inline pickup budget)? Private link? User disabled / re-enabled events? Which version does the hoster run (the app README says 11.0.10; the BW-Tech repository has tags up to `v11.0.13`; the spike runs on the host install at 11.0.11 + 39), does the checkout behave like the hoster's installation, and can the hoster give us a test tenant? Watch index at the cap (1 000 targets in an app table): first sync, incremental sync, matching cost per file event? | CF1.2, CF2.8, CF3.4, CF3.9, CF4.4, CF5.5 | Sidebar-only state; reconcile-only watches; pickups fully in background jobs; a lower instance cap |
-| **CF-S5 — Nextcloud Files APIs at scale** (30–34) | Inline row rendering with one batched call on a 5 000-file folder (virtual scroll)? Sidebar tab API across 30–34? List header for the current folder? New-file menu entry? Node events for group folders, external storage, trash and restore? Notifications? Private link `/f/<fileid>`? Inline pickup budget inside a request and background-job latency with system cron? Watch index at the cap (1 000 targets): sync time, table size, matching cost per node event on both matrix images? | CF3.3, CF3.8, CF4.3, CF5.4 | Glyph only on folders + sidebar; reconcile-only for external storage; pickups fully in background jobs; a lower instance cap |
+| **CF-S5 — Nextcloud Files APIs at scale** (33–35) | Inline row rendering with one batched call on a 5 000-file folder (virtual scroll)? Sidebar tab API across 33–35? List header for the current folder? New-file menu entry? Node events for group folders, external storage, trash and restore? Notifications? Private link `/f/<fileid>`? Inline pickup budget inside a request and background-job latency with system cron? Watch index at the cap (1 000 targets): sync time, table size, matching cost per node event on both matrix images? | CF3.3, CF3.8, CF4.3, CF5.4 | Glyph only on folders + sidebar; reconcile-only for external storage; pickups fully in background jobs; a lower instance cap |
 
 ---
 
@@ -127,7 +132,7 @@ before; walks recorded. Never cut.
 **Goal:** nothing in the Nextcloud 1.6 feature set is missing from
 ownCloud.online or OpenCloud without a reason in `01` §5.2; all three apps
 speak the core's words in five locales and have a CI gate. Per phase: P1
-Nextcloud (CF1.3, CF1.4), P2 OpenCloud (CF1.5, CF1.4), P3 ownCloud.online
+Nextcloud (CF1.3a–d, CF1.4), P2 OpenCloud (CF1.5, CF1.4), P3 ownCloud.online
 (CF1.1, CF1.2, CF1.4).
 
 **User-flow:** J-NC-1 (P1), J-CF-2 (P3). **Briefs:** `08` §4 · **Tests:** `09` §2.
@@ -136,7 +141,10 @@ Nextcloud (CF1.3, CF1.4), P2 OpenCloud (CF1.5, CF1.4), P3 ownCloud.online
 | ---- | ---- | ------- | ----- |
 | CF1.1 | `synaplan-owncloud-online` | Mode enum (`shared` / `provision` / `link`); link mode ported from Nextcloud (`PlatformLinkService`, `LinkController`, routes, personal settings page, admin **Register this instance**); consent gate on every AI surface (D5); MIME filters on the four actions (D6); per-user keys encrypted (D4); chat launcher on every page like Nextcloud. | app release |
 | CF1.2 | `synaplan-owncloud-online` | PHPUnit suite mirroring Nextcloud's; `.github/workflows/ci.yml` with `All Checks Passed`; `AGENTS.md`; consumes the E-5 Docker stack (`10` §3.4: BW-Tech checkout at the hoster's tag in `php:8.4-apache`, MariaDB 10.11, cron sidecar, port `8083`, Synaplan network) for walks and E2E (CF-S4). | app repo |
-| CF1.3 | `synaplan-nextcloud` | CI workflow with `All Checks Passed`; `AGENTS.md`; per-user keys encrypted with transparent migration (D4); Playwright against `make dev-up` for J-NC-1 and summarize; user disabled / re-enabled listener (prepares CF2.4). | app release |
+| CF1.3a | `synaplan-nextcloud` | **D21.** Nextcloud 33–35 (row 47); controller annotations → attributes, pinned by `ControllerAccessTest`; `nextcloud/ocp` off `dev-master`. Fast lane, ships alone as 1.6.1. | app release |
+| CF1.3b | `synaplan-nextcloud` | Engineering baseline of `11` §3.1: CI with `All Checks Passed`, Synaplan pinned by ref and digest, contract test against the pinned OpenAPI spec, PHPStan, vue-tsc, Vitest, Playwright journeys of today's behaviour on 33 and 35, Renovate, `AGENTS.md`. No behaviour change. | app repo |
+| CF1.3c | `synaplan-nextcloud` | **D4.** Per-user keys encrypted with transparent migration. The disabled / re-enabled listener moved to CF2.10, where it calls `lifecycle`. | app release |
+| CF1.3d | `synaplan-nextcloud` | Release workflow: a tag on a green `main` commit builds, signs and publishes to the App Store. | app repo |
 | CF1.4 | each app, in its phase | Five locales (en, de, es, fr, tr) with the words of `00` §11 (D12); "Add to AI Knowledge" / "Add to knowledge…" → **Make searchable by AI** (D13); locale parity check in the app's CI. One PR per app: Nextcloud in P1, OpenCloud in P2, ownCloud.online in P3. | app releases |
 | CF1.5 | `synaplan-opencloud` | Chat about a file and research chat (SSE through the Go service to `/v1/chat/completions` with the exchanged token — needs CF2.2), media generation, binary **Save to Files** (D7). First step of P2; may run during P1 (row 34). | app release |
 

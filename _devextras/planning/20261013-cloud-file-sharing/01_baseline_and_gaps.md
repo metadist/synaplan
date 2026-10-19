@@ -14,6 +14,11 @@ walked; every "by code reading" claim is re-checked in the first walk (CF0.7).
 | `synaplan-owncloud-online` | `3b916f6` (`main`) | 1.0.0 — app id `oco_synaplan`, ownCloud 11, PHP 8.4 |
 | `synaplan-opencloud` | `5cc1351` (`main`) | v1.0.0 — Go backend + OpenCloud web extension, OpenCloud 8.1.0; README: "Early development — not ready for production use" |
 
+**Re-checked 2026-10-19** at `synaplan` `297d0cc67` (225 commits later,
+after 5.5.0) and `synaplan-nextcloud` `a80e2d8`: D1–D3 and D18–D20 hold
+unchanged; the classes this plan names are where it says (the service moves
+since 5.4.0 did not touch them). New: D21.
+
 ---
 
 ## 2. The three apps today
@@ -104,14 +109,14 @@ walked; every "by code reading" claim is re-checked in the first walk (CF0.7).
 | **D1** | Platform keys (`chat files rag [memories]`) are restricted keys. The scope map has no branch for `/api/v1/summary/*`, `/api/v1/media/*` or `/api/v1/config/memory-service/*`, and `/v1/*` requires `desktop:messages`. The Nextcloud and ownCloud.online apps call exactly those paths for summarize, translate, chat about a file, research chat and media. By code reading: `403 insufficient_scope` in the provision and link modes. #1936 mapped `/api/v1/messages`, `/chats`, `/files`, `/rag`, `/config/models` — not the paths the apps use. | `ApiKeyScope::requiredScopesForPath()`; `ApiKeyScopeTest::platformLinkProductPaths()`; app clients `lib/Service/SynaplanClient.php`, `lib/Controller/ChatController.php` | CF0.1 |
 | **D2** | `File::SOURCES` lacks `owncloud`. `FileController::upload` rewrites unknown sources to `web_upload`; `check-stale` filters by source → every ownCloud.online status is "missing"; the Library shows these files as web uploads. | `backend/src/Entity/File.php` (`SOURCES`), `FileController.php` (source whitelist, `findByUserSourceIds`) | CF0.2 |
 | **D3** | Every `nextcloud` / `opencloud` / `outlook` upload sets `BINCOMING = 1`, also when the caller named a knowledge folder. A synced folder would put hundreds of files into Incoming. | `backend/src/Service/File/FileUploadService.php` (`setIncoming(in_array($options->source, File::INCOMING_SOURCES))`) | CF0.3 |
-| **D4** | Nextcloud and ownCloud.online keep per-user keys in plain user preferences; only the instance secret is encrypted. Watches make these keys work while the person is away. | `UserAccountService.php` (both apps), `PlatformLinkService.php` (NC) | CF1.3 / CF1.1 |
+| **D4** | Nextcloud and ownCloud.online keep per-user keys in plain user preferences; only the instance secret is encrypted. Watches make these keys work while the person is away. | `UserAccountService.php` (both apps), `PlatformLinkService.php` (NC) | CF1.3c / CF1.1 |
 | **D5** | ownCloud.online asks for consent only in the chat panel. | `src/components/ChatPanel.vue`; modals without a gate | CF1.1 |
 | **D6** | ownCloud.online registers its actions for every MIME type. | `src/files-init.ts` (`mime: 'all'`) | CF1.1 |
 | **D7** | OpenCloud saves only text (2 MiB) into the space; generated images, audio and Office files cannot be saved. | `backend/internal/handler/files.go` | CF1.5 / CF3.5 |
 | **D8** | OIDC bearer users are recorded as `oidc:<issuer>` without the calling client. Synaplan cannot show "OpenCloud — last used", cannot offer a stop, cannot copy into the right OpenCloud account. | `OidcUserService::oidcSource()` | CF2.2 |
 | **D9** | The Apps directory has no OpenCloud card; the Nextcloud and ownCloud cards count only platform links, so provisioned or shared-key users look disconnected. | `frontend/src/apps/catalog.ts`, `status.ts` | CF2.5 |
 | **D10** | The docs promise OpenCloud "WebDAV and Graph API", "Spaces-aware indexing", "Automatic sync and re-indexing" and an app-token setup; the code uses CS3, the personal space, manual updates and a shared Keycloak. | `synaplan-docs/docs/plugins.md` (OpenCloud section), `docs/intro.md` | CF0.5 |
-| **D11** | Nextcloud and ownCloud.online have no CI in the repository; ownCloud.online has no tests; the Nextcloud hosting guide's roadmap is out of date. | missing `.github/`; empty `tests/`; `docs/HOSTING_GUIDE.md` | CF1.2 / CF1.3 / CF0.5 |
+| **D11** | Nextcloud and ownCloud.online have no CI in the repository; ownCloud.online has no tests; the Nextcloud hosting guide's roadmap is out of date. | missing `.github/`; empty `tests/`; `docs/HOSTING_GUIDE.md` | CF1.2 / CF1.3b / CF0.5 |
 | **D12** | Locales: Nextcloud `de` only, ownCloud.online none, OpenCloud none; the core has five. | `l10n/` in each app | CF1.4 |
 | **D13** | Words drift: "Add to AI Knowledge" (Nextcloud), "Add to knowledge…" (OpenCloud) against the core's "Make searchable by AI" / "Searchable by AI". | app sources; `frontend/src/i18n/locales/en/files.json` | CF1.4 |
 | **D14** | More-Nextcloud STATUS still lists S2 as planned; it is merged in `synaplan-nextcloud` #34 (the roadmap already notes this). | `../20260903_more_nextcloud/STATUS.md` | CF0.6 |
@@ -121,6 +126,7 @@ walked; every "by code reading" claim is re-checked in the first walk (CF0.7).
 | **D18** | OIDC bearer tokens are refused on `/v1/*`: the `openai_compat` firewall (`^/v1`) runs only `ApiKeyAuthenticator`. Chat about a file over organisation login (OpenCloud CF1.5, Nextcloud CF2.6) cannot work. Found in the third review. | `backend/config/packages/security.yaml` (`openai_compat`); `OidcBearerAuthenticator::supports()` | CF2.2 |
 | **D19** | Disconnect deletes the identity row (`PlatformLinkExchangeService::disconnect()` calls `remove($identity)`), so nothing is left to resume: watches would lose their owner link, and "Resume 2 watched folders?" (C9) could not be offered. Found in the third review. | `backend/src/Service/PlatformLink/PlatformLinkExchangeService.php` | CF2.5 |
 | **D20** | The ephemeral reaper deletes hidden files after 24 hours (`ReapEphemeralFilesCommand::DEFAULT_TTL_HOURS`), but working copies of watch runs must stay 7 days for retries (decision 20). Found in the third review. | `backend/src/Command/ReapEphemeralFilesCommand.php` | CF5.1 |
+| **D21** | The Nextcloud app declares Nextcloud 30–34. Nextcloud 35.0.0 shipped on 2026-09-15 and is `nextcloud:latest`, so the App Store does not offer the app there; 30–32 get no maintenance releases any more (32.0.15 on 2026-09-10 was the last). Six controllers rely only on docblock annotations, which Nextcloud deprecated in favour of attributes (`LinkController` carries both), and `nextcloud/ocp` is required as `dev-master`. Found in the fourth review. | `appinfo/info.xml` (`<nextcloud min-version="30" max-version="34"/>`), `lib/Controller/*.php`, `composer.json` | CF1.3a |
 
 ---
 
@@ -131,10 +137,10 @@ walked; every "by code reading" claim is re-checked in the first walk (CF0.7).
 "Verified" means seen in this workspace's code; "spike" means it is believed to
 exist and is confirmed in the named spike before a sprint depends on it.
 
-| Need | Nextcloud 30–34 | ownCloud 11 (ownCloud.online) | OpenCloud 8.x |
+| Need | Nextcloud 33–35 | ownCloud 11 (ownCloud.online) | OpenCloud 8.x |
 | ---- | --------------- | ----------------------------- | ------------- |
 | Bird in the file list | Files action with inline rendering in `@nextcloud/files` 4 (spike CF-S5: batched async render at 5 000 files) | Files `FileList` plugin row hook (spike CF-S4) | No known row-indicator extension point; `sidebarPanel`, `action`, `folderView`, `customComponent`, `accountExtension` exist in the SDK types (spike CF-S1) |
-| Sidebar tab | Files sidebar tab API (spike CF-S5: which API across 30–34) | Detail tab view (spike CF-S4) | `sidebarPanel` (verified in SDK types) |
+| Sidebar tab | Files sidebar tab API (spike CF-S5: which API across 33–35) | Detail tab view (spike CF-S4) | `sidebarPanel` (verified in SDK types) |
 | "New → From Synaplan" | New-file menu entry in `@nextcloud/files` (spike CF-S5) | New-file menu plugin (spike CF-S4) | Create-menu extension (spike CF-S1) |
 | File events | Node created / written / renamed / deleted events (spike CF-S5: group folders, external storage, trash restore) | Files hooks / dispatcher events (spike CF-S4) | Event bus consumer for upload, move, trash, restore (spike CF-S3) |
 | Write as a user without a session | `IRootFolder::getUserFolder()` (verified in `MediaController`) | Same (verified in `MediaController`) | Service account / impersonation (spike CF-S3); today only the request user's token |

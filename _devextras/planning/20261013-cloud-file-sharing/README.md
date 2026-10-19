@@ -6,7 +6,9 @@ six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467),
 No product code. All 46 decision rows of master-plan §3 agreed 2026-10-14
 (row 41 with lower caps). Delivery order (row 42): **P1** Synaplan core +
 Nextcloud, ending with the core API frozen as contract v1; **P2** OpenCloud;
-**P3** ownCloud.online.
+**P3** ownCloud.online. **2026-10-19:** P1 finalized in
+[`11`](./11_nextcloud_release.md) — four milestone releases, the Nextcloud
+release at the end, then a **break** until a dated "P2 go" (rows 47–49).
 **Plan of record:** [`00_master_plan.md`](./00_master_plan.md).
 
 Asked for on 2026-10-13:
@@ -35,8 +37,9 @@ Asked for on 2026-10-13:
 | [`08_agent_briefs.md`](./08_agent_briefs.md) | Work orders for coding agents: rules, definition of done, PR template, one brief per spike and step |
 | [`09_functional_tests.md`](./09_functional_tests.md) | Per sprint: unit and contract tests, integration scripts, browser walks with expected results; fixtures, accounts, regression set |
 | [`10_local_environments.md`](./10_local_environments.md) | Local stacks (Synaplan + Keycloak, Nextcloud, OpenCloud, ownCloud.online): pins, requirements, inventory, cleanup, update briefs E-1…E-9, `env-check.sh` |
+| [`11_nextcloud_release.md`](./11_nextcloud_release.md) | **P1 entry point**: four milestone releases, the engineering standard (`synaplan-opencloud`, `synaplan-charts`), test stacks, regression guards, release checklist, the break; briefs CF1.3a–d |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 Reading order for a reviewer: `00` §0–§3 → `01` §4 (defects) → `05` §1
-(journeys) → the goal files. For a coding agent: `08` §0 → the brief → the
-sections it cites → `09` for the sprint → `10` for the stack.
+(journeys) → the goal files. For a coding agent in P1: `11` → `08` §0 → the
+brief → the sections it cites → `09` for the sprint → `10` for the stack.
