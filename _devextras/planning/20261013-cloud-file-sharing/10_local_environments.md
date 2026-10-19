@@ -350,3 +350,16 @@ reason — then a summary; exit code 1 if any `FAIL`. Checks never change state.
   `:8000`, the dev UI runs on `:5173`. The test stack serves both on `:8001`,
   so `oidc-auth.spec.ts` › "should logout" passes there and fails against the
   dev stack (the other OIDC specs pass on both, checked 2026-10-19).
+- **The Synaplan test stack has no Redis**, and Synaplan keeps the one-time
+  codes of "Connect your Synaplan account" there (`platform_link:code:*`), so
+  every code exchange against `docker-compose.test.yml` answers "Invalid or
+  expired link code." The cache and the queues are in memory under
+  `APP_ENV=test`; the link codes are not. The Nextcloud e2e adds `redis_test`
+  with an extra compose file (`synaplan-nextcloud`:
+  `tests/e2e/synaplan-test-stack.yml`, `REDIS_DSN`). Adding Redis to the test
+  stack itself would let that file go.
+- **Two host ports of the test stack are taken on the maintainer
+  workstation**: `3308` (another project's MariaDB) and `11434` (a host
+  Ollama). The Nextcloud `make e2e-up` takes extra compose files in
+  `E2E_SYNAPLAN_FILES`; one that resets the `ports` of `db_test` and
+  `ollama-stub` (`ports: !reset []`) runs the stack beside them.
