@@ -12,7 +12,7 @@
   },
   "fileLines": {
     "src/components/ChatBrowser.vue": 999,
-    "src/components/ChatInput.vue": 2605,
+    "src/components/ChatInput.vue": 2543,
     "src/components/ChatMessage.vue": 2398,
     "src/components/FileSelectionModal.vue": 889,
     "src/components/MemoryGraphView.vue": 934,
@@ -61,7 +61,6 @@
     "src/composables/search/useSearchModels.ts::useSearchModels": 124,
     "src/composables/search/useSmartSearch.ts::useSmartSearch": 198,
     "src/composables/useChatHistory.ts::useChatHistory": 250,
-    "src/composables/useConversationFiles.ts::useConversationFiles": 103,
     "src/composables/useGoogleTag.ts::useGoogleTag": 196,
     "src/composables/useInputPersistence.ts::useAttachmentPersist": 124,
     "src/composables/useInputPersistence.ts::usePastedBlocksPersist": 119,

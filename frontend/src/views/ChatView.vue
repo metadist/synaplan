@@ -384,15 +384,8 @@
         :guest-session-id="isGuestMode ? guestStore.sessionId : null"
         :can-reattach="canComposeSharedChat && !isGuestMode"
         @close="conversationPreview = null"
-        @download="conversationPreview && downloadConversationPreview()"
-        @reattach="
-          conversationPreview &&
-          attachConversationFile({
-            id: conversationPreview.id,
-            name: conversationPreview.filename,
-            fileType: '',
-          })
-        "
+        @download="downloadConversationPreview"
+        @reattach="attachOpenPreview"
       />
       <ChatAccessErrorBanner
         v-if="
@@ -698,6 +691,7 @@ import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
 import { useConversationFiles } from '@/composables/useConversationFiles'
+import { useConversationFilePreview } from '@/composables/useConversationFilePreview'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
@@ -836,29 +830,15 @@ const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
 const { confirm: confirmDialog } = useDialog()
-
-const conversationPreview = ref<{ id: number; filename: string } | null>(null)
+const {
+  conversationPreview,
+  previewConversationFile,
+  downloadConversationPreview,
+  attachConversationFile,
+  attachOpenPreview,
+  reattachMessageFile,
+} = useConversationFilePreview(() => chatInputRef.value)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
-const previewConversationFile = (file: { id: number | null; name: string }) => {
-  if (file.id == null) return
-  conversationPreview.value = { id: file.id, filename: file.name }
-}
-const downloadConversationPreview = async () => {
-  const file = conversationPreview.value
-  if (!file) return
-  const { downloadFile } = await import('@/services/filesService')
-  await downloadFile(file.id, file.filename)
-}
-const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
-  if (file.id === null) {
-    return
-  }
-  chatInputRef.value?.attachExistingFile({
-    file_id: file.id,
-    filename: file.name,
-    file_type: file.fileType,
-  })
-}
 
 // Remove a file the chat can use, from the "Files in this chat" popover. This is
 // a permanent delete of the file (and its indexed knowledge), so it is gated
@@ -3831,14 +3811,6 @@ async function editUserMessage(message: Message, text: string): Promise<void> {
   await streamAIResponse(text, {
     ...(fileIds.length > 0 ? { fileIds } : {}),
     linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
-  })
-}
-
-function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {
-  chatInputRef.value?.attachExistingFile({
-    file_id: file.id,
-    filename: file.filename,
-    file_type: file.fileType || '',
   })
 }
 

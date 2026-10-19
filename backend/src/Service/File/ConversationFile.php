@@ -13,7 +13,7 @@ namespace App\Service\File;
  * Produced exclusively by {@see ConversationFileCatalog} so the offered
  * references and the accepted ones can never drift apart.
  */
-final readonly class ConversationFile
+final class ConversationFile
 {
     public const ORIGIN_ATTACHED = 'attached';
     public const ORIGIN_GENERATED = 'generated';
@@ -62,6 +62,13 @@ final readonly class ConversationFile
     ];
 
     /**
+     * Stored MIME (`video/webm`, `audio/webm`, …). Empty when the row was
+     * synthesised without a File entity. Authoritative for ambiguous
+     * containers such as webm.
+     */
+    public string $mime = '';
+
+    /**
      * @param string   $reference     marker payload, e.g. `file:42` or `attached:1`
      * @param string   $displayName   single-line safe name shown to the model
      * @param string   $category      one of the CATEGORY_* constants
@@ -74,16 +81,16 @@ final readonly class ConversationFile
      * @param string   $extractedText Tika/Whisper text already stored on BFILES
      */
     public function __construct(
-        public string $reference,
-        public string $displayName,
-        public string $category,
-        public string $origin,
-        public string $absolutePath,
-        public string $relativePath,
-        public ?int $fileId = null,
-        public ?int $messageId = null,
-        public string $direction = '',
-        public string $extractedText = '',
+        public readonly string $reference,
+        public readonly string $displayName,
+        public readonly string $category,
+        public readonly string $origin,
+        public readonly string $absolutePath,
+        public readonly string $relativePath,
+        public readonly ?int $fileId = null,
+        public readonly ?int $messageId = null,
+        public readonly string $direction = '',
+        public readonly string $extractedText = '',
     ) {
     }
 

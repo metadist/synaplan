@@ -126,6 +126,17 @@ const mountInput = (props: Record<string, unknown> = {}): VueWrapper =>
     },
   })
 
+const uploadedFile = (filename: string, mime: string, fileType: string, fileId: number) => ({
+  success: true,
+  file_id: fileId,
+  filename,
+  size: 3,
+  mime,
+  file_type: fileType,
+  status: 'ready',
+  extracted_text_length: 0,
+})
+
 const attachPdf = async (wrapper: VueWrapper) => {
   await (wrapper.vm as unknown as ChatInputExposed).uploadFiles([
     new File(['hi'], 'doc.pdf', { type: 'application/pdf' }),
@@ -392,6 +403,71 @@ describe('ChatInput explicit model pick', () => {
     const sent = wrapper.emitted('send')?.[0] as [string, { modelId?: number }]
     expect(sent[0]).toBe('Hello')
     expect(sent[1].modelId).toBeUndefined()
+
+    wrapper.unmount()
+  })
+})
+
+describe('ChatInput media previews', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+    vi.mocked(deleteFile).mockClear()
+    vi.mocked(chatApi.uploadChatFile).mockReset()
+  })
+
+  it('shows a picture with its name and keeps a document as a chip', async () => {
+    vi.mocked(chatApi.uploadChatFile)
+      .mockResolvedValueOnce(uploadedFile('shot.png', 'image/png', 'png', 2))
+      .mockResolvedValueOnce(uploadedFile('notes.pdf', 'application/pdf', 'pdf', 3))
+
+    const wrapper = mountInput()
+    await (wrapper.vm as unknown as ChatInputExposed).uploadFiles([
+      new File(['x'], 'shot.png', { type: 'image/png' }),
+      new File(['x'], 'notes.pdf', { type: 'application/pdf' }),
+    ])
+    await flushPromises()
+
+    const image = wrapper.get('[data-testid="img-composer-media"]')
+    expect(image.attributes('alt')).toBe('shot.png')
+    expect(wrapper.get('[data-testid="card-composer-media"]').text()).toContain('shot.png')
+    expect(wrapper.find('[data-testid="chip-chat-file"]').text()).toContain('notes.pdf')
+    expect(wrapper.findAll('[data-testid="img-composer-media"]')).toHaveLength(1)
+
+    await wrapper
+      .get('[data-testid="card-composer-media"] [data-testid="btn-remove-chat-file"]')
+      .trigger('click')
+    await flushPromises()
+
+    expect(deleteFile).toHaveBeenCalledWith(2)
+    expect(wrapper.find('[data-testid="img-composer-media"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="chip-chat-file"]').exists()).toBe(true)
+  })
+
+  it('shows a video still with a play mark and opens it larger', async () => {
+    vi.mocked(chatApi.uploadChatFile).mockResolvedValueOnce(
+      uploadedFile('clip.mp4', 'video/mp4', 'mp4', 4)
+    )
+
+    const wrapper = mountInput()
+    await (wrapper.vm as unknown as ChatInputExposed).uploadFiles([
+      new File(['x'], 'clip.mp4', { type: 'video/mp4' }),
+    ])
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="media-composer-video"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="badge-composer-video"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="chip-chat-file"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="card-composer-media"]').text()).toContain('clip.mp4')
+
+    await wrapper.get('[data-testid="btn-composer-media"]').trigger('click')
+    await flushPromises()
+
+    const dialog = document.body.querySelector('[data-testid="modal-composer-media"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.textContent).toContain('clip.mp4')
+    expect(document.body.querySelector('[data-testid="media-composer-video-large"]')).not.toBeNull()
 
     wrapper.unmount()
   })

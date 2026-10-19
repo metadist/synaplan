@@ -25,6 +25,7 @@ class ConversationFileHistoryTest extends TestCase
             'IN',
             'Clause 1.',
         );
+        $entry->mime = 'application/pdf';
 
         $catalog = $this->createMock(ConversationFileCatalog::class);
         $catalog->expects($this->once())
@@ -44,6 +45,7 @@ class ConversationFileHistoryTest extends TestCase
                 'fileType' => 'pdf',
                 'messageId' => 100,
                 'hasText' => true,
+                'mime' => 'application/pdf',
             ],
         ], $history->forChat(7, 42));
     }
