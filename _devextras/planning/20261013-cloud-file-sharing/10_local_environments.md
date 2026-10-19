@@ -176,9 +176,9 @@ Today: one container, SQLite, no cron, no `user_oidc`. Target:
 | ------- | ----- |
 | Port | `8081:80` (unchanged) |
 | Network | `synaplan_synaplan-network` (external, unchanged) |
-| Env | `NEXTCLOUD_TRUSTED_DOMAINS="localhost nextcloud 127.0.0.1 host.docker.internal"`, `OVERWRITEHOST=localhost:8081`, `OVERWRITEPROTOCOL=http`, `OVERWRITECLIURL=http://localhost:8081`, `NEXTCLOUD_ADMIN_USER=admin`, `NEXTCLOUD_ADMIN_PASSWORD=admin`, `PHP_MEMORY_LIMIT=1G` |
+| Env | `NEXTCLOUD_TRUSTED_DOMAINS="localhost localhost:8081 nextcloud 127.0.0.1 host.docker.internal"` (Nextcloud 33+ refuses a password login whose `Origin` host is not trusted, so `localhost:8081` is listed), `OVERWRITEHOST=localhost:8081`, `OVERWRITEPROTOCOL=http`, `OVERWRITECLIURL=http://localhost:8081`, `NEXTCLOUD_ADMIN_USER=admin`, `NEXTCLOUD_ADMIN_PASSWORD=admin`, `PHP_MEMORY_LIMIT=1G` |
 | Hooks | `docker/dev-hooks/before-starting/10-link-synaplan-app.sh` links the app on every start; `docker/dev-hooks/post-installation/20-dev-setup.sh` runs once after the official image installed Nextcloud, before Apache starts; `docker/dev-seed.sh` runs on every `make dev-up` for what needs HTTP |
-| `20-dev-setup.sh` does | `occ background:cron`; `allow_local_remote_servers` true (the app calls `http://backend`); no skeleton files; default language `en`; mail to MailHog (`mailhog:1025`); the app set to the local stack (`active_env=local`, `synaplan_url_local=http://backend`, `synaplan_public_url_local=http://localhost:5173`); users `ada`, `bob`, `carol` (password `<name>-dev-pass`; emails `ada@example.org`, `bob@example.org`, `carol@example.org`); organisation login (next row) |
+| `20-dev-setup.sh` does | `occ background:cron`; `allow_local_remote_servers` true (the app calls `http://backend`); no skeleton files; default language `en`; `firstrunwizard` disabled (its dialog covers the page for every new user); mail to MailHog (`mailhog:1025`); the app set to the local stack (`active_env=local`, `synaplan_url_local=http://backend`, `synaplan_public_url_local=http://localhost:5173`); users `ada`, `bob`, `carol` (password `<name>-dev-pass`; emails `ada@example.org`, `bob@example.org`, `carol@example.org`); organisation login (next row) |
 | `dev-seed.sh` does | enables the app (with `--force` while `info.xml` stops below the server version); Ada's eight folders `Specs`, `Incoming-DE`, `Incoming-EN`, `Reports`, `Invoices`, `Exports`, `Projects/Q3`, `HR/Contracts` over WebDAV; `Incoming-DE` (edit) and `Specs` (read) shared with Bob over the OCS API. Later, E-6's helper creates and deletes the throwaway user `nc-temp` for J-NC-2, and from CF3.3 on the stack sets `delivery_url_override` to `http://nextcloud/index.php/apps/synaplan_integration/api/v1/inbound` |
 | Organisation login (default; `NC_OIDC=0` skips it) | `user_oidc` from the App Store; `allow_multiple_user_backends=1` (the password login stays); `allow_insecure_http=1` (`user_oidc` refuses plain `http://localhost:8081` otherwise); `soft_auto_provision` (Keycloak's `ada` signs in as the local `ada`); `occ user_oidc:provider keycloak --clientid=nextcloud --clientsecret=nextcloud-dev-secret --discoveryuri=http://keycloak:8080/realms/synaplan/.well-known/openid-configuration --scope="openid email profile" --unique-uid=0 --mapping-uid=preferred_username`. The discovery document names the issuer `https://host.docker.internal:8443/realms/synaplan`; `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` keeps server calls on `http://keycloak:8080`. Keycloak accepts both redirect URIs, `/apps/user_oidc/code` and `/index.php/apps/user_oidc/code` (E-3) |
 | Make targets | `dev-up`, `dev-down`, `dev-reset` (`down -v`), `dev-occ CMD="…"`, `dev-logs`, `dev-shell`; `NC_IMAGE=nextcloud:33-apache make dev-reset dev-up` for the floor (a different major version needs fresh volumes) |
@@ -324,6 +324,11 @@ reason — then a summary; exit code 1 if any `FAIL`. Checks never change state.
   variables reach Compose only when `WSLENV` names them — the Nextcloud
   Makefile exports `NC_IMAGE` and `NC_OIDC` that way. Scripts use
   `docker compose` or `docker exec`, never `docker run -v`.
+- **After a WSL restart, Docker Desktop starts containers before the WSL
+  paths are shared.** Bind mounts come up empty — Nextcloud then serves
+  without the app — and `/tmp` is gone. Restart the affected containers
+  (`docker compose restart nextcloud nextcloud-cron`); keep nothing needed
+  later in `/tmp`.
 - **OpenCloud 8.1.0 crashes under parallel load.** Several Playwright workers
   at once end the `opencloud` container with `fatal error: concurrent map read
   and map write` (web service, config merge), and the service has no restart

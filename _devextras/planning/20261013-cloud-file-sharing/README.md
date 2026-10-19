@@ -37,7 +37,7 @@ Asked for on 2026-10-13:
 | [`08_agent_briefs.md`](./08_agent_briefs.md) | Work orders for coding agents: rules, definition of done, PR template, one brief per spike and step |
 | [`09_functional_tests.md`](./09_functional_tests.md) | Per sprint: unit and contract tests, integration scripts, browser walks with expected results; fixtures, accounts, regression set |
 | [`10_local_environments.md`](./10_local_environments.md) | Local stacks (Synaplan + Keycloak, Nextcloud, OpenCloud, ownCloud.online): pins, requirements, inventory, cleanup, update briefs E-1…E-9, `env-check.sh` |
-| [`11_nextcloud_release.md`](./11_nextcloud_release.md) | **P1 entry point**: four milestone releases, the engineering standard (`synaplan-opencloud`, `synaplan-charts`), test stacks, regression guards, release checklist, the break; briefs CF1.3a–d |
+| [`11_nextcloud_release.md`](./11_nextcloud_release.md) | **P1 entry point**: four milestone releases, the engineering standard (`synaplan-opencloud`, `synaplan-charts`), test stacks, regression guards, release checklist, the break; briefs CF1.3a–e |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 Reading order for a reviewer: `00` §0–§3 → `01` §4 (defects) → `05` §1

@@ -35,7 +35,7 @@ name "all three apps" (CF1.4, CF5.9) run once per phase for that phase's app.
 | Phase | Steps | Gate before it starts | Exit |
 | ----- | ----- | --------------------- | ---- |
 | **P0** | E-1, E-2, E-3, E-6 (`10` §4); E-4 for the spikes and the compatibility check | The §3 rows the first briefs cite are agreed | `env-check.sh --cloud nextcloud --oidc` green |
-| **P1** | CF-S2, CF-S5 at the start; CF-S1, CF-S3, CF-S4 before CF3.1 and CF5.1 merge; E-9 before CF2.1; CF0.0–CF0.7; CF1.3a–d, CF1.4 (Nextcloud); CF2.1–CF2.6, CF2.9, CF2.10; CF3.1–CF3.3, CF3.6–CF3.8; CF4.1–CF4.3; CF5.1–CF5.4, CF5.7, CF5.8, CF5.9 (Nextcloud), CF5.10 — in milestones M1–M4 (`11` §2) | P0 exit | `09` §8.1, then the release (`11` §6) and the break |
+| **P1** | CF-S2, CF-S5 at the start; CF-S1, CF-S3, CF-S4 before CF3.1 and CF5.1 merge; E-9 before CF2.1; CF0.0–CF0.7; CF1.3a–e, CF1.4 (Nextcloud); CF2.1–CF2.6, CF2.9, CF2.10; CF3.1–CF3.3, CF3.6–CF3.8; CF4.1–CF4.3; CF5.1–CF5.4, CF5.7, CF5.8, CF5.9 (Nextcloud), CF5.10 — in milestones M1–M4 (`11` §2) | P0 exit | `09` §8.1, then the release (`11` §6) and the break |
 | **P2** | CF1.4 (OpenCloud), CF1.5, CF2.7, CF2.11, CF3.5, CF3.10, CF4.5, CF5.6, CF5.9 (OpenCloud) | P1 exit; the dated "P2 go" (row 48); E-4 green; CF-S1 and CF-S3 answered | `09` §8.2 |
 | **P3** | E-5; CF1.1, CF1.2, CF1.4 (ownCloud.online), CF2.8, CF3.4, CF3.9, CF4.4, CF5.5, CF5.9 (ownCloud.online) | P2 exit; CF-S4 answered | `09` §8.3 |
 
@@ -132,7 +132,7 @@ before; walks recorded. Never cut.
 **Goal:** nothing in the Nextcloud 1.6 feature set is missing from
 ownCloud.online or OpenCloud without a reason in `01` §5.2; all three apps
 speak the core's words in five locales and have a CI gate. Per phase: P1
-Nextcloud (CF1.3a–d, CF1.4), P2 OpenCloud (CF1.5, CF1.4), P3 ownCloud.online
+Nextcloud (CF1.3a–e, CF1.4), P2 OpenCloud (CF1.5, CF1.4), P3 ownCloud.online
 (CF1.1, CF1.2, CF1.4).
 
 **User-flow:** J-NC-1 (P1), J-CF-2 (P3). **Briefs:** `08` §4 · **Tests:** `09` §2.
@@ -145,6 +145,7 @@ Nextcloud (CF1.3a–d, CF1.4), P2 OpenCloud (CF1.5, CF1.4), P3 ownCloud.online
 | CF1.3b | `synaplan-nextcloud` | Engineering baseline of `11` §3.1: CI with `All Checks Passed`, Synaplan pinned by ref and digest, contract test against the pinned OpenAPI spec, PHPStan, vue-tsc, Vitest, Playwright journeys of today's behaviour on 33 and 35, Renovate, `AGENTS.md`. No behaviour change. | app repo |
 | CF1.3c | `synaplan-nextcloud` | **D4.** Per-user, admin and shared keys stored as sensitive config values, which Nextcloud encrypts; plaintext values migrate on first read. The disabled / re-enabled listener moved to CF2.10, where it calls `lifecycle`. | app release |
 | CF1.3d | `synaplan-nextcloud` | Release workflow: a tag on a green `main` commit builds, signs and publishes to the App Store. | app repo |
+| CF1.3e | `synaplan-nextcloud` | **D23, D24.** The chat launcher and the Files actions load only for a signed-in person; failures answer with a status and a code instead of HTTP 500 and the raw exception, and the app shows one sentence with the recovery. | app release |
 | CF1.4 | each app, in its phase | Five locales (en, de, es, fr, tr) with the words of `00` §11 (D12); "Add to AI Knowledge" / "Add to knowledge…" → **Make searchable by AI** (D13); locale parity check in the app's CI. One PR per app: Nextcloud in P1, OpenCloud in P2, ownCloud.online in P3. | app releases |
 | CF1.5 | `synaplan-opencloud` | Chat about a file and research chat (SSE through the Go service to `/v1/chat/completions` with the exchanged token — needs CF2.2), media generation, binary **Save to Files** (D7). First step of P2; may run during P1 (row 34). | app release |
 

@@ -4,7 +4,7 @@ Plan of record: [`00_master_plan.md`](./00_master_plan.md) (rows 42–49). This
 file is the entry point for everyone working in P1: it orders the P1 steps
 into four releases, sets the engineering standard, names the test stacks and
 the regression guards, and ends P1 with a break. Briefs stay in
-[`08`](./08_agent_briefs.md) (CF1.3a–d are in §8 here), tests in
+[`08`](./08_agent_briefs.md) (CF1.3a–e are in §8 here), tests in
 [`09`](./09_functional_tests.md), stacks in [`10`](./10_local_environments.md).
 Where an older file disagrees with this one, this one wins and the older file
 is a bug.
@@ -42,7 +42,7 @@ After M4 the track **pauses** (row 48):
 
 | | Ships | Core (`synaplan`) | Nextcloud app | Before or beside | Exit (`09`) |
 | - | ----- | ----------------- | ------------- | ---------------- | ----------- |
-| **M1 — works, tested, releasable** | Synaplan release · Nextcloud 1.6.1 (fast lane) and 1.7.0 | CF0.1–CF0.6 | CF1.3a–d, CF1.4-nc | E-2–E-4, E-6 (E-1 done); walks CF0.7 | §1; §2 Nextcloud rows |
+| **M1 — works, tested, releasable** | Synaplan release · Nextcloud 1.6.1 (fast lane) and 1.7.0 | CF0.1–CF0.6 | CF1.3a–e, CF1.4-nc | E-2–E-4, E-6 (E-1 done); walks CF0.7 | §1; §2 Nextcloud rows |
 | **M2 — one identity** | Synaplan release · Nextcloud 1.8.0 | CF2.1–CF2.5, CF2.9 | CF2.10; CF2.6 if CF-S2 says yes | E-9; spikes CF-S2, CF-S5 (from M1, once E-2 is green) | §3 |
 | **M3 — files both ways, searchable state** | Synaplan release · Nextcloud 1.9.0 · chart value `cloudFiles` | CF3.1, CF3.2, CF3.6, CF3.7, CF4.1, CF4.2 | CF3.3, CF3.8, CF4.3 | spikes CF-S1, CF-S3, CF-S4 answered before CF3.1 merges | §4, §5 |
 | **M4 — watched folders, contract v1** | Synaplan release · **Nextcloud 2.0.0** | CF5.1, CF5.2, CF5.7, CF5.8, CF5.3, CF5.10 | CF5.4, CF5.9-nc, CF5.10 (vendored fixtures) | — | §6, §8.1 |
@@ -139,6 +139,13 @@ from `MASTER_PASSWORD` instead of living in values. For P1:
   green before and after: `AdminSettings.vue` (1 547 lines) in CF2.10,
   `ResearchChat.vue` (1 311) in the first brief that touches it. New files stay
   under 400 lines.
+- **The core's ledgers only shrink.** `SizeRatchetTest`, `ThinControllerTest`
+  and the frontend `sizeRatchet.spec.ts` freeze the files this plan touches
+  most: `FileController.php`, `FileUploadService.php`, `FilesView.vue`,
+  `filesService.ts`. New code goes into a class or module of its own (CF0.4:
+  `SourceStaleCheck`; CF0.2: `services/fileSources.ts`), a frozen
+  constructor gets a service as an action argument, and a regenerated ledger
+  is trimmed to the PR's own entries.
 - **Ratchets only move up.** The PHPStan level in `phpstan.neon` (CF1.3b) is
   the highest that passes after fixing real findings, without a baseline
   file; no later PR lowers it.
@@ -241,10 +248,10 @@ entries, never in merged code.
 
 ---
 
-## 8. Briefs CF1.3a–d (replace CF1.3 of `08` §4)
+## 8. Briefs CF1.3a–e (replace CF1.3 of `08` §4)
 
 CF1.3 mixed CI, a security change and a listener nothing used yet. Split, each
-PR has one purpose. CF1.4-nc follows CF1.3c.
+PR has one purpose. CF1.4-nc follows CF1.3c and CF1.3e.
 
 ### CF1.3a — Nextcloud 33 to 35 (D21)
 
@@ -289,3 +296,15 @@ PR has one purpose. CF1.4-nc follows CF1.3c.
 | Depends on | CF1.3b; the owner stores two repository secrets (A6): the App Store signing key (today in `.local/`, never committed) and an App Store API token |
 | Build | `.github/workflows/release.yml` on tag `v*`: refuse unless the tagged commit is on `main` with a green CI run, `info.xml` `<version>` equals the tag and `CHANGELOG.md` has its section; `make package`; sign as `make sign` does; attach tarball and signature to the GitHub release; publish through the App Store releases API. A pre-release tag (`v*-rc.*`) stops before the App Store |
 | Acceptance | a release-candidate tag produces a draft GitHub release whose signature verifies against the app certificate; 1.7.0 is the first release published this way |
+
+### CF1.3e — Honest app states (D23, D24)
+
+| | |
+| - | - |
+| Repo · class · type | `synaplan-nextcloud` (P1, M1) · app release 1.7.0 · `fix(app)` |
+| Branch | `fix/cf1-3e-honest-app-states` |
+| Depends on | CF1.3b (Vitest and Playwright exist) |
+| Build | 1. `Application::boot()` stops adding the chat launcher and the Files actions to every page; a `BeforeTemplateRenderedEvent` listener adds both when `$event->isLoggedIn()`, so the login and public share pages load neither. 2. The controllers stop answering failures with HTTP 500 and the exception message: no key → 409 `not_connected`; Synaplan unreachable → 502 `synaplan_unreachable`; a Synaplan 4xx keeps its status and Synaplan's error code. The exception goes to the log, never into the response. 3. The Files actions and the chat turn each code into one sentence with the recovery — not connected: "Connect your Synaplan account first." with a link to Personal settings → Synaplan; unreachable: "Synaplan cannot be reached. Try again in a minute, or ask your administrator." English here; CF1.4-nc adds the other four locales |
+| Tests | `ControllerErrorTest`: for every controller that calls Synaplan, no key → 409 `not_connected`, transport failure → 502, and no response body contains the exception message. Vitest for the code-to-sentence mapping. Playwright: the login page has no launcher; Summarize without a connection shows the sentence and the settings link |
+| Acceptance | J-NC-1 from a fresh user: before Connect, Summarize says what to do and links there (U8); signed out, the login page shows no launcher |
+| Don't | change a success path; add a dependency |

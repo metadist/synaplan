@@ -10,11 +10,11 @@ not a chat message.
 | Step | Repo | Phase | State | Notes |
 | ---- | ---- | ----- | ----- | ----- |
 | E-1 Cleanup and baseline | workstation | P0 | **done** 2026-10-19 | §2.1 done 2026-10-13; §2.2 done 2026-10-14; scheduler running and healthy since 2026-10-17 (cause of the exit 127 not recorded — `10` §1.4) |
-| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users `ada` / `bob` / `carol`) | `synaplan-nextcloud` | P0 | **done** 2026-10-19, uncommitted on `chore/env-2-nextcloud-stack-v2` | 35.0.2 running, 33.0.10 checked; organisation login works on both |
-| E-3 Keycloak clients and users for the clouds | `synaplan` | P0 | **done** 2026-10-19, uncommitted | `_docker/keycloak/setup.sh` "Cloud apps" block, `docs/DEVELOPMENT.md`; local `backend/.env` OIDC values |
+| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users `ada` / `bob` / `carol`) | `synaplan-nextcloud` | P0 | **done** 2026-10-19 · in review [synaplan-nextcloud#45](https://github.com/metadist/synaplan-nextcloud/pull/45) | 35.0.2 running, 33.0.10 checked; organisation login works on both |
+| E-3 Keycloak clients and users for the clouds | `synaplan` | P0 | **done** 2026-10-19 · in review [#2566](https://github.com/metadist/synaplan/pull/2566) | `_docker/keycloak/setup.sh` "Cloud apps" block, `docs/DEVELOPMENT.md`; local `backend/.env` OIDC values |
 | E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | P0 | **done** 2026-10-19 | fresh `init`, client regenerated, extension rebuilt; no file changed; E2E 10/10 with one worker |
 | E-5 ownCloud.online Docker stack | `synaplan-owncloud-online` | P3 | planned | port 8083, tag `v11.0.10` (`OCO_TAG`); first brief of P3 |
-| E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` done 2026-10-19 (uncommitted); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open |
+| E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` done 2026-10-19, in review [#2566](https://github.com/metadist/synaplan/pull/2566); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open |
 | E-7 Developer docs | all | any | planned | after the stack it documents is green |
 | E-8 Refresh policy | STATUS | — | recurring | monthly or on `max-version` change |
 | E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | planned | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); extended by every core brief |
@@ -24,19 +24,20 @@ not a chat message.
 | CF-S4 ownCloud 11 Files APIs | `synaplan-owncloud-online` | P1 (before CF3.1) | planned | Host install on `:8088`; asks the hoster for its version and a test tenant; includes the watch index at the cap (row 41) |
 | CF-S5 Nextcloud Files APIs at scale | `synaplan-nextcloud` | P1 (start) | planned | Includes the watch index at the cap (row 41) |
 | CF0.0 Local stacks ready (E-1, E-2, E-3, E-6; E-4) | workstation, repos | P1 | planned | gate for CF0.7; `carol` on the `:8088` host install |
-| CF0.1 Scope map for the paths the apps call (D1) | `synaplan` | P1 | planned | starts the contract folder `backend/tests/Fixtures/cloud-apps-contract/` |
-| CF0.2 `owncloud` source (D2) | `synaplan` | P1 | planned | Data fix per §3 row 26 (`BUSERID`, `BSOURCE`) |
-| CF0.3 Cloud uploads that name a knowledge folder skip Incoming (D3) | `synaplan` | P1 | planned | automatic rule, no new request field (decision 2026-10-14) |
-| CF0.4 `check-stale` returns `vector_state` | `synaplan` | P1 | planned |  |
+| CF0.1 Scope map for the paths the apps call (D1) | `synaplan` | P1 | **in review** [#2571](https://github.com/metadist/synaplan/pull/2571) | starts the contract folder `backend/tests/Fixtures/cloud-apps-contract/` |
+| CF0.2 `owncloud` source (D2) | `synaplan` | P1 | **in review** [#2574](https://github.com/metadist/synaplan/pull/2574) | Data fix per §3 row 26 (`BUSERID`, `BSOURCE`) |
+| CF0.3 Cloud uploads that name a knowledge folder skip Incoming (D3) | `synaplan` | P1 | **in review** [#2572](https://github.com/metadist/synaplan/pull/2572) | automatic rule, no new request field (decision 2026-10-14) |
+| CF0.4 `check-stale` returns `vector_state` | `synaplan` | P1 | **in review** [#2573](https://github.com/metadist/synaplan/pull/2573) |  |
 | CF0.5 Docs truth (D10, D11) | `synaplan-docs`, `synaplan-nextcloud` | P1 | planned |  |
 | CF0.6 STATUS hygiene (D14) | `synaplan` | P1 | planned | rows 1–36 agreed; can start |
 | CF0.7 First walks + compatibility check | all (walk) | P1 | planned | Nextcloud J-NC-1…3; current OpenCloud and ownCloud.online releases |
 | CF1.1 ownCloud.online link mode, consent, MIME, key encryption | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.2 ownCloud.online tests, CI, AGENTS.md, local stack | `synaplan-owncloud-online` | P3 | planned | after CF-S4 |
-| CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | planned | D21; app release 1.6.1; row 47 agreed |
+| CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | **in review** [synaplan-nextcloud#46](https://github.com/metadist/synaplan-nextcloud/pull/46) (stacked on #45) | D21; app release 1.6.1; row 47 agreed |
 | CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | planned | `11` §3.1; dev dependencies ask first (A2) |
 | CF1.3c Keys encrypted at rest (per-user, admin, shared) | `synaplan-nextcloud` | P1 (M1) | planned | D4; Nextcloud's sensitive config; app release 1.7.0 |
 | CF1.3d Release from CI | `synaplan-nextcloud` | P1 (M1) | planned | owner stores two repository secrets (A6) |
+| CF1.3e Honest app states (D23, D24) | `synaplan-nextcloud` | P1 (M1) | planned | app release 1.7.0; CF1.4-nc translates its sentences |
 | CF1.4-nc Five locales, core words — Nextcloud | `synaplan-nextcloud` | P1 | planned |  |
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF1.4-oco Five locales, core words — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
@@ -425,8 +426,8 @@ Findings, fixed in the stacks and written into `10`:
    Folders and shares need HTTP, so they moved from the install hook to
    `docker/dev-seed.sh`, which `make dev-up` runs on every start.
 3. Synaplan accepted no Keycloak token: `backend/.env` had no OIDC values. It
-   now carries the values of the test stack (`10` §3.1; the old file is kept as
-   `/tmp/synaplan-backend.env.bak-20261019`).
+   now carries the values of the test stack (`10` §3.1); before, the three
+   OIDC lines were empty and nothing else differed.
 4. This workstation's `docker` calls Docker Desktop's Windows `docker.exe`:
    environment variables reach Compose only through `WSLENV`, so
    `NC_IMAGE=…` was silently ignored until the Makefile exported it there.
@@ -453,3 +454,27 @@ job, the Synaplan pins and Renovate managers, the client generation from the
 pinned image, the three HTTP helpers the contract test covers, the controller
 attributes. `ci-local` is the house convention, not `synaplan-opencloud`'s
 (it relies on CI alone); `11` §3.1 says so.
+
+**2026-10-19 (M1 implementation).** CF0.1–CF0.4 and CF1.3a are built and in
+review, each on its own branch with its own PR; CF0.1–CF0.4 were gated together
+on one integration branch (`make ci-local`, `make test-e2e` — only the
+documented local-only failures). Evidence per step is in the PR descriptions:
+CF0.1 through the real Nextcloud 35 app (Connect, Summarize, Disconnect);
+CF0.3 by real uploads; CF0.2's data fix by seeded rows, up and down; CF0.2 walked
+in the browser in light and dark.
+
+Findings, written into the plan:
+
+1. Nextcloud 33+ refuses a password login whose `Origin` host is not trusted,
+   and the first-run wizard covers the page for every new user. The dev stack
+   trusts `localhost:8081` and disables the wizard (`10` §3.2, #45).
+2. Two defects of the released app 1.6.0, seen in the CF0.1 walk: **D23** (the
+   chat launcher on the Nextcloud login page) and **D24** (Summarize without a
+   connection answers HTTP 500 with the raw Guzzle error). New brief
+   **CF1.3e** in M1, after CF1.3b, before CF1.4-nc (`11` §8).
+3. The core's size ledgers froze the files this plan touches most. CF0.4
+   moved the check-stale classification into `SourceStaleCheck`, CF0.2 the
+   source enum into `services/fileSources.ts`; the rule is in `11` §3.3.
+4. After a WSL restart, bind mounts came up empty and `/tmp` was gone; the
+   backup of the old `backend/.env` named in the environments entry above was
+   lost with it (its OIDC lines were empty). `10` §6.

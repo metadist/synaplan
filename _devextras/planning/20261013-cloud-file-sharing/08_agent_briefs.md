@@ -165,7 +165,7 @@ etags).
 | Phase | Briefs an agent may take | Stack profile |
 | ----- | ------------------------ | ------------- |
 | P0 | E-1, E-2, E-3, E-4, E-6 (`10` §4) | `env-check.sh --cloud nextcloud --oidc` |
-| P1 | spikes CF-S2, CF-S5 (start), CF-S1, CF-S3, CF-S4 (before CF3.1 and CF5.1 merge); E-9 (before CF2.1); every `synaplan` brief except CF2.11; every `synaplan-nextcloud` brief (CF1.3a–d, CF1.4-nc, CF2.6, CF2.10, CF3.3, CF3.8, CF4.3, CF5.4, CF5.9-nc, CF5.10); optionally CF1.5 (`00` row 34). Order and releases: `11` §2 | `env-check.sh --cloud nextcloud --oidc` |
+| P1 | spikes CF-S2, CF-S5 (start), CF-S1, CF-S3, CF-S4 (before CF3.1 and CF5.1 merge); E-9 (before CF2.1); every `synaplan` brief except CF2.11; every `synaplan-nextcloud` brief (CF1.3a–e, CF1.4-nc, CF2.6, CF2.10, CF3.3, CF3.8, CF4.3, CF5.4, CF5.9-nc, CF5.10); optionally CF1.5 (`00` row 34). Order and releases: `11` §2 | `env-check.sh --cloud nextcloud --oidc` |
 | P2 | every `synaplan-opencloud` brief (CF1.4-oc, CF1.5, CF2.7, CF3.5, CF3.10, CF4.5, CF5.6, CF5.9-oc) and CF2.11 | `env-check.sh --cloud opencloud --oidc` |
 | P3 | E-5; every `synaplan-owncloud-online` brief (CF1.1, CF1.2, CF1.4-oco, CF2.8, CF3.4, CF3.9, CF4.4, CF5.5, CF5.9-oco) | `env-check.sh --cloud owncloud --oidc` |
 
@@ -184,7 +184,7 @@ P1  CF-S2 ‖ CF-S5                          (start, 2 days each)
     CF0.0 → { CF0.1 ‖ CF0.2 ‖ CF0.3 ‖ CF0.4 } → CF0.7 (walks) → release
     E-9 (reference client) → CF2.1
             CF0.5 ‖ CF0.6 (docs, any time in CF0)
-    CF1.3a (fast lane, 1.6.1) → CF1.3b → { CF1.3c ‖ CF1.3d } → CF1.4-nc → release (Nextcloud 1.7.0)
+    CF1.3a (fast lane, 1.6.1) → CF1.3b → { CF1.3c ‖ CF1.3d ‖ CF1.3e } → CF1.4-nc → release (Nextcloud 1.7.0)
     CF2.1 → CF2.2 → CF2.3 → CF2.4 → CF2.5 ;  CF2.2 → CF2.9
            → CF2.10 (Nextcloud identity basics) → CF2.6 (only if CF-S2 = yes) → release
     CF-S1 ‖ CF-S3 ‖ CF-S4  ─── must be answered before CF3.1 and CF5.1 merge
@@ -416,14 +416,14 @@ Wave contract: `00` §5, `01` §5.2, `06` §3. Tests: `09` §2.
 
 **Acceptance** — CI green on the PR; `make ci-local` documented and green; `AGENTS.md` carries the house rules (English, Conventional Commits, no attribution, gate before commit, locales).
 
-### CF1.3 — Nextcloud: split into CF1.3a–d (2026-10-19)
+### CF1.3 — Nextcloud: split into CF1.3a–e (2026-10-19)
 
 The briefs are in [`11`](./11_nextcloud_release.md) §8: **CF1.3a** Nextcloud
 33–35 (D21, fast lane 1.6.1), **CF1.3b** engineering baseline (CI gate,
 contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md` —
 no behaviour change), **CF1.3c** per-user keys encrypted (D4, 1.7.0),
-**CF1.3d** release workflow. The disabled / re-enabled listener moved to
-CF2.10, where it calls `lifecycle`.
+**CF1.3d** release workflow, **CF1.3e** honest app states (D23, D24). The
+disabled / re-enabled listener moved to CF2.10, where it calls `lifecycle`.
 
 ### CF1.4 — Five locales and the core's words (one PR per app, in its phase)
 
