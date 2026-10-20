@@ -209,6 +209,7 @@ class ApiKeyController extends AbstractController
     #[Route('/{id}', name: 'revoke', methods: ['DELETE'])]
     public function revoke(
         int $id,
+        Request $request,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
@@ -232,7 +233,9 @@ class ApiKeyController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // The key goes first: its revocation must not depend on the link's bookkeeping.
         $this->apiKeyRepository->remove($apiKey);
+        $this->platformLinkExchangeService->endLinkOfKey((int) $user->getId(), $id, $request->getClientIp() ?? '');
 
         return $this->json([
             'success' => true,

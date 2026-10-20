@@ -185,7 +185,11 @@ final readonly class PlatformLinkExchangeService
             $keyLabel = '';
             if (null !== $identity->getApiKeyId()) {
                 $key = $this->apiKeyRepository->find($identity->getApiKeyId());
-                $keyLabel = $key instanceof ApiKey ? $key->getName() : '';
+                // Without its key the platform cannot act for the person: the link is over.
+                if (!$key instanceof ApiKey) {
+                    continue;
+                }
+                $keyLabel = $key->getName();
             }
             $out[] = [
                 'id' => (int) $identity->getId(),
@@ -200,6 +204,31 @@ final readonly class PlatformLinkExchangeService
         }
 
         return $out;
+    }
+
+    /**
+     * Revoking a key ends the link that holds it, as a disconnect does: a
+     * platform revokes its key when the person disconnects there, and must
+     * not stay listed as connected.
+     */
+    public function endLinkOfKey(int $userId, int $apiKeyId, string $ip): void
+    {
+        $identity = $this->externalIdentityRepository->findOneByApiKeyId($apiKeyId);
+        if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $userId) {
+            return;
+        }
+
+        $linkId = (string) $identity->getId();
+        $this->externalIdentityRepository->remove($identity);
+
+        $this->auditLogWriter->record(
+            $userId,
+            'platform_link.disconnected',
+            'platform_link',
+            $linkId,
+            null,
+            $ip,
+        );
     }
 
     public function disconnect(int $userId, int $linkId, string $ip): void

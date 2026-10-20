@@ -315,6 +315,35 @@ final class PlatformLinkControllerTest extends WebTestCase
     }
 
     /**
+     * A platform revokes its key when the person disconnects there; the link
+     * then ends in Synaplan too, instead of staying listed as connected.
+     */
+    public function testRevokingTheLinkKeyEndsTheLink(): void
+    {
+        $this->enableFlag();
+        $admin = $this->createUser('pl-revoke-admin@synaplan.internal', 'ADMIN');
+        $person = $this->createUser('pl-revoke-person@synaplan.internal');
+
+        $this->authenticateClient($this->client, $admin);
+        $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));
+        $link = $this->link($this->json(), $person, 'ada', 'nonce-revoke');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request(
+            'DELETE',
+            '/api/v1/apikeys/'.$link['api_key']['id'],
+            server: ['HTTP_X_API_KEY' => $link['api_key']['key']],
+        );
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(ApiKey::class)->find($link['api_key']['id']));
+
+        $this->authenticateClient($this->client, $person);
+        $this->client->request('GET', '/api/v1/me/platform-links');
+        self::assertSame([], $this->json()['links']);
+    }
+
+    /**
      * Issues a link code as $user and exchanges it as the instance.
      *
      * @param array{instance_id: string, instance_secret: string} $instance
