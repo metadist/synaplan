@@ -782,6 +782,10 @@
         "app": {
           "title": "Bir uygulama bağlayın",
           "where": "Bağlı uygulamalar Uygulamalar › Bağlı altında listelenir"
+        },
+        "providerDemo": {
+          "title": "Kendi AI sağlayıcınızı ekleyin",
+          "where": "Şu anda Synaplan Demo kullanıyorsunuz"
         }
       }
     }

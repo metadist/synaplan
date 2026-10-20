@@ -19,7 +19,13 @@ import type { AIModel, Capability } from '@/types/ai-models'
  */
 
 export type ModelMixId =
-  'default' | 'openai' | 'anthropic' | 'google' | 'xai' | 'a2agent' | 'europe'
+  'demo' | 'default' | 'openai' | 'anthropic' | 'google' | 'xai' | 'a2agent' | 'europe'
+
+/** The Synaplan Demo mix; the panel lists it only while the Demo is active. */
+export const DEMO_MIX_ID: ModelMixId = 'demo'
+
+/** Reserved endpoint name of the Synaplan Demo (FreeApiConfig::ENDPOINT_NAME). */
+export const DEMO_ENDPOINT = 'synaplan-demo'
 
 export type ModelMixIcon =
   /** The installation's brand icon (Synaplan bird unless white-labeled). */
@@ -32,6 +38,8 @@ export type ModelMixIcon =
 interface MixCandidate {
   service: string
   providerId: string
+  /** Only a model of this OpenAI-compatible endpoint matches. */
+  endpoint?: string
 }
 
 export interface ModelMixDefinition {
@@ -59,8 +67,27 @@ const a2agent = (providerId: string): MixCandidate => ({
   service: 'A2Agent',
   providerId,
 })
+// The endpoint check keeps another OpenAI-compatible endpoint that happens to
+// serve a `free-*` model id from ever matching.
+const demo = (providerId: string): MixCandidate => ({
+  service: 'OpenAICompatible',
+  providerId,
+  endpoint: DEMO_ENDPOINT,
+})
 
 export const MODEL_MIXES: ModelMixDefinition[] = [
+  {
+    id: 'demo',
+    icon: { kind: 'brand' },
+    resetsToRecommended: false,
+    candidates: {
+      CHAT: [demo('free-chat')],
+      ANALYZE: [demo('free-chat')],
+      SORT: [demo('free-sort')],
+      PIC2TEXT: [demo('free-vision')],
+      TEXT2PIC: [demo('free-image')],
+    },
+  },
   {
     id: 'default',
     icon: { kind: 'brand' },
@@ -236,15 +263,20 @@ const findCandidate = (
       (model) =>
         model.available !== false &&
         model.service.toLowerCase() === candidate.service.toLowerCase() &&
-        model.providerId === candidate.providerId
+        model.providerId === candidate.providerId &&
+        (candidate.endpoint === undefined || model.endpoint === candidate.endpoint)
     )
     if (match) return match
   }
   return null
 }
 
-/** Vision twins share the base model's name plus a suffix; fold them together. */
-const displayName = (model: AIModel): string => model.name.replace(/\s*\(vision\)$/i, '')
+/**
+ * Vision twins share the base model's name plus a suffix; fold them together.
+ * Demo models are named "Synaplan Demo · <model>"; the row already says Demo.
+ */
+const displayName = (model: AIModel): string =>
+  model.name.replace(/\s*\(vision\)$/i, '').replace(/^Synaplan Demo\s*·\s*/, '')
 
 export function resolveModelMix(
   definition: ModelMixDefinition,

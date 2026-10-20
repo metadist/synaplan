@@ -856,6 +856,10 @@
         "app": {
           "title": "Connect an app",
           "where": "Connected apps are listed under Apps › Connected"
+        },
+        "providerDemo": {
+          "title": "Add your own AI provider",
+          "where": "You are on the Synaplan Demo"
         }
       }
     }

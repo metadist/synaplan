@@ -205,6 +205,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import { useDialog } from '@/composables/useDialog'
+import { useFreeApiAutoLeave } from '@/composables/useFreeApiAutoLeave'
 import { useNotification } from '@/composables/useNotification'
 import {
   applyProviderDefaults,
@@ -227,6 +228,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { confirm } = useDialog()
 const { success, error: showError } = useNotification()
+const { announce: announceAutoLeave } = useFreeApiAutoLeave()
 
 const keyInput = ref('')
 const secretInput = ref('')
@@ -277,13 +279,15 @@ const save = async () => {
     keyInput.value = ''
     secretInput.value = ''
     // Say what happened: a provider without a probe was stored, not verified.
-    success(
-      result.defaultsApplied
-        ? t('adminSetup.savedWithDefaults', { provider: props.provider.displayName })
-        : result.tested
-          ? t('adminSetup.saved', { provider: props.provider.displayName })
-          : t('adminSetup.savedUntested', { provider: props.provider.displayName })
-    )
+    if (!(await announceAutoLeave(result, props.provider.displayName))) {
+      success(
+        result.defaultsApplied
+          ? t('adminSetup.savedWithDefaults', { provider: props.provider.displayName })
+          : result.tested
+            ? t('adminSetup.saved', { provider: props.provider.displayName })
+            : t('adminSetup.savedUntested', { provider: props.provider.displayName })
+      )
+    }
     emit('changed')
   } catch (err) {
     showError(err instanceof Error ? err.message : t('adminSetup.saveFailed'))

@@ -779,6 +779,10 @@
         "app": {
           "title": "App verbinden",
           "where": "Verbundene Apps stehen unter Apps › Verbunden"
+        },
+        "providerDemo": {
+          "title": "Eigenen KI-Anbieter hinzufügen",
+          "where": "Du nutzt gerade die Synaplan Demo"
         }
       }
     }

@@ -24,7 +24,7 @@ const model = (
 })
 
 const mixDefinition = (
-  id: 'openai' | 'anthropic' | 'google' | 'xai' | 'a2agent' | 'europe' | 'default'
+  id: 'demo' | 'openai' | 'anthropic' | 'google' | 'xai' | 'a2agent' | 'europe' | 'default'
 ) => {
   const definition = MODEL_MIXES.find((mix) => mix.id === id)
   if (!definition) throw new Error(`mix ${id} missing`)
@@ -287,11 +287,46 @@ describe('resolveModelMix', () => {
   })
 })
 
+describe('the Synaplan Demo mix', () => {
+  const demoModel = (id: number, providerId: string, tag: string, endpoint?: string) =>
+    model({
+      id,
+      service: 'OpenAICompatible',
+      providerId,
+      name: `Synaplan Demo · ${providerId === 'free-image' ? 'Image' : 'GPT OSS 120B'}`,
+      tag,
+      endpoint,
+    })
+
+  it('binds the Demo aliases and names the models without the Demo prefix', () => {
+    const resolved = resolveModelMix(mixDefinition('demo'), {
+      CHAT: [demoModel(400, 'free-chat', 'chat', 'synaplan-demo')],
+      SORT: [demoModel(401, 'free-sort', 'chat', 'synaplan-demo')],
+      TEXT2PIC: [demoModel(404, 'free-image', 'text2pic', 'synaplan-demo')],
+    })
+
+    expect(resolved.available).toBe(true)
+    expect(resolved.defaults).toEqual({ CHAT: 400, SORT: 401, TEXT2PIC: 404 })
+    expect(resolved.modelNames).toEqual(['GPT OSS 120B', 'Image'])
+  })
+
+  // Another OpenAI-compatible endpoint may serve a model called free-chat too.
+  it('never matches a free-* model of another endpoint', () => {
+    const resolved = resolveModelMix(mixDefinition('demo'), {
+      CHAT: [demoModel(500, 'free-chat', 'chat', 'my-lab'), demoModel(501, 'free-chat', 'chat')],
+    })
+
+    expect(resolved.available).toBe(false)
+    expect(resolved.defaults).toEqual({})
+  })
+})
+
 describe('resolveModelMixes', () => {
   it('returns one entry per defined mix, in definition order', () => {
     const resolved = resolveModelMixes({})
 
     expect(resolved.map((mix) => mix.id)).toEqual([
+      'demo',
       'default',
       'openai',
       'anthropic',

@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
 
 /**
  * Admin CRUD for "OpenAI Compatible" upstream endpoints (LocalAI, vLLM,
@@ -27,6 +28,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Admin OpenAI-Compatible Endpoints')]
 final class AdminOpenAiEndpointsController extends AbstractController
 {
+    private const KEEP_EMPTY_MAPS = [AbstractObjectNormalizer::PRESERVE_EMPTY_OBJECTS => true];
+
     public function __construct(
         private readonly OpenAiCompatibleEndpointRegistry $endpoints,
         private readonly ChatReadinessService $chatReadiness,
@@ -52,9 +55,9 @@ final class AdminOpenAiEndpointsController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'endpoints' => $this->endpoints->listEndpoints(),
+            'endpoints' => $this->endpointRows(),
             'capabilities' => OpenAiCompatibleEndpointRegistry::CAPABILITIES,
-        ]);
+        ], context: self::KEEP_EMPTY_MAPS);
     }
 
     #[Route('', name: 'admin_openai_endpoints_save', methods: ['POST'])]
@@ -144,9 +147,23 @@ final class AdminOpenAiEndpointsController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'endpoints' => $this->endpoints->listEndpoints(),
+            'endpoints' => $this->endpointRows(),
             'demoLeft' => $demoLeft,
-        ]);
+        ], context: self::KEEP_EMPTY_MAPS);
+    }
+
+    /**
+     * Endpoint rows for the browser. An endpoint without extra headers still
+     * sends "headers": {}, because the client reads that field as a map.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function endpointRows(): array
+    {
+        return array_map(
+            static fn (array $endpoint): array => ['headers' => (object) $endpoint['headers']] + $endpoint,
+            $this->endpoints->listEndpoints(),
+        );
     }
 
     #[Route('/test', name: 'admin_openai_endpoints_test', methods: ['POST'])]

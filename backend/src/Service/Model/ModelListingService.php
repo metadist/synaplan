@@ -127,6 +127,11 @@ final readonly class ModelListingService
             'unavailableReason' => $unavailableReason,
         ];
 
+        $endpoint = $model->getJson()['endpoint'] ?? null;
+        if (\is_string($endpoint) && '' !== $endpoint) {
+            $row['endpoint'] = $endpoint;
+        }
+
         $capabilityPrices = $this->costCalculationService?->imageCapabilityPrices($model);
         if (null !== $capabilityPrices) {
             $row['capabilityPrices'] = $capabilityPrices;

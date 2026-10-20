@@ -54,6 +54,22 @@ final class AdminOpenAiEndpointsControllerTest extends WebTestCase
         self::assertFalse($body['demoLeft']);
     }
 
+    public function testAnEndpointWithoutHeadersSendsAnEmptyHeaderMap(): void
+    {
+        $this->loginAdmin();
+
+        $this->postJson('/api/v1/admin/openai-endpoints', [
+            'name' => self::NAME,
+            'base_url' => 'http://127.0.0.1:9/v1',
+        ]);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame('{}', $this->savedHeadersJson());
+
+        $this->client->request('GET', '/api/v1/admin/openai-endpoints');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame('{}', $this->savedHeadersJson());
+    }
+
     public function testTheDemoEndpointNameIsReserved(): void
     {
         $this->loginAdmin();
@@ -90,6 +106,20 @@ final class AdminOpenAiEndpointsControllerTest extends WebTestCase
     private function postJson(string $uri, array $payload): void
     {
         $this->client->request('POST', $uri, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * The test endpoint's "headers" exactly as encoded, so [] and {} stay apart.
+     */
+    private function savedHeadersJson(): string
+    {
+        $body = json_decode((string) $this->client->getResponse()->getContent(), false, 512, JSON_THROW_ON_ERROR);
+        foreach ($body->endpoints as $endpoint) {
+            if (self::NAME === $endpoint->name) {
+                return json_encode($endpoint->headers, JSON_THROW_ON_ERROR);
+            }
+        }
+        self::fail('The saved endpoint is missing from the response.');
     }
 
     private function loginAdmin(): void

@@ -13,6 +13,12 @@ vi.mock('@/composables/useTour', () => ({
 const httpClient = vi.hoisted(() => vi.fn())
 vi.mock('@/services/api/httpClient', () => ({ httpClient }))
 
+const freeApi = vi.hoisted(() => ({
+  status: null as null | { active: boolean },
+  load: vi.fn(),
+}))
+vi.mock('@/stores/freeApi', () => ({ useFreeApiStore: () => freeApi }))
+
 async function mountChecklist() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -30,6 +36,7 @@ describe('GettingStartedChecklist', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     seen.value = []
+    freeApi.status = null
     httpClient.mockResolvedValue({
       success: true,
       items: { file: true, assistant: false, app: false },
@@ -58,6 +65,31 @@ describe('GettingStartedChecklist', () => {
 
     expect(item(wrapper, 'provider').attributes('href')).toBe('/admin/setup')
     expect(item(wrapper, 'provider').attributes('data-done')).toBe('false')
+  })
+
+  // The Demo makes chat work, so the open step has to say what is still missing.
+  it('asks for an own provider while the Synaplan Demo answers', async () => {
+    freeApi.status = { active: true }
+    httpClient.mockResolvedValue({
+      success: true,
+      items: { file: true, provider: false },
+    })
+    const wrapper = await mountChecklist()
+
+    expect(item(wrapper, 'provider').text()).toContain('Add your own AI provider')
+    expect(item(wrapper, 'provider').text()).toContain('You are on the Synaplan Demo')
+    expect(item(wrapper, 'provider').attributes('data-done')).toBe('false')
+  })
+
+  it('reads the Demo state only when the provider step is open', async () => {
+    httpClient.mockResolvedValue({ success: true, items: { file: true, provider: false } })
+    await mountChecklist()
+    expect(freeApi.load).toHaveBeenCalledTimes(1)
+
+    freeApi.load.mockClear()
+    httpClient.mockResolvedValue({ success: true, items: { file: false, provider: true } })
+    await mountChecklist()
+    expect(freeApi.load).not.toHaveBeenCalled()
   })
 
   it('leaves out a step the answer omits', async () => {

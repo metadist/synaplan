@@ -1,4 +1,8 @@
+import type { z } from 'zod'
+import { PostAdminOpenaiEndpointsSaveResponseSchema } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
+
+export type OpenAiEndpointSaveResponse = z.infer<typeof PostAdminOpenaiEndpointsSaveResponseSchema>
 
 export interface OpenAiEndpoint {
   name: string
@@ -44,10 +48,11 @@ export const adminOpenAiEndpointsApi = {
   list: async (): Promise<OpenAiEndpointsListResponse> => {
     return httpClient<OpenAiEndpointsListResponse>('/api/v1/admin/openai-endpoints')
   },
-  save: async (req: OpenAiEndpointSaveRequest): Promise<OpenAiEndpointsListResponse> => {
-    return httpClient<OpenAiEndpointsListResponse>('/api/v1/admin/openai-endpoints', {
+  save: async (req: OpenAiEndpointSaveRequest): Promise<OpenAiEndpointSaveResponse> => {
+    return httpClient('/api/v1/admin/openai-endpoints', {
       method: 'POST',
       body: JSON.stringify(req),
+      schema: PostAdminOpenaiEndpointsSaveResponseSchema,
     })
   },
   test: async (req: OpenAiEndpointTestRequest): Promise<OpenAiEndpointTestResponse> => {

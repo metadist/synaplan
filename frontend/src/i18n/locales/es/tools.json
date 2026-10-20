@@ -782,6 +782,10 @@
         "app": {
           "title": "Conecta una app",
           "where": "Las apps conectadas aparecen en Apps › Conectadas"
+        },
+        "providerDemo": {
+          "title": "Añade tu propio proveedor de IA",
+          "where": "Estás usando Synaplan Demo"
         }
       }
     }
