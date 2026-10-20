@@ -631,6 +631,14 @@ export const selectors = {
     schedulerDocsLink: '[data-testid="link-scheduler-docs"]',
     /** Admin rail/drawer hint while background jobs are stale */
     schedulerSidebarHint: '[data-testid="link-sidebar-v2-scheduler"]',
+    servicesSection: '[data-testid="section-services"]',
+    serviceItem: '[data-testid="item-service"]',
+    serviceStateBadge: '[data-testid="badge-service-state"]',
+    serviceProgress: '[data-testid="text-service-progress"]',
+    serviceEffect: '[data-testid="text-service-effect"]',
+    serviceCommand: '[data-testid="code-service-command"]',
+    servicesNeedAttention: '[data-testid="text-services-need-attention"]',
+    attentionItem: '[data-testid="item-needs-attention"]',
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',

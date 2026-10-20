@@ -92,7 +92,7 @@ final class ServiceReadinessReporterTest extends TestCase
         self::assertNull($prod['recovery'], 'the office profile exists only in the dev compose files');
 
         $dev = $this->row($this->reporter(['collabora' => ReadinessObservation::off()], 'dev')->rows(), 'collabora');
-        self::assertSame('Turn it on with the "office" Compose profile: COMPOSE_PROFILES=office make up', $dev['recovery']);
+        self::assertSame('Turn it on with the "office" Compose profile: `COMPOSE_PROFILES=office make up`', $dev['recovery']);
     }
 
     public function testAFailedServiceOnAComposeInstallNamesTheCommand(): void
@@ -122,7 +122,7 @@ final class ServiceReadinessReporterTest extends TestCase
         $docling = $this->row($rows, 'docling');
         self::assertSame('off', $docling['state']);
         self::assertSame('docling', $docling['profile']);
-        self::assertSame('Turn it on with the "docling" Compose profile: COMPOSE_PROFILES=docling make up', $docling['recovery']);
+        self::assertSame('Turn it on with the "docling" Compose profile: `COMPOSE_PROFILES=docling make up`', $docling['recovery']);
         self::assertSame('starting', $this->row($rows, 'qdrant')['state'], 'a default service without its container is still coming in wave 2');
     }
 
@@ -141,7 +141,7 @@ final class ServiceReadinessReporterTest extends TestCase
         $minimal = $this->row($this->reporter($down, 'dev', platform: 'minimal', containersExist: false)->rows(), 'tts');
         self::assertSame('off', $minimal['state']);
         self::assertSame('tts', $minimal['profile']);
-        self::assertSame('Turn it on with the "tts" Compose profile: COMPOSE_PROFILES=tts make up', $minimal['recovery']);
+        self::assertSame('Turn it on with the "tts" Compose profile: `COMPOSE_PROFILES=tts make up`', $minimal['recovery']);
 
         $running = $this->row($this->reporter($down, 'dev', platform: 'minimal')->rows(), 'tts');
         self::assertSame('starting', $running['state'], 'a minimal stack with the tts container up is still starting');

@@ -818,6 +818,76 @@
           "syncPrices": "synchronisation des prix des modèles",
           "modelHealth": "contrôle de santé des modèles"
         }
+      },
+      "services": {
+        "title": "Services",
+        "subtitle": "Les conteneurs que cette installation exécute en arrière-plan. Le chat fonctionne sans eux ; chacun ajoute une fonction.",
+        "summary": "{ready} sur {total} services en marche prêts",
+        "needAttention": "{count} service demande votre attention. | {count} services demandent votre attention.",
+        "guide": "Guide",
+        "downloadingPercent": "Téléchargement · {percent} %",
+        "minutesLeft": "environ {count} min restantes",
+        "state": {
+          "starting": "Démarrage",
+          "downloading": "Téléchargement",
+          "ready": "Prêt",
+          "off": "Désactivé",
+          "unavailable": "Injoignable",
+          "failed": "Échec"
+        },
+        "recovery": {
+          "offProfile": "Activez-le avec le profil Compose « {profile} » :",
+          "unavailable": "Il ne répond plus. La première commande montre pourquoi, la seconde le relance.",
+          "failed": "Il n’a pas fini de démarrer. La première commande montre pourquoi, la seconde le redémarre.",
+          "failedOllama": "Il n’a pas fini de démarrer. La première commande montre pourquoi, la seconde reprend le téléchargement du modèle."
+        },
+        "items": {
+          "ollama": {
+            "name": "Ollama (IA locale)",
+            "unlocks": "Chat privé et embeddings sur cette machine.",
+            "effect": "Les modèles d’IA locaux ne sont pas disponibles."
+          },
+          "qdrant": {
+            "name": "Qdrant (souvenirs)",
+            "unlocks": "Souvenirs d’une conversation à l’autre.",
+            "effect": "Les souvenirs sont en pause."
+          },
+          "whisper": {
+            "name": "Whisper (dictée)",
+            "unlocks": "Dictée et messages vocaux.",
+            "effect": "La dictée est désactivée."
+          },
+          "tts": {
+            "name": "Piper (réponses vocales)",
+            "unlocks": "Réponses vocales.",
+            "effect": "Les réponses vocales sont désactivées."
+          },
+          "tika": {
+            "name": "Tika (documents)",
+            "unlocks": "Lecture des PDF et fichiers Office.",
+            "effect": "Les PDF et fichiers Office ne peuvent pas être lus."
+          },
+          "docling": {
+            "name": "Docling (mise en page)",
+            "unlocks": "Tableaux et mise en page des documents numérisés et complexes.",
+            "effect": "Les documents complexes sont lus comme du texte brut."
+          },
+          "searxng": {
+            "name": "SearXNG (recherche web)",
+            "unlocks": "Recherche web sans clé d’API.",
+            "effect": "La recherche web est désactivée."
+          },
+          "collabora": {
+            "name": "Collabora (fichiers Office)",
+            "unlocks": "Modifier et convertir des fichiers Office.",
+            "effect": "Les fichiers Office s’ouvrent en lecture seule."
+          },
+          "centrifugo": {
+            "name": "Centrifugo (mises à jour en direct)",
+            "unlocks": "Mises à jour en direct et reprise en direct des chats du widget.",
+            "effect": "La reprise en direct des chats du widget est désactivée."
+          }
+        }
       }
     },
     "notLoggedIn": "Non connecté"

@@ -21,10 +21,11 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useApprovalsStore } from '../stores/approvals'
-import { getFeaturesStatus } from '../services/featuresService'
+import { getFeaturesStatus, type FeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { partnersApi } from '../services/api/partnersApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
+import { idsReportedAsDown, servicesNeedingAttention } from '../utils/serviceReadiness'
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
 
@@ -108,6 +109,7 @@ export interface NavItem {
 // Module-scoped so the desktop rail and the mobile nav share one fetch.
 const disabledFeaturesCount = ref(0)
 const offlineModelsCount = ref(0)
+const servicesDownCount = ref(0)
 /** Partners needs a public https address; an opened membership stays listed so it can be closed. */
 const partnersListed = ref(false)
 let featureStatusRequested = false
@@ -118,6 +120,27 @@ export function setModelsNeedingAttention(count: number): void {
 }
 
 export const modelsNeedingAttention = readonly(offlineModelsCount)
+
+/**
+ * Switched-off features and stopped services share the System status badge;
+ * a feature that is off because its service stopped counts once.
+ */
+export function setFeatureStatusCounts(status: FeaturesStatus): void {
+  const reported = idsReportedAsDown(status.services)
+  disabledFeaturesCount.value = Object.values(status.features ?? {}).filter(
+    (f) => !f.enabled && !reported.has(f.id)
+  ).length
+  servicesDownCount.value = servicesNeedingAttention(status.services)
+}
+
+async function loadFeatureCounts(): Promise<void> {
+  try {
+    setFeatureStatusCounts(await getFeaturesStatus())
+  } catch {
+    disabledFeaturesCount.value = 0
+    servicesDownCount.value = 0
+  }
+}
 
 /**
  * Workspace seam — one named predicate per nav context
@@ -163,22 +186,10 @@ export function useNavItems() {
   const signedIn = computed(() => authStore.isAuthenticated)
 
   const loadFeatureStatus = async () => {
-    try {
-      if (!authStore.isAdmin || !authStore.isAuthenticated) return
-      if (featureStatusRequested) return
-      featureStatusRequested = true
-
-      const status = await getFeaturesStatus()
-      if (status && status.features) {
-        disabledFeaturesCount.value = Object.values(status.features).filter(
-          (f) => !f.enabled
-        ).length
-      } else {
-        disabledFeaturesCount.value = 0
-      }
-    } catch {
-      disabledFeaturesCount.value = 0
-    }
+    if (!authStore.isAdmin || !authStore.isAuthenticated) return
+    if (featureStatusRequested) return
+    featureStatusRequested = true
+    await loadFeatureCounts()
 
     // Both admin badges load together: they share the same trigger, the same
     // admin guard and the same once-per-session flag, and splitting them would
@@ -344,7 +355,7 @@ export function useNavItems() {
           path: '/admin/features',
           label: t('nav.adminFeatureStatus'),
           icon: AdjustmentsHorizontalIcon,
-          badge: badge(disabledFeaturesCount.value),
+          badge: badge(disabledFeaturesCount.value + servicesDownCount.value),
         },
         {
           key: 'admin-setup',

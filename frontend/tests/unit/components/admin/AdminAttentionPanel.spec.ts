@@ -6,15 +6,34 @@ import AdminAttentionPanel from '@/components/admin/AdminAttentionPanel.vue'
 const getFeaturesStatus = vi.hoisted(() => vi.fn())
 const getStatus = vi.hoisted(() => vi.fn())
 const setModelsNeedingAttention = vi.hoisted(() => vi.fn())
+const setFeatureStatusCounts = vi.hoisted(() => vi.fn())
 vi.mock('@/services/featuresService', () => ({ getFeaturesStatus }))
 vi.mock('@/services/api/adminModelStatusApi', () => ({ modelStatusApi: { getStatus } }))
-vi.mock('@/composables/useNavItems', () => ({ setModelsNeedingAttention }))
+vi.mock('@/composables/useNavItems', () => ({
+  setModelsNeedingAttention,
+  setFeatureStatusCounts,
+}))
 
 const feature = (id: string, enabled: boolean, status: string) => ({
   id,
   name: id.toUpperCase(),
   enabled,
   status,
+})
+
+const service = (id: string, state: string, effect: string) => ({
+  id,
+  name: id,
+  state,
+  unlocks: '',
+  effect,
+  recovery: null,
+  since: null,
+  percent: null,
+  model: null,
+  minutes_left: null,
+  profile: null,
+  docs_anchor: null,
 })
 
 async function mountPanel() {
@@ -79,6 +98,77 @@ describe('AdminAttentionPanel', () => {
     const wrapper = await mountPanel()
 
     expect(wrapper.findAll('[data-testid="item-needs-attention"]')).toHaveLength(1)
+  })
+
+  it('lists a stopped or failed service once and never a starting one', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: { 'memory-service': feature('memory-service', true, 'unhealthy') },
+      modules: [{ id: 'local_ai', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [
+        service('qdrant', 'unavailable', 'Memories are paused.'),
+        service('ollama', 'failed', 'Local AI models are not available.'),
+        service('tts', 'starting', 'Spoken answers are off.'),
+        service('docling', 'off', 'Complex documents are read as plain text.'),
+      ],
+    })
+    const wrapper = await mountPanel()
+
+    const items = wrapper.findAll('[data-testid="item-needs-attention"]')
+    expect(items.map((item) => item.text())).toEqual([
+      expect.stringContaining('Qdrant (memories) is not reachable. Memories are paused.'),
+      expect.stringContaining(
+        'Ollama (local AI) did not finish starting. Local AI models are not available.'
+      ),
+    ])
+    expect(items[0]!.get('a').attributes('href')).toBe('/admin/features')
+    expect(setFeatureStatusCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ services: expect.any(Array) })
+    )
+  })
+
+  it('lists a stopped Piper service once, not also its provider feature', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: { piper: feature('piper', true, 'unhealthy') },
+      modules: [{ id: 'piper_tts', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [service('tts', 'unavailable', 'Spoken answers are off.')],
+    })
+    const wrapper = await mountPanel()
+
+    const items = wrapper.findAll('[data-testid="item-needs-attention"]')
+    expect(items.map((item) => item.text())).toEqual([
+      expect.stringContaining('Piper (spoken answers) is not reachable. Spoken answers are off.'),
+    ])
+  })
+
+  it('does not flag a feature or module while its service is starting or downloading', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: {
+        tika: feature('tika', true, 'unhealthy'),
+        ollama: feature('ollama', true, 'unhealthy'),
+      },
+      modules: [{ id: 'local_ai', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [
+        service('tika', 'starting', 'PDFs and Office files cannot be read.'),
+        service('ollama', 'downloading', 'Local AI models are not available.'),
+      ],
+    })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-testid="attention-all-good"]').exists()).toBe(true)
+  })
+
+  it('does not report a sidecar as broken when its container is switched off', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: { docling: feature('docling', true, 'unhealthy') },
+      modules: [{ id: 'office_convert', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [
+        service('docling', 'off', 'Complex documents are read as plain text.'),
+        service('collabora', 'off', 'Office files open read-only.'),
+      ],
+    })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-testid="attention-all-good"]').exists()).toBe(true)
   })
 
   it('offers a retry when the status cannot be loaded', async () => {

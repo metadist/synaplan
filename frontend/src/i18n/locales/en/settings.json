@@ -818,6 +818,76 @@
           "syncPrices": "model price sync",
           "modelHealth": "model health check"
         }
+      },
+      "services": {
+        "title": "Services",
+        "subtitle": "The containers this installation runs in the background. Chat works without them; each one adds a capability.",
+        "summary": "{ready} of {total} running services ready",
+        "needAttention": "{count} service needs attention. | {count} services need attention.",
+        "guide": "Guide",
+        "downloadingPercent": "Downloading · {percent} %",
+        "minutesLeft": "about {count} min left",
+        "state": {
+          "starting": "Starting",
+          "downloading": "Downloading",
+          "ready": "Ready",
+          "off": "Off",
+          "unavailable": "Not reachable",
+          "failed": "Failed"
+        },
+        "recovery": {
+          "offProfile": "Turn it on with the \"{profile}\" Compose profile:",
+          "unavailable": "It stopped answering. The first command shows why, the second brings it back.",
+          "failed": "It did not finish starting. The first command shows why, the second starts it again.",
+          "failedOllama": "It did not finish starting. The first command shows why, the second resumes the model download."
+        },
+        "items": {
+          "ollama": {
+            "name": "Ollama (local AI)",
+            "unlocks": "Private chat and embeddings on this machine.",
+            "effect": "Local AI models are not available."
+          },
+          "qdrant": {
+            "name": "Qdrant (memories)",
+            "unlocks": "Memories across chats.",
+            "effect": "Memories are paused."
+          },
+          "whisper": {
+            "name": "Whisper (dictation)",
+            "unlocks": "Dictation and voice messages.",
+            "effect": "Dictation is off."
+          },
+          "tts": {
+            "name": "Piper (spoken answers)",
+            "unlocks": "Spoken answers.",
+            "effect": "Spoken answers are off."
+          },
+          "tika": {
+            "name": "Tika (documents)",
+            "unlocks": "Reading PDFs and Office files.",
+            "effect": "PDFs and Office files cannot be read."
+          },
+          "docling": {
+            "name": "Docling (document layout)",
+            "unlocks": "Tables and layout from scanned and complex documents.",
+            "effect": "Complex documents are read as plain text."
+          },
+          "searxng": {
+            "name": "SearXNG (web search)",
+            "unlocks": "Web search without an API key.",
+            "effect": "Web search is off."
+          },
+          "collabora": {
+            "name": "Collabora (office files)",
+            "unlocks": "Editing and converting office files.",
+            "effect": "Office files open read-only."
+          },
+          "centrifugo": {
+            "name": "Centrifugo (live updates)",
+            "unlocks": "Live updates and live takeover of widget chats.",
+            "effect": "Live takeover of widget chats is off."
+          }
+        }
       }
     },
     "notLoggedIn": "Not logged in"

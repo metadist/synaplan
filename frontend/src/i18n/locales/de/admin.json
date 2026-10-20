@@ -581,7 +581,9 @@
         "featuresHint": "Abgeschaltet oder nicht eingerichtet",
         "models": "Zu prüfende Modelle",
         "modelsHint": "Offline, fehlerhaft oder eingestellt"
-      }
+      },
+      "serviceDown": "{name} ist nicht erreichbar. {effect}",
+      "serviceFailed": "{name} ist nicht fertig gestartet. {effect}"
     }
   },
   "statistics": {

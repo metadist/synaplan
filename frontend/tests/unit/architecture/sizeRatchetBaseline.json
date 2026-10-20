@@ -70,7 +70,7 @@
     "src/composables/useMediaJobPoll.ts::useMediaJobPoll": 108,
     "src/composables/useMessageQuoting.ts::useMessageQuoting": 144,
     "src/composables/useModelSelection.ts::useModelSelection": 225,
-    "src/composables/useNavItems.ts::useNavItems": 270,
+    "src/composables/useNavItems.ts::useNavItems": 258,
     "src/composables/useNavItems.ts::useNavItems.navItems": 191,
     "src/composables/useNavSections.ts::useNavSections": 218,
     "src/composables/usePinnedAssistant.ts::usePinnedAssistant": 115,

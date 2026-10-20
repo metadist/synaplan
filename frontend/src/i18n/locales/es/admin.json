@@ -577,7 +577,9 @@
         "featuresHint": "Desactivadas o sin configurar",
         "models": "Modelos por revisar",
         "modelsHint": "Sin conexión, con fallos o retirados"
-      }
+      },
+      "serviceDown": "{name} no es accesible. {effect}",
+      "serviceFailed": "{name} no terminó de iniciarse. {effect}"
     }
   },
   "statistics": {
