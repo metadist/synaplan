@@ -772,10 +772,10 @@ class OpenAICompatibleController extends AbstractController
     private function resolveModel(?string $modelString, int $userId): ?array
     {
         if ($modelString) {
-            foreach (['CHAT', 'SORT', 'PIC2TEXT'] as $capability) {
+            foreach (['CHAT', 'SORT'] as $capability) {
                 $configuredId = $this->modelConfigService->getConfiguredDefaultModel($capability, $userId);
                 $configured = null !== $configuredId ? $this->modelRepository->find($configuredId) : null;
-                if ($configured instanceof Model && ($configured->getProviderId() === $modelString || $configured->getName() === $modelString)) {
+                if ($configured instanceof Model && 'chat' === strtolower((string) $configured->getTag()) && ($configured->getProviderId() === $modelString || $configured->getName() === $modelString)) {
                     return $this->resolvedFromEntity($configured);
                 }
             }

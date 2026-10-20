@@ -302,6 +302,7 @@ class OpenAICompatibleControllerTest extends TestCase
 
         $configuredModel = $this->createMock(Model::class);
         $configuredModel->method('getService')->willReturn('OpenAICompatible');
+        $configuredModel->method('getTag')->willReturn('chat');
         $configuredModel->method('getProviderId')->willReturn('gpt-oss-120b');
         $configuredModel->method('getName')->willReturn('FreeAPI · Cerebras GPT OSS 120B');
         $configuredModel->method('getId')->willReturn(500);
