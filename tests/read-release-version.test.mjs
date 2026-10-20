@@ -23,12 +23,25 @@ const catalog = (overrides = {}) => ({
     '',
     `x-app-image: &app-image ghcr.io/metadist/synaplan:4.4.1@${DIGEST}`,
   ].join('\n'),
+  'deploy/casaos/Synaplan/docker-compose.yml': [
+    'x-app-image: &app-image ghcr.io/metadist/synaplan:4.4.1',
+    'x-app-environment: &app-environment',
+    '  APP_VERSION: "4.4.1"',
+    'x-casaos:',
+    '  version: "4.4.1"',
+  ].join('\n'),
   'deploy/aws/packer/synaplan.pkr.hcl': [
     'variable "synaplan_version" {',
     '  type        = string',
     '  default     = "4.4.1"',
     '}',
   ].join('\n'),
+  'deploy/quickstart/compose.yaml': [
+    'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.4.1}',
+    'x-app-environment: &app-environment',
+    '  APP_VERSION: ${SYNAPLAN_VERSION:-4.4.1}',
+  ].join('\n'),
+  'server.json': '{\n  "version": "4.4.1"\n}\n',
   ...overrides,
 })
 
@@ -86,6 +99,16 @@ test('refuses a pin that is not a plain release', () => {
       '  default     = "4.4.2-rc.1"',
       '}',
     ].join('\n'),
+    'deploy/casaos/Synaplan/docker-compose.yml': [
+      'x-app-image: &app-image ghcr.io/metadist/synaplan:4.4.2-rc.1',
+      '  APP_VERSION: "4.4.2-rc.1"',
+      '  version: "4.4.2-rc.1"',
+    ].join('\n'),
+    'deploy/quickstart/compose.yaml': [
+      'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.4.2-rc.1}',
+      '  APP_VERSION: ${SYNAPLAN_VERSION:-4.4.2-rc.1}',
+    ].join('\n'),
+    'server.json': '{\n  "version": "4.4.2-rc.1"\n}\n',
   })
 
   assert.throws(() => readPinnedRelease(root), /is not a plain release/)

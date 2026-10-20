@@ -5,18 +5,22 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
+  applyCasaosComposeVersion,
   applyElestioVersion,
   applyEnvExampleVersion,
   applyPackerVersion,
   applyQuickstartComposeVersion,
+  applyServerJsonVersion,
   applyUmbrelAppVersion,
   applyUmbrelComposeVersion,
   parseImageDigest,
   parseReleaseVersion,
+  readCasaosComposeVersion,
   readElestioVersion,
   readEnvExampleVersion,
   readPackerVersion,
   readQuickstartComposeVersion,
+  readServerJsonVersion,
   readUmbrelAppVersion,
   readUmbrelComposePin,
 } from '../scripts/set-release-version.mjs'
@@ -356,6 +360,10 @@ test('the shipped files name one and the same released version', () => {
   const quickstart = readQuickstartComposeVersion(
     readFileSync(join(ROOT, 'deploy', 'quickstart', 'compose.yaml'), 'utf8')
   )
+  const casaos = readCasaosComposeVersion(
+    readFileSync(join(ROOT, 'deploy', 'casaos', 'Synaplan', 'docker-compose.yml'), 'utf8')
+  )
+  const serverJson = readServerJsonVersion(readFileSync(join(ROOT, 'server.json'), 'utf8'))
 
   assert.equal(
     parseReleaseVersion(elestio),
@@ -401,6 +409,35 @@ test('the shipped files name one and the same released version', () => {
   assert.equal(elestio, packer, 'The AWS AMI must bake the same version as Elestio')
   assert.equal(elestio, quickstart.image, 'The quickstart image default must match Elestio')
   assert.equal(elestio, quickstart.appVersion, 'The quickstart APP_VERSION must match Elestio')
+  assert.equal(elestio, casaos.image, 'The CasaOS image tag must match Elestio')
+  assert.equal(elestio, casaos.appVersion, 'The CasaOS APP_VERSION must match Elestio')
+  assert.equal(elestio, casaos.storeVersion, 'The CasaOS store version must match Elestio')
+  assert.equal(elestio, serverJson, 'server.json version must match Elestio')
+})
+
+test('rewrites CasaOS image tag, APP_VERSION, and x-casaos.version together', () => {
+  const sample = [
+    'name: synaplan',
+    'x-app-image: &app-image ghcr.io/metadist/synaplan:4.0.12',
+    'x-app-environment: &app-environment',
+    '  APP_VERSION: "4.0.12"',
+    'x-casaos:',
+    '  id: com.synaplan.synaplan',
+    '  version: "4.0.12"',
+  ].join('\n')
+
+  const result = applyCasaosComposeVersion(sample, '4.0.14')
+  assert.deepEqual(readCasaosComposeVersion(result), {
+    image: '4.0.14',
+    appVersion: '4.0.14',
+    storeVersion: '4.0.14',
+  })
+})
+
+test('rewrites server.json version field', () => {
+  const sample = '{\n  "name": "io.github.metadist/synaplan",\n  "version": "4.0.12"\n}\n'
+  const result = applyServerJsonVersion(sample, '4.0.14')
+  assert.equal(readServerJsonVersion(result), '4.0.14')
 })
 
 test('a comment mentioning the variable is not treated as an assignment', () => {

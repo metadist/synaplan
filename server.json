@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "com.synaplan/synaplan",
+  "name": "io.github.metadist/synaplan",
   "title": "Synaplan",
-  "description": "Connect AI clients to a Synaplan workspace: semantic search over your documents (RAG) and your stored memories, exposed as MCP tools. Authenticated with a Synaplan API key.",
-  "version": "0.1.0",
+  "description": "Self-hosted AI workspace: semantic RAG document search, long-term memory, and AI chat via MCP.",
+  "version": "5.5.1",
   "websiteUrl": "https://synaplan.com",
   "repository": {
     "url": "https://github.com/metadist/synaplan",

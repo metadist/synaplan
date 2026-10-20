@@ -26,7 +26,7 @@ import { CATALOG_PATHS } from './read-release-version.mjs'
 const PLAIN_RELEASE_TAG_REF = /^refs\/tags\/v\d+\.\d+\.\d+$/
 const UNKNOWN_CHANGE = '__unknown__'
 
-export const PIN_PATH_PREFIXES = ['deploy/umbrel/synaplan/']
+export const PIN_PATH_PREFIXES = ['deploy/umbrel/synaplan/', 'deploy/casaos/Synaplan/']
 
 export const isPinPath = (path) => {
   const normalized = String(path ?? '').replace(/^\.\//, '')
