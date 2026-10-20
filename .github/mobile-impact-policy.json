@@ -103,6 +103,7 @@
       ".env.example",
       "elestio.yml",
       "server.json",
+      "glama.json",
       "renovate.json5",
       "LICENSE",
       "redocly.yaml",

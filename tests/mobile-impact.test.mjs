@@ -256,6 +256,7 @@ test('local development, deployment, and test tooling does not trigger an app re
     'cloudflare/src/index.ts',
     'elestio.yml',
     'server.json',
+    'glama.json',
     'renovate.json5',
     'LICENSE',
     'redocly.yaml',
