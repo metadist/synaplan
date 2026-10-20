@@ -192,8 +192,9 @@ final readonly class PlatformInstanceService
         $instance->setStatus(PlatformInstance::STATUS_REVOKED);
         $this->instanceRepository->save($instance);
 
+        $revoked = [];
         foreach ($this->externalIdentityRepository->findByInstanceId($instanceId) as $identity) {
-            $this->notifier->identityRevoked($identity);
+            $revoked[] = $identity;
             $keyId = $identity->getApiKeyId();
             if (null !== $keyId) {
                 $key = $this->apiKeyRepository->find($keyId);
@@ -204,6 +205,9 @@ final readonly class PlatformInstanceService
             $this->externalIdentityRepository->remove($identity, false);
         }
         $this->entityManager->flush();
+        foreach ($revoked as $identity) {
+            $this->notifier->identityRevoked($identity);
+        }
 
         $this->auditLogWriter->record(
             (int) $admin->getId(),

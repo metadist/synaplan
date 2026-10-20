@@ -141,6 +141,9 @@ framework:
             'App\Message\ProcessTelegramAlbumCommand': async_ai_high
             # Finished render → Telegram upload, off the media worker.
             'App\Message\DeliverTelegramMediaCommand': async_ai_high
+            # Link revocation is already committed. The notice must not hold
+            # that request open while the cloud answers.
+            'App\Message\NotifyIdentityRevoked': async_index
 
 when@test:
     framework:

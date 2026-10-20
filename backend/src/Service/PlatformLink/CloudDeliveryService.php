@@ -42,6 +42,7 @@ final readonly class CloudDeliveryService
         private RedisService $redis,
         private DeliveryNotifier $notifier,
         private AuditLogWriter $audit,
+        private PlatformLinksConfig $platformLinks,
     ) {
     }
 
@@ -50,6 +51,9 @@ final readonly class CloudDeliveryService
      */
     public function copy(ShareableFile $file, array $params): DestinationResult
     {
+        if (!$this->platformLinks->isEnabled($file->ownerId)) {
+            return DestinationResult::failure(DestinationFailureCode::Unauthorized);
+        }
         $identity = $this->identities->find((int) ($params['identity_id'] ?? 0));
         if (
             !$identity instanceof ExternalIdentity
@@ -78,7 +82,14 @@ final readonly class CloudDeliveryService
 
         $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
         $answer = $instance instanceof PlatformInstance ? $this->notifier->delivery($instance, $id) : null;
-        if (is_array($answer) && ($answer['status'] ?? null) === CloudDelivery::STATE_DELIVERED) {
+        if (!is_array($answer)) {
+            return DestinationResult::pending([
+                'delivery_id' => (string) $id,
+                'state' => 'pending',
+            ]);
+        }
+        $status = is_string($answer['status'] ?? null) ? $answer['status'] : '';
+        if (CloudDelivery::STATE_DELIVERED === $status) {
             $this->record($delivery, $answer);
 
             return DestinationResult::success((string) ($delivery->getRemotePath() ?? ''), [
@@ -86,6 +97,13 @@ final readonly class CloudDeliveryService
                 'state' => CloudDelivery::STATE_DELIVERED,
                 'open_url' => (string) ($delivery->getOpenUrl() ?? ''),
             ]);
+        }
+        if (CloudDelivery::STATE_FAILED === $status) {
+            $this->record($delivery, $answer);
+            $code = DestinationFailureCode::tryFrom((string) ($answer['error_code'] ?? ''))
+                ?? DestinationFailureCode::Unreachable;
+
+            return DestinationResult::failure($code, ['delivery_id' => (string) $id]);
         }
 
         return DestinationResult::pending([
@@ -172,6 +190,9 @@ final readonly class CloudDeliveryService
     {
         $delivery = $this->requireOwn($instance, $id);
         $status = is_string($body['status'] ?? null) ? $body['status'] : '';
+        if (!in_array($status, [CloudDelivery::STATE_DELIVERED, CloudDelivery::STATE_FAILED], true)) {
+            return ['state' => $delivery->getState()];
+        }
         if (CloudDelivery::STATE_FAILED === $delivery->getState()
             && DestinationFailureCode::Unconfirmed->value === $delivery->getErrorCode()
             && CloudDelivery::STATE_DELIVERED === $status) {
@@ -188,14 +209,10 @@ final readonly class CloudDeliveryService
 
     public function sweep(): int
     {
-        $changed = 0;
-        foreach ($this->deliveries->findQueuedOlderThan(time() - $this->unconfirmedAfter()) as $delivery) {
-            $delivery->markFailed(DestinationFailureCode::Unconfirmed->value);
-            $this->deliveries->save($delivery);
-            ++$changed;
-        }
-
-        return $changed;
+        return $this->deliveries->failQueuedOlderThan(
+            time() - $this->unconfirmedAfter(),
+            DestinationFailureCode::Unconfirmed->value,
+        );
     }
 
     /**

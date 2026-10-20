@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\PlatformLink;
 
 use App\Repository\ConfigRepository;
 use App\Service\Federation\FederationSigner;
+use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\NotifyKeyStore;
 use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
@@ -47,13 +48,20 @@ final class NotifyKeyStoreTest extends TestCase
         $configs->method('getValue')->willReturnCallback(static function () use (&$saved): ?string {
             return $saved;
         });
+        $configs->method('insertIfAbsent')->willReturnCallback(static function (int $owner, string $group, string $setting, string $value) use (&$saved): string {
+            $saved ??= $value;
+
+            return $saved;
+        });
         $configs->method('setValue')->willReturnCallback(static function (int $owner, string $group, string $setting, string $value) use (&$saved): \App\Entity\Config {
             $saved = $value;
 
             return new \App\Entity\Config();
         });
         $encryption = new EncryptionService('test-secret', new NullLogger());
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('isAvailable')->willReturn(false);
 
-        return new NotifyKeyStore($configs, $encryption, new FederationSigner());
+        return new NotifyKeyStore($configs, $encryption, new FederationSigner(), $redis);
     }
 }

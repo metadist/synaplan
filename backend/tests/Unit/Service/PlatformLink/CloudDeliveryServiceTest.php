@@ -19,6 +19,7 @@ use App\Service\Iam\AuditLogWriter;
 use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\CloudDeliveryService;
 use App\Service\PlatformLink\DeliveryNotifier;
+use App\Service\PlatformLink\PlatformLinksConfig;
 use PHPUnit\Framework\TestCase;
 
 final class CloudDeliveryServiceTest extends TestCase
@@ -106,20 +107,14 @@ final class CloudDeliveryServiceTest extends TestCase
     public function testAnOldUnconfirmedCopyIsFailedAndALateResultCanStillDeliverIt(): void
     {
         $delivery = $this->delivery(9, 4);
-        $created = new \ReflectionProperty(CloudDelivery::class, 'created');
-        $created->setValue($delivery, time() - 601);
+        $delivery->markFailed('unconfirmed');
         $deliveries = $this->createMock(CloudDeliveryRepository::class);
-        $deliveries->method('findQueuedOlderThan')->willReturn([$delivery]);
         $deliveries->method('find')->willReturn($delivery);
-        $deliveries->expects(self::exactly(2))->method('save');
+        $deliveries->expects(self::once())->method('save');
         $identities = $this->createStub(ExternalIdentityRepository::class);
         $identities->method('find')->willReturn($this->identity(4, 7, 'pi_abc'));
 
-        $service = $this->service($deliveries, $identities);
-        self::assertSame(1, $service->sweep());
-        self::assertSame('failed', $delivery->getState());
-
-        $state = $service->result(
+        $state = $this->service($deliveries, $identities)->result(
             new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE),
             9,
             ['status' => 'delivered', 'remote_path' => 'Synaplan/Documents/notes.txt', 'open_url' => 'https://files.example.org/f/1'],
@@ -127,6 +122,47 @@ final class CloudDeliveryServiceTest extends TestCase
 
         self::assertSame('delivered', $state['state']);
         self::assertSame('Synaplan/Documents/notes.txt', $delivery->getRemotePath());
+    }
+
+    public function testTheSweepFailsOnlyRowsThatAreStillQueued(): void
+    {
+        $deliveries = $this->createMock(CloudDeliveryRepository::class);
+        $deliveries->expects(self::once())->method('failQueuedOlderThan')->willReturn(2);
+
+        self::assertSame(2, $this->service($deliveries)->sweep());
+    }
+
+    public function testAResultWithoutAStatusLeavesTheCopyQueued(): void
+    {
+        $delivery = $this->delivery(9, 4);
+        $deliveries = $this->createMock(CloudDeliveryRepository::class);
+        $deliveries->method('find')->willReturn($delivery);
+        $deliveries->expects(self::never())->method('save');
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('find')->willReturn($this->identity(4, 7, 'pi_abc'));
+
+        $state = $this->service($deliveries, $identities)->result(
+            new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE),
+            9,
+            [],
+        );
+
+        self::assertSame('queued', $state['state']);
+    }
+
+    public function testACopyIsRefusedWhenLinkingIsOff(): void
+    {
+        $links = $this->createStub(PlatformLinksConfig::class);
+        $links->method('isEnabled')->willReturn(false);
+        $deliveries = $this->createMock(CloudDeliveryRepository::class);
+        $deliveries->expects(self::never())->method('save');
+
+        $result = $this->service($deliveries, links: $links)->copy(
+            new ShareableFile(3, 7, '/tmp/a', 'notes.txt', 12),
+            ['identity_id' => 4],
+        );
+
+        self::assertFalse($result->ok);
     }
 
     public function testAnExpiredCopyCannotBeClaimed(): void
@@ -200,12 +236,21 @@ final class CloudDeliveryServiceTest extends TestCase
         return $identity;
     }
 
+    private function enabledLinks(): PlatformLinksConfig
+    {
+        $links = $this->createStub(PlatformLinksConfig::class);
+        $links->method('isEnabled')->willReturn(true);
+
+        return $links;
+    }
+
     private function service(
         ?CloudDeliveryRepository $deliveries = null,
         ?ExternalIdentityRepository $identities = null,
         ?PlatformInstanceRepository $platforms = null,
         ?FileRepository $files = null,
         ?RedisService $redis = null,
+        ?PlatformLinksConfig $links = null,
     ): CloudDeliveryService {
         return new CloudDeliveryService(
             $deliveries ?? $this->createStub(CloudDeliveryRepository::class),
@@ -216,6 +261,7 @@ final class CloudDeliveryServiceTest extends TestCase
             $redis ?? $this->createStub(RedisService::class),
             $this->createStub(DeliveryNotifier::class),
             $this->createStub(AuditLogWriter::class),
+            $links ?? $this->enabledLinks(),
         );
     }
 }

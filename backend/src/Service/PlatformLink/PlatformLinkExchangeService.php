@@ -220,8 +220,8 @@ final readonly class PlatformLinkExchangeService
         }
 
         $linkId = (string) $identity->getId();
-        $this->notifier->identityRevoked($identity);
         $this->externalIdentityRepository->remove($identity);
+        $this->notifier->identityRevoked($identity);
 
         $this->auditLogWriter->record(
             $userId,
@@ -246,8 +246,8 @@ final readonly class PlatformLinkExchangeService
                 $this->apiKeyRepository->remove($key, false);
             }
         }
-        $this->notifier->identityRevoked($identity);
         $this->externalIdentityRepository->remove($identity);
+        $this->notifier->identityRevoked($identity);
 
         $this->auditLogWriter->record(
             $userId,

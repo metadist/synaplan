@@ -795,7 +795,7 @@
         "owner": "These jobs run in this server's scheduler service, started by its Docker Compose file. Restart it with {command}.",
         "lanes": {
           "tick": "Every minute",
-          "tasks": "Tasks",
+          "tasks": "Saved Tasks",
           "hourly": "Hourly",
           "daily": "Daily",
           "health": "Model health"

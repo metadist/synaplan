@@ -6,12 +6,12 @@ namespace App\Tests\Unit\Service\PlatformLink;
 
 use App\Entity\PlatformInstance;
 use App\Repository\ConfigRepository;
-use App\Repository\PlatformInstanceRepository;
 use App\Service\Federation\FederationSigner;
-use App\Service\PlatformLink\DeliveryNotifier;
+use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
 use App\Service\PlatformLink\NotifyKeyStore;
 use App\Service\PlatformLink\RedirectUriPolicy;
+use App\Service\PlatformLink\SignedNotificationClient;
 use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
@@ -29,7 +29,7 @@ final class DeliveryNotifierTest extends TestCase
         $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
         $instance->setDeliveryUrl('https://other.example/inbound');
 
-        self::assertNull($this->notifier($http)->delivery($instance, 9));
+        self::assertNull($this->client($http)->post($instance, 'delivery', '9'));
     }
 
     public function testATimeoutLeavesTheCopyUnconfirmed(): void
@@ -39,7 +39,7 @@ final class DeliveryNotifierTest extends TestCase
         $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
         $instance->setDeliveryUrl('https://files.example.org/index.php/apps/synaplan_integration/api/v1/inbound');
 
-        self::assertNull($this->notifier($http)->delivery($instance, 9));
+        self::assertNull($this->client($http)->post($instance, 'delivery', '9'));
     }
 
     public function testAFinishedCopyReturnsTheCloudsAnswer(): void
@@ -52,28 +52,29 @@ final class DeliveryNotifierTest extends TestCase
         $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
         $instance->setDeliveryUrl('https://files.example.org/inbound');
 
-        $answer = $this->notifier($http)->delivery($instance, 9);
+        $answer = $this->client($http)->post($instance, 'delivery', '9');
 
         self::assertSame('delivered', $answer['status'] ?? null);
     }
 
-    private function notifier(HttpClientInterface $http): DeliveryNotifier
+    private function client(HttpClientInterface $http): SignedNotificationClient
     {
         $saved = null;
         $configs = $this->createStub(ConfigRepository::class);
         $configs->method('getValue')->willReturnCallback(static function () use (&$saved): ?string {
             return $saved;
         });
-        $configs->method('setValue')->willReturnCallback(static function (int $owner, string $group, string $setting, string $value) use (&$saved): \App\Entity\Config {
-            $saved = $value;
+        $configs->method('insertIfAbsent')->willReturnCallback(static function (int $owner, string $group, string $setting, string $value) use (&$saved): string {
+            $saved ??= $value;
 
-            return new \App\Entity\Config();
+            return $saved;
         });
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('isAvailable')->willReturn(false);
 
-        return new DeliveryNotifier(
+        return new SignedNotificationClient(
             $http,
-            $this->createStub(PlatformInstanceRepository::class),
-            new NotifyKeyStore($configs, new EncryptionService('test-secret', new NullLogger()), new FederationSigner()),
+            new NotifyKeyStore($configs, new EncryptionService('test-secret', new NullLogger()), new FederationSigner(), $redis),
             new FederationSigner(),
             new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard()),
             new NullLogger(),

@@ -6,6 +6,7 @@ namespace App\Service\PlatformLink;
 
 use App\Repository\ConfigRepository;
 use App\Service\Federation\FederationSigner;
+use App\Service\Infrastructure\RedisService;
 use App\Service\Security\EncryptionService;
 
 /**
@@ -24,6 +25,7 @@ final class NotifyKeyStore
         private ConfigRepository $configs,
         private EncryptionService $encryption,
         private FederationSigner $signer,
+        private RedisService $redis,
     ) {
     }
 
@@ -33,7 +35,7 @@ final class NotifyKeyStore
     public function publicKeys(): array
     {
         $out = [];
-        foreach ($this->live($this->load()) as $key) {
+        foreach ($this->ensure() as $key) {
             $out[] = [
                 'publicKey' => $key['publicKey'],
                 'kid' => $this->signer->fingerprint($key['publicKey']),
@@ -70,6 +72,9 @@ final class NotifyKeyStore
      */
     public function rotate(): void
     {
+        if ($this->redis->isAvailable() && !$this->redis->setIfAbsent('platform_links:notify_key_lock', '1', 30)) {
+            throw new \RuntimeException('A notification key change is already running.');
+        }
         $keys = $this->ensure();
         $now = time();
         foreach ($keys as $index => $key) {
@@ -103,9 +108,15 @@ final class NotifyKeyStore
             'activeFrom' => time(),
             'retireAt' => null,
         ]];
-        $this->save($keys);
+        $stored = $this->configs->insertIfAbsent(
+            0,
+            self::GROUP,
+            self::SETTING,
+            $this->encryption->encrypt(json_encode($keys, JSON_THROW_ON_ERROR)),
+        );
+        $winner = $this->live($this->decode($stored));
 
-        return $keys;
+        return [] !== $winner ? $winner : $keys;
     }
 
     /**
@@ -128,7 +139,14 @@ final class NotifyKeyStore
      */
     private function load(): array
     {
-        $stored = $this->configs->getValue(0, self::GROUP, self::SETTING);
+        return $this->decode($this->configs->getValue(0, self::GROUP, self::SETTING));
+    }
+
+    /**
+     * @return list<array{publicKey: string, secretKey: string, activeFrom: int, retireAt: ?int}>
+     */
+    private function decode(?string $stored): array
+    {
         if (null === $stored || '' === $stored) {
             return [];
         }

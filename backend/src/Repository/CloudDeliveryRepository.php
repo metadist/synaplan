@@ -35,19 +35,14 @@ class CloudDeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return list<CloudDelivery>
+     * Fails only rows that are still queued. A confirmation that landed
+     * between the check and the write is left alone.
      */
-    public function findQueuedOlderThan(int $createdBefore): array
+    public function failQueuedOlderThan(int $createdBefore, string $errorCode): int
     {
-        /** @var list<CloudDelivery> $rows */
-        $rows = $this->createQueryBuilder('d')
-            ->where('d.state = :state')
-            ->andWhere('d.created < :before')
-            ->setParameter('state', CloudDelivery::STATE_QUEUED)
-            ->setParameter('before', $createdBefore)
-            ->getQuery()
-            ->getResult();
-
-        return $rows;
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BCLOUDDELIVERIES SET BSTATE = ?, BERRORCODE = ?, BFINISHED = ? WHERE BSTATE = ? AND BCREATED < ?',
+            [CloudDelivery::STATE_FAILED, $errorCode, time(), CloudDelivery::STATE_QUEUED, $createdBefore],
+        );
     }
 }

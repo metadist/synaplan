@@ -795,7 +795,7 @@
         "owner": "Ces travaux s’exécutent dans le service du planificateur de ce serveur, démarré par son fichier Docker Compose. Redémarrez-le avec {command}.",
         "lanes": {
           "tick": "Chaque minute",
-          "tasks": "Tâches",
+          "tasks": "Tâches enregistrées",
           "hourly": "Toutes les heures",
           "daily": "Chaque jour",
           "health": "Santé des modèles"

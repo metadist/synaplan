@@ -795,7 +795,7 @@
         "owner": "Diese Jobs laufen im Scheduler-Dienst dieses Servers und werden über seine Docker-Compose-Datei gestartet. Starten Sie ihn neu mit {command}.",
         "lanes": {
           "tick": "Jede Minute",
-          "tasks": "Aufgaben",
+          "tasks": "Gespeicherte Aufgaben",
           "hourly": "Stündlich",
           "daily": "Täglich",
           "health": "Modellzustand"

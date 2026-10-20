@@ -773,7 +773,7 @@
         "owner": "Estos trabajos se ejecutan en el servicio del planificador de este servidor, iniciado por su archivo de Docker Compose. Reinícialo con {command}.",
         "lanes": {
           "tick": "Cada minuto",
-          "tasks": "Tareas",
+          "tasks": "Tareas guardadas",
           "hourly": "Cada hora",
           "daily": "Cada día",
           "health": "Estado de los modelos"
