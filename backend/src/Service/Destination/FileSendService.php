@@ -45,6 +45,17 @@ final readonly class FileSendService
         }
 
         $result = $provider->send($this->toShareable($file), $params);
+        if ($result->isPending()) {
+            return [
+                'status' => 202,
+                'body' => [
+                    'success' => true,
+                    'destination' => $destinationId,
+                    'reference' => null,
+                    'context' => $result->context,
+                ],
+            ];
+        }
         if (!$result->ok) {
             $code = $result->code instanceof DestinationFailureCode
                 ? $result->code->value

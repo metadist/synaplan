@@ -19,3 +19,7 @@ Source: `synaplan-nextcloud` 1.6.0 (`a80e2d8`) and `synaplan-owncloud-online`
 
 The folder becomes the frozen contract v1 of the cloud file sharing plan
 (`_devextras/planning/20261013-cloud-file-sharing/`, step CF5.10).
+
+`notify-vectors.json` is the signed-notification fixture for Copy to cloud.
+Each cloud app verifies those five bodies in its own language. The PHP check
+is `NotifyVectorTest`.

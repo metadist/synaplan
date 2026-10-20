@@ -34,7 +34,8 @@ final class FileSendController extends AbstractController
             content: new OA\JsonContent(
                 required: ['destination'],
                 properties: [
-                    new OA\Property(property: 'destination', type: 'string', enum: ['email', 'share_link', 'webdav', 'dropbox', 'caldav', 'm365_calendar'], example: 'email'),
+                    new OA\Property(property: 'destination', type: 'string', enum: ['email', 'share_link', 'webdav', 'dropbox', 'caldav', 'm365_calendar', 'platform'], example: 'email'),
+                    new OA\Property(property: 'identity_id', type: 'integer', description: 'Required for platform: the linked cloud', example: 4),
                     new OA\Property(property: 'subject', type: 'string'),
                     new OA\Property(property: 'body', type: 'string'),
                     new OA\Property(property: 'expiry_days', type: 'integer', example: 7),
@@ -55,6 +56,7 @@ final class FileSendController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 202, description: 'Copy accepted; the cloud has not confirmed it yet'),
             new OA\Response(response: 400, description: 'Unknown destination'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Not the file owner'),

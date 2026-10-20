@@ -46,6 +46,20 @@ class ConfigRepository extends ServiceEntityRepository
     /**
      * Set configuration value (upsert).
      */
+    /**
+     * Insert the row only when this owner, group and setting are still empty.
+     * The stored value is returned, which may belong to a writer that won the race.
+     */
+    public function insertIfAbsent(int $ownerId, string $group, string $setting, string $value): ?string
+    {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE, BLOCKED) VALUES (?, ?, ?, ?, 0)',
+            [$ownerId, $group, $setting, $value],
+        );
+
+        return $this->getValue($ownerId, $group, $setting);
+    }
+
     public function setValue(int $ownerId, string $group, string $setting, string $value): Config
     {
         $config = $this->findOneBy([

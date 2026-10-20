@@ -24,7 +24,7 @@ final class ScheduledJobStatusReaderTest extends TestCase
 
         self::assertSame(ScheduledJobStatusReader::STATE_RUNNING, $report->state);
         self::assertCount(count(ScheduledJobs::all()), $report->jobs);
-        self::assertSame('app:media:reap-jobs', $report->jobs[0]->command);
+        self::assertSame('app:cloud-deliveries:sweep', $report->jobs[0]->command);
         self::assertSame('tick', $report->jobs[0]->lane);
         self::assertSame('web-1', $report->jobs[1]->host);
         self::assertSame(0, $report->jobs[1]->lastExitCode);

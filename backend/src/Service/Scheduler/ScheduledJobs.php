@@ -23,6 +23,7 @@ final class ScheduledJobs
      */
     public const LANES = [
         self::LANE_TICK => [
+            'app:cloud-deliveries:sweep',
             'app:media:reap-jobs',
             'app:chat:reap-stuck',
             'app:desktop:reap-jobs',

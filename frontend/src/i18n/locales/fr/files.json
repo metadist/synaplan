@@ -216,6 +216,8 @@
         "conflict": "Un fichier de ce nom existe déjà dans {connection}. Rien n’a été copié.",
         "rate_limited": "{connection} a demandé d’attendre. Rien n’a été copié.",
         "unsupported": "Ce type de fichier ne peut pas être envoyé vers {connection}. Rien n’a été copié.",
+        "forbidden": "Impossible d’ajouter des fichiers dans {target}. Rien n’a été copié.",
+        "unconfirmed": "{connection} n’a pas confirmé la copie. Ouvrez le dossier et copiez à nouveau si le fichier manque.",
         "compute_unavailable": "Le travail sur fichiers est indisponible pour le moment. Rien n’a été copié."
       }
     },

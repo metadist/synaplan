@@ -270,6 +270,8 @@
         "conflict": "{connection} içinde bu adda bir dosya zaten var. Hiçbir şey kopyalanmadı.",
         "rate_limited": "{connection} beklemenizi istedi. Hiçbir şey kopyalanmadı.",
         "unsupported": "Bu dosya türü {connection} konumuna gönderilemez. Hiçbir şey kopyalanmadı.",
+        "forbidden": "{target} konumuna dosya eklenemiyor. Hiçbir şey kopyalanmadı.",
+        "unconfirmed": "{connection} kopyayı onaylamadı. Klasörü kontrol et ve dosya yoksa yeniden kopyala.",
         "compute_unavailable": "Dosya çalışması şu anda erişilemiyor. Hiçbir şey kopyalanmadı."
       }
     },

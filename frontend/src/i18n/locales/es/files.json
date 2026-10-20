@@ -270,6 +270,8 @@
         "conflict": "Ya existe un archivo con ese nombre en {connection}. No se copió nada.",
         "rate_limited": "{connection} pidió esperar. No se copió nada.",
         "unsupported": "Este tipo de archivo no se puede enviar a {connection}. No se copió nada.",
+        "forbidden": "No puedes añadir archivos a {target}. No se copió nada.",
+        "unconfirmed": "{connection} no confirmó la copia. Revisa la carpeta y vuelve a copiar si falta el archivo.",
         "compute_unavailable": "El trabajo con archivos no está disponible ahora. No se copió nada."
       }
     },

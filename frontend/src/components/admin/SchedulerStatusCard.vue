@@ -129,6 +129,7 @@ const JOB_LABEL_KEYS: Record<string, string> = {
   'app:desktop:reap-jobs': 'settings.features.scheduler.jobs.desktopReap',
   'app:process-mail-handlers': 'settings.features.scheduler.jobs.mailHandlers',
   'app:process-emails': 'settings.features.scheduler.jobs.processEmails',
+  'app:cloud-deliveries:sweep': 'settings.features.scheduler.jobs.cloudCopies',
   'app:saved-tasks:tick': 'settings.features.scheduler.jobs.savedTasks',
   'app:files:reap-ephemeral': 'settings.features.scheduler.jobs.ephemeralFiles',
   'app:approvals:expire': 'settings.features.scheduler.jobs.approvalsExpire',

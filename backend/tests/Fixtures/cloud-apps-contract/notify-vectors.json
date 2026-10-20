@@ -1,0 +1,68 @@
+{
+    "receiver_instance_id": "pi_abc",
+    "public_key": "ed25519:4dwtgZJhZVjjcxGFKBtTeZtGdpEFmUcp_rz0xfgPGFM",
+    "now": 1700000000,
+    "window_seconds": 300,
+    "vectors": [
+        {
+            "name": "valid",
+            "expect": "ok",
+            "body": {
+                "type": "delivery",
+                "id": "9",
+                "instance_id": "pi_abc",
+                "ts": 1700000000,
+                "kid": "4dwtgZJhZVjjcxGF",
+                "sig": "ed25519:eGnZ6Abr28M81w2xwh7winprjeSwIYz5mp5DCDoBNndoUohYmq30_gODDAgenoVn7_XOrTvtHlGkziR0J1ikCA"
+            }
+        },
+        {
+            "name": "wrong_key",
+            "expect": "bad_signature",
+            "body": {
+                "type": "delivery",
+                "id": "9",
+                "instance_id": "pi_abc",
+                "ts": 1700000000,
+                "kid": "4dwtgZJhZVjjcxGF",
+                "sig": "ed25519:RPRf_Y4PX3fFNem5rww8uM6wK9XPPhZDqtHz4XT50kQsM0IGi7m9-9uQe1Tug9tpqNMdLyNADmUxBvTYIlkLCA"
+            }
+        },
+        {
+            "name": "wrong_instance",
+            "expect": "wrong_instance",
+            "body": {
+                "type": "delivery",
+                "id": "9",
+                "instance_id": "pi_other",
+                "ts": 1700000000,
+                "kid": "4dwtgZJhZVjjcxGF",
+                "sig": "ed25519:jcifh3zkF1BKWrI19tL1vQCcx52BQfRA0_KR3wrnGw8fuMP_9glUJTSTjxQNnxc6sP8X2k2QZZtiER-NMej1BQ"
+            }
+        },
+        {
+            "name": "stale",
+            "expect": "stale",
+            "body": {
+                "type": "delivery",
+                "id": "9",
+                "instance_id": "pi_abc",
+                "ts": 1699999699,
+                "kid": "4dwtgZJhZVjjcxGF",
+                "sig": "ed25519:rMFhK3jsjv1zNg4mb10MuwNxM_naQ07dO60wSC_2pPRmcru_wu2LMgt-mfXrFNmI0pRBYm4buQlHxPs4crv_Dg"
+            }
+        },
+        {
+            "name": "tampered",
+            "expect": "bad_signature",
+            "body": {
+                "type": "delivery",
+                "id": "10",
+                "instance_id": "pi_abc",
+                "ts": 1700000000,
+                "kid": "4dwtgZJhZVjjcxGF",
+                "sig": "ed25519:eGnZ6Abr28M81w2xwh7winprjeSwIYz5mp5DCDoBNndoUohYmq30_gODDAgenoVn7_XOrTvtHlGkziR0J1ikCA"
+            }
+        }
+    ]
+}

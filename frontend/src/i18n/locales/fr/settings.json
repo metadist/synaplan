@@ -806,6 +806,7 @@
           "desktopReap": "nettoyage des tâches du bureau",
           "mailHandlers": "gestionnaires de courrier entrant",
           "processEmails": "boîte mail intelligente",
+          "cloudCopies": "nettoyage des copies non confirmées",
           "savedTasks": "Tâches enregistrées",
           "ephemeralFiles": "nettoyage des fichiers temporaires",
           "approvalsExpire": "approbations expirées",

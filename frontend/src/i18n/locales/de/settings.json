@@ -806,6 +806,7 @@
           "desktopReap": "Aufräumen von Desktop-Aufträgen",
           "mailHandlers": "Verarbeitung eingehender E-Mails",
           "processEmails": "Intelligentes Postfach",
+          "cloudCopies": "Aufräumen unbestätigter Kopien",
           "savedTasks": "Gespeicherte Aufgaben",
           "ephemeralFiles": "Aufräumen temporärer Dateien",
           "approvalsExpire": "Abgelaufene Freigaben",

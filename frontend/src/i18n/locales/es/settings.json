@@ -784,6 +784,7 @@
           "desktopReap": "limpieza de trabajos de escritorio",
           "mailHandlers": "gestores de correo entrante",
           "processEmails": "buzón inteligente",
+          "cloudCopies": "limpieza de copias sin confirmar",
           "savedTasks": "Tareas guardadas",
           "ephemeralFiles": "limpieza de archivos temporales",
           "approvalsExpire": "aprobaciones caducadas",

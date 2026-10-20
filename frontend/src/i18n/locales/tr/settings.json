@@ -785,6 +785,7 @@
           "desktopReap": "masaüstü işi temizliği",
           "mailHandlers": "gelen e-posta işleyicileri",
           "processEmails": "akıllı posta kutusu",
+          "cloudCopies": "onaylanmamış kopya temizliği",
           "savedTasks": "Kayıtlı görevler",
           "ephemeralFiles": "geçici dosya temizliği",
           "approvalsExpire": "süresi dolan onaylar",

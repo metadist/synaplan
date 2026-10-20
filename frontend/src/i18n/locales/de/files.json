@@ -257,6 +257,8 @@
         "conflict": "Eine Datei dieses Namens gibt es in {connection} bereits. Es wurde nichts kopiert.",
         "rate_limited": "{connection} hat um Wartezeit gebeten. Es wurde nichts kopiert.",
         "unsupported": "Dieser Dateityp lässt sich nicht nach {connection} senden. Es wurde nichts kopiert.",
+        "forbidden": "Du kannst in {target} keine Dateien ablegen. Es wurde nichts kopiert.",
+        "unconfirmed": "{connection} hat die Kopie nicht bestätigt. Prüfe den Ordner und kopiere erneut, falls die Datei fehlt.",
         "compute_unavailable": "Die Dateiarbeit ist gerade nicht erreichbar. Es wurde nichts kopiert."
       }
     },

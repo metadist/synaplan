@@ -191,7 +191,7 @@ Jobs run in five lanes, so a slow job never holds up the others:
 
 | Lane | When | Jobs |
 |------|------|------|
-| Every minute | each tick | media reaper, stuck chats, desktop jobs, inbound mail handlers |
+| Every minute | each tick | unconfirmed copy clean-up, media reaper, stuck chats, desktop jobs, inbound mail handlers |
 | Saved Tasks | each tick | `app:saved-tasks:tick` |
 | Hourly | once an hour | expired temporary files, expired approvals, new-model discovery |
 | Daily | once a day at `SYNAPLAN_SCHEDULER_DAILY_AT` (UTC, default `03:30`) | update check, model availability, message digest, documentation sync, approval digest |

@@ -659,6 +659,10 @@ run_scheduler_tick_lane() {
 
     trap scheduler_lane_on_term TERM
 
+    # Own lane from Saved Tasks: a long task run skips that lane, and a copy
+    # must not stay queued past the ten-minute confirmation window.
+    run_scheduler_job 60 bin/console --env="$env" app:cloud-deliveries:sweep --no-interaction
+
     run_scheduler_job 300 bin/console --env="$env" app:media:reap-jobs --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:chat:reap-stuck --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:desktop:reap-jobs --no-interaction

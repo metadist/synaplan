@@ -13,6 +13,7 @@ final class ScheduledJobsTest extends TestCase
     {
         self::assertSame([
             'tick' => [
+                'app:cloud-deliveries:sweep',
                 'app:media:reap-jobs',
                 'app:chat:reap-stuck',
                 'app:desktop:reap-jobs',

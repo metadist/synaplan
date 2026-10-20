@@ -216,6 +216,8 @@
         "conflict": "A file with that name already exists in {connection}. Nothing was copied.",
         "rate_limited": "{connection} asked us to wait. Nothing was copied.",
         "unsupported": "This file type cannot be sent to {connection}. Nothing was copied.",
+        "forbidden": "You cannot add files to {target}. Nothing was copied.",
+        "unconfirmed": "{connection} did not confirm the copy. Check the folder and copy again if the file is missing.",
         "compute_unavailable": "File work is not reachable right now. Nothing was copied."
       }
     },
