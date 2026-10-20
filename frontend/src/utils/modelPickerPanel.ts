@@ -10,7 +10,7 @@ export function modelPickerPanelStyle(
   if (rect.width === 0 && rect.right === 0) return null
 
   const margin = 12
-  const preferred = Math.min(320, window.innerWidth - margin * 2)
+  const preferred = Math.min(368, window.innerWidth - margin * 2)
   const spaceLeft = rect.right - margin
   if (spaceLeft >= preferred) {
     return { width: `${preferred}px`, right: '0px' }

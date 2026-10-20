@@ -132,12 +132,14 @@
         >
           <ServiceIcon :service="model.service" :size="18" class="flex-shrink-0" />
           <span class="min-w-0 flex-1">
-            <span class="flex min-w-0 items-center gap-1.5">
-              <span class="model-option__name min-w-0 truncate font-medium">{{ model.name }}</span>
-              <ModelCostBadge class="flex-shrink-0" :model="model" :peers="chatModels" />
-            </span>
-            <span class="model-option__meta block truncate txt-secondary">{{ model.service }}</span>
+            <span class="model-option__name block truncate text-[13px] font-medium">{{
+              model.name
+            }}</span>
+            <span class="model-option__meta block truncate text-xs txt-secondary">{{
+              model.service
+            }}</span>
           </span>
+          <ModelCostBadge class="shrink-0 whitespace-nowrap" :model="model" :peers="chatModels" />
           <CheckIcon
             v-if="modelValue === model.id"
             class="h-4 w-4 flex-shrink-0 text-[var(--brand)]"
@@ -189,6 +191,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useModelListKeyboard } from '@/composables/useModelListKeyboard'
+import { compareProviderThenName } from '@/composables/useModelSelection'
 import { CheckIcon, ChevronUpIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -269,15 +272,13 @@ const modelRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLElement | null>(null)
 const panelStyle = ref<{ width: string; right: string }>({
-  width: 'min(20rem, calc(100vw - 1.5rem))',
+  width: 'min(23rem, calc(100vw - 1.5rem))',
   right: '0px',
 })
 
 const chatModels = computed(() => {
   const models = aiConfigStore.models.CHAT || []
-  return [...models]
-    .filter((model) => model.service !== 'test')
-    .sort((a, b) => a.name.localeCompare(b.name))
+  return [...models].filter((model) => model.service !== 'test').sort(compareProviderThenName)
 })
 
 const defaultModelId = computed(() => aiConfigStore.defaults.CHAT)

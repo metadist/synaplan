@@ -1,9 +1,12 @@
 <template>
+  <!-- z-20 while the model menu is open: the glass bubble's backdrop-filter
+       traps the menu, so the next message would paint over its labels. -->
   <div
     :class="[
       'flex gap-0 md:gap-4 p-3 md:p-4 text-[16px] leading-6',
       role === 'user' ? 'justify-end' : '',
       isSuperseded && 'opacity-50',
+      modelDropdownOpen && 'relative z-20',
     ]"
     data-testid="message-container"
     :data-message-id="backendMessageId != null ? String(backendMessageId) : undefined"
@@ -1034,7 +1037,7 @@
                   v-if="modelDropdownOpen && !isSuperseded"
                   v-click-outside="closeModelDropdown"
                   data-testid="dropdown-again-models"
-                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
+                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
                   @keydown.escape="closeModelDropdown"
                 >
                   <button
@@ -1051,18 +1054,19 @@
                     ]"
                     @click="selectModel(option)"
                   >
-                    <ServiceIcon :service="option.provider" :size="20" />
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium">{{ option.label }}</span>
-                        <ModelCostBadge
-                          v-if="getModelForOption(option)"
-                          :model="getModelForOption(option)!"
-                          :peers="peerModelsForCost"
-                        />
-                      </div>
-                      <div class="text-xs txt-secondary">{{ option.provider }}</div>
-                    </div>
+                    <ServiceIcon class="shrink-0" :service="option.provider" :size="20" />
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-[13px] font-medium">{{ option.label }}</span>
+                      <span class="block truncate text-xs txt-secondary">{{
+                        option.provider
+                      }}</span>
+                    </span>
+                    <ModelCostBadge
+                      v-if="getModelForOption(option)"
+                      class="shrink-0 whitespace-nowrap"
+                      :model="getModelForOption(option)!"
+                      :peers="peerModelsForCost"
+                    />
                   </button>
                 </div>
               </Transition>
