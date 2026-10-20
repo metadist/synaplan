@@ -9,6 +9,7 @@ root="$(cd "$(dirname "$0")/../../.." && pwd)"
 script="$root/deploy/scripts/secrets-init.sh"
 compose="$root/deploy/compose.yaml"
 quickstart="$root/deploy/quickstart/compose.yaml"
+quickstart_lite="$root/deploy/quickstart/compose.lite.yaml"
 casaos="$root/deploy/casaos/Synaplan/docker-compose.yml"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -83,6 +84,7 @@ value_of() {
 
 assert_same_script "$compose"
 assert_same_script "$quickstart"
+assert_same_script "$quickstart_lite"
 assert_same_script "$casaos"
 
 grep -Fq 'export DB_PASSWORD="$$MARIADB_PASSWORD"' "$compose" ||

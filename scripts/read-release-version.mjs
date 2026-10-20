@@ -43,6 +43,7 @@ export const CATALOG_PATHS = [
   'deploy/casaos/Synaplan/docker-compose.yml',
   'deploy/aws/packer/synaplan.pkr.hcl',
   'deploy/quickstart/compose.yaml',
+  'deploy/quickstart/compose.lite.yaml',
   'server.json',
 ]
 
@@ -55,6 +56,9 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
   )
   const quickstartCompose = readQuickstartComposeVersion(
     read('deploy/quickstart/compose.yaml')
+  )
+  const quickstartLiteCompose = readQuickstartComposeVersion(
+    read('deploy/quickstart/compose.lite.yaml')
   )
 
   // Checked before the versions: an image pinned without a digest leaves both
@@ -83,6 +87,8 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
     ),
     'deploy/quickstart/compose.yaml (image default)': quickstartCompose.image,
     'deploy/quickstart/compose.yaml (APP_VERSION default)': quickstartCompose.appVersion,
+    'deploy/quickstart/compose.lite.yaml (image default)': quickstartLiteCompose.image,
+    'deploy/quickstart/compose.lite.yaml (APP_VERSION default)': quickstartLiteCompose.appVersion,
     'server.json': readServerJsonVersion(read('server.json')),
   }
 

@@ -4,7 +4,7 @@
 
 **We produce AI freedom.**
 
-Open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG over your docs, embeddable widget, MCP — see the cost of every answer. Apache-2.0.
+[**Try it hosted**](https://web.synaplan.com/) or [**run it yourself in three minutes**](#quickstart) — open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG over your docs, embeddable widget, MCP, and see the cost of every answer. Apache-2.0.
 
 [Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iOS](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) &nbsp;·&nbsp; [Desktop](https://github.com/metadist/synaplan-desktop) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
 
@@ -36,7 +36,7 @@ cd synaplan
 make up
 ```
 
-Open **<http://localhost:5173>**. Log in as `admin@synaplan.com` / `admin123` and paste one provider key. Free: [Groq](https://console.groq.com).
+Open **<http://localhost:5173>**. Log in as `admin@synaplan.com` / `admin123` and click **Start with Synaplan Demo** (40 messages/day for 14 days, no API key needed — [how it works](https://docs.synaplan.com/demo)), or connect [your own AI key](https://docs.synaplan.com/own-ai-keys) (free: [Groq](https://console.groq.com)) or [local Ollama](https://docs.synaplan.com/modules/local-ai).
 
 A published image, a Docker GUI, a closed network, or a Linux server: [More ways to install](#more-ways-to-install).
 
@@ -143,7 +143,7 @@ The [quickstart](#quickstart) is this path. Open **<http://localhost:5173>**. A 
 `make up` answers on `:5173` before the rest of the images finish pulling. `docker compose up -d` starts the same stack; `:5173` stays quiet until those pulls finish.
 
 1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
-2. Paste one provider key. Free: [Groq](https://console.groq.com). The app opens **AI provider setup** until a key is in place. You do not edit a config file for that.
+2. Click **Start with Synaplan Demo** (14 days, 40 messages a day via `web.synaplan.com`), or paste one provider key (free: [Groq](https://console.groq.com)). You do not edit a config file for that.
 3. Same notes in the terminal: `docker compose logs -f startup-notes`.
 
 No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pulls a local chat model (`gpt-oss:20b`, ~14 GB). Chat starts when the download finishes.
@@ -158,7 +158,9 @@ curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/m
 docker compose up -d
 ```
 
-Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
+Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, then click **Start with Synaplan Demo** or paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
+
+Need a smaller footprint (~3.2 GB instead of ~5.3 GB)? [`deploy/quickstart/compose.lite.yaml`](deploy/quickstart/compose.lite.yaml) omits `tts`, `qdrant` (document search stays on MariaDB VECTOR; memories pause) and `centrifugo` while keeping the exact same volume names — so you can switch to `compose.yaml` later without losing a single chat or file.
 
 **Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. When the GUI runs on another machine (a NAS or a server), add `SYNAPLAN_HTTP_BIND=0.0.0.0` and `SYNAPLAN_URL=http://<that machine's IP>:8000`; without them Synaplan only opens on that machine itself. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
 
@@ -285,7 +287,8 @@ Everything below is the same platform, packaged for different homes. Pick what f
 | Mode | Command | Size | Best For |
 |------|---------|------|----------|
 | **One-liner** | `curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh \| bash` | ~4 GB | Easiest start — checks prerequisites, fetches, and starts the standard stack (`--mode server` available for production) |
-| **Standard** | `make up` | ~4 GB | Local try-out: chat, file work, spoken answers — status page first, then the rest; add one provider key and it works |
+| **Standard** | `make up` | ~4 GB | Local try-out: chat works after one click (Synaplan Demo or your own key), file work, spoken answers — status page first, then the rest |
+| **Quickstart (lite)** | `deploy/quickstart/compose.lite.yaml` | ~3.2 GB | Published image, 6 runtime containers (no git clone, no `.env`; shares volumes with `compose.yaml`) |
 | **+ local AI** | `COMPOSE_PROFILES=local-ai make up` | ~5 GB | Adds Ollama and the `bge-m3` embedding model on your own hardware (local chat model optional, +~14 GB) |
 | **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
 | **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |

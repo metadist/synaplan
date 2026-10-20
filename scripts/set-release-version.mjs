@@ -452,6 +452,10 @@ const TARGETS = [
     apply: (text, version) => applyQuickstartComposeVersion(text, version),
   },
   {
+    path: join('deploy', 'quickstart', 'compose.lite.yaml'),
+    apply: (text, version) => applyQuickstartComposeVersion(text, version),
+  },
+  {
     path: 'server.json',
     apply: (text, version) => applyServerJsonVersion(text, version),
   },

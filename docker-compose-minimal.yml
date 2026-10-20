@@ -77,9 +77,11 @@ services:
            Mail UI  http://localhost:${SYNAPLAN_MAILHOG_UI_PORT:-8025}  (MailHog)
            DB UI    http://localhost:${SYNAPLAN_PHPMYADMIN_PORT:-8082}  (phpMyAdmin)
 
-         This minimal install uses cloud AI only: the app greets
-         you with a first-run setup screen where you paste one
-         provider key (free key: Groq) -- then chat works.
+         Chat works out of the box with the Synaplan Demo
+         (web.synaplan.com): 14 days, 40 messages a day, shared with
+         every tester -- log in and click Start. Add your own AI key
+         or run Ollama locally when you test with your customers.
+         Turn it off: FEATURE_FREEAPI_ENABLED=false.
 
          LEAN BY DESIGN -- optional building blocks
            Core is small: app + MariaDB + Redis. Everything else is a
@@ -256,8 +258,10 @@ services:
       FRONTEND_URL: http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
-      # No Ollama - use external AI providers
+      # No Ollama - use external AI providers or the Synaplan Demo
       OLLAMA_BASE_URL: ""
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
@@ -425,6 +429,8 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: ""
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
       TIKA_BASE_URL: http://tika:9998
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
@@ -509,6 +515,8 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: ""
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: groq
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'

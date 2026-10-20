@@ -95,8 +95,11 @@ services:
            Mail UI  http://localhost:${SYNAPLAN_MAILHOG_UI_PORT:-8025}  (MailHog)
            DB UI    http://localhost:${SYNAPLAN_PHPMYADMIN_PORT:-8082}  (phpMyAdmin)
 
-         Chat needs one AI provider key -- the app greets you with
-         a first-run setup screen and guides you (free key: Groq).
+         Chat works out of the box with the Synaplan Demo
+         (web.synaplan.com): 14 days, 40 messages a day, shared with
+         every tester -- log in and click Start. Add your own AI key
+         or run Ollama locally when you test with your customers.
+         Turn it off: FEATURE_FREEAPI_ENABLED=false.
 
          LEAN BY DESIGN -- optional building blocks
            Core is small: app + MariaDB + Redis. Everything else is a
@@ -337,10 +340,11 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       CHAT_ARTIFACTS_ENABLED: ${CHAT_ARTIFACTS_ENABLED:-1}
-      # Synaplan Demo (module `freeapi`). Off unless both are set; with the
-      # `freeapi-fake` profile use FREEAPI_BASE_URL=http://freeapi-fake:8787.
-      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-}
-      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-}
+      # Synaplan Demo (module `freeapi`). Preselected on the welcome screen for
+      # fresh tester installs; starts only on click. With the `freeapi-fake`
+      # profile use FREEAPI_BASE_URL=http://freeapi-fake:8787.
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
@@ -547,10 +551,11 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       CHAT_ARTIFACTS_ENABLED: ${CHAT_ARTIFACTS_ENABLED:-1}
-      # Synaplan Demo (module `freeapi`). Off unless both are set; with the
-      # `freeapi-fake` profile use FREEAPI_BASE_URL=http://freeapi-fake:8787.
-      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-}
-      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-}
+      # Synaplan Demo (module `freeapi`). Preselected on the welcome screen for
+      # fresh tester installs; starts only on click. With the `freeapi-fake`
+      # profile use FREEAPI_BASE_URL=http://freeapi-fake:8787.
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
@@ -775,8 +780,8 @@ services:
       COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}
       FEATURE_COMPUTE_WORKSPACES_ENABLED: ${FEATURE_COMPUTE_WORKSPACES_ENABLED:-true}
-      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-}
-      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-}
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
     entrypoint: ["/bin/bash", "-ec"]
     command:
       - |
