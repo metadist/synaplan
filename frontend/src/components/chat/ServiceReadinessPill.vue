@@ -36,7 +36,7 @@ import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outlin
 import { useTour } from '@/composables/useTour'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceReadinessStore } from '@/stores/serviceReadiness'
-import { SERVICES_READY_TOAST_SEEN_ID, SERVICES_STARTING_TOAST_SEEN_ID } from '@/tours'
+import { SERVICES_READY_TOAST_SEEN_ID } from '@/tours'
 import { serviceReadinessPillSummary } from '@/utils/serviceReadiness'
 
 /**
@@ -48,12 +48,7 @@ const authStore = useAuthStore()
 const readinessStore = useServiceReadinessStore()
 const { seen } = useTour()
 
-const progressSeen = computed(
-  () =>
-    !readinessStore.sawInProgressThisSession &&
-    seen.value.includes(SERVICES_READY_TOAST_SEEN_ID) &&
-    !seen.value.includes(SERVICES_STARTING_TOAST_SEEN_ID)
-)
+const progressSeen = computed(() => seen.value.includes(SERVICES_READY_TOAST_SEEN_ID))
 
 const summary = computed(() => {
   if (!authStore.isAuthenticated || !authStore.isAdmin) return null

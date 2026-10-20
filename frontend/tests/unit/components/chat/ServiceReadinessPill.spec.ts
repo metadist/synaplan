@@ -13,7 +13,6 @@ const { authStore, readinessStore, seen } = vi.hoisted(() => ({
   },
   readinessStore: {
     services: [] as ServiceReadiness[],
-    sawInProgressThisSession: false,
     acquire: vi.fn(),
     release: vi.fn(),
   },
@@ -76,7 +75,6 @@ describe('ServiceReadinessPill', () => {
     authStore.isAuthenticated = true
     authStore.isAdmin = true
     readinessStore.services = []
-    readinessStore.sawInProgressThisSession = false
     seen.value = []
   })
 
@@ -143,10 +141,15 @@ describe('ServiceReadinessPill', () => {
     const progressWrapper = mountPill()
     expect(progressWrapper.find('[data-testid="pill-service-readiness"]').exists()).toBe(false)
 
-    // First session where starting was seen before ready still shows progress:
+    // First setup, still in progress, shows progress:
     seen.value = [SERVICES_STARTING_TOAST_SEEN_ID]
     const firstSessionWrapper = mountPill()
     expect(firstSessionWrapper.find('[data-testid="pill-service-readiness"]').exists()).toBe(true)
+
+    // A finished first setup that went through "starting" stays quiet on later restarts:
+    seen.value = [SERVICES_STARTING_TOAST_SEEN_ID, SERVICES_READY_TOAST_SEEN_ID]
+    const restartWrapper = mountPill()
+    expect(restartWrapper.find('[data-testid="pill-service-readiness"]').exists()).toBe(false)
 
     // Later session with an outage still shows the amber pill:
     seen.value = [SERVICES_READY_TOAST_SEEN_ID]

@@ -12,10 +12,23 @@ use App\AI\StructuredOutput\StructuredOutputTranslator;
 use ArdaGnsrn\Ollama\Ollama;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
-class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterface
+class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterface, ResetInterface
 {
+    /**
+     * Status, availability and the pulled-model list run on every health check
+     * and model listing. An unreachable host that drops packets must cost this
+     * bound once per request, not the library's 10 s connect timeout per call.
+     */
+    private const PROBE_TIMEOUT_SECONDS = 2.0;
+
     private $client;
+
+    /** @var list<array{name: string, size: int, family: string}>|null */
+    private ?array $probedModels = null;
+
+    private ?\Throwable $probeFailure = null;
 
     public function __construct(
         private LoggerInterface $logger,
@@ -64,7 +77,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $start = microtime(true);
-            $models = $this->client->models()->list();
+            $models = $this->probeModels();
             $latency = (microtime(true) - $start) * 1000;
 
             return [
@@ -72,9 +85,9 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'latency_ms' => round($latency, 2),
                 'error_rate' => 0.0,
                 'active_connections' => 0,
-                'models' => count($models->models ?? []),
+                'models' => count($models),
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return [
                 'healthy' => false,
                 'error' => $e->getMessage(),
@@ -89,11 +102,38 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $this->client->models()->list();
+            $this->probeModels();
 
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable) {
             return false;
+        }
+    }
+
+    public function reset(): void
+    {
+        $this->probedModels = null;
+        $this->probeFailure = null;
+    }
+
+    /**
+     * One bounded `/api/tags` call per request, shared by every status check.
+     *
+     * @return list<array{name: string, size: int, family: string}>
+     */
+    private function probeModels(): array
+    {
+        if (null !== $this->probeFailure) {
+            throw $this->probeFailure;
+        }
+        if (null !== $this->probedModels) {
+            return $this->probedModels;
+        }
+
+        try {
+            return $this->probedModels = $this->listPulledModels(self::PROBE_TIMEOUT_SECONDS);
+        } catch (\Throwable $e) {
+            throw $this->probeFailure = $e;
         }
     }
 
@@ -495,14 +535,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $models = $this->client->models()->list();
-            $modelNames = [];
-            foreach (($models->models ?? []) as $model) {
-                $modelNames[] = $model->model ?? $model->name ?? '';
-            }
-
-            return array_filter($modelNames);
-        } catch (\Exception $e) {
+            return array_column($this->probeModels(), 'name');
+        } catch (\Throwable $e) {
             $this->logger->error('Failed to list Ollama models', ['error' => $e->getMessage()]);
 
             return [];
@@ -519,12 +553,13 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      *
      * @return list<array{name: string, size: int, family: string}>
      */
-    public function listPulledModels(): array
+    public function listPulledModels(float $timeoutSeconds = 10.0): array
     {
         $response = $this->httpClient->request('GET', rtrim($this->baseUrl, '/').'/api/tags', [
-            'timeout' => 10,
+            'timeout' => $timeoutSeconds,
+            'max_duration' => $timeoutSeconds,
         ]);
-        $body = $response->toArray(false);
+        $body = $response->toArray();
 
         $out = [];
         foreach ($body['models'] ?? [] as $model) {

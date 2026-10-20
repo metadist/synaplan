@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { ServiceReadiness } from '@/services/featuresService'
 import { SERVICES_READY_TOAST_SEEN_ID, SERVICES_STARTING_TOAST_SEEN_ID } from '@/tours'
@@ -183,5 +183,54 @@ describe('serviceReadiness store', () => {
     expect(markSeen).toHaveBeenCalledWith(SERVICES_READY_TOAST_SEEN_ID)
     expect(info).not.toHaveBeenCalled()
     expect(push).not.toHaveBeenCalled()
+  })
+
+  describe('polling', () => {
+    const starting = {
+      features: {},
+      summary: { total: 2, healthy: 1, unhealthy: 1, all_ready: false },
+      services: [service('ollama', 'starting'), service('tika', 'ready')],
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      getFeaturesStatus.mockResolvedValue(starting)
+    })
+
+    afterEach(() => {
+      useServiceReadinessStore().resetForTests()
+      vi.useRealTimers()
+    })
+
+    it('polls while first setup is still in progress', async () => {
+      const store = useServiceReadinessStore()
+      store.acquire()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(getFeaturesStatus).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(getFeaturesStatus).toHaveBeenCalledTimes(3)
+    })
+
+    it('does not poll in the background once first setup has finished', async () => {
+      seen.value = [SERVICES_READY_TOAST_SEEN_ID]
+      const store = useServiceReadinessStore()
+      store.acquire()
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      expect(getFeaturesStatus).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps polling for a live consumer after first setup and stops on release', async () => {
+      seen.value = [SERVICES_READY_TOAST_SEEN_ID]
+      const store = useServiceReadinessStore()
+      store.acquire({ live: true })
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(getFeaturesStatus).toHaveBeenCalledTimes(3)
+
+      store.release({ live: true })
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(getFeaturesStatus).toHaveBeenCalledTimes(3)
+    })
   })
 })

@@ -51,6 +51,14 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     private const FFMPEG_TIMEOUT_SECONDS = 30;
 
+    /** Health and voice listing run on status pages; an unreachable host must not hang them. */
+    private const PROBE_TIMEOUT_SECONDS = 2.0;
+
+    private const PROBE_OPTIONS = [
+        'timeout' => self::PROBE_TIMEOUT_SECONDS,
+        'max_duration' => self::PROBE_TIMEOUT_SECONDS,
+    ];
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private string $ttsUrl,
@@ -98,7 +106,7 @@ class PiperProvider implements TextToSpeechProviderInterface
     public function getStatus(): array
     {
         try {
-            $response = $this->httpClient->request('GET', $this->ttsUrl.'/health');
+            $response = $this->httpClient->request('GET', $this->ttsUrl.'/health', self::PROBE_OPTIONS);
             $data = $response->toArray();
 
             return [
@@ -132,7 +140,7 @@ class PiperProvider implements TextToSpeechProviderInterface
     public function getVoices(): array
     {
         try {
-            $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/voices');
+            $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/voices', self::PROBE_OPTIONS);
 
             return $response->toArray();
         } catch (\Throwable $e) {
