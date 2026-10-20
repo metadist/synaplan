@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "stable": {
-    "version": "5.5.0",
-    "releasedAt": "2026-10-18T11:07:50Z",
-    "notesUrl": "https://github.com/metadist/synaplan/releases/tag/v5.5.0",
+    "version": "5.5.1",
+    "releasedAt": "2026-10-20T08:51:57Z",
+    "notesUrl": "https://github.com/metadist/synaplan/releases/tag/v5.5.1",
     "severity": "normal"
   },
   "yanked": []
