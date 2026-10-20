@@ -73,13 +73,13 @@ const leadText = computed(() =>
 )
 
 onMounted(() => {
-  readinessStore.acquire()
+  readinessStore.acquire({ live: true })
   if (freeApi.isAvailable() && freeApi.status === null) {
     void freeApi.load()
   }
 })
 
 onUnmounted(() => {
-  readinessStore.release()
+  readinessStore.release({ live: true })
 })
 </script>

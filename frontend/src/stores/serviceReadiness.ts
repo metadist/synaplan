@@ -82,6 +82,36 @@ async function announceReadinessToasts(
 }
 
 /**
+ * Once first setup has finished, the pill and the welcome tile no longer show
+ * progress, so background polling would only load the server. The status page
+ * still asks for live updates explicitly.
+ */
+function firstSetupCompleted(): boolean {
+  return useTour().seen.value.includes(SERVICES_READY_TOAST_SEEN_ID)
+}
+
+/** Mounted consumers; a `live` one keeps polling after first setup. */
+function createPollDemand() {
+  let all = 0
+  let live = 0
+  return {
+    add(isLive = false): void {
+      all += 1
+      if (isLive) live += 1
+    },
+    remove(isLive = false): void {
+      all = Math.max(0, all - 1)
+      if (isLive) live = Math.max(0, live - 1)
+    },
+    wants: (): boolean => all > 0 && (live > 0 || !firstSetupCompleted()),
+    reset(): void {
+      all = 0
+      live = 0
+    },
+  }
+}
+
+/**
  * Shared service-readiness state for the "Still setting up" pill, the two
  * onboarding toasts, `/setup/status` and the welcome screen's Ollama tile
  * (plan §5.10, C15). Admin-only: non-admins never see service internals.
@@ -92,13 +122,12 @@ export const useServiceReadinessStore = defineStore('serviceReadiness', () => {
   const loadFailed = ref(false)
   let pendingLoad: Promise<void> | null = null
   let timer: ReturnType<typeof setInterval> | null = null
-  let consumers = 0
+  const demand = createPollDemand()
   const sawInProgress = ref(false)
 
   const runningServices = computed(() => services.value.filter((s) => s.state !== 'off'))
   const hasInProgress = computed(() => runningServices.value.some(serviceIsInProgress))
   const hasAttention = computed(() => runningServices.value.some(serviceNeedsAttention))
-  const sawInProgressThisSession = computed(() => sawInProgress.value)
 
   const canRead = (): boolean => {
     const auth = useAuthStore()
@@ -132,7 +161,7 @@ export const useServiceReadinessStore = defineStore('serviceReadiness', () => {
           hasAttention.value,
           sawInProgress
         )
-        if (!hasInProgress.value) stopTimer()
+        if (!shouldPoll()) stopTimer()
       } catch {
         loadFailed.value = true
       } finally {
@@ -142,24 +171,26 @@ export const useServiceReadinessStore = defineStore('serviceReadiness', () => {
     return pendingLoad
   }
 
+  const shouldPoll = (): boolean => hasInProgress.value && demand.wants()
+
   const startTimer = (): void => {
     if (timer || !canRead()) return
     timer = setInterval(() => {
-      if (consumers <= 0 || !hasInProgress.value) stopTimer()
+      if (!shouldPoll()) stopTimer()
       else void refresh()
     }, POLL_MS)
   }
 
-  const acquire = (): void => {
-    consumers += 1
+  const acquire = (options: { live?: boolean } = {}): void => {
+    demand.add(options.live)
     void refresh().then(() => {
-      if (consumers > 0 && hasInProgress.value) startTimer()
+      if (shouldPoll()) startTimer()
     })
   }
 
-  const release = (): void => {
-    consumers = Math.max(0, consumers - 1)
-    if (consumers === 0) stopTimer()
+  const release = (options: { live?: boolean } = {}): void => {
+    demand.remove(options.live)
+    if (!shouldPoll()) stopTimer()
   }
 
   const resetForTests = (): void => {
@@ -168,7 +199,7 @@ export const useServiceReadinessStore = defineStore('serviceReadiness', () => {
     loaded.value = false
     loadFailed.value = false
     pendingLoad = null
-    consumers = 0
+    demand.reset()
     sawInProgress.value = false
   }
 
@@ -178,7 +209,6 @@ export const useServiceReadinessStore = defineStore('serviceReadiness', () => {
     loadFailed,
     hasInProgress,
     hasAttention,
-    sawInProgressThisSession,
     refresh,
     switchToLocalModels,
     acquire,

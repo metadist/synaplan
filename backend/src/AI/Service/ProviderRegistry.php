@@ -369,16 +369,17 @@ class ProviderRegistry
         foreach ($uniqueProviders as $name => $provider) {
             $status = $provider->getStatus();
             $envVars = $provider->getRequiredEnvVars();
+            $available = $provider->isAvailable();
 
             $metadata[$name] = [
                 'id' => $name,
                 'name' => $provider->getDisplayName(),
                 'description' => $provider->getDescription(),
                 'capabilities' => $provider->getCapabilities(),
-                'enabled' => $provider->isAvailable(),
+                'enabled' => $available,
                 'status' => $status['healthy'] ? 'healthy' : 'unhealthy',
                 'status_message' => $status['error'] ?? $provider->getDescription(),
-                'setup_required' => !$provider->isAvailable(),
+                'setup_required' => !$available,
                 'env_vars' => $envVars,
             ];
 
