@@ -12,7 +12,7 @@
         <p class="txt-secondary text-base leading-relaxed">{{ $t('freeApi.welcome.lead') }}</p>
       </div>
 
-      <FreeApiChoices v-model="choice" />
+      <FreeApiChoices v-model="choice" :ollama-badge="ollamaBadge" />
 
       <p
         v-if="choice === 'demo'"
@@ -48,14 +48,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import FreeApiChoices from '@/components/freeapi/FreeApiChoices.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useFreeApiStore } from '@/stores/freeApi'
+import { useServiceReadinessStore } from '@/stores/serviceReadiness'
 import { freeApiStartErrorKey, type FreeApiChoice } from '@/utils/freeApiCopy'
+import { ollamaServiceBadge } from '@/utils/serviceReadiness'
 
 /**
  * Replaces "No AI provider configured" for admins while the Synaplan Demo
@@ -71,15 +73,27 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const { success } = useNotification()
 const freeApi = useFreeApiStore()
+const readinessStore = useServiceReadinessStore()
 
 const choice = ref<FreeApiChoice>('demo')
 const errorKey = ref('')
+
+const ollamaBadge = computed(() =>
+  ollamaServiceBadge(readinessStore.services, (key, params) => t(key, params ?? {}))
+)
 
 watch(choice, () => {
   errorKey.value = ''
 })
 
-onMounted(() => freeApi.load())
+onMounted(() => {
+  void freeApi.load()
+  readinessStore.acquire()
+})
+
+onUnmounted(() => {
+  readinessStore.release()
+})
 
 async function proceed(): Promise<void> {
   if (choice.value !== 'demo') {

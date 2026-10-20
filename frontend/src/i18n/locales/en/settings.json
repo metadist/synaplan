@@ -827,6 +827,22 @@
         "guide": "Guide",
         "downloadingPercent": "Downloading · {percent} %",
         "minutesLeft": "about {count} min left",
+        "pill": {
+          "progress": "Still setting up · {ready} of {total} ready",
+          "attention": "{count} needs attention | {count} need attention"
+        },
+        "toast": {
+          "starting": "You can chat already. Local AI, document search and spoken answers are still starting.",
+          "allReady": "Everything is ready.",
+          "switchToLocal": "Switch to your local models",
+          "switchedToLocal": "Your local Ollama models answer chat now. The Synaplan Demo was left.",
+          "switchFailed": "Switching to your local models did not finish. Try again under AI infrastructure."
+        },
+        "statusPage": {
+          "title": "Setting up this computer",
+          "lead": "You can chat already.",
+          "leadDemo": "You can chat already — the Synaplan Demo answers while the rest loads."
+        },
         "state": {
           "starting": "Starting",
           "downloading": "Downloading",

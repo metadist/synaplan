@@ -613,6 +613,7 @@ export const selectors = {
     people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',
     featureStatus: '[data-testid="page-feature-status"]',
+    setupStatus: '[data-testid="page-setup-status"]',
   },
 
   featureStatus: {
@@ -639,6 +640,9 @@ export const selectors = {
     serviceCommand: '[data-testid="code-service-command"]',
     servicesNeedAttention: '[data-testid="text-services-need-attention"]',
     attentionItem: '[data-testid="item-needs-attention"]',
+    readinessPill: '[data-testid="pill-service-readiness"]',
+    readinessPillLabel: '[data-testid="pill-service-readiness-label"]',
+    readinessPillShort: '[data-testid="pill-service-readiness-short"]',
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',

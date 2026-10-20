@@ -40,6 +40,13 @@
           >
             {{ $t('freeApi.choice.demo.badge') }}
           </span>
+          <span
+            v-else-if="choice.id === 'ollama' && ollamaBadge"
+            class="text-[11px] font-medium leading-none px-1.5 py-1 rounded-full surface-card txt-secondary"
+            data-testid="freeapi-ollama-badge"
+          >
+            {{ ollamaBadge }}
+          </span>
         </span>
         <span class="block text-sm txt-secondary mt-1">
           {{ $t(`freeApi.choice.${choice.id}.text`) }}
@@ -53,7 +60,10 @@
 import { ComputerDesktopIcon, KeyIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import type { FreeApiChoice } from '@/utils/freeApiCopy'
 
-defineProps<{ modelValue: FreeApiChoice }>()
+defineProps<{
+  modelValue: FreeApiChoice
+  ollamaBadge?: string | null
+}>()
 const emit = defineEmits<{ 'update:modelValue': [value: FreeApiChoice] }>()
 
 const choices = [

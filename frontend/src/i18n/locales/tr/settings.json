@@ -806,6 +806,22 @@
         "guide": "Kılavuz",
         "downloadingPercent": "İndiriliyor · %{percent}",
         "minutesLeft": "yaklaşık {count} dk kaldı",
+        "pill": {
+          "progress": "Hâlâ kuruluyor · {ready} / {total} hazır",
+          "attention": "{count} ilgi bekliyor | {count} ilgi bekliyor"
+        },
+        "toast": {
+          "starting": "Şimdiden sohbet edebilirsiniz. Yerel AI, belge araması ve sesli yanıtlar hâlâ başlatılıyor.",
+          "allReady": "Her şey hazır.",
+          "switchToLocal": "Yerel modellerinize geçin",
+          "switchedToLocal": "Artık sohbete yerel Ollama modelleriniz yanıt veriyor. Synaplan Demosundan çıkıldı.",
+          "switchFailed": "Yerel modellerinize geçiş tamamlanmadı. AI altyapısı altından tekrar deneyin."
+        },
+        "statusPage": {
+          "title": "Bu bilgisayar kuruluyor",
+          "lead": "Şimdiden sohbet edebilirsiniz.",
+          "leadDemo": "Şimdiden sohbet edebilirsiniz — geri kalanı yüklenirken Synaplan Demosu yanıt verir."
+        },
         "state": {
           "starting": "Başlatılıyor",
           "downloading": "İndiriliyor",

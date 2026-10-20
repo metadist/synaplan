@@ -805,6 +805,22 @@
         "guide": "Guía",
         "downloadingPercent": "Descargando · {percent} %",
         "minutesLeft": "quedan unos {count} min",
+        "pill": {
+          "progress": "Aún configurando · {ready} de {total} listos",
+          "attention": "{count} necesita atención | {count} necesitan atención"
+        },
+        "toast": {
+          "starting": "Ya puedes chatear. La IA local, la búsqueda de documentos y las respuestas habladas aún se están iniciando.",
+          "allReady": "Todo está listo.",
+          "switchToLocal": "Cambiar a tus modelos locales",
+          "switchedToLocal": "Tus modelos locales de Ollama responden al chat ahora. Se salió de la Demo de Synaplan.",
+          "switchFailed": "No se pudo cambiar a tus modelos locales. Inténtalo de nuevo en Infraestructura de IA."
+        },
+        "statusPage": {
+          "title": "Configurando este equipo",
+          "lead": "Ya puedes chatear.",
+          "leadDemo": "Ya puedes chatear: la Demo de Synaplan responde mientras se carga el resto."
+        },
         "state": {
           "starting": "Iniciando",
           "downloading": "Descargando",
