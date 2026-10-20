@@ -41,6 +41,11 @@ const catalog = (overrides = {}) => ({
     'x-app-environment: &app-environment',
     '  APP_VERSION: ${SYNAPLAN_VERSION:-4.4.1}',
   ].join('\n'),
+  'deploy/quickstart/compose.lite.yaml': [
+    'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.4.1}',
+    'x-app-environment: &app-environment',
+    '  APP_VERSION: ${SYNAPLAN_VERSION:-4.4.1}',
+  ].join('\n'),
   'server.json': '{\n  "version": "4.4.1"\n}\n',
   ...overrides,
 })
@@ -105,6 +110,10 @@ test('refuses a pin that is not a plain release', () => {
       '  version: "4.4.2-rc.1"',
     ].join('\n'),
     'deploy/quickstart/compose.yaml': [
+      'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.4.2-rc.1}',
+      '  APP_VERSION: ${SYNAPLAN_VERSION:-4.4.2-rc.1}',
+    ].join('\n'),
+    'deploy/quickstart/compose.lite.yaml': [
       'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.4.2-rc.1}',
       '  APP_VERSION: ${SYNAPLAN_VERSION:-4.4.2-rc.1}',
     ].join('\n'),

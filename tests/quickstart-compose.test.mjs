@@ -13,6 +13,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (...parts) => readFileSync(join(ROOT, ...parts), 'utf8')
 
 const QUICKSTART = read('deploy', 'quickstart', 'compose.yaml')
+const QUICKSTART_LITE = read('deploy', 'quickstart', 'compose.lite.yaml')
 const QUICKSTART_ENV = read('deploy', 'quickstart', '.env.example')
 const SELFHOST = read('deploy', 'compose.yaml')
 const SELFHOST_ENV = read('deploy', 'selfhost.env.example')
@@ -87,4 +88,30 @@ test('installs the same release as the self-host example', () => {
 
 test('configures the same realtime channels as the self-host compose', () => {
   assert.deepEqual(centrifugoNamespaces(QUICKSTART), centrifugoNamespaces(SELFHOST))
+})
+
+test('compose.lite.yaml is standalone, starts without variables, and shares volume names with compose.yaml', () => {
+  assert.doesNotMatch(QUICKSTART_LITE, /^\s*build:/m)
+  assert.doesNotMatch(QUICKSTART_LITE, /^\s*env_file:/m)
+  assert.doesNotMatch(QUICKSTART_LITE, /^\s*profiles:/m)
+  assert.doesNotMatch(QUICKSTART_LITE, /^name:/m)
+
+  const withoutDefault = interpolations(QUICKSTART_LITE)
+    .filter(({ rest }) => !rest.startsWith(':-'))
+    .map(({ name }) => name)
+  assert.deepEqual(withoutDefault, [], 'every variable in compose.lite.yaml needs a default')
+
+  const volumesBlock = (text) =>
+    text
+      .slice(text.indexOf('\nvolumes:\n'))
+      .trim()
+      .split('\n')
+      .map((line) => line.trim())
+  assert.deepEqual(volumesBlock(QUICKSTART_LITE), volumesBlock(QUICKSTART))
+
+  const selfhostImages = new Set(imageRefs(SELFHOST))
+  for (const image of imageRefs(QUICKSTART_LITE)) {
+    assert.match(image, /@sha256:[a-f0-9]{64}$/, `${image} must be pinned by digest`)
+    assert.ok(selfhostImages.has(image), `${image} differs from deploy/compose.yaml`)
+  }
 })

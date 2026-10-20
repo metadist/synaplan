@@ -20,7 +20,12 @@ const WAVE_2 = new Set([
 ])
 
 const DEV_FILES = ['docker-compose.yml', 'docker-compose-minimal.yml']
-const ALL_FILES = [...DEV_FILES, 'deploy/compose.yaml', 'deploy/quickstart/compose.yaml']
+const ALL_FILES = [
+  ...DEV_FILES,
+  'deploy/compose.yaml',
+  'deploy/quickstart/compose.yaml',
+  'deploy/quickstart/compose.lite.yaml',
+]
 
 /** service name → { dependency → condition } for the top-level `services:` block. */
 const dependencies = (text) => {
@@ -107,7 +112,11 @@ for (const file of ALL_FILES) {
 }
 
 test('deploy/ and the quickstart do not stagger', () => {
-  for (const file of ['deploy/compose.yaml', 'deploy/quickstart/compose.yaml']) {
+  for (const file of [
+    'deploy/compose.yaml',
+    'deploy/quickstart/compose.yaml',
+    'deploy/quickstart/compose.lite.yaml',
+  ]) {
     const services = dependencies(read(file))
     for (const name of [...services.keys()].filter((n) => WAVE_2.has(n))) {
       assert.equal(services.get(name).backend, undefined, `${file}: ${name} must not wait for the backend`)

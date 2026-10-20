@@ -101,6 +101,8 @@ x-app-environment: &app-environment
   FEATURE_DOCUMENT_TOOLS_ENABLED: "${FEATURE_DOCUMENT_TOOLS_ENABLED:-}"
   FEATURE_DESKTOP_AGENT_ENABLED: "${FEATURE_DESKTOP_AGENT_ENABLED:-}"
   FEATURE_PLATFORM_LINKS_ENABLED: "${FEATURE_PLATFORM_LINKS_ENABLED:-}"
+  FEATURE_FREEAPI_ENABLED: "${FEATURE_FREEAPI_ENABLED:-}"
+  FREEAPI_BASE_URL: "${FREEAPI_BASE_URL:-https://web.synaplan.com}"
   # First-run setup wizard. Empty keeps it enabled, which is what a deployment
   # without BOOTSTRAP_ADMIN_* needs: the API stays closed with 503 SETUP_REQUIRED
   # until someone creates the first administrator at /setup. It never appears once
