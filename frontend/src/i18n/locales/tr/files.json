@@ -255,6 +255,16 @@
     "push": {
       "action": "Buluta kopyala",
       "to": "{name} konumuna kopyala",
+      "line": "{app} · {host}",
+      "landing": "→ {folder}",
+      "pending": "{name} kopyası sürüyor. Bu dosyadaki Gönderildi bölümünde görürsün.",
+      "openIn": "{name} içinde aç",
+      "sentTo": "Gönderildi",
+      "state": {
+        "queued": "Kopyalanıyor",
+        "delivered": "Kopyalandı",
+        "failed": "Kopyalanmadı"
+      },
       "kind": {
         "nextcloud": "Nextcloud",
         "opencloud": "OpenCloud"

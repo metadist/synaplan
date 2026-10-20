@@ -52,7 +52,15 @@ final class FileSendController extends AbstractController
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'destination', type: 'string', example: 'email'),
                         new OA\Property(property: 'reference', type: 'string', nullable: true),
-                        new OA\Property(property: 'context', type: 'object'),
+                        new OA\Property(
+                            property: 'context',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'delivery_id', type: 'string'),
+                                new OA\Property(property: 'state', type: 'string', example: 'delivered'),
+                                new OA\Property(property: 'open_url', type: 'string'),
+                            ],
+                        ),
                     ]
                 )
             ),

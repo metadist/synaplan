@@ -45,7 +45,7 @@ final class MePlatformLinkController extends AbstractController
                             property: 'links',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'client', 'host', 'external_id', 'key_id', 'key_label', 'created', 'last_seen'],
+                                required: ['id', 'client', 'host', 'external_id', 'key_id', 'key_label', 'created', 'last_seen', 'can_copy'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer'),
                                     new OA\Property(property: 'client', type: 'string', example: 'nextcloud'),
@@ -55,6 +55,7 @@ final class MePlatformLinkController extends AbstractController
                                     new OA\Property(property: 'key_label', type: 'string'),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'last_seen', type: 'integer', format: 'int64'),
+                                    new OA\Property(property: 'can_copy', type: 'boolean', example: true),
                                 ]
                             )
                         ),

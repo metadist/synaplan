@@ -170,7 +170,7 @@ final readonly class PlatformLinkExchangeService
     }
 
     /**
-     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int}>
+     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, can_copy: bool}>
      */
     public function listForUser(int $userId): array
     {
@@ -201,6 +201,7 @@ final readonly class PlatformLinkExchangeService
                 'key_label' => $keyLabel,
                 'created' => $identity->getCreated(),
                 'last_seen' => $identity->getLastSeen(),
+                'can_copy' => $instance->canReceiveCopies(),
             ];
         }
 

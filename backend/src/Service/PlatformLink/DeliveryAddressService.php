@@ -19,20 +19,33 @@ final readonly class DeliveryAddressService
     ) {
     }
 
-    public function update(string $instanceId, string $secret, string $url): string
+    /**
+     * @param list<string>|null $capabilities null leaves the reported features unchanged
+     *
+     * @return array{delivery_url: string, app_capabilities: list<string>}
+     */
+    public function update(string $instanceId, string $secret, ?string $url, ?array $capabilities): array
     {
         $instance = $this->instances->requireInstance($instanceId);
         $this->instances->assertSecret($instance, $secret);
-        $url = trim($url);
-        if ('' === $url) {
-            $instance->setDeliveryUrl(null);
-        } elseif (!$this->origins->accepts($instance, $url)) {
-            throw new PlatformLinkValidationException('That address is not on this cloud.');
-        } else {
-            $instance->setDeliveryUrl($url);
+        if (null !== $url) {
+            $url = trim($url);
+            if ('' === $url) {
+                $instance->setDeliveryUrl(null);
+            } elseif (!$this->origins->accepts($instance, $url)) {
+                throw new PlatformLinkValidationException('That address is not on this cloud.');
+            } else {
+                $instance->setDeliveryUrl($url);
+            }
+        }
+        if (null !== $capabilities) {
+            $instance->setAppCapabilities($capabilities);
         }
         $this->platforms->save($instance);
 
-        return $instance->getDeliveryUrl() ?? '';
+        return [
+            'delivery_url' => $instance->getDeliveryUrl() ?? '',
+            'app_capabilities' => $instance->getAppCapabilities(),
+        ];
     }
 }

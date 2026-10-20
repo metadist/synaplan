@@ -47,6 +47,57 @@ final readonly class CloudDeliveryService
     }
 
     /**
+     * @param list<int> $fileIds
+     *
+     * @return list<array{id: int, file_id: int, state: string, remote_path: string, open_url: string, error_code: string, created: int, client: string, host: string}>
+     */
+    public function listForOwner(int $ownerId, array $fileIds): array
+    {
+        $deliveries = $this->deliveries->findForOwnerFiles($ownerId, array_slice($fileIds, 0, 100));
+        $identityIds = [];
+        foreach ($deliveries as $delivery) {
+            $identityIds[] = $delivery->getIdentityId();
+        }
+        $identities = [];
+        if ([] !== $identityIds) {
+            foreach ($this->identities->findBy(['id' => array_values(array_unique($identityIds))]) as $identity) {
+                $identities[(int) $identity->getId()] = $identity;
+            }
+        }
+        $instanceIds = [];
+        foreach ($identities as $identity) {
+            if ('' !== $identity->getInstanceId()) {
+                $instanceIds[] = $identity->getInstanceId();
+            }
+        }
+        $instances = [];
+        foreach ($this->platforms->findByInstanceIds($instanceIds) as $instance) {
+            $instances[$instance->getInstanceId()] = $instance;
+        }
+
+        $rows = [];
+        foreach ($deliveries as $delivery) {
+            $identity = $identities[$delivery->getIdentityId()] ?? null;
+            $instance = $identity instanceof ExternalIdentity
+                ? ($instances[$identity->getInstanceId()] ?? null)
+                : null;
+            $rows[] = [
+                'id' => (int) $delivery->getId(),
+                'file_id' => $delivery->getFileId(),
+                'state' => $delivery->getState(),
+                'remote_path' => $delivery->getRemotePath() ?? '',
+                'open_url' => $delivery->getOpenUrl() ?? '',
+                'error_code' => $delivery->getErrorCode() ?? '',
+                'created' => $delivery->getCreated(),
+                'client' => $instance instanceof PlatformInstance ? $instance->getClient() : '',
+                'host' => $instance instanceof PlatformInstance ? $instance->getHost() : '',
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param array<string, mixed> $params
      */
     public function copy(ShareableFile $file, array $params): DestinationResult

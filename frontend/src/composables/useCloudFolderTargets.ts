@@ -1,20 +1,33 @@
 import { onMounted, ref } from 'vue'
 import { connectionsApi } from '@/services/api/connectionsApi'
-import { cloudFolderTargetsFrom, type CloudFolderTargetItem } from '@/services/cloudFolderTargets'
+import { platformLinksApi } from '@/services/api/platformLinksApi'
+import {
+  cloudFolderTargetsFrom,
+  platformCopyTargets,
+  type CloudFolderTargetItem,
+} from '@/services/cloudFolderTargets'
 
 /**
- * Nextcloud / OpenCloud folders the Files "Send to cloud" action may use.
- * Empty means the control is absent (U11) — never a teaser.
+ * Linked clouds that accept a copy, then WebDAV folders.
+ * Empty means the control is absent — never a teaser.
  */
 export function useCloudFolderTargets() {
   const targets = ref<CloudFolderTargetItem[]>([])
 
   async function reload(): Promise<void> {
+    let webdav: CloudFolderTargetItem[]
     try {
-      targets.value = cloudFolderTargetsFrom(await connectionsApi.list())
+      webdav = cloudFolderTargetsFrom(await connectionsApi.list())
     } catch {
-      targets.value = []
+      webdav = []
     }
+    let linked: CloudFolderTargetItem[]
+    try {
+      linked = platformCopyTargets(await platformLinksApi.listMine())
+    } catch {
+      linked = []
+    }
+    targets.value = [...linked, ...webdav]
   }
 
   onMounted(() => {

@@ -8,6 +8,15 @@ export type CloudFolderTargetItem = {
   name: string
   kind: CloudFolderKind
   folder: string
+  source: 'webdav' | 'platform'
+  host: string
+}
+
+export type CopyLink = {
+  id: number
+  client: string
+  host: string
+  can_copy?: boolean
 }
 
 function sanitizeChannel(raw: string): string {
@@ -76,7 +85,39 @@ export function cloudFolderTargetsFrom(connections: ConnectionItem[]): CloudFold
     const rawFolder = connection.config?.folder
     const folder =
       typeof rawFolder === 'string' && rawFolder.trim() !== '' ? rawFolder.trim() : 'Synaplan'
-    out.push({ id, name: connection.name, kind, folder })
+    out.push({ id, name: connection.name, kind, folder, source: 'webdav', host: '' })
+  }
+  return out
+}
+
+const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
+const AUDIO = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac'])
+const VIDEO = new Set(['mp4', 'webm', 'mov'])
+
+/** Kind folder a copy lands in, from the file name. */
+export function landingFolder(fileName: string): string {
+  const ext = fileName.includes('.') ? (fileName.split('.').pop() ?? '').toLowerCase() : ''
+  if (IMAGE.has(ext)) return 'Synaplan/Images'
+  if (AUDIO.has(ext)) return 'Synaplan/Audio'
+  if (VIDEO.has(ext)) return 'Synaplan/Video'
+  if (ext === 'ics') return 'Synaplan/Calendar'
+  return 'Synaplan/Documents'
+}
+
+export function platformCopyTargets(links: CopyLink[]): CloudFolderTargetItem[] {
+  const out: CloudFolderTargetItem[] = []
+  for (const link of links) {
+    if (link.can_copy !== true || link.id <= 0 || link.host.trim() === '') continue
+    const kind = kindFromChannel(link.client) ?? (link.client === 'owncloud' ? 'nextcloud' : null)
+    if (kind === null) continue
+    out.push({
+      id: link.id,
+      name: link.host,
+      kind,
+      folder: 'Synaplan/Documents',
+      source: 'platform',
+      host: link.host,
+    })
   }
   return out
 }

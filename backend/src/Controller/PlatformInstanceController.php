@@ -163,9 +163,14 @@ final class PlatformInstanceController extends AbstractController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['delivery_url'],
                 properties: [
                     new OA\Property(property: 'delivery_url', type: 'string'),
+                    new OA\Property(
+                        property: 'app_capabilities',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        example: ['deliveries'],
+                    ),
                 ]
             )
         ),
@@ -180,13 +185,24 @@ final class PlatformInstanceController extends AbstractController
     {
         $this->guard(null);
         $body = json_decode($request->getContent(), true);
-        $url = is_array($body) && is_string($body['delivery_url'] ?? null) ? $body['delivery_url'] : '';
+        $body = is_array($body) ? $body : [];
+        $hasUrl = array_key_exists('delivery_url', $body);
+        $hasCapabilities = array_key_exists('app_capabilities', $body);
+        if (!$hasUrl && !$hasCapabilities) {
+            return $this->json(['success' => false, 'error' => 'Nothing to save.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        $url = $hasUrl && is_string($body['delivery_url']) ? $body['delivery_url'] : ($hasUrl ? '' : null);
+        $capabilities = null;
+        if ($hasCapabilities && is_array($body['app_capabilities'])) {
+            $capabilities = array_values(array_filter($body['app_capabilities'], 'is_string'));
+        }
 
         try {
             $saved = $this->deliveryAddress->update(
                 (string) $request->headers->get('X-Instance-Id', ''),
                 (string) $request->headers->get('X-Instance-Secret', ''),
                 $url,
+                $capabilities,
             );
         } catch (PlatformInstanceNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
@@ -196,7 +212,7 @@ final class PlatformInstanceController extends AbstractController
             return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        return $this->json(['success' => true, 'delivery_url' => $saved]);
+        return $this->json(['success' => true, ...$saved]);
     }
 
     #[Route('/{instanceId}/public', name: 'public', methods: ['GET'], requirements: ['instanceId' => 'pi_[a-f0-9]+|outlook-builtin'])]

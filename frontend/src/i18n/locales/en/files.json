@@ -199,8 +199,18 @@
       "retry": "Try again"
     },
     "push": {
-      "action": "Send to cloud",
-      "to": "Send to {name}",
+      "action": "Copy to cloud",
+      "to": "{name}",
+      "line": "{app} · {host}",
+      "landing": "→ {folder}",
+      "pending": "Still copying to {name}. You'll find it under Sent to on this file.",
+      "openIn": "Open in {name}",
+      "sentTo": "Sent to",
+      "state": {
+        "queued": "Copying",
+        "delivered": "Copied",
+        "failed": "Not copied"
+      },
       "kind": {
         "nextcloud": "Nextcloud",
         "opencloud": "OpenCloud"

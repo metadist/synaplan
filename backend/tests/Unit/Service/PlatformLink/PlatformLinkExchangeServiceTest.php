@@ -140,6 +140,32 @@ final class PlatformLinkExchangeServiceTest extends TestCase
         $links = $this->service(keys: $keys, identities: $identities, instances: $instances)->listForUser(7);
 
         self::assertSame([5], array_column($links, 'id'));
+        self::assertFalse($links[0]['can_copy']);
+    }
+
+    public function testACloudThatAcceptsCopiesIsOffered(): void
+    {
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('findByUserId')->willReturn([$this->identity(5, 7, 99)]);
+        $instance = new PlatformInstance(
+            PlatformInstance::CLIENT_NEXTCLOUD,
+            'pi_aabbccddeeff',
+            'files.example.org',
+            null,
+            PlatformInstance::STATUS_ACTIVE,
+        );
+        $instance->setDeliveryUrl('https://files.example.org/index.php/apps/synaplan_integration/api/v1/inbound');
+        $instance->setAppCapabilities(['deliveries', 'unknown']);
+        $instances = $this->createStub(PlatformInstanceRepository::class);
+        $instances->method('findByInstanceId')->willReturn($instance);
+        $key = new ApiKey();
+        $key->setName('Nextcloud');
+        $keys = $this->createStub(ApiKeyRepository::class);
+        $keys->method('find')->willReturn($key);
+
+        $links = $this->service(keys: $keys, identities: $identities, instances: $instances)->listForUser(7);
+
+        self::assertTrue($links[0]['can_copy']);
     }
 
     private function identity(int $id, int $userId, ?int $apiKeyId): ExternalIdentity
