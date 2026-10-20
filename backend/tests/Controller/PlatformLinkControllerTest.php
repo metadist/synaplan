@@ -335,6 +335,8 @@ final class PlatformLinkControllerTest extends WebTestCase
             server: ['HTTP_X_API_KEY' => $link['api_key']['key']],
         );
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(ApiKey::class)->find($link['api_key']['id']));
 
         $this->authenticateClient($this->client, $person);
         $this->client->request('GET', '/api/v1/me/platform-links');

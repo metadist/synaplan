@@ -233,8 +233,9 @@ class ApiKeyController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $this->platformLinkExchangeService->endLinkOfKey((int) $user->getId(), $id, $request->getClientIp() ?? '');
+        // The key goes first: its revocation must not depend on the link's bookkeeping.
         $this->apiKeyRepository->remove($apiKey);
+        $this->platformLinkExchangeService->endLinkOfKey((int) $user->getId(), $id, $request->getClientIp() ?? '');
 
         return $this->json([
             'success' => true,
