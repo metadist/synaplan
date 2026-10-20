@@ -772,28 +772,31 @@ class OpenAICompatibleController extends AbstractController
     private function resolveModel(?string $modelString, int $userId): ?array
     {
         if ($modelString) {
-            $model = $this->modelRepository->createQueryBuilder('m')
-                ->where('m.providerId = :pid')
-                ->andWhere('m.active = 1')
-                ->setParameter('pid', $modelString)
-                ->setMaxResults(1)
-                ->getQuery()
-                ->getOneOrNullResult();
-
-            if ($model instanceof Model) {
-                return $this->resolvedFromEntity($model);
+            // Only a chat-tagged CHAT or SORT default may win on identity.
+            // SORT matching a chat row is the free-sort custom-endpoint case.
+            // A PIC2TEXT default is often the vision twin of the same
+            // providerId: it has no tool_use and would bill the vision row.
+            foreach (['CHAT', 'SORT'] as $capability) {
+                $configuredId = $this->modelConfigService->getConfiguredDefaultModel($capability, $userId);
+                $configured = null !== $configuredId ? $this->modelRepository->find($configuredId) : null;
+                if ($configured instanceof Model
+                    && 'chat' === strtolower((string) $configured->getTag())
+                    && ($configured->getProviderId() === $modelString || $configured->getName() === $modelString)
+                ) {
+                    return $this->resolvedFromEntity($configured);
+                }
             }
 
-            $model = $this->modelRepository->createQueryBuilder('m')
-                ->where('m.name = :name')
-                ->andWhere('m.active = 1')
-                ->setParameter('name', $modelString)
-                ->setMaxResults(1)
-                ->getQuery()
-                ->getOneOrNullResult();
+            $chat = $this->modelRepository->findActiveByTagAndIdentity('chat', $modelString);
+            if ($chat instanceof Model) {
+                return $this->resolvedFromEntity($chat);
+            }
 
-            if ($model instanceof Model) {
-                return $this->resolvedFromEntity($model);
+            foreach (['providerId', 'name'] as $field) {
+                $model = $this->modelRepository->findOneBy([$field => $modelString, 'active' => 1]);
+                if ($model instanceof Model) {
+                    return $this->resolvedFromEntity($model);
+                }
             }
         }
 
@@ -805,10 +808,6 @@ class OpenAICompatibleController extends AbstractController
             }
         }
 
-        // No requested model matched and no CHAT default is configured. Return
-        // null so the caller responds with a 4xx instead of silently routing to
-        // a hardcoded OpenAI model — which would bill an unconfigured vendor and
-        // record usage with a null model_id (unattributable cost) (#1320).
         $this->logger->warning('OpenAI-compatible: No matching model and no CHAT default configured', [
             'requested_model' => $modelString,
             'user_id' => $userId,

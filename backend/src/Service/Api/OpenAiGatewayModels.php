@@ -41,7 +41,12 @@ final readonly class OpenAiGatewayModels
     public function resolve(string $tag, string $capability, ?string $requested, int $userId): Model
     {
         if (null !== $requested) {
-            $model = $this->models->findActiveByTagAndIdentity($tag, $requested);
+            $configuredId = $this->modelConfig->getConfiguredDefaultModel($capability, $userId);
+            $configured = null !== $configuredId ? $this->models->find($configuredId) : null;
+            $model = ($configured instanceof Model && 1 === $configured->getActive() && $tag === $configured->getTag()
+                && ($configured->getProviderId() === $requested || $configured->getName() === $requested))
+                ? $configured
+                : $this->models->findActiveByTagAndIdentity($tag, $requested);
         } else {
             $defaultId = $this->modelConfig->getDefaultModel($capability, $userId);
             $model = null !== $defaultId ? $this->models->find($defaultId) : null;
