@@ -1,7 +1,12 @@
 <template>
   <div v-if="rows.length > 0" class="min-w-0" data-testid="file-sent-to">
     <p class="text-[10px] font-medium txt-secondary">{{ t('files.push.sentTo') }}</p>
-    <p v-for="row in rows" :key="row.id" class="text-[10px] txt-primary break-words" :title="row.remote_path">
+    <p
+      v-for="row in rows"
+      :key="row.id"
+      class="text-[10px] txt-primary break-words"
+      :title="row.remote_path"
+    >
       <span>{{ line(row) }}</span>
       <a
         v-if="row.open_url"
