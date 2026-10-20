@@ -1,6 +1,4 @@
 <template>
-  <!-- z-20 while the model menu is open: the glass bubble's backdrop-filter
-       traps the menu, so the next message would paint over its labels. -->
   <div
     :class="[
       'flex gap-0 md:gap-4 p-3 md:p-4 text-[16px] leading-6',
@@ -1040,34 +1038,12 @@
                   class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
                   @keydown.escape="closeModelDropdown"
                 >
-                  <button
-                    v-for="option in modelOptions"
-                    :key="`${option.provider}-${option.model}`"
-                    type="button"
-                    :class="[
-                      'dropdown-item',
-                      selectedModel &&
-                      selectedModel.model === option.model &&
-                      selectedModel.provider === option.provider
-                        ? 'dropdown-item--active'
-                        : '',
-                    ]"
-                    @click="selectModel(option)"
-                  >
-                    <ServiceIcon class="shrink-0" :service="option.provider" :size="20" />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-[13px] font-medium">{{ option.label }}</span>
-                      <span class="block truncate text-xs txt-secondary">{{
-                        option.provider
-                      }}</span>
-                    </span>
-                    <ModelCostBadge
-                      v-if="getModelForOption(option)"
-                      class="shrink-0 whitespace-nowrap"
-                      :model="getModelForOption(option)!"
-                      :peers="peerModelsForCost"
-                    />
-                  </button>
+                  <AgainModelMenu
+                    :options="modelOptions"
+                    :selected="selectedModel"
+                    :peers="peerModelsForCost"
+                    @select="selectModel"
+                  />
                 </div>
               </Transition>
             </div>
@@ -1168,7 +1144,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
-import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import AgainModelMenu from '@/components/chat/AgainModelMenu.vue'
 import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
@@ -2095,10 +2071,6 @@ const peerModelsForCost = computed((): AIModel[] => {
     })
     .filter((m): m is AIModel => !!m)
 })
-
-const getModelForOption = (option: ModelOption): AIModel | undefined => {
-  return peerModelsForCost.value.find((m) => m.id === option.id)
-}
 
 // Navigate to AI models configuration with highlight
 const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio' | 'voice') => {
