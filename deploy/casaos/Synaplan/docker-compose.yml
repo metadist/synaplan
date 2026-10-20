@@ -1,6 +1,6 @@
 name: synaplan
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:5.5.1
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.5.2
 
 x-app-command: &app-command
   - |
@@ -14,7 +14,7 @@ x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
   SYNAPLAN_PLATFORM: selfhost
-  APP_VERSION: "5.5.1"
+  APP_VERSION: "5.5.2"
   APP_URL: ${SYNAPLAN_URL:-http://localhost:8300}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://localhost:8300}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://localhost:8300}
@@ -626,7 +626,7 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  version: "5.5.1"
+  version: "5.5.2"
   update_at: "2026-10-18"
   release_notes:
     en_US: "Synaplan 5.5.0"
