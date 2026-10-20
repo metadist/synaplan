@@ -41,12 +41,25 @@ jobs:
           TOKEN: ${{ secrets.CASAOS_FORK_TOKEN || secrets.UMBREL_FORK_TOKEN }}
           FORK_OVERRIDE: ${{ vars.CASAOS_FORK }}
         run: |
-          if test -n "${TOKEN:-}"; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "fork=${FORK_OVERRIDE:-metadist/CasaOS-AppStore}" >> "$GITHUB_OUTPUT"
-          else
+          set -euo pipefail
+          fork="${FORK_OVERRIDE:-cristiangrxs/CasaOS-AppStore}"
+          echo "fork=${fork}" >> "$GITHUB_OUTPUT"
+
+          if test -z "${TOKEN:-}"; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "No \`CASAOS_FORK_TOKEN\` (or \`UMBREL_FORK_TOKEN\`); the CasaOS AppStore sync is skipped." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          can_push="$(
+            GH_TOKEN="$TOKEN" gh api "repos/${fork}" --jq '.permissions.push // false' 2>/dev/null || echo false
+          )"
+          if [ "$can_push" = "true" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Token does not have push access to \`${fork}\`; set \`CASAOS_FORK_TOKEN\` to enable the CasaOS AppStore sync." |
               tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -204,7 +217,7 @@ jobs:
 
           existing="$(
             gh pr list --repo "$UPSTREAM" --state open \
-              --head "$BRANCH" --json number,url --jq '.[0].url // ""' || true
+              --head "${FORK%%/*}:${BRANCH}" --json number,url --jq '.[0].url // ""' || true
           )"
 
           if [ -n "$existing" ]; then

@@ -88,11 +88,29 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
+        # SECRETS_INIT_SCRIPT_START
+        # Resolve the eight deployment secrets once, then publish a separate file for
+        # each consumer. data/secrets.env is the backup copy and is never rewritten.
+        # A replace-with-* example value is refused. Nothing is written in that case.
+        # A file that already exists but is missing a key is refused too: a value that
+        # lives only in .env would not be in the backup.
+        #
+        # The published files are sourced by the other containers, so each value is
+        # written as a single-quoted shell literal. The backup file stays raw
+        # KEY=value lines, which is what a restore reads back.
+        #
+        # The same script is inlined in deploy/compose.yaml and
+        # deploy/quickstart/compose.yaml (every "$$" doubled) so neither install needs
+        # this path. deploy/scripts/tests/test-secrets-init.sh fails when a copy differs.
         set -eu
         DATA="$${SECRETS_INIT_DATA:-/data}"
         SECRETS="$$DATA/secrets.env"
+        # The quickstart keeps the database in its own volume, not under $$DATA.
         DB_DIR="$${SECRETS_INIT_DB_DIR:-$$DATA/mariadb}"
+        # Where the person reading an error finds the backup copy.
         SECRETS_NAME="$${SECRETS_INIT_FILE_LABEL:-data/secrets.env}"
+        # Each consumer mounts only its own directory. The web container never sees
+        # the database root password or the realtime admin credentials.
         APP_OUT="$${SECRETS_INIT_APP_OUT:-/out/app/secrets.env}"
         DB_OUT="$${SECRETS_INIT_DB_OUT:-/out/db/secrets.env}"
         REALTIME_OUT="$${SECRETS_INIT_REALTIME_OUT:-/out/realtime/secrets.env}"
@@ -116,6 +134,8 @@ services:
             printf '%s' "$$val"
         }
 
+        # One character at a time, so a secret containing *, ? or [ is not treated as a
+        # pattern. A single quote becomes the four-character sequence '\'' .
         shell_quote() {
             input=$$1
             quoted="'"
@@ -133,8 +153,46 @@ services:
             printf '%s' "$${quoted}'"
         }
 
+        stack_initialised() {
+            [ -d "$$DB_DIR" ] || return 1
+            find "$$DB_DIR" -mindepth 1 -print -quit 2>/dev/null | grep -q .
+        }
+
+        is_placeholder() {
+            case "$$1" in
+                replace-with-*) return 0 ;;
+            esac
+            return 1
+        }
+
+        is_adoptable() {
+            case "$$1" in
+                *'$$'*|*' #'*) return 1 ;;
+                \"*\"|\'*\') return 1 ;;
+                [[:space:]]*|*[[:space:]]) return 1 ;;
+            esac
+            return 0
+        }
+
         generate_secret() {
-            hexdump -vn 32 -e '/1 "%02x"' /dev/urandom
+            val=$$(hexdump -vn 32 -e '/1 "%02x"' /dev/urandom)
+            case "$$val" in
+                *[!0-9a-f]*) val="" ;;
+            esac
+            if [ "$${#val}" -ne 64 ]; then
+                echo "Synaplan did not start and created nothing: a random secret could not be generated." >&2
+                exit 1
+            fi
+            printf '%s' "$$val"
+        }
+
+        refuse() {
+            echo "Synaplan did not start and created nothing: $$1" >&2
+            exit 1
+        }
+
+        list_keys() {
+            printf '%s' "$$1" | sed 's/^ //; s/ /, /g'
         }
 
         publish_quoted() {
@@ -155,23 +213,93 @@ services:
             chmod 644 "$$dest"
         }
 
-        if [ ! -f "$$SECRETS" ]; then
+        file_existed=false
+        if [ -f "$$SECRETS" ]; then
+            file_existed=true
+        fi
+        initialised=false
+        if stack_initialised; then
+            initialised=true
+        fi
+
+        placeholders=""
+        file_placeholders=""
+        unadoptable=""
+        unresolved=""
+        assignments=""
+
+        for key in $$KEYS; do
+            val=""
+            if [ "$$file_existed" = true ]; then
+                val=$$(read_key "$$SECRETS" "$$key")
+                if [ -z "$$val" ]; then
+                    unresolved="$$unresolved $$key"
+                    continue
+                fi
+                if is_placeholder "$$val"; then
+                    file_placeholders="$$file_placeholders $$key"
+                    continue
+                fi
+            else
+                envval=$$(printenv "$$key" || true)
+                if [ -n "$$envval" ]; then
+                    if is_placeholder "$$envval"; then
+                        placeholders="$$placeholders $$key"
+                        continue
+                    fi
+                    if ! is_adoptable "$$envval"; then
+                        unadoptable="$$unadoptable $$key"
+                        continue
+                    fi
+                    val=$$envval
+                fi
+                if [ -z "$$val" ]; then
+                    if [ "$$initialised" = true ]; then
+                        unresolved="$$unresolved $$key"
+                        continue
+                    fi
+                    val=$$(generate_secret)
+                fi
+            fi
+            assignments="$${assignments}$${key}=$${val}
+        "
+        done
+
+        if [ -n "$$placeholders" ]; then
+            refuse "$$(list_keys "$$placeholders") still has the example value. Delete that line so Synaplan generates one, or set it to the output of \"openssl rand -hex 32\"."
+        fi
+
+        if [ -n "$$file_placeholders" ]; then
+            refuse "$$(list_keys "$$file_placeholders") in $$SECRETS_NAME still has the example value. Replace it with the output of \"openssl rand -hex 32\". The file was not rewritten."
+        fi
+
+        if [ -n "$$unadoptable" ]; then
+            refuse "$$(list_keys "$$unadoptable") cannot be read unchanged. Use only letters, digits, '-' and '_', or delete the line so Synaplan generates one."
+        fi
+
+        if [ -n "$$unresolved" ]; then
+            if [ "$$file_existed" = true ]; then
+                refuse "$$(list_keys "$$unresolved") has no value in $$SECRETS_NAME. That file was not changed. Add the original value there, or restore the file from a backup. A value that exists only in .env is not used once this file exists."
+            fi
+            refuse "$$(list_keys "$$unresolved") has no value, and this install already has a database. Restore $$SECRETS_NAME from the backup of this install, or put the original values back. A new password would not open the existing database."
+        fi
+
+        if [ "$$file_existed" = false ]; then
             mkdir -p "$$DATA"
             chmod 0700 "$$DATA"
             umask 077
             tmp="$$DATA/.secrets.env.$$$$"
             {
-                printf '%s\n' '# Synaplan deployment secrets. Generated once. Back this file up with the database.'
-                for key in $$KEYS; do
-                    envval=$$(printenv "$$key" || true)
-                    if [ -n "$$envval" ]; then
-                        val=$$envval
-                    else
-                        val=$$(generate_secret)
-                    fi
-                    printf '%s=%s\n' "$$key" "$$val"
-                done
+                printf '%s\n' '# Synaplan deployment secrets. Generated once. Back this file up with the database. Do not commit it.'
+                printf '%s' "$$assignments"
             } > "$$tmp"
+            for key in $$KEYS; do
+                got=$$(read_key "$$tmp" "$$key")
+                if ! printf '%s\n' "$$assignments" | grep -Fxq "$${key}=$${got}"; then
+                    rm -f "$$tmp"
+                    refuse "the generated secrets file could not be read back. Nothing was kept."
+                fi
+            done
             mv "$$tmp" "$$SECRETS"
             chmod 600 "$$SECRETS"
         fi
@@ -180,6 +308,7 @@ services:
         publish_quoted "$$APP_OUT" "$$APP_KEYS"
         publish_quoted "$$DB_OUT" "$$DB_KEYS"
         publish_quoted "$$REALTIME_OUT" "$$REALTIME_KEYS"
+        # SECRETS_INIT_SCRIPT_END
 
   backend:
     image: *app-image

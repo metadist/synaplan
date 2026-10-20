@@ -22,6 +22,7 @@ import {
   readElestioVersion,
   readEnvExampleVersion,
   readPackerVersion,
+  readQuickstartComposeVersion,
   readServerJsonVersion,
   readUmbrelAppVersion,
   readUmbrelComposePin,
@@ -41,6 +42,7 @@ export const CATALOG_PATHS = [
   'deploy/umbrel/synaplan/docker-compose.yml',
   'deploy/casaos/Synaplan/docker-compose.yml',
   'deploy/aws/packer/synaplan.pkr.hcl',
+  'deploy/quickstart/compose.yaml',
   'server.json',
 ]
 
@@ -50,6 +52,9 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
   const umbrelCompose = readUmbrelComposePin(read('deploy/umbrel/synaplan/docker-compose.yml'))
   const casaosCompose = readCasaosComposeVersion(
     read('deploy/casaos/Synaplan/docker-compose.yml')
+  )
+  const quickstartCompose = readQuickstartComposeVersion(
+    read('deploy/quickstart/compose.yaml')
   )
 
   // Checked before the versions: an image pinned without a digest leaves both
@@ -76,6 +81,8 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
     'deploy/aws/packer/synaplan.pkr.hcl': readPackerVersion(
       read('deploy/aws/packer/synaplan.pkr.hcl')
     ),
+    'deploy/quickstart/compose.yaml (image default)': quickstartCompose.image,
+    'deploy/quickstart/compose.yaml (APP_VERSION default)': quickstartCompose.appVersion,
     'server.json': readServerJsonVersion(read('server.json')),
   }
 
