@@ -10,11 +10,11 @@ not a chat message.
 | Step | Repo | Phase | State | Notes |
 | ---- | ---- | ----- | ----- | ----- |
 | E-1 Cleanup and baseline | workstation | P0 | **done** 2026-10-19 | §2.1 done 2026-10-13; §2.2 done 2026-10-14; scheduler running and healthy since 2026-10-17 (cause of the exit 127 not recorded — `10` §1.4) |
-| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users `ada` / `bob` / `carol`) | `synaplan-nextcloud` | P0 | **done** 2026-10-19 · in review [synaplan-nextcloud#45](https://github.com/metadist/synaplan-nextcloud/pull/45) | 35.0.2 running, 33.0.10 checked; organisation login works on both |
-| E-3 Keycloak clients and users for the clouds | `synaplan` | P0 | **done** 2026-10-19 · in review [#2566](https://github.com/metadist/synaplan/pull/2566) | `_docker/keycloak/setup.sh` "Cloud apps" block, `docs/DEVELOPMENT.md`; local `backend/.env` OIDC values |
+| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users `ada` / `bob` / `carol`) | `synaplan-nextcloud` | P0 | **done** 2026-10-19 · merged [synaplan-nextcloud#45](https://github.com/metadist/synaplan-nextcloud/pull/45) | 35.0.2 running, 33.0.10 checked; organisation login works on both |
+| E-3 Keycloak clients and users for the clouds | `synaplan` | P0 | **done** 2026-10-19 · merged [#2566](https://github.com/metadist/synaplan/pull/2566) | `_docker/keycloak/setup.sh` "Cloud apps" block, `docs/DEVELOPMENT.md`; local `backend/.env` OIDC values |
 | E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | P0 | **done** 2026-10-19 | fresh `init`, client regenerated, extension rebuilt; no file changed; E2E 10/10 with one worker |
 | E-5 ownCloud.online Docker stack | `synaplan-owncloud-online` | P3 | planned | port 8083, tag `v11.0.10` (`OCO_TAG`); first brief of P3 |
-| E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` done 2026-10-19, in review [#2566](https://github.com/metadist/synaplan/pull/2566); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open |
+| E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` merged ([#2566](https://github.com/metadist/synaplan/pull/2566)); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open. The Nextcloud e2e (CF1.3b part 3) runs on the plain test stack plus Redis meanwhile |
 | E-7 Developer docs | all | any | planned | after the stack it documents is green |
 | E-8 Refresh policy | STATUS | — | recurring | monthly or on `max-version` change |
 | E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | planned | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); extended by every core brief |
@@ -24,21 +24,24 @@ not a chat message.
 | CF-S4 ownCloud 11 Files APIs | `synaplan-owncloud-online` | P1 (before CF3.1) | planned | Host install on `:8088`; asks the hoster for its version and a test tenant; includes the watch index at the cap (row 41) |
 | CF-S5 Nextcloud Files APIs at scale | `synaplan-nextcloud` | P1 (start) | planned | Includes the watch index at the cap (row 41) |
 | CF0.0 Local stacks ready (E-1, E-2, E-3, E-6; E-4) | workstation, repos | P1 | planned | gate for CF0.7; `carol` on the `:8088` host install |
-| CF0.1 Scope map for the paths the apps call (D1) | `synaplan` | P1 | **in review** [#2571](https://github.com/metadist/synaplan/pull/2571) | starts the contract folder `backend/tests/Fixtures/cloud-apps-contract/` |
-| CF0.2 `owncloud` source (D2) | `synaplan` | P1 | **in review** [#2574](https://github.com/metadist/synaplan/pull/2574) | Data fix per §3 row 26 (`BUSERID`, `BSOURCE`) |
-| CF0.3 Cloud uploads that name a knowledge folder skip Incoming (D3) | `synaplan` | P1 | **in review** [#2572](https://github.com/metadist/synaplan/pull/2572) | automatic rule, no new request field (decision 2026-10-14) |
-| CF0.4 `check-stale` returns `vector_state` | `synaplan` | P1 | **in review** [#2573](https://github.com/metadist/synaplan/pull/2573) |  |
-| CF0.5 Docs truth (D10, D11) | `synaplan-docs`, `synaplan-nextcloud` | P1 | planned |  |
+| CF0.1 Scope map for the paths the apps call (D1) | `synaplan` | P1 | **merged** 2026-10-19 [#2571](https://github.com/metadist/synaplan/pull/2571) | starts the contract folder `backend/tests/Fixtures/cloud-apps-contract/` |
+| CF0.2 `owncloud` source (D2) | `synaplan` | P1 | **merged** 2026-10-19 [#2574](https://github.com/metadist/synaplan/pull/2574) | Data fix per §3 row 26 (`BUSERID`, `BSOURCE`) |
+| CF0.3 Cloud uploads that name a knowledge folder skip Incoming (D3) | `synaplan` | P1 | **merged** 2026-10-19 [#2572](https://github.com/metadist/synaplan/pull/2572) | automatic rule, no new request field (decision 2026-10-14) |
+| CF0.4 `check-stale` returns `vector_state` | `synaplan` | P1 | **merged** 2026-10-19 [#2573](https://github.com/metadist/synaplan/pull/2573) |  |
+| CF0.5 Docs truth (D10, D11) | `synaplan-docs`, `synaplan-nextcloud` | P1 | **in progress** · Nextcloud hosting guide in review [synaplan-nextcloud#63](https://github.com/metadist/synaplan-nextcloud/pull/63) | the guide describes 1.7.0, so it merges after #59 and #60; the OpenCloud half in `synaplan-docs` is open |
 | CF0.6 STATUS hygiene (D14) | `synaplan` | P1 | planned | rows 1–36 agreed; can start |
 | CF0.7 First walks + compatibility check | all (walk) | P1 | planned | Nextcloud J-NC-1…3; current OpenCloud and ownCloud.online releases |
+| CF0.8 Translation mode for documents (D25) | `synaplan` | P1 | **merged** 2026-10-19 [#2582](https://github.com/metadist/synaplan/pull/2582) | `summaryType: translation`; a translation the model cut off is refused |
+| CF0.9 The connect page names the signed-in account (D28) | `synaplan` | P1 | **merged** 2026-10-19 [#2581](https://github.com/metadist/synaplan/pull/2581) | follow-up: the card follows the theme ([#2584](https://github.com/metadist/synaplan/pull/2584)) |
 | CF1.1 ownCloud.online link mode, consent, MIME, key encryption | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.2 ownCloud.online tests, CI, AGENTS.md, local stack | `synaplan-owncloud-online` | P3 | planned | after CF-S4 |
-| CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | **in review** [synaplan-nextcloud#46](https://github.com/metadist/synaplan-nextcloud/pull/46) (stacked on #45) | D21; app release 1.6.1; row 47 agreed |
-| CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | **in progress** · CI gate in review [synaplan-nextcloud#47](https://github.com/metadist/synaplan-nextcloud/pull/47), contract test [#48](https://github.com/metadist/synaplan-nextcloud/pull/48); e2e next | `11` §3.1; dev dependencies agreed 2026-10-19 (A2) |
-| CF1.3c Keys encrypted at rest (per-user, admin, shared) | `synaplan-nextcloud` | P1 (M1) | planned | D4; Nextcloud's sensitive config; app release 1.7.0 |
-| CF1.3d Release from CI | `synaplan-nextcloud` | P1 (M1) | planned | owner stores two repository secrets (A6) |
-| CF1.3e Honest app states (D23, D24) | `synaplan-nextcloud` | P1 (M1) | planned | app release 1.7.0; CF1.4-nc translates its sentences |
-| CF1.4-nc Five locales, core words — Nextcloud | `synaplan-nextcloud` | P1 | planned |  |
+| CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | **merged** 2026-10-19 [synaplan-nextcloud#46](https://github.com/metadist/synaplan-nextcloud/pull/46) | D21; 1.6.1 was never released — it ships in 1.7.0 |
+| CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | **in review** · CI gate [#47](https://github.com/metadist/synaplan-nextcloud/pull/47), contract test [#48](https://github.com/metadist/synaplan-nextcloud/pull/48) and size and style [#50](https://github.com/metadist/synaplan-nextcloud/pull/50) merged; e2e journeys in review [#61](https://github.com/metadist/synaplan-nextcloud/pull/61) | `11` §3.1; e2e green in CI on Nextcloud 33 and 35; after #61 the owner makes **All Checks Passed** required |
+| CF1.3c Keys encrypted at rest (per-user, admin, shared) | `synaplan-nextcloud` | P1 (M1) | **in review** [synaplan-nextcloud#59](https://github.com/metadist/synaplan-nextcloud/pull/59) | D4; Nextcloud's sensitive config; going back to 1.6 means entering the admin key again |
+| CF1.3d Release from CI | `synaplan-nextcloud` | P1 (M1) | **in review** [synaplan-nextcloud#62](https://github.com/metadist/synaplan-nextcloud/pull/62) | owner stores two repository secrets (A6) before the first tag; the dry run is green |
+| CF1.3e Honest app states (D23, D24) | `synaplan-nextcloud` | P1 (M1) | **in review** [synaplan-nextcloud#58](https://github.com/metadist/synaplan-nextcloud/pull/58) (on #57) | app release 1.7.0; CF1.4-nc translates its sentences |
+| CF1.3f The AI actions do what they say (D25 app side, D26, D27) | `synaplan-nextcloud` | P1 (M1) | **in review** · Chat about this file and the deep link merged ([#49](https://github.com/metadist/synaplan-nextcloud/pull/49)), Markdown answers ([#53](https://github.com/metadist/synaplan-nextcloud/pull/53)); Translate in review ([#57](https://github.com/metadist/synaplan-nextcloud/pull/57)) | Translate needs CF0.8; an older core keeps the summary path (C1) |
+| CF1.4-nc Five locales, core words — Nextcloud | `synaplan-nextcloud` | P1 | **in review** [synaplan-nextcloud#60](https://github.com/metadist/synaplan-nextcloud/pull/60) (on #58) | `de`, `de_DE`, `es`, `fr`, `tr`; a Vitest check for parity, placeholders, core and banned words |
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF1.4-oco Five locales, core words — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.5 OpenCloud chat, media, binary save | `synaplan-opencloud` | P2 | planned | needs CF2.2 (D18); may run during P1 (row 34) |
@@ -80,7 +83,7 @@ not a chat message.
 | CF5.9-oc Dialog file sets and trial — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF5.9-oco Dialog file sets and trial — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF5.10 Contract v1 freeze | `synaplan`, `synaplan-nextcloud` | P1 (last) | planned | row 44; P1 exit |
-| M1 release: Synaplan + Nextcloud 1.7.0 | `synaplan`, `synaplan-nextcloud` | P1 | planned | `11` §2, §6; 1.6.1 may ship earlier (CF1.3a) |
+| M1 release: Synaplan + Nextcloud 1.7.0 | `synaplan`, `synaplan-nextcloud` | P1 | **in progress** · the app PRs are green; the version PR [synaplan-nextcloud#64](https://github.com/metadist/synaplan-nextcloud/pull/64) merges last | `11` §2, §6. Gates before the tag `v1.7.0`: (1) a Synaplan release with CF0.1–CF0.4, CF0.8 and CF0.9, deployed — v5.5.0 has none of them, and without CF0.1 linked and provisioned keys get `insufficient_scope` on Summarize; (2) CF0.5 (`synaplan-docs` half) and CF0.6; (3) the CF0.7 walks green — `09` row 6 (J-NC-3) stays red until D29 is fixed in the core; (4) the two release secrets (A6). The App Store offers 1.5.0 today; 1.6.0 and 1.6.1 were never uploaded |
 | M2 release: Synaplan + Nextcloud 1.8.0 | `synaplan`, `synaplan-nextcloud` | P1 | planned |  |
 | M3 release: Synaplan + Nextcloud 1.9.0, chart `features.cloudFiles` | `synaplan`, `synaplan-nextcloud`, `synaplan-charts` | P1 | planned |  |
 | M4 release: Synaplan + Nextcloud 2.0.0, contract v1 — the Nextcloud release | `synaplan`, `synaplan-nextcloud` | P1 exit | planned | then row 46 flags |
@@ -511,3 +514,83 @@ state when the vectors are stored (`File::markVectorized()`). Recorded: D25
 answers with a summary), D27 (deep link to the internal API host), D28 (the
 connect page does not name the signed-in Synaplan account); D24 widened to the
 streaming chat. Two dev-loop constraints went into `10` §6.
+
+**2026-10-19 (M1, the Nextcloud PRs).** With CF0.1–CF0.4, CF0.8 and CF0.9 on
+`main`, the remaining M1 steps of the Nextcloud app are built, each on its own
+branch with its own PR, CI green and every Copilot finding answered:
+
+- CF1.3f Translate ([synaplan-nextcloud#57](https://github.com/metadist/synaplan-nextcloud/pull/57))
+- CF1.3e honest app states ([#58](https://github.com/metadist/synaplan-nextcloud/pull/58))
+- CF1.3c encrypted keys ([#59](https://github.com/metadist/synaplan-nextcloud/pull/59))
+- CF1.4-nc five locales ([#60](https://github.com/metadist/synaplan-nextcloud/pull/60))
+- CF1.3b part 3, the e2e journeys ([#61](https://github.com/metadist/synaplan-nextcloud/pull/61))
+- CF1.3d release from CI ([#62](https://github.com/metadist/synaplan-nextcloud/pull/62))
+- CF0.5, the hosting guide ([#63](https://github.com/metadist/synaplan-nextcloud/pull/63))
+- the version PR for 1.7.0 ([#64](https://github.com/metadist/synaplan-nextcloud/pull/64))
+
+Merge order: #57, #58, #60, #61; #59 and #62 in any order; #63 after #59
+and #60, because it describes them; #64 last. Merging is not releasing: the
+tag waits for the M1 gates in the steps table, first of all a Synaplan
+release with CF0.1 (v5.5.0 predates it).
+
+The e2e journeys run in CI against the pinned Synaplan image on Nextcloud 33
+and 35. The CI job reads the image's source commit and checks out that
+commit's test stack files, so the image digest stays the only pin. The ten
+journeys take about a minute:
+
+- the login page loads no app code
+- a new person connects from the first file action
+- Summarize, Translate, Chat about this file
+- Make searchable by AI and back
+- an image saved to `Synaplan/Images`
+- a disconnect on either side
+- accounts created by the administrator
+
+Findings:
+
+1. **The Synaplan test stack has no Redis**, so Connect cannot work there
+   (`10` §6). The e2e adds Redis with an extra compose file.
+2. **D29**: a disconnect in Nextcloud leaves the link in Synaplan's linked
+   platforms. The app can only revoke the key. The journey checks the key,
+   and J-NC-3 waits for the core.
+3. **D30**: Deactivate in the Nextcloud admin panel leaves a provisioned
+   person's key valid in Synaplan.
+4. **The App Store offers 1.5.0** (Nextcloud 30–34). 1.6.0 and 1.6.1 were
+   never tagged or uploaded. The decision of 2026-10-19 and row 47 say
+   installations on Nextcloud 30–32 "keep 1.6.0": they keep 1.5.0. 1.7.0 is
+   the first App Store release for Nextcloud 35.
+5. **`info.xml` did not validate** against the App Store schema
+   (`<discussion>` in the wrong place). 1.5.0 got through anyway. Fixed in
+   #62 and #64, and the release workflow now checks the schema.
+6. **Found by the journeys and the reviews, fixed in #58:**
+   - the failure note linked to a settings page that does not exist
+   - a 404 or a connection error whose message contained "401" deleted a
+     linked person's key
+   - the chat completions error shape lost Synaplan's code and sentence
+   - a quick `/pic` was refused before the chat knew its capabilities
+
+   Each fix has a test that fails without it.
+7. **Release secrets (A6)**: before the first tag the owner stores
+   `APP_STORE_SIGNING_KEY` and `APP_STORE_TOKEN`. The local signing key
+   matches the certificate the App Store holds for the app.
+8. **The integrated release candidate** (all eight branches merged locally in
+   the merge order above; no conflict):
+   - `make ci-local` passes: 200 PHPUnit, 7 contract, 326 Vitest tests.
+   - The ten journeys pass on Nextcloud 33 after an in-place `occ upgrade`
+     from 1.6.1.
+9. **Upgrade from the App Store version** (`11` §5 item 6, adapted): 1.5.0
+   has no link mode and stops at Nextcloud 34. So the check ran on Nextcloud
+   33:
+   - 1.5.0 from its release tarball, accounts created by the administrator,
+     carol activated, Summarize.
+   - The 1.7.0 package and `occ upgrade` ("Updated <synaplan_integration> to
+     1.7.0").
+   - Carol's next Summarize worked without activating again.
+   - Her plain-text key was stored encrypted after that first use, and the
+     admin key after the admin settings first read it.
+   - Caveat: right after files are swapped under a running server, PHP's
+     opcache may serve the old code for up to a minute. Keys stay readable
+     meanwhile and are encrypted on the next use.
+
+   A link made with 1.6.x surviving the upgrade was checked on the dev stack
+   when CF1.3c was built.
