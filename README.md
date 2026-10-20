@@ -550,7 +550,7 @@ synaplan/
 
 ## Contributing
 
-See [AGENTS.md](AGENTS.md) for development guidelines and code standards.
+See [CONTRIBUTING.md](CONTRIBUTING.md). [AGENTS.md](AGENTS.md) is the guide for coding agents working in this repository.
 
 ---
 
