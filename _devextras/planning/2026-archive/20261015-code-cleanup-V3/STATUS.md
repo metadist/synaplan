@@ -8,7 +8,7 @@
 > deps, `FileAnalysisHandler` 161 / 6, `SeedAllCommand` and
 > `UserDeletionService` out of the constructor ledger. The twelve findings
 > of §7 are the plan of code cleanup V4,
-> [`../../20261016-code-cleanup-V4/`](../../20261016-code-cleanup-V4/00_master_plan.md),
+> [`../20261016-code-cleanup-V4/`](../20261016-code-cleanup-V4/00_master_plan.md),
 > led by the 12 user-owned tables account deletion never erases. Code
 > comments that cite `_devextras/planning/20261015-code-cleanup-V3/` mean
 > this folder.

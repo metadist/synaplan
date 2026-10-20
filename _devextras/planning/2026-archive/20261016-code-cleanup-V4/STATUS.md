@@ -1,5 +1,26 @@
 # Code cleanup V4 — status
 
+> **Archived 2026-10-18.** S0–S11 merged on `main`, sixteen pull requests:
+> [#2534](https://github.com/metadist/synaplan/pull/2534) (`6e380716f`),
+> [#2535](https://github.com/metadist/synaplan/pull/2535) (`31e459c7f`),
+> [#2536](https://github.com/metadist/synaplan/pull/2536) (`fea290ec0`),
+> [#2538](https://github.com/metadist/synaplan/pull/2538) (`4675c572f`),
+> [#2539](https://github.com/metadist/synaplan/pull/2539) (`4c79629ef`),
+> [#2543](https://github.com/metadist/synaplan/pull/2543) (`4c9ca8bdf`),
+> [#2545](https://github.com/metadist/synaplan/pull/2545) (`ac9800dad`),
+> [#2546](https://github.com/metadist/synaplan/pull/2546) (`9a15a5a7b`),
+> [#2547](https://github.com/metadist/synaplan/pull/2547) (`2f009f451`),
+> [#2548](https://github.com/metadist/synaplan/pull/2548) (`a0c82469d`),
+> [#2550](https://github.com/metadist/synaplan/pull/2550) (`becd34d3d`),
+> [#2551](https://github.com/metadist/synaplan/pull/2551) (`285cf29f1`),
+> [#2552](https://github.com/metadist/synaplan/pull/2552) (`59afd9056`),
+> [#2553](https://github.com/metadist/synaplan/pull/2553) (`4c38e1b2e`),
+> [#2554](https://github.com/metadist/synaplan/pull/2554) (`3a8b5625f`),
+> [#2555](https://github.com/metadist/synaplan/pull/2555) (`9a8f9a578`).
+> Ledger after S11: 50 / 65 / 126; frontend 29 / 80. `NOT_ERASED_YET` is
+> gone. Code comments that cite `_devextras/planning/20261016-code-cleanup-V4/`
+> mean this folder.
+
 Every step row carries the three numbers of the V2 size ratchet: files >
 800 lines, constructors > 10 params, methods > 100 lines. From S1a on it
 also carries the frontend ledger (files > 800 / functions > 100). Start
@@ -115,11 +136,9 @@ One row per Copilot round (loop §8).
 
 ## V4 exit (master plan §4)
 
-As of 2026-10-17 all twelve sprints are delivered, in sixteen pull
+As of 2026-10-18 all twelve sprints are merged, in sixteen pull
 requests: S1a–b, S4a–c and S10a–b are lettered, since S10 split by the
-size budget. Seven are merged; the rest are in review, stacked, with CI
-green on `main`. V4 is done once they are merged and the archive pull
-request has followed.
+size budget. The archive note at the top of this file is the close.
 
 | Exit item | Evidence | Pull requests |
 | --------- | -------- | ------------- |
@@ -129,7 +148,7 @@ request has followed.
 | One topic / intent rule for the classifier and Again | S3 | [#2539](https://github.com/metadist/synaplan/pull/2539) (merged) |
 | `WebhookController`, `MediaGenerationHandler`, `MessageClassifier`, `SystemConfigService`, `GoogleProvider`, `OpenAIProvider` off the file ledger; ledger ≤ 51 / ≤ 66 / ≤ 132 | `sizeRatchetBaseline.json`: none of the six has a file entry; counts 50 / 65 / 126 | [#2545](https://github.com/metadist/synaplan/pull/2545) (merged), [#2547](https://github.com/metadist/synaplan/pull/2547), [#2548](https://github.com/metadist/synaplan/pull/2548), [#2550](https://github.com/metadist/synaplan/pull/2550), [#2553](https://github.com/metadist/synaplan/pull/2553), [#2554](https://github.com/metadist/synaplan/pull/2554) |
 | One MIME-to-extension map; a controller gate with a shrink-only baseline; strict types across the message turn | `FileHelper::getExtensionFromMimeType()`; `ThinControllerTest` with `thinControllerBaseline.json`; S11's exit check prints nothing | [#2551](https://github.com/metadist/synaplan/pull/2551), [#2552](https://github.com/metadist/synaplan/pull/2552), [#2555](https://github.com/metadist/synaplan/pull/2555) |
-| `docs/ARCHITECTURE.md` describes every new seam; V4 archived with a dated note | Channel turns, media turn, the classifier cascade, system settings, the thin-controller gate and provider adapters are described; the archive pull request follows once S11 is merged | — |
+| `docs/ARCHITECTURE.md` describes every new seam; V4 archived with a dated note | Channel turns, media turn, the classifier cascade, system settings, the thin-controller gate and provider adapters are described; archived 2026-10-18 | — |
 
 ## Merges
 
@@ -142,3 +161,12 @@ request has followed.
 | 2026-10-17 | [#2539](https://github.com/metadist/synaplan/pull/2539) (S3) | `4c79629ef` (squash) | 57 / 69 / 147; frontend 29 / 80 |
 | 2026-10-17 | [#2543](https://github.com/metadist/synaplan/pull/2543) (S4a) | `4c9ca8bdf` (squash) | 57 / 69 / 145; frontend 29 / 80 |
 | 2026-10-17 | [#2545](https://github.com/metadist/synaplan/pull/2545) (S4b) | `ac9800dad` (squash) | 56 / 69 / 144; frontend 29 / 80 |
+| 2026-10-18 | [#2546](https://github.com/metadist/synaplan/pull/2546) (S4c) | `9a15a5a7b` (squash) | 56 / 68 / 142; frontend 29 / 80 |
+| 2026-10-18 | [#2547](https://github.com/metadist/synaplan/pull/2547) (S5) | `2f009f451` (squash) | 55 / 67 / 140; frontend 29 / 80 |
+| 2026-10-18 | [#2548](https://github.com/metadist/synaplan/pull/2548) (S6) | `a0c82469d` (squash) | 54 / 66 / 138; frontend 29 / 80 |
+| 2026-10-18 | [#2550](https://github.com/metadist/synaplan/pull/2550) (S7) | `becd34d3d` (squash) | 53 / 65 / 134; frontend 29 / 80 |
+| 2026-10-18 | [#2551](https://github.com/metadist/synaplan/pull/2551) (S8) | `285cf29f1` (squash) | 53 / 65 / 134; frontend 29 / 80 |
+| 2026-10-18 | [#2552](https://github.com/metadist/synaplan/pull/2552) (S9) | `59afd9056` (squash) | 52 / 65 / 130; frontend 29 / 80 |
+| 2026-10-18 | [#2553](https://github.com/metadist/synaplan/pull/2553) (S10a) | `4c38e1b2e` (squash) | 51 / 65 / 127; frontend 29 / 80 |
+| 2026-10-18 | [#2554](https://github.com/metadist/synaplan/pull/2554) (S10b) | `3a8b5625f` (squash) | 50 / 65 / 126; frontend 29 / 80 |
+| 2026-10-18 | [#2555](https://github.com/metadist/synaplan/pull/2555) (S11) | `9a8f9a578` (squash) | 50 / 65 / 126; frontend 29 / 80 |

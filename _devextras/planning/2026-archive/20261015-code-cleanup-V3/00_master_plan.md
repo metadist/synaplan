@@ -3,7 +3,7 @@
 **Status:** Implemented 2026-10-15 (K0–K10, see `STATUS.md`); exit met;
 merged 2026-10-16 as one pull request per fix, in order: [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514).
 **Archived 2026-10-16.** §7 became code cleanup V4
-([`../../20261016-code-cleanup-V4/`](../../20261016-code-cleanup-V4/00_master_plan.md)).
+([`../20261016-code-cleanup-V4/`](../20261016-code-cleanup-V4/00_master_plan.md)).
 Drafted the same day from a measurement of `main` at `eef29b5ac`; §0 agreed
 in chat ("fix 3 things in V3, not perfection in one go").
 **Priority:** Row 17 of [`../../ROADMAP.md`](../../ROADMAP.md): the cleanup follow-up

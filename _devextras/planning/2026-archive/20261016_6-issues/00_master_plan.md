@@ -1,6 +1,8 @@
 # Six open issues — 2026-10-16
 
-**Status:** Plan only. No product code in this pull request.
+**Status:** Archived 2026-10-18. The six issues are implemented on `main`;
+the close and the two leftovers are in [`STATUS.md`](./STATUS.md).
+This pull request itself carried no product code.
 **Base:** `main` at `9ca56ccb12747c901b0bed491d8ae7a04ceb7a60`.
 **Source:** the six newest product issues on
 [metadist/synaplan/issues](https://github.com/metadist/synaplan/issues)

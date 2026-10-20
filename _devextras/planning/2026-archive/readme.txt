@@ -38,4 +38,10 @@ wireframes) is in `20260907_ux_user_flows/`; its rules U1–U12 moved to
 `_devextras/planning/<folder>/` paths mean the folder of the same name here.
 
 2026-10-16 housekeeping: `20261015-code-cleanup-V3/` merged (#2512–#2514)
-and moved here; its §7 became `_devextras/planning/20261016-code-cleanup-V4/`.
+and moved here; its §7 became code cleanup V4.
+
+2026-10-18 housekeeping: `20261016-code-cleanup-V4/` merged (S0–S11,
+#2534–#2536, #2538, #2539, #2543, #2545–#2548, #2550–#2555) and moved here.
+`20261016_6-issues/` is implemented (#2525–#2527, #2529, #2531) and moved
+here; GitHub #2504 is still open, and the #2460 CI-image repeat was never
+run.
