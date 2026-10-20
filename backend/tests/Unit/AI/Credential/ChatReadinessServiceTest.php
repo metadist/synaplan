@@ -196,4 +196,52 @@ class ChatReadinessServiceTest extends TestCase
             'The demo TestProvider must not make the setup page claim AI is ready.'
         );
     }
+
+    public function testModelAvailabilitySkipsOllamaInventoryWhenOllamaServerIsDown(): void
+    {
+        $ollama = $this->createMock(\App\AI\Provider\OllamaProvider::class);
+        $ollama->expects($this->once())->method('isAvailable')->willReturn(false);
+        $ollama->method('getDisplayName')->willReturn('Ollama');
+        $ollama->expects($this->never())->method('hasModel');
+
+        $this->providerRegistry->method('getUniqueProviders')->willReturn(['ollama' => $ollama]);
+
+        $service = $this->service();
+
+        $this->assertSame(
+            ['available' => false, 'reason' => 'provider_unavailable'],
+            $service->modelAvailability('Ollama', 'bge-m3'),
+        );
+        $this->assertSame(
+            ['available' => false, 'reason' => 'provider_unavailable'],
+            $service->modelAvailability('Ollama', 'gpt-oss:20b'),
+        );
+    }
+
+    public function testModelAvailabilityStillChecksPulledOllamaModelWhenServerIsUpWithoutChatModel(): void
+    {
+        $this->givenDefaultChatBindings([]);
+
+        $ollama = $this->createMock(\App\AI\Provider\OllamaProvider::class);
+        $ollama->expects($this->once())->method('isAvailable')->willReturn(true);
+        $ollama->method('getDisplayName')->willReturn('Ollama');
+        $ollama->method('hasModel')->willReturnCallback(
+            static fn (string $model): bool => 'bge-m3' === $model
+        );
+
+        $this->providerRegistry->method('getUniqueProviders')->willReturn(['ollama' => $ollama]);
+
+        $service = $this->service();
+        $availability = $service->providerAvailability();
+
+        $this->assertFalse($availability['ollama'], 'Chat availability is false while no Ollama chat model is pulled.');
+        $this->assertSame(
+            ['available' => true, 'reason' => null],
+            $service->modelAvailability('Ollama', 'bge-m3', $availability),
+        );
+        $this->assertSame(
+            ['available' => false, 'reason' => 'not_pulled'],
+            $service->modelAvailability('Ollama', 'gpt-oss:20b', $availability),
+        );
+    }
 }

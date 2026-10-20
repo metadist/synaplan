@@ -153,6 +153,11 @@ final class ChatReadinessService
         $provider = ModelCatalog::normalizeProvider($service);
 
         if ('ollama' === $provider) {
+            $ollamaReachable = $this->snapshot(false)['ollamaReachable'] ?? null;
+            if (false === $ollamaReachable || (null === $ollamaReachable && null !== $availability && false === ($availability['ollama'] ?? null))) {
+                return ['available' => false, 'reason' => 'provider_unavailable'];
+            }
+
             return $this->ollamaModelInventory->isPulled($providerId)
                 ? ['available' => true, 'reason' => null]
                 : ['available' => false, 'reason' => 'not_pulled'];
@@ -223,13 +228,13 @@ final class ChatReadinessService
     }
 
     /**
-     * @return array{available: array<string, bool>, displayNames: array<string, string>}
+     * @return array{available: array<string, bool>, displayNames: array<string, string>, ollamaReachable?: ?bool}
      */
     private function snapshot(bool $fresh): array
     {
         $item = $this->cache->getItem(self::CACHE_KEY);
         if (!$fresh && $item->isHit()) {
-            /** @var array{available: array<string, bool>, displayNames: array<string, string>} $cached */
+            /** @var array{available: array<string, bool>, displayNames: array<string, string>, ollamaReachable?: ?bool} $cached */
             $cached = $item->get();
 
             return $cached;
@@ -243,6 +248,8 @@ final class ChatReadinessService
             $displayNames[$key] = $provider->getDisplayName();
         }
 
+        $ollamaReachable = $available['ollama'] ?? null;
+
         // Ollama answers as soon as the server is up, even with zero models
         // pulled. Treating that as "available" would route chat at a model
         // nobody downloaded and falsely hide the setup banner.
@@ -250,7 +257,11 @@ final class ChatReadinessService
             $available['ollama'] = false;
         }
 
-        $snapshot = ['available' => $available, 'displayNames' => $displayNames];
+        $snapshot = [
+            'available' => $available,
+            'displayNames' => $displayNames,
+            'ollamaReachable' => $ollamaReachable,
+        ];
 
         $item->set($snapshot);
         $item->expiresAfter(self::CACHE_TTL_SECONDS);

@@ -375,6 +375,10 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
             $request['temperature'] = $options['temperature'];
         }
 
+        if (isset($options['reasoning_effort']) && is_string($options['reasoning_effort']) && '' !== $options['reasoning_effort']) {
+            $request['reasoning_effort'] = $options['reasoning_effort'];
+        }
+
         // Ollama's OpenAI-compatible API. Qwen3 otherwise spends max_tokens on
         // thinking and the JSON answer is cut off (#2264). Only sent when a
         // caller asked. A strict gateway that rejects the unknown field is

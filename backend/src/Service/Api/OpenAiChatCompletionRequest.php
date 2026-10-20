@@ -28,6 +28,7 @@ final readonly class OpenAiChatCompletionRequest
         public mixed $toolChoice,
         public ?bool $parallelToolCalls,
         public bool $includeUsage,
+        public ?string $reasoningEffort = null,
     ) {
     }
 
@@ -87,6 +88,9 @@ final readonly class OpenAiChatCompletionRequest
             $model = is_scalar($model) ? (string) $model : null;
         }
 
+        $reasoningEffort = $body['reasoning_effort'] ?? null;
+        $reasoningEffort = is_string($reasoningEffort) && '' !== trim($reasoningEffort) ? trim($reasoningEffort) : null;
+
         return new self(
             messages: $normalizedMessages,
             model: is_string($model) && '' !== $model ? $model : null,
@@ -97,6 +101,7 @@ final readonly class OpenAiChatCompletionRequest
             toolChoice: $toolChoice,
             parallelToolCalls: $parallelToolCalls,
             includeUsage: $includeUsage,
+            reasoningEffort: $reasoningEffort,
         );
     }
 
@@ -135,6 +140,9 @@ final readonly class OpenAiChatCompletionRequest
         }
         if (null !== $this->parallelToolCalls) {
             $options['parallel_tool_calls'] = $this->parallelToolCalls;
+        }
+        if (null !== $this->reasoningEffort) {
+            $options['reasoning_effort'] = $this->reasoningEffort;
         }
 
         return $options;

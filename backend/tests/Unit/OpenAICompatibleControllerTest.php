@@ -293,6 +293,60 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->assertSame('model_not_found', $data['error']['code']);
     }
 
+    public function testChatCompletionsPrefersUserConfiguredDefaultModelAndForwardsReasoningEffort(): void
+    {
+        $user = $this->createMockUser();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
+
+        $configuredModel = $this->createMock(Model::class);
+        $configuredModel->method('getService')->willReturn('OpenAICompatible');
+        $configuredModel->method('getProviderId')->willReturn('gpt-oss-120b');
+        $configuredModel->method('getName')->willReturn('FreeAPI · Cerebras GPT OSS 120B');
+        $configuredModel->method('getId')->willReturn(500);
+
+        $catalogDuplicate = $this->createMock(Model::class);
+        $catalogDuplicate->method('getService')->willReturn('Cerebras');
+        $catalogDuplicate->method('getProviderId')->willReturn('gpt-oss-120b');
+        $catalogDuplicate->method('getId')->willReturn(385);
+
+        $this->modelConfigService->method('getConfiguredDefaultModel')
+            ->willReturnCallback(static fn (string $cap, ?int $uid): ?int => 'SORT' === $cap && 1 === $uid ? 500 : null);
+        $this->modelRepository->method('find')
+            ->willReturnCallback(static fn (int $id): ?Model => 500 === $id ? $configuredModel : null);
+        $this->modelRepository->method('findOneBy')->willReturn($catalogDuplicate);
+
+        $capturedOptions = null;
+        $this->aiFacade->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(static function (array $messages, ?int $uid, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return [
+                    'content' => '{"BTOPIC":"general"}',
+                    'provider' => 'openaicompatible',
+                    'model' => 'gpt-oss-120b',
+                    'usage' => [],
+                ];
+            });
+
+        $request = Request::create('/v1/chat/completions', 'POST', [], [], [], [], (string) json_encode([
+            'model' => 'gpt-oss-120b',
+            'reasoning_effort' => 'low',
+            'messages' => [['role' => 'user', 'content' => 'Sort this']],
+        ]));
+        $request->headers->set('Content-Type', 'application/json');
+
+        $response = $this->controller->chatCompletions($request, $user);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertIsArray($capturedOptions);
+        $this->assertSame('openaicompatible', $capturedOptions['provider']);
+        $this->assertSame('gpt-oss-120b', $capturedOptions['model']);
+        $this->assertSame('low', $capturedOptions['reasoning_effort']);
+    }
+
     private function createMockUser(): User
     {
         $user = $this->createMock(User::class);
