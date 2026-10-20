@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization;
 
+use App\AI\Provider\OllamaProvider;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
@@ -17,6 +18,7 @@ use App\Service\Usage\RecordedUsage;
 use App\Tests\Characterization\Support\CleanupSnapshot;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -244,11 +246,14 @@ final class EmailTurnCharacterizationTest extends WebTestCase
         });
         $container->set(ConversationSummaryRefreshDispatcher::class, $summaries);
 
-        $container->set('http_client', new MockHttpClient(function (string $method, string $url): MockResponse {
+        $httpClient = new MockHttpClient(function (string $method, string $url): MockResponse {
             $this->log['http'][] = $method.' '.$url;
 
             return new MockResponse('', ['http_code' => 500]);
-        }));
+        });
+        $container->set('http_client', $httpClient);
+        // Speech-model resolution asks which providers are usable; no local Ollama runs in this turn.
+        $container->set(OllamaProvider::class, new OllamaProvider(new NullLogger(), '', $httpClient));
     }
 
     private static function uploadDir(): string
