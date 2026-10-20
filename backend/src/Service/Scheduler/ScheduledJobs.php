@@ -31,6 +31,7 @@ final class ScheduledJobs
             'app:process-emails',
         ],
         self::LANE_TASKS => [
+            'app:cloud-deliveries:sweep',
             'app:saved-tasks:tick',
         ],
         self::LANE_HOURLY => [

@@ -795,7 +795,7 @@
         "owner": "These jobs run in this server's scheduler service, started by its Docker Compose file. Restart it with {command}.",
         "lanes": {
           "tick": "Every minute",
-          "tasks": "Saved Tasks",
+          "tasks": "Tasks",
           "hourly": "Hourly",
           "daily": "Daily",
           "health": "Model health"
@@ -806,6 +806,7 @@
           "desktopReap": "desktop job clean-up",
           "mailHandlers": "inbound mail handlers",
           "processEmails": "smart mailbox",
+          "cloudCopies": "unconfirmed copy clean-up",
           "savedTasks": "Saved Tasks",
           "ephemeralFiles": "temporary file clean-up",
           "approvalsExpire": "expired approvals",

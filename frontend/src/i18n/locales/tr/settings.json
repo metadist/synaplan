@@ -774,7 +774,7 @@
         "owner": "Bu işler, bu sunucunun zamanlayıcı hizmetinde, Docker Compose dosyasıyla başlatılarak çalışır. Şu komutla yeniden başlatın: {command}.",
         "lanes": {
           "tick": "Her dakika",
-          "tasks": "Kayıtlı görevler",
+          "tasks": "Görevler",
           "hourly": "Saatlik",
           "daily": "Günlük",
           "health": "Model sağlığı"
@@ -785,6 +785,7 @@
           "desktopReap": "masaüstü işi temizliği",
           "mailHandlers": "gelen e-posta işleyicileri",
           "processEmails": "akıllı posta kutusu",
+          "cloudCopies": "onaylanmamış kopya temizliği",
           "savedTasks": "Kayıtlı görevler",
           "ephemeralFiles": "geçici dosya temizliği",
           "approvalsExpire": "süresi dolan onaylar",
