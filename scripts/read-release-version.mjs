@@ -18,9 +18,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   parseImageDigest,
   parseReleaseVersion,
+  readCasaosComposeVersion,
   readElestioVersion,
   readEnvExampleVersion,
   readPackerVersion,
+  readServerJsonVersion,
   readUmbrelAppVersion,
   readUmbrelComposePin,
 } from './set-release-version.mjs'
@@ -37,13 +39,18 @@ export const CATALOG_PATHS = [
   'deploy/selfhost.env.example',
   'deploy/umbrel/synaplan/umbrel-app.yml',
   'deploy/umbrel/synaplan/docker-compose.yml',
+  'deploy/casaos/Synaplan/docker-compose.yml',
   'deploy/aws/packer/synaplan.pkr.hcl',
+  'server.json',
 ]
 
 export const readPinnedRelease = (root = DEFAULT_ROOT) => {
   const read = (path) => readFileSync(join(root, path), 'utf8')
 
   const umbrelCompose = readUmbrelComposePin(read('deploy/umbrel/synaplan/docker-compose.yml'))
+  const casaosCompose = readCasaosComposeVersion(
+    read('deploy/casaos/Synaplan/docker-compose.yml')
+  )
 
   // Checked before the versions: an image pinned without a digest leaves both
   // the tag and the digest unreadable, and reporting that as a missing version
@@ -63,9 +70,13 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
     ),
     'deploy/umbrel/synaplan/docker-compose.yml (APP_VERSION)': umbrelCompose.appVersion,
     'deploy/umbrel/synaplan/docker-compose.yml (image tag)': umbrelCompose.version,
+    'deploy/casaos/Synaplan/docker-compose.yml (image tag)': casaosCompose.image,
+    'deploy/casaos/Synaplan/docker-compose.yml (APP_VERSION)': casaosCompose.appVersion,
+    'deploy/casaos/Synaplan/docker-compose.yml (x-casaos.version)': casaosCompose.storeVersion,
     'deploy/aws/packer/synaplan.pkr.hcl': readPackerVersion(
       read('deploy/aws/packer/synaplan.pkr.hcl')
     ),
+    'server.json': readServerJsonVersion(read('server.json')),
   }
 
   const missing = Object.entries(pins)

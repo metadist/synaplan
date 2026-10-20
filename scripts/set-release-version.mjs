@@ -328,6 +328,102 @@ export const readPackerVersion = (text) => {
   return match ? match[1].trim() : null
 }
 
+export const applyServerJsonVersion = (text, version) => {
+  let replaced = 0
+  const result = text
+    .split('\n')
+    .map((line) => {
+      const match = /^(\s*"version":\s*)"[^"]*"(,?\s*)$/.exec(line)
+      if (!match) return line
+      replaced += 1
+      return `${match[1]}"${version}"${match[2]}`
+    })
+    .join('\n')
+
+  if (replaced !== 1) {
+    throw new Error(`server.json: expected exactly one version field, found ${replaced}`)
+  }
+
+  return result
+}
+
+export const readServerJsonVersion = (text) => {
+  const match = /^\s*"version":\s*"([^"\n]*)"/m.exec(text)
+  return match ? match[1].trim() : null
+}
+
+const CASAOS_IMAGE_LINE = /^x-app-image:\s*&app-image\s+ghcr\.io\/metadist\/synaplan:([^\s]+)\s*$/
+const CASAOS_APP_VERSION_LINE = /^(\s*APP_VERSION:\s*)"([^"\n]*)"\s*$/
+const CASAOS_STORE_VERSION_LINE = /^( {2}version:\s*)"([^"\n]*)"\s*$/
+
+export const applyCasaosComposeVersion = (text, version) => {
+  let imageReplaced = 0
+  let appVersionReplaced = 0
+  let storeVersionReplaced = 0
+
+  const result = text
+    .split('\n')
+    .map((line) => {
+      if (CASAOS_IMAGE_LINE.test(line)) {
+        imageReplaced += 1
+        return `x-app-image: &app-image ${UMBREL_IMAGE_REPOSITORY}:${version}`
+      }
+
+      const appVersion = CASAOS_APP_VERSION_LINE.exec(line)
+      if (appVersion) {
+        appVersionReplaced += 1
+        return `${appVersion[1]}"${version}"`
+      }
+
+      const storeVersion = CASAOS_STORE_VERSION_LINE.exec(line)
+      if (storeVersion) {
+        storeVersionReplaced += 1
+        return `${storeVersion[1]}"${version}"`
+      }
+
+      return line
+    })
+    .join('\n')
+
+  if (imageReplaced !== 1) {
+    throw new Error(
+      `deploy/casaos/Synaplan/docker-compose.yml: expected exactly one x-app-image line, found ${imageReplaced}`
+    )
+  }
+
+  if (appVersionReplaced !== 1) {
+    throw new Error(
+      `deploy/casaos/Synaplan/docker-compose.yml: expected exactly one APP_VERSION assignment, found ${appVersionReplaced}`
+    )
+  }
+
+  if (storeVersionReplaced !== 1) {
+    throw new Error(
+      `deploy/casaos/Synaplan/docker-compose.yml: expected exactly one x-casaos.version field, found ${storeVersionReplaced}`
+    )
+  }
+
+  return result
+}
+
+export const readCasaosComposeVersion = (text) => {
+  const image = CASAOS_IMAGE_LINE.exec(text)
+  const lines = text.split('\n')
+  const find = (pattern) => {
+    for (const line of lines) {
+      const match = pattern.exec(line)
+      if (match) return match[2].trim()
+    }
+    return null
+  }
+  const imageLine = lines.find((line) => CASAOS_IMAGE_LINE.test(line))
+  return {
+    image: imageLine ? CASAOS_IMAGE_LINE.exec(imageLine)[1].trim() : null,
+    appVersion: find(CASAOS_APP_VERSION_LINE),
+    storeVersion: find(CASAOS_STORE_VERSION_LINE),
+  }
+}
+
 const TARGETS = [
   { path: 'elestio.yml', apply: (text, version) => applyElestioVersion(text, version) },
   {
@@ -344,12 +440,20 @@ const TARGETS = [
     needsDigest: true,
   },
   {
+    path: join('deploy', 'casaos', 'Synaplan', 'docker-compose.yml'),
+    apply: (text, version) => applyCasaosComposeVersion(text, version),
+  },
+  {
     path: join('deploy', 'aws', 'packer', 'synaplan.pkr.hcl'),
     apply: (text, version) => applyPackerVersion(text, version),
   },
   {
     path: join('deploy', 'quickstart', 'compose.yaml'),
     apply: (text, version) => applyQuickstartComposeVersion(text, version),
+  },
+  {
+    path: 'server.json',
+    apply: (text, version) => applyServerJsonVersion(text, version),
   },
 ]
 

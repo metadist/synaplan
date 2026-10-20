@@ -1,0 +1,78 @@
+name: MCP Registry Publish
+
+# Publishes `server.json` to the official Model Context Protocol Registry
+# (https://registry.modelcontextprotocol.io) whenever the pinned version lands
+# on the default branch.
+#
+# Uses GitHub Actions OIDC (`mcp-publisher login github-oidc`) so no secret or
+# personal access token has to be stored or rotated for `io.github.metadist/*`.
+
+on:
+  push:
+    branches: [main]
+    paths: ['server.json']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mcp-registry-publish
+  cancel-in-progress: false
+
+env:
+  MCP_PUBLISHER_VERSION: v1.8.1
+
+jobs:
+  publish:
+    name: Publish to Official MCP Registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin mcp-publisher
+          chmod +x /usr/local/bin/mcp-publisher
+
+      - name: Validate server.json
+        run: mcp-publisher validate
+
+      - name: Check if version is already published
+        id: check
+        run: |
+          set -euo pipefail
+          name="$(jq -r .name server.json)"
+          version="$(jq -r .version server.json)"
+          encoded_name="${name/\//%2F}"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          status="$(
+            curl -s -o /dev/null -w '%{http_code}' \
+              "https://registry.modelcontextprotocol.io/v0.1/servers/${encoded_name}/versions/${version}"
+          )"
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "\`${name}\` version \`${version}\` is already published in the Official MCP Registry." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate and publish
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          mcp-publisher login github-oidc
+          mcp-publisher publish
+          echo "Published \`${{ steps.check.outputs.name }}\` \`${{ steps.check.outputs.version }}\` to the Official MCP Registry." |
+            tee -a "$GITHUB_STEP_SUMMARY"

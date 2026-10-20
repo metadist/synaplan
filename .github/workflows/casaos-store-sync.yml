@@ -1,0 +1,245 @@
+name: CasaOS Store Sync
+
+# Carries deploy/casaos/Synaplan/ into the ZimaOS / CasaOS AppStore
+# (IceWhaleTech/CasaOS-AppStore), mirroring the Umbrel store sync pattern:
+#
+#   * While Synaplan is not in the store yet, updates the open submission
+#     branch (`add-synaplan`).
+#   * Once Synaplan is in the store, opens a version-bump pull request on a
+#     release branch (`synaplan-<version>`) with the GitHub release notes and
+#     publish date injected into `x-casaos`.
+
+on:
+  push:
+    branches: [main]
+    paths: ['deploy/casaos/Synaplan/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: casaos-store-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: IceWhaleTech/CasaOS-AppStore
+  APP_DIR: Apps/Synaplan
+  SUBMISSION_BRANCH: add-synaplan
+  ASSETS_BASE: https://raw.githubusercontent.com/metadist/umbrel-apps/submission-assets/synaplan-submission
+
+jobs:
+  sync:
+    name: Update the CasaOS AppStore package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check the fork credentials
+        id: config
+        env:
+          TOKEN: ${{ secrets.CASAOS_FORK_TOKEN || secrets.UMBREL_FORK_TOKEN }}
+          FORK_OVERRIDE: ${{ vars.CASAOS_FORK }}
+        run: |
+          if test -n "${TOKEN:-}"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "fork=${FORK_OVERRIDE:-metadist/CasaOS-AppStore}" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No \`CASAOS_FORK_TOKEN\` (or \`UMBREL_FORK_TOKEN\`); the CasaOS AppStore sync is skipped." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: synaplan
+          persist-credentials: false
+
+      - name: Read the packaged version
+        id: package
+        if: steps.config.outputs.configured == 'true'
+        working-directory: synaplan
+        run: |
+          set -euo pipefail
+          version="$(node scripts/read-release-version.mjs | jq -r .version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Packaging Synaplan ${version} for the CasaOS AppStore." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clone the fork
+        if: steps.config.outputs.configured == 'true'
+        env:
+          TOKEN: ${{ secrets.CASAOS_FORK_TOKEN || secrets.UMBREL_FORK_TOKEN }}
+          FORK: ${{ steps.config.outputs.fork }}
+        run: |
+          set -euo pipefail
+          git clone --quiet --depth=50 --no-tags "https://github.com/${FORK}.git" fork
+          cd fork
+          git config credential.helper '!f() { echo "username=x-access-token"; echo "password=${TOKEN}"; }; f'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream "https://github.com/${UPSTREAM}.git"
+          git fetch --quiet --depth=50 --no-tags upstream main
+
+      - name: Decide submission or version bump
+        id: mode
+        if: steps.config.outputs.configured == 'true'
+        working-directory: fork
+        run: |
+          set -euo pipefail
+          if git cat-file -e "upstream/main:${APP_DIR}/docker-compose.yml" 2>/dev/null; then
+            echo "mode=bump" >> "$GITHUB_OUTPUT"
+            echo "The store already carries \`${APP_DIR}\`; this release is a version bump." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "mode=submission" >> "$GITHUB_OUTPUT"
+            echo "\`${APP_DIR}\` is not in the store yet; the open submission is updated instead." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Check the submission branch for foreign changes
+        if: steps.config.outputs.configured == 'true' && steps.mode.outputs.mode == 'submission'
+        env:
+          FORK: ${{ steps.config.outputs.fork }}
+        working-directory: fork
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "${SUBMISSION_BRANCH}" 2>/dev/null || exit 0
+          foreign="$(
+            git diff --name-only "upstream/main...FETCH_HEAD" \
+              | grep -v "^${APP_DIR}/" || true
+          )"
+          if [ -n "$foreign" ]; then
+            echo "::error::\`${FORK}:${SUBMISSION_BRANCH}\` changes files outside \`${APP_DIR}/\`, which this sync would discard: $(echo "$foreign" | tr '\n' ' ')"
+            exit 1
+          fi
+
+      - name: Build the store package
+        id: build
+        if: steps.config.outputs.configured == 'true'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          VERSION: ${{ steps.package.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: fork
+        run: |
+          set -euo pipefail
+
+          if [ "$MODE" = submission ]; then
+            branch="$SUBMISSION_BRANCH"
+          else
+            branch="synaplan-${VERSION}"
+          fi
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+
+          git checkout --quiet -B "$branch" upstream/main
+          mkdir -p "${APP_DIR}"
+          rsync --archive --delete "../synaplan/deploy/casaos/Synaplan/" "${APP_DIR}/"
+
+          # Copy SVG icon from repo and fetch PNG assets from the submission-assets branch
+          cp "../synaplan/frontend/public/single_bird.svg" "${APP_DIR}/icon.svg"
+          curl -fsSL "${ASSETS_BASE}/logo-512.png" -o "${APP_DIR}/icon.png"
+          curl -fsSL "${ASSETS_BASE}/1-chat.png" -o "${APP_DIR}/thumbnail.png"
+          curl -fsSL "${ASSETS_BASE}/1-chat.png" -o "${APP_DIR}/screenshot-1.png"
+          curl -fsSL "${ASSETS_BASE}/2-document-search.png" -o "${APP_DIR}/screenshot-2.png"
+          curl -fsSL "${ASSETS_BASE}/3-chat-widgets.png" -o "${APP_DIR}/screenshot-3.png"
+          curl -fsSL "${ASSETS_BASE}/4-widget-conversations.png" -o "${APP_DIR}/screenshot-4.png"
+          curl -fsSL "${ASSETS_BASE}/5-memories.png" -o "${APP_DIR}/screenshot-5.png"
+
+          release_json="$(gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" --json body,publishedAt 2>/dev/null || echo '{}')"
+          body="$(printf '%s' "$release_json" | jq -r '.body // ""')"
+          pub_date="$(printf '%s' "$release_json" | jq -r '(.publishedAt // "") | split("T")[0]')"
+          if [ -z "$pub_date" ]; then
+            pub_date="$(date -u +%Y-%m-%d)"
+          fi
+
+          node ../synaplan/scripts/set-casaos-release-notes.mjs \
+            --manifest "${APP_DIR}/docker-compose.yml" \
+            --body "$body" \
+            --url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}" \
+            --date "$pub_date" \
+            > /dev/null
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "The store package already matches this repository; nothing to push." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git add --all "${APP_DIR}"
+          if [ "$MODE" = submission ]; then
+            git commit --quiet -m "feat(appstore): add Synaplan ${VERSION}"
+          else
+            git commit --quiet -m "chore(synaplan): update to ${VERSION}"
+          fi
+
+      - name: Validate the package with CasaOS's validator
+        if: steps.build.outputs.changed == 'true'
+        working-directory: fork
+        run: |
+          set -euo pipefail
+          if [ ! -f .github/actions/validate-compose/scripts/validate_compose.py ]; then
+            echo "::warning::${UPSTREAM} no longer provides validate_compose.py; skipping local validation."
+            exit 0
+          fi
+          python3 -m pip install --quiet PyYAML
+          AppID=synaplan python3 .github/actions/validate-compose/scripts/validate_compose.py \
+            --app-path Synaplan \
+            --report-json /tmp/casaos-validation.json
+
+      - name: Push and propose
+        if: steps.build.outputs.changed == 'true'
+        env:
+          TOKEN: ${{ secrets.CASAOS_FORK_TOKEN || secrets.UMBREL_FORK_TOKEN }}
+          GH_TOKEN: ${{ secrets.CASAOS_FORK_TOKEN || secrets.UMBREL_FORK_TOKEN }}
+          FORK: ${{ steps.config.outputs.fork }}
+          MODE: ${{ steps.mode.outputs.mode }}
+          VERSION: ${{ steps.package.outputs.version }}
+          BRANCH: ${{ steps.build.outputs.branch }}
+        working-directory: fork
+        run: |
+          set -euo pipefail
+          git push --quiet --force origin "HEAD:refs/heads/${BRANCH}"
+
+          existing="$(
+            gh pr list --repo "$UPSTREAM" --state open \
+              --head "$BRANCH" --json number,url --jq '.[0].url // ""' || true
+          )"
+
+          if [ -n "$existing" ]; then
+            {
+              echo "### CasaOS AppStore"
+              echo ""
+              echo "Updated ${existing} to Synaplan \`${VERSION}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$MODE" = submission ]; then
+            echo "::warning::No open submission pull request for ${BRANCH}; the branch was updated but nothing was proposed."
+            exit 0
+          fi
+
+          body_file="$(mktemp)"
+          cat > "$body_file" <<EOF
+          Updates **Synaplan** (\`com.synaplan.synaplan\`) to \`${VERSION}\`.
+
+          - Release notes: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}
+          - Image: \`ghcr.io/metadist/synaplan:${VERSION}\` (\`amd64\` + \`arm64\`)
+          - Validated with \`validate_compose.py --app-path Synaplan\` (including \`docker compose config -q\`).
+          EOF
+
+          url="$(
+            gh pr create --repo "$UPSTREAM" \
+              --base main \
+              --head "${FORK%%/*}:${BRANCH}" \
+              --title "chore(synaplan): update to ${VERSION}" \
+              --body-file "$body_file"
+          )"
+
+          {
+            echo "### CasaOS AppStore"
+            echo ""
+            echo "Opened ${url} for Synaplan \`${VERSION}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

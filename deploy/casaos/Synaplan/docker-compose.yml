@@ -1,0 +1,507 @@
+name: synaplan
+
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.5.1
+
+x-app-command: &app-command
+  - |
+    set -a
+    . /run/synaplan-secrets/secrets.env
+    set +a
+    export DB_PASSWORD="$$MARIADB_PASSWORD"
+    exec /usr/local/bin/docker-entrypoint.sh
+
+x-app-environment: &app-environment
+  APP_ENV: prod
+  APP_DEBUG: "0"
+  SYNAPLAN_PLATFORM: selfhost
+  APP_VERSION: "5.5.1"
+  APP_URL: ${SYNAPLAN_URL:-http://localhost:8300}
+  FRONTEND_URL: ${SYNAPLAN_URL:-http://localhost:8300}
+  REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://localhost:8300}
+  BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-}
+  GUEST_CHAT_ENABLED: ${GUEST_CHAT_ENABLED:-}
+  AI_DEFAULT_PROVIDER: ${AI_DEFAULT_PROVIDER:-groq}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+  MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+  MAILER_DSN: ${MAILER_DSN:-null://null}
+  APP_SENDER_EMAIL: ${APP_SENDER_EMAIL:-}
+  APP_SENDER_NAME: Synaplan
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: synaplan
+  DB_USER: synaplan
+  DB_SERVER_VERSION: mariadb-12.3.2
+  REDIS_DSN: redis://redis:6379
+  LOCK_DSN: redis://redis:6379
+  REALTIME_ENABLED: "true"
+  REALTIME_API_URL: http://centrifugo:8000/api
+  REALTIME_PUBLIC_WS_URL: ""
+  QDRANT_URL: http://qdrant:6333
+  TIKA_BASE_URL: http://tika:9998
+  SYNAPLAN_TTS_URL: http://tts:10200
+  OLLAMA_BASE_URL: ""
+  AUTO_DOWNLOAD_MODELS: "false"
+  WHISPER_ENABLED: "false"
+  FFMPEG_BINARY: /usr/bin/ffmpeg
+  LOG_FORMAT: json
+
+services:
+  secrets-init:
+    image: alpine:3.24
+    container_name: synaplan_secrets_init
+    restart: "no"
+    networks:
+      - default
+    environment:
+      APP_SECRET: ${APP_SECRET:-}
+      TOKEN_SECRET: ${TOKEN_SECRET:-}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-}
+      REALTIME_ADMIN_PASSWORD: ${REALTIME_ADMIN_PASSWORD:-}
+      REALTIME_ADMIN_SECRET: ${REALTIME_ADMIN_SECRET:-}
+      SECRETS_INIT_DB_DIR: /db
+      SECRETS_INIT_FILE_LABEL: /DATA/AppData/$AppID/secrets/secrets.env
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets
+        target: /data
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/app
+        target: /out/app
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/db
+        target: /out/db
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/realtime
+        target: /out/realtime
+      - type: bind
+        source: /DATA/AppData/$AppID/mariadb
+        target: /db
+        read_only: true
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -eu
+        DATA="$${SECRETS_INIT_DATA:-/data}"
+        SECRETS="$$DATA/secrets.env"
+        DB_DIR="$${SECRETS_INIT_DB_DIR:-$$DATA/mariadb}"
+        SECRETS_NAME="$${SECRETS_INIT_FILE_LABEL:-data/secrets.env}"
+        APP_OUT="$${SECRETS_INIT_APP_OUT:-/out/app/secrets.env}"
+        DB_OUT="$${SECRETS_INIT_DB_OUT:-/out/db/secrets.env}"
+        REALTIME_OUT="$${SECRETS_INIT_REALTIME_OUT:-/out/realtime/secrets.env}"
+        KEYS="APP_SECRET TOKEN_SECRET MARIADB_PASSWORD MARIADB_ROOT_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET"
+        APP_KEYS="APP_SECRET TOKEN_SECRET MARIADB_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET"
+        DB_KEYS="MARIADB_PASSWORD MARIADB_ROOT_PASSWORD"
+        REALTIME_KEYS="REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET"
+
+        read_key() {
+            file=$$1
+            key=$$2
+            val=""
+            while IFS= read -r line || [ -n "$$line" ]; do
+                case "$$line" in
+                    ''|\#*) continue ;;
+                esac
+                case "$$line" in
+                    "$$key"=*) val=$${line#*=} ;;
+                esac
+            done < "$$file"
+            printf '%s' "$$val"
+        }
+
+        shell_quote() {
+            input=$$1
+            quoted="'"
+            while [ -n "$$input" ]; do
+                case "$$input" in
+                    \'*)
+                        quoted="$${quoted}'\\''"
+                        ;;
+                    *)
+                        quoted="$${quoted}$${input%"$${input#?}"}"
+                        ;;
+                esac
+                input=$${input#?}
+            done
+            printf '%s' "$${quoted}'"
+        }
+
+        generate_secret() {
+            hexdump -vn 32 -e '/1 "%02x"' /dev/urandom
+        }
+
+        publish_quoted() {
+            dest=$$1
+            key_list=$$2
+            dest_dir=$$(dirname "$$dest")
+            mkdir -p "$$dest_dir"
+            chmod 755 "$$dest_dir"
+            umask 022
+            tmp="$$dest_dir/.secrets.env.$$$$"
+            {
+                printf '%s\n' '# Copy for this start. Do not edit.'
+                for key in $$key_list; do
+                    printf '%s=%s\n' "$$key" "$$(shell_quote "$$(read_key "$$SECRETS" "$$key")")"
+                done
+            } > "$$tmp"
+            mv "$$tmp" "$$dest"
+            chmod 644 "$$dest"
+        }
+
+        if [ ! -f "$$SECRETS" ]; then
+            mkdir -p "$$DATA"
+            chmod 0700 "$$DATA"
+            umask 077
+            tmp="$$DATA/.secrets.env.$$$$"
+            {
+                printf '%s\n' '# Synaplan deployment secrets. Generated once. Back this file up with the database.'
+                for key in $$KEYS; do
+                    envval=$$(printenv "$$key" || true)
+                    if [ -n "$$envval" ]; then
+                        val=$$envval
+                    else
+                        val=$$(generate_secret)
+                    fi
+                    printf '%s=%s\n' "$$key" "$$val"
+                done
+            } > "$$tmp"
+            mv "$$tmp" "$$SECRETS"
+            chmod 600 "$$SECRETS"
+        fi
+
+        umask 077
+        publish_quoted "$$APP_OUT" "$$APP_KEYS"
+        publish_quoted "$$DB_OUT" "$$DB_KEYS"
+        publish_quoted "$$REALTIME_OUT" "$$REALTIME_KEYS"
+
+  backend:
+    image: *app-image
+    container_name: synaplan_backend
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    networks:
+      - default
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: web
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/uploads
+        target: /var/www/backend/var/uploads
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/app
+        target: /run/synaplan-secrets
+        read_only: true
+    ports:
+      - target: 80
+        published: "8300"
+        protocol: tcp
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      centrifugo:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+
+  worker:
+    image: *app-image
+    container_name: synaplan_worker
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    networks:
+      - default
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: worker
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/uploads
+        target: /var/www/backend/var/uploads
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/app
+        target: /run/synaplan-secrets
+        read_only: true
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  scheduler:
+    image: *app-image
+    container_name: synaplan_scheduler
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    networks:
+      - default
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: scheduler
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/uploads
+        target: /var/www/backend/var/uploads
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/app
+        target: /run/synaplan-secrets
+        read_only: true
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  db:
+    image: mariadb:13.0.2
+    container_name: synaplan_db
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -a
+        . /run/synaplan-secrets/secrets.env
+        set +a
+        exec docker-entrypoint.sh --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    networks:
+      - default
+    environment:
+      MARIADB_DATABASE: synaplan
+      MARIADB_USER: synaplan
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/mariadb
+        target: /var/lib/mysql
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/db
+        target: /run/synaplan-secrets
+        read_only: true
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "set -a; . /run/synaplan-secrets/secrets.env; set +a; mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" --silent"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: synaplan_redis
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - default
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/redis
+        target: /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.9.7
+    container_name: synaplan_centrifugo
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -a
+        . /run/synaplan-secrets/secrets.env
+        set +a
+        export CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY="$$REALTIME_TOKEN_SECRET"
+        export CENTRIFUGO_HTTP_API_KEY="$$REALTIME_API_KEY"
+        export CENTRIFUGO_ADMIN_PASSWORD="$$REALTIME_ADMIN_PASSWORD"
+        export CENTRIFUGO_ADMIN_SECRET="$$REALTIME_ADMIN_SECRET"
+        exec centrifugo
+    networks:
+      - default
+    environment:
+      CENTRIFUGO_HTTP_SERVER_ADDRESS: "0.0.0.0"
+      CENTRIFUGO_HTTP_SERVER_PORT: "8000"
+      CENTRIFUGO_LOG_LEVEL: info
+      CENTRIFUGO_ENGINE_TYPE: redis
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: redis://redis:6379/3
+      CENTRIFUGO_CLIENT_USER_CONNECTION_LIMIT: "16"
+      CENTRIFUGO_CLIENT_PING_INTERVAL: 25s
+      CENTRIFUGO_CLIENT_STALE_CLOSE_DELAY: 60s
+      CENTRIFUGO_ADMIN_ENABLED: "true"
+      CENTRIFUGO_PROMETHEUS_ENABLED: "true"
+      CENTRIFUGO_HEALTH_ENABLED: "true"
+      CENTRIFUGO_CHANNEL_NAMESPACES: '[{"name":"widget","presence":false,"history_size":100,"history_ttl":"10m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"widgettyping","presence":false,"history_size":0,"history_ttl":"0s","force_recovery":false,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":true,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"user","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"admin","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"system","presence":false,"history_size":10,"history_ttl":"1m","force_recovery":false,"allow_subscribe_for_anonymous":true,"allow_subscribe_for_client":true,"allow_publish_for_subscriber":false}]'
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://localhost:8300}
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets/realtime
+        target: /run/synaplan-secrets
+        read_only: true
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  tika:
+    image: apache/tika:3.3.1.0
+    container_name: synaplan_tika
+    command: -h 0.0.0.0 -p 9998
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.2
+    container_name: synaplan_qdrant
+    networks:
+      - default
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/qdrant
+        target: /qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && printf 'GET /readyz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest
+    container_name: synaplan_tts
+    networks:
+      - default
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    restart: unless-stopped
+
+networks:
+  default:
+    name: synaplan_default
+    driver: bridge
+
+x-casaos:
+  id: com.synaplan.synaplan
+  main: backend
+  index: /
+  port_map: "8300"
+  scheme: http
+  icon: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/icon.png
+  thumbnail: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/thumbnail.png
+  screenshot_link:
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/screenshot-1.png
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/screenshot-2.png
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/screenshot-3.png
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/screenshot-4.png
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/Synaplan/screenshot-5.png
+  title:
+    en_US: Synaplan
+    de_DE: Synaplan
+    fr_FR: Synaplan
+    es_ES: Synaplan
+    tr_TR: Synaplan
+  tagline:
+    en_US: Private AI workspace with multi-model chat, RAG document search, and embeddable widgets
+    de_DE: Privater KI-Arbeitsbereich mit Multi-Modell-Chat, RAG-Dokumentensuche und einbettbaren Widgets
+    fr_FR: Espace de travail IA privé avec chat multi-modèles, recherche documentaire RAG et widgets intégrables
+    es_ES: Espacio de trabajo de IA privado con chat multimodelo, búsqueda documental RAG y widgets integrables
+    tr_TR: Çoklu model sohbeti, RAG belge araması ve gömülebilir widget'lar içeren özel yapay zeka çalışma alanı
+  description:
+    en_US: |-
+      Synaplan is an open-source (Apache-2.0), self-hosted AI workspace. Chat with the AI provider of your choice, upload documents and search them by meaning (RAG), keep long-term memories across conversations, expose your workspace via MCP, and publish embeddable chat widgets for your own websites — while seeing the exact cost of every answer.
+
+      What you get:
+      - Multi-provider AI chat (OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI) with transparent per-answer token & cost tracking
+      - Semantic document search (RAG) powered by Qdrant and Apache Tika for PDFs, Office files, and images
+      - Long-term memories the assistant recalls across conversations
+      - Built-in MCP server and OpenAI/Anthropic-compatible API endpoints
+      - Embeddable chat widgets for your websites with live human handoff
+      - Multi-user accounts, groups, and role-based permissions
+    de_DE: |-
+      Synaplan ist ein quelloffener (Apache-2.0), selbst-gehosteter KI-Arbeitsbereich. Chatten Sie mit dem KI-Anbieter Ihrer Wahl, durchsuchen Sie eigene Dokumente semantisch (RAG), nutzen Sie das Langzeitgedächtnis über Gespräche hinweg, binden Sie Clients per MCP an und veröffentlichen Sie einbettbare Chat-Widgets für Ihre Websites – mit voller Kostentransparenz für jede Antwort.
+    fr_FR: |-
+      Synaplan est un espace de travail IA open-source (Apache-2.0) et auto-hébergé. Discutez avec le fournisseur IA de votre choix, recherchez dans vos documents par le sens (RAG), conservez une mémoire à long terme, connectez vos outils via MCP et publiez des widgets de chat intégrables avec suivi du coût de chaque réponse.
+    es_ES: |-
+      Synaplan es un espacio de trabajo de IA de código abierto (Apache-2.0) y autoalojado. Chatea con el proveedor de IA que prefieras, busca en tus documentos por significado (RAG), mantén memoria a largo plazo, conecta clientes mediante MCP y publica widgets de chat integrables viendo el coste exacto de cada respuesta.
+    tr_TR: |-
+      Synaplan, açık kaynaklı (Apache-2.0) ve kendi sunucunuzda barındırabileceğiniz bir yapay zeka çalışma alanıdır. Seçtiğiniz yapay zeka sağlayıcısıyla sohbet edin, belgelerinizi anlamsal olarak arayın (RAG), uzun süreli hafıza kullanın, MCP sunucusuyla bağlanın ve her yanıtın maliyetini görerek web siteleriniz için sohbet widget'ları yayınlayın.
+  tips:
+    before_install:
+      en_US: |-
+        1. All database and application secrets are generated automatically on first boot and persisted under `/DATA/AppData/synaplan/secrets/secrets.env`.
+        2. On first launch, open `http://<your-device-ip>:8300` to complete the setup wizard: create your administrator account and add an API key for at least one AI provider (e.g. Groq, OpenAI, Anthropic, Google Gemini, or Mistral).
+        3. If you access Synaplan via a custom hostname or LAN IP and want live WebSocket updates, set `SYNAPLAN_URL` to the exact URL you open in your browser (e.g. `http://192.168.1.50:8300`).
+      de_DE: |-
+        1. Alle Datenbank- und Anwendungs-Secrets werden beim ersten Start automatisch generiert und unter `/DATA/AppData/synaplan/secrets/secrets.env` gespeichert.
+        2. Öffnen Sie nach dem ersten Start `http://<ihre-geraete-ip>:8300`, um im Setup-Assistenten das Administrator-Konto anzulegen und mindestens einen KI-API-Schlüssel (z. B. Groq, OpenAI, Anthropic, Gemini oder Mistral) zu hinterlegen.
+  author: Metadist
+  developer: Metadist
+  category: AI
+  architectures:
+    - amd64
+    - arm64
+  version: "5.5.1"
+  update_at: "2026-10-18"
+  release_notes:
+    en_US: "Synaplan 5.5.0"
+  website: "https://synaplan.com"
+  repo: "https://github.com/metadist/synaplan"
+  support: "https://github.com/metadist/synaplan/issues"
+  docs: "https://github.com/metadist/synaplan/blob/main/deploy/README.md"
