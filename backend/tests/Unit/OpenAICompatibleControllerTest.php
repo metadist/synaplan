@@ -14,6 +14,7 @@ use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -34,6 +35,7 @@ class OpenAICompatibleControllerTest extends TestCase
     private MessageBusInterface&MockObject $messageBus;
     private LoggerInterface&MockObject $logger;
     private OpenAiToolCallingGate&MockObject $toolCallingGate;
+    private OpenAiGatewayToolLoop&MockObject $toolLoop;
     private OpenAICompatibleController $controller;
 
     protected function setUp(): void
@@ -46,6 +48,7 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->messageBus = $this->createMock(MessageBusInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->toolCallingGate = $this->createMock(OpenAiToolCallingGate::class);
+        $this->toolLoop = $this->createMock(OpenAiGatewayToolLoop::class);
 
         $this->controller = new OpenAICompatibleController(
             $this->aiFacade,
@@ -56,7 +59,7 @@ class OpenAICompatibleControllerTest extends TestCase
             $this->messageBus,
             $this->logger,
             $this->toolCallingGate,
-            $this->createMock(OpenAiGatewayToolLoop::class),
+            $this->toolLoop,
         );
     }
 
@@ -346,6 +349,95 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->assertSame('openaicompatible', $capturedOptions['provider']);
         $this->assertSame('gpt-oss-120b', $capturedOptions['model']);
         $this->assertSame('low', $capturedOptions['reasoning_effort']);
+    }
+
+    public function testChatCompletionsIgnoresPic2TextDefaultThatSharesProviderId(): void
+    {
+        $user = $this->createMockUser();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
+
+        $chatDefault = $this->modelStub(10, 'other-chat', 'chat', 'Groq');
+        $sortDefault = $this->modelStub(11, 'other-sort', 'chat', 'Groq');
+        $visionDefault = $this->modelStub(384, 'qwen-3.8-27b', 'pic2text', 'Cerebras');
+        $chatRow = $this->modelStub(383, 'qwen-3.8-27b', 'chat', 'Cerebras');
+
+        $this->modelConfigService->method('getConfiguredDefaultModel')
+            ->willReturnCallback(static fn (string $cap, ?int $uid): ?int => 1 !== $uid ? null : match ($cap) {
+                'CHAT' => 10,
+                'SORT' => 11,
+                'PIC2TEXT' => 384,
+                default => null,
+            });
+        $this->modelRepository->method('find')
+            ->willReturnCallback(static function (int $id) use ($chatDefault, $sortDefault, $visionDefault): ?Model {
+                return match ($id) {
+                    10 => $chatDefault,
+                    11 => $sortDefault,
+                    384 => $visionDefault,
+                    default => null,
+                };
+            });
+        $this->modelRepository->method('findActiveByTagAndIdentity')->willReturn($chatRow);
+        $this->modelRepository->method('findOneBy')->willReturn($visionDefault);
+        $this->toolCallingGate->method('allows')
+            ->willReturnCallback(static fn (Model $model): bool => 383 === (int) $model->getId());
+
+        $meteredModelId = null;
+        $this->rateLimitService->method('recordUsage')
+            ->willReturnCallback(static function (User $user, string $action, array $metadata) use (&$meteredModelId): RecordedUsage {
+                $meteredModelId = 1 === $user->getId() && 'MESSAGES' === $action ? ($metadata['model_id'] ?? null) : null;
+
+                return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
+            });
+
+        $capturedOptions = null;
+        $this->toolLoop->expects($this->once())
+            ->method('complete')
+            ->willReturnCallback(static function (User $user, array $messages, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return [
+                    'content' => 'ok',
+                    'provider' => 'cerebras',
+                    'model' => 'qwen-3.8-27b',
+                    'usage' => [],
+                ];
+            });
+
+        $request = Request::create('/v1/chat/completions', 'POST', [], [], [], [], (string) json_encode([
+            'model' => 'qwen-3.8-27b',
+            'messages' => [['role' => 'user', 'content' => 'Hello']],
+            'tools' => [[
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_weather',
+                    'parameters' => ['type' => 'object', 'properties' => ['city' => ['type' => 'string']]],
+                ],
+            ]],
+        ]));
+        $request->headers->set('Content-Type', 'application/json');
+
+        $response = $this->controller->chatCompletions($request, $user);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertIsArray($capturedOptions);
+        $this->assertSame('cerebras', $capturedOptions['provider']);
+        $this->assertSame('qwen-3.8-27b', $capturedOptions['model']);
+        $this->assertSame(383, $meteredModelId);
+    }
+
+    private function modelStub(int $id, string $providerId, string $tag, string $service): Model&MockObject
+    {
+        $model = $this->createMock(Model::class);
+        $model->method('getId')->willReturn($id);
+        $model->method('getProviderId')->willReturn($providerId);
+        $model->method('getName')->willReturn($providerId);
+        $model->method('getTag')->willReturn($tag);
+        $model->method('getService')->willReturn($service);
+
+        return $model;
     }
 
     private function createMockUser(): User

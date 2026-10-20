@@ -772,12 +772,24 @@ class OpenAICompatibleController extends AbstractController
     private function resolveModel(?string $modelString, int $userId): ?array
     {
         if ($modelString) {
+            // Only a chat-tagged CHAT or SORT default may win on identity.
+            // SORT matching a chat row is the free-sort custom-endpoint case.
+            // A PIC2TEXT default is often the vision twin of the same
+            // providerId: it has no tool_use and would bill the vision row.
             foreach (['CHAT', 'SORT'] as $capability) {
                 $configuredId = $this->modelConfigService->getConfiguredDefaultModel($capability, $userId);
                 $configured = null !== $configuredId ? $this->modelRepository->find($configuredId) : null;
-                if ($configured instanceof Model && 'chat' === strtolower((string) $configured->getTag()) && ($configured->getProviderId() === $modelString || $configured->getName() === $modelString)) {
+                if ($configured instanceof Model
+                    && 'chat' === strtolower((string) $configured->getTag())
+                    && ($configured->getProviderId() === $modelString || $configured->getName() === $modelString)
+                ) {
                     return $this->resolvedFromEntity($configured);
                 }
+            }
+
+            $chat = $this->modelRepository->findActiveByTagAndIdentity('chat', $modelString);
+            if ($chat instanceof Model) {
+                return $this->resolvedFromEntity($chat);
             }
 
             foreach (['providerId', 'name'] as $field) {
