@@ -87,6 +87,7 @@
               :group-key="file.group_key ?? null"
             />
           </div>
+          <FileSentTo :rows="copiesFor(file.id)" />
           <p class="text-[10px] txt-secondary truncate mt-0.5">{{ file.uploaded_date }}</p>
           <!--
             Every control is the same height as Download, and the icon buttons
@@ -107,6 +108,7 @@
               :targets="cloudTargets"
               :file-id="file.id"
               :file-name="file.display_name || file.filename"
+              @copied="reloadCopies"
             />
             <button
               type="button"
@@ -259,6 +261,8 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import FilePreview from '@/components/files/FilePreview.vue'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
 import FilePushMenu from '@/components/files/FilePushMenu.vue'
+import FileSentTo from '@/components/files/FileSentTo.vue'
+import { useFileCopies } from '@/composables/useFileCopies'
 import { useCloudFolderTargets } from '@/composables/useCloudFolderTargets'
 import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
 import { previewKindForFile } from '@/services/filePreview'
@@ -283,6 +287,8 @@ const chatsStore = useChatsStore()
 const { targets: cloudTargets } = useCloudFolderTargets()
 
 const files = ref<FileItem[]>([])
+const fileIds = computed(() => files.value.map((file) => file.id))
+const { forFile: copiesFor, reload: reloadCopies } = useFileCopies(fileIds)
 const previewFile = ref<{ id: number; filename: string } | null>(null)
 const loading = ref(false)
 // Only one media player is mounted at a time (#1499): tiles show a poster/icon

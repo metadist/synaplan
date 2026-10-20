@@ -47,6 +47,31 @@ final readonly class CloudDeliveryService
     }
 
     /**
+     * @param list<int> $fileIds
+     *
+     * @return list<array{id: int, file_id: int, state: string, remote_path: string, open_url: string, error_code: string, created: int, client: string, host: string}>
+     */
+    public function listForOwner(int $ownerId, array $fileIds): array
+    {
+        $rows = [];
+        foreach ($this->deliveries->findForOwnerFiles($ownerId, array_slice($fileIds, 0, 100)) as $delivery) {
+            $rows[] = [
+                'id' => (int) $delivery->getId(),
+                'file_id' => $delivery->getFileId(),
+                'state' => $delivery->getState(),
+                'remote_path' => $delivery->getRemotePath() ?? '',
+                'open_url' => $delivery->getOpenUrl() ?? '',
+                'error_code' => $delivery->getErrorCode() ?? '',
+                'created' => $delivery->getCreated(),
+                'client' => $delivery->getDestinationClient(),
+                'host' => $delivery->getDestinationHost(),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param array<string, mixed> $params
      */
     public function copy(ShareableFile $file, array $params): DestinationResult
@@ -72,6 +97,10 @@ final readonly class CloudDeliveryService
             : CloudDelivery::CONFLICT_RENAME;
 
         $delivery = new CloudDelivery($file->ownerId, $file->fileId, (int) $identity->getId(), $kind, $ref, $conflict);
+        $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
+        if ($instance instanceof PlatformInstance) {
+            $delivery->rememberDestination($instance->getClient(), $instance->getHost());
+        }
         $this->deliveries->save($delivery);
         $id = (int) $delivery->getId();
         $this->redis->set(self::TICKET_PREFIX.$id, $identity->getInstanceId(), $this->ttl());
@@ -80,7 +109,6 @@ final readonly class CloudDeliveryService
             'identity_id' => (int) $identity->getId(),
         ]);
 
-        $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
         $answer = $instance instanceof PlatformInstance ? $this->notifier->delivery($instance, $id) : null;
         if (!is_array($answer)) {
             return DestinationResult::pending([

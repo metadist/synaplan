@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Entity\CloudDelivery;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -16,6 +17,31 @@ class CloudDeliveryRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, CloudDelivery::class);
+    }
+
+    /**
+     * @param list<int> $fileIds
+     *
+     * @return list<CloudDelivery>
+     */
+    public function findForOwnerFiles(int $ownerId, array $fileIds): array
+    {
+        if ([] === $fileIds) {
+            return [];
+        }
+
+        /** @var list<CloudDelivery> $rows */
+        $rows = $this->createQueryBuilder('d')
+            ->where('d.ownerId = :owner')
+            ->andWhere('d.fileId IN (:ids)')
+            ->setParameter('owner', $ownerId)
+            ->setParameter('ids', $fileIds, ArrayParameterType::INTEGER)
+            ->orderBy('d.created', 'DESC')
+            ->setMaxResults(200)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
     }
 
     public function deleteForUser(int $userId): void

@@ -255,6 +255,16 @@
     "push": {
       "action": "Copiar a la nube",
       "to": "Copiar a {name}",
+      "line": "{app} · {host}",
+      "landing": "→ {folder}",
+      "pending": "Todavía se está copiando a {name}. Lo verás en Enviado a, en este archivo.",
+      "openIn": "Abrir en {name}",
+      "sentTo": "Enviado a",
+      "state": {
+        "queued": "Copiando",
+        "delivered": "Copiado",
+        "failed": "No copiado"
+      },
       "kind": {
         "nextcloud": "Nextcloud",
         "opencloud": "OpenCloud"

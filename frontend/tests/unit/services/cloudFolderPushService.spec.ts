@@ -38,6 +38,8 @@ describe('cloudFolderPushService helpers', () => {
           name: 'Office files',
           kind: 'nextcloud',
           folder: 'Synaplan',
+          source: 'webdav',
+          host: '',
         },
         'probe.txt'
       )

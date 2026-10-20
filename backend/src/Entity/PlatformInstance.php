@@ -83,6 +83,12 @@ class PlatformInstance
     #[ORM\Column(name: 'BDELIVERYURL', length: 512, nullable: true)]
     private ?string $deliveryUrl = null;
 
+    /** JSON list of features the app reported, for example ["deliveries"]. */
+    #[ORM\Column(name: 'BAPPCAPABILITIES', length: 255, nullable: true)]
+    private ?string $appCapabilities = null;
+
+    public const CAPABILITY_DELIVERIES = 'deliveries';
+
     /**
      * @param list<string>|null $redirectUris
      */
@@ -184,5 +190,44 @@ class PlatformInstance
     public function setDeliveryUrl(?string $deliveryUrl): void
     {
         $this->deliveryUrl = $deliveryUrl;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAppCapabilities(): array
+    {
+        if (null === $this->appCapabilities || '' === $this->appCapabilities) {
+            return [];
+        }
+        $decoded = json_decode($this->appCapabilities, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $names = [];
+        foreach ($decoded as $name) {
+            if (is_string($name) && '' !== $name) {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    public function setAppCapabilities(array $names): void
+    {
+        $known = array_values(array_intersect([self::CAPABILITY_DELIVERIES], $names));
+        $this->appCapabilities = [] === $known ? null : json_encode($known, JSON_THROW_ON_ERROR);
+    }
+
+    public function canReceiveCopies(): bool
+    {
+        return $this->isActive()
+            && is_string($this->deliveryUrl)
+            && '' !== $this->deliveryUrl
+            && in_array(self::CAPABILITY_DELIVERIES, $this->getAppCapabilities(), true);
     }
 }

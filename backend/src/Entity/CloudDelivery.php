@@ -75,6 +75,13 @@ class CloudDelivery
     #[ORM\Column(name: 'BFINISHED', type: 'bigint', nullable: true)]
     private ?int $finished = null;
 
+    /** App and host at the time of the copy. They stay after the link is removed. */
+    #[ORM\Column(name: 'BCLIENT', length: 32, nullable: true)]
+    private ?string $destinationClient = null;
+
+    #[ORM\Column(name: 'BHOST', length: 255, nullable: true)]
+    private ?string $destinationHost = null;
+
     public function __construct(
         int $ownerId,
         int $fileId,
@@ -172,5 +179,21 @@ class CloudDelivery
         $this->state = self::STATE_FAILED;
         $this->errorCode = $errorCode;
         $this->finished = time();
+    }
+
+    public function rememberDestination(string $client, string $host): void
+    {
+        $this->destinationClient = $client;
+        $this->destinationHost = $host;
+    }
+
+    public function getDestinationClient(): string
+    {
+        return $this->destinationClient ?? '';
+    }
+
+    public function getDestinationHost(): string
+    {
+        return $this->destinationHost ?? '';
     }
 }

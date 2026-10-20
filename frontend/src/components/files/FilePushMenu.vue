@@ -1,5 +1,5 @@
 <template>
-  <div v-if="targets.length > 0" class="relative shrink-0" data-testid="file-push-menu">
+  <div v-if="shown.length > 0" class="relative shrink-0" data-testid="file-push-menu">
     <button
       ref="triggerRef"
       type="button"
@@ -29,8 +29,8 @@
           {{ $t('files.push.action') }}
         </div>
         <button
-          v-for="target in targets"
-          :key="target.id"
+          v-for="target in shown"
+          :key="`${target.source}-${target.id}`"
           type="button"
           class="w-full flex items-start gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left disabled:opacity-50"
           :data-testid="`btn-file-push-target-${target.id}`"
@@ -39,8 +39,8 @@
         >
           <Icon icon="mdi:cloud-outline" class="w-4 h-4 shrink-0 mt-0.5" />
           <span class="min-w-0">
-            <span class="block truncate">{{ $t('files.push.to', { name: target.name }) }}</span>
-            <span class="block txt-secondary">{{ $t(`files.push.kind.${target.kind}`) }}</span>
+            <span class="block truncate">{{ rowTitle(target) }}</span>
+            <span class="block txt-secondary">{{ rowDetail(target) }}</span>
           </span>
         </button>
       </div>
@@ -65,10 +65,11 @@ import { useNotification } from '@/composables/useNotification'
 import {
   pushFailureCopy,
   pushGeneratedFile,
+  pushPlatformFile,
   pushSuccessFolder,
   pushWorkspaceFile,
 } from '@/services/cloudFolderPushService'
-import type { CloudFolderTargetItem } from '@/services/cloudFolderTargets'
+import { landingFolder, type CloudFolderTargetItem } from '@/services/cloudFolderTargets'
 
 const props = withDefaults(
   defineProps<{
@@ -82,8 +83,31 @@ const props = withDefaults(
   { size: 'row', path: '', fileId: 0 }
 )
 
+const emit = defineEmits<{
+  copied: []
+}>()
+
 const { t, te } = useI18n()
-const { success, error: notifyError } = useNotification()
+const { success, error: notifyError, push } = useNotification()
+
+const shown = computed(() =>
+  props.targets.filter((target) => target.source !== 'platform' || (props.fileId ?? 0) > 0)
+)
+
+const rowTitle = (target: CloudFolderTargetItem): string => {
+  if (target.source === 'platform') {
+    return t('files.push.line', {
+      app: t(`files.push.kind.${target.kind}`),
+      host: target.host,
+    })
+  }
+  return t('files.push.to', { name: target.name })
+}
+
+const rowDetail = (target: CloudFolderTargetItem): string =>
+  target.source === 'platform'
+    ? t('files.push.landing', { folder: landingFolder(props.fileName) })
+    : t(`files.push.kind.${target.kind}`)
 
 const open = ref(false)
 const busy = ref(false)
@@ -148,6 +172,36 @@ const onSelect = async (target: CloudFolderTargetItem) => {
   if (busy.value) return
   busy.value = true
   try {
+    if (target.source === 'platform') {
+      if ((props.fileId ?? 0) <= 0) return
+      const result = await pushPlatformFile(props.fileId ?? 0, target.id)
+      const state = result.context?.state
+      const openUrl = result.context?.open_url
+      const app = t(`files.push.kind.${target.kind}`)
+      const folder = pushSuccessFolder(
+        result.reference,
+        { ...target, folder: landingFolder(props.fileName) },
+        props.fileName
+      )
+      emit('copied')
+      if (state === 'pending') {
+        success(t('files.push.pending', { name: app }))
+        return
+      }
+      if (typeof openUrl === 'string' && openUrl !== '') {
+        push({
+          type: 'success',
+          message: t('files.push.done', { folder, name: app }),
+          action: {
+            label: t('files.push.openIn', { name: app }),
+            onClick: () => window.open(openUrl, '_blank', 'noopener'),
+          },
+        })
+        return
+      }
+      success(t('files.push.done', { folder, name: app }))
+      return
+    }
     const result =
       props.source === 'workspace'
         ? await pushWorkspaceFile(props.path ?? '', target.id)

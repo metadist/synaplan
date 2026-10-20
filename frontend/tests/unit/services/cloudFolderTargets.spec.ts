@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ConnectionItem } from '@/services/api/connectionsApi'
-import { cloudFolderKindFor, cloudFolderTargetsFrom } from '@/services/cloudFolderTargets'
+import {
+  cloudFolderKindFor,
+  cloudFolderTargetsFrom,
+  landingFolder,
+  platformCopyTargets,
+} from '@/services/cloudFolderTargets'
 
 function connection(partial: Partial<ConnectionItem>): ConnectionItem {
   return {
@@ -45,8 +50,22 @@ describe('cloudFolderTargetsFrom', () => {
     ])
 
     expect(targets).toEqual([
-      { id: 12, name: 'Office files', kind: 'nextcloud', folder: 'Synaplan' },
-      { id: 13, name: 'Team drive', kind: 'opencloud', folder: 'Inbox' },
+      {
+        id: 12,
+        name: 'Office files',
+        kind: 'nextcloud',
+        folder: 'Synaplan',
+        source: 'webdav',
+        host: '',
+      },
+      {
+        id: 13,
+        name: 'Team drive',
+        kind: 'opencloud',
+        folder: 'Inbox',
+        source: 'webdav',
+        host: '',
+      },
     ])
   })
 
@@ -118,5 +137,32 @@ describe('cloudFolderTargetsFrom', () => {
         })
       )
     ).toBeNull()
+  })
+})
+
+describe('platform copy targets', () => {
+  it('lists only a cloud that reports deliveries, above nothing else', () => {
+    expect(
+      platformCopyTargets([
+        { id: 4, client: 'nextcloud', host: 'files.example.org', can_copy: true },
+        { id: 5, client: 'nextcloud', host: 'other.example.org', can_copy: false },
+        { id: 6, client: 'dropbox', host: 'dropbox.example', can_copy: true },
+      ])
+    ).toEqual([
+      {
+        id: 4,
+        name: 'files.example.org',
+        kind: 'nextcloud',
+        folder: 'Synaplan/Documents',
+        source: 'platform',
+        host: 'files.example.org',
+      },
+    ])
+  })
+
+  it('picks the kind folder from the file name', () => {
+    expect(landingFolder('chart.png')).toBe('Synaplan/Images')
+    expect(landingFolder('notes.txt')).toBe('Synaplan/Documents')
+    expect(landingFolder('meeting.ics')).toBe('Synaplan/Calendar')
   })
 })

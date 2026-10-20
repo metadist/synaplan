@@ -20,7 +20,7 @@ vi.mock('@/services/cloudFolderPushService', async () => {
 })
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: mockSuccess, error: mockError }),
+  useNotification: () => ({ success: mockSuccess, error: mockError, push: vi.fn() }),
 }))
 
 vi.mock('@iconify/vue', () => ({
@@ -32,6 +32,8 @@ const nextcloud = {
   name: 'Office files',
   kind: 'nextcloud' as const,
   folder: 'Synaplan',
+  source: 'webdav' as const,
+  host: '',
 }
 
 describe('FilePushMenu', () => {

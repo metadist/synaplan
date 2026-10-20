@@ -1,7 +1,9 @@
 import {
+  ListFileCopiesResponseSchema,
   PostApiComputeWorkspacePushSendResponseSchema,
   PostApiFilesSendSendResponseSchema,
 } from '@/generated/api-schemas'
+import type { z } from 'zod'
 import { ApiError, httpClient } from '@/services/api/httpClient'
 import type { CloudFolderTargetItem } from '@/services/cloudFolderTargets'
 
@@ -19,6 +21,27 @@ export async function pushGeneratedFile(fileId: number, connectionId: number) {
     body: JSON.stringify({ destination: 'webdav', connection_id: connectionId }),
     schema: PostApiFilesSendSendResponseSchema,
   })
+}
+
+export async function pushPlatformFile(fileId: number, identityId: number) {
+  return httpClient(`/api/v1/files/${fileId}/send`, {
+    method: 'POST',
+    body: JSON.stringify({ destination: 'platform', identity_id: identityId }),
+    schema: PostApiFilesSendSendResponseSchema,
+  })
+}
+
+export type FileCopyRow = NonNullable<
+  z.infer<typeof ListFileCopiesResponseSchema>['copies']
+>[number]
+
+export async function listFileCopies(fileIds: number[]) {
+  if (fileIds.length === 0) return []
+  const data = await httpClient(`/api/v1/files/copies?ids=${fileIds.join(',')}`, {
+    method: 'GET',
+    schema: ListFileCopiesResponseSchema,
+  })
+  return data.copies ?? []
 }
 
 function asContext(details: Record<string, unknown> | undefined): Record<string, string> {

@@ -242,6 +242,16 @@
     "push": {
       "action": "In die Cloud kopieren",
       "to": "Nach {name} kopieren",
+      "line": "{app} · {host}",
+      "landing": "→ {folder}",
+      "pending": "Die Kopie nach {name} läuft noch. Du findest sie unter „Gesendet an“ bei dieser Datei.",
+      "openIn": "In {name} öffnen",
+      "sentTo": "Gesendet an",
+      "state": {
+        "queued": "Wird kopiert",
+        "delivered": "Kopiert",
+        "failed": "Nicht kopiert"
+      },
       "kind": {
         "nextcloud": "Nextcloud",
         "opencloud": "OpenCloud"
