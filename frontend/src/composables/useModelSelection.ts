@@ -25,8 +25,17 @@ export interface ModelOption {
  * - For audio: Uses TEXT2SOUND models
  * - Otherwise: Uses CHAT models
  *
- * Round-Robin: Recommends next model in BRANKING-sorted list (not the current one)
+ * Round-Robin: Recommends the next model in provider-then-name order.
  */
+export function compareProviderThenName(
+  a: { service: string; name: string },
+  b: { service: string; name: string }
+): number {
+  const byProvider = a.service.localeCompare(b.service, undefined, { sensitivity: 'base' })
+  if (byProvider !== 0) return byProvider
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+}
+
 export function useModelSelection(
   againData?: ComputedRef<BackendAgainData | null | undefined>,
   files?: ComputedRef<MessageFile[] | undefined>,
@@ -146,9 +155,9 @@ export function useModelSelection(
   })
 
   /**
-   * Get available model options for selection
-   * Uses models from store based on media type (chat/image/video/audio)
-   * Models are sorted by BRANKING (rating) - highest first
+   * Models for the Again menu, grouped by provider then model name.
+   * Letter case is ignored. The store array is copied so the sort cannot
+   * reorder the catalog itself.
    */
   const modelOptions = computed((): ModelOption[] => {
     const tag = modelTag.value
@@ -158,17 +167,15 @@ export function useModelSelection(
       return []
     }
 
-    return models
-      .sort((a: AIModel, b: AIModel) => b.rating - a.rating) // Sort by BRANKING descending
-      .map((model: AIModel) => ({
-        provider: model.service,
-        model: model.name,
-        label: model.name,
-        id: model.id,
-        quality: model.quality,
-        rating: model.rating,
-        description: model.description,
-      }))
+    return [...models].sort(compareProviderThenName).map((model: AIModel) => ({
+      provider: model.service,
+      model: model.name,
+      label: model.name,
+      id: model.id,
+      quality: model.quality,
+      rating: model.rating,
+      description: model.description,
+    }))
   })
 
   const currentModelIndex = computed((): number => {

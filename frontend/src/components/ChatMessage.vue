@@ -4,6 +4,7 @@
       'flex gap-0 md:gap-4 p-3 md:p-4 text-[16px] leading-6',
       role === 'user' ? 'justify-end' : '',
       isSuperseded && 'opacity-50',
+      modelDropdownOpen && 'relative z-20',
     ]"
     data-testid="message-container"
     :data-message-id="backendMessageId != null ? String(backendMessageId) : undefined"
@@ -1034,36 +1035,15 @@
                   v-if="modelDropdownOpen && !isSuperseded"
                   v-click-outside="closeModelDropdown"
                   data-testid="dropdown-again-models"
-                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
+                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
                   @keydown.escape="closeModelDropdown"
                 >
-                  <button
-                    v-for="option in modelOptions"
-                    :key="`${option.provider}-${option.model}`"
-                    type="button"
-                    :class="[
-                      'dropdown-item',
-                      selectedModel &&
-                      selectedModel.model === option.model &&
-                      selectedModel.provider === option.provider
-                        ? 'dropdown-item--active'
-                        : '',
-                    ]"
-                    @click="selectModel(option)"
-                  >
-                    <ServiceIcon :service="option.provider" :size="20" />
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium">{{ option.label }}</span>
-                        <ModelCostBadge
-                          v-if="getModelForOption(option)"
-                          :model="getModelForOption(option)!"
-                          :peers="peerModelsForCost"
-                        />
-                      </div>
-                      <div class="text-xs txt-secondary">{{ option.provider }}</div>
-                    </div>
-                  </button>
+                  <AgainModelMenu
+                    :options="modelOptions"
+                    :selected="selectedModel"
+                    :peers="peerModelsForCost"
+                    @select="selectModel"
+                  />
                 </div>
               </Transition>
             </div>
@@ -1164,7 +1144,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
-import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import AgainModelMenu from '@/components/chat/AgainModelMenu.vue'
 import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
@@ -2091,10 +2071,6 @@ const peerModelsForCost = computed((): AIModel[] => {
     })
     .filter((m): m is AIModel => !!m)
 })
-
-const getModelForOption = (option: ModelOption): AIModel | undefined => {
-  return peerModelsForCost.value.find((m) => m.id === option.id)
-}
 
 // Navigate to AI models configuration with highlight
 const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio' | 'voice') => {

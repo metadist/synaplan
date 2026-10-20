@@ -116,6 +116,7 @@ function enableMenuScroll(panel: HTMLElement): void {
     if (!(child instanceof HTMLElement)) continue
     const overflow = getComputedStyle(child).overflowY
     if (overflow !== 'auto' && overflow !== 'scroll') continue
+    child.style.maxHeight = 'none'
     child.style.minHeight = 'auto'
     child.style.overflowY = 'visible'
   }
