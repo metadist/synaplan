@@ -13,6 +13,7 @@ use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\AuditLogWriter;
+use App\Service\PlatformLink\DeliveryNotifier;
 use App\Service\PlatformLink\LinkCodeService;
 use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinkExchangeService;
@@ -80,6 +81,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
             $identities,
             $this->createStub(PlatformInstanceRepository::class),
             $this->createStub(AuditLogWriter::class),
+            $this->createStub(DeliveryNotifier::class),
         );
 
         $result = $service->exchange('pi_aabbccddeeff', 'secret', str_repeat('ab', 16), '127.0.0.1');
@@ -166,6 +168,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
             $identities ?? $this->createStub(ExternalIdentityRepository::class),
             $instances ?? $this->createStub(PlatformInstanceRepository::class),
             $audit ?? $this->createStub(AuditLogWriter::class),
+            $this->createStub(DeliveryNotifier::class),
         );
     }
 }

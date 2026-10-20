@@ -36,6 +36,8 @@ final readonly class PlatformInstanceService
         private AuditLogWriter $auditLogWriter,
         private EntityManagerInterface $entityManager,
         private LinkCodeService $linkCodeService,
+        private NotifyKeyStore $notifyKeys,
+        private DeliveryNotifier $notifier,
     ) {
     }
 
@@ -100,7 +102,14 @@ final readonly class PlatformInstanceService
     }
 
     /**
-     * @return array{status: string, host: string, client: string}
+     * @return array{
+     *     status: string,
+     *     host: string,
+     *     client: string,
+     *     delivery_url: string,
+     *     capabilities: list<string>,
+     *     notify_keys: list<array{publicKey: string, kid: string}>
+     * }
      */
     public function describeSelf(string $instanceId, string $secret): array
     {
@@ -113,6 +122,9 @@ final readonly class PlatformInstanceService
             'status' => $instance->getStatus(),
             'host' => $instance->getHost(),
             'client' => $instance->getClient(),
+            'delivery_url' => $instance->getDeliveryUrl() ?? '',
+            'capabilities' => ['deliveries'],
+            'notify_keys' => $this->notifyKeys->publicKeys(),
         ];
     }
 
@@ -181,6 +193,7 @@ final readonly class PlatformInstanceService
         $this->instanceRepository->save($instance);
 
         foreach ($this->externalIdentityRepository->findByInstanceId($instanceId) as $identity) {
+            $this->notifier->identityRevoked($identity);
             $keyId = $identity->getApiKeyId();
             if (null !== $keyId) {
                 $key = $this->apiKeyRepository->find($keyId);

@@ -14,6 +14,7 @@ final readonly class DestinationResult
         public ?string $reference,
         public ?DestinationFailureCode $code,
         public array $context,
+        public bool $pending = false,
     ) {
     }
 
@@ -31,5 +32,21 @@ final readonly class DestinationResult
     public static function failure(DestinationFailureCode $code, array $context = []): self
     {
         return new self(false, null, $code, $context);
+    }
+
+    /**
+     * The copy was accepted and is still being written in the cloud.
+     * Only the platform destination returns this.
+     *
+     * @param array<string, string> $context
+     */
+    public static function pending(array $context): self
+    {
+        return new self(true, null, null, $context, true);
+    }
+
+    public function isPending(): bool
+    {
+        return $this->pending;
     }
 }

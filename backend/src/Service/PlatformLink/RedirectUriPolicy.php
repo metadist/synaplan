@@ -16,8 +16,13 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final readonly class RedirectUriPolicy
 {
-    /** Hosts that may use http:// when APP_ENV=dev (local Nextcloud / Outlook). */
-    private const DEV_LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', 'nextcloud'];
+    /**
+     * Hosts that may use http:// when APP_ENV is dev or test. Shared by
+     * registration and the copy-to-cloud delivery check.
+     *
+     * @var list<string>
+     */
+    public const DEV_LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', 'nextcloud', 'owncloud', 'cloud-fixture', 'host.docker.internal'];
 
     public function __construct(
         private SsrfGuard $ssrfGuard,

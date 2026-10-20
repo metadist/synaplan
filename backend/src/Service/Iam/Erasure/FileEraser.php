@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\Iam\Erasure;
 
+use App\Entity\CloudDelivery;
 use App\Entity\DocumentRevision;
 use App\Entity\File;
+use App\Repository\CloudDeliveryRepository;
 use App\Repository\DocumentRevisionRepository;
 use App\Repository\FileRepository;
 use App\Service\File\FileStorageService;
@@ -25,6 +27,7 @@ final readonly class FileEraser implements UserDataEraserInterface
         private EntityManagerInterface $em,
         private FileRepository $files,
         private DocumentRevisionRepository $revisions,
+        private CloudDeliveryRepository $deliveries,
         private FileStorageService $fileStorage,
         private LoggerInterface $logger,
     ) {
@@ -33,6 +36,7 @@ final readonly class FileEraser implements UserDataEraserInterface
     public function erase(UserErasure $erasure): void
     {
         $userId = $erasure->userId;
+        $this->deliveries->deleteForUser($userId);
         $this->revisions->deleteForUser($userId);
 
         $paths = [];
@@ -50,7 +54,7 @@ final readonly class FileEraser implements UserDataEraserInterface
 
     public static function covers(): array
     {
-        return [File::class, DocumentRevision::class];
+        return [File::class, DocumentRevision::class, CloudDelivery::class];
     }
 
     /**

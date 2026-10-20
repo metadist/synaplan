@@ -18,4 +18,8 @@ enum DestinationFailureCode: string
     case RateLimited = 'rate_limited';
     /** The file's format cannot be delivered to this destination (e.g. a non-.ics file to a calendar). */
     case Unsupported = 'unsupported';
+    /** The cloud refused the copy. Nothing was written. */
+    case Forbidden = 'forbidden';
+    /** The cloud never confirmed the copy. */
+    case Unconfirmed = 'unconfirmed';
 }

@@ -193,7 +193,9 @@
         "unreachable": "{connection} ulaşılabilir değil. Synaplan bir sonraki çalışmada yeniden deneyecek.",
         "conflict": "Bu adda bir dosya zaten var; {newName} olarak kaydedildi.",
         "rate_limited": "Kullanım sınırına ulaşıldı, bu çalışma atlandı.",
-        "unsupported": "Bu dosya türü {connection} hedefine aktarılamaz."
+        "unsupported": "Bu dosya türü {connection} hedefine aktarılamaz.",
+        "forbidden": "{target} konumuna dosya eklenemiyor. Sonuç Synaplan’da kalır.",
+        "unconfirmed": "{connection} kopyayı onaylamadı. Klasörü kontrol et ve dosya yoksa yeniden dene."
       },
       "explainer": "Bir sistemi burada bir kez bağla. Kaydedilmiş görevler ve yapay zekâ sonrasında onu kullanabilir; örneğin en son Outlook postalarını okuyabilir. Parolan hiçbir zaman saklanmaz: Microsoft 365 oturum açmanı ister ve Synaplan’a istediğin an geri alabileceğin bir belirteç verir.",
       "yourConnections": "Bağlantıların",

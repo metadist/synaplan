@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Iam\Erasure;
 
 use App\Entity\File;
+use App\Repository\CloudDeliveryRepository;
 use App\Repository\DocumentRevisionRepository;
 use App\Repository\FileRepository;
 use App\Service\File\FileStorageService;
@@ -24,6 +25,11 @@ final class FileEraserTest extends TestCase
     {
         $order = [];
         $file = (new File())->setFilePath('42/2026/10/report.pdf');
+        $deliveries = $this->createMock(CloudDeliveryRepository::class);
+        $deliveries->expects(self::once())->method('deleteForUser')->with(42)
+            ->willReturnCallback(static function () use (&$order): void {
+                $order[] = 'deliveries';
+            });
         $revisions = $this->createMock(DocumentRevisionRepository::class);
         $revisions->expects(self::once())->method('deleteForUser')->with(42)
             ->willReturnCallback(static function () use (&$order): void {
@@ -43,12 +49,12 @@ final class FileEraserTest extends TestCase
         });
 
         $erasure = new UserErasure(42, 'ada@example.test');
-        (new FileEraser($em, $files, $revisions, $storage, new NullLogger()))->erase($erasure);
+        (new FileEraser($em, $files, $revisions, $deliveries, $storage, new NullLogger()))->erase($erasure);
 
-        self::assertSame(['revisions', 'file row'], $order, 'No byte may be deleted before the commit.');
+        self::assertSame(['deliveries', 'revisions', 'file row'], $order, 'No byte may be deleted before the commit.');
         foreach ($erasure->pendingCleanups() as $cleanup) {
             $cleanup();
         }
-        self::assertSame(['revisions', 'file row', 'bytes 42/2026/10/report.pdf'], $order);
+        self::assertSame(['deliveries', 'revisions', 'file row', 'bytes 42/2026/10/report.pdf'], $order);
     }
 }

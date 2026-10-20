@@ -79,6 +79,10 @@ class PlatformInstance
     #[ORM\Column(name: 'BLASTSEEN', type: 'bigint', options: ['default' => 0])]
     private int $lastSeen = 0;
 
+    /** Address Synaplan's servers call. Browsers keep using the registered host. */
+    #[ORM\Column(name: 'BDELIVERYURL', length: 512, nullable: true)]
+    private ?string $deliveryUrl = null;
+
     /**
      * @param list<string>|null $redirectUris
      */
@@ -170,5 +174,15 @@ class PlatformInstance
     public function touchLastSeen(): void
     {
         $this->lastSeen = time();
+    }
+
+    public function getDeliveryUrl(): ?string
+    {
+        return $this->deliveryUrl;
+    }
+
+    public function setDeliveryUrl(?string $deliveryUrl): void
+    {
+        $this->deliveryUrl = $deliveryUrl;
     }
 }

@@ -675,6 +675,9 @@ run_scheduler_tasks_lane() {
 
     trap scheduler_lane_on_term TERM
 
+    # Copies the cloud never confirmed. Cheap, and it must not wait behind a long task run.
+    run_scheduler_job 60 bin/console --env="$env" app:cloud-deliveries:sweep --no-interaction
+
     # No cap: the command runs due AI tasks inline, and killing it would strand a run.
     run_scheduler_job 0 bin/console --env="$env" app:saved-tasks:tick --no-interaction
 }

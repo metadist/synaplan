@@ -193,7 +193,9 @@
         "unreachable": "No se pudo alcanzar {connection}. Synaplan lo intentará de nuevo en la próxima ejecución.",
         "conflict": "Ya existe un archivo con ese nombre; se guardó como {newName}.",
         "rate_limited": "Se alcanzó tu límite de uso, así que se omitió esta ejecución.",
-        "unsupported": "Este tipo de archivo no se puede entregar a {connection}."
+        "unsupported": "Este tipo de archivo no se puede entregar a {connection}.",
+        "forbidden": "No puedes añadir archivos a {target}. El resultado sigue en Synaplan.",
+        "unconfirmed": "{connection} no confirmó la copia. Revisa la carpeta y vuelve a intentarlo si falta el archivo."
       },
       "explainer": "Configura un sistema aquí una sola vez. Después, las tareas guardadas y la IA podrán usarlo, por ejemplo para leer tus últimos correos de Outlook. Tu contraseña nunca se guarda: Microsoft 365 te pide iniciar sesión y le da a Synaplan un token que puedes revocar cuando quieras.",
       "yourConnections": "Tus conexiones",

@@ -638,7 +638,9 @@
         "unreachable": "{connection} war nicht erreichbar. Synaplan versucht es beim nächsten Lauf erneut.",
         "conflict": "Eine Datei mit diesem Namen existiert bereits; gespeichert als {newName}.",
         "rate_limited": "Dein Nutzungslimit wurde erreicht, daher wurde dieser Lauf übersprungen.",
-        "unsupported": "Dieser Dateityp kann nicht an {connection} übergeben werden."
+        "unsupported": "Dieser Dateityp kann nicht an {connection} übergeben werden.",
+        "forbidden": "Du kannst in {target} keine Dateien ablegen. Das Ergebnis bleibt in Synaplan.",
+        "unconfirmed": "{connection} hat die Kopie nicht bestätigt. Prüfe den Ordner und versuche es erneut, falls die Datei fehlt."
       },
       "explainer": "Richte ein System hier einmal ein. Gespeicherte Aufgaben und die KI können es danach nutzen – zum Beispiel, um deine neuesten Outlook-Mails zu lesen. Dein Passwort wird nie gespeichert: Microsoft 365 fragt dich nach der Anmeldung und gibt Synaplan ein Token, das du jederzeit zurückziehen kannst.",
       "yourConnections": "Deine Verbindungen",

@@ -651,7 +651,9 @@
         "unreachable": "Impossible d’atteindre {connection}. Synaplan réessaiera à la prochaine exécution.",
         "conflict": "Un fichier de ce nom existe déjà ; enregistré sous {newName} à la place.",
         "rate_limited": "Votre limite d’utilisation a été atteinte, cette exécution a donc été ignorée.",
-        "unsupported": "Ce type de fichier ne peut pas être envoyé vers {connection}."
+        "unsupported": "Ce type de fichier ne peut pas être envoyé vers {connection}.",
+        "forbidden": "Impossible d’ajouter des fichiers dans {target}. Le résultat reste dans Synaplan.",
+        "unconfirmed": "{connection} n’a pas confirmé la copie. Vérifiez le dossier et réessayez si le fichier manque."
       },
       "explainer": "Connectez un système une seule fois ici. Les tâches enregistrées et l’IA pourront ensuite l’utiliser — par exemple pour lire vos derniers e-mails Outlook. Votre mot de passe n’est jamais stocké : Microsoft 365 vous demande de vous connecter et donne à Synaplan un jeton que vous pouvez révoquer à tout moment.",
       "yourConnections": "Vos connexions",

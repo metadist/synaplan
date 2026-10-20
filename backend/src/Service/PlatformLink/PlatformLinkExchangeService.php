@@ -31,6 +31,7 @@ final readonly class PlatformLinkExchangeService
         private ExternalIdentityRepository $externalIdentityRepository,
         private PlatformInstanceRepository $instanceRepository,
         private AuditLogWriter $auditLogWriter,
+        private DeliveryNotifier $notifier,
     ) {
     }
 
@@ -219,6 +220,7 @@ final readonly class PlatformLinkExchangeService
         }
 
         $linkId = (string) $identity->getId();
+        $this->notifier->identityRevoked($identity);
         $this->externalIdentityRepository->remove($identity);
 
         $this->auditLogWriter->record(
@@ -244,6 +246,7 @@ final readonly class PlatformLinkExchangeService
                 $this->apiKeyRepository->remove($key, false);
             }
         }
+        $this->notifier->identityRevoked($identity);
         $this->externalIdentityRepository->remove($identity);
 
         $this->auditLogWriter->record(
