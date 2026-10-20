@@ -53,34 +53,8 @@ final readonly class CloudDeliveryService
      */
     public function listForOwner(int $ownerId, array $fileIds): array
     {
-        $deliveries = $this->deliveries->findForOwnerFiles($ownerId, array_slice($fileIds, 0, 100));
-        $identityIds = [];
-        foreach ($deliveries as $delivery) {
-            $identityIds[] = $delivery->getIdentityId();
-        }
-        $identities = [];
-        if ([] !== $identityIds) {
-            foreach ($this->identities->findBy(['id' => array_values(array_unique($identityIds))]) as $identity) {
-                $identities[(int) $identity->getId()] = $identity;
-            }
-        }
-        $instanceIds = [];
-        foreach ($identities as $identity) {
-            if ('' !== $identity->getInstanceId()) {
-                $instanceIds[] = $identity->getInstanceId();
-            }
-        }
-        $instances = [];
-        foreach ($this->platforms->findByInstanceIds($instanceIds) as $instance) {
-            $instances[$instance->getInstanceId()] = $instance;
-        }
-
         $rows = [];
-        foreach ($deliveries as $delivery) {
-            $identity = $identities[$delivery->getIdentityId()] ?? null;
-            $instance = $identity instanceof ExternalIdentity
-                ? ($instances[$identity->getInstanceId()] ?? null)
-                : null;
+        foreach ($this->deliveries->findForOwnerFiles($ownerId, array_slice($fileIds, 0, 100)) as $delivery) {
             $rows[] = [
                 'id' => (int) $delivery->getId(),
                 'file_id' => $delivery->getFileId(),
@@ -89,8 +63,8 @@ final readonly class CloudDeliveryService
                 'open_url' => $delivery->getOpenUrl() ?? '',
                 'error_code' => $delivery->getErrorCode() ?? '',
                 'created' => $delivery->getCreated(),
-                'client' => $instance instanceof PlatformInstance ? $instance->getClient() : '',
-                'host' => $instance instanceof PlatformInstance ? $instance->getHost() : '',
+                'client' => $delivery->getDestinationClient(),
+                'host' => $delivery->getDestinationHost(),
             ];
         }
 
@@ -123,6 +97,10 @@ final readonly class CloudDeliveryService
             : CloudDelivery::CONFLICT_RENAME;
 
         $delivery = new CloudDelivery($file->ownerId, $file->fileId, (int) $identity->getId(), $kind, $ref, $conflict);
+        $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
+        if ($instance instanceof PlatformInstance) {
+            $delivery->rememberDestination($instance->getClient(), $instance->getHost());
+        }
         $this->deliveries->save($delivery);
         $id = (int) $delivery->getId();
         $this->redis->set(self::TICKET_PREFIX.$id, $identity->getInstanceId(), $this->ttl());
@@ -131,7 +109,6 @@ final readonly class CloudDeliveryService
             'identity_id' => (int) $identity->getId(),
         ]);
 
-        $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
         $answer = $instance instanceof PlatformInstance ? $this->notifier->delivery($instance, $id) : null;
         if (!is_array($answer)) {
             return DestinationResult::pending([

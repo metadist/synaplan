@@ -1,12 +1,7 @@
 <template>
   <div v-if="rows.length > 0" class="min-w-0" data-testid="file-sent-to">
     <p class="text-[10px] font-medium txt-secondary">{{ t('files.push.sentTo') }}</p>
-    <p
-      v-for="row in rows"
-      :key="row.id"
-      class="text-[10px] txt-primary truncate"
-      :title="row.remote_path"
-    >
+    <p v-for="row in rows" :key="row.id" class="text-[10px] txt-primary break-words" :title="row.remote_path">
       <span>{{ line(row) }}</span>
       <a
         v-if="row.open_url"
@@ -41,8 +36,12 @@ function appName(client: string): string {
 
 function line(row: FileCopyRow): string {
   const when = formatRelativeTime(new Date(row.created * 1000))
-  const stateKey = `files.push.state.${row.state}`
-  const state = te(stateKey) ? t(stateKey) : row.state
+  const state =
+    row.error_code === 'unconfirmed'
+      ? t('files.push.failure.unconfirmed', { connection: row.host || appName(row.client) })
+      : te(`files.push.state.${row.state}`)
+        ? t(`files.push.state.${row.state}`)
+        : row.state
   const where = row.host !== '' ? `${appName(row.client)} · ${row.host}` : appName(row.client)
   return `${where} — ${state} — ${when}`
 }

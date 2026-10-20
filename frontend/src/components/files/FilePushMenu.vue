@@ -83,6 +83,10 @@ const props = withDefaults(
   { size: 'row', path: '', fileId: 0 }
 )
 
+const emit = defineEmits<{
+  copied: []
+}>()
+
 const { t, te } = useI18n()
 const { success, error: notifyError, push } = useNotification()
 
@@ -173,8 +177,13 @@ const onSelect = async (target: CloudFolderTargetItem) => {
       const result = await pushPlatformFile(props.fileId ?? 0, target.id)
       const state = result.context?.state
       const openUrl = result.context?.open_url
-      const where = landingFolder(props.fileName)
       const app = t(`files.push.kind.${target.kind}`)
+      const folder = pushSuccessFolder(
+        result.reference,
+        { ...target, folder: landingFolder(props.fileName) },
+        props.fileName
+      )
+      emit('copied')
       if (state === 'pending') {
         success(t('files.push.pending', { name: app }))
         return
@@ -182,7 +191,7 @@ const onSelect = async (target: CloudFolderTargetItem) => {
       if (typeof openUrl === 'string' && openUrl !== '') {
         push({
           type: 'success',
-          message: t('files.push.done', { folder: `${where}/${props.fileName}`, name: app }),
+          message: t('files.push.done', { folder, name: app }),
           action: {
             label: t('files.push.openIn', { name: app }),
             onClick: () => window.open(openUrl, '_blank', 'noopener'),
@@ -190,7 +199,7 @@ const onSelect = async (target: CloudFolderTargetItem) => {
         })
         return
       }
-      success(t('files.push.done', { folder: where, name: app }))
+      success(t('files.push.done', { folder, name: app }))
       return
     }
     const result =

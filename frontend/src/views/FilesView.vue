@@ -913,7 +913,6 @@
                       <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
                         {{ displayName(file) }}
                       </p>
-                      <FileSentTo :rows="copiesFor(file.id)" />
                       <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap overflow-hidden">
                         <FileVectorPill
                           :state="vectorStateOf(file)"
@@ -1015,7 +1014,6 @@
                             <span class="text-sm txt-primary truncate" :title="file.filename">{{
                               displayName(file)
                             }}</span>
-                            <FileSentTo :rows="copiesFor(file.id)" />
                             <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
                               <button
                                 v-if="file.source && file.chat_id"
@@ -1609,8 +1607,6 @@ import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
 import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
-import FileSentTo from '@/components/files/FileSentTo.vue'
-import { useFileCopies } from '@/composables/useFileCopies'
 import { Icon } from '@iconify/vue'
 import {
   ChatBubbleLeftRightIcon,
@@ -1989,8 +1985,6 @@ const totalPages = computed(() => {
 })
 
 const paginatedFiles = computed(() => files.value)
-const browseFileIds = computed(() => paginatedFiles.value.map((file) => file.id))
-const { forFile: copiesFor } = useFileCopies(browseFileIds)
 
 const allSelected = computed(() => {
   return totalCount.value > 0 && selectedFileIds.value.length === totalCount.value

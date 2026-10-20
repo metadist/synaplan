@@ -20,7 +20,8 @@ const CHART = {
   chat_id: null,
 }
 
-async function mockCopyMenu(page: Page): Promise<void> {
+async function mockCopyMenu(page: Page): Promise<{ copies: unknown[] }> {
+  const history: { copies: unknown[] } = { copies: [] }
   await page.route('**/api/v1/connections', async (route) => {
     if (route.request().method() !== 'GET' || route.request().url().includes('/connections/')) {
       return route.continue()
@@ -60,24 +61,7 @@ async function mockCopyMenu(page: Page): Promise<void> {
     })
   })
   await page.route('**/api/v1/files/copies**', (route) =>
-    route.fulfill({
-      json: {
-        success: true,
-        copies: [
-          {
-            id: 9,
-            file_id: 42,
-            state: 'delivered',
-            remote_path: 'Synaplan/Images/chart.png',
-            open_url: 'https://files.example.org/f/1',
-            error_code: '',
-            created: 1_700_000_100,
-            client: 'nextcloud',
-            host: 'files.example.org',
-          },
-        ],
-      },
-    })
+    route.fulfill({ json: { success: true, copies: history.copies } })
   )
   await page.route(/\/api\/v1\/files\?/, async (route) => {
     if (!route.request().url().includes('source=generated')) return route.continue()
@@ -89,6 +73,7 @@ async function mockCopyMenu(page: Page): Promise<void> {
       },
     })
   })
+  return history
 }
 
 test.describe('@ci Copy to cloud', () => {
@@ -96,24 +81,36 @@ test.describe('@ci Copy to cloud', () => {
     page,
   }) => {
     await openApp(page)
-    await mockCopyMenu(page)
+    const history = await mockCopyMenu(page)
     await page.goto('/files/generated')
-    await expect(page.getByTestId('file-sent-to')).toContainText('files.example.org', {
-      timeout: TIMEOUTS.STANDARD,
-    })
+    await expect(page.getByTestId('btn-file-push')).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(page.getByTestId('file-sent-to')).toHaveCount(0)
     await page.getByTestId('btn-file-push').click()
     const menu = page.getByTestId('file-push-menu-panel')
     await expect(menu).toContainText('files.example.org')
     await expect(menu).toContainText('Synaplan/Images')
     await expect(menu).not.toContainText('quiet.example.org')
 
-    await page.route('**/api/v1/files/42/send', (route) =>
-      route.fulfill({
+    await page.route('**/api/v1/files/42/send', (route) => {
+      history.copies = [
+        {
+          id: 9,
+          file_id: 42,
+          state: 'delivered',
+          remote_path: 'Synaplan/Images/chart (2).png',
+          open_url: 'https://files.example.org/f/1',
+          error_code: '',
+          created: 1_700_000_100,
+          client: 'nextcloud',
+          host: 'files.example.org',
+        },
+      ]
+      return route.fulfill({
         status: 200,
         json: {
           success: true,
           destination: 'platform',
-          reference: 'Synaplan/Images/chart.png',
+          reference: 'Synaplan/Images/chart (2).png',
           context: {
             delivery_id: '9',
             state: 'delivered',
@@ -121,8 +118,10 @@ test.describe('@ci Copy to cloud', () => {
           },
         },
       })
-    )
+    })
     await page.getByTestId('btn-file-push-target-4').click()
     await expect(page.getByTestId('btn-notification-action')).toHaveText('Open in Nextcloud')
+    await expect(page.getByText('chart (2).png')).toBeVisible()
+    await expect(page.getByTestId('file-sent-to')).toContainText('files.example.org')
   })
 })
