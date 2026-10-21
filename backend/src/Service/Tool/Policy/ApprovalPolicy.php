@@ -15,8 +15,9 @@ use App\Service\Tool\ToolSource;
  * Resolves auto / approve / block. Most restrictive wins (block > approve > auto)
  * across the instance default, group policy, assistant definition and the MCP
  * hard block. Only afterwards may a resolved `approve` be loosened to `auto` —
- * by `allow_unattended` on an unattended write-class step, or by the owner's
- * "always allow" list for the assistant. Neither can unblock.
+ * by `allow_unattended` on an unattended write-class step, by the owner's
+ * "always allow" list for the assistant, or by an MCP connection whose
+ * `writeAuto` flag is on (interactive chat only). None of these can unblock.
  */
 final readonly class ApprovalPolicy
 {
@@ -50,6 +51,9 @@ final readonly class ApprovalPolicy
         ]);
         if (PolicyOutcome::Approve !== $resolved || SideEffect::Write !== $class) {
             return $resolved;
+        }
+        if (PolicyContext::Interactive === $context && $this->mcpWritesWithoutAsking($tool)) {
+            return PolicyOutcome::Auto;
         }
         if (PolicyContext::Unattended === $context && $allowUnattended) {
             return PolicyOutcome::Auto;
@@ -99,6 +103,11 @@ final readonly class ApprovalPolicy
         }
 
         return null;
+    }
+
+    private function mcpWritesWithoutAsking(ToolDescriptor $tool): bool
+    {
+        return ToolSource::Mcp === $tool->source && true === ($tool->meta['writeAuto'] ?? false);
     }
 
     private function isAlwaysAllowed(int $actorId, ?string $assistantKey, ToolDescriptor $tool): bool

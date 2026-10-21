@@ -991,6 +991,12 @@
         "about": "Save your Higgsfield key and secret. Images and videos you create in chat are then billed to your Higgsfield account.",
         "stop": "Remove your key below."
       },
+      "notion": {
+        "name": "Notion",
+        "tagline": "Read and edit your Notion pages in chat.",
+        "about": "After you connect, the AI can read your Notion pages. Writing is a separate switch. Deleting and moving stay off.",
+        "stop": "Disconnect below. The AI can no longer read or change Notion. Pages already there stay."
+      },
       "mcp": {
         "name": "Tool servers (MCP)",
         "tagline": "Give the AI tools from any MCP server.",
@@ -1015,6 +1021,32 @@
         "about": "Create a key for scripts and other apps. Every call acts as you and counts against your limits.",
         "stop": "Revoke the key below. It stops working immediately."
       }
+    },
+    "notion": {
+      "loading": "Loading Notion…",
+      "loadFailed": "Notion could not be loaded. Nothing was changed.",
+      "retry": "Try again",
+      "notConnected": "Connect Notion so the AI can read your pages in chat.",
+      "connect": "Connect Notion",
+      "connectFailed": "Notion was not connected. Nothing was changed. Try again.",
+      "reconnectTitle": "Notion needs to be connected again before the AI can use it.",
+      "reconnect": "Connect again",
+      "connected": "Notion is connected.",
+      "writeLabel": "The AI may change Notion",
+      "writeOn": "The AI can create and edit pages in Notion without asking each time. It cannot delete or move pages.",
+      "writeOff": "The AI can read Notion. It will not change anything.",
+      "writeSavedOn": "The AI can now create and edit Notion pages without asking. It still cannot delete or move pages.",
+      "writeSavedOff": "Writing is off. The AI can still read Notion and will not change anything.",
+      "writeFailed": "The setting was not saved. Notion was not changed. Try again.",
+      "examplesTitle": "Try one of these in chat",
+      "exampleRead": "Summarize my Roadmap page",
+      "exampleWrite": "Create a page called Meeting notes",
+      "tryChat": "Try it in chat",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect Notion?",
+      "disconnectMessage": "The AI will no longer read or change Notion. Pages already in Notion stay. You can connect again later.",
+      "disconnected": "Notion is disconnected. Nothing was changed in Notion.",
+      "disconnectFailed": "Notion is still connected. Nothing was changed. Try again."
     },
     "linkedSteps": {
       "title": "How to connect",

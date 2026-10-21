@@ -43,6 +43,33 @@ final class McpOAuthConsentServiceTest extends TestCase
         self::assertSame(McpServerConfig::AUTH_MODE_OAUTH, $server->getAuthMode());
     }
 
+    public function testStartKeepsOnlyWhitelistedReturnPaths(): void
+    {
+        $state = new OAuthStateService(new NullLogger(), 'app-secret');
+        $repo = $this->createMock(McpServerConfigRepository::class);
+        $service = $this->service(
+            new EncryptionService('test-secret', new NullLogger()),
+            $repo,
+            $this->tokenClient([]),
+            state: $state,
+        );
+
+        $allowed = $service->start($this->server(), 7, '/apps/notion');
+        parse_str((string) parse_url($allowed, PHP_URL_QUERY), $allowedQuery);
+        $payload = $state->validateState((string) $allowedQuery['state'], McpOAuthConsentService::PROVIDER);
+        self::assertIsArray($payload);
+        self::assertSame('/apps/notion', $payload['return_to']);
+        self::assertSame('/apps/notion', $service->returnPath((string) $allowedQuery['state']));
+
+        $rejected = $service->start($this->server(), 7, 'https://evil.example/phish');
+        parse_str((string) parse_url($rejected, PHP_URL_QUERY), $rejectedQuery);
+        $rejectedPayload = $state->validateState((string) $rejectedQuery['state'], McpOAuthConsentService::PROVIDER);
+        self::assertIsArray($rejectedPayload);
+        self::assertArrayNotHasKey('return_to', $rejectedPayload);
+        self::assertSame('/channels/mcp', $service->returnPath((string) $rejectedQuery['state']));
+        self::assertSame('/channels/mcp', $service->returnPath('not-a-state'));
+    }
+
     public function testStartIsRejectedWhenFlagIsOff(): void
     {
         $this->expectException(McpOAuthException::class);

@@ -608,6 +608,10 @@ const startCreate = () => {
 }
 
 const startCreateFromTemplate = (key: string) => {
+  if (key === 'notion') {
+    void router.push('/apps/notion')
+    return
+  }
   startCreate()
   applyTemplate(key)
 }

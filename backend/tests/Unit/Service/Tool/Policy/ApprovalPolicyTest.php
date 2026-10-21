@@ -52,6 +52,20 @@ final class ApprovalPolicyTest extends TestCase
         );
     }
 
+    public function testMcpWriteAutoSkipsTheCardOnlyForInteractiveWrites(): void
+    {
+        $policy = $this->policy();
+        $write = $this->mcpTool(SideEffect::Write, true);
+        $this->assertSame(PolicyOutcome::Auto, $policy->decide($write, 1, PolicyContext::Interactive));
+        $this->assertSame(PolicyOutcome::Approve, $policy->decide($write, 1, PolicyContext::Unattended));
+
+        $blocked = $this->mcpTool(SideEffect::Write, true, false);
+        $this->assertSame(PolicyOutcome::Block, $policy->decide($blocked, 1, PolicyContext::Interactive));
+
+        $destructive = $this->mcpTool(SideEffect::Destructive, true);
+        $this->assertSame(PolicyOutcome::Block, $policy->decide($destructive, 1, PolicyContext::Interactive));
+    }
+
     public function testAllowUnattendedTurnsApproveIntoAutoForWriteOnly(): void
     {
         $policy = $this->policy();
@@ -173,5 +187,19 @@ final class ApprovalPolicyTest extends TestCase
     private function tool(SideEffect $side): ToolDescriptor
     {
         return new ToolDescriptor('web_search', 'Web search', '', [], $side, ToolSource::Builtin, 0);
+    }
+
+    private function mcpTool(SideEffect $side, bool $writeAuto, bool $allowWrite = true): ToolDescriptor
+    {
+        return new ToolDescriptor(
+            'mcp:1:create-pages',
+            'Create pages',
+            '',
+            [],
+            $side,
+            ToolSource::Mcp,
+            1,
+            meta: ['allowWrite' => $allowWrite, 'writeAuto' => $writeAuto],
+        );
     }
 }
