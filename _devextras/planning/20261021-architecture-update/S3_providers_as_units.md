@@ -14,6 +14,11 @@ becomes one file (AU22). Measured today: a Cerebras-class provider touches
 
 ## AU19 — Every provider declares its capabilities, endpoints and keys (backend-only)
 
+**Precondition (AU0b):** the hardening of `03_contracts.md` §2.3 — the
+frozen §2.1 inventory with file and line, the descriptor sub-type shapes
+and the discovery rule — is merged. AU19 must not start before it; the
+parity test is written against the merged inventory.
+
 ### Goal
 
 - Do: `App\AI\Catalog\` with `ProviderDescriptor` and its parts (`03` §2),
