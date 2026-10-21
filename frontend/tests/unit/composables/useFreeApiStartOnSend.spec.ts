@@ -7,6 +7,7 @@ const { store, auth } = vi.hoisted(() => ({
   store: {
     status: null as { active: boolean } | null,
     busy: false,
+    configReloadFailed: false,
     available: true,
     isAvailable: () => store.available,
     start: vi.fn(),
@@ -25,6 +26,7 @@ describe('useFreeApiStartOnSend', () => {
     vi.clearAllMocks()
     store.status = { active: false }
     store.busy = false
+    store.configReloadFailed = false
     store.available = true
     auth.isAdmin = true
   })
@@ -58,10 +60,21 @@ describe('useFreeApiStartOnSend', () => {
     expect(useFreeApiStartOnSend(ref(true), restoreDraft).startsOnSend.value).toBe(true)
   })
 
+  it('keeps the composer when the demo is on but the config reload failed', async () => {
+    store.status = { active: true }
+    store.configReloadFailed = true
+    const { startsOnSend, readyForSend } = useFreeApiStartOnSend(ref(true), restoreDraft)
+
+    expect(startsOnSend.value).toBe(true)
+    expect(await readyForSend('Hallo')).toBe(true)
+    expect(store.start).not.toHaveBeenCalled()
+    expect(restoreDraft).not.toHaveBeenCalled()
+  })
+
   it('lets the message through without starting when no start is needed', async () => {
     const { readyForSend } = useFreeApiStartOnSend(ref(false), restoreDraft)
 
-    await expect(readyForSend('Hallo')).resolves.toBe(true)
+    expect(await readyForSend('Hallo')).toBe(true)
     expect(store.start).not.toHaveBeenCalled()
   })
 

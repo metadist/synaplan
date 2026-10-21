@@ -56,6 +56,7 @@ describe('freeApi store', () => {
     expect(loadModels).toHaveBeenCalled()
     expect(loadDefaults).toHaveBeenCalled()
     expect(store.busy).toBe(false)
+    expect(store.configReloadFailed).toBe(false)
   })
 
   it('leaves nothing refreshed and no busy flag behind when the start fails', async () => {
@@ -66,6 +67,7 @@ describe('freeApi store', () => {
 
     expect(reload).not.toHaveBeenCalled()
     expect(store.busy).toBe(false)
+    expect(store.configReloadFailed).toBe(false)
   })
 
   // The Demo is on at that point; "could not be started" would be untrue.
@@ -78,6 +80,7 @@ describe('freeApi store', () => {
 
     expect(store.status).toEqual(activeStatus)
     expect(store.busy).toBe(false)
+    expect(store.configReloadFailed).toBe(true)
   })
 
   it('takes the status from the leave result and forgets the Demo mix', async () => {

@@ -632,6 +632,12 @@ interface Props {
    * until that finishes so the message is not written into the previous chat.
    */
   sendLocked?: boolean
+  /**
+   * Runs before the composer is cleared. False leaves the draft untouched
+   * (text, attachments, pasted blocks, quote). A boolean stays inside the
+   * click so the keyboard does not close; only a promise waits.
+   */
+  beforeSend?: (text: string) => boolean | Promise<boolean>
 }
 
 const props = defineProps<Props>()
@@ -1223,8 +1229,12 @@ const emit = defineEmits<{
   budgetBlocked: [result: LimitCheckResult]
 }>()
 
+// Held while `beforeSend` is still deciding, so a second Enter cannot clear
+// the draft or start the same send twice before the first one settles.
+const acceptingSend = ref(false)
+
 const canSend = computed(() => {
-  if (props.sendLocked) {
+  if (props.sendLocked || acceptingSend.value) {
     return false
   }
   const trimmedMessage = message.value.trim()
@@ -1413,7 +1423,7 @@ const stopDictation = (options: { keepText: boolean }) => {
   autoSendPending.value = false
 }
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (isStreaming.value) {
     warning(t('chatInput.waitForStreaming'))
     return
@@ -1423,8 +1433,20 @@ const sendMessage = () => {
   // cannot write text back after the composer is cleared for the next turn.
   stopDictation({ keepText: true })
 
-  if (!canSend.value) {
+  if (!canSend.value || acceptingSend.value) {
     return
+  }
+
+  if (props.beforeSend) {
+    const verdict = props.beforeSend(message.value)
+    if (verdict !== true) {
+      acceptingSend.value = true
+      try {
+        if (!(await verdict)) return
+      } finally {
+        acceptingSend.value = false
+      }
+    }
   }
 
   const hasWebSearch = activeTool.value === 'search'

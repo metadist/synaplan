@@ -21,21 +21,33 @@ export function useFreeApiStartOnSend(
   const startErrorKey = ref('')
 
   // `busy` keeps the composer mounted while the start reloads the runtime
-  // config: the status turns active before chat readiness does.
+  // config: the status turns active before chat readiness does. A failed
+  // reload ends that wait with `busy` already cleared, so the same window
+  // stays open through `configReloadFailed`.
   const startsOnSend = computed(
     () =>
       chatHasNoProvider.value &&
       authStore.isAdmin &&
       freeApi.isAvailable() &&
-      (freeApi.status?.active !== true || freeApi.busy)
+      (freeApi.status?.active !== true || freeApi.busy || freeApi.configReloadFailed)
   )
 
   /**
    * False when the Demo had to start and did not: the message stays unsent,
    * goes back into the composer, and `startErrorKey` says why.
+   *
+   * A boolean means nothing was waited on, so the composer can clear inside
+   * the click. Only the real start returns a promise.
    */
-  async function readyForSend(content: string): Promise<boolean> {
+  function readyForSend(content: string): boolean | Promise<boolean> {
     if (!startsOnSend.value) return true
+    // Already on. Starting again is refused, and that refusal would drop
+    // the message the person just tried to send.
+    if (freeApi.configReloadFailed && freeApi.status?.active === true) return true
+    return startForSend(content)
+  }
+
+  async function startForSend(content: string): Promise<boolean> {
     startErrorKey.value = ''
     try {
       await freeApi.start(locale.value)

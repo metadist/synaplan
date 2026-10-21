@@ -420,6 +420,7 @@
           Boolean(pinnedAgentId)
         "
         :quote="quoting.pendingQuote.value"
+        :before-send="freeApiStartsOnSend ? confirmFreeApiStart : undefined"
         @budget-blocked="showLimitOrPaywall"
         @send="handleSendMessage"
         @stop="handleUserStop"
@@ -1277,6 +1278,12 @@ const freeApiStart = useFreeApiStartOnSend(chatHasNoProvider, (text) =>
   chatInputRef.value?.setInputText(text)
 )
 const freeApiStartsOnSend = freeApiStart.startsOnSend
+
+// The Demo starts before ChatInput clears the draft. A refusal puts the text
+// back and leaves attachments, pasted blocks and the quote where they are.
+function confirmFreeApiStart(text: string): boolean | Promise<boolean> {
+  return freeApiStart.readyForSend(text)
+}
 const needsProviderSetup = computed(() => chatHasNoProvider.value && !freeApiStartsOnSend.value)
 
 // Empty start page: the self-aware question is the one suggested action in
@@ -2722,7 +2729,7 @@ const handleSendMessage = async (
     agentId?: number | null
   }
 ) => {
-  if (needsProviderSetup.value || !(await freeApiStart.readyForSend(content))) {
+  if (needsProviderSetup.value) {
     return
   }
 

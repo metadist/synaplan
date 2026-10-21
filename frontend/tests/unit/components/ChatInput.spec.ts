@@ -7,6 +7,7 @@ import { deleteFile } from '@/services/filesService'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useModelMixStore } from '@/stores/modelMix'
 import type { AIModel } from '@/types/ai-models'
+import { PASTE_BLOCK_MIN_CHARS } from '@/utils/pastedContent'
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, fullPath: '/chat' }),
@@ -470,5 +471,95 @@ describe('ChatInput media previews', () => {
     expect(document.body.querySelector('[data-testid="media-composer-video-large"]')).not.toBeNull()
 
     wrapper.unmount()
+  })
+})
+
+describe('ChatInput beforeSend', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+    vi.mocked(chatApi.uploadChatFile).mockReset()
+    vi.mocked(chatApi.uploadChatFile).mockResolvedValue(
+      uploadedFile('notes.pdf', 'application/pdf', 'pdf', 7)
+    )
+  })
+
+  const pasteBlock = async (wrapper: VueWrapper) => {
+    const textarea = wrapper.get('[data-testid="input-chat-message"]')
+    ;(textarea.element as HTMLTextAreaElement).focus()
+    await wrapper.get('[data-testid="comp-chat-input"]').trigger('paste', {
+      clipboardData: {
+        items: [],
+        getData: (type: string) => (type === 'text/plain' ? 'P'.repeat(PASTE_BLOCK_MIN_CHARS) : ''),
+      },
+    })
+  }
+
+  it('keeps text, attachments, pasted blocks and the quote when the send is refused', async () => {
+    const beforeSend = vi.fn().mockResolvedValue(false)
+    const wrapper = mountInput({
+      beforeSend,
+      quote: { text: 'quoted line', messageId: 4 },
+    })
+    await wrapper.get('[data-testid="input-chat-message"]').setValue('Hello with a file')
+    await attachPdf(wrapper)
+    await pasteBlock(wrapper)
+
+    await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
+    await flushPromises()
+
+    expect(beforeSend).toHaveBeenCalledWith('Hello with a file')
+    expect(wrapper.emitted('send')).toBeFalsy()
+    expect(wrapper.emitted('clearQuote')).toBeFalsy()
+    expect(
+      (wrapper.get('[data-testid="input-chat-message"]').element as HTMLTextAreaElement).value
+    ).toBe('Hello with a file')
+    expect(wrapper.find('[data-testid="chip-chat-file"]').text()).toContain('notes.pdf')
+    expect(wrapper.find('[data-testid="chip-pasted-text"]').exists()).toBe(true)
+  })
+
+  it('clears the draft only after beforeSend accepts', async () => {
+    let resolveSend: (accepted: boolean) => void = () => {}
+    const beforeSend = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSend = resolve
+        })
+    )
+    const wrapper = mountInput({
+      beforeSend,
+      quote: { text: 'quoted line', messageId: 4 },
+    })
+    await wrapper.get('[data-testid="input-chat-message"]').setValue('Hello')
+    await attachPdf(wrapper)
+
+    const pending = wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
+    expect(wrapper.emitted('send')).toBeFalsy()
+    expect(wrapper.find('[data-testid="chip-chat-file"]').exists()).toBe(true)
+
+    resolveSend(true)
+    await pending
+
+    expect(wrapper.emitted('send')).toBeTruthy()
+    expect(wrapper.emitted('clearQuote')).toEqual([[]])
+    expect(
+      (wrapper.get('[data-testid="input-chat-message"]').element as HTMLTextAreaElement).value
+    ).toBe('')
+    expect(wrapper.find('[data-testid="chip-chat-file"]').exists()).toBe(false)
+  })
+
+  it('still clears inside the click when beforeSend accepts immediately', async () => {
+    const beforeSend = vi.fn().mockReturnValue(true)
+    const wrapper = mountInput({ beforeSend })
+    await wrapper.get('[data-testid="input-chat-message"]').setValue('Hello')
+
+    await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
+
+    expect(beforeSend).toHaveBeenCalledWith('Hello')
+    expect(wrapper.emitted('send')?.[0]?.[0]).toBe('Hello')
+    expect(
+      (wrapper.get('[data-testid="input-chat-message"]').element as HTMLTextAreaElement).value
+    ).toBe('')
   })
 })
