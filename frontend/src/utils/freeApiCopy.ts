@@ -15,9 +15,6 @@ export interface FreeApiCardRow {
   value: string
 }
 
-/** The three ways to make chat work on a fresh install. */
-export type FreeApiChoice = 'demo' | 'ollama' | 'key'
-
 /** Start failures with a sentence of their own; every other failure reads `freeApi.startError.unknown`. */
 const START_ERRORS: Record<string, string> = {
   freeapi_unreachable: 'unreachable',

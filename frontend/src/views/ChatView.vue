@@ -55,8 +55,7 @@
         data-testid="state-provider-setup"
       >
         <LocalAiDownloadCard class="mx-auto max-w-[70rem] w-full px-4 pt-4" />
-        <FreeApiWelcome v-if="offerFreeApiWelcome" />
-        <ProviderSetupBanner v-else />
+        <ProviderSetupBanner />
       </div>
 
       <div
@@ -399,8 +398,13 @@
         :retrying="retryingConversationAccess"
         @retry="retryConversationAccess"
       />
+      <FreeApiStartBanner
+        v-if="freeApiStartsOnSend && canComposeSharedChat && !isGuestMode"
+        class="max-w-[70rem] mx-auto w-full px-4 mb-2"
+        :error-key="freeApiStart.startErrorKey.value"
+      />
       <FreeApiChatBanner
-        v-if="!needsProviderSetup && canComposeSharedChat && !isGuestMode"
+        v-else-if="!needsProviderSetup && canComposeSharedChat && !isGuestMode"
         class="max-w-[70rem] mx-auto w-full px-4 mb-2"
         :streaming="isStreaming"
       />
@@ -408,7 +412,7 @@
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
         :is-streaming="isStreaming"
-        :send-locked="!assistantThreadReady"
+        :send-locked="!assistantThreadReady || freeApiStore.busy"
         :is-guest-mode="isGuestMode"
         :banner-visible="
           showPendingPurchaseBanner ||
@@ -667,9 +671,10 @@ import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
-import FreeApiWelcome from '@/components/freeapi/FreeApiWelcome.vue'
+import FreeApiStartBanner from '@/components/freeapi/FreeApiStartBanner.vue'
 import FreeApiChatBanner from '@/components/freeapi/FreeApiChatBanner.vue'
 import { useFreeApiStore } from '@/stores/freeApi'
+import { useFreeApiStartOnSend } from '@/composables/useFreeApiStartOnSend'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import { useExtractedMemoryPoll } from '@/composables/useExtractedMemoryPoll'
@@ -1262,16 +1267,17 @@ const liveStage = computed(() => chatInputRef.value?.liveStage ?? null)
 
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot
-// produce the cryptic HTTP 500 the old banner still allowed.
-const needsProviderSetup = computed(
+// produce the cryptic HTTP 500 the old banner still allowed — unless the
+// Synaplan Demo starts with the admin's first message.
+const chatHasNoProvider = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
 )
-
-// Only an admin can start the Synaplan Demo; everyone else keeps the tombstone.
 const freeApiStore = useFreeApiStore()
-const offerFreeApiWelcome = computed(
-  () => needsProviderSetup.value && authStore.isAdmin && freeApiStore.isAvailable()
+const freeApiStart = useFreeApiStartOnSend(chatHasNoProvider, (text) =>
+  chatInputRef.value?.setInputText(text)
 )
+const freeApiStartsOnSend = freeApiStart.startsOnSend
+const needsProviderSetup = computed(() => chatHasNoProvider.value && !freeApiStartsOnSend.value)
 
 // Empty start page: the self-aware question is the one suggested action in
 // the first week after the account was created. A pinned assistant with its
@@ -2716,7 +2722,7 @@ const handleSendMessage = async (
     agentId?: number | null
   }
 ) => {
-  if (needsProviderSetup.value) {
+  if (needsProviderSetup.value || !(await freeApiStart.readyForSend(content))) {
     return
   }
 

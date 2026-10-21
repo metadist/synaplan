@@ -429,11 +429,8 @@ import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
 import RegistrationClosedHint from '@/components/auth/RegistrationClosedHint.vue'
-import {
-  FIRST_RUN_ADMIN_EMAIL,
-  FIRST_RUN_ADMIN_PASSWORD,
-  FIRST_RUN_SETUP_PATH,
-} from '@/constants/firstRunAdmin'
+import { FIRST_RUN_ADMIN_EMAIL, FIRST_RUN_ADMIN_PASSWORD } from '@/constants/firstRunAdmin'
+import { firstRunLandingPath } from '@/composables/useFirstRunSetup'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -591,7 +588,7 @@ const continueAsDemoAdmin = async () => {
   password.value = FIRST_RUN_ADMIN_PASSWORD
   if (!route.query.redirect) {
     await router.replace({
-      query: { ...route.query, redirect: FIRST_RUN_SETUP_PATH },
+      query: { ...route.query, redirect: firstRunLandingPath() },
     })
   }
   await handleLogin()
