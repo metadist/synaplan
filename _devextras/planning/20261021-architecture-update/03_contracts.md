@@ -164,8 +164,16 @@ today it writes **one** `MESSAGES` row with the usage summed over its rounds
 `RateLimitService` counts those rows against message quotas. One row per
 provider call would spend several message allowances on one answer. So:
 
-- `UsageHook` does not write per call. It adds each call's usage to a
-  request-scoped `TurnUsageLedger` under the call's `turnId`.
+- `UsageHook` does not write per call. It adds each call's usage to the
+  `TurnUsageLedger` under the call's `turnId`. The ledger is **shared state,
+  not process memory**, because from S5 on one turn's rounds run on different
+  pumps and Messenger workers and are finished by `FinishTurnCommand` in yet
+  another process: a Redis hash `turnusage:{turnId}` (TTL 1 h) with one field
+  per provider call, written with `HSETNX` on the call's `callId`, so a
+  retried or duplicated contribution counts once. Closing is idempotent too:
+  `SET turnusage:{turnId}:closed NX` decides the single writer of the
+  per-turn row, which sums every field present at that moment. In-request
+  turns use the same store, so both modes share one implementation.
 - Each `AiAction` declares its unit: **per turn** (`MESSAGES` on every
   channel) or **per call** (`SORTING`, `EMBEDDINGS`, `MEMORY_EXTRACTION`,
   `IMAGES`, `VIDEOS`, `TRANSCRIPTION`, `SPEECH`, …, as today).
@@ -179,7 +187,10 @@ provider call would spend several message allowances on one answer. So:
 - Tests: a gateway turn with three MCP rounds, a document tool loop with two
   rounds and a buffered single call each write exactly today's rows (one
   `MESSAGES` row with summed tokens for the turns) under `legacy`, `shadow`
-  and `on`; the shadow comparison is per row, not per call.
+  and `on`; the shadow comparison is per row, not per call; a duplicated
+  contribution and a second close each change nothing. AU30 adds the
+  distributed case: three rounds on two different pumps, the finish on a
+  separate worker — one `MESSAGES` row with the full total.
 
 Non-AI usage rows (`TOOLS`, `MCP_TOOL`, `COMPUTE_RUNS`, `WEB_SEARCH` from tool
 loops, storage, messages-per-hour counters) are not part of this switch; they
@@ -582,8 +593,14 @@ hostname.
   for the same run.
 - End → `FinishTurnCommand` (Messenger): store the reply, usage through the
   pipeline's after-hooks, memory extraction, `complete` frame.
-- Heartbeat `pump:{serverId}:{pid}` every 2 s, and each run records the pump
-  that owns it. **Cleaning up after a dead pump is not a pump's job**, because
+- Every pump start gets a fresh **incarnation id** (a random UUID, created
+  before the first claim), because a quick container restart can reuse both
+  the server id and the PID. Heartbeat `pump:{incarnationId}` (value: server
+  id and PID, for people) every 2 s with a 10 s TTL, and each run records the
+  incarnation that owns it. A restarted pump never renews its predecessor's
+  heartbeat, so that predecessor's runs are reaped. Test: kill a pump and
+  start a new one with the same server id and PID inside the heartbeat TTL;
+  the old runs are failed, the new pump's runs are not. **Cleaning up after a dead pump is not a pump's job**, because
   the dead one may have been the last: `app:runs:reap` runs in the scheduler's
   tick lane (every minute, `ScheduledJobs` and `container-runtime.sh`), and
   each pump also runs it once at start. A run that is `queued` past its claim
@@ -598,6 +615,23 @@ hostname.
   after the last pump died (UX bar 6).
 - Cancel: `CancelledTurns` flag checked on every tick; the upstream request
   is cancelled, the partial answer stored as today.
+- **Graceful shutdown.** A pump owns provider sockets that cannot be moved
+  and answers that are never retried half-way, so stopping one is a drain:
+  on `SIGTERM` it (1) stops claiming — no new `XREADGROUP`, its heartbeat
+  says `draining` so the capacity page and the reaper know; (2) keeps
+  streaming its active turns to their end; (3) at `PUMP_DRAIN_SECONDS`
+  (default = the turn deadline, 240 s) ends whatever is still running the way
+  a person's Stop does today: the partial answer is stored, the run gets a
+  `terminal` entry with the existing cut-off sentence, usage is closed.
+  Nothing is left "running" and nothing is retried. The orchestrator's grace
+  period is longer than the drain (`terminationGracePeriodSeconds` =
+  `PUMP_DRAIN_SECONDS` + 30 s; in compose `stop_grace_period`). Rollouts
+  replace pumps one at a time with a new one started first (Kubernetes
+  `maxSurge: 1`, `maxUnavailable: 0`); scale-down picks a pump through the
+  same drain. Drills (AU30 on compose, AU34 on Kubernetes): roll the pumps and
+  scale them down by one while 200 turns run — every turn ends complete, or,
+  past the drain, with its stored partial and the cut-off sentence; none ends
+  in an error or stays running.
 
 ```php
 interface StreamDecoderInterface

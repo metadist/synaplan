@@ -227,3 +227,6 @@ spike process, no `var/cache/prod`, no `*prod*` Redis keys.
 | 2026-10-21 | #2623 | 2 | Pump misses `[DONE]` split across chunks | Defect. Per-response line buffer; re-run: 200 events per stream, all done |
 | 2026-10-21 | #2623 | 2 | `microreq.py` times non-200s and ignores thread failures | Defect. Only 200 timed, failures counted, non-zero exit; re-run: every request 200 |
 | 2026-10-21 | #2623 | 2 | `saturate.py` probe non-200s enter the latency | Defect. Baseline must be 200 or the run aborts; later non-200s are errors; re-run: 0 probe errors |
+| 2026-10-21 | #2623 | 3 | A request-scoped usage ledger cannot span pumps and the finish job | Gap. `turnusage:{turnId}` in Redis, `HSETNX` per call, `SET … NX` close; distributed parity test in AU30 (`03` §1.5) |
+| 2026-10-21 | #2623 | 3 | A restart with the same server id and PID renews a dead pump's heartbeat | Gap. Incarnation id per start in the heartbeat and run ownership; same-PID restart test (`03` §7) |
+| 2026-10-21 | #2623 | 3 | Pumps have no graceful shutdown, so scaling interrupts answers | Gap. Drain on `SIGTERM`, `PUMP_DRAIN_SECONDS`, grace period = drain + 30 s, `maxSurge 1 / maxUnavailable 0`, rollout and scale-down drills (`03` §7, `04` §5.1, AU30, AU34) |

@@ -165,6 +165,7 @@ resources) and AU34 (autoscaling, drain). Each follows that repository's
 | no Downward API | env `SYNAPLAN_SERVER_ID` (pod name), `SYNAPLAN_K8S_NAMESPACE`, `SYNAPLAN_K8S_NODE`, `SYNAPLAN_CPU_REQUEST`, `SYNAPLAN_MEMORY_LIMIT` from `fieldRef` / `resourceFieldRef`, read by the watchdog for the technical row (AU8) |
 | a restart kills running streams | `preStop`: `POST :8098/drain`, wait for held streams up to `terminationGracePeriodSeconds`; with the pump (AU30) on its own Deployment, a web pod only drops client connections and clients re-attach, so the grace period can stay at 30 s (AU34) |
 | web, worker, scheduler, tts Deployments | + `pump` Deployment (AU30), scaled on `synaplan_pump_streams`; `PodDisruptionBudget` `minAvailable: 1` for web and pump (AU34) |
+| (pump, new) | its own shutdown contract (`03` §7): `SIGTERM` ⇒ stop claiming, finish active turns, at `PUMP_DRAIN_SECONDS` (240 s) end the rest like a Stop; `terminationGracePeriodSeconds` = drain + 30 s; rollout `maxSurge: 1`, `maxUnavailable: 0`; scale-down stabilisation long enough that a pump is not drained while it is still the busiest. A web pod's `/drain` does not cover pumps — they hold the provider sockets |
 
 ### 5.2 Detection in the watchdog
 

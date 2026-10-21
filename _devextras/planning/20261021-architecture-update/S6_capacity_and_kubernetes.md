@@ -76,15 +76,19 @@ Wireframes and the tab content: `04` §4.2.
 > In `synaplan-charts`: implement AU34, `make all`. On the `vultr-cluster`
 > load-test namespace: drive `saturate.py` until the ratio passes the target
 > and watch a second web pod start; roll the web Deployment during 200
-> streams and count failed streams (target 0: clients re-attach). Tables and
-> the Grafana screenshot in this track's STATUS. Pull request in
-> `synaplan-charts`, Copilot, CI.
+> streams and count failed streams (target 0: clients re-attach). Then the
+> pumps: roll the `pump` Deployment and scale it down by one while 200 turns
+> run — every turn ends complete or, past `PUMP_DRAIN_SECONDS`, with its
+> stored partial and the cut-off sentence; none errors or stays running
+> (`03` §7). Tables and the Grafana screenshot in this track's STATUS. Pull
+> request in `synaplan-charts`, Copilot, CI.
 
 ### Exit criteria
 
 1. `make all` and CI green in `synaplan-charts`.
 2. Scale-out observed on the load-test cluster; rolling restart with 0
-   failed streams (STATUS).
+   failed streams; pump rollout and scale-down drills with no errored or
+   stuck turn (STATUS).
 
 ---
 

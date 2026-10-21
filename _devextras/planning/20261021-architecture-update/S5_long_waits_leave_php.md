@@ -152,7 +152,12 @@ released connections, with larger stream pools per node, and the owner decides.
   `app:runs:reap` (scheduler tick lane) fails the run atomically — stored
   state and `terminal` entry both checked; the credential parity cases
   (user-key-only, mixed, operator fallback off, endpoint registry) write the
-  same usage row and use the same key in both modes; entries carry `frame` / `terminal` /
+  same usage row and use the same key in both modes; a turn whose three rounds
+  run on two pumps and finish on a separate worker writes one `MESSAGES` row
+  with the full total; a pump restarted with the same server id and PID
+  inside the heartbeat TTL does not keep its predecessor's runs alive; the
+  compose drain drill (`03` §7): roll the pumps and stop one while turns run,
+  none errors or stays running; entries carry `frame` / `terminal` /
   `gap`; a run past `RUNTIME.RUN_STREAM_MAX_BYTES` ends with the recoverable
   terminal and a complete stored reply; an attach from `N` returns only the
   frames after `N`.
