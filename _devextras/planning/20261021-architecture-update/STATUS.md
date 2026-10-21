@@ -9,7 +9,7 @@ measurement and a rollout are entries here, not chat messages.
 | ---- | ---- | ------------ | ----- | ----- |
 | 2026-10-21 | AU0 | [#2623](https://github.com/metadist/synaplan/pull/2623) | merged (`ce89e32a4`) | research, spike, plan; three Copilot rounds, all findings accepted |
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
-| 2026-10-21 | AU1 | this branch | in progress | `make perf-runtime` |
+| 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | in review | `make perf-runtime` |
 
 ## Baselines
 
