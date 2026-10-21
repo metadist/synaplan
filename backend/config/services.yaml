@@ -1578,21 +1578,20 @@ services:
     App\Service\Widget\WidgetEventStoreInterface:
         alias: App\Service\Widget\DatabaseWidgetEventStore
 
-# TestProvider: mock AI for dev/test only. Not registered in prod.
-# Duplicated because Symfony when@ blocks don't support when@dev,test.
-when@dev:
-    services:
-        App\AI\Provider\TestProvider:
-            arguments:
-                $uploadDir: '%kernel.project_dir%/var/uploads'
-            tags:
-                - { name: 'app.ai.chat', key: 'test' }
-                - { name: 'app.ai.embedding', key: 'test' }
-                - { name: 'app.ai.vision', key: 'test' }
-                - { name: 'app.ai.image_generation', key: 'test' }
-                - { name: 'app.ai.speech_to_text', key: 'test' }
-                - { name: 'app.ai.text_to_speech', key: 'test' }
-                - { name: 'app.ai.file_analysis', key: 'test' }
+    # Mock AI for dev and test. PerfTestProviderPass removes it from every
+    # other environment unless SYNAPLAN_PERF_TEST_PROVIDER=1, so a benchmark
+    # worker can stream test-model without a paid provider.
+    App\AI\Provider\TestProvider:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'test' }
+            - { name: 'app.ai.embedding', key: 'test' }
+            - { name: 'app.ai.vision', key: 'test' }
+            - { name: 'app.ai.image_generation', key: 'test' }
+            - { name: 'app.ai.speech_to_text', key: 'test' }
+            - { name: 'app.ai.text_to_speech', key: 'test' }
+            - { name: 'app.ai.file_analysis', key: 'test' }
 
 when@test:
     services:
@@ -1600,16 +1599,4 @@ when@test:
         # Centrifugo instance.
         App\Realtime\Publisher\RealtimePublisherInterface:
             alias: App\Realtime\Publisher\NullPublisher
-
-        App\AI\Provider\TestProvider:
-            arguments:
-                $uploadDir: '%kernel.project_dir%/var/uploads'
-            tags:
-                - { name: 'app.ai.chat', key: 'test' }
-                - { name: 'app.ai.embedding', key: 'test' }
-                - { name: 'app.ai.vision', key: 'test' }
-                - { name: 'app.ai.image_generation', key: 'test' }
-                - { name: 'app.ai.speech_to_text', key: 'test' }
-                - { name: 'app.ai.text_to_speech', key: 'test' }
-                - { name: 'app.ai.file_analysis', key: 'test' }
 

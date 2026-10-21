@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import http.client
+import json
 import statistics
 import threading
 import time
@@ -51,6 +52,7 @@ def main() -> int:
     parser.add_argument("--path", default="/api/health")
     parser.add_argument("--clients", type=int, default=8)
     parser.add_argument("--requests", type=int, default=200)
+    parser.add_argument("--json", action="store_true", help="print one JSON object on stdout")
     args = parser.parse_args()
     base = urllib.parse.urlparse(args.base)
 
@@ -67,14 +69,37 @@ def main() -> int:
     wall = time.monotonic() - started
 
     if not latencies:
-        print(f"{args.path} clients={args.clients}: no successful request; failures: {sorted(set(failures))}")
+        message = f"{args.path} clients={args.clients}: no successful request; failures: {sorted(set(failures))}"
+        if args.json:
+            print(json.dumps({
+                "path": args.path, "clients": args.clients, "ok": 0, "failed": len(failures),
+                "error": message,
+            }))
+        else:
+            print(message)
         return 1
     ordered = sorted(latencies)
     p95 = ordered[round(0.95 * (len(ordered) - 1))]
-    print(f"{args.path} clients={args.clients} ok={len(latencies)} failed={len(failures)} wall={wall:.2f}s "
-          f"rps(ok)={len(latencies) / wall:.0f} p50={statistics.median(latencies) * 1000:.1f}ms p95={p95 * 1000:.1f}ms")
+    p50_ms = statistics.median(latencies) * 1000
+    p95_ms = p95 * 1000
+    rps = len(latencies) / wall if wall else 0.0
+    if args.json:
+        print(json.dumps({
+            "path": args.path,
+            "clients": args.clients,
+            "ok": len(latencies),
+            "failed": len(failures),
+            "wall_s": round(wall, 3),
+            "rps": round(rps, 1),
+            "p50_ms": round(p50_ms, 3),
+            "p95_ms": round(p95_ms, 3),
+        }))
+    else:
+        print(f"{args.path} clients={args.clients} ok={len(latencies)} failed={len(failures)} wall={wall:.2f}s "
+              f"rps(ok)={rps:.0f} p50={p50_ms:.1f}ms p95={p95_ms:.1f}ms")
     if failures:
-        print(f"  failures: {sorted(set(failures))}")
+        if not args.json:
+            print(f"  failures: {sorted(set(failures))}")
         return 1
     return 0
 

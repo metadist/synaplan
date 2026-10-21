@@ -46,6 +46,7 @@ logs/
 # Backend cache & build
 backend/var/cache/
 backend/var/log/
+backend/var/perf/
 backend/.phpunit.cache/
 backend/vendor/
 

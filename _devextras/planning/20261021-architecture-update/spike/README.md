@@ -3,14 +3,16 @@
 Measurements behind [`../02_measurements.md`](../02_measurements.md). Every
 number there comes from one of these scripts, run against the local dev
 stack on `main` at `4dd1b26da`. Nothing here is product code; nothing here is
-deployed.
+deployed. AU1 moved the runtime scripts to `_devextras/perf/runtime/`;
+`make perf-runtime` is how to run them. The block below is the original
+procedure, with those paths.
 
 | Path | What it measures | Needs |
 | ---- | ---------------- | ----- |
-| [`runtime/saturate.py`](./runtime/saturate.py) | Holds N streaming AI requests open (`POST /v1/chat/completions`, `stream: true`) and times a cheap PHP request (`GET /api/health`) every 250 ms while they run. Samples FrankenPHP's per-thread state from the Caddy admin API | Python 3 (stdlib), a Synaplan API key with `desktop:messages` |
-| [`runtime/overhead.py`](./runtime/overhead.py) | Time to first token: the provider directly vs. the same call through Synaplan's gateways | Provider keys in `backend/.env` (read, never printed) |
-| [`runtime/microreq.py`](./runtime/microreq.py) | Throughput of short PHP requests on keep-alive connections | Python 3 |
-| [`runtime/worker-mode.Caddyfile`](./runtime/worker-mode.Caddyfile) | A second FrankenPHP inside the dev backend container, in production worker mode, on `:8090` (admin `:2020`, Docker network only) | the dev stack |
+| [`saturate.py`](../../../perf/runtime/saturate.py) | Holds N streaming AI requests open (`POST /v1/chat/completions`, `stream: true`) and times a cheap PHP request (`GET /api/health`) every 250 ms while they run. Samples FrankenPHP's per-thread state from the Caddy admin API | Python 3 (stdlib), a Synaplan API key with `desktop:messages` |
+| [`overhead.py`](../../../perf/runtime/overhead.py) | Time to first token: the provider directly vs. the same call through Synaplan's gateways | Provider keys in `backend/.env` (read, never printed) |
+| [`microreq.py`](../../../perf/runtime/microreq.py) | Throughput of short PHP requests on keep-alive connections | Python 3 |
+| [`worker-mode.Caddyfile`](../../../perf/runtime/worker-mode.Caddyfile) | A second FrankenPHP inside the dev backend container, in production worker mode, on `:8090` (admin `:2020`, Docker network only) | the dev stack |
 | [`runtime/split-pools.Caddyfile`](./runtime/split-pools.Caddyfile) | Two worker pools (`match /v1/chat/completions` → `streams`, the rest → `api`) and `max_wait_time` | the dev stack |
 | [`relay/`](./relay/main.go) | A Go relay (stdlib only) holding 100 … 2,000 slow streams from a stub upstream; memory and CPU per stream | Docker (`golang:1.25.8`) |
 | [`pump/pump.php`](./pump/pump.php) | One PHP CLI process holding 100 … 1,000 upstream streams at once with Symfony HttpClient (`stream()` over curl_multi) | the backend container, the relay stub as upstream |
@@ -43,17 +45,17 @@ the scripts are strict, and every table in `02` comes from the strict re-run:
 #    {"api_key": {"key": "sk_…", …}} → /tmp/syn-key.json
 
 # 1. Classic mode (the dev backend as it runs): 20 threads on a 10-core host
-python3 runtime/saturate.py --streams 20 --model claude-haiku-4-5-20251001
-python3 runtime/saturate.py --streams 30 --model claude-haiku-4-5-20251001
+python3 ../../../perf/runtime/saturate.py --streams 20 --model claude-haiku-4-5-20251001
+python3 ../../../perf/runtime/saturate.py --streams 30 --model claude-haiku-4-5-20251001
 
 # 2. Gateway overhead
-python3 runtime/overhead.py --runs 10 --env-file ../../../../backend/.env
+python3 ../../../perf/runtime/overhead.py --runs 10 --env-file ../../../../backend/.env
 
 # 3. Production worker mode, inside the dev backend container
 docker exec synaplan-backend sh -c 'cd /var/www/backend && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup'
-docker cp runtime/worker-mode.Caddyfile synaplan-backend:/tmp/spike-worker.Caddyfile
+docker cp ../../../perf/runtime/worker-mode.Caddyfile synaplan-backend:/tmp/spike-worker.Caddyfile
 docker exec -d synaplan-backend sh -c 'cd /var/www/backend && APP_ENV=prod APP_DEBUG=0 SPIKE_WORKER_NUM=8 frankenphp run --config /tmp/spike-worker.Caddyfile'
-docker run --rm --network synaplan_synaplan-network -v "$PWD/runtime":/spike:ro -v /tmp/syn-key.json:/key.json:ro \
+docker run --rm --network synaplan_synaplan-network -v "$PWD/../../../perf/runtime":/spike:ro -v /tmp/syn-key.json:/key.json:ro \
   python:3.12-slim python /spike/saturate.py --base http://synaplan-backend:8090 \
   --admin-url http://synaplan-backend:2020 --key-file /key.json --streams 12 --model claude-haiku-4-5-20251001
 

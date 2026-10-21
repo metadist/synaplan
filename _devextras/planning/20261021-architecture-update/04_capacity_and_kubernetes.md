@@ -186,7 +186,7 @@ source). `/.dockerenv` ⇒ `compose`; else `host`.
 ### 5.3 Verification
 
 `vultr-cluster/load-testing` already installs kube-prometheus and Grafana and
-has a Synaplan chat scenario in Playwright. M6 runs `spike/runtime/saturate.py`
+has a Synaplan chat scenario in Playwright. M6 runs `_devextras/perf/runtime/saturate.py`
 against a test deployment there, once before AU8 and once after AU34, and
 enters the tables of `02` §2 for a pod in STATUS. Never against production.
 
