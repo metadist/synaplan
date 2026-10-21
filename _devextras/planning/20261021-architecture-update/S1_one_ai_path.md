@@ -92,35 +92,47 @@ pipeline own metering (AU11), bring the paths that bypass the facade in
 
 ### Goal
 
-- Do: `RateLimitHook` (before) and `UsageHook` (after) as `03` §1.3;
-  `AI.USAGE_HOOK` (`off` | `shadow` | `on`, BCONFIG global, code default
-  `shadow` after this step). Shadow compares and logs `ai.usage_mismatch`
-  (`03` §1.5).
-- Do: in this pull request the shadow only. A follow-up pull request in the
-  same step (`fix(ai): …`, part 2) switches to `on` after the seven-day
-  production soak and removes the callers' `recordUsage()` calls.
-- Do: the paths AU9 listed without a row get one (with `on`); probes stay
+- Do: `RateLimitHook` (before), `UsageHook` (after) and `LegacyUsageWriter`
+  as `03` §1.3 and §1.5. `AI.USAGE_HOOK` (`legacy` | `shadow` | `on`, BCONFIG
+  global). Every caller's AI-action `recordUsage()` call moves into
+  `LegacyUsageWriter` unchanged; `AiCallSource` gets the "joined" constant for
+  the paths that run through `AiFacade` today.
+- Do: part 1 (this pull request) ships `legacy` as the default and lets an
+  installation choose `shadow`. Part 2 (`fix(ai): …`, after the seven-day
+  production soak in `shadow`) makes `on` the default. Callers keep their
+  `LegacyUsageWriter` call: it is a no-op for joined paths under `on` and the
+  writer again under `legacy` / `shadow`, so a rollback never leaves a call
   unmetered.
-- Do not: change prices, actions or the cost calculation.
+- Do: `/v1/messages` and live voice stay "not joined": their own writers keep
+  writing under every mode until AU12.
+- Do: the paths AU9 listed without a row get one once joined and `on`;
+  probes stay unmetered.
+- Do not: change prices, actions or the cost calculation; touch non-AI usage
+  (`TOOLS`, `MCP_TOOL`, `COMPUTE_RUNS`, `WEB_SEARCH`, storage, message
+  counters — they move with S4).
 
 ### Vibe brief
 
-> Read `03` §1.5. Implement AU11 part 1: hooks, setting, shadow comparison.
-> Test first: for every AU9 path the shadow row equals the caller's row
-> (action, provider, model, tokens, cost); a deliberately wrong shadow logs a
-> mismatch. Snapshot unchanged with shadow (no extra row). Part 2 after the
-> soak: flip to `on`, delete the caller calls, re-record the snapshot with
-> `UPDATE_AI_PATH_SNAPSHOTS=1` — the diff may only add rows for the listed
-> paths and remove nothing; quote it. `make ci-local`, `make test-e2e`.
+> Read `03` §1.5. Implement AU11 part 1. Tests first, per AU9 path **and per
+> mode**: exactly one `BUSELOG` row per billable call under `legacy`, `shadow`
+> and `on`; under `shadow` the shadow row equals the caller's row (action,
+> provider, model, tokens, cost) and a deliberately wrong shadow logs a
+> mismatch; `/v1/messages` and live voice write one row under all three modes.
+> Snapshot unchanged under `legacy` and `shadow`. Part 2 after the soak: flip
+> the default to `on`, re-record with `UPDATE_AI_PATH_SNAPSHOTS=1` — the diff
+> may only add rows for the listed paths and remove none; quote it.
+> `make ci-local`, `make test-e2e`.
 
 ### Exit criteria
 
-1. Part 1: shadow equality on every path; snapshot unchanged.
-2. Soak: seven days on production without `ai.usage_mismatch` (event ring
-   summary in STATUS).
-3. Part 2: one row per billable call on every path; the diff quoted.
-4. `RateLimitService::recordUsage()` has no caller outside the hook (grep in
-   STATUS).
+1. Part 1: one row per billable call on every path under every mode; shadow
+   equality; snapshot unchanged under `legacy` / `shadow`.
+2. Soak: seven days on production in `shadow` without `ai.usage_mismatch`
+   (event ring summary in STATUS).
+3. Part 2: one row per billable call on every path with `on`; the diff quoted;
+   switching back to `legacy` keeps one row per call (test).
+4. No AI-action `recordUsage()` call outside `UsageHook` and
+   `LegacyUsageWriter` (grep in STATUS); non-AI usage rows untouched.
 
 ---
 
@@ -135,6 +147,13 @@ pipeline own metering (AU11), bring the paths that bypass the facade in
   `VoiceLiveUsageService` writes through the pipeline.
 - Do: Perplexity web answers through `AiFacade::chat()`; probes with
   `AiCallContext::probe()`.
+- Do: metering moves with each path in the same commit (`03` §1.5 step 3):
+  the path's source gets the "joined" constant, its own writer becomes a
+  `LegacyUsageWriter` call, and the per-mode test of AU11 is extended to it —
+  so no commit, and no release, leaves a gateway or voice call unmetered.
+- Do: after one release with `on` everywhere, the follow-up removal of
+  `LegacyUsageWriter` and the setting (`03` §1.5 step 5) is its own pull
+  request, `refactor(ai): metering has one writer and no switch`.
 - Do: `AiPathOnlyThroughPipelineTest`: no class outside `App\AI\Pipeline`,
   `App\AI\Provider` and the translators calls a provider's capability method
   directly (reflection scan; shrink-only baseline if any remain).
@@ -155,7 +174,9 @@ pipeline own metering (AU11), bring the paths that bypass the facade in
 1. Every snapshot unchanged; `MessagesGateway` smaller.
 2. `AiPathOnlyThroughPipelineTest` green with an empty baseline, or a
    baseline listed in STATUS with a reason per entry.
-3. `make ci-local`, `make test-e2e` green.
+3. One `BUSELOG` row per billable gateway and voice call under `legacy`,
+   `shadow` and `on` (the AU11 per-mode test, extended).
+4. `make ci-local`, `make test-e2e` green.
 
 ---
 

@@ -55,8 +55,13 @@ report mode.
 - Do: a streaming request through a proxy in a test: a small CONNECT proxy
   in the test (the compute sidecar's proxy image, or a PHP stub on a socket)
   and a stub SSE upstream — chunks arrive unbuffered.
-- Do not: change `SsrfGuard` or the pinned connect of `HttpToolExecutor`;
-  default to anything but `off`.
+- Do: keep the pin for URLs a person typed when a proxy is set (`03` §3.6):
+  the tunnel goes to the pinned IP (`CURLOPT_CONNECT_TO` through
+  `extra.curl`), TLS keeps the original name. Tested with a test proxy that
+  logs its `CONNECT` target and a resolver that answers public first and
+  private second (DNS rebinding), for a custom HTTP tool and the URL reader.
+- Do not: change `SsrfGuard`'s rules or the no-proxy path of
+  `HttpToolExecutor`; default to anything but `off`.
 
 ### Vibe brief
 
@@ -74,7 +79,8 @@ report mode.
 ### Exit criteria
 
 1. The three modes and the proxy precedence covered by tests; snapshots
-   unchanged in `off`.
+   unchanged in `off`; behind the test proxy a rebinding name never reaches
+   the private address.
 2. The `report` run's destination list in STATUS.
 3. `docs/EGRESS.md` explains modes, proxy, allowlist, what is not covered.
 4. Budgets met.
@@ -153,6 +159,11 @@ report mode.
 - Do: an opt-in compose profile `egress`; PHP, worker, scheduler, voice,
   transcriber, compute get `HTTPS_PROXY=http://egress:3128` and `NO_PROXY`
   for the internal names when the profile is on.
+- Do: request-scoped grants for URLs a person typed (`03` §3.6): PHP writes
+  `egress:grant:{id}` (host, port, pinned IPs, request id, TTL 60 s), sends
+  `Proxy-Authorization: Bearer <grant id>`, and the gateway dials only the
+  granted IPs for that tunnel, then deletes the grant; when chained to
+  `UPSTREAM_PROXY`, it sends `CONNECT <pinned ip>:<port>` upstream.
 - Do: the voice and transcriber sidecars honour the proxy with
   `NODE_USE_ENV_PROXY=1`. Verified on 2026-10-21 on their pinned image
   (`node:22-alpine`, Node 22.23.3): with an unreachable `HTTPS_PROXY`, both
@@ -175,9 +186,13 @@ report mode.
 
 1. Every service's outbound traffic visible in the gateway's log on the dev
    stack with the profile on (STATUS list).
-2. With the profile off, nothing changes (E2E green).
-3. `docs/EGRESS.md` has the enterprise recipe: company proxy, allowlist,
-   report week, enforce.
+2. Grant tests: a custom tool and the URL reader pass with a grant; an
+   expired, reused or foreign grant is refused; a rebinding name never
+   reaches the private address; no grant id or secret in any log.
+3. With the profile off, nothing changes (E2E green).
+4. `docs/EGRESS.md` has the enterprise recipe: company proxy, allowlist,
+   report week, enforce, and what an enterprise proxy that refuses IP
+   literals means for typed-URL features.
 
 ---
 

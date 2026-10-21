@@ -15,6 +15,22 @@ deployed.
 | [`relay/`](./relay/main.go) | A Go relay (stdlib only) holding 100 … 2,000 slow streams from a stub upstream; memory and CPU per stream | Docker (`golang:1.25.8`) |
 | [`pump/pump.php`](./pump/pump.php) | One PHP CLI process holding 100 … 1,000 upstream streams at once with Symfony HttpClient (`stream()` over curl_multi) | the backend container, the relay stub as upstream |
 
+## What counts as a result
+
+After the Copilot review of [#2623](https://github.com/metadist/synaplan/pull/2623)
+the scripts are strict, and every table in `02` comes from the strict re-run:
+
+- a stream is successful only with HTTP 200, answer text and its end marker
+  (`[DONE]`); everything else is counted as failed, never averaged in;
+- time to first token is the first non-empty **text** delta, not a role or
+  metadata event; `overhead.py` reuses one warm keep-alive connection per
+  destination (after a warm-up call) so the direct call and Synaplan's own
+  provider connection are compared fairly, and asks for `max_tokens 400` so a
+  reasoning model reaches text;
+- the pump reports the process's resident memory (`VmRSS` / `VmHWM`), which
+  includes libcurl's buffers, next to the PHP heap;
+- `RACE=1 relay/run.sh` builds the relay with the Go race detector.
+
 ## Reproduce
 
 ```bash

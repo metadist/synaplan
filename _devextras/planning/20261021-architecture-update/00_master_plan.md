@@ -15,10 +15,10 @@ goes through one invoker that applies approvals and audit. A server holds
 hundreds of AI streams instead of as many as it has PHP workers, and an
 administrator sees how loaded each server is.
 **Binding UX:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12) for
-AU4, AU7, AU21, AU25b, AU33. Everything else is invisible to people when it
+AU4, AU7, AU21, AU25b, AU31b, AU33. Everything else is invisible to people when it
 works, and the plan measures that it stays invisible (§6).
 **Class:** per step in §5. Most steps are `backend-only`; runtime and
-infrastructure steps are `no-app-impact`; five steps are `ota-candidate`.
+infrastructure steps are `no-app-impact`; six steps are `ota-candidate`.
 Nothing touches a `store-required` path.
 **Prerequisite:** none on `main`. Ask-first rows: §0 #10, #13, #15, #18
 (Docker / compose / CI), #15 and #10 (Go dependency), #25 (schema).
@@ -116,11 +116,11 @@ journey, performance) → one installation opts in → seeded default.
 | 1 | **Order.** S0 (protect and measure) first, because it relieves production at once and every later sprint is judged by its numbers. Then S1 one AI path → S2 central egress → S3 providers as units → S4 one tool path → S5 long waits leave PHP → S6 capacity, Kubernetes, sizing. S2 may start once AU10 has merged; S3 needs AU15; S5 needs AU12, AU17 and AU24. At most two sprint branches open at a time. | Proposed | |
 | 2 | **The one AI path lives under `AiFacade`.** `AiFacade` stays the API callers use; inside it every capability call becomes an `AiCall` that runs through `AiCallPipeline`. The Messages gateway translators, live voice usage, Perplexity web answers, the LLM reranker and the model probes join the same pipeline; probes carry a `probe` context that metering ignores. No second facade, no new entry point. | Proposed | |
 | 3 | **Hooks are tagged PHP services** (`app.ai.call_hook`, `#[AsAiCallHook(phase, priority, blocking, budgetMs, onError)]`). A non-blocking hook may touch only memory, APCu or Redis. A hook that calls a network service or a model is `blocking`: off by default, switched on per installation, with its budget shown on the capacity page. Work that can wait (memory extraction, summaries) stays a Messenger job. Out-of-process hooks come later through row 18's plugin services (§9). | Proposed | |
-| 4 | **Hook budget.** Pipeline plus default hooks ≤ **1 ms p95** per call, measured by `make perf-runtime` (§6). A blocking hook declares its budget and is cut off at it: observability hooks fail open, policy hooks fail closed, declared per hook. Today's gateway overhead is ≈ 25 ms and the app chat's pre-call work ≈ 1.5 s (`02` §3); the pipeline must not add to either measurably. | Proposed | |
-| 5 | **Metering once, in the pipeline.** `UsageHook` writes the `BUSELOG` row and `RateLimitHook` checks before the call; callers stop calling `recordUsage()`. Double entry first: the hook computes the row in shadow mode, a test compares it with the caller's row per path, and production logs mismatches for seven days before callers stop. | Proposed | |
+| 4 | **Hook budget.** Pipeline plus default hooks ≤ **1 ms p95** per call, measured by `make perf-runtime` (§6). A blocking hook declares its budget and is cut off at it: observability hooks fail open, policy hooks fail closed, declared per hook. Today the gateways add 10–50 ms before the first text token (worker mode, warm connections) and the app chat's pre-call work ≈ 1.5 s (`02` §3); the pipeline must not add to either measurably. | Proposed | |
+| 5 | **Metering in the pipeline, exactly one writer per billable call at every step.** `UsageHook` writes the `BUSELOG` row and `RateLimitHook` checks before the call. `AI.USAGE_HOOK` = `legacy` (callers write) → `shadow` (callers write, the hook compares; seven days in production) → `on` (the hook writes for paths that joined the pipeline). Callers' writes go through `LegacyUsageWriter`, which stays until one release after `on`, so every rollback keeps one writer; the gateway and live voice keep their own writers until AU12 joins them (`03` §1.5). | Proposed (changed after review) | |
 | 6 | **A provider describes itself in typed PHP.** `public static function descriptor(): ProviderDescriptor` on the provider class: name, display name, capabilities, endpoints, key requirements, dialects, defaults, icon, help URL (`03` §2). DI tags come from an attribute, not `services.yaml`. `ModelCatalog` rows stay data. JSON descriptors only for OpenAI-compatible providers a plugin declares, later (row 18). | Proposed | |
 | 7 | **The frontend reads provider metadata from a new endpoint** (`GET /api/v1/ai/providers`), never from runtime config (`stores/config.ts` and `*RuntimeConfig*` are `store-required`). | Locked (mobile policy) | |
-| 8 | **One outbound HTTP client.** Symfony HttpClient is the only HTTP stack; `EgressHttpClient` decorates the default `http_client` service. Modes `off` \| `report` \| `enforce`, default `off`; `report` for a week before `enforce`. Allowlist = endpoints the enabled providers declare + configured integrations + administrator entries. `HTTPS_PROXY` / `NO_PROXY` are honoured explicitly, `EGRESS_PROXY` overrides. URLs a person types keep `SsrfGuard` and the pinned connect, unchanged. | Proposed | |
+| 8 | **One outbound HTTP client.** Symfony HttpClient is the only HTTP stack; `EgressHttpClient` decorates the default `http_client` service. Modes `off` \| `report` \| `enforce`, default `off`; `report` for a week before `enforce`. Allowlist = endpoints the enabled providers declare + configured integrations + administrator entries. `HTTPS_PROXY` / `NO_PROXY` are honoured explicitly, `EGRESS_PROXY` overrides. URLs a person types keep `SsrfGuard` and the pinned connect; behind a proxy the pin is kept by tunnelling to the pinned IP, and through the egress gateway by a request-scoped grant (`03` §3.6). | Proposed (changed after review) | |
 | 9 | **Non-HTTP traffic is listed, not wrapped:** MariaDB, Redis, SMTP, IMAP, gRPC to Triton, the voice sidecar's provider WebSockets. `docs/EGRESS.md` names each with its setting. The egress gateway (#10) covers WebSockets through CONNECT. | Proposed | |
 | 10 | **Optional egress gateway** for every Synaplan service: the CONNECT proxy of `sidecars/synaplan-compute/internal/egress` as its own service; PHP, voice, transcriber and compute send through it; it enforces the allowlist and chains to the enterprise proxy. **Docker / compose — ask first.** | Ask | |
 | 11 | **One tool invoker.** `ToolInvoker::invoke()` runs registry → gate → executor → clamp → audit → usage → metrics for every loop. The gate always runs. Document tools on the person's own files are `write` with policy `auto` (no new prompt) and are audited. `tool.executed` rows go to `BAUDITLOG` for write and destructive calls; reads become metrics only, to keep the audit log readable. | Proposed | |
@@ -129,14 +129,14 @@ journey, performance) → one installation opts in → seeded default.
 | 14 | **A full server answers at once.** `max_wait_time` 15 s; Caddy turns FrankenPHP's 503 into `{"error":"server_busy","retryAfter":5}` with `Retry-After: 5` (OpenAI- and Anthropic-shaped on `/v1/*`, so SDKs retry by themselves). Web chat and widget retry three times with backoff and then say so (AU4). | Proposed | |
 | 15 | **The watchdog** is one Go binary, `sidecars/synaplan-watchdog`, built into the backend image and started by the `web` role next to FrankenPHP, restarted when it exits, off with `SYNAPLAN_WATCHDOG=0`. Relay on `127.0.0.1:8097`, probes and metrics on `:8098`. It never parses an AI wire format. Standard library plus `github.com/redis/go-redis/v9`. **New Go dependency and Docker — ask first.** | Ask | |
 | 16 | **Not a Caddy module.** A panic in a Caddy module stops FrankenPHP and every request with it; a separate process fails alone. On Kubernetes the same binary can run as its own container in the pod. | Proposed | |
-| 17 | **The stream pump is PHP.** One PHP process held 1,000 provider streams at 26 MB (`02` §4.4), so the decoders and translators stay in one language and one test suite. It runs as a new role `pump` of the backend image, like `worker`. | Proposed | |
-| 18 | **Run events move to a Redis Stream** (`XADD chatrun:{id}:stream`) so the watchdog block-reads many runs in one call; `StreamAttachController` reads both shapes during the change. New role in the compose files — **Docker — ask first.** | Ask | |
-| 19 | **Attach token:** HMAC-SHA256 over run id, owner key and expiry (30 min) with an installation secret (encrypted in BCONFIG); the watchdog verifies it without asking PHP. | Proposed | |
+| 17 | **The stream pump is PHP.** One PHP process held 1,000 provider streams at ≈ 134 MB resident, ≈ 73 KB each with libcurl's buffers (`02` §4.4), so the decoders and translators stay in one language and one test suite. It runs as a new role `pump` of the backend image, like `worker`. Its queue carries opaque ids; job bodies expire one by one and hold no provider key (`03` §7). | Proposed (changed after review) | |
+| 18 | **Run events move to a Redis Stream** (`XADD chatrun:{id}:stream 0-{seq}`) so the watchdog block-reads many runs in one call. Entries say `frame`, `terminal` or `gap`, so the watchdog closes without reading a frame; no silent trimming; the attach cursor and SSE `id:` lines keep today's meaning (`03` §8). `StreamAttachController` reads both shapes during the change. New role in the compose files — **Docker — ask first.** | Ask (changed after review) | |
+| 19 | **Attach token:** HMAC-SHA256 over run id, owner key, resume cursor and expiry (30 min) with an installation secret (encrypted in BCONFIG); the watchdog verifies it without asking PHP. | Proposed | |
 | 20 | **Capacity page:** Admin → System → **Capacity** at `/admin/capacity`, sibling of Features, administrators only. Copy says "server", never "node" or "container" (UX contract §8); Kubernetes facts sit in a technical row. | Proposed | |
 | 21 | **Metrics:** Prometheus text on the watchdog's `:8098/metrics` (FrankenPHP's own metrics merged with Synaplan's). The in-app page needs no Prometheus: the watchdog writes snapshots and one-minute aggregates to Redis. | Proposed | |
 | 22 | **Request timeline:** one redacted record per request (route class, status, durations, AI calls, tool calls, outbound calls, database time) in a Redis ring (10,000 records, 24 h), built from an allow-list like the event ring. No table. | Proposed | |
 | 23 | **Kubernetes:** liveness → watchdog `/live`, readiness → watchdog `/ready` (false while PHP misses its own probe for 2 s, Redis is down, or the server drains); HPA on `synaplan_stream_slots_busy_ratio` through KEDA or prometheus-adapter, off by default; `preStop` drain. In `synaplan-charts`, with that repo's gate. | Proposed | |
-| 24 | **Flags.** Boot-time settings are env (pools, `max_wait_time`, watchdog). Runtime switches are global BCONFIG (`RUNTIME.STREAM_PUMP`, `EGRESS.MODE`, `AI.USAGE_HOOK`, …). Every new behaviour has a kill switch and is off until its soak; then seeded on for new installs, and existing installs get it through an explicit migration `UPDATE` (AGENTS.md: BCONFIG defaults are bootstrap-only). | Proposed | |
+| 24 | **Flags.** Boot-time settings are env and therefore per server (pools, `max_wait_time`, watchdog, `SYNAPLAN_RELAY`). Runtime switches are global BCONFIG and therefore installation-wide (`RUNTIME.STREAM_PUMP`, `EGRESS.MODE`, `AI.USAGE_HOOK`, …): a per-server rollout or rollback uses an env switch, never a BCONFIG one. Every new behaviour has a kill switch and is off until its soak; then seeded on for new installs, and existing installs get it through an explicit migration `UPDATE` (AGENTS.md: BCONFIG defaults are bootstrap-only). | Proposed (changed after review) | |
 | 25 | **No schema change.** Timelines and snapshots in Redis, audit in `BAUDITLOG`, settings in BCONFIG. A step that needs a table stops and asks. | Proposed | |
 | 26 | **Cross-repo.** AU8 and AU34 land in `synaplan-charts`; rollout notes for the web nodes in `synaplan-platform` (private, no IPs here); no base-image change (the worker Caddyfile override lives in this repo). | Proposed | |
 | 27 | **The numbers are published.** `02_measurements.md` answers the architect now; `docs/CAPACITY.md` (AU35) is the maintained version with the production figures of AU6. | Proposed | |
@@ -233,7 +233,7 @@ Details, wireframes and copy in the sprint files and in
 | **J-AU-3** — Olga sends all outbound traffic through the company proxy: report mode, the Outbound tab, missing entries added, enforce | Olga | AU15, AU33 |
 | **J-AU-4** — A developer adds an OpenAI-compatible provider with one class and model rows; it appears under AI keys, in the model list and in the allowlist | Dev | AU22 |
 | **J-AU-5** — Ada finds every tool call in the audit log: a document edit in chat, an MCP write from a gateway, a Saved Task step | Ada (administrator) | AU25b |
-| **J-AU-6** — Ben's answer keeps streaming while the server it started on restarts | Ben | AU31, AU34 |
+| **J-AU-6** — Ben's answer keeps streaming in the open page while the server it started on restarts | Ben | AU31b, again with AU34 |
 
 ---
 
@@ -306,7 +306,8 @@ Ids are stable; other plans may cite them.
 | AU29 | `refactor(ai): provider streams as a request plus an incremental decoder` | backend-only | AU17, AU28 |
 | AU30 | `feat(runtime): a stream pump reads provider streams outside the web workers` | backend-only | AU29, AU24, §0 #17 #18 |
 | AU31 | `feat(runtime): the watchdog holds AI streams so PHP never waits` | backend-only | AU30, §0 #15 #19 |
-| AU32 | `feat(runtime): chat, widget and both gateways stream through the watchdog by default` | backend-only | AU31, J-AU-1 and J-AU-6 walked |
+| AU31b | `feat(chat): an answer that loses its connection continues in the open page` | ota-candidate | AU30 (can land before AU31) |
+| AU32 | `feat(runtime): chat, widget and both gateways stream through the watchdog by default` | backend-only | AU31, AU31b, J-AU-1 and J-AU-6 walked |
 | **S6 — Capacity, Kubernetes, sizing** ([file](./S6_capacity_and_kubernetes.md)) | | | |
 | AU33 | `feat(admin): requests, AI calls, tools and outbound traffic on the capacity page` | ota-candidate | AU7, AU13, AU15, AU24 |
 | AU34 | `feat(kubernetes): scale on held streams and drain before a restart` (in `synaplan-charts`) | no-app-impact | AU8, AU31 |
@@ -331,7 +332,7 @@ Per pull request, in addition:
 
 ```bash
 make test-e2e                                                   # every step that changes an HTTP contract, a stream or a screen
-make -C frontend test-e2e-layout                                # AU4, AU7, AU21, AU25b, AU33
+make -C frontend test-e2e-layout                                # AU4, AU7, AU21, AU25b, AU31b, AU33
 make -C frontend generate-schemas && git diff --exit-code frontend/src/generated/   # zero diff unless the step adds an endpoint
 docker compose exec -T backend php bin/console lint:container   # every step that adds services, tags or attributes
 node scripts/mobile-impact.mjs --base <parent> --head HEAD      # equals the class in §5
@@ -349,7 +350,7 @@ pull request):
 | `GET /api/health` p95, idle, worker mode | ≤ 15 ms (after AU2: ≤ 5 ms) |
 | API probe p95 while the stream pool is saturated | ≤ 50 ms (after AU3) |
 | Pipeline overhead per AI call with the default hooks | ≤ 1 ms p95 (AU10 onward) |
-| Gateway TTFB overhead vs. direct, worker mode | ≤ 40 ms median (today ≈ 25 ms) |
+| Gateway overhead to the first text token vs. direct, worker mode, warm connections | ≤ the AU1 baseline + 15 ms median (baseline 10–50 ms on 2026-10-21) |
 | Watchdog hop added to TTFB | ≤ 5 ms p95 (AU31) |
 | Streams held per server with the watchdog and pump | ≥ 500 at 10 s each without a failed stream (AU31) |
 
@@ -384,7 +385,8 @@ pull request):
 | Audit volume | Write and destructive calls only (§0 #11); reads as metrics |
 | The watchdog becomes a second application | It never parses AI formats (rule); it copies frames PHP wrote; a size budget of 2,000 lines of Go outside tests, checked in its own `make test`; Linux only, shipped inside the backend image |
 | The pump stalls every stream it holds when one turn blocks | The pump does only non-blocking I/O; tools, persistence and memory go to Messenger jobs; one decoder per turn with a CPU guard; several pump processes per server |
-| Streams lost during a deploy | Today they are; after AU31 the run lives in Redis and the pump on its own role, so a web restart drops the client connection only and the client re-attaches (J-AU-6); AU34 drains before stopping |
+| Streams lost during a deploy | Today they are; after AU30 the run lives in Redis and the pump on its own role, so a web restart drops the client connection only. Today the open page then reloads the turn from history (`memberError.ts`, `recoverInterruptedTurn()`); AU31b makes it re-attach from its last frame instead (J-AU-6); AU34 drains before stopping |
+| A user-typed URL loses its DNS pin behind a proxy | `03` §3.6: tunnel to the pinned IP through an enterprise proxy, a request-scoped grant through the egress gateway; rebinding tests in AU15 and AU18 |
 | SSE contract drift | `StreamTranscriptCharacterizationTest` runs in both modes (in-request and pump) and must produce identical frames (AU30) |
 | Kubernetes autoscaling on a custom metric is not available everywhere | Off by default; KEDA and prometheus-adapter documented; the CPU HPA stays as a fallback with a warning that it does not see streams |
 | Three web nodes in production | Everything shared lives in Redis or the database; rollout one node at a time (`updatewebN.sh`); flags global, not per node |
@@ -426,3 +428,4 @@ pull request):
 | Date | Change |
 | ---- | ------ |
 | 2026-10-21 | Draft: research, code maps of the four directions, runtime spike (`spike/`), measurements (`02`), contracts, capacity and Kubernetes part, seven sprint files. |
+| 2026-10-21 | Copilot review of [#2623](https://github.com/metadist/synaplan/pull/2623), 14 findings, all accepted: the spike scripts count only complete streams, time the first text token over warm connections and report process RSS; every table re-measured (`02`: pump ≈ 134 MB, not 26 MB, for 1,000 streams; gateway overhead 10–50 ms). Contracts: hook phases in one order, one usage writer through every migration step and rollback, pinned requests behind a proxy, a job queue without secrets and with per-job expiry, run-stream entry kinds, no silent trimming, the attach cursor kept. AU31b added (re-attach in the open page); per-server vs. installation-wide switches separated (§0 #24). |

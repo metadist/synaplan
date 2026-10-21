@@ -114,8 +114,8 @@ Providers used: `test-model` (free), Groq `openai/gpt-oss-20b`, Anthropic
 | One `match` line with several patterns | `match /api/v1/messages/stream* /api/v1/widget/*/message /v1/chat/completions /v1/messages`: each of `/api/v1/messages/stream/attach`, `/api/v1/widget/abc/message`, `/v1/messages`, `/v1/chat/completions` counted on `streams`; `/api/health`, `/api/v1/config/runtime` on `api` |
 | FrankenPHP Prometheus metrics behind Caddy `metrics` | `frankenphp_busy_threads`, `busy_workers`, `queue_depth`, `ready_workers`, `total_threads`, `total_workers`, `worker_request_count`, `worker_request_time` |
 | Caddy admin `/frankenphp/threads` | per thread: state, busy, current URI and method, request start, request count, memory |
-| Symfony HttpClient multiplexing in one PHP process | 1,000 streams, 26 MB, 2.5 ms CPU per stream (`spike/pump`) |
-| Go relay, stdlib only | 2,000 streams, 142 MB (`spike/relay`); a second run reproduced it: 147.7 MB peak, 38 KB per stream, 6.0 s CPU, TTFB p95 0.15 s |
+| Symfony HttpClient multiplexing in one PHP process | 1,000 streams, all ending in `[DONE]`; process RSS 63 → ≈ 134 MB (≈ 73 KB per stream with libcurl's buffers; the PHP heap alone is 26 MB, which the first run reported by mistake), 2.7 ms CPU per stream (`spike/pump`, re-run after review) |
+| Go relay, stdlib only | 2,000 streams, all with HTTP 200 and `[DONE]`: 147 MB peak, ≈ 33 KB per stream, 6.6 s CPU, TTFB p95 0.14 s (re-run after review; the first two runs gave 142 and 148 MB); a `-race` build at 200 streams reported no data race |
 | Node 22.23.3 (`node:22-alpine` pinned in both Node sidecars) with `NODE_USE_ENV_PROXY=1` | `fetch()` and `https.get()` go to `HTTPS_PROXY` (ECONNREFUSED at an unreachable proxy); without the flag `fetch()` goes direct (200) |
 | One database connection per worker | 8 workers → 8 connections in `information_schema.PROCESSLIST` |
 | `/api/health` spawns a process | `WhisperService::isAvailable()` runs `whisper --help` on every call; ≈ 80 req/s at 1, 8 and 16 clients |
@@ -151,7 +151,46 @@ the runs stay in the dev database.
 
 ---
 
+## 2026-10-21 — Copilot review, round 1, and the re-run
+
+Copilot reviewed [#2623](https://github.com/metadist/synaplan/pull/2623)
+("Changes recommended", 14 threads: 5 medium on the benchmarks, 9 low on
+contracts and plan). All 14 were accepted. The four scripts were fixed, then
+every number they produce was measured again on the same stack (all tables in
+`02` are from this re-run; the clean-up was repeated: only PID 1 running, no
+`var/cache/prod`, gateway flags back to 0, no API key, no spike container):
+
+| Re-run | Result |
+| ------ | ------ |
+| Classic, 20 / 30 Haiku streams | all complete with text and `[DONE]`; probe max 10.72 s / 11.57 s; queued streams' first text p95 13.12 s |
+| Worker mode, 12 streams on 8 workers | 12 complete; first text p95 12.01 s; probe max 10.98 s; RSS 186 → 228 MB |
+| Split pools, 8 streams on 4 stream workers | probe p95 19 ms, max 30 ms |
+| `max_wait_time 2s` | 4 complete, 4 × 503; probe p95 20 ms |
+| Gateway overhead, worker mode, warm, 20 runs | Groq +12 / +30 ms, Anthropic +38 / +46 ms (`/v1/chat` / `/v1/messages`); the cold, per-call-connection variant made Synaplan look faster than the provider, hence warm connections on both sides |
+| Gateway overhead, classic, 10 runs | Groq +172 / +89 ms, Anthropic +123 / +144 ms (dev kernel boot); with `max_tokens 60` five of ten direct Groq runs had no answer text (reasoning model), hence `max_tokens 400` |
+| Go relay, 100–2,000 streams | all complete; 2,000 at 147 MB, 6.6 s CPU; `-race` clean |
+| PHP pump, 100–1,000 streams | all complete; 1,000 at ≈ 134 MB RSS (≈ 73 KB per stream) |
+
+The temporary admin key and the Messages gateway flags were set for these
+runs and removed / restored afterwards.
+
+---
+
 ## Review log
 
 | Date | Pull request | Round | Finding | Answer |
 | ---- | ------------ | ----- | ------- | ------ |
+| 2026-10-21 | #2623 | 1 | Pump reports PHP heap, not process RSS | Defect. `pump.php` reads `VmRSS` / `VmHWM`; re-run: ≈ 134 MB for 1,000 streams; `02` §1, §4.4, master §0 #17, ROADMAP corrected |
+| 2026-10-21 | #2623 | 1 | Relay counts 502/503 and cut-off streams as ok | Defect. Ok = HTTP 200 and `[DONE]`; re-run: 0 failed at every size |
+| 2026-10-21 | #2623 | 1 | Relay sampler races with the final peak read | Defect. Sampler done-channel waited on; `-race` build clean |
+| 2026-10-21 | #2623 | 1 | `overhead.py` times metadata, keeps failed and textless runs | Defect. First non-empty text delta, non-200 / error / textless counted as failures; warm connections; `max_tokens 400`; re-run: 10–50 ms; `02` §3.1, master §0 #4, §6 |
+| 2026-10-21 | #2623 | 1 | `saturate.py` counts partial and error streams as ok | Defect. Ok = 200 + text + `[DONE]`, SSE errors recorded; re-run of every case |
+| 2026-10-21 | #2623 | 1 | After-hooks in reverse order run metrics before usage | Defect in the contract. Both phases descending; `HookContractTest` pins usage before metrics (`03` §1.2–§1.3) |
+| 2026-10-21 | #2623 | 1 | Proxy routing loses the pin and the per-request exception | Gap. `03` §3.6: tunnel to the pinned IP via an enterprise proxy, request-scoped grants via the gateway, rebinding tests (AU15, AU18) |
+| 2026-10-21 | #2623 | 1 | `stream:jobs` has no per-job expiry; payloads keep provider keys | Gap. Opaque ids in the stream, bodies in keys with their own TTL, `GETDEL` claim, `XACK` + `XDEL`, `XAUTOCLAIM`, claim deadline; no provider key in Redis — the pump builds the request (`03` §7) |
+| 2026-10-21 | #2623 | 1 | The watchdog cannot see completion without parsing | Gap. Entry kinds `frame` / `terminal` / `gap`; close on `terminal` with a healthy pump; test (`03` §8) |
+| 2026-10-21 | #2623 | 1 | `MAXLEN` hides lost prefixes | Gap. No trimming; byte cap with a `gap` entry and the existing truncated flag, ending in today's recoverable path; test (`03` §8) |
+| 2026-10-21 | #2623 | 1 | Attach from `0` loses the `from` cursor | Gap. `fromSeq` in the directive and the token, entry ids `0-{seq}`, `id:` lines kept for web chat and widget (`03` §8) |
+| 2026-10-21 | #2623 | 1 | AU11 could leave the gateway unmetered; retained modes stop metering | Gap. One writer per billable call at every step and rollback: `legacy` / `shadow` / `on`, `LegacyUsageWriter`, gateway and voice join in AU12 with their writers (`03` §1.5, S1 AU11–AU12, master §0 #5) |
+| 2026-10-21 | #2623 | 1 | No live re-attach in the open page after a transport drop | Gap, confirmed in `memberError.ts:46–50`. New step AU31b (`ota-candidate`), J-AU-6 walked there |
+| 2026-10-21 | #2623 | 1 | A global pump flag cannot roll back one node | Gap. §0 #24 separates per-server env switches from installation-wide BCONFIG ones; AU31 rollout and AU32 drills split accordingly |

@@ -65,7 +65,7 @@ builds an `AiCall`, calls `AiCallPipeline::run()` (or `stream()`), and returns
 final readonly class AsAiCallHook
 {
     public function __construct(
-        public int $priority,                 // higher runs earlier before the call, later after it
+        public int $priority,                 // higher runs earlier, in both phases (before and after)
         public bool $blocking = false,        // true: may do network I/O or call a model
         public int $budgetMs = 1,             // cut-off; enforced for blocking hooks
         public HookFailure $onError = HookFailure::Open,   // Open: log and continue · Closed: refuse the call
@@ -103,8 +103,12 @@ order, pinned by a test (the tagged-list rule of `docs/ARCHITECTURE.md`).
 | 200 | `AiCallMetricsHook` | — | counters, histograms, the call record of the request timeline | — | AU13 |
 | 100 | `AiCallAuditHook` | — | `ai.call` audit row only when an installation turns on "audit AI calls" (off by default) | — | AU13 |
 
-The order is a contract: limits before the breaker (a refused call does not
-count as a provider failure), usage before metrics (metrics read the cost).
+Both phases run in **descending priority** (900 → 100), before and after the
+call alike. The order is a contract: limits before the breaker (a refused call
+does not count as a provider failure), usage before metrics (metrics read the
+cost `UsageHook` computed), metrics before audit. `HookContractTest` pins the
+whole order and asserts explicitly that `UsageHook::after()` runs before
+`AiCallMetricsHook::after()`.
 
 ### 1.4 Budget and failure
 
@@ -122,19 +126,39 @@ count as a provider failure), usage before metrics (metrics read the cost).
 - A hook exception never escapes the pipeline: `Open` hooks log it, `Closed`
   hooks refuse.
 
-### 1.5 Metering, double entry
+### 1.5 Metering: exactly one writer per billable call, at every step
 
-1. AU11 adds `UsageHook` with `AI.USAGE_HOOK = shadow`: it builds the
-   `BUSELOG` row it would write and compares it with the row the caller wrote
-   in the same request (same request id, action, provider, model). A mismatch
-   logs `ai.usage_mismatch` (action, provider, model, token delta — no
-   content) to the event ring.
-2. `AiPathCharacterizationTest` asserts equality per path; the paths without
-   a caller row today (F1: Perplexity web answer, LLM rerank, …) are listed as
-   expected additions.
-3. After seven days without a mismatch in production, `AI.USAGE_HOOK = on`:
-   the hook writes, callers' `recordUsage()` calls are removed in the same
-   pull request, and the snapshot shows one row per billable call.
+The rule that holds through the whole migration and every rollback: **each
+billable call has exactly one writer of its `BUSELOG` row.**
+
+| `AI.USAGE_HOOK` | Who writes | `UsageHook` |
+| --------------- | ---------- | ----------- |
+| `legacy` (default until AU11 part 2) | the caller, as today | silent |
+| `shadow` | the caller | computes the row it would write, compares, logs `ai.usage_mismatch` (action, provider, model, token delta — no content) to the event ring |
+| `on` | `UsageHook`, for paths that run through the pipeline | writes |
+
+1. AU11 part 1 adds `UsageHook` and `LegacyUsageWriter`. Every caller's
+   `recordUsage()` call for an AI action moves into `LegacyUsageWriter`, which
+   writes only when the mode is not `on` **or** the path has not joined the
+   pipeline yet. A path is "joined" by a constant on its `AiCallSource`, set
+   in the step that moves it.
+2. `AiPathCharacterizationTest` asserts, per path and per mode, one row per
+   billable call. The paths without a row today (F1: Perplexity web answer,
+   LLM rerank, …) get theirs when they join (`on` only).
+3. After seven days of `shadow` in production without a mismatch, `on`. The
+   `/v1/messages` gateway and live voice keep their own writers until AU12
+   joins them; AU12 flips their constant in the same pull request, so there is
+   no release in which they are unmetered.
+4. Rollback at any time: `legacy` or `shadow` restores the callers' writers
+   for every path, because `LegacyUsageWriter` is still there.
+5. After one release with `on` everywhere, a separate pull request removes
+   `LegacyUsageWriter` and the setting. `UsageHook` then carries no flag
+   (`flag: null`): metering cannot be switched off, and the way back from
+   that point is a release revert, not a setting.
+
+Non-AI usage rows (`TOOLS`, `MCP_TOOL`, `COMPUTE_RUNS`, `WEB_SEARCH` from tool
+loops, storage, messages-per-hour counters) are not part of this switch; they
+move with the tool invoker (S4).
 
 ### 1.6 Paths that join (AU12)
 
@@ -267,7 +291,7 @@ final readonly class EgressDecision
 | The endpoints of every enabled provider's descriptor | `api.anthropic.com:443` | AU22 (AU15 uses a static list until then) |
 | Configured integrations | the OpenAI-compatible endpoints, MCP servers, web-search plugs, WhatsApp Graph, Telegram, Stripe, OAuth providers, federation peers | AU15 |
 | Administrator entries | `*.example.org:443` (one wildcard level) | AU15 |
-| Requests whose URL a person typed (URL reader, custom tools, MCP servers of a person, URL watch) | allowed per request by `SsrfGuard` + pinned connect, never added to the list | unchanged |
+| Requests whose URL a person typed (URL reader, custom tools, MCP servers of a person, URL watch) | allowed per request by `SsrfGuard` + pinned connect, never added to the list; behind a proxy as §3.6 | AU15 (direct proxy), AU18 (gateway) |
 
 Settings: `EGRESS.MODE` (BCONFIG global, default `off`), `EGRESS.ALLOW`
 (JSON list), env `EGRESS_PROXY`, `EGRESS_NO_PROXY`. Admin → System settings →
@@ -301,6 +325,26 @@ to their existing "service not reachable" sentence.
 an injected client. `egressInventoryBaseline.json` freezes today's sites; it may
 only shrink. After AU17 it lists only the allow-listed transports (Triton
 gRPC, Redis, SMTP, IMAP).
+
+### 3.6 Pinned requests behind a proxy
+
+Today a URL a person typed is checked by `SsrfGuard`, and `HttpToolExecutor`
+connects to the checked address through HttpClient's `resolve` option. Behind
+any HTTP proxy that pin is lost: the client sends `CONNECT host:port`, and the
+proxy resolves the name again — the DNS-rebinding window `resolve` closes.
+And these destinations are deliberately not on the shared allowlist, so a
+gateway that enforces it would refuse them.
+
+| Route | Rule |
+| ----- | ---- |
+| No proxy | unchanged: `resolve` pin, no redirects |
+| An enterprise proxy set for PHP (`EGRESS_PROXY` / `HTTPS_PROXY`) | PHP tunnels to the **pinned IP**: `CONNECT <ip>:<port>` while TLS keeps the original name for SNI and certificate checks (curl `CURLOPT_CONNECT_TO` through HttpClient's `extra.curl`). AU15 verifies this with a test proxy that logs the `CONNECT` target and with a rebinding resolver (first answer public, second private) |
+| The Synaplan egress gateway (AU18) | PHP writes a **request-scoped grant** to Redis before the request: `egress:grant:{id}` = destination host and port, the pinned IPs, the request id, TTL 60 s, deleted after use. The request carries `Proxy-Authorization: Bearer <grant id>`. The gateway dials only the granted IPs for that one tunnel; without a valid grant the destination must be on the shared list |
+| The gateway chained to an enterprise proxy (`UPSTREAM_PROXY`) | The gateway sends `CONNECT <pinned ip>:<port>` upstream. If the enterprise proxy refuses IP literals, the installation must choose: allow IP literals for granted tunnels there, or turn off typed-URL features (`docs/EGRESS.md` says so; a test covers the refusal copy) |
+
+Tests (AU15, AU18): a custom HTTP tool and the URL reader through each route;
+a rebinding name never reaches the private address; an expired or reused
+grant is refused; the grant carries no secret and is never logged.
 
 ---
 
@@ -439,17 +483,30 @@ hostname.
 - Role `pump` of the backend image (`SYNAPLAN_ROLE=pump`), started by
   `_docker/backend/lib/container-runtime.sh` like `worker`; in compose a
   `pump` service; on the platform one per web node to start.
-- Reads jobs from the Redis Stream `stream:jobs` (consumer group `pump`):
+- **Jobs carry no secret and expire one by one.** The queue `stream:jobs`
+  (consumer group `pump`) holds only opaque ids: `XADD stream:jobs * job <jobId>`.
+  The job itself is a separate key with its own TTL:
 
 ```json
+// stream:job:{jobId}   TTL 120 s, deleted on claim
 { "runId": "…", "callId": "…", "channel": "chat_stream|widget|openai_api|messages_api",
-  "provider": "anthropic", "request": { "method": "POST", "url": "…", "headers": { … }, "body": "…" },
+  "provider": "anthropic", "model": "claude-…", "call": { "payload": { … }, "options": { … } },
   "decoder": "anthropic_messages", "encoder": "synaplan_sse|openai_chunks|anthropic_events",
   "deadlineSec": 240, "turn": { "chatId": 1, "messageId": 2, "userId": 3 } }
 ```
 
-  The request headers carry the provider key; the job lives only in Redis,
-  with a TTL of 60 s until claimed, and is never logged.
+  No provider key and no auth header are in Redis: the pump is PHP and builds
+  the request itself (`buildStreamRequest(AiCall)`, §7 below), reading the key
+  from `ProviderKeyStore` in its own process. Prompts in `call.payload` live
+  only for the 120 s until claim.
+- **Lifecycle.** `XREADGROUP` gives a pump the id; `GETDEL stream:job:{jobId}`
+  claims the body atomically; then `XACK` and `XDEL` remove the entry, so the
+  stream holds only unclaimed ids. A body that already expired ⇒ the pump
+  writes the run's terminal entry ("could not start", §8) and removes the id.
+  An id read by a pump that died before `GETDEL` is taken over with
+  `XAUTOCLAIM` after 10 s. A run stays in state `queued` with a claim deadline
+  of 30 s; the reaper (below) fails a queued run past it. A half-streamed
+  answer is never retried.
 - One event loop: `HttpClient::stream()` over all active responses with a
   50 ms tick; per chunk `StreamDecoderInterface::feed()` → `StreamChunk`s →
   `AiCallPipeline` streaming hooks → encoder → `XADD chatrun:{runId}:stream`.
@@ -484,30 +541,61 @@ so in-request mode and pump mode share the same decoder.
 
 ## 8. Run stream, attach directive, attach token (S5)
 
-- `chatrun:{runId}:stream` — Redis Stream of frames; each entry
-  `{seq, frame}` where `frame` is the exact bytes for the client's wire
-  (`event: …\ndata: …\n\n` or `data: {…}\n\n`). `MAXLEN ~ 5000`, TTL as
-  `ChatRunBuffer` today (30 min running, 5 min terminal). The ZSET is written
-  as well until AU32 ships; `StreamAttachController` reads either.
+- `chatrun:{runId}:stream` — Redis Stream, one entry per frame, written with
+  the **explicit id `0-{seq}`** (`XADD key 0-{seq} …`), where `seq` is today's
+  SSE sequence number (`id:` of `StreamAttachController`). Fields:
+
+  | Field | Meaning |
+  | ----- | ------- |
+  | `kind` | `frame` (copy and flush), `terminal` (copy, flush, close — the run ended, successfully or not), `gap` (the log was cut, see below) |
+  | `frame` | the exact bytes for the client's wire (`event: …\ndata: …\n\n` or `data: {…}\n\n`), without the `id:` line |
+
+  The watchdog closes on `terminal` while the pump is healthy; it never has to
+  read a frame to know the run ended. TTL as `ChatRunBuffer` today (30 min
+  running, 5 min terminal). The ZSET is written as well until AU32 ships;
+  `StreamAttachController` reads either.
+- **No silent trimming.** No `MAXLEN`. The log is complete for its lifetime up
+  to `RUNTIME.RUN_STREAM_MAX_BYTES` (default 16 MiB; today's replay buffer
+  stops at 1 MiB, `ChatRunRecorder::MAX_BUFFERED_BYTES`, but there the live
+  client did not read from it). At the cap the pump appends one `gap` entry
+  and marks the run truncated, exactly as `ChatRun::markTruncated()` does
+  today; a reader that meets `gap` writes the directive's `terminal` frame,
+  which the clients already treat as a recoverable error and answer with the
+  history recovery they use today. The pump keeps generating; the stored
+  reply is complete.
 - With `SYNAPLAN_RELAY=1`, Caddy sends the long routes to the watchdog, which
   forwards the request to PHP with `X-Synaplan-Relay: 1`. PHP either answers
   normally (the watchdog passes the response through, byte for byte) or
   answers `200` with `Content-Type: application/vnd.synaplan.attach+json`:
 
 ```json
-{ "runId": "…", "token": "…", "contentType": "text/event-stream",
-  "headers": { "X-Request-Id": "…" },
+{ "runId": "…", "token": "…", "fromSeq": 0, "sseIds": true,
+  "contentType": "text/event-stream", "headers": { "X-Request-Id": "…" },
   "terminal": "data: {\"status\":\"error\",\"message\":\"…\"}\n\n",
   "idleTimeoutSec": 60 }
 ```
 
-- `token` = base64url(runId · ownerKey · exp) + "." + HMAC-SHA256 with
-  `RUNTIME.ATTACH_SECRET`. The watchdog checks signature and expiry, then
-  `XREAD BLOCK` on the run stream from `0`, writes each frame, flushes, and
-  sends an SSE comment `: keep-alive` every 15 s of silence.
+- `token` = base64url(runId · ownerKey · fromSeq · exp) + "." + HMAC-SHA256
+  with `RUNTIME.ATTACH_SECRET`; the cursor is inside the signature, so a client
+  cannot widen it.
+- **The resume cursor survives.** A new stream gets `fromSeq: 0` (full replay).
+  An attach (`GET /api/v1/messages/stream/attach?from=N`) is authorized by PHP
+  exactly as today and answered with `fromSeq: N`. The watchdog reads
+  `XREAD BLOCK … STREAMS chatrun:{runId}:stream 0-{fromSeq}`, which returns only
+  entries after the cursor, so a resumed attach never repeats rendered text.
+  `sseIds: true` (web chat, widget) makes the watchdog prefix each frame with
+  `id: {seq}` as `StreamAttachController::emit()` does; `false` for the
+  gateways, whose wire has no ids today.
+- Each frame is written and flushed; an SSE comment `: keep-alive` goes out
+  after 15 s of silence. `terminal` or `gap` ⇒ write, flush, close.
 - If the run stream stays silent for `idleTimeoutSec` and the pump heartbeat
-  is gone, the watchdog writes `terminal` and closes. A stream always ends in
-  a terminal frame.
+  is gone, the watchdog writes the directive's `terminal` frame and closes. A
+  stream always ends in a terminal frame.
+- Tests (AU30, AU31): completion while the pump stays healthy closes the
+  client; a resumed attach from `N` gets exactly the frames after `N`; a run
+  past the byte cap (cap set small in the test) ends with the recoverable
+  terminal and a complete stored reply; an expired job body and a dead
+  pre-claim consumer both end their runs in a terminal frame.
 - Client disconnect → the watchdog sets the cancel flag (`CancelledTurns`
   key) for runs whose channel cancels on disconnect (gateways), and leaves
   web-chat runs running so a reload re-attaches (today's behaviour).

@@ -4,9 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 IMAGE="${GO_IMAGE:-golang:1.25.8}"
-docker run --rm -e CLIENTS -v "$PWD":/src -w /src "$IMAGE" sh -c '
+docker run --rm -e CLIENTS -e RACE -v "$PWD":/src -w /src "$IMAGE" sh -c '
   set -e
-  go build -o /tmp/relay main.go
+  if [ "${RACE:-0}" = 1 ]; then go build -race -o /tmp/relay main.go; else go build -o /tmp/relay main.go; fi
   /tmp/relay --mode upstream --listen :9001 --tokens 200 --interval 50ms &
   /tmp/relay --mode relay --listen :9000 --upstream http://127.0.0.1:9001/stream &
   sleep 1

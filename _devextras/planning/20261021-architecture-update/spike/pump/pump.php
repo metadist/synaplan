@@ -22,6 +22,19 @@ use Symfony\Component\HttpClient\HttpClient;
 $url = $argv[1] ?? 'http://spike-upstream:9001/stream';
 $streams = (int) ($argv[2] ?? 100);
 
+/** Resident memory of this process in MB from /proc (includes libcurl's native buffers, unlike memory_get_usage()). */
+function procMemoryMb(string $field): float
+{
+    $status = (string) @file_get_contents('/proc/self/status');
+    if (1 !== preg_match('/^'.$field.':\s+(\d+)\s+kB/m', $status, $match)) {
+        return 0.0;
+    }
+
+    return (int) $match[1] / 1024;
+}
+
+$rssBefore = procMemoryMb('VmRSS');
+
 $client = HttpClient::create([], $streams);
 $started = microtime(true);
 $usageBefore = getrusage();
@@ -41,20 +54,36 @@ foreach ($responses as $i => $response) {
 }
 
 $done = 0;
+$failed = 0;
+$sawDone = array_fill(0, $streams, false);
+$rssPeakSampled = $rssBefore;
+$lastSample = 0.0;
 foreach ($client->stream($responses) as $response => $chunk) {
     $i = $ids[$response];
-    if ($chunk->isTimeout()) {
-        continue;
+    if (microtime(true) - $lastSample > 0.5) {
+        $rssPeakSampled = max($rssPeakSampled, procMemoryMb('VmRSS'));
+        $lastSample = microtime(true);
     }
-    if ($chunk->isFirst()) {
-        $firstChunkAt[$i] = microtime(true) - $started;
-        continue;
+    try {
+        if ($chunk->isTimeout()) {
+            continue;
+        }
+        if ($chunk->isFirst()) {
+            $firstChunkAt[$i] = microtime(true) - $started;
+            continue;
+        }
+        if ($chunk->isLast()) {
+            200 === $response->getStatusCode() && $sawDone[$i] ? ++$done : ++$failed;
+            continue;
+        }
+        $content = $chunk->getContent();
+        $events[$i] += substr_count($content, 'data: ');
+        if (str_contains($content, 'data: [DONE]')) {
+            $sawDone[$i] = true;
+        }
+    } catch (Symfony\Contracts\HttpClient\Exception\ExceptionInterface) {
+        ++$failed;
     }
-    if ($chunk->isLast()) {
-        ++$done;
-        continue;
-    }
-    $events[$i] += substr_count($chunk->getContent(), "data: ");
 }
 
 $wall = microtime(true) - $started;
@@ -64,14 +93,21 @@ $cpu = ($usageAfter['ru_utime.tv_sec'] + $usageAfter['ru_utime.tv_usec'] / 1e6 +
 sort($firstChunkAt);
 $p95 = $firstChunkAt[(int) floor(0.95 * (count($firstChunkAt) - 1))] ?? 0.0;
 
+$rssHwm = procMemoryMb('VmHWM');
 printf(
-    "streams=%d done=%d events=%d wall=%.1fs cpu=%.2fs (%.1f ms per stream) peak_mem=%.1f MB first_chunk_p95=%.3fs\n",
+    "streams=%d done=%d failed=%d events=%d wall=%.1fs cpu=%.2fs (%.1f ms per stream) php_heap_peak=%.1f MB "
+    ."rss_before=%.1f MB rss_peak=%.1f MB (VmHWM %.1f MB) -> %.1f KB RSS per stream, first_chunk_p95=%.3fs\n",
     $streams,
     $done,
+    $failed,
     array_sum($events),
     $wall,
     $cpu,
     $cpu / max(1, $streams) * 1000,
     memory_get_peak_usage(true) / 1048576,
+    $rssBefore,
+    $rssPeakSampled,
+    $rssHwm,
+    max(0.0, $rssHwm - $rssBefore) * 1024 / max(1, $streams),
     $p95,
 );

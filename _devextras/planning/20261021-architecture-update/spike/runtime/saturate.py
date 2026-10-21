@@ -75,19 +75,39 @@ def run_stream(base, key, model, prompt, max_tokens, record, start_gate):
         resp = conn.getresponse()
         record["status"] = resp.status
         chunks = 0
-        first = None
+        first_event = None
+        first_text = None
+        done = False
         while True:
             line = resp.readline()
             if not line:
                 break
-            if line.startswith(b"data:"):
-                if first is None:
-                    first = time.monotonic()
-                chunks += 1
-                if line.strip() == b"data: [DONE]":
-                    break
-        record["ttfb"] = (first - started) if first else None
+            if not line.startswith(b"data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == b"[DONE]":
+                done = True
+                break
+            if first_event is None:
+                first_event = time.monotonic()
+            chunks += 1
+            try:
+                event = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            if "error" in event:
+                record["error"] = f"SSE error: {str(event['error'])[:200]}"
+                break
+            if first_text is None:
+                for choice in event.get("choices") or []:
+                    if (choice.get("delta") or {}).get("content"):
+                        first_text = time.monotonic()
+                        break
+        record["ttfb"] = (first_event - started) if first_event else None
+        record["ttft"] = (first_text - started) if first_text else None
         record["chunks"] = chunks
+        if resp.status == 200 and not done and "error" not in record:
+            record["error"] = "stream ended before [DONE]"
         conn.close()
     except Exception as exc:  # noqa: BLE001 - a spike records every failure
         record["error"] = f"{type(exc).__name__}: {exc}"
@@ -234,7 +254,7 @@ def main() -> int:
     sampler.join()
     wall = time.monotonic() - t0
 
-    ok = [r for r in records if r.get("status") == 200 and not r.get("error")]
+    ok = [r for r in records if r.get("status") == 200 and not r.get("error") and r.get("ttft") is not None]
     result = {
         "model": args.model,
         "streams": args.streams,
@@ -250,6 +270,7 @@ def main() -> int:
             {k: r.get(k) for k in ("status", "error")} for r in records if r not in ok
         ],
         "stream_ttfb_s": summary([r["ttfb"] for r in ok if r.get("ttfb") is not None]),
+        "stream_ttft_s": summary([r["ttft"] for r in ok]),
         "stream_duration_s": summary([r["duration"] for r in ok]),
         "probe_baseline_s": summary(baseline),
         "probe_during_s": summary([p["latency"] for p in probes if "latency" in p]),

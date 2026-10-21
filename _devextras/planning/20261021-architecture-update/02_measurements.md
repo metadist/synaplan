@@ -11,6 +11,19 @@ hardware (requests per second, absolute memory) are indicative. The numbers
 that depend on the design (one worker per stream, CPU share of a held stream,
 cost per stream in Go and in a PHP pump) carry over.
 
+**Method (after the review of [#2623](https://github.com/metadist/synaplan/pull/2623)).**
+The first run of the scripts had four measuring defects that Copilot found;
+every table below is from the corrected re-run. A stream counts as successful
+only with HTTP 200, answer text and its end marker (`[DONE]`); failed and cut-off
+streams are counted, never averaged in. Time to first token means the first
+non-empty **text** delta (not a role, metadata or empty delta). The pump's
+memory is the process's resident memory from `/proc/self/status`, which
+includes libcurl's buffers, not only the PHP heap. The Go load client waits for
+its memory sampler before reading the peak (`go build -race`: no report).
+The design conclusions did not change; two numbers did, and both are corrected
+here and in the plan: the PHP pump's memory (≈ 134 MB, not 26 MB, for 1,000
+streams) and the gateway overhead (10–50 ms, not "≈ 25 ms").
+
 ---
 
 ## 1. The headline
@@ -22,12 +35,12 @@ cost per stream in Go and in a PHP pump) carry over.
 | CPU a held stream uses | **≈ 4 %** of its duration (upper bound; dev boots the kernel per request). The worker waits on the provider ≥ 96 % of the time | §2.3 |
 | Memory per worker | **≈ 3.3 MB** per extra booted worker (170 MB with 2 workers, 243 MB with 24). Memory is not the limit | §2.4 |
 | What does limit adding workers | **One database connection per worker** (8 workers → 8 connections). 3 nodes × N workers on one Galera cluster | §2.5 |
-| What the gateways add before the first token | **≈ 25 ms** median in worker mode | §3.1 |
+| What the gateways add before the first text token | **+10 to +50 ms** median in worker mode, with warm connections on both sides; inside the network jitter | §3.1 |
 | What the app's own chat adds before the first token | **≈ 1.5 s**: AI sorter 1.0 s, shared embedding 0.23 s, memory search 0.24 s. A pre-call step that calls a model already exists: the sorter | §3.2 |
-| Separate pool for streams | API stays at **22 ms p95** while streams saturate their pool (was 10.8 s) | §4.1 |
-| Fast "busy" instead of a silent wait | `max_wait_time 2s` → the excess streams get **503 after 2 s** instead of waiting 12 s | §4.2 |
-| One Go process holding streams | **2,000 streams, 142 MB peak RSS (~35 KB each), 6.3 s CPU** for 2,000 × 10 s | §4.3 |
-| One PHP process holding provider streams | **1,000 streams, 26 MB peak, 2.5 ms CPU each** (Symfony HttpClient, curl_multi) | §4.4 |
+| Separate pool for streams | API stays at **19 ms p95, 30 ms max** while streams saturate their pool (one shared pool: 11 s) | §4.1 |
+| Fast "busy" instead of a silent wait | `max_wait_time 2s` → the excess streams get **503** instead of waiting 12 s | §4.2 |
+| One Go process holding client streams | **2,000 streams, 147 MB peak RSS (≈ 33 KB each), 6.6 s CPU** for 2,000 × 10 s | §4.3 |
+| One PHP process holding provider streams | **1,000 streams, ≈ 134 MB peak RSS (≈ 73 KB each, libcurl included; PHP heap 26 MB), 2.7 ms CPU each** (Symfony HttpClient, curl_multi) | §4.4 |
 
 **Answer for "start with mid-sized customers":** today's limit is a design
 limit, not a hardware limit. One web node serves as many simultaneous AI turns
@@ -43,24 +56,24 @@ Little's law is in §5.
 ### 2.1 Classic mode, 20 threads (the dev backend as it runs)
 
 `saturate.py`, model `claude-haiku-4-5-20251001`, a 700-word answer (≈ 12 s).
-The probe is `GET /api/health`.
+The probe is `GET /api/health` every 250 ms.
 
-| Streams | Threads busy (max) | Stream TTFB p50 / p95 | Stream duration p95 | Probe p50 / p95 / max | Probes answered |
-| ------: | -----------------: | --------------------- | ------------------: | --------------------- | --------------: |
-| 10 (`test-model`) | 12 of 20 | 0.54 / 0.55 s | 1.8 s | 0.10 / 0.55 / 0.55 s | 11 |
-| 20 | **20 of 20** | 1.68 / 1.79 s | 13.1 s | 0.10 / **11.06** / 11.06 s | 5 in 13 s |
-| 30 | **20 of 20** | 1.90 / **12.87** s | 24.0 s | 0.11 / 0.16 / **11.51** s | 34 |
+| Streams | Threads busy (max) | Streams ok | First text p50 / p95 | Duration p95 | Probe p50 / p95 / max | Probes answered |
+| ------: | -----------------: | ---------: | -------------------- | -----------: | --------------------- | --------------: |
+| 20 | **20 of 20** | 20 | 2.13 / 2.26 s | 13.4 s | 1.35 / **10.72** / 10.72 s | 4 in 13 s |
+| 30 | **20 of 20** | 30 | 1.69 / **13.12** s | 24.2 s | 0.11 / 0.14 / **11.57** s | 34 |
 
 At 30 streams the ten that did not get a thread waited about one stream
-duration (≈ 11 s) before their first token.
+duration (≈ 11 s) before their first token. (A first run, with the looser
+success rule, gave the same picture: probe max 11.06 s and 11.51 s.)
 
 ### 2.2 Production worker mode, 8 workers
 
 `worker-mode.Caddyfile` (`APP_ENV=prod`, `num 8`, `num_threads 12`).
 
-| Streams | Workers busy (max) | Stream TTFB p50 / p95 | Probe baseline p50 | Probe during p50 / max |
-| ------: | -----------------: | --------------------- | -----------------: | ---------------------- |
-| 12 | **8 of 8** | 1.23 / **12.06** s | 16 ms | 15 ms / **10.85 s** |
+| Streams | Workers busy (max) | Streams ok | First text p50 / p95 | Probe baseline p50 | Probe during p50 / max | FrankenPHP RSS before → during |
+| ------: | -----------------: | ---------: | -------------------- | -----------------: | ---------------------- | ------------------------------ |
+| 12 | **8 of 8** | 12 | 1.29 / **12.01** s | 15 ms | 15 ms / **10.98 s** | 186 → 228 MB |
 
 The four threads outside the worker pool stay idle: every request goes to
 `public/index.php`, which is the worker. Worker count is the ceiling, as
@@ -87,7 +100,7 @@ booted):
 | 24 | 243 MB |
 
 ≈ 3.3 MB per extra worker; the base (≈ 160 MB) is mostly the shared OPcache.
-During 8 streams the RSS rose 182 → 202 MB (≈ 2.5 MB per streaming request); in
+During 8 streams the RSS rose 186 → 228 MB (≈ 5 MB per streaming request); in
 classic mode 20 streams raised the container 447 → 690 MB (≈ 12 MB each, dev
 mode). The production limit stays `num_threads × memory_limit` (32 × 512 MB),
 as `PHP-RUNTIME-SIZING.md` says, not the resident size.
@@ -125,18 +138,37 @@ caches the probe.
 
 ### 3.1 The gateways
 
-`overhead.py`, 10 runs, `max_tokens 60`, time to first token:
+`overhead.py`: time to the first **text** delta, `max_tokens 400` (so the
+reasoning model `gpt-oss` always reaches answer text), failures counted and
+left out. Every call reuses one keep-alive connection per destination after a
+warm-up call, so the direct call and Synaplan's call to the provider are both
+warm — Synaplan's long-lived workers keep their provider connections, and a
+cold direct call would otherwise flatter the gateway.
 
-| Model | Direct p50 | `/v1/chat/completions` classic | worker mode |
-| ----- | ---------: | -----------------------------: | ----------: |
-| Groq `openai/gpt-oss-20b` | 0.13 s | +0.19 s | **+0.03 s** |
-| Anthropic `claude-haiku-4-5-20251001` | 0.47 s | +0.13 s | **±0.01 s** (inside network jitter) |
-| Anthropic via `/v1/messages` (classic) | 0.48 s | +0.15 s | — (gateway off locally) |
+**Worker mode, warm, 20 runs per path, no failure:**
+
+| Model | Direct p50 / p95 | `/v1/chat/completions` | `/v1/messages` |
+| ----- | ---------------- | ---------------------: | -------------: |
+| Groq `openai/gpt-oss-20b` | 0.139 / 0.610 s | **+0.012 s** | **+0.030 s** |
+| Anthropic `claude-haiku-4-5-20251001` | 0.411 / 0.459 s | **+0.038 s** | **+0.046 s** |
+
+**Classic mode (dev), a new connection per call, 10 runs, no failure:**
+
+| Model | Direct p50 | `/v1/chat/completions` | `/v1/messages` |
+| ----- | ---------: | ---------------------: | -------------: |
+| Groq `openai/gpt-oss-20b` | 0.205 s | +0.172 s | +0.089 s |
+| Anthropic `claude-haiku-4-5-20251001` | 0.483 s | +0.123 s | +0.144 s |
 
 The classic-mode overhead is mostly the dev kernel boot (`/api/health` takes
 0.10 s there, 0.012 s in worker mode). Production runs worker mode, so the
-gateway path adds ≈ 25 ms today. This is the baseline for the hook budget in
-[`03_contracts.md`](./03_contracts.md) §1.4.
+gateway path adds **10–50 ms** today, inside the provider's own jitter (Groq's
+direct p95 is 0.61 s). This is the baseline for the hook budget in
+[`03_contracts.md`](./03_contracts.md) §1.4 and master plan §6.
+
+Why the first run was wrong: it took the first SSE line that contained
+"content" — Anthropic's `message_start` (`"content": []`) and OpenAI's role
+delta (`"content": ""`) — so it timed metadata; with `max_tokens 60` five of
+ten direct Groq runs produced no answer text at all and were timed anyway.
 
 Side finding: a two-word "Hi" through `/v1/messages` reached Anthropic as
 **1,298 input tokens**: the gateway's injected context. Tokens a hook adds are
@@ -170,49 +202,57 @@ a model hold it longer". The sorter is such a hook today.
 `split-pools.Caddyfile`: `worker { name streams; match /v1/chat/completions; num 4 }`
 and `worker { name api; num 4 }`, accepted by FrankenPHP 1.12.6
 (`frankenphp validate`, metrics `frankenphp_total_workers{worker="m#streams"} 4`).
+A later check put all four long routes on one `match` line and counted each on
+`streams` (STATUS).
 
 | 8 Haiku streams on 4 stream workers | Value |
 | ----------------------------------- | ----: |
-| Streams busy (max) | 4 |
-| Stream TTFB p50 / p95 | 12.0 / 12.6 s (the second four waited) |
-| Probe baseline p50 | 13 ms |
-| **Probe during p50 / p95 / max** | **14 / 22 / 29 ms** (one shared pool: 10.85 s max) |
+| Streams ok | 8 |
+| First text p50 / p95 | 12.5 / 13.1 s (the second four waited) |
+| Probe baseline p50 | 16 ms |
+| **Probe during p50 / p95 / max** | **14 / 19 / 30 ms** (one shared pool: 10.98 s max) |
 
 ### 4.2 A fast "busy" instead of a silent wait
 
-Same pools, global `max_wait_time 2s`: 4 streams ran, **4 got HTTP 503 after
-2 s**, the probe stayed at 26 ms p95. FrankenPHP answers with a bare 503; AU3
-turns it into a machine-readable body with `Retry-After`, and AU4 into copy a
-person understands.
+Same pools, global `max_wait_time 2s`: 4 streams ran, **4 got HTTP 503**
+instead of waiting ≈ 12 s, the probe stayed at 20 ms p95. FrankenPHP answers
+with a bare 503; AU3 turns it into a machine-readable body with `Retry-After`,
+and AU4 into copy a person understands.
 
 ### 4.3 A Go process holding client streams
 
 `relay/` (stdlib only): a stub upstream streams 200 tokens 50 ms apart
 (10 s); the relay copies and flushes every event; the load client opens N at
-once.
+once and counts a stream only with HTTP 200 and `[DONE]`.
 
-| Streams | TTFB p95 | Duration p95 | Relay RSS idle → peak | Per stream | CPU for all |
-| ------: | -------: | -----------: | --------------------- | ---------: | ----------: |
-| 100 | 0.07 s | 10.41 s | 8 → 18 MB | 95 KB | 0.46 s |
-| 500 | 0.11 s | 10.41 s | 18 → 45 MB | 55 KB | 1.80 s |
-| 1,000 | 0.08 s | 10.40 s | 45 → 73 MB | 28 KB | 3.51 s |
-| **2,000** | **0.18 s** | **10.47 s** | 73 → **142 MB** | **35 KB** | **6.30 s** |
+| Streams | Ok / failed | TTFB p95 | Duration p95 | Relay RSS idle → peak | Per stream | CPU for all |
+| ------: | ----------- | -------: | -----------: | --------------------- | ---------: | ----------: |
+| 100 | 100 / 0 | 0.07 s | 10.45 s | 8 → 21 MB | ≈ 127 KB | 0.46 s |
+| 500 | 500 / 0 | 0.10 s | 10.49 s | 21 → 45 MB | ≈ 50 KB | 1.92 s |
+| 1,000 | 1,000 / 0 | 0.06 s | 10.48 s | 45 → 83 MB | ≈ 38 KB | 3.73 s |
+| **2,000** | **2,000 / 0** | **0.14 s** | **10.53 s** | 83 → **147 MB** | **≈ 33 KB** | **6.56 s** |
+
+The idle value of a run is the process after the previous one (Go keeps freed
+memory), so the per-stream column is approximate. A `-race` build at 200
+streams reported no data race.
 
 ### 4.4 One PHP process holding provider streams
 
 `pump/pump.php` in the backend container: `HttpClient::create([], $n)`, N
 `request()` calls, one `stream()` loop over all responses, against the same
-stub.
+stub. A stream counts only with HTTP 200 and `[DONE]`.
 
-| Streams | Events read | Wall | CPU | Per stream | Peak memory | First chunk p95 |
-| ------: | ----------: | ---: | --: | ---------: | ----------: | --------------: |
-| 100 | 20,100 | 10.5 s | 0.21 s | 2.1 ms | 6.4 MB | 0.09 s |
-| 500 | 100,500 | 10.5 s | 1.15 s | 2.3 ms | 14.0 MB | 0.18 s |
-| **1,000** | **201,000** | **10.5 s** | **2.49 s** | **2.5 ms** | **26.0 MB** | **0.21 s** |
+| Streams | Done / failed | CPU | Per stream | PHP heap peak | Process RSS before → peak | RSS per stream | First chunk p95 |
+| ------: | ------------- | --: | ---------: | ------------: | ------------------------- | -------------: | --------------: |
+| 100 | 100 / 0 | 0.30 s | 3.0 ms | 6.4 MB | 63 → 72 MB | ≈ 79 KB | 0.09 s |
+| 500 | 500 / 0 | 1.25 s | 2.5 ms | 14.0 MB | 63 → 99 MB | ≈ 73 KB | 0.18 s |
+| **1,000** | **1,000 / 0** | **2.70 s** | **2.7 ms** | 26.0 MB | 63 → **134 MB** | **≈ 73 KB** | **0.27 s** |
 
-The pump only counted events; decoding and translating them adds CPU per
-event. Even at ten times this cost, one process holds hundreds of streams.
-This is what lets the plan keep every wire format in PHP (S5).
+Per stream the PHP pump costs about twice the Go relay's memory (libcurl keeps
+a buffer per transfer). The pump only counted events; decoding and translating
+them adds CPU per event. Even at ten times this cost, one process holds
+hundreds of streams. This is what lets the plan keep every wire format in PHP
+(S5).
 
 ---
 

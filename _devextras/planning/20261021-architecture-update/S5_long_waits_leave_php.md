@@ -1,6 +1,6 @@
 # S5 — Long waits leave PHP
 
-Master plan §5 rows AU27–AU32; the owner's remark: requests that would keep
+Master plan §5 rows AU27–AU32 and AU31b; the owner's remark: requests that would keep
 PHP busy for 30 seconds or minutes must leave PHP idle, and a watchdog directs
 them to the logic. Contracts: [`03_contracts.md`](./03_contracts.md) §6–§9.
 Measurements that justify the design: [`02_measurements.md`](./02_measurements.md)
@@ -139,6 +139,13 @@ released connections, with larger stream pools per node, and the owner decides.
   pump off and on and must be identical (`01` §4).
 - Do: failure drills as tests: pump gone ⇒ terminal frame; tool step fails ⇒
   the existing tool-error sentence; deadline ⇒ the existing cut-off copy.
+- Do: the queue and run-stream tests of `03` §7–§8: no provider key or auth
+  header in any Redis key (scan after a turn); an expired job body and a pump
+  that dies before `GETDEL` both end their runs in a terminal entry; a queued
+  run past its claim deadline is failed; entries carry `frame` / `terminal` /
+  `gap`; a run past `RUNTIME.RUN_STREAM_MAX_BYTES` ends with the recoverable
+  terminal and a complete stored reply; an attach from `N` returns only the
+  frames after `N`.
 - Do not: change an SSE event, a stored message, a usage row.
 
 ### Vibe brief
@@ -184,18 +191,78 @@ released connections, with larger stream pools per node, and the owner decides.
 > (a non-attach PHP response must reach the client unchanged, headers
 > included). Then the PHP directive and the Caddy route. Load case in
 > `make perf-runtime`: ≥ 500 streams of 10 s per server, API probe p95 ≤ 50 ms,
-> hop ≤ 5 ms p95. Walk J-AU-1 (full server) and J-AU-6 (restart the backend
-> web container mid-answer; the page re-attaches and the answer continues).
-> `make -C sidecars/synaplan-watchdog test`, `make ci-local`, `make test-e2e`
-> with relay on and off, `make test-e2e-full`.
+> hop ≤ 5 ms p95. Go tests also cover the `03` §8 contract: close on a
+> `terminal` entry while the pump is healthy, `XREAD` from `0-{fromSeq}`,
+> `id:` lines only when `sseIds` is true, `gap` ends with the directive's
+> terminal. Walk J-AU-1 (full server). J-AU-6 needs AU31b; walk it again here
+> with the relay on. `make -C sidecars/synaplan-watchdog test`,
+> `make ci-local`, `make test-e2e` with relay on and off, `make test-e2e-full`.
 
 ### Exit criteria
 
 1. Budgets of master plan §6 met with relay and pump on.
-2. J-AU-1 and J-AU-6 walked, in STATUS.
+2. J-AU-1 walked, and J-AU-6 again with the relay on, in STATUS.
 3. E2E green with relay on and off.
-4. Rollout: one web node, 14 days, its capacity page and the event ring in
-   STATUS before the next node.
+4. Rollout in two switches of different reach (§0 #24):
+   `RUNTIME.STREAM_PUMP` is installation-wide (BCONFIG), so it ramps by
+   `RUNTIME.STREAM_PUMP_PERCENT` on every server at once — safe without the
+   relay, because each server's PHP stream worker tails the run (AU30).
+   `SYNAPLAN_RELAY` is per server (env): one web node, 14 days, its capacity
+   page and the event ring in STATUS before the next node.
+
+---
+
+## AU31b — An answer that loses its connection continues in the open page (ota-candidate)
+
+### User-flow
+
+Journey **J-AU-6**. Ben's answer is streaming when the server holding his
+connection restarts (a deploy) or his network drops for a moment. Today the
+open page ends the answer locally and reloads the turn from history when it
+is stored (`frontend/src/services/chat/stream/handlers/memberError.ts:46–50`,
+`recoverInterruptedTurn()`); live re-attachment happens only after a reload
+or a navigation.
+
+```text
+  … the answer is streaming …
+  ◌ Reconnecting — your answer continues in a moment.        (status line, ≤ 3 tries)
+  … the answer continues from the next word, nothing repeated.
+
+  after three tries:
+  ⚠ The connection to Synaplan was lost. Your answer is still being written
+    and appears here when it is ready. [ Reload the answer ]
+```
+
+### Goal
+
+- Do: on a transport drop of a member turn with a known run id, the stream
+  transport re-attaches (`GET /api/v1/messages/stream/attach?from=<last id>`)
+  up to three times with backoff, and the handler continues the same message;
+  only after that the existing history recovery runs.
+- Do: the widget does the same for its run (`widgetsApi.ts` already has the
+  attach call).
+- Do: a Playwright `@ci` spec that cuts the connection mid-answer (route
+  abort on the stream request) and sees the answer continue without a
+  repeated word; Vitest for the cursor and the retry schedule.
+- Do not: re-attach incognito drafts (they have no run); change SSE events.
+
+### Vibe brief
+
+> Copy in five locales and the status line first (U1). Implement in the
+> transport and the member error handler, not in `ChatView.vue`. Works with
+> today's in-request streams too (the run buffer exists now), so this step
+> can land before AU31. Walk J-AU-6 on the dev stack by restarting the backend
+> container mid-answer, light / dark / 320 px; enter the walk in STATUS.
+> `make ci-local`, `make test-e2e`, layout suite.
+
+### Exit criteria (with the UX contract §6 bullets)
+
+1. J-AU-6 walked (U10).
+2. Findability: the answer continues in the same bubble; nothing to look for (U2).
+3. Copy says what still happens ("is still being written") in five locales (U3, U8).
+4. Incognito and no-run turns keep today's behaviour; a run that ended while
+   disconnected shows its stored answer (U5, U8).
+5. Dark + V2 + 320 px (U9).
 
 ---
 
@@ -214,8 +281,13 @@ released connections, with larger stream pools per node, and the owner decides.
 
 1. Fresh install (`make up` on an empty database): streams go through the
    watchdog; existing install after migration: the same.
-2. Rollback drill: `SYNAPLAN_RELAY=0` and `RUNTIME.STREAM_PUMP=off` on one
-   node bring back today's path without a restart of the others (STATUS).
+2. Rollback drills, both in STATUS:
+   - **one server**: `SYNAPLAN_RELAY=0` on one web node (env, a restart of that
+     node only) brings back the PHP stream worker for its clients; the pump
+     keeps serving all servers;
+   - **the installation**: `RUNTIME.STREAM_PUMP=off` (BCONFIG, every server at
+     once, no restart) sends new turns back to in-request generation
+     everywhere, while turns already in the pump finish there.
 3. Gates green.
 
 ---

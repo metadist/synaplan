@@ -182,7 +182,9 @@ func runLoad(target, statsURL string, clients int) {
 	failed := 0
 	var peakRSS float64
 	stop := make(chan struct{})
+	samplerDone := make(chan struct{})
 	go func() {
+		defer close(samplerDone)
 		for {
 			select {
 			case <-stop:
@@ -210,25 +212,38 @@ func runLoad(target, statsURL string, clients int) {
 			defer resp.Body.Close()
 			reader := bufio.NewReader(resp.Body)
 			first := time.Duration(0)
+			done := false
+			var readErr error
 			for {
 				line, err := reader.ReadBytes('\n')
 				if first == 0 && len(line) > 1 {
 					first = time.Since(t0)
 				}
-				if err == io.EOF || err != nil {
+				if strings.TrimSpace(string(line)) == "data: [DONE]" {
+					done = true
+				}
+				if err != nil {
+					if err != io.EOF {
+						readErr = err
+					}
 					break
 				}
 			}
 			mu.Lock()
+			defer mu.Unlock()
+			if resp.StatusCode != http.StatusOK || !done || readErr != nil {
+				failed++
+				return
+			}
 			ttfb = append(ttfb, first.Seconds())
 			total = append(total, time.Since(t0).Seconds())
-			mu.Unlock()
 		}()
 	}
 	wg.Wait()
 	close(stop)
+	<-samplerDone
 	after := readStats(statsURL)
-	fmt.Printf("clients=%d ok=%d failed=%d wall=%.1fs\n", clients, len(total), failed, time.Since(started).Seconds())
+	fmt.Printf("clients=%d ok=%d failed=%d (ok = HTTP 200 and [DONE] received) wall=%.1fs\n", clients, len(total), failed, time.Since(started).Seconds())
 	fmt.Printf("  ttfb     %s\n", pct(ttfb))
 	fmt.Printf("  duration %s\n", pct(total))
 	fmt.Printf("  relay: peak active=%d rss idle=%.1f MB peak=%.1f MB -> %.1f KB per stream; cpu %.2fs for %d streams\n",

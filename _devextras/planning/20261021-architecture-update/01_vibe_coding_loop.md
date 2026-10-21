@@ -12,7 +12,7 @@ Binding underneath: [`AGENTS.md`](../../../AGENTS.md) (gates, Git rules, commit
 types, red flags), [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md),
 [`docs/PHP_CONVENTIONS.md`](../../../docs/PHP_CONVENTIONS.md),
 [`docs/FRONTEND_CONVENTIONS.md`](../../../docs/FRONTEND_CONVENTIONS.md),
-[`docs/E2E_TESTING.md`](../../../docs/E2E_TESTING.md), and for the five
+[`docs/E2E_TESTING.md`](../../../docs/E2E_TESTING.md), and for the six
 `ota-candidate` steps [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md).
 
 ---
@@ -119,7 +119,7 @@ make -C backend phpstan            # src/ and tests/, never a single path
 make -C backend deptrac
 make -C backend test               # size ratchet, thin-controller gate and every characterization snapshot included
 
-# Every commit — frontend (AU4, AU7, AU21, AU25b, AU33)
+# Every commit — frontend (AU4, AU7, AU21, AU25b, AU31b, AU33)
 make -C frontend lint
 docker compose exec -T frontend npm run check:types
 make -C frontend test

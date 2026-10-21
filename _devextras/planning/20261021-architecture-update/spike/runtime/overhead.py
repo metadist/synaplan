@@ -53,31 +53,73 @@ def read_env(path: str) -> dict[str, str]:
     return values
 
 
-def ttfb(url: str, headers: dict[str, str], body: dict) -> tuple[float, float, int]:
+def first_text(event: dict) -> bool:
+    """True when an SSE event carries answer text (not role, metadata or an empty delta)."""
+    if event.get("type") == "content_block_delta":
+        delta = event.get("delta") or {}
+        return delta.get("type") == "text_delta" and bool(delta.get("text"))
+    for choice in event.get("choices") or []:
+        if (choice.get("delta") or {}).get("content"):
+            return True
+    return False
+
+
+CONNECTIONS: dict[tuple, http.client.HTTPConnection] = {}
+
+
+def connection(parsed: urllib.parse.ParseResult) -> http.client.HTTPConnection:
+    """One keep-alive connection per destination, so direct and gateway calls are both warm."""
+    key = (parsed.scheme, parsed.hostname, parsed.port)
+    if key not in CONNECTIONS:
+        cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        CONNECTIONS[key] = cls(parsed.hostname, parsed.port, timeout=120)
+    return CONNECTIONS[key]
+
+
+def ttft(url: str, headers: dict[str, str], body: dict) -> float | None:
+    """Seconds to the first text delta; None for a non-200, an error event or no text at all."""
     parsed = urllib.parse.urlparse(url)
-    cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
-    conn = cls(parsed.hostname, parsed.port, timeout=120)
+    conn = connection(parsed)
     started = time.monotonic()
-    conn.request("POST", parsed.path, body=json.dumps(body), headers={**headers, "Content-Type": "application/json"})
-    resp = conn.getresponse()
+    try:
+        conn.request("POST", parsed.path, body=json.dumps(body), headers={**headers, "Content-Type": "application/json"})
+        resp = conn.getresponse()
+    except (http.client.HTTPException, OSError):
+        CONNECTIONS.pop((parsed.scheme, parsed.hostname, parsed.port), None)
+        conn = connection(parsed)
+        started = time.monotonic()
+        conn.request("POST", parsed.path, body=json.dumps(body), headers={**headers, "Content-Type": "application/json"})
+        resp = conn.getresponse()
     first = None
-    while True:
+    failed = resp.status != 200
+    while not failed:
         line = resp.readline()
         if not line:
             break
-        if first is None and line.startswith(b"data:") and b"[DONE]" not in line:
-            if b"content" in line or b"text_delta" in line:
-                first = time.monotonic()
-    total = time.monotonic() - started
-    conn.close()
-    return (first - started) if first else total, total, resp.status
+        if not line.startswith(b"data:"):
+            continue
+        payload = line[5:].strip()
+        if payload == b"[DONE]":
+            break
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if "error" in event or event.get("type") == "error":
+            failed = True
+        elif first is None and first_text(event):
+            first = time.monotonic()
+    resp.read()
+    if failed or first is None:
+        return None
+    return first - started
+
+
+MAX_TOKENS = 400  # room for a reasoning model (gpt-oss) to reach answer text
 
 
 def body_for(style: str, model: str) -> dict:
-    if style == "anthropic":
-        return {"model": model, "max_tokens": 60, "stream": True,
-                "messages": [{"role": "user", "content": PROMPT}]}
-    return {"model": model, "max_tokens": 60, "stream": True,
+    return {"model": model, "max_tokens": MAX_TOKENS, "stream": True,
             "messages": [{"role": "user", "content": PROMPT}]}
 
 
@@ -101,7 +143,11 @@ def main() -> int:
     parser.add_argument("--base", default="http://localhost:8000")
     parser.add_argument("--cases", default="groq,anthropic")
     parser.add_argument("--skip-messages", action="store_true", help="skip /v1/messages (gateway off)")
+    parser.add_argument("--max-tokens", type=int, default=400)
+    parser.add_argument("--warmup", type=int, default=1, help="untimed calls per path to open the connections")
     args = parser.parse_args()
+    global MAX_TOKENS
+    MAX_TOKENS = args.max_tokens
 
     env = read_env(args.env_file)
     syn_key = os.environ.get("SYNAPLAN_API_KEY")
@@ -115,21 +161,36 @@ def main() -> int:
         if not provider_key:
             print(f"{name}: {case['env']} not set, skipped")
             continue
-        direct, via_openai, via_messages = [], [], []
+        samples: dict[str, list[float]] = {"direct": [], "chat": [], "messages": []}
+        failures: dict[str, int] = {"direct": 0, "chat": 0, "messages": 0}
+        calls = {
+            "direct": (case["direct_url"], headers_for(case["style"], provider_key), body_for(case["style"], case["model"])),
+            "chat": (f"{args.base}/v1/chat/completions", headers_for("openai", syn_key), body_for("openai", case["model"])),
+            "messages": (f"{args.base}/v1/messages",
+                         {"Authorization": f"Bearer {syn_key}", "anthropic-version": "2023-06-01"},
+                         body_for("anthropic", case["model"])),
+        }
+        paths = ["direct", "chat"] + ([] if args.skip_messages else ["messages"])
+        for _ in range(args.warmup):
+            for path in paths:
+                ttft(*calls[path])
         for _ in range(args.runs):
-            direct.append(ttfb(case["direct_url"], headers_for(case["style"], provider_key),
-                               body_for(case["style"], case["model"]))[0])
-            via_openai.append(ttfb(f"{args.base}/v1/chat/completions", headers_for("openai", syn_key),
-                                   body_for("openai", case["model"]))[0])
-            if not args.skip_messages:
-                via_messages.append(ttfb(f"{args.base}/v1/messages",
-                                         {"Authorization": f"Bearer {syn_key}", "anthropic-version": "2023-06-01"},
-                                         body_for("anthropic", case["model"]))[0])
-        print(f"{name} ({case['model']}), {args.runs} runs, time to first token")
-        print(f"  direct                 {stats(direct)}")
-        print(f"  Synaplan /v1/chat      {stats(via_openai)}  (+{statistics.median(via_openai) - statistics.median(direct):.3f}s median)")
-        if via_messages:
-            print(f"  Synaplan /v1/messages  {stats(via_messages)}  (+{statistics.median(via_messages) - statistics.median(direct):.3f}s median)")
+            for path in paths:
+                value = ttft(*calls[path])
+                if value is None:
+                    failures[path] += 1
+                else:
+                    samples[path].append(value)
+        print(f"{name} ({case['model']}), {args.runs} runs, time to first text token")
+        labels = {"direct": "direct", "chat": "Synaplan /v1/chat", "messages": "Synaplan /v1/messages"}
+        for path in paths:
+            if not samples[path]:
+                print(f"  {labels[path]:22} no successful run ({failures[path]} failed)")
+                continue
+            delta = ""
+            if path != "direct" and samples["direct"]:
+                delta = f"  (+{statistics.median(samples[path]) - statistics.median(samples['direct']):.3f}s median)"
+            print(f"  {labels[path]:22} {stats(samples[path])}  failed={failures[path]}{delta}")
     return 0
 
 
