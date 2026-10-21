@@ -61,6 +61,8 @@ final class ModelHealthRecorder
     /** @var array<string, int|null> */
     private array $resolveMemo = [];
 
+    private readonly ModelUnavailabilityWindow $unavailability;
+
     public function __construct(
         private readonly CacheItemPoolInterface $cache,
         private readonly ModelHealthConfig $config,
@@ -69,6 +71,7 @@ final class ModelHealthRecorder
         private readonly UsageFailureLogger $failureLogger,
         private readonly LoggerInterface $logger,
     ) {
+        $this->unavailability = new ModelUnavailabilityWindow($cache, $logger);
     }
 
     /**
@@ -139,6 +142,10 @@ final class ModelHealthRecorder
             return $window;
         });
 
+        // Kept apart from the rate window: a success must not forget that this
+        // model was unreachable, and the offer waits for more than two in an hour.
+        $this->unavailability->record($modelId);
+
         return $kind;
     }
 
@@ -185,6 +192,14 @@ final class ModelHealthRecorder
                 'error' => $e->getMessage(),
             ]);
         }
+
+        $this->unavailability->reset($modelId);
+    }
+
+    /** Unreachable attempts for this model in the last hour. */
+    public function unavailableCount(int $modelId): int
+    {
+        return $this->unavailability->count($modelId);
     }
 
     /**

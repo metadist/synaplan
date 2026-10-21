@@ -248,6 +248,56 @@
                   </button>
                 </div>
               </div>
+
+              <p
+                v-if="(model.unavailableCount ?? 0) > 0"
+                class="mt-3 text-sm txt-secondary"
+                data-testid="text-unavailable-count"
+              >
+                {{
+                  $t('adminModelStatus.alternatives.unavailable', {
+                    count: model.unavailableCount,
+                  })
+                }}
+              </p>
+              <div
+                v-if="alternativesFor(model).length > 0"
+                class="mt-3 space-y-2"
+                data-testid="model-alternatives"
+              >
+                <p class="text-sm txt-primary">{{ $t('adminModelStatus.alternatives.hint') }}</p>
+                <div v-if="model.defaultCapability" class="flex flex-wrap items-center gap-2">
+                  <select
+                    :value="selectedAlternative(model)"
+                    class="min-w-0 flex-1 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    :aria-label="$t('adminModelStatus.alternatives.hint')"
+                    data-testid="select-model-alternative"
+                    @change="onPickAlternative(model, $event)"
+                  >
+                    <option
+                      v-for="alternative in alternativesFor(model)"
+                      :key="alternative.id"
+                      :value="alternative.id"
+                    >
+                      {{ alternative.name }}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn-secondary px-3 py-1.5 rounded-xl text-xs"
+                    :disabled="busyModelId === model.id"
+                    data-testid="btn-use-alternative"
+                    @click="useAlternative(model)"
+                  >
+                    {{ $t('adminModelStatus.alternatives.use') }}
+                  </button>
+                </div>
+                <ul v-else class="text-sm txt-secondary">
+                  <li v-for="alternative in alternativesFor(model)" :key="alternative.id">
+                    {{ alternative.name }}
+                  </li>
+                </ul>
+              </div>
             </AccordionSection>
           </AccordionStack>
         </AccordionSection>
@@ -275,6 +325,10 @@ import {
   type ModelStatusSnapshot,
   type ModelStatusState,
 } from '@/services/api/adminModelStatusApi'
+import { saveDefaultModels } from '@/services/api/configApi'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import type { Capability } from '@/types/ai-models'
+import { interpretDefaultSave } from '@/utils/defaultModelOfferResult'
 
 const { t, locale } = useI18n()
 const { success, error } = useNotification()
@@ -286,6 +340,7 @@ const isRefreshing = ref(false)
 const onlyProblems = ref(false)
 const capabilityFilter = ref('')
 const busyModelId = ref<number | null>(null)
+const pickedAlternative = ref<Record<number, number>>({})
 
 /** Keeps the Operate badge in step with what this panel shows. */
 async function fetchSnapshot(): Promise<void> {
@@ -447,6 +502,79 @@ const toggleExempt = async (model: ModelStatusEntry) => {
     )
   } catch {
     error(t('adminModelStatus.messages.exemptFailed'))
+  } finally {
+    busyModelId.value = null
+  }
+}
+
+function alternativesFor(model: ModelStatusEntry) {
+  return model.alternatives ?? []
+}
+
+function selectedAlternative(model: ModelStatusEntry): number | null {
+  const alternatives = alternativesFor(model)
+  const picked = pickedAlternative.value[model.id]
+  if (picked !== undefined && alternatives.some((alternative) => alternative.id === picked)) {
+    return picked
+  }
+  return alternatives[0]?.id ?? null
+}
+
+function onPickAlternative(model: ModelStatusEntry, event: Event): void {
+  const value = Number((event.target as HTMLSelectElement).value)
+  if (!Number.isFinite(value)) return
+  pickedAlternative.value = { ...pickedAlternative.value, [model.id]: value }
+}
+
+const useAlternative = async (model: ModelStatusEntry) => {
+  const capability = model.defaultCapability
+  const alternativeId = selectedAlternative(model)
+  const alternative = alternativesFor(model).find((item) => item.id === alternativeId)
+  if (!capability || !alternative) return
+
+  const purpose = capabilityLabel(capability.toLowerCase())
+  const confirmed = await confirm({
+    title: t('adminModelStatus.alternatives.confirmTitle'),
+    message: t('adminModelStatus.alternatives.confirmMessage', {
+      name: alternative.name,
+      purpose,
+    }),
+    confirmText: t('adminModelStatus.alternatives.use'),
+    cancelText: t('common.cancel'),
+  })
+  if (!confirmed) return
+
+  busyModelId.value = model.id
+  try {
+    const response = await saveDefaultModels({
+      defaults: { [capability]: alternative.id } as Partial<Record<Capability, number>>,
+    })
+    const outcome = interpretDefaultSave(response, capability, alternative.id)
+    if (outcome.kind === 'skipped') {
+      error(t('adminModelStatus.alternatives.saveFailed', { name: model.name }))
+      return
+    }
+    const store = useAiConfigStore()
+    store.defaults[capability as Capability] = outcome.modelId
+    if (outcome.kind === 'unusable') {
+      error(t('adminModelStatus.alternatives.savedUnusable', { name: alternative.name }))
+      return
+    }
+    const appliedName =
+      outcome.kind === 'replaced'
+        ? (store.models[capability as Capability]?.find((item) => item.id === outcome.modelId)
+            ?.name ?? t('adminModelStatus.alternatives.otherModel'))
+        : alternative.name
+    success(
+      t(
+        outcome.kind === 'replaced'
+          ? 'adminModelStatus.alternatives.savedOther'
+          : 'adminModelStatus.alternatives.saved',
+        { picked: alternative.name, name: appliedName, purpose }
+      )
+    )
+  } catch {
+    error(t('adminModelStatus.alternatives.saveFailed', { name: model.name }))
   } finally {
     busyModelId.value = null
   }

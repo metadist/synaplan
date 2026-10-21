@@ -176,4 +176,32 @@ final class ModelHealthRecorderTest extends TestCase
 
         self::assertTrue($this->recorder->snapshot(self::MODEL_ID)->isEmpty());
     }
+
+    public function testUnreachableAttemptsStayForTheHourEvenAfterASuccess(): void
+    {
+        $gone = new ProviderException('The model `gpt-5` does not exist', 'openai', ['error_code' => 'model_not_found'], 404);
+        $this->recorder->recordFailure('chat', 'openai', 'gpt-5', $gone);
+        $this->recorder->recordFailure('chat', 'openai', 'gpt-5', $gone);
+        self::assertSame(2, $this->recorder->unavailableCount(self::MODEL_ID));
+
+        $this->recorder->recordFailure('chat', 'openai', 'gpt-5', $gone);
+        $this->recorder->recordSuccess('chat', 'openai', 'gpt-5');
+
+        self::assertSame(3, $this->recorder->unavailableCount(self::MODEL_ID));
+    }
+
+    public function testARequestTheUserCausedDoesNotCountAsUnreachable(): void
+    {
+        $this->recorder->recordFailure('chat', 'google', 'gemini-3-pro', ProviderException::contentBlocked('google', 'SAFETY'));
+
+        self::assertSame(0, $this->recorder->unavailableCount(self::MODEL_ID));
+    }
+
+    public function testResetAlsoClearsTheHourlyUnreachableCount(): void
+    {
+        $this->recorder->recordFailure('chat', 'openai', 'gpt-5', new ProviderException('boom', 'openai', null, 500));
+        $this->recorder->reset(self::MODEL_ID);
+
+        self::assertSame(0, $this->recorder->unavailableCount(self::MODEL_ID));
+    }
 }

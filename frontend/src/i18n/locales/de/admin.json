@@ -48,6 +48,18 @@
       "switchedOff": "Abgeschaltet",
       "exempt": "Von automatischer Abschaltung ausgenommen"
     },
+    "alternatives": {
+      "unavailable": "In der letzten Stunde {count}-mal nicht erreichbar",
+      "hint": "Andere Modelle für diese Aufgabe:",
+      "use": "Als meinen Standard setzen",
+      "confirmTitle": "Standard ändern?",
+      "confirmMessage": "Dein Standard für {purpose} wird {name}. Die Standards anderer Personen bleiben. Sonst ändert sich nichts.",
+      "saved": "Dein Standard für {purpose} ist jetzt {name}. Die Standards anderer Personen bleiben.",
+      "savedOther": "{picked} kann gerade nicht antworten. Dein Standard für {purpose} ist {name}.",
+      "savedUnusable": "{name} wurde gespeichert, kann aber gerade nicht antworten. Es wurde kein anderes Modell eingesetzt.",
+      "otherModel": "ein anderes Modell",
+      "saveFailed": "Der Standard wurde nicht geändert. Er ist weiterhin {name}."
+    },
     "actions": {
       "refresh": "Jetzt prüfen",
       "refreshProvider": "Diesen Anbieter prüfen",

@@ -424,6 +424,21 @@
       "noMatch": "Kein Modell passt zu „{query}“.",
       "assistants": "Assistenten"
     },
+    "defaultModelOffer": {
+      "body": "{name} war in der letzten Stunde {count}-mal nicht erreichbar.",
+      "prompt": "Standard für {purpose} ändern?",
+      "useNamed": "{name} verwenden",
+      "use": "Dieses Modell verwenden",
+      "dismiss": "Nicht jetzt",
+      "choose": "Ersatz",
+      "saved": "Dein Standard für {purpose} ist jetzt {name}. Die anderen Standards bleiben.",
+      "savedOther": "{picked} kann gerade nicht antworten. Dein Standard für {purpose} ist {name}.",
+      "savedUnusable": "{name} wurde gespeichert, kann aber gerade nicht antworten. Es wurde kein anderes Modell eingesetzt.",
+      "otherModel": "ein anderes Modell",
+      "saveFailed": "Der Standard wurde nicht geändert. Er ist weiterhin {name}.",
+      "noAlternative": "Es ist kein anderes Modell verfügbar, zu dem du wechseln kannst.",
+      "settings": "KI-Einstellungen"
+    },
     "removeTool": "Werkzeug entfernen",
     "pastedText": {
       "label": "Eingefügt",
