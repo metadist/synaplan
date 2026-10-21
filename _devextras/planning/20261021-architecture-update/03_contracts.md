@@ -126,8 +126,14 @@ whole order and asserts explicitly that `UsageHook::after()` runs before
 - **A budget is measured, not preemptive** (corrected in AU0b; the earlier
   "cut off at its budget" wording was not implementable). PHP cannot
   interrupt a running hook, so enforcement is cooperative and measured:
-  (a) a `blocking` hook **must** pass its remaining `budgetMs` as the
-  timeout of every network or model call it makes — a blocking hook whose
+  (a) a `blocking` hook **must** turn its remaining `budgetMs` into a
+  total-duration deadline for every network or model call it makes —
+  Symfony HttpClient's `max_duration` (with `timeout` as the inactivity
+  limit beside it), never `timeout` alone: a provider that keeps sending
+  chunks would otherwise run past the budget without ever tripping an
+  inactivity timeout. A hook that calls a model, or retries, carries the
+  **same** deadline through every attempt (start time plus `budgetMs`,
+  computed once) — a retry never resets it. A blocking hook whose
   constructor injects an HTTP client or the facade without reading its
   declared budget is a review defect; (b) the pipeline times every hook
   with `hrtime` and, when a `before()` returns over budget, applies
@@ -241,6 +247,10 @@ until a `docs(architecture)` pull request has added, in this section:
 3. **The streaming shape:** the signature of `AiCallPipeline::stream()`,
    who cancels it, and what a hook sees per chunk — enough that AU29's
    decoders can be written against it without reopening this section.
+4. **The deadline shape:** how a blocking hook's one deadline (§1.4) is
+   represented and handed to the transport and to a model call — a field
+   on `AiCallOptions` or a value the pipeline passes — so no hook or
+   provider adapter computes (or resets) its own.
 
 The hardening pull request changes no production code. AU10's vibe brief
 re-checks its capability commits against the merged map.
@@ -736,9 +746,12 @@ them:
    (the header rides on a loopback-only route in Caddy, plus a shared
    secret or mTLS — the hardening pull request decides) and the test
    that an external request carrying `X-Synaplan-Relay: 1` gains nothing.
-5. **Security tests written as exit criteria, not prose:** a tampered or
-   expired attach token is refused; a reused egress grant (§3.6) is
-   refused; the stream above. These three join AU30's drill list.
+5. **Security tests written as exit criteria, not prose, each in the
+   step that introduces what it exercises:** a reused egress grant (§3.6)
+   is refused — AU30, with the gateway work; a tampered or expired attach
+   token is refused and an external request carrying
+   `X-Synaplan-Relay: 1` gains nothing — AU31, which introduces the token
+   check and the relay route (AU30 has neither, so it cannot drill them).
 6. **The canary rule:** `RUNTIME.STREAM_PUMP_PERCENT` (AU30) hashes a
    named stable key (run id, chat id or user id — the pull request picks
    and says why), so one turn never changes mode between its rounds.

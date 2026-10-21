@@ -203,6 +203,10 @@ released connections, with larger stream pools per node, and the owner decides.
   gateways, `wait_ms` into the request timeline, `POST /drain`.
 - Do: the streaming translators drop `set_time_limit(0)` for pump turns;
   `LongWaitGateTest` baseline empties.
+- Do: the AU31 security drills of `03` §7.1 #5 (this step introduces the
+  token and the relay, so it owns them): a tampered or expired attach
+  token is refused, and an external request carrying `X-Synaplan-Relay: 1`
+  receives no attach directive.
 - Do not: parse a frame; touch a turn the pump does not handle.
 
 ### Vibe brief
@@ -224,7 +228,9 @@ released connections, with larger stream pools per node, and the owner decides.
 1. Budgets of master plan §6 met with relay and pump on.
 2. J-AU-1 walked, and J-AU-6 again with the relay on, in STATUS.
 3. E2E green with relay on and off.
-4. Rollout in two switches of different reach (§0 #24):
+4. Security drills green: tampered and expired attach tokens refused; an
+   external `X-Synaplan-Relay: 1` request gains no directive.
+5. Rollout in two switches of different reach (§0 #24):
    `RUNTIME.STREAM_PUMP` is installation-wide (BCONFIG), so it ramps by
    `RUNTIME.STREAM_PUMP_PERCENT` on every server at once — safe without the
    relay, because each server's PHP stream worker tails the run (AU30).

@@ -79,8 +79,8 @@ must not start before it; its capability commits follow the merged map.
 > and the provider request snapshots must stay byte-identical. One capability
 > per commit (chat, chat stream, embed, vision, image, video, speech), each
 > green. Unit tests for the pipeline: order, refusal before the call, after
-> hooks on failure, hook timings, a blocking hook cut at its budget (inject a
-> clock). Mutation: swap two hook priorities, see `HookContractTest` fail.
+> hooks on failure, hook timings, a blocking hook that returns over its budget in
+> `before()` (inject a clock: `onError` applied on return, only logged in `after()`). Mutation: swap two hook priorities, see `HookContractTest` fail.
 > `make perf-runtime` before/after. `make ci-local`, `make test-e2e`.
 
 ### Exit criteria
