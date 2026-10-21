@@ -68,7 +68,7 @@ final readonly class AsAiCallHook
     public function __construct(
         public int $priority,                 // higher runs earlier, in both phases (before and after)
         public bool $blocking = false,        // true: may do network I/O or call a model
-        public int $budgetMs = 1,             // cut-off; enforced for blocking hooks
+        public int $budgetMs = 1,             // measured budget (see §1.4 — not a preemptive cut-off)
         public HookFailure $onError = HookFailure::Open,   // Open: log and continue · Closed: refuse the call
         public ?string $flag = null,          // BCONFIG key that switches the hook; null = always on
     ) {}
@@ -91,6 +91,9 @@ interface StreamingAiCallHookInterface extends AiCallHookInterface
 
 Tag `app.ai.call_hook`, collected with `#[AutowireIterator]` in priority
 order, pinned by a test (the tagged-list rule of `docs/ARCHITECTURE.md`).
+The attribute carries **no phase field** (corrected in AU0b, which removed
+`phase` from master plan §0 #3): the phase is the method the hook
+implements — `before()` or `after()` above.
 
 ### 1.3 Default hooks, in order
 
@@ -120,10 +123,24 @@ whole order and asserts explicitly that `UsageHook::after()` runs before
   when a hook without `blocking: true` injects `HttpClientInterface`,
   `AiFacade`, `EntityManagerInterface` or a repository (checked by reflection
   over the tagged services, like `ThinControllerTest`).
-- A blocking hook runs under its `budgetMs`: past it, `onError` decides.
-  `Open` logs `ai.hook_timeout` to the event ring and continues; `Closed`
-  refuses the call with `AiCallRefusal::policy()`, which callers already map to
-  one sentence.
+- **A budget is measured, not preemptive** (corrected in AU0b; the earlier
+  "cut off at its budget" wording was not implementable). PHP cannot
+  interrupt a running hook, so enforcement is cooperative and measured:
+  (a) a `blocking` hook **must** pass its remaining `budgetMs` as the
+  timeout of every network or model call it makes — a blocking hook whose
+  constructor injects an HTTP client or the facade without reading its
+  declared budget is a review defect; (b) the pipeline times every hook
+  with `hrtime` and, when a `before()` returns over budget, applies
+  `onError` to its result: `Open` logs `ai.hook_timeout` (hook, budget,
+  measured — no content) to the event ring and keeps the returned call;
+  `Closed` discards the result and refuses with
+  `AiCallRefusal::policy()`, which callers already map to one sentence;
+  (c) an `after()` that returns over budget can only be logged the same
+  way — its work is already done, so `Closed` has no effect there and a
+  hook that must be able to refuse declares that work in `before()`;
+  (d) `HookContractTest` covers a slow hook in both phases with an
+  injected clock: the overrun is logged once, `Closed` refuses in
+  `before()` and does not refuse in `after()`.
 - A hook exception never escapes the pipeline: `Open` hooks log it, `Closed`
   hooks refuse.
 
@@ -204,6 +221,29 @@ move with the tool invoker (S4).
 | Live voice (`VoiceLiveUsageService`) | one `AiCall(capability: voice_session)` opened at session start, closed with usage at the end; hooks see start and end, not audio |
 | Perplexity web answer (`PerplexityAdapter::maybeAnswer`) | through `AiFacade::chat()` |
 | `ModelAvailabilityChecker`, capability probes, admin embed preflight | `AiCallContext::probe()`: hooks run, metering skips, metrics label `source=probe` |
+
+### 1.7 Pre-sprint hardening — must merge before AU10 (AU0b)
+
+§1.1 names `AiCallPayload`, `AiCallOptions`, `AiUsage`, `AiCallTimings`
+and §1.2 names `StreamChunk`, but no section gives their fields; and no
+table maps the facade's methods to the pipeline. AU10 must not start
+until a `docs(architecture)` pull request has added, in this section:
+
+1. **The method map:** every public `AiFacade` method (and the AU12 paths
+   of §1.6) with its `AiCapability`, its `AiCallSource`, its billable
+   flag and its accounting unit (§1.5) — one row per method, checked
+   against `AiPathCharacterizationTest`'s case list from AU9.
+2. **The value shapes:** the fields of `AiCallPayload` (one variant per
+   capability, or one class with capability-checked fields — the pull
+   request decides and says why), `AiCallOptions`, `AiUsage`,
+   `AiCallTimings` and `StreamChunk`, each with types; no `mixed` outside
+   `AiCallResult::$value`, whose per-capability type the method map names.
+3. **The streaming shape:** the signature of `AiCallPipeline::stream()`,
+   who cancels it, and what a hook sees per chunk — enough that AU29's
+   decoders can be written against it without reopening this section.
+
+The hardening pull request changes no production code. AU10's vibe brief
+re-checks its capability commits against the merged map.
 
 ---
 
@@ -286,6 +326,29 @@ today's tables, which the parity test enforces.)
 descriptors and compares it with today's constant, entry by entry. It is the
 regression proof for AU20: each table switch keeps it green, then the
 constant is deleted and the test asserts the consumer's output instead.
+
+### 2.3 Pre-sprint hardening — must merge before AU19 (AU0b)
+
+§2 names `ProviderEndpoint`, `ProviderKeySpec`, `ProviderDialects`,
+`ProviderDefaults` and `ProviderBranding` without their fields, and §2.2's
+parity test compares against tables that today exist only as the condensed
+list in STATUS. AU19 must not start until a `docs(architecture)` pull
+request has added, in this section:
+
+1. **The frozen inventory:** every row of §2.1 with its file and line on
+   `main` at the time of writing, and the constant or method the parity
+   test will read — the same discipline as AU23's tool-loop list.
+2. **The sub-type shapes:** the fields of `ProviderEndpoint`,
+   `ProviderKeySpec` (including how BYOK user keys and the
+   OpenAI-compatible endpoint registry are represented, since neither is a
+   platform key), `ProviderDialects`, `ProviderDefaults` and
+   `ProviderBranding`.
+3. **Discovery:** how `ProviderCatalog` finds the descriptors (the
+   `#[AsAiProvider]` attribute of §2.1, a tagged iterator, or a static
+   list) and what happens for a provider class that carries no descriptor
+   (the parity test must fail, not skip).
+
+The hardening pull request changes no production code.
 
 ---
 
@@ -648,6 +711,42 @@ Each streaming provider exposes `buildStreamRequest(AiCall): HttpRequestSpec`
 and `streamDecoder(AiCall): StreamDecoderInterface` (AU29). Its existing
 blocking loop becomes `foreach ($http->stream($response) as $chunk) { $decoder->feed(…) }`,
 so in-request mode and pump mode share the same decoder.
+
+### 7.1 Pre-sprint hardening — must merge before AU28 (AU0b)
+
+The spike of AU28 is where design gaps turn into load-test failures, so
+the following are written down — in this section or in §8 — and merged
+before the spike branch opens; AU28 verifies them, it does not invent
+them:
+
+1. **The turn state machine:** the states a run passes through (`queued`,
+   `running`, the terminal states) with the one writer allowed to make
+   each transition, including the atomic reaper transition of §7 and the
+   `gap` path of §8. One table, cited by AU30's tests.
+2. **Sequence numbers:** the first `seq` of a run (the explicit stream id
+   `0-{seq}` of §8 rejects `0-0`, so the base is verified, not assumed),
+   who allocates it across the pump rounds of one turn, and why two pumps
+   can never allocate the same `seq` for one run.
+3. **The attach token:** what `ownerKey` in §8 is (today's attach
+   authorisation, named by class), how `RUNTIME.ATTACH_SECRET` is created
+   on an existing installation (seeder / migration `UPDATE`, §0 #24) and
+   what happens to in-flight tokens when it rotates.
+4. **The relay trust boundary:** PHP answers an attach directive only to a
+   request the watchdog actually made. How the watchdog proves itself
+   (the header rides on a loopback-only route in Caddy, plus a shared
+   secret or mTLS — the hardening pull request decides) and the test
+   that an external request carrying `X-Synaplan-Relay: 1` gains nothing.
+5. **Security tests written as exit criteria, not prose:** a tampered or
+   expired attach token is refused; a reused egress grant (§3.6) is
+   refused; the stream above. These three join AU30's drill list.
+6. **The canary rule:** `RUNTIME.STREAM_PUMP_PERCENT` (AU30) hashes a
+   named stable key (run id, chat id or user id — the pull request picks
+   and says why), so one turn never changes mode between its rounds.
+7. **Prompts in Redis:** job bodies carry `call.payload` for up to 120 s
+   (§7). The hardening states what the production Redis settings imply
+   (persistence, encryption at rest, who may read the keyspace) and what
+   `docs/EGRESS.md`'s sister note in `docs/CAPACITY.md` must tell an
+   operator — or it shortens the TTL and says why that is safe.
 
 ---
 

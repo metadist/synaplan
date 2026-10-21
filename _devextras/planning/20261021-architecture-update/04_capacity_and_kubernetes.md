@@ -44,6 +44,14 @@ Admin → System → Capacity ─► GET /api/v1/admin/capacity/* (PHP, reads Re
 - **Measuring costs ≤ 0.3 ms per request** (one Redis pipeline in
   `kernel.terminate`, after the response is sent). `make perf-runtime` checks it
   (AU13).
+- **Aggregates store distributions, not averages** (corrected in AU0b):
+  a one-minute aggregate carries a fixed-bucket duration histogram per
+  series (the bucket bounds are part of AU13's contract), so the p50 /
+  p95 / p99 of §4.2 are computed from buckets when minutes are merged —
+  percentiles cannot be derived from stored percentiles. The watchdog
+  rolls one-minute aggregates into the fifteen-minute aggregates of §7
+  before the one-minute keys expire (AU13 names the roll-up in its
+  contract; AU33's tests seed buckets, not percentile values).
 
 ---
 
@@ -200,7 +208,7 @@ remains the shell view and gains the watchdog's numbers (ops, private repo).
 | ---- | ----- | ---- |
 | Server snapshot | Redis `capacity:server:{id}` | 20 s (overwritten every 5 s) |
 | One-minute aggregates | Redis `capacity:agg:{id}:{minute}` | 24 h |
-| Fifteen-minute aggregates | Redis `capacity:agg15:{id}:{slot}` | 14 days |
+| Fifteen-minute aggregates | Redis `capacity:agg15:{id}:{slot}` (rolled up from the one-minute buckets by the watchdog, §2) | 14 days |
 | Request timeline records | Redis ring | 10,000 records or 24 h |
 | Prometheus | the operator's | the operator's |
 

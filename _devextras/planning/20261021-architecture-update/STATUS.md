@@ -7,7 +7,8 @@ measurement and a rollout are entries here, not chat messages.
 
 | Date | Step | Pull request | State | Notes |
 | ---- | ---- | ------------ | ----- | ----- |
-| 2026-10-21 | AU0 | this plan | open | research, spike, plan |
+| 2026-10-21 | AU0 | [#2623](https://github.com/metadist/synaplan/pull/2623) | merged (`ce89e32a4`) | research, spike, plan; three Copilot rounds, all findings accepted |
+| 2026-10-21 | AU0b | this pull request | open | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
 
 ## Baselines
 
@@ -195,6 +196,57 @@ Re-run after the script fixes (same stack, same clean-up, all verified):
 
 The temporary admin key was revoked; `BAPIKEYS` empty, gateway flags 0, no
 spike process, no `var/cache/prod`, no `*prod*` Redis keys.
+
+---
+
+## 2026-10-21 — Pre-flight (AU0b)
+
+A professional review of the plan found it strong on architecture, the
+execution loop and regression protection, and thin in five places. The
+owner decided all of them the same day; this pull request writes the
+decisions into the plan and nothing else changes:
+
+| # | Finding | Decision / fix |
+| - | ------- | -------------- |
+| B1 | Prompt handling (assembly, sorter prompt, context budget) was only mentioned as "never log it" | Out of scope for this track (master §8); a separate plan owns it |
+| B2 | §0 unticked; this file still listed AU0 as open | All 27 rows ticked in the owner's decision session, Ask rows approved; AU0 corrected to merged #2623 (`ce89e32a4`) |
+| B3 | Master §0 #3 gave the hook attribute a `phase` the contract does not have; "cut off at its budget" is not implementable in PHP | Attribute aligned with `03` §1.2; the budget is measured, not preemptive, and a blocking hook passes its budget as its own I/O timeout (`03` §1.4) |
+| B4–B6, B8 | `AiCallPayload` and friends, the descriptor sub-types, the pump/watchdog state and trust questions, and percentile aggregation were named, not defined | Hardening tasks scheduled and merged before the step that needs them: `03` §1.7 before AU10, §2.3 before AU19, §7.1 before AU28; aggregates store histogram buckets (`04` §2, §7); AU10, AU19 and AU28 carry the precondition in their sprint files |
+| B7 | Docs-only steps, Go formatting and the conditional E2E matrix were not gate lines | Added in `01` §6 (house lint plus the relative-link check, `gofmt -l` inside the watchdog test gate, firefox / OIDC / Ollama conditionals, mobile-impact allowlist updates) |
+
+Also decided and written down: plugin development is AU22 only (real
+plugins stay row 18), non-AI ingress channels are unchanged, autonomy is
+"merge-ready, then pause" (`01` §1, §11), Copilot is capped at three
+rounds with the owner deciding beyond it (`01` §9), remote final testing
+is CI + `vultr-cluster` + a one-node production soak (master §6, `01`
+§10), and one lead model executes the track with a second model reviewing
+read-only at the S1, S4 and S5 exits (`01` §1).
+
+S0 may start on the owner's word after this pull request merges. AU8
+additionally needs the `synaplan-charts` checkout, which is not part of
+this workspace today.
+
+### Gate for AU0b
+
+The diff touches only `_devextras/`, so the gate is the docs-only line of
+`01` §6 plus the full unit/static gate, run on this branch:
+
+- `make lint` (php-cs-fixer 0 of 3,276 files, Prettier, ESLint): green.
+- The relative-link check over every changed Markdown file: no broken
+  link.
+- `make -C backend phpstan`: no errors. `make -C backend deptrac`:
+  0 violations.
+- PHPUnit, first run: 5 failures, all from the drifted local
+  `synaplan_test` database — the same first run AU0 recorded. After the
+  CI-style reset (`doctrine:migrations:migrate`,
+  `doctrine:fixtures:load`, `app:seed`, all `--env=test`): 9,666 tests,
+  1 failure, `TelegramChannelAccessTest::testChannelIsOpenForARegularUser`
+  — the known local-only case (the dev container's
+  `TELEGRAM_ENABLED=false` overrides `.env.test`; with `.env.test`'s
+  values the test passes, 1 test, 5 assertions).
+- Vitest 439 of 439 files (3,115 tests), `vue-tsc` clean.
+- `node scripts/mobile-impact.mjs --base origin/main --head HEAD`:
+  exit 0, class `no-app-impact`.
 
 ---
 

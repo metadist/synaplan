@@ -63,6 +63,12 @@ worker waits — and with either part off, everything runs as today.
 
 ## AU28 — Spike: watchdog relay and stream pump end to end (STATUS entry; branch never merged)
 
+**Precondition (AU0b):** the hardening of `03_contracts.md` §7.1 — the
+turn state machine, sequence numbers, the attach token, the relay trust
+boundary, the security tests, the canary rule and the Redis prompt note —
+is merged. AU28 must not start before it; the spike verifies the merged
+contract, it does not invent it.
+
 ### Goal
 
 On a branch `spike/au28-relay-pump`, prove the whole S5 shape for one route
