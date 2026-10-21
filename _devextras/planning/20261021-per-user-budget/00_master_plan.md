@@ -22,11 +22,13 @@ that contains its date, so a standing allowance cannot be stored that way.
 | Return from Stripe | `SubscriptionSuccessView.vue` | Every return is treated as a plan activation ("your plan is now …"). A top-up uses the same `success_url`. Cancel goes to the subscription-cancel page. |
 | People → Users | `UsersTab.vue`, `PATCH /api/v1/admin/users/{id}/level` | Level can be changed. Budget cannot. Level changes are audited. |
 | Website gate | `PremiumFeatureGate::isCostBudgetEnforced()` | Chat, media, and live voice block only when `COST_BUDGET_GATE_ENABLED` is set **and** billing is on. |
-| Coding-client gate | `MessagesGateway` | Blocks on `checkCostBudget()` whenever the request uses the operator key, including when the website gate is off. |
+| Coding-client gate | `MessagesGateway` (operator-key branch, around lines 273–285) | Blocks on `checkCostBudget()` for the operator key. It does not read `PremiumFeatureGate` or the Stripe configuration, so a positive budget stops these clients even when the website gate is off and even when Stripe is not configured. |
 
-Self-host installs with no Stripe key never enforce the budget
-(`docs/BILLING_SELFHOST.md`). Do not add a second way around
-`PremiumFeatureGate`.
+With no Stripe key, the website does not enforce the budget
+(`docs/BILLING_SELFHOST.md`, `PremiumFeatureGate::isCostBudgetEnforced()`).
+Coding clients that use the operator key still do. A positive override on
+a no-Stripe install therefore stops those clients once spend reaches it.
+Do not add a second website path around `PremiumFeatureGate`.
 
 ## Decisions
 
@@ -107,8 +109,9 @@ reviewed from this file before the first `.vue`.
   next request is accepted when charged spend is under the new budget.
   The modal does not claim a plan upgrade.
 - **J-UB-4 — Billing off, and the native app.** No **Add €100** anywhere.
-  The admin panel can still save 250 and says the website is not blocking
-  on it. The native app never shows a Stripe button.
+  The admin panel can still save 250. It says the website is not applying
+  the number and that coding clients which use the server key are. The
+  native app never shows a Stripe button.
 
 Ten-second findability (U2): the admin finds the number on the user row
 in **People → Users**. The person finds used, budget, remaining, the end
@@ -161,10 +164,12 @@ Placeholders match English.
 | Save | "Only this account. Other {plan} accounts stay at {planAmount}. Takes effect on the next request. Spend already recorded is unchanged." |
 | Clear | "This account again uses the {plan} budget of {planAmount}." |
 | Gate off | "The website is not blocking on this number. Coding clients that use the server key are." |
-| Billing off, admin | "Payments are off, so this limit is stored and not applied on the website." |
+| Billing off, admin | "Payments are off. The website is not applying this number. Coding clients that use the server key are." |
 | Add button | "Add €{amount} until {date}" |
 | Success | "€{amount} was added until {date}. €{left} is left." |
-| Webhook slower than the page | "Payment received. The budget updates within a minute — open Statistics to see what is left." |
+| Payment not finished | "The payment is not finished. Nothing was added." |
+| Paid, credit not stored yet | "Payment received. The budget updates within a minute — open Statistics to see what is left." |
+| Session not this account | "This payment could not be confirmed. Nothing shown here was added." |
 | Cancel | "No payment was taken. The budget is unchanged." |
 | Stripe error | "The payment page did not open. Nothing was added. Try again from Statistics." |
 
@@ -176,7 +181,7 @@ blocked path and the statistics path do not disagree.
 
 | Step | Class | Does |
 | ---- | ----- | ---- |
-| UB1 | backend-only | Column, formula, admin read/write, audit. No Vue. |
+| UB1 | backend-only | Column, formula, admin read/write, audit, top-up session status, `period_end` on cost-budget refusals. No Vue. |
 | UB2 | ota-candidate | People → Users row and panel. J-UB-1, J-UB-4. |
 | UB3 | ota-candidate | Statistics card, Checkout return and cancel, limit-modal until-date. J-UB-2, J-UB-3. |
 | UB4 | no-app-impact | One paragraph in `docs/BILLING_SELFHOST.md`. |
@@ -211,6 +216,22 @@ override replaces the plan, top-ups still add, `0` is not a stored
 value, unlimited stays "plan budget is 0 and there is no override".
 Controller test: non-admin 403, bad amount 400, clear back to null, audit
 row written.
+
+`GET /api/v1/subscription/topup/session?session_id=` is authenticated and
+scoped to the signed-in user. The server reads the Checkout session with
+the secret key. If `metadata.user_id` and `client_reference_id` are not
+this user, the response is 404 and names no other account. The body is
+`payment` (`unpaid`, `paid`, or `expired`), `credited` (true only when
+`BUSER_TOPUPS.BSTRIPE_SESSION_ID` is this session), and `amount_eur` from
+metadata `topup_eur`, so a 1-step and a 50-step purchase are told apart.
+`GET /api/v1/subscription/budget` is not used to decide whether this
+payment landed. Another purchase in the same period must not satisfy the
+check.
+
+The cost-budget refusal adds `period_end` next to `limit`, `used`, and
+`remaining` in `MessageController`, `StreamRequestResolver`, and
+`VoiceLiveSessionService::assertBudget`. Those three bodies omit it today,
+and the stream handler forces `resetTime: null`.
 
 Exit: formula tests green; no UI.
 
@@ -251,12 +272,19 @@ share the Checkout session and the webhook.
 `/subscription/success?session_id={CHECKOUT_SESSION_ID}&kind=topup`.
 `cancel_url` is `/statistics?budget=cancelled` (the real statistics
 route, not a new one). The success view, when `kind=topup`, does not run
-the plan-activation poll. It polls `GET /api/v1/subscription/budget`
-until `topups` reflects the payment or the wait ends with the "within a
-minute" sentence. A refresh of statistics shows the same remaining.
+the plan-activation poll. It polls
+`GET /api/v1/subscription/topup/session`. It says the payment is not
+finished while `payment` is `unpaid`. It says "Payment received" only
+once `payment` is `paid`. It says "€{amount} was added" only once
+`credited` is true, and `{amount}` is that session's `amount_eur`. Only
+then does it call `GET /api/v1/subscription/budget`, and only to show what
+is left. A refresh of statistics shows the same remaining.
 
-The limit modal's button gains "until {date}" from the budget payload
-already returned with the refusal. It does not gain a second endpoint.
+The limit modal's button gains "until {date}" from `period_end` on the
+refusal. `memberError.ts` passes that field through instead of
+`resetTime: null`. `liveBudgetResult()` in `ChatInput.vue` does the same
+for the live-voice refusal, which today drops the date. The modal does
+not gain a second Checkout endpoint.
 
 Unlimited (`budget` 0): the card keeps the unlimited state and shows no
 **Add €100**.
@@ -272,9 +300,11 @@ Exit:
 ### UB4 — self-host doc
 
 `docs/BILLING_SELFHOST.md` gains a short paragraph: an admin may set a
-per-account monthly budget; it is enforced only when the cost-budget gate
-is on; a person buys more only when Stripe is configured; a purchase lasts
-the current period; the standing amount does not.
+per-account monthly budget. The website applies it only when the
+cost-budget gate is on. Coding clients that use the operator key apply a
+positive amount even when Stripe is not configured. A person buys more
+only when Stripe is configured. A purchase lasts the current period; the
+standing amount does not.
 
 ## Out of scope
 
