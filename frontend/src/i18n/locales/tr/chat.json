@@ -420,6 +420,18 @@
       "noMatch": "“{query}” ile eşleşen model yok.",
       "assistants": "Asistanlar"
     },
+    "defaultModelOffer": {
+      "body": "{name} son bir saatte {count} kez ulaşılamadı.",
+      "prompt": "{purpose} varsayılanını değiştir?",
+      "useNamed": "{name} kullan",
+      "use": "Bu modeli kullan",
+      "dismiss": "Şimdi değil",
+      "choose": "Yerine",
+      "saved": "{purpose} varsayılanın artık {name}. Diğer varsayılanlar aynı kalır.",
+      "saveFailed": "Varsayılan değişmedi. Hâlâ {name}.",
+      "noAlternative": "Geçilecek başka bir model yok.",
+      "settings": "Yapay zeka ayarları"
+    },
     "removeTool": "Aracı kaldır",
     "pastedText": {
       "label": "Yapıştırıldı",

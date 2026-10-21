@@ -193,6 +193,9 @@ class AdminModelHealthControllerTest extends WebTestCase
                 self::assertIsInt($model['errorRatePercent']);
                 self::assertIsBool($model['active']);
                 self::assertIsBool($model['needsAttention']);
+                self::assertIsInt($model['unavailableCount']);
+                self::assertIsArray($model['alternatives']);
+                self::assertArrayHasKey('defaultCapability', $model);
             }
         }
         self::assertSame($catalogued, $listed);

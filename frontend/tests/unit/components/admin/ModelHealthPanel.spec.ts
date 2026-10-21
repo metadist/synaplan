@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 const mockGetStatus = vi.fn()
 const mockResetCounters = vi.fn()
 const mockConfirm = vi.fn()
+const mockSaveDefaults = vi.fn()
 
 vi.mock('@/services/api/adminModelStatusApi', () => ({
   modelStatusApi: {
@@ -16,6 +17,10 @@ vi.mock('@/services/api/adminModelStatusApi', () => ({
 
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+}))
+
+vi.mock('@/services/api/configApi', () => ({
+  saveDefaultModels: (...args: unknown[]) => mockSaveDefaults(...args),
 }))
 
 vi.mock('@/composables/useDialog', () => ({
@@ -31,6 +36,7 @@ vi.mock('@/composables/useNavItems', () => ({
   setModelsNeedingAttention: (...args: unknown[]) => setModelsNeedingAttention(...args),
 }))
 
+import { createPinia, setActivePinia } from 'pinia'
 import ModelHealthPanel from '@/components/admin/ModelHealthPanel.vue'
 
 const snapshot = {
@@ -127,6 +133,7 @@ describe('ModelHealthPanel', () => {
     mockGetStatus.mockResolvedValue(snapshot)
     mockConfirm.mockResolvedValue(true)
     mockResetCounters.mockResolvedValue({ success: true, modelId: 42 })
+    mockSaveDefaults.mockResolvedValue({ success: true, message: 'saved' })
   })
 
   it('shows a human task name instead of the raw catalog tag', async () => {
@@ -237,6 +244,46 @@ describe('ModelHealthPanel', () => {
     const problems = wrapper.findAll('[data-testid="item-model"]')
     expect(problems).toHaveLength(1)
     expect(problems[0].text()).toContain('GPT-4o')
+    wrapper.unmount()
+  })
+
+  it('offers another model and changes only that default after confirmation', async () => {
+    const online = snapshot.providers[0].models[0]
+    mockGetStatus.mockResolvedValue({
+      ...snapshot,
+      providers: [
+        {
+          ...snapshot.providers[0],
+          models: [
+            {
+              ...online,
+              state: 'offline',
+              needsAttention: true,
+              unavailableCount: 3,
+              defaultCapability: 'CHAT',
+              alternatives: [{ id: 88, name: 'gpt 6 sol', service: 'OpenAI' }],
+            },
+          ],
+        },
+      ],
+    })
+    setActivePinia(createPinia())
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="text-unavailable-count"]').text()).toContain('3')
+    expect(wrapper.get('[data-testid="model-alternatives"]').text()).toContain('gpt 6 sol')
+
+    mockConfirm.mockResolvedValueOnce(false)
+    await wrapper.get('[data-testid="btn-use-alternative"]').trigger('click')
+    await flushPromises()
+    expect(mockSaveDefaults).not.toHaveBeenCalled()
+
+    mockConfirm.mockResolvedValueOnce(true)
+    await wrapper.get('[data-testid="btn-use-alternative"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSaveDefaults).toHaveBeenCalledWith({ defaults: { CHAT: 88 } })
     wrapper.unmount()
   })
 

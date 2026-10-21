@@ -429,6 +429,18 @@
       "noMatch": "No model matches “{query}”.",
       "assistants": "Assistants"
     },
+    "defaultModelOffer": {
+      "body": "{name} has been unreachable {count} times in the last hour.",
+      "prompt": "Change your {purpose} default?",
+      "useNamed": "Use {name}",
+      "use": "Use this model",
+      "dismiss": "Not now",
+      "choose": "Replacement",
+      "saved": "Your {purpose} default is now {name}. Other defaults stay as they are.",
+      "saveFailed": "The default was not changed. It is still {name}.",
+      "noAlternative": "No other model is available to switch to.",
+      "settings": "AI settings"
+    },
     "removeTool": "Remove tool",
     "pastedText": {
       "label": "Pasted",

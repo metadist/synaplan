@@ -48,6 +48,15 @@
       "switchedOff": "Désactivé",
       "exempt": "Exempté de la désactivation automatique"
     },
+    "alternatives": {
+      "unavailable": "Injoignable {count} fois au cours de la dernière heure",
+      "hint": "Autres modèles pour cette tâche :",
+      "use": "En faire mon modèle par défaut",
+      "confirmTitle": "Changer ton modèle par défaut ?",
+      "confirmMessage": "Ton modèle par défaut pour {purpose} devient {name}. Ceux des autres personnes restent. Rien d’autre ne change.",
+      "saved": "Ton modèle par défaut pour {purpose} est maintenant {name}. Ceux des autres personnes restent.",
+      "saveFailed": "Le modèle par défaut n’a pas été changé. C’est toujours {name}."
+    },
     "actions": {
       "refresh": "Vérifier maintenant",
       "refreshProvider": "Vérifier ce fournisseur",

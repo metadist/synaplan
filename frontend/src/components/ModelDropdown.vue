@@ -39,6 +39,13 @@
       <ChevronUpIcon class="h-4 w-4 flex-shrink-0" />
     </button>
 
+    <DefaultModelChangeOffer
+      v-if="!guest && !isOpen"
+      capability="CHAT"
+      :active-model-id="modelValue === null ? (defaultModelId ?? null) : modelValue"
+      @applied="selectModel(null)"
+    />
+
     <div
       v-if="isOpen"
       :id="panelId"
@@ -196,6 +203,7 @@ import { CheckIcon, ChevronUpIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroi
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useAiConfigStore } from '@/stores/aiConfig'
+import DefaultModelChangeOffer from '@/components/DefaultModelChangeOffer.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import ReasoningLevelOptions from '@/components/ReasoningLevelOptions.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'

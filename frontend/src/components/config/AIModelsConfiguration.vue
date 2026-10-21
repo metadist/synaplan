@@ -90,14 +90,12 @@
           }}
         </p>
       </div>
-
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
           class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"
         ></div>
         <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
       </div>
-
       <div
         v-else-if="modelsLoadFailed"
         class="py-6 text-center"
@@ -115,6 +113,7 @@
       </div>
 
       <div v-else>
+        <DefaultModelChangeOffer v-if="defaultsScope === 'user'" placement="page" />
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
           <div
             v-for="capability in Object.keys(purposeLabels)"
@@ -768,6 +767,7 @@ import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
+import DefaultModelChangeOffer from '@/components/DefaultModelChangeOffer.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'

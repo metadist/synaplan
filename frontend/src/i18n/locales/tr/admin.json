@@ -48,6 +48,15 @@
       "switchedOff": "Kapalı",
       "exempt": "Otomatik kapatmadan muaf"
     },
+    "alternatives": {
+      "unavailable": "Son bir saatte {count} kez ulaşılamadı",
+      "hint": "Bu iş için diğer modeller:",
+      "use": "Varsayılanım yap",
+      "confirmTitle": "Varsayılanı değiştir?",
+      "confirmMessage": "{purpose} varsayılanın {name} olur. Başkalarının varsayılanları aynı kalır. Başka bir şey değişmez.",
+      "saved": "{purpose} varsayılanın artık {name}. Başkalarının varsayılanları aynı kalır.",
+      "saveFailed": "Varsayılan değişmedi. Hâlâ {name}."
+    },
     "actions": {
       "refresh": "Şimdi kontrol et",
       "refreshProvider": "Bu sağlayıcıyı kontrol et",

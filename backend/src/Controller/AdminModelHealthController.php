@@ -8,6 +8,7 @@ use App\AI\Health\ModelHealthConfig;
 use App\AI\Health\ModelHealthEvaluator;
 use App\AI\Health\ModelHealthOverview;
 use App\AI\Health\ModelHealthRecorder;
+use App\AI\Health\ModelHealthSnapshotAlternatives;
 use App\AI\Health\ModelHealthState;
 use App\Entity\ModelHealth;
 use App\Repository\ModelHealthRepository;
@@ -40,6 +41,7 @@ final class AdminModelHealthController extends AbstractController
 {
     public function __construct(
         private readonly ModelHealthOverview $overview,
+        private readonly ModelHealthSnapshotAlternatives $snapshotAlternatives,
         private readonly ModelHealthEvaluator $evaluator,
         private readonly ModelHealthRecorder $recorder,
         private readonly ModelHealthRepository $healthRepository,
@@ -54,7 +56,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Get(
         path: '/api/v1/admin/model-health',
         summary: 'Availability of every catalogued AI model (admin only)',
-        description: 'Returns the last stored verdict per model together with the rolling success/failure counters from live traffic. Retired models are listed separately; they and models an operator switched off never count as needing attention. Reads stored state only and never calls a provider.',
+        description: 'Returns the last stored verdict per model together with the rolling success/failure counters from live traffic. A model that needs attention, or that was unreachable more than twice in the last hour, also lists other models for the same task. Those are suggestions: nothing is changed until a person picks one. Retired models are listed separately; they and models an operator switched off never count as needing attention. Reads stored state only and never calls a provider.',
         security: [['Bearer' => []]],
         tags: ['Admin Model Health']
     )]
@@ -97,7 +99,7 @@ final class AdminModelHealthController extends AbstractController
                                 property: 'models',
                                 type: 'array',
                                 items: new OA\Items(
-                                    required: ['id', 'name', 'providerId', 'capability', 'state', 'needsAttention', 'reason', 'source', 'lastCheck', 'lastSuccess', 'lastFailure', 'successes', 'failures', 'errorRatePercent', 'active', 'selectable', 'autoDisabled', 'exemptUntil'],
+                                    required: ['id', 'name', 'providerId', 'capability', 'state', 'needsAttention', 'reason', 'source', 'lastCheck', 'lastSuccess', 'lastFailure', 'successes', 'failures', 'errorRatePercent', 'active', 'selectable', 'autoDisabled', 'exemptUntil', 'unavailableCount', 'defaultCapability', 'alternatives'],
                                     properties: [
                                         new OA\Property(property: 'id', type: 'integer', example: 42),
                                         new OA\Property(property: 'name', type: 'string', example: 'Llama 3.3 70B'),
@@ -117,6 +119,22 @@ final class AdminModelHealthController extends AbstractController
                                         new OA\Property(property: 'selectable', type: 'boolean', example: true),
                                         new OA\Property(property: 'autoDisabled', type: 'boolean', description: 'Switched off by the monitor rather than by an operator', example: false),
                                         new OA\Property(property: 'exemptUntil', type: 'integer', description: 'Unix timestamp until which automatic disabling is paused, 0 when not paused', example: 0),
+                                        new OA\Property(property: 'unavailableCount', type: 'integer', description: 'Times this model was unreachable in the last 60 minutes', example: 0),
+                                        new OA\Property(property: 'defaultCapability', type: 'string', nullable: true, description: 'Default slot a person can point at an alternative, or null when this row has no one-click change', example: 'CHAT'),
+                                        new OA\Property(
+                                            property: 'alternatives',
+                                            description: 'Other selectable models for the same task. Empty unless the model needs attention or was unreachable more than twice in the last hour.',
+                                            type: 'array',
+                                            items: new OA\Items(
+                                                required: ['id', 'name', 'service'],
+                                                properties: [
+                                                    new OA\Property(property: 'id', type: 'integer', example: 88),
+                                                    new OA\Property(property: 'name', type: 'string', example: 'gpt 6 sol'),
+                                                    new OA\Property(property: 'service', type: 'string', example: 'OpenAI'),
+                                                ],
+                                                type: 'object'
+                                            )
+                                        ),
                                     ],
                                     type: 'object'
                                 )
@@ -150,7 +168,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Response(response: 403, description: 'Admin access required')]
     public function status(): JsonResponse
     {
-        return $this->json(['success' => true] + $this->overview->build());
+        return $this->json(['success' => true] + $this->snapshotAlternatives->annotate($this->overview->build()));
     }
 
     #[Route('/refresh', name: 'admin_model_health_refresh', methods: ['POST'])]

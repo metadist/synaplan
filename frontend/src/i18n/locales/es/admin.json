@@ -48,6 +48,15 @@
       "switchedOff": "Desactivado",
       "exempt": "Exento de la desactivación automática"
     },
+    "alternatives": {
+      "unavailable": "No disponible {count} veces en la última hora",
+      "hint": "Otros modelos para esta tarea:",
+      "use": "Usar como mi predeterminado",
+      "confirmTitle": "¿Cambiar tu modelo predeterminado?",
+      "confirmMessage": "Tu modelo predeterminado de {purpose} pasa a ser {name}. Los de las demás personas no cambian. No se cambia nada más.",
+      "saved": "Tu modelo predeterminado de {purpose} ahora es {name}. Los de las demás personas no cambian.",
+      "saveFailed": "El modelo predeterminado no se cambió. Sigue siendo {name}."
+    },
     "actions": {
       "refresh": "Comprobar ahora",
       "refreshProvider": "Comprobar este proveedor",
