@@ -68,6 +68,8 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
         $probe = new class($listed, $confirmations, $authoritative) implements ModelListProbeInterface {
             public int $confirmCalls = 0;
 
+            public ?ModelProbeResult $override = null;
+
             /**
              * @param list<string>                    $listed
              * @param array<string, ModelProbeResult> $confirmations
@@ -93,7 +95,7 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
             {
                 ++$this->confirmCalls;
 
-                return $this->confirmations[$providerModelId] ?? ModelProbeResult::Inconclusive;
+                return $this->override ?? $this->confirmations[$providerModelId] ?? ModelProbeResult::Inconclusive;
             }
         };
 
@@ -250,6 +252,30 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
         $evaluator->run(dryRun: true);
 
         self::assertSame(2, $this->lastProbe->confirmCalls);
+    }
+
+    /**
+     * A remembered "gone" must not outlive the button an operator just pressed.
+     * The scheduled check still reuses the answer; only a fresh confirmation
+     * asks again and replaces the stored verdict.
+     */
+    public function testAFreshConfirmationReplacesACachedVerdict(): void
+    {
+        $model = self::model(394, 'xAI', 'grok-voice-3.0', 'voice2voice');
+        $evaluator = $this->evaluatorFor($model, ['grok-4.5'], ['grok-voice-3.0' => ModelProbeResult::Gone]);
+
+        $first = $evaluator->run(dryRun: true);
+        self::assertSame(ModelHealthState::Offline, $first->verdicts[0]->state);
+
+        $this->lastProbe->override = ModelProbeResult::Alive;
+        $cached = $evaluator->run(dryRun: true);
+        self::assertSame(ModelHealthState::Offline, $cached->verdicts[0]->state);
+        self::assertSame(1, $this->lastProbe->confirmCalls);
+
+        $fresh = $evaluator->run(dryRun: true, freshConfirmations: true);
+        self::assertSame(2, $this->lastProbe->confirmCalls);
+        self::assertSame(ModelHealthState::Online, $fresh->verdicts[0]->state);
+        self::assertFalse($fresh->verdicts[0]->safeToDisable);
     }
 
     /**

@@ -157,7 +157,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/model-health/refresh',
         summary: 'Re-check model availability now (admin only)',
-        description: 'Asks every provider for its published model list and re-evaluates the traffic counters. Uses free catalog endpoints only, so it never runs inference and never costs anything. Pass a provider to check just one.',
+        description: 'Asks every provider for its published model list and re-evaluates the traffic counters. Models missing from that list are asked again, even when a recent check already remembered an answer. Uses free catalog endpoints only, so it never runs inference and never costs anything. Pass a provider to check just one.',
         security: [['Bearer' => []]],
         tags: ['Admin Model Health'],
         requestBody: new OA\RequestBody(
@@ -193,7 +193,7 @@ final class AdminModelHealthController extends AbstractController
             : [];
 
         try {
-            $run = $this->evaluator->run(dryRun: false, onlyServices: $provider);
+            $run = $this->evaluator->run(dryRun: false, onlyServices: $provider, freshConfirmations: true);
         } catch (\Throwable $e) {
             $this->logger->error('Manual model health check failed', ['error' => $e->getMessage()]);
 

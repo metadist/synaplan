@@ -114,6 +114,58 @@ final class ProviderModelInventoryTest extends TestCase
         }
     }
 
+    /**
+     * xAI omits grok-voice-3.0 from GET /v1/models and answers 404 for that
+     * exact id, while the realtime socket still serves it. The voice roster
+     * is the free read that must not retire a working voice model.
+     */
+    public function testXaiVoiceModelsAreConfirmedThroughTheVoiceRoster(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(static function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+
+            return new MockResponse(json_encode([
+                'voices' => [['voice_id' => 'ara', 'name' => 'Ara']],
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $result = $this->inventoryWithClient($client, 'xai')->probe('xai', 'grok-voice-3.0');
+
+        $this->assertSame(ModelProbeResult::Alive, $result);
+        $this->assertSame(['https://api.x.ai/v1/tts/voices'], $requested);
+    }
+
+    public function testXaiVoiceProbeWithAnEmptyRosterStaysInconclusive(): void
+    {
+        $result = $this->inventory(new MockResponse('{"voices":[]}'), 'xai')->probe('xai', 'grok-voice-3.0');
+
+        $this->assertSame(ModelProbeResult::Inconclusive, $result);
+    }
+
+    public function testXaiVoiceProbeTreatsAMissingRosterAsGone(): void
+    {
+        $result = $this->inventory(new MockResponse('{"code":"not-found"}', ['http_code' => 404]), 'xai')
+            ->probe('xai', 'grok-voice-latest');
+
+        $this->assertSame(ModelProbeResult::Gone, $result);
+    }
+
+    public function testXaiChatModelsAreStillAddressedUnderTheListingUrl(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(static function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+
+            return new MockResponse('{}', ['http_code' => 200]);
+        });
+
+        $result = $this->inventoryWithClient($client, 'xai')->probe('xai', 'grok-4.5');
+
+        $this->assertSame(ModelProbeResult::Alive, $result);
+        $this->assertSame(['https://api.x.ai/v1/models/grok-4.5'], $requested);
+    }
+
     public function testProbeAddressesTheModelUnderTheListingUrl(): void
     {
         $requested = [];
