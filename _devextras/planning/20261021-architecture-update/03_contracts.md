@@ -34,6 +34,7 @@ final readonly class AiCallContext
                                               // messages_api, saved_task, sorter, memory, summary, vectorize, rerank,
                                               // media, voice_live, probe, system
         public ?string $requestId,            // X-Request-Id
+        public ?string $turnId,               // one answer: all rounds of a tool loop share it (§1.5)
         public ?string $runId,                // ChatRun id when streamed
         public ?int $messageId,
         public bool $billable = true,         // false for probes and health checks
@@ -99,7 +100,7 @@ order, pinned by a test (the tagged-list rule of `docs/ARCHITECTURE.md`).
 | 800 | `RateLimitHook` | refuses when the caller's limit is exhausted (billable calls) | — | caller-side `checkLimit()` | AU11 |
 | 700 | `CircuitBreakerHook` | refuses while the provider's breaker is open | records success / failure | `executeWithHealth()` | AU10 |
 | 600 | `ModelHealthHook` | — | `ModelHealthRecorder` success / failure | `observing()` | AU10 |
-| 300 | `UsageHook` | — | writes the `BUSELOG` row (shadow first) | caller-side `recordUsage()` | AU11 |
+| 300 | `UsageHook` | — | adds the call's usage to the turn ledger; writes per-call rows, the turn's owner closes per-turn rows (§1.5) | caller-side `recordUsage()` | AU11 |
 | 200 | `AiCallMetricsHook` | — | counters, histograms, the call record of the request timeline | — | AU13 |
 | 100 | `AiCallAuditHook` | — | `ai.call` audit row only when an installation turns on "audit AI calls" (off by default) | — | AU13 |
 
@@ -155,6 +156,30 @@ billable call has exactly one writer of its `BUSELOG` row.**
    `LegacyUsageWriter` and the setting. `UsageHook` then carries no flag
    (`flag: null`): metering cannot be switched off, and the way back from
    that point is a release revert, not a setting.
+
+**The accounting unit stays what it is today.** A turn of the gateways or the
+chat can make several provider calls (every round of a tool loop is one), but
+today it writes **one** `MESSAGES` row with the usage summed over its rounds
+(`GatewayToolLoop` aggregates, `MessagesGateway` writes once), and
+`RateLimitService` counts those rows against message quotas. One row per
+provider call would spend several message allowances on one answer. So:
+
+- `UsageHook` does not write per call. It adds each call's usage to a
+  request-scoped `TurnUsageLedger` under the call's `turnId`.
+- Each `AiAction` declares its unit: **per turn** (`MESSAGES` on every
+  channel) or **per call** (`SORTING`, `EMBEDDINGS`, `MEMORY_EXTRACTION`,
+  `IMAGES`, `VIDEOS`, `TRANSCRIPTION`, `SPEECH`, …, as today).
+- A per-call action's row is written in the call's after-hook; a per-turn
+  action's row is written once, when the turn's owner closes the ledger
+  (`TurnUsageLedger::close($turnId)`, called where today's single row is
+  written). `key_source`, model and provider of the row follow today's rule
+  for that path.
+- Cost per provider call, when someone needs it, is in the request timeline
+  and the metrics (AU13), never as extra `BUSELOG` rows.
+- Tests: a gateway turn with three MCP rounds, a document tool loop with two
+  rounds and a buffered single call each write exactly today's rows (one
+  `MESSAGES` row with summed tokens for the turns) under `legacy`, `shadow`
+  and `on`; the shadow comparison is per row, not per call.
 
 Non-AI usage rows (`TOOLS`, `MCP_TOOL`, `COMPUTE_RUNS`, `WEB_SEARCH` from tool
 loops, storage, messages-per-hour counters) are not part of this switch; they
@@ -239,7 +264,7 @@ today's tables, which the parity test enforces.)
 | `PlatformKeyModelListProbe::NO_LISTING` | `listsModels` |
 | `SyncModelPricesCommand` `PREFIX_MAP` | `pricingPrefix` |
 | `VoiceLiveConcurrency` caps | `liveVoiceSessions` |
-| `AdminProviderKeysController` OpenAPI enum | kept as a constant; a test asserts it equals the catalog (OpenAPI attributes must be constant) |
+| `AdminProviderKeysController` OpenAPI enum | **dropped** (AU21): the field becomes a string validated against the catalog (unknown name ⇒ 400 with the existing error shape). A hand-kept enum would be one more list to edit, and a generated one would make every new provider a change of the frontend's generated schemas; the UI already gets the names from `GET /api/v1/ai/providers`. Test: the exported spec (`/api/doc.json`) contains no provider-name list, and the AU22 fixture provider is accepted |
 | `AiTab` password fields | generated from `key` |
 | `services.yaml` `app.ai.<capability>` tags and `$envKeys` | `#[AsAiProvider]` + `registerAttributeForAutoconfiguration`, tags from the implemented interfaces, keys from the descriptor |
 | frontend `providerIcons.ts`, `providerHelp.ts`, `ServiceIcon.vue` | `GET /api/v1/ai/providers` (AU21); help text stays in the five locale files under `admin.providerHelp.<helpKey>` |
@@ -301,6 +326,19 @@ In `report` mode a request that `enforce` would refuse goes out and logs
 `egress.would_block` (destination, caller class, request id). In `enforce`
 mode it throws `EgressRefusedException` before connecting, which callers map
 to their existing "service not reachable" sentence.
+
+**Every hop is checked, not only the first URL.** Symfony HttpClient follows
+redirects inside the transport (`max_redirects`, default 20), where a
+decorator never sees them. `EgressHttpClient` therefore sends every request
+with `max_redirects: 0` and follows redirects itself, up to the caller's own
+`max_redirects`: before each hop it applies the policy to the `Location`
+destination (and, for a URL a person typed, `SsrfGuard` and the pin of §3.6),
+keeps 307 / 308 method and body, and drops `Authorization` and cookies on a
+host change, as Symfony does. A caller that asked for no redirects
+(`HttpToolExecutor`) still gets none. Tests (AU15): allowed host → 302 →
+refused host is refused in `enforce` and logged in `report`; allowed → allowed
+follows; the hop limit holds; `MediaDownloader`, whose cURL transport follows
+redirects today, keeps following them through this path (AU16).
 
 ### 3.3 Per-destination metrics
 
@@ -421,7 +459,7 @@ frankenphp {
 		name streams
 		file "/var/www/backend/public/index.php"
 		num {$FRANKENPHP_STREAM_WORKER_NUM:{$FRANKENPHP_WORKER_NUM:16}}
-		match /api/v1/messages/stream* /api/v1/widget/*/message /v1/chat/completions /v1/messages
+		match /api/v1/messages/stream* /api/v1/widget/*/message /v1/chat/completions /v1/messages /v1/audio/transcriptions/sessions/*/stream /api/v1/tts/stream /mcp
 		env APP_RUNTIME App\Runtime\FrankenPhpRuntime
 	}
 	worker {
@@ -433,8 +471,19 @@ frankenphp {
 }
 ```
 
+Which routes are long (checked 2026-10-21 by scanning the controllers for
+`StreamedResponse` and event streams): the chat stream and its attach, the
+widget message, both gateways, the dictation session stream
+(`AudioTranscriptionController::streamSession()`, a PHP poll loop held 300 s by
+default, up to 600 s), the TTS stream (`TtsController`, synchronous), and
+`/mcp` (its `synaplan_chat` tool runs a whole chat turn inside one POST). The
+usage CSV export streams but is short and stays in `api`. A new streaming
+route goes on this line in the same pull request; `LongRouteListTest` (AU3)
+fails when a controller returns a `StreamedResponse` from a route that no
+`match` pattern covers, unless the route is on its short-stream allow-list.
+
 Verified on 2026-10-21 with FrankenPHP 1.12.6, workers inside `php_server`:
-`name`, global `max_wait_time`, and one `match` line with all four patterns.
+`name`, global `max_wait_time`, and one `match` line with the first four patterns.
 A request to each long route was counted on `streams`
 (`frankenphp_worker_request_count{worker="m#streams"}`), `/api/health` and
 `/api/v1/config/runtime` on `api` (STATUS). Still to verify in AU3: the
@@ -449,6 +498,9 @@ placeholder, and an empty `num_threads`.
 | `/api/v1/messages/stream*`, `/api/v1/widget/*/message` | `{"error":"server_busy","retryAfter":5}` | `Retry-After: 5` |
 | `/v1/chat/completions` | `{"error":{"message":"Synaplan is busy. Retry in a few seconds.","type":"server_error","code":"server_busy"}}` | `Retry-After: 5` |
 | `/v1/messages` | `{"type":"error","error":{"type":"overloaded_error","message":"Synaplan is busy. Retry in a few seconds."}}` (status 529 is Anthropic's; we keep 503) | `Retry-After: 5` |
+| `/v1/audio/transcriptions/sessions/*/stream` | the `/v1/chat/completions` body (OpenAI shape) | `Retry-After: 5` |
+| `/api/v1/tts/stream` | `{"error":"server_busy","retryAfter":5}` | `Retry-After: 5` |
+| `/mcp` | `{"jsonrpc":"2.0","error":{"code":-32000,"message":"Synaplan is busy. Retry in a few seconds."},"id":null}` | `Retry-After: 5` |
 
 The API copy is English on purpose: it is a machine contract that SDKs
 retry on. People see AU4's localized sentence.
@@ -491,14 +543,29 @@ hostname.
 // stream:job:{jobId}   TTL 120 s, deleted on claim
 { "runId": "…", "callId": "…", "channel": "chat_stream|widget|openai_api|messages_api",
   "provider": "anthropic", "model": "claude-…", "call": { "payload": { … }, "options": { … } },
+  "credential": { "source": "user|operator|endpoint", "userId": 3, "endpointId": null,
+                  "operatorFallback": false, "keySource": "user" },
   "decoder": "anthropic_messages", "encoder": "synaplan_sse|openai_chunks|anthropic_events",
   "deadlineSec": 240, "turn": { "chatId": 1, "messageId": 2, "userId": 3 } }
 ```
 
   No provider key and no auth header are in Redis: the pump is PHP and builds
-  the request itself (`buildStreamRequest(AiCall)`, §7 below), reading the key
-  from `ProviderKeyStore` in its own process. Prompts in `call.payload` live
-  only for the 120 s until claim.
+  the request itself (`buildStreamRequest(AiCall)`, §7 below). Prompts in
+  `call.payload` live only for the 120 s until claim.
+- **The pump uses the credential the turn was admitted with.** Admission
+  already decided whose key pays: `MessagesGateway::resolveCredential()`
+  picks a person's own key (BYOK, metered at zero cost), an endpoint of the
+  OpenAI-compatible registry, or the operator's key only where
+  `ALLOW_OPERATOR_KEY` permits it; the app chat has its own rule. AU29 moves
+  these rules into one `TurnCredentialResolver`; admission stores its
+  **non-secret** decision in `credential`, and the pump asks the same resolver
+  for exactly that source — never "whatever `ProviderKeyStore` has". A source
+  that is gone by then (key deleted) ends the run with the existing "key
+  missing" sentence instead of falling back to another account. `keySource`
+  flows into the usage row, so BYOK calls stay at zero cost. Parity tests
+  (AU30): user-key-only, mixed (user key for one provider, operator for
+  another), operator fallback disabled, endpoint registry — in-request and
+  pump mode write the same row and use the same key.
 - **Lifecycle.** `XREADGROUP` gives a pump the id; `GETDEL stream:job:{jobId}`
   claims the body atomically; then `XACK` and `XDEL` remove the entry, so the
   stream holds only unclaimed ids. A body that already expired ⇒ the pump
@@ -515,9 +582,20 @@ hostname.
   for the same run.
 - End → `FinishTurnCommand` (Messenger): store the reply, usage through the
   pipeline's after-hooks, memory extraction, `complete` frame.
-- Heartbeat `pump:{serverId}:{pid}` every 2 s; a run whose pump heartbeat is
-  gone for 10 s is failed with its terminal frame by any pump (no stuck
-  "running", UX bar 6).
+- Heartbeat `pump:{serverId}:{pid}` every 2 s, and each run records the pump
+  that owns it. **Cleaning up after a dead pump is not a pump's job**, because
+  the dead one may have been the last: `app:runs:reap` runs in the scheduler's
+  tick lane (every minute, `ScheduledJobs` and `container-runtime.sh`), and
+  each pump also runs it once at start. A run that is `queued` past its claim
+  deadline, or `running` while its owner's heartbeat is gone for 10 s, is
+  failed in **one atomic step** (a Redis script: only if still in that state,
+  set the run snapshot to failed and append its `terminal` entry), then the
+  stored message gets the same failure as an in-request turn gets today. Pumps
+  and the scheduler can both run it; the state check makes the second a
+  no-op. While nobody has reaped yet, the watchdog closes the client after
+  `idleTimeoutSec` with the directive's terminal frame (§8), so no client
+  waits forever and no run stays "running" for more than about a minute
+  after the last pump died (UX bar 6).
 - Cancel: `CancelledTurns` flag checked on every tick; the upstream request
   is cancelled, the partial answer stored as today.
 

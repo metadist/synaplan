@@ -125,10 +125,14 @@ def probe_once(base, path) -> tuple[float, int]:
 
 
 def probe_loop(base, path, stop, samples):
+    """Time the probe until stopped; a non-200 answer is an error, never a latency sample."""
     while not stop.is_set():
         try:
             latency, status = probe_once(base, path)
-            samples.append({"t": time.monotonic(), "latency": latency, "status": status})
+            if status == 200:
+                samples.append({"t": time.monotonic(), "latency": latency, "status": status})
+            else:
+                samples.append({"t": time.monotonic(), "error": f"HTTP {status}", "latency_failed": latency})
         except Exception as exc:  # noqa: BLE001
             samples.append({"t": time.monotonic(), "error": str(exc)})
         stop.wait(0.25)
@@ -221,7 +225,9 @@ def main() -> int:
 
     baseline = []
     for _ in range(20):
-        latency, _status = probe_once(base, args.probe_path)
+        latency, status = probe_once(base, args.probe_path)
+        if status != 200:
+            raise SystemExit(f"baseline probe {args.probe_path} answered HTTP {status}; the stack is not healthy, aborting")
         baseline.append(latency)
     idle_threads = read_threads(args.container)
     stats_before = container_stats(args.container)
@@ -275,6 +281,7 @@ def main() -> int:
         "probe_baseline_s": summary(baseline),
         "probe_during_s": summary([p["latency"] for p in probes if "latency" in p]),
         "probe_errors": len([p for p in probes if "error" in p]),
+        "probe_error_kinds": sorted({p["error"] for p in probes if "error" in p}),
     }
     print(json.dumps(result, indent=2))
     if args.out:

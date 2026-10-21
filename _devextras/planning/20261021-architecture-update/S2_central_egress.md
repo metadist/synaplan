@@ -60,6 +60,10 @@ report mode.
   `extra.curl`), TLS keeps the original name. Tested with a test proxy that
   logs its `CONNECT` target and a resolver that answers public first and
   private second (DNS rebinding), for a custom HTTP tool and the URL reader.
+- Do: the decorator follows redirects itself and checks every hop (`03` §3.2):
+  inner `max_redirects: 0`, the caller's limit honoured, 307 / 308 kept,
+  credentials dropped on a host change. Tests: allowed → 302 → refused host is
+  refused in `enforce` and logged in `report`; allowed → allowed follows.
 - Do not: change `SsrfGuard`'s rules or the no-proxy path of
   `HttpToolExecutor`; default to anything but `off`.
 
@@ -74,7 +78,7 @@ report mode.
 > dev stack with `EGRESS.MODE=report` through `make test-e2e` and list every
 > `would_block` destination in STATUS — that list is the gap AU16, AU17 and
 > AU22 must close. `make ci-local`, `make test-e2e`, `make perf-runtime`
-> (gateway overhead ≤ 40 ms median).
+> (gateway overhead within the master plan §6 budget).
 
 ### Exit criteria
 
@@ -106,7 +110,10 @@ report mode.
 > Implement AU16 as a `refactor(egress)`, one site per commit. For each:
 > record the request (method, URL, headers masked, body hash, timeouts) on
 > the untouched code, switch, the recording must match. `OpenAICurlTransport`
-> streams multipart image uploads — test a large upload. `make ci-local`,
+> streams multipart image uploads — test a large upload. `MediaDownloader`
+> follows redirects with cURL today: after the switch it follows them through
+> the decorator's checked hops, and a test proves an allowed host that
+> redirects to a refused one is refused under `enforce`. `make ci-local`,
 > `make test-e2e` (media specs), baseline regenerated with removals only.
 
 ### Exit criteria

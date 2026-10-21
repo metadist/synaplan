@@ -56,6 +56,8 @@ foreach ($responses as $i => $response) {
 $done = 0;
 $failed = 0;
 $sawDone = array_fill(0, $streams, false);
+// HTTP chunks need not end on a line: keep each response's unfinished line and count complete lines only.
+$partial = array_fill(0, $streams, '');
 $rssPeakSampled = $rssBefore;
 $lastSample = 0.0;
 foreach ($client->stream($responses) as $response => $chunk) {
@@ -76,10 +78,15 @@ foreach ($client->stream($responses) as $response => $chunk) {
             200 === $response->getStatusCode() && $sawDone[$i] ? ++$done : ++$failed;
             continue;
         }
-        $content = $chunk->getContent();
-        $events[$i] += substr_count($content, 'data: ');
-        if (str_contains($content, 'data: [DONE]')) {
-            $sawDone[$i] = true;
+        $lines = explode("\n", $partial[$i].$chunk->getContent());
+        $partial[$i] = (string) array_pop($lines);
+        foreach ($lines as $line) {
+            $line = rtrim($line, "\r");
+            if ('data: [DONE]' === $line) {
+                $sawDone[$i] = true;
+            } elseif (str_starts_with($line, 'data: ')) {
+                ++$events[$i];
+            }
         }
     } catch (Symfony\Contracts\HttpClient\Exception\ExceptionInterface) {
         ++$failed;

@@ -87,6 +87,11 @@ those three places. The help text stays in the locale files
   Zod.
 - Do: `providerIcons.ts`, `providerHelp.ts`, `ServiceIcon.vue` read it via a
   small store; a bundled fallback map only for offline first paint.
+- Do: drop the provider-name enum of `AdminProviderKeysController`'s OpenAPI
+  attributes (`03` §2.1): the field becomes a string validated against the
+  catalog (unknown ⇒ 400). It changes the generated Zod schema, which is why
+  it lands here (`ota-candidate`) and not in AU20; the admin AI-keys page
+  takes its names from the new endpoint.
 - Do not: touch `stores/config.ts` or any `*RuntimeConfig*` file (§0 #7).
 
 ### Vibe brief
@@ -143,7 +148,9 @@ egress allowlist.
 
 ### Exit criteria
 
-1. `AddProviderJourneyTest` green; red on the parent.
+1. `AddProviderJourneyTest` green; red on the parent. It also asserts that
+   the exported spec (`/api/doc.json`) needs no change for the fixture
+   provider: no provider-name list remains in it.
 2. J-AU-4 walked; file count in STATUS.
 3. The egress allowlist follows the enabled providers (test).
 

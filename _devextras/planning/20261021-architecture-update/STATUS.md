@@ -118,7 +118,7 @@ Providers used: `test-model` (free), Groq `openai/gpt-oss-20b`, Anthropic
 | Go relay, stdlib only | 2,000 streams, all with HTTP 200 and `[DONE]`: 147 MB peak, ≈ 33 KB per stream, 6.6 s CPU, TTFB p95 0.14 s (re-run after review; the first two runs gave 142 and 148 MB); a `-race` build at 200 streams reported no data race |
 | Node 22.23.3 (`node:22-alpine` pinned in both Node sidecars) with `NODE_USE_ENV_PROXY=1` | `fetch()` and `https.get()` go to `HTTPS_PROXY` (ECONNREFUSED at an unreachable proxy); without the flag `fetch()` goes direct (200) |
 | One database connection per worker | 8 workers → 8 connections in `information_schema.PROCESSLIST` |
-| `/api/health` spawns a process | `WhisperService::isAvailable()` runs `whisper --help` on every call; ≈ 80 req/s at 1, 8 and 16 clients |
+| `/api/health` spawns a process | `WhisperService::isAvailable()` runs `whisper --help` on every call; ≈ 80–110 req/s whether 1, 8 or 16 clients ask (two runs, every response 200) |
 
 ### Gate for AU0
 
@@ -176,6 +176,28 @@ runs and removed / restored afterwards.
 
 ---
 
+## 2026-10-21 — Copilot review, round 2
+
+Requested after `2f26e52ba`; "Changes recommended", 11 new threads (8 on the
+contracts and plan, 3 on the spike scripts). All accepted. A second writer
+edited `pump.php` and `saturate.py` in this worktree at the same time; the
+owner asked this session to continue alone, the duplicates were removed and
+the merged code kept.
+
+Re-run after the script fixes (same stack, same clean-up, all verified):
+
+| Re-run | Result |
+| ------ | ------ |
+| Pump, line-buffered, 100 / 500 / 1,000 streams | all done; exactly 200 events per stream; 1,000 at 133.6 MB peak, 2.6 ms CPU each |
+| `microreq.py`, worker mode, status-checked | every request 200; `/api/health` 109 / 107 / 89 req/s at 1 / 8 / 16 clients; runtime config 242 req/s at 8 |
+| Split pools, 8 streams on 4, status-checked probes | 0 probe errors; probe p95 23 ms, max 27 ms |
+| `max_wait_time 2s` | 4 × 503; 0 probe errors; probe p95 25 ms |
+
+The temporary admin key was revoked; `BAPIKEYS` empty, gateway flags 0, no
+spike process, no `var/cache/prod`, no `*prod*` Redis keys.
+
+---
+
 ## Review log
 
 | Date | Pull request | Round | Finding | Answer |
@@ -194,3 +216,14 @@ runs and removed / restored afterwards.
 | 2026-10-21 | #2623 | 1 | AU11 could leave the gateway unmetered; retained modes stop metering | Gap. One writer per billable call at every step and rollback: `legacy` / `shadow` / `on`, `LegacyUsageWriter`, gateway and voice join in AU12 with their writers (`03` §1.5, S1 AU11–AU12, master §0 #5) |
 | 2026-10-21 | #2623 | 1 | No live re-attach in the open page after a transport drop | Gap, confirmed in `memberError.ts:46–50`. New step AU31b (`ota-candidate`), J-AU-6 walked there |
 | 2026-10-21 | #2623 | 1 | A global pump flag cannot roll back one node | Gap. §0 #24 separates per-server env switches from installation-wide BCONFIG ones; AU31 rollout and AU32 drills split accordingly |
+| 2026-10-21 | #2623 | 2 | One usage row per provider call breaks the per-turn `MESSAGES` unit and quotas | Defect in the contract. `TurnUsageLedger`, a unit per action (per turn / per call), rows exactly as today; multi-round tests in AU11 (`03` §1.5) |
+| 2026-10-21 | #2623 | 2 | Redirects bypass the egress policy | Gap. The decorator follows redirects itself and checks every hop; allowed → refused regression in AU15, `MediaDownloader` in AU16 (`03` §3.2) |
+| 2026-10-21 | #2623 | 2 | The pump reading `ProviderKeyStore` loses BYOK, endpoints and operator-fallback rules | Gap, confirmed in `MessagesGateway::resolveCredential()`. Non-secret credential decision in the job, one `TurnCredentialResolver` (AU29), parity cases in AU30 (`03` §7) |
+| 2026-10-21 | #2623 | 2 | No reaper when the last pump dies | Gap. `app:runs:reap` in the scheduler's tick lane and at pump start, atomic transition; AU28 G4 and AU30 stop every pump (`03` §7) |
+| 2026-10-21 | #2623 | 2 | A hand-kept provider enum defeats one-file providers | Agreed, solved differently: the enum is dropped (string validated against the catalog) rather than generated, because a generated enum would make each provider a frontend schema change; in AU21 (`03` §2.1) |
+| 2026-10-21 | #2623 | 2 | Dictation and TTS streams stay in the API pool | Gap, confirmed (300 s / 600 s poll loop, synchronous TTS); `/mcp` added too; `LongRouteListTest` and audio saturation in AU3 (`03` §5) |
+| 2026-10-21 | #2623 | 2 | "Your message is saved" is not true for a refused request | Defect, confirmed (`createIncoming()` runs after admission). Copy says "not sent", the text goes back into the composer and its per-chat draft (AU4) |
+| 2026-10-21 | #2623 | 2 | No cursor on the live stream, merged chunks | Gap, confirmed (`SseWriter::send()`, `ChatRunRecorder`). AU31b rebuilds the bubble from a full replay where no `id:` exists, resumes by cursor only behind the watchdog; tests in both modes |
+| 2026-10-21 | #2623 | 2 | Pump misses `[DONE]` split across chunks | Defect. Per-response line buffer; re-run: 200 events per stream, all done |
+| 2026-10-21 | #2623 | 2 | `microreq.py` times non-200s and ignores thread failures | Defect. Only 200 timed, failures counted, non-zero exit; re-run: every request 200 |
+| 2026-10-21 | #2623 | 2 | `saturate.py` probe non-200s enter the latency | Defect. Baseline must be 200 or the run aborts; later non-200s are errors; re-run: 0 probe errors |

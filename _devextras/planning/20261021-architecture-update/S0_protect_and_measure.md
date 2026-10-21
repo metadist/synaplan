@@ -90,8 +90,8 @@ delay knob), `backend/.env.example`, `docs/DEVELOPMENT.md` (one paragraph).
 > binary path); run it on the parent, quote the failure in STATUS. Add
 > `/api/health/ready` with a functional test (200, under 10 ms in the test
 > kernel, no process started). Then `make perf-runtime`: health p95 with 8
-> clients must drop from ≈ 95 ms to under 15 ms, and its throughput must grow
-> with the worker count. `make ci-local`, `make test-e2e`.
+> clients must drop from ≈ 115–140 ms to under 15 ms, and its throughput must
+> grow with the worker count (today ≈ 80–110 req/s whatever the client count). `make ci-local`, `make test-e2e`.
 
 ### Exit criteria
 
@@ -122,6 +122,9 @@ delay knob), `backend/.env.example`, `docs/DEVELOPMENT.md` (one paragraph).
   1 stream worker and `max_wait_time 1s`: two parallel slow `test-model`
   streams, the second gets 503 with the `server_busy` body; a parallel
   `/api/v1/config/runtime` answers.
+- Do: `tests/Architecture/LongRouteListTest.php` (`03` §5): every route whose
+  controller returns a `StreamedResponse` is covered by a `match` pattern or
+  listed as short (the usage export); a new streaming route fails it.
 - Do not: change the base image; change dev classic mode (dev keeps no
   worker mode); touch PHP code.
 
@@ -133,7 +136,11 @@ delay knob), `backend/.env.example`, `docs/DEVELOPMENT.md` (one paragraph).
 > prod stage), run `frankenphp validate`, start it with 2 + 2 workers and run
 > `_devextras/perf/runtime/run.sh --case pool-isolation` (8 slow streams, the
 > API probe p95 must stay ≤ 50 ms; with `FRANKENPHP_MAX_WAIT_TIME=2s` the
-> excess streams get the `server_busy` body within 3 s). Check whether
+> excess streams get the `server_busy` body within 3 s). Repeat the case with
+> the stream pool filled by dictation session streams
+> (`/v1/audio/transcriptions/sessions/{id}/stream`, a short `timeout`) and by
+> `/api/v1/tts/stream`: the API probe must hold the same budget. Probes count
+> only HTTP 200 (`saturate.py` aborts on an unhealthy baseline). Check whether
 > nested env placeholders work; if not, default the stream pool in the
 > entrypoint (`_docker/backend/docker-entrypoint.sh`) instead. Then the
 > compose and docs changes. `make ci-local`, `make test-e2e`,
@@ -176,19 +183,28 @@ hardcoded English string with a status code — a U8 breach).
   … then the answer streams as usual.
 
   after three tries:
-  ⚠ Synaplan is busy right now. Your message is saved, nothing was sent to
-    the AI yet. [ Try again ]
+  ⚠ Synaplan is busy right now. Your message was not sent — it is back in
+    the input box. [ Try again ]
 ```
 
 The widget shows the same two sentences in its own bubble style.
+
+A refused request never reached PHP, so nothing was stored
+(`StreamTurnPreparer::createIncoming()` runs only after admission). The copy
+therefore never claims the message is saved. Instead the text goes back into
+the composer, where the existing per-chat draft persistence
+(`useInputPersistence` / `useAutoPersist`, off in incognito) keeps it across a
+reload; the unsent bubble is removed so the history shows only what the server
+has.
 
 ### Goal
 
 - Do: the chat stream transport (`chatApi.ts` POST SSE path) and the widget
   message call (`widgetsApi.ts:293`) recognise `503` + `server_busy`, retry
   after `Retry-After` (default 5 s) up to three times with jitter, report a
-  `busy` status to the stream handler, then end with the honest sentence and a
-  **Try again** that resends the same message (no duplicate user message).
+  `busy` status to the stream handler, then end with the honest sentence, put
+  the text back into the composer (persisted as the chat's draft) and offer
+  **Try again**, which sends it again (no duplicate user message).
 - Do: every other non-OK status keeps today's path but loses the status code
   in copy: one sentence per class (auth, limit, server) in five locales.
 - Do: unit tests in `frontend/tests/unit/services/` for the retry schedule
@@ -212,8 +228,9 @@ The widget shows the same two sentences in its own bubble style.
 1. J-AU-1 walked in the browser for web chat and widget (U10).
 2. Findability: the status line appears where the answer will appear, within
    one second of the 503 (U2).
-3. Consequence copy says what did not happen ("nothing was sent to the AI
-   yet") in all five locales (U3, U8).
+3. Consequence copy says what did not happen ("your message was not sent")
+   and where the text is, in all five locales; a reload after the final
+   refusal still shows the text in the composer (not in incognito) (U3, U8).
 4. Empty / error / flag-off: with one free slot nothing changes; on 500 the
    new server sentence; no status code anywhere (U5, U8, U11).
 5. Dark + V2 + 320 px (U9).

@@ -113,9 +113,11 @@ pipeline own metering (AU11), bring the paths that bypass the facade in
 
 ### Vibe brief
 
-> Read `03` §1.5. Implement AU11 part 1. Tests first, per AU9 path **and per
-> mode**: exactly one `BUSELOG` row per billable call under `legacy`, `shadow`
-> and `on`; under `shadow` the shadow row equals the caller's row (action,
+> Read `03` §1.5. Implement AU11 part 1, including `TurnUsageLedger` and the
+> per-turn / per-call unit of each `AiAction`. Tests first, per AU9 path **and
+> per mode**: exactly today's rows under `legacy`, `shadow` and `on` — for a
+> gateway turn with three MCP rounds and a two-round document tool loop that
+> is one `MESSAGES` row with the summed tokens, not one per round; under `shadow` the shadow row equals the caller's row (action,
 > provider, model, tokens, cost) and a deliberately wrong shadow logs a
 > mismatch; `/v1/messages` and live voice write one row under all three modes.
 > Snapshot unchanged under `legacy` and `shadow`. Part 2 after the soak: flip
@@ -125,8 +127,10 @@ pipeline own metering (AU11), bring the paths that bypass the facade in
 
 ### Exit criteria
 
-1. Part 1: one row per billable call on every path under every mode; shadow
-   equality; snapshot unchanged under `legacy` / `shadow`.
+1. Part 1: today's rows on every path under every mode — one per turn for
+   per-turn actions (multi-round turns included), one per call for per-call
+   actions; message-quota counts unchanged; shadow equality; snapshot
+   unchanged under `legacy` / `shadow`.
 2. Soak: seven days on production in `shadow` without `ai.usage_mismatch`
    (event ring summary in STATUS).
 3. Part 2: one row per billable call on every path with `on`; the diff quoted;

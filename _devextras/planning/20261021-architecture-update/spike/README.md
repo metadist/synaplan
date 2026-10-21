@@ -28,7 +28,11 @@ the scripts are strict, and every table in `02` comes from the strict re-run:
   provider connection are compared fairly, and asks for `max_tokens 400` so a
   reasoning model reaches text;
 - the pump reports the process's resident memory (`VmRSS` / `VmHWM`), which
-  includes libcurl's buffers, next to the PHP heap;
+  includes libcurl's buffers, next to the PHP heap, and reads complete lines
+  across chunk boundaries;
+- probes (`saturate.py`) and short requests (`microreq.py`) count only HTTP
+  200: an unhealthy baseline aborts the run, later non-200 answers are errors,
+  and `microreq.py` exits non-zero on any failure;
 - `RACE=1 relay/run.sh` builds the relay with the Go race detector.
 
 ## Reproduce

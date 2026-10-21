@@ -22,7 +22,11 @@ includes libcurl's buffers, not only the PHP heap. The Go load client waits for
 its memory sampler before reading the peak (`go build -race`: no report).
 The design conclusions did not change; two numbers did, and both are corrected
 here and in the plan: the PHP pump's memory (≈ 134 MB, not 26 MB, for 1,000
-streams) and the gateway overhead (10–50 ms, not "≈ 25 ms").
+streams) and the gateway overhead (10–50 ms, not "≈ 25 ms"). A second review
+round made three scripts stricter again — the pump parses complete lines
+across chunk boundaries, and probes and micro-requests count only HTTP 200
+(an unhealthy baseline aborts the run) — and the affected cases were re-run
+with every probe and request answering 200; the results did not move.
 
 ---
 
@@ -37,7 +41,7 @@ streams) and the gateway overhead (10–50 ms, not "≈ 25 ms").
 | What does limit adding workers | **One database connection per worker** (8 workers → 8 connections). 3 nodes × N workers on one Galera cluster | §2.5 |
 | What the gateways add before the first text token | **+10 to +50 ms** median in worker mode, with warm connections on both sides; inside the network jitter | §3.1 |
 | What the app's own chat adds before the first token | **≈ 1.5 s**: AI sorter 1.0 s, shared embedding 0.23 s, memory search 0.24 s. A pre-call step that calls a model already exists: the sorter | §3.2 |
-| Separate pool for streams | API stays at **19 ms p95, 30 ms max** while streams saturate their pool (one shared pool: 11 s) | §4.1 |
+| Separate pool for streams | API stays at **19–23 ms p95, ≤ 30 ms max** (two runs, every probe HTTP 200) while streams saturate their pool (one shared pool: 11 s) | §4.1 |
 | Fast "busy" instead of a silent wait | `max_wait_time 2s` → the excess streams get **503** instead of waiting 12 s | §4.2 |
 | One Go process holding client streams | **2,000 streams, 147 MB peak RSS (≈ 33 KB each), 6.6 s CPU** for 2,000 × 10 s | §4.3 |
 | One PHP process holding provider streams | **1,000 streams, ≈ 134 MB peak RSS (≈ 73 KB each, libcurl included; PHP heap 26 MB), 2.7 ms CPU each** (Symfony HttpClient, curl_multi) | §4.4 |
@@ -116,16 +120,18 @@ the messenger workers). That is why the plan does not answer the limit with
 
 ### 2.6 Short PHP requests
 
-`microreq.py`, keep-alive, worker mode, 8 workers:
+`microreq.py`, keep-alive, worker mode, 8 workers, only HTTP 200 timed
+(re-run with status checks: every request answered 200; the first run is in
+brackets):
 
 | Route | Clients | Requests/s | p50 | p95 |
 | ----- | ------: | ---------: | --: | --: |
-| `/api/health` | 1 | 82 | 11.7 ms | 14.3 ms |
-| `/api/health` | 8 | **81** | 95 ms | 137 ms |
-| `/api/health` | 16 | **80** | 192 ms | 259 ms |
-| `/api/v1/config/runtime` | 8 | 291 | 18 ms | 24 ms |
+| `/api/health` | 1 | 109 (82) | 7.5 ms | 15.9 ms |
+| `/api/health` | 8 | **107** (81) | 64 ms | 116 ms |
+| `/api/health` | 16 | **89** (80) | 184 ms | 234 ms |
+| `/api/v1/config/runtime` | 8 | 242 (291) | 21 ms | 28 ms |
 
-`/api/health` does not scale with workers. `HealthController::health()` calls
+`/api/health` does not scale with workers: one client gets as much as sixteen. `HealthController::health()` calls
 `WhisperService::isAvailable()`, which starts `whisper --help` with
 `Symfony\Component\Process` on every call. Forking a large multi-threaded
 FrankenPHP process costs ≈ 12 ms and does not run in parallel. The same cost
@@ -205,17 +211,20 @@ and `worker { name api; num 4 }`, accepted by FrankenPHP 1.12.6
 A later check put all four long routes on one `match` line and counted each on
 `streams` (STATUS).
 
-| 8 Haiku streams on 4 stream workers | Value |
-| ----------------------------------- | ----: |
-| Streams ok | 8 |
-| First text p50 / p95 | 12.5 / 13.1 s (the second four waited) |
-| Probe baseline p50 | 16 ms |
-| **Probe during p50 / p95 / max** | **14 / 19 / 30 ms** (one shared pool: 10.98 s max) |
+| 8 Haiku streams on 4 stream workers | First re-run | Second re-run (status-checked probes) |
+| ----------------------------------- | ----------: | ------------------------------------: |
+| Streams ok | 8 | 8 |
+| First text p50 / p95 | 12.5 / 13.1 s | 11.8 / 13.2 s (the second four waited) |
+| Probe baseline p50 | 16 ms | 14 ms |
+| **Probe during p50 / p95 / max** | **14 / 19 / 30 ms** | **15 / 23 / 27 ms**, 0 probe errors |
+
+One shared pool, for comparison: 10.98 s max.
 
 ### 4.2 A fast "busy" instead of a silent wait
 
 Same pools, global `max_wait_time 2s`: 4 streams ran, **4 got HTTP 503**
-instead of waiting ≈ 12 s, the probe stayed at 20 ms p95. FrankenPHP answers
+instead of waiting ≈ 12 s, and the probe stayed at 20–25 ms p95 with every
+probe answering 200 (second re-run: 0 probe errors). FrankenPHP answers
 with a bare 503; AU3 turns it into a machine-readable body with `Retry-After`,
 and AU4 into copy a person understands.
 
@@ -240,7 +249,10 @@ streams reported no data race.
 
 `pump/pump.php` in the backend container: `HttpClient::create([], $n)`, N
 `request()` calls, one `stream()` loop over all responses, against the same
-stub. A stream counts only with HTTP 200 and `[DONE]`.
+stub. A stream counts only with HTTP 200 and `[DONE]`, read from complete
+lines (chunks are buffered across boundaries). The line-buffered re-run
+counted exactly 200 events per stream and the same memory (1,000 streams:
+133.6 MB peak, 2.6 ms CPU each).
 
 | Streams | Done / failed | CPU | Per stream | PHP heap peak | Process RSS before → peak | RSS per stream | First chunk p95 |
 | ------: | ------------- | --: | ---------: | ------------: | ------------------------- | -------------: | --------------: |

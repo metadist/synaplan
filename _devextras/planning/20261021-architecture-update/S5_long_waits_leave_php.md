@@ -22,6 +22,7 @@ worker waits — and with either part off, everything runs as today.
 | A tool call inside a streamed turn | the same worker, blocking | a Messenger job (`ToolStepCommand`), the pump continues the turn (AU30) |
 | A video / image render | a Messenger job by default; inline `sleep()` polling for dependent multitask nodes and the direct generation path | always a job; the multitask node waits as a paused node (AU27) |
 | Waiting for a person (approval, ask-the-user) | already a paused run, resumed by a job | unchanged |
+| A dictation session stream (`/v1/audio/transcriptions/sessions/{id}/stream`) | a PHP poll loop for up to 300 s (600 s max) in a web worker | the `streams` pool from AU3 (isolated); served by the watchdog from the session store later (master plan §9) |
 | Turn preparation (sorter ≈ 1 s, embeddings, memory search) | the stream worker | still the `streams` pool, short; moving it to workers is master plan §9 #1 |
 
 ---
@@ -81,7 +82,7 @@ On a branch `spike/au28-relay-pump`, prove the whole S5 shape for one route
 | G1 | 500 concurrent 10 s streams through watchdog + pump on 8 workers | all complete; API probe p95 ≤ 50 ms |
 | G2 | Watchdog hop added to TTFB (M5) | ≤ 5 ms p95 |
 | G3 | Pump CPU per event with the real decoder (M3) | ≤ 0.2 ms |
-| G4 | Kill the pump mid-stream | the client gets the terminal frame within `idleTimeoutSec`; no run stays "running" |
+| G4 | Kill the pump mid-stream — once with a second pump alive, once with **every** pump stopped | the client gets the terminal frame within `idleTimeoutSec`; within about a minute the scheduler's `app:runs:reap` leaves the stored run failed and its `terminal` entry written (both checked); no run stays "running" |
 | G5 | Kill the watchdog mid-stream | the client errors; the run finishes; a re-attach shows the full answer |
 | G6 | Client disconnects (gateway) | the upstream request is cancelled within one pump tick |
 | G7 | Frames byte-identical to the in-request path for the same scripted answer | identical except ids and timestamps |
@@ -104,6 +105,11 @@ released connections, with larger stream pools per node, and the owner decides.
 - Do: decoder tests from recorded SSE fixtures, fed whole **and** split at
   random byte boundaries (seeded): the chunks must be identical — the guard
   against a decoder that only works when the network splits nicely.
+- Do: `TurnCredentialResolver` (`03` §7): the rules of
+  `MessagesGateway::resolveCredential()` (BYOK, endpoint registry, operator
+  fallback only where allowed, zero-cost user keys) and the app chat's rule in
+  one service, returning a non-secret credential decision plus the key; both
+  paths use it in-request already, so AU30 only has to pass the decision on.
 - Do not: change a provider request, a chunk, or an SSE frame.
 
 ### Vibe brief
@@ -142,7 +148,11 @@ released connections, with larger stream pools per node, and the owner decides.
 - Do: the queue and run-stream tests of `03` §7–§8: no provider key or auth
   header in any Redis key (scan after a turn); an expired job body and a pump
   that dies before `GETDEL` both end their runs in a terminal entry; a queued
-  run past its claim deadline is failed; entries carry `frame` / `terminal` /
+  run past its claim deadline is failed; with every pump stopped,
+  `app:runs:reap` (scheduler tick lane) fails the run atomically — stored
+  state and `terminal` entry both checked; the credential parity cases
+  (user-key-only, mixed, operator fallback off, endpoint registry) write the
+  same usage row and use the same key in both modes; entries carry `frame` / `terminal` /
   `gap`; a run past `RUNTIME.RUN_STREAM_MAX_BYTES` ends with the recoverable
   terminal and a complete stored reply; an attach from `N` returns only the
   frames after `N`.
@@ -235,15 +245,30 @@ or a navigation.
 
 ### Goal
 
+The live stream has no resume cursor today: `SseWriter::send()` writes only
+`data:` lines, and `ChatRunRecorder` merges text chunks before it numbers
+them, so the client cannot know the sequence number of what it has rendered.
+Two ways to continue, one per mode:
+
+- **Without a cursor (in-request streams, and the pump without the relay):**
+  re-attach from `0` and **rebuild** the bubble from the full replay — replace
+  its content, do not append — so nothing repeats. The replay buffer is at
+  most 1 MiB today, so this is cheap.
+- **With a cursor (the watchdog, `sseIds: true`, `03` §8):** the frames the
+  client received carry `id:`; re-attach with `from=<last id>` and append.
+
 - Do: on a transport drop of a member turn with a known run id, the stream
-  transport re-attaches (`GET /api/v1/messages/stream/attach?from=<last id>`)
-  up to three times with backoff, and the handler continues the same message;
-  only after that the existing history recovery runs.
+  transport re-attaches up to three times with backoff, in the mode the
+  stream allows (`id:` seen ⇒ cursor, else rebuild); only after that the
+  existing history recovery runs.
+- Do: tests for both modes: a rebuilt bubble equals the stored answer, no
+  word twice; a cursor resume appends exactly the missing frames.
 - Do: the widget does the same for its run (`widgetsApi.ts` already has the
   attach call).
 - Do: a Playwright `@ci` spec that cuts the connection mid-answer (route
   abort on the stream request) and sees the answer continue without a
-  repeated word; Vitest for the cursor and the retry schedule.
+  repeated word — run with the pump off (rebuild) and, from AU31 on, with the
+  relay on (cursor); Vitest for both modes and the retry schedule.
 - Do not: re-attach incognito drafts (they have no run); change SSE events.
 
 ### Vibe brief
