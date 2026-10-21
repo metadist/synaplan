@@ -222,9 +222,11 @@ is CI + `vultr-cluster` + a one-node production soak (master §6, `01`
 §10), and one lead model executes the track with a second model reviewing
 read-only at the S1, S4 and S5 exits (`01` §1).
 
-S0 may start on the owner's word after this pull request merges. AU8
-additionally needs the `synaplan-charts` checkout, which is not part of
-this workspace today.
+S0 may start on the owner's word after this pull request merges. The
+`synaplan-charts` checkout AU8 needs was added to the workspace the same
+evening (2026-10-21), as was already the case for `vultr-cluster` with
+its `load-testing/` namespace, so no cross-repo blocker remains for
+AU8 or AU34.
 
 ### Gate for AU0b
 
