@@ -58,6 +58,7 @@ final readonly class SetupLockdownSubscriber
         'api_setup_complete',
         'api_config_runtime_config',
         'api_health',
+        'api_health_ready',
         'api_auth_me',
         'api_auth_refresh',
     ];
