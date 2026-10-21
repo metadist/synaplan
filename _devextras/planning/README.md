@@ -53,6 +53,7 @@ prompting flow.
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid; §0 unticked | not started |
 | [`20261016-out-of-process-plugins/`](./20261016-out-of-process-plugins/00_master_plan.md) | Tools and plugins in Python, Node.js and Go, out of process: MCP servers administrators add for everyone (organisation network, signed identity), then plugins that are a manifest plus a service, then isolated views. Research with a tested Python / Node.js / Go spike | not started (row 18) — plan 2026-10-16 |
 | [`20261017-research-quality/`](./20261017-research-quality/00_master_plan.md) | Agentic research with a model team, Desktop first: measure, quick wins on today's paths (full web answers, page reading on every model, knowledge search as a tool), a server-side research run with reading and fact-checking model slots, the Desktop research surface, then the web chat | not started (row 21) — plan 2026-10-17 |
+| [`20261021-architecture-update/`](./20261021-architecture-update/00_master_plan.md) | Architecture update: one AI path with hooks, providers as self-contained units, central egress, one tool path, long waits out of PHP (Go watchdog + PHP stream pump), request timeline, capacity page, Kubernetes probes and autoscaling. Measured runtime spike in `spike/` | not started (row 22) — plan 2026-10-21 |
 
 ## Archive
 

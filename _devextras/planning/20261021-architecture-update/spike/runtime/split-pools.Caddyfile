@@ -1,0 +1,33 @@
+# Spike: two worker pools, so long AI streams can never take the threads the
+# rest of the API needs. Same code and entry point; `match` sends the
+# streaming routes to their own pool. `max_wait_time` turns "wait forever for
+# a free thread" into a fast 503 the client can explain.
+{
+	admin 0.0.0.0:2020
+	auto_https off
+	metrics
+	frankenphp {
+		num_threads 12
+		max_wait_time {$SPIKE_MAX_WAIT:30s}
+	}
+	order php_server before file_server
+}
+
+:8090 {
+	root * /var/www/backend/public
+	php_server {
+		worker {
+			name streams
+			file /var/www/backend/public/index.php
+			num {$SPIKE_STREAM_WORKERS:4}
+			match /v1/chat/completions
+			env APP_RUNTIME App\Runtime\FrankenPhpRuntime
+		}
+		worker {
+			name api
+			file /var/www/backend/public/index.php
+			num {$SPIKE_API_WORKERS:4}
+			env APP_RUNTIME App\Runtime\FrankenPhpRuntime
+		}
+	}
+}
