@@ -164,7 +164,10 @@ make lint                          # the house lint (backend format, frontend li
 
 # Conditional E2E (AGENTS.md — the unfiltered @ci suite above is always the floor)
 (cd frontend && npm run test:e2e:firefox)      # when a @crossbrowser flow changed
-(cd frontend && npm run test:e2e:oidc)         # when auth / OIDC changed (…:oidc-redirect likewise)
+(cd frontend && npm run test:e2e:oidc -- --grep @oidc)   # when auth / OIDC changed (…:oidc-redirect likewise)
+# The OIDC script needs the `-- --grep @oidc`: CI appends the same filter
+# (grep_filter in ci.yml), and without it the run also picks up specs that
+# need an external installation (e.g. the castingdata plugin spec).
 (cd frontend && npm run test:e2e:ollama)       # when the chat-model / Ollama path changed
 # Each in a subshell, so several can run in sequence from the repository root.
 # A new file or path also updates .github/mobile-impact-policy.json and
