@@ -100,12 +100,13 @@ final readonly class TaskPlanner
     public function plan(Message $message, array $conversationHistory = [], ?int $userId = null, array $options = []): TaskPlanResult
     {
         $language = $message->getLanguage() ?: 'en';
+        $allowed = $this->allowedCapabilitiesFromOptions($options);
 
         $promptRow = $this->promptRepository->findByTopic('tools:plan', 0);
         if (!$promptRow) {
             $this->logger->warning('TaskPlanner: tools:plan prompt missing, falling back to single chat');
 
-            return $this->fallback($language, ['tools:plan prompt missing']);
+            return $this->fallback($language, ['tools:plan prompt missing'], message: $message, userId: $userId, allowed: $allowed);
         }
 
         $modelId = $this->modelConfigService->getDefaultModel('PLAN', $userId)
@@ -141,7 +142,7 @@ final readonly class TaskPlanner
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fallback($language, ['planner model call failed: '.$e->getMessage()], $modelId);
+            return $this->fallback($language, ['planner model call failed: '.$e->getMessage()], $modelId, message: $message, userId: $userId, allowed: $allowed);
         }
 
         $decoded = $this->decodeJson($raw);
@@ -156,7 +157,7 @@ final readonly class TaskPlanner
             }
         }
         if (null === $decoded) {
-            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
+            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage, $message, $userId, $allowed);
         }
 
         // A node that reads `$nX.text` but forgot to list nX in depends_on
@@ -170,21 +171,21 @@ final readonly class TaskPlanner
             $decoded = TaskPlanNormalizer::inferDependencies($decoded);
         }
 
-        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, (string) $message->getTopic());
         $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
             $this->logger->info('TaskPlanner: plan failed validation, falling back', [
                 'errors' => $errors,
             ]);
 
-            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage);
+            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage, $message, $userId, $allowed);
         }
 
         try {
             /** @var array<string, mixed> $decoded */
             $plan = TaskPlan::fromArray($decoded, $this->validator, $allowed);
         } catch (\Throwable $e) {
-            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage);
+            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage, $message, $userId, $allowed);
         }
 
         return new TaskPlanResult(
@@ -242,9 +243,9 @@ final readonly class TaskPlanner
     }
 
     /**
-     * @param list<string> $errors
-     *
-     * @phpstan-param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
+     * @param list<string>                                                                                                                            $errors
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown?: bool}|null $planningUsage
+     * @param list<string>|null                                                                                                                       $allowed
      */
     private function fallback(
         string $language,
@@ -252,9 +253,31 @@ final readonly class TaskPlanner
         ?int $modelId = null,
         string $raw = '',
         ?array $planningUsage = null,
+        ?Message $message = null,
+        ?int $userId = null,
+        ?array $allowed = null,
     ): TaskPlanResult {
+        $plan = TaskPlan::singleChatPlan($language);
+        if (null !== $message) {
+            $payload = $this->skillCatalog->adjustPlan(
+                $plan->toArray(),
+                (string) $message->getText(),
+                $userId,
+                $allowed,
+                (string) $message->getTopic(),
+            );
+            try {
+                $plan = TaskPlan::fromArray($payload, $this->validator, $allowed);
+            } catch (\Throwable $e) {
+                $this->logger->info('TaskPlanner: repaired plan was not valid, keeping the chat fallback', [
+                    'error' => $e->getMessage(),
+                ]);
+                $plan = TaskPlan::singleChatPlan($language);
+            }
+        }
+
         return new TaskPlanResult(
-            TaskPlan::singleChatPlan($language),
+            $plan,
             fallback: true,
             modelId: $modelId,
             rawResponse: $raw,

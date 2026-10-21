@@ -40,6 +40,19 @@ final class NotionToolHintsTest extends TestCase
         self::assertSame([], $other[1]['annotations']);
     }
 
+    public function testUpdatePageIsAWriteEvenWhenNotionCallsItDestructive(): void
+    {
+        $tools = [$this->tool('notion-update-page', ['readOnlyHint' => false, 'destructiveHint' => true])];
+
+        $annotated = $this->hints->apply($this->server('https://mcp.notion.com/mcp'), $tools);
+
+        self::assertFalse($annotated[0]['annotations']['readOnlyHint']);
+        self::assertFalse($annotated[0]['annotations']['destructiveHint']);
+
+        $other = $this->hints->apply($this->server('https://crm.example.com/mcp'), $tools);
+        self::assertTrue($other[0]['annotations']['destructiveHint']);
+    }
+
     public function testLeavesUnknownNotionToolsUntouched(): void
     {
         $tools = [$this->tool('something-new')];

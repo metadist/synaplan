@@ -73,6 +73,14 @@ final class NotionToolHints
     private function annotate(array $tool): array
     {
         $annotations = $tool['annotations'];
+        // Notion marks update-page destructive for its replace_content mode.
+        // McpClient refuses that mode (NotionPageWrite::refusal), so the tool
+        // only renames and edits here, like the other write tools.
+        if (NotionPageWrite::UPDATE_TOOL === $this->bare((string) $tool['name'])) {
+            $tool['annotations'] = array_merge($annotations, ['readOnlyHint' => false, 'destructiveHint' => false]);
+
+            return $tool;
+        }
         if (array_key_exists('readOnlyHint', $annotations) || array_key_exists('destructiveHint', $annotations)) {
             return $tool;
         }

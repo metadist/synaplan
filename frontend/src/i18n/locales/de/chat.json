@@ -691,6 +691,7 @@
       "web_search": "Websuche",
       "url_fetch": "Webseite lesen",
       "mcp_fetch": "Verbundene Daten abrufen",
+      "mcp_action": "Verbundene Daten ändern",
       "email_search": "E-Mails durchsuchen",
       "file_analysis": "Dateianalyse",
       "image_generation": "Bild",

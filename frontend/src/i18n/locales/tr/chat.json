@@ -701,6 +701,7 @@
       "web_search": "Web araması",
       "url_fetch": "Web sayfası okunuyor",
       "mcp_fetch": "Bağlı veriler alınıyor",
+      "mcp_action": "Bağlı veriler değiştiriliyor",
       "email_search": "E-postalarınızda aranıyor",
       "file_analysis": "Dosya analizi",
       "image_generation": "Görsel",

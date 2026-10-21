@@ -693,6 +693,7 @@
       "web_search": "Recherche Web",
       "url_fetch": "Lecture de la page web",
       "mcp_fetch": "Récupération des données connectées",
+      "mcp_action": "Modification des données connectées",
       "email_search": "Recherche dans vos e-mails",
       "file_analysis": "Analyse de fichier",
       "image_generation": "Image",
