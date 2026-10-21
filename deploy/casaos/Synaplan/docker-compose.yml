@@ -52,7 +52,7 @@ x-app-environment: &app-environment
 
 services:
   secrets-init:
-    image: alpine:3.24
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     container_name: synaplan_secrets_init
     restart: "no"
     networks:
@@ -420,7 +420,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: mariadb:13.0.2
+    image: mariadb:13.0.2@sha256:0e4bb0f339feba125d1154fbacd36c16ec8518f52e44e1f82ecec7d6771caf39
     container_name: synaplan_db
     entrypoint: ["/bin/sh", "-ec"]
     command:
@@ -454,7 +454,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     container_name: synaplan_redis
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
@@ -472,7 +472,7 @@ services:
     restart: unless-stopped
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.7
+    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
     container_name: synaplan_centrifugo
     entrypoint: ["/bin/sh", "-ec"]
     command:
@@ -520,7 +520,7 @@ services:
     restart: unless-stopped
 
   tika:
-    image: apache/tika:3.3.1.0
+    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
     container_name: synaplan_tika
     command: -h 0.0.0.0 -p 9998
     networks:
@@ -534,7 +534,7 @@ services:
     restart: unless-stopped
 
   qdrant:
-    image: qdrant/qdrant:v1.19.2
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     container_name: synaplan_qdrant
     networks:
       - default
