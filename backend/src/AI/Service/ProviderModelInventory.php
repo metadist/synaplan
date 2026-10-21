@@ -120,7 +120,11 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
      * answers 200. Judging by listing membership alone reports such models as
      * discontinued, and hides the opposite case just as easily.
      *
-     * Every supported provider addresses a single model as `{listUrl}/{id}`.
+     * Every supported provider addresses a single model as `{listUrl}/{id}`,
+     * except xAI speech-to-speech. Those ids are absent from `/v1/models`
+     * and `GET /v1/models/grok-voice-3.0` answers 404 while
+     * `wss://api.x.ai/v1/realtime` still serves the model. The free voice
+     * roster is the check that does not retire a working voice model.
      */
     public function probe(string $provider, string $providerModelId): ModelProbeResult
     {
@@ -142,6 +146,10 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
         $headers = [];
         foreach ($listing['headers'] as $name => $value) {
             $headers[$name] = str_replace('{key}', $key, $value);
+        }
+
+        if ('xai' === $provider && str_starts_with(mb_strtolower($providerModelId), 'grok-voice-')) {
+            return $this->probeXaiVoice($provider, $providerModelId, $listing['url'], $headers);
         }
 
         try {
@@ -167,6 +175,52 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             404 === $status, 400 === $status => ModelProbeResult::Gone,
             default => ModelProbeResult::Inconclusive,
         };
+    }
+
+    /**
+     * Confirm an xAI speech-to-speech id through the voice roster.
+     *
+     * The roster is shared by Grok Voice and xAI text-to-speech, and it is
+     * the only free read that stays 200 while the realtime socket is up.
+     * An empty or unreadable roster says nothing, so it stays inconclusive.
+     *
+     * @param array<string, string> $headers
+     */
+    private function probeXaiVoice(string $provider, string $providerModelId, string $listingUrl, array $headers): ModelProbeResult
+    {
+        $rosterUrl = preg_replace('#/models$#', '/tts/voices', rtrim($listingUrl, '/'));
+        if (!is_string($rosterUrl) || $rosterUrl === rtrim($listingUrl, '/')) {
+            return ModelProbeResult::Inconclusive;
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $rosterUrl, [
+                'headers' => $headers,
+                'timeout' => self::PROBE_TIMEOUT_SECONDS,
+            ]);
+            $status = $response->getStatusCode();
+            $body = $status >= 200 && $status < 300 ? $response->toArray(false) : [];
+        } catch (\Throwable $e) {
+            $this->logger->warning('Model availability probe failed', [
+                'provider' => $provider,
+                'model' => $providerModelId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ModelProbeResult::Inconclusive;
+        }
+
+        if ($status >= 200 && $status < 300) {
+            $voices = $body['voices'] ?? null;
+
+            return is_array($voices) && [] !== $voices
+                ? ModelProbeResult::Alive
+                : ModelProbeResult::Inconclusive;
+        }
+
+        // A missing roster means the voice product itself is gone. Auth and
+        // rate-limit answers still say nothing about the model.
+        return 404 === $status ? ModelProbeResult::Gone : ModelProbeResult::Inconclusive;
     }
 
     /**

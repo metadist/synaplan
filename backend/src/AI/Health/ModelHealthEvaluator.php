@@ -70,9 +70,10 @@ final readonly class ModelHealthEvaluator
     /**
      * Run one full check.
      *
-     * @param list<string> $onlyServices restrict the run to these services (case-insensitive)
+     * @param list<string> $onlyServices       restrict the run to these services (case-insensitive)
+     * @param bool         $freshConfirmations ignore a remembered per-model answer and ask again
      */
-    public function run(bool $dryRun = false, array $onlyServices = []): ModelHealthRun
+    public function run(bool $dryRun = false, array $onlyServices = [], bool $freshConfirmations = false): ModelHealthRun
     {
         $verdicts = [];
         $skipped = [];
@@ -130,7 +131,7 @@ final readonly class ModelHealthEvaluator
 
                 // One confirmation per provider model id, not per BMODELS row:
                 // the same id appears once per capability it is bound to.
-                $presence = $this->presence($service, $probe, $result, (string) $providerId, $budget);
+                $presence = $this->presence($service, $probe, $result, (string) $providerId, $budget, $freshConfirmations);
 
                 foreach ($liveRows as $model) {
                     $switchedOff = ModelHealth::isSwitchedOffByOperator($model, $healthByModel[(int) $model->getId()] ?? null);
@@ -197,6 +198,7 @@ final readonly class ModelHealthEvaluator
         ProbeResult $result,
         string $providerId,
         array &$budget,
+        bool $freshConfirmations = false,
     ): ModelProbeResult {
         if (!$result->listingComplete) {
             return ModelProbeResult::Inconclusive;
@@ -220,7 +222,10 @@ final readonly class ModelHealthEvaluator
         // noticed, just one cache period later instead of one run later.
         $cacheKey = 'model_health.presence.'.mb_strtolower($service).'.'.md5($providerId);
         $item = $this->cache->getItem($cacheKey);
-        if ($item->isHit()) {
+        // A scheduled run reuses the last answer. A person who just pressed
+        // "check again" needs the provider's current answer, not the one
+        // stored up to an hour ago.
+        if (!$freshConfirmations && $item->isHit()) {
             $cached = $item->get();
             if ($cached instanceof ModelProbeResult) {
                 return $cached;
