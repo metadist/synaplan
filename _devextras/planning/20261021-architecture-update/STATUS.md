@@ -1,0 +1,232 @@
+# Architecture update — status
+
+Step log for [`00_master_plan.md`](./00_master_plan.md). A walk, a
+measurement and a rollout are entries here, not chat messages.
+
+## Steps
+
+| Date | Step | Pull request | State | Notes |
+| ---- | ---- | ------------ | ----- | ----- |
+| 2026-10-21 | AU0 | this plan | open | research, spike, plan |
+
+## Baselines
+
+| Date | What | Value | Source |
+| ---- | ---- | ----- | ------ |
+| 2026-10-21 | Size ledger (`make -C backend metrics`) | to be recorded by AU1 | — |
+| 2026-10-21 | Runtime measurements | `02_measurements.md` §1–§4 | `spike/` |
+
+---
+
+## 2026-10-21 — Research and spike (AU0)
+
+Against `main` at `4dd1b26da`, dev stack on Docker Desktop (10 cores, 16 GB),
+FrankenPHP v1.12.6 / PHP 8.5.9 / Caddy 2.11.4. Plan written in a worktree
+(`../synaplan-arch-plan`, branch `docs/architecture-update-plan`) so the dev
+stack's checkout was not switched.
+
+### Code maps (condensed; four read-only explorations of `backend/src` and `frontend/src`)
+
+**AI paths.** `AiFacade` (1,747 lines) → `ProviderRegistry` (tagged locators
+`app.ai.<capability>`) serves chat, widget, email / WhatsApp / Telegram turns,
+`/v1/chat/completions`, `/v1/embeddings`, `/v1/images/generations`, the sorter,
+memory extraction, vectorization, the embedding router, the LLM reranker,
+media, STT and TTS. Bypassing it: `MessagesGateway` (1,051) through
+`AnthropicPassthroughTranslator` (324), `OpenAiMessagesTranslator` (1,499),
+`GeminiMessagesTranslator` (658) over `HttpClient`; live voice (the Node
+sidecar opens the provider socket, `VoiceLiveUsageService` meters);
+`PerplexityAdapter::maybeAnswer()` → `PerplexityProvider::chat()`; probes
+(`ModelAvailabilityChecker`, `CapabilityProbe`, admin embed preflight).
+Hook-like seams today: `AiFacade::executeWithHealth()` / `observing()`
+(`CircuitBreaker` + `ModelHealthRecorder`), `UsageRecorded` (dispatched, no
+listener), the Messages translator tag. No `*Listener` / `*Middleware` /
+`*Interceptor` under `backend/src/AI/`. Metering is the caller's
+`RateLimitService::recordUsage()`; the facade records only STT usage itself.
+Streams are generated inside the web request (`ignore_user_abort(true)` in
+both gateways); `ChatRunBuffer` keeps frames in Redis for re-attach.
+
+**Providers.** Add commits: Cerebras `78f55bcf6` 41 files, Meta `c1aa202a4`
+54, Higgsfield `d90f85ae5` 50, Perplexity `752f178e2` 72, Mistral `6700aff6c`
+20 (older, smaller key stack). Spine for a Cerebras-class provider: 15–21
+files. About 33 name-keyed sites: `ProviderKeyStore::SUPPORTED_PROVIDERS`,
+`ProviderKeyCatalog`, `ProviderDefaultsService` (bindings,
+`PREFERENCE_ORDER`), `ChatCompletionsUpstreams`, `OpenAiMessagesTranslator::INLINE_PNG_JPEG_ONLY`,
+`MessagesGateway::VISION_REWRITE_PROVIDERS`, `MessagesGatewayController` BYOK
+list, `StructuredOutputCapability`, `ToolCallingCapability`, `CatalogToolUse`,
+`ReasoningLevelCatalog`, `PlatformKeyModelListProbe::NO_LISTING`,
+`ProviderException` spellings, `SyncModelPricesCommand` (`PREFIX_MAP`),
+`VoiceLiveConcurrency`, `AdminProviderKeysController` OpenAPI enum, `AiTab`,
+`services.yaml`; frontend `providerIcons.ts`, `providerHelp.ts`,
+`ServiceIcon.vue`, `WebSearchPlugTab.vue` and a few more. Already
+registry-driven: `ProviderDisplayNames`, `AiProviderDisclosure`. Key stores:
+`ProviderKeyStore` (platform, BCONFIG `provider_keys`), `UserProviderKeyResolver`
+(BYOK), `HiggsfieldCredentialResolver`, `OpenAiCompatibleEndpointRegistry`,
+`PlugKeyStore` (search / rerank plugs).
+
+**Egress.** 76 classes inject `HttpClientInterface` (no `http_client`
+config, no scoped client, no default options; honours proxy env). Raw cURL:
+`MediaDownloader` (+ `file_get_contents` fallback), `MediaGenerationService`,
+`OpenAICurlTransport`, `CloudflareProvider`, `SystemConfigService` ×5.
+`HttpClient::create()` in `MetaProvider`. Own stacks: openai-php (PSR-18
+discovery), Ollama SDK (Guzzle), Stripe (`CurlClient`), Google API client and
+Apple App Store library (Guzzle), reCAPTCHA. Non-HTTP: Predis, IMAP
+(`imap_open`), SMTP (Mailer), Triton gRPC. No `HTTP(S)_PROXY` / `NO_PROXY` in
+any compose file. `SsrfGuard` in ~20 classes; pinned connect only in
+`HttpToolExecutor`. Secure Compute egress: `sidecars/synaplan-compute/internal/egress/`
+(CONNECT proxy dialling PHP-pinned IPs), behind `COMPUTE_EGRESS_ENABLED`,
+default off.
+
+**Tools.** Agent loops: `ChatToolLoop` (162, no gate, no audit),
+`GatewayToolLoop` (1,432, gate only when approvals are on, `TOOLS` usage),
+`OpenAiGatewayToolLoop` (626, gate only when approvals are on, no tool
+usage, no custom HTTP). 22 runners; `ToolCallRunner`, `McpActionRunner`,
+`CodeRunRunner` use the gate, `McpFetchRunner` does not; skill writes use
+`StepApprovalGate` for unattended runs. Approval resume runs tools outside
+the loops. Synaplan's MCP server (`McpServerFactory`, 1,426) has no gate.
+`ToolSourceInterface`: Custom, Document, GatewayBuiltin, McpClient,
+PluginCommand, Skill, Compute. Audit: only `approval.*` events. Caps 12,000 /
+16 / 240 s and the iteration loop copied three times
+(`ChatToolLoop.php:26–28`, `GatewayToolLoop.php:58–60`,
+`OpenAiGatewayToolLoop.php:47–49`).
+
+**Runtime.** Production web nodes: `FRANKENPHP_WORKER_NUM=24`, PHP
+`memory_limit` 512M, two Messenger consumers (`synaplan-platform/docs/PHP-RUNTIME-SIZING.md`).
+`_docker/backend/synaplan-worker-mode.Caddyfile` exposes only `num`.
+Caddyfile: no `metrics`; long routes excluded from compression. Helm chart:
+probes on `/`, `resources: {}`, CPU HPA off. Video providers poll with
+`sleep()`; `MediaJobDetach` is the default, `force_inline_media` and
+`MediaGenerationService::generateVideo()` still poll in a request. The web
+chat turns a 503 into "Connection failed (HTTP 503)"
+(`frontend/src/services/api/chatApi.ts:551`).
+
+### Measurements
+
+All tables in `02_measurements.md`; scripts and the exact runs in `spike/`.
+Providers used: `test-model` (free), Groq `openai/gpt-oss-20b`, Anthropic
+`claude-haiku-4-5-20251001`, OpenAI `gpt-5.4-mini` (one timing run); about
+150 short turns in total.
+
+### Verified technical dependencies
+
+| Dependency | Result |
+| ---------- | ------ |
+| FrankenPHP 1.12.6 worker `name` + `match`, global `max_wait_time` | `frankenphp validate`: "Valid configuration"; two pools `m#streams` / `m#api` in the metrics; 503 after `max_wait_time` |
+| One `match` line with several patterns | `match /api/v1/messages/stream* /api/v1/widget/*/message /v1/chat/completions /v1/messages`: each of `/api/v1/messages/stream/attach`, `/api/v1/widget/abc/message`, `/v1/messages`, `/v1/chat/completions` counted on `streams`; `/api/health`, `/api/v1/config/runtime` on `api` |
+| FrankenPHP Prometheus metrics behind Caddy `metrics` | `frankenphp_busy_threads`, `busy_workers`, `queue_depth`, `ready_workers`, `total_threads`, `total_workers`, `worker_request_count`, `worker_request_time` |
+| Caddy admin `/frankenphp/threads` | per thread: state, busy, current URI and method, request start, request count, memory |
+| Symfony HttpClient multiplexing in one PHP process | 1,000 streams, all ending in `[DONE]`; process RSS 63 → ≈ 134 MB (≈ 73 KB per stream with libcurl's buffers; the PHP heap alone is 26 MB, which the first run reported by mistake), 2.7 ms CPU per stream (`spike/pump`, re-run after review) |
+| Go relay, stdlib only | 2,000 streams, all with HTTP 200 and `[DONE]`: 147 MB peak, ≈ 33 KB per stream, 6.6 s CPU, TTFB p95 0.14 s (re-run after review; the first two runs gave 142 and 148 MB); a `-race` build at 200 streams reported no data race |
+| Node 22.23.3 (`node:22-alpine` pinned in both Node sidecars) with `NODE_USE_ENV_PROXY=1` | `fetch()` and `https.get()` go to `HTTPS_PROXY` (ECONNREFUSED at an unreachable proxy); without the flag `fetch()` goes direct (200) |
+| One database connection per worker | 8 workers → 8 connections in `information_schema.PROCESSLIST` |
+| `/api/health` spawns a process | `WhisperService::isAvailable()` runs `whisper --help` on every call; ≈ 80–110 req/s whether 1, 8 or 16 clients ask (two runs, every response 200) |
+
+### Gate for AU0
+
+The diff touches only `_devextras/`, so the local gate ran on the dev
+checkout at the same base (`4dd1b26da`, CI green on `main`):
+
+- `make lint` (php-cs-fixer 0 of 3,276 files, Prettier, ESLint), PHPStan
+  (no errors), deptrac (0 violations): green.
+- PHPUnit, first run: 5 failures, all from a drifted local `synaplan_test`
+  database ("Summary service not configured. Please load fixtures.",
+  "Enhancement prompt not found", default summary provider `a2agent`
+  instead of `test`). Reset the way CI prepares it (`doctrine:migrations:migrate`,
+  `doctrine:fixtures:load`, `app:seed`, all `--env=test`).
+- PHPUnit, second run: 9,666 tests, 1 failure,
+  `TelegramChannelAccessTest::testChannelIsOpenForARegularUser`: the dev
+  backend container sets `TELEGRAM_ENABLED=false` and an empty
+  `TELEGRAM_WEBHOOK_BASE_URL`, which override `.env.test`. With `.env.test`'s
+  values passed in, the test passes (1 test, 5 assertions). Local-only.
+- Vitest 438 of 438 files, `vue-tsc` clean.
+- Spike files: `py_compile`, `php -l`, `go vet`, `gofmt` clean; every
+  relative link in the changed Markdown files resolves.
+
+### Clean-up after the spike
+
+Spike FrankenPHP instances stopped (only PID 1 left), `var/cache/prod`
+removed, `spike-upstream` container removed, all three temporary API keys
+revoked (`BAPIKEYS` empty), the test chat deleted, `MESSAGES_GATEWAY.ENABLED`
+and `ALLOW_OPERATOR_KEY` back to 0, no `*prod*` keys in Redis. Usage rows of
+the runs stay in the dev database.
+
+---
+
+## 2026-10-21 — Copilot review, round 1, and the re-run
+
+Copilot reviewed [#2623](https://github.com/metadist/synaplan/pull/2623)
+("Changes recommended", 14 threads: 5 medium on the benchmarks, 9 low on
+contracts and plan). All 14 were accepted. The four scripts were fixed, then
+every number they produce was measured again on the same stack (all tables in
+`02` are from this re-run; the clean-up was repeated: only PID 1 running, no
+`var/cache/prod`, gateway flags back to 0, no API key, no spike container):
+
+| Re-run | Result |
+| ------ | ------ |
+| Classic, 20 / 30 Haiku streams | all complete with text and `[DONE]`; probe max 10.72 s / 11.57 s; queued streams' first text p95 13.12 s |
+| Worker mode, 12 streams on 8 workers | 12 complete; first text p95 12.01 s; probe max 10.98 s; RSS 186 → 228 MB |
+| Split pools, 8 streams on 4 stream workers | probe p95 19 ms, max 30 ms |
+| `max_wait_time 2s` | 4 complete, 4 × 503; probe p95 20 ms |
+| Gateway overhead, worker mode, warm, 20 runs | Groq +12 / +30 ms, Anthropic +38 / +46 ms (`/v1/chat` / `/v1/messages`); the cold, per-call-connection variant made Synaplan look faster than the provider, hence warm connections on both sides |
+| Gateway overhead, classic, 10 runs | Groq +172 / +89 ms, Anthropic +123 / +144 ms (dev kernel boot); with `max_tokens 60` five of ten direct Groq runs had no answer text (reasoning model), hence `max_tokens 400` |
+| Go relay, 100–2,000 streams | all complete; 2,000 at 147 MB, 6.6 s CPU; `-race` clean |
+| PHP pump, 100–1,000 streams | all complete; 1,000 at ≈ 134 MB RSS (≈ 73 KB per stream) |
+
+The temporary admin key and the Messages gateway flags were set for these
+runs and removed / restored afterwards.
+
+---
+
+## 2026-10-21 — Copilot review, round 2
+
+Requested after `2f26e52ba`; "Changes recommended", 11 new threads (8 on the
+contracts and plan, 3 on the spike scripts). All accepted. A second writer
+edited `pump.php` and `saturate.py` in this worktree at the same time; the
+owner asked this session to continue alone, the duplicates were removed and
+the merged code kept.
+
+Re-run after the script fixes (same stack, same clean-up, all verified):
+
+| Re-run | Result |
+| ------ | ------ |
+| Pump, line-buffered, 100 / 500 / 1,000 streams | all done; exactly 200 events per stream; 1,000 at 133.6 MB peak, 2.6 ms CPU each |
+| `microreq.py`, worker mode, status-checked | every request 200; `/api/health` 109 / 107 / 89 req/s at 1 / 8 / 16 clients; runtime config 242 req/s at 8 |
+| Split pools, 8 streams on 4, status-checked probes | 0 probe errors; probe p95 23 ms, max 27 ms |
+| `max_wait_time 2s` | 4 × 503; 0 probe errors; probe p95 25 ms |
+
+The temporary admin key was revoked; `BAPIKEYS` empty, gateway flags 0, no
+spike process, no `var/cache/prod`, no `*prod*` Redis keys.
+
+---
+
+## Review log
+
+| Date | Pull request | Round | Finding | Answer |
+| ---- | ------------ | ----- | ------- | ------ |
+| 2026-10-21 | #2623 | 1 | Pump reports PHP heap, not process RSS | Defect. `pump.php` reads `VmRSS` / `VmHWM`; re-run: ≈ 134 MB for 1,000 streams; `02` §1, §4.4, master §0 #17, ROADMAP corrected |
+| 2026-10-21 | #2623 | 1 | Relay counts 502/503 and cut-off streams as ok | Defect. Ok = HTTP 200 and `[DONE]`; re-run: 0 failed at every size |
+| 2026-10-21 | #2623 | 1 | Relay sampler races with the final peak read | Defect. Sampler done-channel waited on; `-race` build clean |
+| 2026-10-21 | #2623 | 1 | `overhead.py` times metadata, keeps failed and textless runs | Defect. First non-empty text delta, non-200 / error / textless counted as failures; warm connections; `max_tokens 400`; re-run: 10–50 ms; `02` §3.1, master §0 #4, §6 |
+| 2026-10-21 | #2623 | 1 | `saturate.py` counts partial and error streams as ok | Defect. Ok = 200 + text + `[DONE]`, SSE errors recorded; re-run of every case |
+| 2026-10-21 | #2623 | 1 | After-hooks in reverse order run metrics before usage | Defect in the contract. Both phases descending; `HookContractTest` pins usage before metrics (`03` §1.2–§1.3) |
+| 2026-10-21 | #2623 | 1 | Proxy routing loses the pin and the per-request exception | Gap. `03` §3.6: tunnel to the pinned IP via an enterprise proxy, request-scoped grants via the gateway, rebinding tests (AU15, AU18) |
+| 2026-10-21 | #2623 | 1 | `stream:jobs` has no per-job expiry; payloads keep provider keys | Gap. Opaque ids in the stream, bodies in keys with their own TTL, `GETDEL` claim, `XACK` + `XDEL`, `XAUTOCLAIM`, claim deadline; no provider key in Redis — the pump builds the request (`03` §7) |
+| 2026-10-21 | #2623 | 1 | The watchdog cannot see completion without parsing | Gap. Entry kinds `frame` / `terminal` / `gap`; close on `terminal` with a healthy pump; test (`03` §8) |
+| 2026-10-21 | #2623 | 1 | `MAXLEN` hides lost prefixes | Gap. No trimming; byte cap with a `gap` entry and the existing truncated flag, ending in today's recoverable path; test (`03` §8) |
+| 2026-10-21 | #2623 | 1 | Attach from `0` loses the `from` cursor | Gap. `fromSeq` in the directive and the token, entry ids `0-{seq}`, `id:` lines kept for web chat and widget (`03` §8) |
+| 2026-10-21 | #2623 | 1 | AU11 could leave the gateway unmetered; retained modes stop metering | Gap. One writer per billable call at every step and rollback: `legacy` / `shadow` / `on`, `LegacyUsageWriter`, gateway and voice join in AU12 with their writers (`03` §1.5, S1 AU11–AU12, master §0 #5) |
+| 2026-10-21 | #2623 | 1 | No live re-attach in the open page after a transport drop | Gap, confirmed in `memberError.ts:46–50`. New step AU31b (`ota-candidate`), J-AU-6 walked there |
+| 2026-10-21 | #2623 | 1 | A global pump flag cannot roll back one node | Gap. §0 #24 separates per-server env switches from installation-wide BCONFIG ones; AU31 rollout and AU32 drills split accordingly |
+| 2026-10-21 | #2623 | 2 | One usage row per provider call breaks the per-turn `MESSAGES` unit and quotas | Defect in the contract. `TurnUsageLedger`, a unit per action (per turn / per call), rows exactly as today; multi-round tests in AU11 (`03` §1.5) |
+| 2026-10-21 | #2623 | 2 | Redirects bypass the egress policy | Gap. The decorator follows redirects itself and checks every hop; allowed → refused regression in AU15, `MediaDownloader` in AU16 (`03` §3.2) |
+| 2026-10-21 | #2623 | 2 | The pump reading `ProviderKeyStore` loses BYOK, endpoints and operator-fallback rules | Gap, confirmed in `MessagesGateway::resolveCredential()`. Non-secret credential decision in the job, one `TurnCredentialResolver` (AU29), parity cases in AU30 (`03` §7) |
+| 2026-10-21 | #2623 | 2 | No reaper when the last pump dies | Gap. `app:runs:reap` in the scheduler's tick lane and at pump start, atomic transition; AU28 G4 and AU30 stop every pump (`03` §7) |
+| 2026-10-21 | #2623 | 2 | A hand-kept provider enum defeats one-file providers | Agreed, solved differently: the enum is dropped (string validated against the catalog) rather than generated, because a generated enum would make each provider a frontend schema change; in AU21 (`03` §2.1) |
+| 2026-10-21 | #2623 | 2 | Dictation and TTS streams stay in the API pool | Gap, confirmed (300 s / 600 s poll loop, synchronous TTS); `/mcp` added too; `LongRouteListTest` and audio saturation in AU3 (`03` §5) |
+| 2026-10-21 | #2623 | 2 | "Your message is saved" is not true for a refused request | Defect, confirmed (`createIncoming()` runs after admission). Copy says "not sent", the text goes back into the composer and its per-chat draft (AU4) |
+| 2026-10-21 | #2623 | 2 | No cursor on the live stream, merged chunks | Gap, confirmed (`SseWriter::send()`, `ChatRunRecorder`). AU31b rebuilds the bubble from a full replay where no `id:` exists, resumes by cursor only behind the watchdog; tests in both modes |
+| 2026-10-21 | #2623 | 2 | Pump misses `[DONE]` split across chunks | Defect. Per-response line buffer; re-run: 200 events per stream, all done |
+| 2026-10-21 | #2623 | 2 | `microreq.py` times non-200s and ignores thread failures | Defect. Only 200 timed, failures counted, non-zero exit; re-run: every request 200 |
+| 2026-10-21 | #2623 | 2 | `saturate.py` probe non-200s enter the latency | Defect. Baseline must be 200 or the run aborts; later non-200s are errors; re-run: 0 probe errors |
+| 2026-10-21 | #2623 | 3 | A request-scoped usage ledger cannot span pumps and the finish job | Gap. `turnusage:{turnId}` in Redis, `HSETNX` per call, `SET … NX` close; distributed parity test in AU30 (`03` §1.5) |
+| 2026-10-21 | #2623 | 3 | A restart with the same server id and PID renews a dead pump's heartbeat | Gap. Incarnation id per start in the heartbeat and run ownership; same-PID restart test (`03` §7) |
+| 2026-10-21 | #2623 | 3 | Pumps have no graceful shutdown, so scaling interrupts answers | Gap. Drain on `SIGTERM`, `PUMP_DRAIN_SECONDS`, grace period = drain + 30 s, `maxSurge 1 / maxUnavailable 0`, rollout and scale-down drills (`03` §7, `04` §5.1, AU30, AU34) |
