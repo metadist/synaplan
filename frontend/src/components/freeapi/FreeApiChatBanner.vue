@@ -2,48 +2,50 @@
   <div v-if="visible" data-testid="freeapi-banner-host">
     <div
       v-if="!collapsed"
-      class="surface-chip rounded-xl px-4 py-3 text-sm flex flex-col gap-3 sm:flex-row sm:items-center"
+      class="surface-chip rounded-xl px-4 py-3 text-sm flex items-start gap-3"
       data-testid="freeapi-banner"
     >
-      <div class="flex items-start gap-3 min-w-0 flex-1">
-        <SparklesIcon class="w-5 h-5 shrink-0 mt-0.5 txt-brand" aria-hidden="true" />
-        <div class="min-w-0">
+      <SparklesIcon class="w-5 h-5 shrink-0 mt-0.5 txt-brand" aria-hidden="true" />
+      <div class="min-w-0 flex-1 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div class="min-w-0 flex-1">
           <p class="txt-primary">
             <strong>{{ $t('freeApi.banner.title') }}</strong>
             — {{ headline }}
           </p>
-          <p class="txt-secondary mt-0.5">{{ followUp }}</p>
+          <p class="txt-secondary mt-0.5" :class="{ 'hidden sm:block': canManage }">
+            {{ followUp }}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 flex-wrap">
+          <RouterLink
+            v-if="canManage"
+            :to="{ path: '/admin/setup', query: { section: 'providers' } }"
+            class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+            data-testid="freeapi-banner-own-keys"
+          >
+            <KeyIcon class="w-5 h-5" aria-hidden="true" />
+            {{ $t('freeApi.banner.ownKeys') }}
+          </RouterLink>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 text-sm font-medium"
+            data-testid="freeapi-banner-details"
+            @click="cardOpen = true"
+          >
+            {{ $t('freeApi.banner.details') }}
+          </button>
         </div>
       </div>
-      <div class="flex items-center gap-2 shrink-0 flex-wrap">
-        <RouterLink
-          v-if="canManage"
-          :to="{ path: '/admin/setup', query: { section: 'providers' } }"
-          class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
-          data-testid="freeapi-banner-own-keys"
-        >
-          <KeyIcon class="w-5 h-5" aria-hidden="true" />
-          {{ $t('freeApi.banner.ownKeys') }}
-        </RouterLink>
-        <button
-          type="button"
-          class="btn-secondary px-4 py-2.5 text-sm font-medium"
-          data-testid="freeapi-banner-details"
-          @click="cardOpen = true"
-        >
-          {{ $t('freeApi.banner.details') }}
-        </button>
-        <button
-          type="button"
-          class="icon-ghost p-2 rounded-lg"
-          :aria-label="$t('freeApi.banner.hide')"
-          :title="$t('freeApi.banner.hide')"
-          data-testid="freeapi-banner-hide"
-          @click="setCollapsed(true)"
-        >
-          <XMarkIcon class="w-5 h-5" aria-hidden="true" />
-        </button>
-      </div>
+      <button
+        type="button"
+        class="icon-ghost p-2 rounded-lg shrink-0 -my-1 -mr-2 sm:my-0"
+        :aria-label="$t('freeApi.banner.hide')"
+        :title="$t('freeApi.banner.hide')"
+        data-testid="freeapi-banner-hide"
+        @click="setCollapsed(true)"
+      >
+        <XMarkIcon class="w-5 h-5" aria-hidden="true" />
+      </button>
     </div>
     <div v-else class="flex justify-center">
       <button
