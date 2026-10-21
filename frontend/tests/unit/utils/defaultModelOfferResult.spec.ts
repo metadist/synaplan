@@ -21,7 +21,7 @@ describe('interpretDefaultSave', () => {
   })
 
   it('reports the requested model when that is what will answer', () => {
-    expect(interpretDefaultSave({ success: true }, 'CHAT', 9)).toEqual({
+    expect(interpretDefaultSave({}, 'CHAT', 9)).toEqual({
       kind: 'applied',
       modelId: 9,
     })

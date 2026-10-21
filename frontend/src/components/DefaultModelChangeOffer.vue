@@ -86,6 +86,7 @@ import { useNotification } from '@/composables/useNotification'
 import { getDefaultModelOffers, type DefaultModelOffer } from '@/services/api/defaultModelOfferApi'
 import { saveDefaultModels, type SaveDefaultsRequest } from '@/services/api/configApi'
 import { useAiConfigStore } from '@/stores/aiConfig'
+import { useAuthStore } from '@/stores/auth'
 import { useHistoryStore } from '@/stores/history'
 import type { Capability } from '@/types/ai-models'
 import { interpretDefaultSave } from '@/utils/defaultModelOfferResult'
@@ -113,6 +114,7 @@ const emit = defineEmits<{
 const { t, te } = useI18n()
 const { success, error } = useNotification()
 const aiConfig = useAiConfigStore()
+const authStore = useAuthStore()
 const history = useHistoryStore()
 
 const offers = ref<DefaultModelOffer[]>([])
@@ -191,6 +193,12 @@ function dismiss(offer: DefaultModelOffer): void {
 }
 
 async function load(): Promise<void> {
+  // Guests are unauthenticated for a moment before the trial session exists.
+  // This endpoint answers 401, and that tears the trial down.
+  if (!authStore.isAuthenticated) {
+    if (alive) offers.value = []
+    return
+  }
   try {
     const response = await getDefaultModelOffers()
     if (!alive) return

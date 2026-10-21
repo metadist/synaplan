@@ -40,7 +40,7 @@
     </button>
 
     <DefaultModelChangeOffer
-      v-if="!guest && !isOpen"
+      v-if="!guest && authStore.isAuthenticated && !isOpen"
       capability="CHAT"
       :active-model-id="modelValue === null ? (defaultModelId ?? null) : modelValue"
       @applied="selectModel(null)"
@@ -203,6 +203,7 @@ import { CheckIcon, ChevronUpIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroi
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useAiConfigStore } from '@/stores/aiConfig'
+import { useAuthStore } from '@/stores/auth'
 import DefaultModelChangeOffer from '@/components/DefaultModelChangeOffer.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import ReasoningLevelOptions from '@/components/ReasoningLevelOptions.vue'
@@ -242,6 +243,7 @@ const MODEL_FILTER_MIN = 6
 
 const { t } = useI18n()
 const aiConfigStore = useAiConfigStore()
+const authStore = useAuthStore()
 const panelId = useId()
 const filterId = useId()
 const listboxId = useId()

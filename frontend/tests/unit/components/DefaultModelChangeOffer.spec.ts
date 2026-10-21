@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DefaultModelChangeOffer from '@/components/DefaultModelChangeOffer.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
+import { useAuthStore } from '@/stores/auth'
 
 const mockGetOffers = vi.fn()
 const mockSave = vi.fn()
@@ -51,6 +52,9 @@ function mountOffer(props: Record<string, unknown> = {}) {
 describe('DefaultModelChangeOffer', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    useAuthStore().user = { id: 1, email: 'user@example.com', level: 'PRO' } as NonNullable<
+      ReturnType<typeof useAuthStore>['user']
+    >
     vi.clearAllMocks()
     sessionStorage.clear()
     mockGetOffers.mockResolvedValue({ success: true, offers: [chatOffer] })
