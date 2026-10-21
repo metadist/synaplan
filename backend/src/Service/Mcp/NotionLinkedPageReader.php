@@ -6,6 +6,7 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -27,6 +28,7 @@ final readonly class NotionLinkedPageReader
         private McpServerConfigRepository $servers,
         private McpClient $client,
         private McpClientConfig $clientConfig,
+        private EncryptionService $encryption,
         private LoggerInterface $logger,
     ) {
     }
@@ -122,22 +124,41 @@ final readonly class NotionLinkedPageReader
     }
 
     /**
+     * Only a connected Notion account counts. Disconnect leaves the row enabled
+     * with no tokens, and a stale custom row must not hide the signed-in one.
+     *
      * @param list<McpServerConfig> $servers
      * @param list<int>|null        $allowlist
      */
     private function pick(array $servers, ?array $allowlist): ?McpServerConfig
     {
+        $custom = null;
         foreach ($servers as $server) {
             if (null !== $allowlist && !in_array((int) $server->getId(), $allowlist, true)) {
                 continue;
             }
             $host = strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST));
-            if ('mcp.notion.com' === $host) {
+            if ('mcp.notion.com' !== $host) {
+                continue;
+            }
+            if ($this->isConnected($server)) {
                 return $server;
+            }
+            if (!$server->isOAuth() && null === $custom) {
+                $custom = $server;
             }
         }
 
-        return null;
+        return $custom;
+    }
+
+    private function isConnected(McpServerConfig $server): bool
+    {
+        if (!$server->isOAuth()) {
+            return false;
+        }
+
+        return McpOAuthState::STATUS_CONNECTED === $server->getDecryptedOAuthState($this->encryption)->status;
     }
 
     /**
