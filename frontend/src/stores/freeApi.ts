@@ -23,6 +23,11 @@ export const FREEAPI_MODULE_ID = 'freeapi'
 export const useFreeApiStore = defineStore('freeApi', () => {
   const status = ref<FreeApiStatus | null>(null)
   const busy = ref(false)
+  /**
+   * The activate call succeeded but the runtime config did not reload, so
+   * chat readiness can still say "no provider" while the Demo is already on.
+   */
+  const configReloadFailed = ref(false)
   let pendingLoad: Promise<void> | null = null
 
   function isAvailable(): boolean {
@@ -57,7 +62,7 @@ export const useFreeApiStore = defineStore('freeApi', () => {
     busy.value = true
     try {
       setStatus(await activateFreeApi({ consent: true, locale, force }))
-      await refreshAfterChange()
+      configReloadFailed.value = !(await refreshAfterChange())
     } finally {
       busy.value = false
     }
@@ -101,5 +106,14 @@ export const useFreeApiStore = defineStore('freeApi', () => {
     return configRefreshed
   }
 
-  return { status, busy, isAvailable, load, start, leave, syncAfterAutoLeave }
+  return {
+    status,
+    busy,
+    configReloadFailed,
+    isAvailable,
+    load,
+    start,
+    leave,
+    syncAfterAutoLeave,
+  }
 })

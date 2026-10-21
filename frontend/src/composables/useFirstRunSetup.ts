@@ -1,10 +1,16 @@
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { isModuleExplicitlyConfigured } from '@/composables/useModuleFeature'
 import {
   FIRST_RUN_ADMIN_EMAIL,
   FIRST_RUN_ADMIN_PASSWORD,
   FIRST_RUN_SETUP_PATH,
 } from '@/constants/firstRunAdmin'
+
+/** With the Synaplan Demo on, the first admin sign-in opens chat; otherwise provider setup. */
+export function firstRunLandingPath(): string {
+  return isModuleExplicitlyConfigured('freeapi') ? '/' : FIRST_RUN_SETUP_PATH
+}
 
 /**
  * Sign in as the default administrator (if needed) and open AI provider setup.

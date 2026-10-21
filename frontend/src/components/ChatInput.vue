@@ -607,6 +607,7 @@ import {
   type ExistingAttachment,
   type UploadedFile,
 } from './chat/composerAttachment'
+import { resolveBeforeSend } from './chat/resolveBeforeSend'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 import {
   createPastedBlockId,
@@ -632,6 +633,7 @@ interface Props {
    * until that finishes so the message is not written into the previous chat.
    */
   sendLocked?: boolean
+  beforeSend?: (text: string) => boolean | Promise<boolean>
 }
 
 const props = defineProps<Props>()
@@ -1223,8 +1225,9 @@ const emit = defineEmits<{
   budgetBlocked: [result: LimitCheckResult]
 }>()
 
+const acceptingSend = ref(false) // true while beforeSend is still deciding
 const canSend = computed(() => {
-  if (props.sendLocked) {
+  if (props.sendLocked || acceptingSend.value) {
     return false
   }
   const trimmedMessage = message.value.trim()
@@ -1413,7 +1416,7 @@ const stopDictation = (options: { keepText: boolean }) => {
   autoSendPending.value = false
 }
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (isStreaming.value) {
     warning(t('chatInput.waitForStreaming'))
     return
@@ -1423,9 +1426,11 @@ const sendMessage = () => {
   // cannot write text back after the composer is cleared for the next turn.
   stopDictation({ keepText: true })
 
-  if (!canSend.value) {
+  if (!canSend.value || acceptingSend.value) {
     return
   }
+  const accepted = resolveBeforeSend(props.beforeSend, message.value, acceptingSend)
+  if (accepted !== true && !(await accepted)) return
 
   const hasWebSearch = activeTool.value === 'search'
 

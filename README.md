@@ -36,7 +36,7 @@ cd synaplan
 make up
 ```
 
-Open **<http://localhost:5173>**. Log in as `admin@synaplan.com` / `admin123` and click **Start with Synaplan Demo** (40 messages/day for 14 days, no API key needed — [how it works](https://docs.synaplan.com/demo)), or connect [your own AI key](https://docs.synaplan.com/own-ai-keys) (free: [Groq](https://console.groq.com)) or [local Ollama](https://docs.synaplan.com/modules/local-ai).
+Open **<http://localhost:5173>**. Log in as `admin@synaplan.com` / `admin123` and type your first message: it starts the Synaplan Demo (40 messages/day for 14 days, no API key needed — [how it works](https://docs.synaplan.com/demo)). Or connect [your own AI key](https://docs.synaplan.com/own-ai-keys) (free: [Groq](https://console.groq.com)) or [local Ollama](https://docs.synaplan.com/modules/local-ai).
 
 A published image, a Docker GUI, a closed network, or a Linux server: [More ways to install](#more-ways-to-install).
 
@@ -143,7 +143,7 @@ The [quickstart](#quickstart) is this path. Open **<http://localhost:5173>**. A 
 `make up` answers on `:5173` before the rest of the images finish pulling. `docker compose up -d` starts the same stack; `:5173` stays quiet until those pulls finish.
 
 1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
-2. Click **Start with Synaplan Demo** (14 days, 40 messages a day via `web.synaplan.com`), or paste one provider key (free: [Groq](https://console.groq.com)). You do not edit a config file for that.
+2. Type your first chat message: it starts the Synaplan Demo (14 days, 40 messages a day via `web.synaplan.com`). Or paste one provider key (free: [Groq](https://console.groq.com)). You do not edit a config file for that.
 3. Same notes in the terminal: `docker compose logs -f startup-notes`.
 
 No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pulls a local chat model (`gpt-oss:20b`, ~14 GB). Chat starts when the download finishes.
