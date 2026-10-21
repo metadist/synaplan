@@ -437,6 +437,9 @@
       "dismiss": "Not now",
       "choose": "Replacement",
       "saved": "Your {purpose} default is now {name}. Other defaults stay as they are.",
+      "savedOther": "{picked} cannot answer right now. Your {purpose} default is {name}.",
+      "savedUnusable": "{name} was saved, but it cannot answer yet. No working model was switched in.",
+      "otherModel": "another model",
       "saveFailed": "The default was not changed. It is still {name}.",
       "noAlternative": "No other model is available to switch to.",
       "settings": "AI settings"

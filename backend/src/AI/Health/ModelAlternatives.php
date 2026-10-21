@@ -8,6 +8,7 @@ use App\Entity\Model;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Service\Iam\Policy\GroupPolicyService;
+use App\Service\Model\PickerCapabilities;
 use App\Service\ModelConfigService;
 
 /**
@@ -35,6 +36,7 @@ final readonly class ModelAlternatives
      */
     public function forModel(Model $model, ?int $userId = null, ?string $capability = null): array
     {
+        $capability ??= $this->defaultCapability($model);
         $selfId = (int) $model->getId();
         $offline = array_flip($this->offlineIds());
         $same = [];
@@ -46,6 +48,9 @@ final readonly class ModelAlternatives
                 continue;
             }
             if (1 !== $candidate->getActive() || $candidate->isRetired() || $candidate->isHiddenBecauseFree()) {
+                continue;
+            }
+            if (!$this->fits($candidate, $capability)) {
                 continue;
             }
             if (isset($offline[$id]) || !$this->usable->isConfiguredModelUsable($id)) {
@@ -99,6 +104,21 @@ final readonly class ModelAlternatives
             'voice2voice' => 'VOICE_LIVE',
             default => null,
         };
+    }
+
+    /**
+     * Sharing a tag is not enough: an image editor and a plain image model
+     * both use text2pic, and only the editor can take the edit slot.
+     */
+    private function fits(Model $candidate, ?string $capability): bool
+    {
+        if (null === $capability || '' === $capability) {
+            return true;
+        }
+
+        $accepted = PickerCapabilities::forTag(strtoupper($candidate->getTag()), $candidate->getFeatures());
+
+        return in_array($capability, $accepted, true);
     }
 
     private function allowedFor(?int $userId, int $modelId, ?string $capability): bool

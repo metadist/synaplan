@@ -55,6 +55,9 @@
       "confirmTitle": "Change your default?",
       "confirmMessage": "Your {purpose} default becomes {name}. Other people's defaults stay as they are. Nothing else is changed.",
       "saved": "Your {purpose} default is now {name}. Other people's defaults stay as they are.",
+      "savedOther": "{picked} cannot answer right now. Your {purpose} default is {name}.",
+      "savedUnusable": "{name} was saved, but it cannot answer yet. No working model was switched in.",
+      "otherModel": "another model",
       "saveFailed": "The default was not changed. It is still {name}."
     },
     "actions": {

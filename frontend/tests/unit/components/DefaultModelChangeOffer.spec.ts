@@ -85,6 +85,20 @@ describe('DefaultModelChangeOffer', () => {
     wrapper.unmount()
   })
 
+  it('follows the model that actually answers when the saved one cannot', async () => {
+    mockSave.mockResolvedValue({ success: true, replaced: { CHAT: 89 } })
+    const wrapper = mountOffer()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-default-offer-use-CHAT"]').trigger('click')
+    await flushPromises()
+
+    expect(useAiConfigStore().defaults.CHAT).toBe(89)
+    expect(mockSuccess.mock.calls[0]?.[0]).toContain('Claude')
+    expect(mockError).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('does not change the default when dismissed', async () => {
     const wrapper = mountOffer()
     await flushPromises()

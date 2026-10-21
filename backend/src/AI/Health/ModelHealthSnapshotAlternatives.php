@@ -6,6 +6,7 @@ namespace App\AI\Health;
 
 use App\Entity\Model;
 use App\Repository\ModelRepository;
+use App\Service\Config\LayeredConfigResolver;
 
 /**
  * Adds "you could use these instead" to a model-status snapshot.
@@ -21,6 +22,7 @@ final readonly class ModelHealthSnapshotAlternatives
         private ModelRepository $models,
         private ModelUnavailabilityWindow $window,
         private ModelAlternatives $alternatives,
+        private ?LayeredConfigResolver $resolver = null,
     ) {
     }
 
@@ -29,14 +31,14 @@ final readonly class ModelHealthSnapshotAlternatives
      *
      * @return array{providers: list<array<string, mixed>>, retired?: list<array<string, mixed>>, summary?: array<string, mixed>}
      */
-    public function annotate(array $snapshot): array
+    public function annotate(array $snapshot, ?int $userId = null): array
     {
         $providers = [];
         foreach ($snapshot['providers'] as $provider) {
             $models = [];
             foreach ($provider['models'] as $row) {
                 if (is_array($row)) {
-                    $models[] = $this->annotateRow($row);
+                    $models[] = $this->annotateRow($row, $userId);
                 }
             }
             $provider['models'] = $models;
@@ -52,7 +54,7 @@ final readonly class ModelHealthSnapshotAlternatives
      *
      * @return array<string, mixed>
      */
-    private function annotateRow(array $row): array
+    private function annotateRow(array $row, ?int $userId): array
     {
         $id = (int) ($row['id'] ?? 0);
         $count = $id > 0 ? $this->window->count($id) : 0;
@@ -74,9 +76,19 @@ final readonly class ModelHealthSnapshotAlternatives
             return $row;
         }
 
-        $row['alternatives'] = $this->alternatives->forModel($model);
-        $row['defaultCapability'] = $this->alternatives->defaultCapability($model);
+        $slot = $this->alternatives->defaultCapability($model);
+        $row['alternatives'] = $this->alternatives->forModel($model, $userId, $slot);
+        $row['defaultCapability'] = $this->locked($userId, $slot) ? null : $slot;
 
         return $row;
+    }
+
+    private function locked(?int $userId, ?string $capability): bool
+    {
+        if (null === $userId || null === $capability || null === $this->resolver) {
+            return false;
+        }
+
+        return $this->resolver->isLocked('DEFAULTMODEL', $capability, $userId);
     }
 }

@@ -11,6 +11,7 @@ use App\AI\Health\ModelHealthRecorder;
 use App\AI\Health\ModelHealthSnapshotAlternatives;
 use App\AI\Health\ModelHealthState;
 use App\Entity\ModelHealth;
+use App\Entity\User;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
@@ -21,6 +22,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
@@ -166,9 +168,11 @@ final class AdminModelHealthController extends AbstractController
         )
     )]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function status(): JsonResponse
+    public function status(#[CurrentUser] ?User $user): JsonResponse
     {
-        return $this->json(['success' => true] + $this->snapshotAlternatives->annotate($this->overview->build()));
+        $userId = $user ? (int) $user->getId() : null;
+
+        return $this->json(['success' => true] + $this->snapshotAlternatives->annotate($this->overview->build(), $userId));
     }
 
     #[Route('/refresh', name: 'admin_model_health_refresh', methods: ['POST'])]

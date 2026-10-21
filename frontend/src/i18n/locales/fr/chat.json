@@ -437,6 +437,9 @@
       "dismiss": "Pas maintenant",
       "choose": "Remplacement",
       "saved": "Ton modèle par défaut pour {purpose} est maintenant {name}. Les autres ne changent pas.",
+      "savedOther": "{picked} ne peut pas répondre pour le moment. Ton modèle par défaut pour {purpose} est {name}.",
+      "savedUnusable": "{name} a été enregistré, mais il ne peut pas répondre. Aucun autre modèle n’a pris sa place.",
+      "otherModel": "un autre modèle",
       "saveFailed": "Le modèle par défaut n’a pas été changé. C’est toujours {name}.",
       "noAlternative": "Aucun autre modèle n’est disponible pour le remplacer.",
       "settings": "Réglages IA"

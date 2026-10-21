@@ -9,6 +9,7 @@ use App\AI\Health\ModelHealthSnapshotAlternatives;
 use App\AI\Health\ModelUnavailabilityWindow;
 use App\Entity\Model;
 use App\Repository\ModelRepository;
+use App\Service\Config\LayeredConfigResolver;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -60,6 +61,31 @@ final class ModelHealthSnapshotAlternativesTest extends TestCase
 
         self::assertSame(3, $rows[2]['unavailableCount']);
         self::assertCount(1, $rows[2]['alternatives']);
+    }
+
+    public function testALockedDefaultHidesTheButtonButStillListsAlternatives(): void
+    {
+        $window = new ModelUnavailabilityWindow(new ArrayAdapter(), new NullLogger());
+        $models = $this->createStub(ModelRepository::class);
+        $models->method('find')->willReturn($this->model(2, 'gpt 5.5'));
+
+        $alternatives = $this->createStub(ModelAlternatives::class);
+        $alternatives->method('forModel')->willReturn([
+            ['id' => 9, 'name' => 'gpt 6 sol', 'service' => 'OpenAI'],
+        ]);
+        $alternatives->method('defaultCapability')->willReturn('CHAT');
+
+        $resolver = $this->createStub(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn(true);
+
+        $snapshot = (new ModelHealthSnapshotAlternatives($models, $window, $alternatives, $resolver))
+            ->annotate([
+                'providers' => [['name' => 'openai', 'models' => [$this->row(2, true)]]],
+            ], 4);
+
+        $row = $snapshot['providers'][0]['models'][0];
+        self::assertNull($row['defaultCapability']);
+        self::assertSame('gpt 6 sol', $row['alternatives'][0]['name']);
     }
 
     /**

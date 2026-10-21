@@ -328,6 +328,7 @@ import {
 import { saveDefaultModels } from '@/services/api/configApi'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { Capability } from '@/types/ai-models'
+import { interpretDefaultSave } from '@/utils/defaultModelOfferResult'
 
 const { t, locale } = useI18n()
 const { success, error } = useNotification()
@@ -548,14 +549,30 @@ const useAlternative = async (model: ModelStatusEntry) => {
     const response = await saveDefaultModels({
       defaults: { [capability]: alternative.id } as Partial<Record<Capability, number>>,
     })
-    const skipped = Boolean(response.skipped && capability in response.skipped)
-    const replaced = response.replaced?.[capability]
-    if (skipped || (replaced !== undefined && replaced !== alternative.id)) {
+    const outcome = interpretDefaultSave(response, capability, alternative.id)
+    if (outcome.kind === 'skipped') {
       error(t('adminModelStatus.alternatives.saveFailed', { name: model.name }))
       return
     }
-    useAiConfigStore().defaults[capability as Capability] = alternative.id
-    success(t('adminModelStatus.alternatives.saved', { name: alternative.name, purpose }))
+    const store = useAiConfigStore()
+    store.defaults[capability as Capability] = outcome.modelId
+    if (outcome.kind === 'unusable') {
+      error(t('adminModelStatus.alternatives.savedUnusable', { name: alternative.name }))
+      return
+    }
+    const appliedName =
+      outcome.kind === 'replaced'
+        ? (store.models[capability as Capability]?.find((item) => item.id === outcome.modelId)
+            ?.name ?? t('adminModelStatus.alternatives.otherModel'))
+        : alternative.name
+    success(
+      t(
+        outcome.kind === 'replaced'
+          ? 'adminModelStatus.alternatives.savedOther'
+          : 'adminModelStatus.alternatives.saved',
+        { picked: alternative.name, name: appliedName, purpose }
+      )
+    )
   } catch {
     error(t('adminModelStatus.alternatives.saveFailed', { name: model.name }))
   } finally {

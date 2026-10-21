@@ -88,6 +88,7 @@ import { saveDefaultModels, type SaveDefaultsRequest } from '@/services/api/conf
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useHistoryStore } from '@/stores/history'
 import type { Capability } from '@/types/ai-models'
+import { interpretDefaultSave } from '@/utils/defaultModelOfferResult'
 
 const props = withDefaults(
   defineProps<{
@@ -210,18 +211,28 @@ async function apply(offer: DefaultModelOffer): Promise<void> {
     const response = await saveDefaultModels({
       defaults: { [offer.capability]: alternative.id } as SaveDefaultsRequest['defaults'],
     })
-    if (!wasApplied(response, offer.capability, alternative.id)) {
+    const outcome = interpretDefaultSave(response, offer.capability, alternative.id)
+    if (outcome.kind === 'skipped') {
       error(t('chatInput.defaultModelOffer.saveFailed', { name: offer.modelName }))
       return
     }
+
     const capability = offer.capability as Capability
-    aiConfig.defaults[capability] = alternative.id
-    success(
-      t('chatInput.defaultModelOffer.saved', {
-        name: alternative.name,
-        purpose: purposeLabel(offer.capability),
-      })
-    )
+    const purpose = purposeLabel(offer.capability)
+    aiConfig.defaults[capability] = outcome.modelId
+    if (outcome.kind === 'unusable') {
+      error(t('chatInput.defaultModelOffer.savedUnusable', { name: alternative.name }))
+    } else if (outcome.kind === 'replaced') {
+      success(
+        t('chatInput.defaultModelOffer.savedOther', {
+          picked: alternative.name,
+          name: resolvedName(offer, outcome.modelId),
+          purpose,
+        })
+      )
+    } else {
+      success(t('chatInput.defaultModelOffer.saved', { name: alternative.name, purpose }))
+    }
     offers.value = offers.value.filter((item) => item.capability !== offer.capability)
     emit('applied', offer.capability)
   } catch {
@@ -231,14 +242,13 @@ async function apply(offer: DefaultModelOffer): Promise<void> {
   }
 }
 
-function wasApplied(
-  response: { skipped?: object | null; replaced?: Record<string, number | null> },
-  capability: string,
-  modelId: number
-): boolean {
-  if (response.skipped && capability in response.skipped) return false
-  if (!response.replaced || !(capability in response.replaced)) return true
-  return response.replaced[capability] === modelId
+function resolvedName(offer: DefaultModelOffer, id: number): string {
+  const listed = offer.alternatives.find((item) => item.id === id)?.name
+  if (listed) return listed
+  const models = aiConfig.models[offer.capability as Capability]
+  return (
+    models?.find((model) => model.id === id)?.name ?? t('chatInput.defaultModelOffer.otherModel')
+  )
 }
 
 watch(

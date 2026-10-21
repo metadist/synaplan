@@ -42,7 +42,6 @@
         @update:model-value="onModelsTabChange"
       />
     </PageHeader>
-
     <div
       v-show="activeTab === 'choice'"
       v-if="!isAdminScope"
@@ -57,7 +56,6 @@
         <CpuChipIcon class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         {{ $t('config.aiModels.defaultConfigTitle') }}
       </h3>
-
       <!-- Admins choose for whom the defaults below apply. Guests run as a
            system user with no choices of its own, so they always get the
            instance defaults, never the admin's personal ones. -->
@@ -111,9 +109,12 @@
           {{ $t('config.aiModels.retry') }}
         </button>
       </div>
-
       <div v-else>
-        <DefaultModelChangeOffer v-if="defaultsScope === 'user'" placement="page" />
+        <DefaultModelChangeOffer
+          v-if="defaultsScope === 'user'"
+          placement="page"
+          @applied="() => loadData({ background: true, replaceDefaults: true })"
+        />
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
           <div
             v-for="capability in Object.keys(purposeLabels)"
@@ -364,7 +365,6 @@
         </div>
       </div>
     </div>
-
     <PlannerModelCard v-if="!isAdminScope && activeTab === 'choice'" />
 
     <div v-if="!isAdminScope" v-show="activeTab === 'list'" class="space-y-6">

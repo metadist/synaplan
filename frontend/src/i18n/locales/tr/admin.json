@@ -55,6 +55,9 @@
       "confirmTitle": "Varsayılanı değiştir?",
       "confirmMessage": "{purpose} varsayılanın {name} olur. Başkalarının varsayılanları aynı kalır. Başka bir şey değişmez.",
       "saved": "{purpose} varsayılanın artık {name}. Başkalarının varsayılanları aynı kalır.",
+      "savedOther": "{picked} şu anda yanıt veremiyor. {purpose} varsayılanın {name}.",
+      "savedUnusable": "{name} kaydedildi, ama şu anda yanıt veremiyor. Başka bir modele geçilmedi.",
+      "otherModel": "başka bir model",
       "saveFailed": "Varsayılan değişmedi. Hâlâ {name}."
     },
     "actions": {

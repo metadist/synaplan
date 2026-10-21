@@ -428,6 +428,9 @@
       "dismiss": "Ahora no",
       "choose": "Alternativa",
       "saved": "Tu modelo predeterminado de {purpose} ahora es {name}. Los demás no cambian.",
+      "savedOther": "{picked} no puede responder ahora. Tu modelo predeterminado de {purpose} es {name}.",
+      "savedUnusable": "{name} se guardó, pero no puede responder todavía. No se cambió a otro modelo.",
+      "otherModel": "otro modelo",
       "saveFailed": "El modelo predeterminado no se cambió. Sigue siendo {name}.",
       "noAlternative": "No hay otro modelo disponible al que cambiar.",
       "settings": "Ajustes de IA"

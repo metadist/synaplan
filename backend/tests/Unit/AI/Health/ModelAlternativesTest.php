@@ -83,6 +83,17 @@ final class ModelAlternativesTest extends TestCase
         self::assertCount(5, $this->alternatives($rows)->forModel($broken));
     }
 
+    public function testAPlainImageModelIsNotOfferedForImageEditing(): void
+    {
+        $editor = $this->model(1, 'edit', 'OpenAI', 'text2pic')->setJson(['features' => ['pic2pic']]);
+        $generator = $this->model(2, 'image', 'OpenAI', 'text2pic');
+        $otherEditor = $this->model(3, 'retouch', 'OpenAI', 'text2pic')->setJson(['features' => ['pic2pic']]);
+
+        $listed = $this->alternatives([$editor, $generator, $otherEditor])->forModel($editor);
+
+        self::assertSame([3], array_column($listed, 'id'));
+    }
+
     public function testDefaultSlotFollowsTheTaskAndSkipsEmbeddings(): void
     {
         $alternatives = $this->alternatives([]);

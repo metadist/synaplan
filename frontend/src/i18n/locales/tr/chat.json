@@ -428,6 +428,9 @@
       "dismiss": "Şimdi değil",
       "choose": "Yerine",
       "saved": "{purpose} varsayılanın artık {name}. Diğer varsayılanlar aynı kalır.",
+      "savedOther": "{picked} şu anda yanıt veremiyor. {purpose} varsayılanın {name}.",
+      "savedUnusable": "{name} kaydedildi, ama şu anda yanıt veremiyor. Başka bir modele geçilmedi.",
+      "otherModel": "başka bir model",
       "saveFailed": "Varsayılan değişmedi. Hâlâ {name}.",
       "noAlternative": "Geçilecek başka bir model yok.",
       "settings": "Yapay zeka ayarları"

@@ -55,6 +55,9 @@
       "confirmTitle": "Changer ton modèle par défaut ?",
       "confirmMessage": "Ton modèle par défaut pour {purpose} devient {name}. Ceux des autres personnes restent. Rien d’autre ne change.",
       "saved": "Ton modèle par défaut pour {purpose} est maintenant {name}. Ceux des autres personnes restent.",
+      "savedOther": "{picked} ne peut pas répondre pour le moment. Ton modèle par défaut pour {purpose} est {name}.",
+      "savedUnusable": "{name} a été enregistré, mais il ne peut pas répondre. Aucun autre modèle n’a pris sa place.",
+      "otherModel": "un autre modèle",
       "saveFailed": "Le modèle par défaut n’a pas été changé. C’est toujours {name}."
     },
     "actions": {
