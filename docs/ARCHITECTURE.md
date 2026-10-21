@@ -88,6 +88,19 @@ Large OpenAPI response schemas live in `App\Attribute\OpenApi\Config\*`, so
 the routes stay in one controller: the spec orders `paths` by route
 registration, and the frontend pins a hash of the spec.
 
+## Readiness — `GET /api/health/ready`
+
+`GET /api/health` reports providers, Whisper and Redis. Whisper's probe
+(`whisper --help` and the model scan) is cached for five minutes when it
+succeeds and for one minute when it fails, so a health poll does not start
+a program on every call. A missing binary is not cached.
+
+`GET /api/health/ready` is the short probe for a load balancer or the
+watchdog. It pings Redis and returns `status` plus that Redis result. It
+does not ask a provider, does not start a program and does not query the
+database. Redis down is `503`, the same rule as `/api/health`. Both are
+public. `GET /api/health/probe` stays the authenticated check.
+
 ## Chat turn — `ChatHandler`
 
 `App\Service\Message\Handler\ChatHandler` answers a message with the model the

@@ -5,6 +5,8 @@ namespace App\Tests\Unit;
 use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class WhisperServiceTest extends TestCase
 {
@@ -434,5 +436,208 @@ class WhisperServiceTest extends TestCase
         );
 
         $this->assertFalse($service->isAvailable(), 'Service should not be available when binary is not executable');
+    }
+
+    public function testAvailabilityProbeStartsTheBinaryOnceWithinTheCacheLifetime(): void
+    {
+        $counter = $this->tempDir.'/runs';
+        $service = $this->serviceWithCountingBinary($counter, 0);
+
+        $this->assertTrue($service->isAvailable());
+        $this->assertTrue($service->isAvailable());
+
+        $this->assertSame(1, $this->runCount($counter));
+    }
+
+    public function testAFailedProbeStartsTheBinaryOnce(): void
+    {
+        $counter = $this->tempDir.'/failed-runs';
+        $service = $this->serviceWithCountingBinary($counter, 1);
+
+        $this->assertFalse($service->isAvailable());
+        $this->assertFalse($service->isAvailable());
+
+        $this->assertSame(1, $this->runCount($counter));
+    }
+
+    public function testASuccessfulProbeIsCachedForFiveMinutes(): void
+    {
+        $counter = $this->tempDir.'/ok-ttl';
+        $cache = new RememberingAvailabilityCache();
+        $service = $this->serviceWithCountingBinary($counter, 0, $cache);
+
+        $this->assertTrue($service->isAvailable());
+        $this->assertTrue($service->isAvailable());
+
+        $this->assertSame(300, $cache->ttlSeconds);
+        $this->assertSame(1, $this->runCount($counter));
+    }
+
+    public function testAFailedProbeIsCachedForOneMinute(): void
+    {
+        $counter = $this->tempDir.'/fail-ttl';
+        $cache = new RememberingAvailabilityCache();
+        $service = $this->serviceWithCountingBinary($counter, 1, $cache);
+
+        $this->assertFalse($service->isAvailable());
+
+        $this->assertSame(60, $cache->ttlSeconds);
+        $this->assertSame(1, $this->runCount($counter));
+    }
+
+    public function testAMissingBinaryDoesNotStartAProcessOrUseTheCache(): void
+    {
+        $cache = new RememberingAvailabilityCache();
+        $service = new WhisperService(
+            $this->createStub(LoggerInterface::class),
+            '/nonexistent/whisper',
+            $this->tempDir,
+            'base',
+            '/usr/bin/ffmpeg',
+            true,
+            $cache,
+        );
+
+        $this->assertFalse($service->isAvailable());
+        $this->assertSame(0, $cache->misses);
+    }
+
+    public function testACacheOutageStillRunsTheProbe(): void
+    {
+        $counter = $this->tempDir.'/cache-down';
+        $cache = new class implements CacheInterface {
+            public function get(string $key, callable $callback, ?float $beta = null, ?array &$metadata = null): mixed
+            {
+                throw new \RuntimeException('cache down');
+            }
+
+            public function delete(string $key): bool
+            {
+                return false;
+            }
+        };
+        $service = $this->serviceWithCountingBinary($counter, 0, $cache);
+
+        $this->assertTrue($service->isAvailable());
+        $this->assertSame(1, $this->runCount($counter));
+    }
+
+    private function serviceWithCountingBinary(string $counter, int $exitCode, ?CacheInterface $cache = null): WhisperService
+    {
+        $binary = $this->tempDir.'/whisper-'.md5($counter);
+        file_put_contents($binary, "#!/bin/sh\necho 1 >> ".escapeshellarg($counter)."\nexit {$exitCode}\n");
+        chmod($binary, 0755);
+
+        $ffmpeg = $this->tempDir.'/ffmpeg-'.md5($counter);
+        file_put_contents($ffmpeg, "#!/bin/sh\nexit 0\n");
+        chmod($ffmpeg, 0755);
+
+        $modelsDir = $this->tempDir.'/models-'.md5($counter);
+        mkdir($modelsDir);
+        touch($modelsDir.'/ggml-base.bin');
+
+        return new WhisperService(
+            $this->createStub(LoggerInterface::class),
+            $binary,
+            $modelsDir,
+            'base',
+            $ffmpeg,
+            true,
+            $cache,
+        );
+    }
+
+    private function runCount(string $counter): int
+    {
+        if (!is_file($counter)) {
+            return 0;
+        }
+
+        return substr_count((string) file_get_contents($counter), '1');
+    }
+}
+
+/**
+ * Stores one value and records the lifetime the probe asked for.
+ */
+final class RememberingAvailabilityCache implements CacheInterface
+{
+    public int $misses = 0;
+    public ?int $ttlSeconds = null;
+    private bool $filled = false;
+    private mixed $value = null;
+
+    public function get(string $key, callable $callback, ?float $beta = null, ?array &$metadata = null): mixed
+    {
+        if ($this->filled) {
+            return $this->value;
+        }
+
+        ++$this->misses;
+        $item = new AvailabilityExpiryItem($this);
+        $this->value = $callback($item, false);
+        $this->filled = true;
+
+        return $this->value;
+    }
+
+    public function delete(string $key): bool
+    {
+        $this->filled = false;
+
+        return true;
+    }
+}
+
+final class AvailabilityExpiryItem implements ItemInterface
+{
+    public function __construct(private RememberingAvailabilityCache $cache)
+    {
+    }
+
+    public function getKey(): string
+    {
+        return 'whisper-probe';
+    }
+
+    public function get(): mixed
+    {
+        return null;
+    }
+
+    public function isHit(): bool
+    {
+        return false;
+    }
+
+    public function set(mixed $value): static
+    {
+        return $this;
+    }
+
+    public function expiresAt(?\DateTimeInterface $expiration): static
+    {
+        return $this;
+    }
+
+    public function expiresAfter(\DateInterval|int|null $time): static
+    {
+        if ($time instanceof \DateInterval) {
+            $this->cache->ttlSeconds = ($time->d * 86400) + ($time->h * 3600) + ($time->i * 60) + $time->s;
+        } else {
+            $this->cache->ttlSeconds = $time;
+        }
+
+        return $this;
+    }
+
+    public function tag(string|iterable $tags): static
+    {
+        return $this;
+    }
+
+    public function getMetadata(): array
+    {
+        return [];
     }
 }

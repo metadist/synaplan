@@ -156,6 +156,14 @@ read back out of the database.
 
 ### Health Check Endpoint
 
+Three addresses, three jobs:
+
+| Address | Who can call it | What it tells you |
+| ------- | --------------- | ----------------- |
+| `GET /api/health` | anyone | Providers, local speech and Redis. A full picture, slower. |
+| `GET /api/health/ready` | anyone | Only whether Redis answers. Use this when a load balancer asks "can this server take a request?". |
+| `GET /api/health/probe` | an API key | Whether sign-in still works. This is the one for Uptime Robot. |
+
 `GET /api/health/probe` exercises the auth stack (DB via API-Key lookup, email-verified gate, token generation) and returns `STATUS:OK` or `STATUS:ERROR`.
 
 Protected by standard API-Key authentication (`X-API-Key` header). No sensitive details in the response — diagnostics are logged server-side only.

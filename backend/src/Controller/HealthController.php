@@ -123,6 +123,64 @@ class HealthController extends AbstractController
         ], $httpStatus);
     }
 
+    #[Route('/api/health/ready', name: 'api_health_ready', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/health/ready',
+        summary: 'Readiness probe',
+        description: 'Answers whether this server can take a request. Pings Redis and returns a fixed body. Does not check AI providers, does not start a program, and does not query the database. Returns 503 when Redis is unreachable in dev/prod (PHPUnit always reports `skipped: true`).',
+        tags: ['Health']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'The server can take a request',
+        content: new OA\JsonContent(
+            required: ['status', 'redis'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', example: 'ok'),
+                new OA\Property(
+                    property: 'redis',
+                    type: 'object',
+                    required: ['available'],
+                    properties: [
+                        new OA\Property(property: 'available', type: 'boolean', example: true),
+                        new OA\Property(property: 'skipped', type: 'boolean', nullable: true, description: 'true when running under APP_ENV=test (Redis ping is intentionally bypassed).'),
+                        new OA\Property(property: 'message', type: 'string', nullable: true),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 503,
+        description: 'Redis is required but unreachable.',
+        content: new OA\JsonContent(
+            required: ['status', 'redis'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', example: 'error'),
+                new OA\Property(
+                    property: 'redis',
+                    type: 'object',
+                    required: ['available'],
+                    properties: [
+                        new OA\Property(property: 'available', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string', example: 'Redis unreachable'),
+                    ]
+                ),
+            ]
+        )
+    )]
+    public function ready(RedisService $redisService, KernelInterface $kernel): JsonResponse
+    {
+        $redis = $this->redisHealth($redisService, $kernel);
+        $redisSkipped = $redis['skipped'] ?? false;
+        $ready = $redisSkipped || true === $redis['available'];
+
+        return $this->json([
+            'status' => $ready ? 'ok' : 'error',
+            'redis' => $redis,
+        ], $ready ? Response::HTTP_OK : Response::HTTP_SERVICE_UNAVAILABLE);
+    }
+
     /**
      * @return array{available: bool, skipped?: bool, message?: string}
      */
