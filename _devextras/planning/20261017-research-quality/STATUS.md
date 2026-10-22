@@ -11,7 +11,7 @@ chat message.
 | RQ1 | planned | Desktop use cases re-run against `main`; CHANGES Done list (synaplan-desktop) |
 | RQ2 | planned | Eval corpus, judges, calibration, B0 baseline |
 | RS1 | planned | Gateway wrap-up answers fully; round limit from config |
-| RS2 | planned | `web_fetch` run by Synaplan on non-Anthropic routes |
+| RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. UC-04 / UC-04b not measured |
 | RS3 | planned | `knowledge_search` and `read_document` in the gateway |
 | RS4 | planned | PDFs and office files from web search — §0 #12 |
 | RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |

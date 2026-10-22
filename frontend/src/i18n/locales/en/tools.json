@@ -498,10 +498,10 @@
     "webSearchHint": "Automatic uses Synaplan's own search when a search provider is configured, and otherwise passes the request on to the AI provider.",
     "webSearchUnavailable": "No search provider is configured on this instance, so requests are passed on to the AI provider. Only Anthropic can answer them.",
     "webFetchLabel": "Read web pages (web fetch)",
-    "webFetchModeAuto": "Automatic — let Anthropic fetch (recommended)",
-    "webFetchModePassthrough": "Always pass web fetch to Anthropic",
+    "webFetchModeAuto": "Automatic (recommended)",
+    "webFetchModePassthrough": "Only Anthropic reads the page",
     "webFetchModeOff": "No web fetch",
-    "webFetchHint": "Synaplan does not download pages itself. On Anthropic models the gateway keeps or adds Anthropic's web_fetch tool so the model can open a URL. Other AI providers cannot run this tool.",
+    "webFetchHint": "Automatic lets Anthropic read the page on Anthropic models. On every other model, Synaplan opens the page itself, up to the limit below. Passing the request on only works for Anthropic.",
     "visionLabel": "Vision for connected AI assistants",
     "visionModeAuto": "Automatic (recommended)",
     "visionModeSynaplan": "Always use Synaplan's vision model",
@@ -550,10 +550,11 @@
       "activeTools": {
         "title": "Running on your behalf right now",
         "empty": "Synaplan runs no tools of its own. Connected AI assistants only get the tools their own program brings along.",
-        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it.",
+        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it. Page reading stops at the page limit.",
         "mcpServers": "plus the tools of 1 connected tool server | plus the tools of {count} connected tool servers",
         "tools": {
           "web_search": "Web search",
+          "web_fetch": "Read a web page",
           "analyze_image": "Image analysis"
         }
       },
@@ -581,6 +582,10 @@
       "webSearchRounds": {
         "label": "Web searches before an answer",
         "description": "After this many searches in one message, the assistant answers from what it found and names each source. 2 is enough for a short question. Raise it when the first results are not enough."
+      },
+      "webFetchPages": {
+        "label": "Pages to open in one message",
+        "description": "After this many pages in one message, the assistant stops opening more and answers from what it read. 3 is enough for a normal question. 0 means it does not open pages."
       },
       "imageDetail": {
         "label": "Image quality",

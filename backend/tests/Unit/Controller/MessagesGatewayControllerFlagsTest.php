@@ -171,6 +171,7 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
         yield 'unknown web search mode' => [['web_search_mode' => 'maybe'], 'web_search_mode must be one of'];
         yield 'iterations out of range' => [['mcp_max_iterations' => 999], 'mcp_max_iterations must be an integer'];
         yield 'search rounds out of range' => [['web_search_max_rounds' => 9], 'web_search_max_rounds must be an integer'];
+        yield 'fetch cap out of range' => [['web_fetch_max_per_turn' => 11], 'web_fetch_max_per_turn must be an integer'];
         yield 'negative image cap' => [['vision_max_images' => -1], 'vision_max_images must be an integer'];
         yield 'non-numeric image cap' => [['vision_max_images' => 'lots'], 'vision_max_images must be an integer'];
         yield 'non-boolean flag' => [['enabled' => 'perhaps'], 'enabled must be a boolean'];

@@ -10,7 +10,9 @@ use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\NativeToolRegistry;
 use App\AI\Messages\Tools\ServerToolReplay;
+use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
@@ -56,7 +58,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $client,
             $servers,
@@ -181,7 +183,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -284,7 +286,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $client,
             $this->createMock(McpServerConfigRepository::class),
@@ -337,7 +339,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -408,7 +410,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -521,7 +523,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -632,7 +634,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -743,7 +745,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -852,7 +854,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
@@ -1403,6 +1405,90 @@ final class GatewayToolLoopTest extends TestCase
         self::assertSame(200, $result['status']);
     }
 
+    public function testMixedWriteFileAndWebFetchDoesNotReturnAnUnpairedFetch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $fetch = $this->createMock(WebFetchTool::class);
+        $fetch->expects($this->once())
+            ->method('execute')
+            ->willReturn([
+                'text' => "Title: Node.js\nURL: https://nodejs.org/en\n\nNode.js 24 is the current LTS.",
+                'isError' => false,
+                'url' => 'https://nodejs.org/en',
+            ]);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), webFetch: $fetch);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_fetch',
+                                    'name' => 'web_fetch',
+                                    'input' => ['url' => 'https://nodejs.org/en'],
+                                ],
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_write',
+                                    'name' => 'write_file',
+                                    'input' => ['path' => 'notes.md'],
+                                ],
+                            ],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('web_fetch', $names);
+                self::assertNotContains('write_file', $names);
+                self::assertSame('tool_result', $body['messages'][2]['content'][0]['type']);
+                self::assertStringContainsString('https://nodejs.org/en', (string) $body['messages'][2]['content'][0]['content']);
+
+                return $this->toolUseBody('toolu_write', 'write_file', ['path' => 'notes.md']);
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Save the current Node LTS']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webFetchSnapshot(),
+        );
+
+        self::assertSame(2, $calls);
+        self::assertSame(200, $result['status']);
+        self::assertIsArray($result['body']);
+        $returned = array_map(
+            static fn (array $block): string => (string) ($block['name'] ?? ''),
+            $result['body']['content'],
+        );
+        self::assertSame(['write_file'], $returned);
+        self::assertSame([], ServerToolReplay::unpairedUseIds($result['body']['content']));
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1426,7 +1512,30 @@ final class GatewayToolLoopTest extends TestCase
         ];
     }
 
-    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2): GatewayToolLoop
+    /**
+     * @return array<string, mixed>
+     */
+    private function webFetchSnapshot(): array
+    {
+        return [
+            'tools' => [[
+                'name' => 'web_fetch',
+                'description' => 'Read one public web page',
+                'input_schema' => ['type' => 'object'],
+            ]],
+            'dispatch' => [
+                'web_fetch' => [
+                    'kind' => GatewayToolCatalog::KIND_NATIVE,
+                    'serverId' => 0,
+                    'tool' => 'web_fetch',
+                    'annotations' => ['readOnlyHint' => true],
+                ],
+            ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
+        ];
+    }
+
+    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2, ?WebFetchTool $webFetch = null): GatewayToolLoop
     {
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
@@ -1434,7 +1543,7 @@ final class GatewayToolLoopTest extends TestCase
 
         return new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $webFetch ?? $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),

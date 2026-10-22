@@ -192,6 +192,9 @@ so `/v1/chat/completions` would offer nothing if it reused those defaults.
 |------|----------------|-------------|
 | User MCP catalog (read-only) | `MCP_CLIENT_ENABLED` is on **and** the user has at least one connected MCP server | Synaplan (`McpClient`) |
 | `web_search` | A search provider is configured **and** `MESSAGES_GATEWAY.WEB_SEARCH_MODE` is not `off` | Synaplan (`WebSearchTool`) |
+| `web_fetch` | Not on this endpoint | — |
+
+`POST /v1/chat/completions` does not run `web_fetch`. Page reading for OpenAI-shaped and Gemini models lives on `POST /v1/messages` (see [Web fetch](./ANTHROPIC_COMPATIBLE_API.md#web-fetch)). Giving this chat-completions loop the same tool is a follow-up: it never sees Anthropic’s server-tool declaration, and its constructor cannot take another parameter.
 
 Injection happens **alongside** client tools. If the client already declared
 the same function name, Synaplan skips its own declaration (the client owns

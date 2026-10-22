@@ -48,6 +48,7 @@ const form = ref<GatewayForm>({
   web_search_mode: 'auto',
   web_search_max_rounds: 2,
   web_fetch_mode: 'auto',
+  web_fetch_max_per_turn: 3,
   vision_mode: 'auto',
   vision_image_detail: 'auto',
   vision_max_images: 0,
@@ -81,6 +82,7 @@ function syncFromStatus() {
       Boolean(status.web_search_available)
     ),
     web_fetch_mode: status.web_fetch_mode ?? 'auto',
+    web_fetch_max_per_turn: status.web_fetch_max_per_turn ?? 3,
     vision_mode: usableMode(status.vision_mode ?? 'auto', Boolean(status.vision_available)),
     vision_image_detail: status.vision_image_detail ?? 'auto',
     vision_max_images: status.vision_max_images ?? 0,

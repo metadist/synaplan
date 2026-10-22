@@ -64,7 +64,7 @@ final readonly class GatewayToolLoop
 
     public function __construct(
         private McpToolCatalogAdapter $catalogAdapter,
-        private WebSearchTool $webSearchTool,
+        private NativeToolRegistry $nativeTools,
         private AnalyzeImageTool $analyzeImageTool,
         private McpClient $mcpClient,
         private McpServerConfigRepository $servers,
@@ -265,12 +265,11 @@ final readonly class GatewayToolLoop
             }
 
             $partition = $this->partitionToolUses($content, $snapshot['dispatch']);
-            if ([] !== $partition['client']) {
-                // Mixed or client-owned — return verbatim; client owns the loop.
+            if ([] !== $partition['client'] && [] === $partition['ours']) {
                 return [
                     'status' => $lastStatus,
                     'headers' => $lastHeaders,
-                    'body' => $this->withUsage($lastBody, $totalUsage),
+                    'body' => $this->withUsage(ServerToolReplay::dropUnpairedServerUses($lastBody), $totalUsage),
                     'usage' => $totalUsage->withStopReason('tool_use'),
                     'iterations' => $iterations,
                 ];
@@ -282,7 +281,7 @@ final readonly class GatewayToolLoop
 
             $webSearchRounds += $this->countWebSearches($partition['ours']);
             $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
-            $body = $this->appendToolTurn($body, $content, $toolResults);
+            $body = $this->appendToolTurn($body, ServerToolReplay::withoutClientUses($content, $partition['client']), $toolResults);
             if ($webSearchRounds >= $this->config->webSearchMaxRounds($user->getId())) {
                 $body = $this->forceWrapUp($body);
             }
@@ -911,11 +910,11 @@ final readonly class GatewayToolLoop
      */
     private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, ?RuntimeProfile $assistant = null): array
     {
-        if (WebSearchTool::NAME === $tool) {
-            $result = $this->webSearchTool->execute($arguments);
-            $this->recordNativeUsage($user, 'WEB_SEARCH', $tool, $result['query'], $result['isError']);
+        $native = $this->nativeTools->tryExecute($tool, $arguments, $user);
+        if (null !== $native) {
+            $this->recordNativeUsage($user, $native['source'], $tool, $native['summary'], $native['isError']);
 
-            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
+            return $this->toolResultBlock($toolUseId, $this->clampToolText($native['text']), $native['isError']);
         }
 
         if (AnalyzeImageTool::NAME === $tool) {

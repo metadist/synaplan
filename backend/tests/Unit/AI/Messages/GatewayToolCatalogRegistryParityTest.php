@@ -7,6 +7,8 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\NativeToolRegistry;
+use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Service\Mcp\McpToolRegistry;
@@ -72,7 +74,7 @@ final class GatewayToolCatalogRegistryParityTest extends TestCase
 
         return new GatewayToolCatalog(
             new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $analyzeImage,
             $config,
             $this->createMock(CacheItemPoolInterface::class),

@@ -96,11 +96,12 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'web_search_max_rounds', type: 'integer', example: 2, minimum: MessagesGatewayConfig::MIN_WEB_SEARCH_MAX_ROUNDS, maximum: MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS, description: 'How many web searches one message may run before the assistant answers from what it found.'),
                 new OA\Property(
                     property: 'web_fetch_mode',
-                    description: 'How the gateway handles Anthropic web_fetch: auto/passthrough forward (and inject if missing) to api.anthropic.com; off drops the capability. Synaplan never fetches pages itself.',
+                    description: 'How the gateway handles web_fetch. auto: Anthropic reads the page on Anthropic routes, Synaplan reads it on every other route. passthrough: only Anthropic reads it. off: the tool is dropped.',
                     type: 'string',
                     enum: MessagesGatewayConfig::WEB_FETCH_MODES,
                     example: MessagesGatewayConfig::WEB_FETCH_AUTO,
                 ),
+                new OA\Property(property: 'web_fetch_max_per_turn', type: 'integer', example: 3, minimum: MessagesGatewayConfig::MIN_WEB_FETCH_MAX_PER_TURN, maximum: MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN, description: 'How many pages Synaplan may open in one message. Anthropic routes keep their own limit.'),
                 new OA\Property(
                     property: 'vision_mode',
                     description: 'How the gateway handles image turns: auto (Synaplan vision when the resolved model lacks vision, otherwise passthrough), synaplan, passthrough, or off.',
@@ -198,6 +199,7 @@ final class MessagesGatewayController extends AbstractController
             'web_search_available' => $this->webSearchTool->isAvailable(),
             'web_search_max_rounds' => $this->config->webSearchMaxRounds($userId),
             'web_fetch_mode' => $this->config->webFetchMode($userId),
+            'web_fetch_max_per_turn' => $this->config->webFetchMaxPerTurn($userId),
             'vision_mode' => $this->config->visionMode($userId),
             'vision_available' => $this->analyzeImageTool->isAvailable($userId),
             'vision_image_detail' => $this->config->visionImageDetail($userId),
@@ -539,6 +541,12 @@ final class MessagesGatewayController extends AbstractController
                     property: 'web_fetch_mode',
                     type: 'string',
                     enum: MessagesGatewayConfig::WEB_FETCH_MODES,
+                ),
+                new OA\Property(
+                    property: 'web_fetch_max_per_turn',
+                    type: 'integer',
+                    minimum: MessagesGatewayConfig::MIN_WEB_FETCH_MAX_PER_TURN,
+                    maximum: MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN,
                 ),
                 new OA\Property(
                     property: 'vision_mode',

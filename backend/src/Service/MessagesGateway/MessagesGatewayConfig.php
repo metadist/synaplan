@@ -28,6 +28,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_WEB_SEARCH_MODE = 'WEB_SEARCH_MODE';
     public const KEY_WEB_SEARCH_MAX_ROUNDS = 'WEB_SEARCH_MAX_ROUNDS';
     public const KEY_WEB_FETCH_MODE = 'WEB_FETCH_MODE';
+    public const KEY_WEB_FETCH_MAX_PER_TURN = 'WEB_FETCH_MAX_PER_TURN';
     public const KEY_VISION_MODE = 'VISION_MODE';
 
     public const KEY_VISION_IMAGE_DETAIL = 'VISION_IMAGE_DETAIL';
@@ -57,14 +58,17 @@ final readonly class MessagesGatewayConfig
     ];
 
     /**
-     * Offer Anthropic's `web_fetch_*` server tool on Anthropic routes (inject if
-     * the client omitted it). Synaplan never executes the fetch itself.
+     * Anthropic routes keep Anthropic's server tool. Every other route offers
+     * an executable `web_fetch` that Synaplan runs.
      */
     public const WEB_FETCH_AUTO = 'auto';
-    /** Same as {@see self::WEB_FETCH_AUTO} — explicit "leave it to Anthropic" label. */
+    /** Leave the page to Anthropic. Other routes drop the tool. */
     public const WEB_FETCH_PASSTHROUGH = 'passthrough';
     /** Drop `web_fetch_*` declarations; do not inject. */
     public const WEB_FETCH_OFF = 'off';
+    public const MIN_WEB_FETCH_MAX_PER_TURN = 0;
+    public const MAX_WEB_FETCH_MAX_PER_TURN = 10;
+    public const DEFAULT_WEB_FETCH_MAX_PER_TURN = 3;
 
     public const WEB_FETCH_MODES = [
         self::WEB_FETCH_AUTO,
@@ -208,10 +212,11 @@ final readonly class MessagesGatewayConfig
     /**
      * How the gateway handles Anthropic's `web_fetch_*` server tool.
      *
-     * Synaplan never fetches pages itself — `auto` / `passthrough` keep (or
-     * inject) the declaration so api.anthropic.com can honour it. `off` drops
-     * the capability. Unknown values fall back to the default so a typo cannot
-     * silently disable page reading.
+     * On Anthropic routes `auto` / `passthrough` keep (or inject) the server
+     * tool so api.anthropic.com can honour it. On every other route `auto`
+     * means Synaplan reads the page itself. `off` drops the capability.
+     * Unknown values fall back to the default so a typo cannot silently
+     * disable page reading.
      *
      * @return self::WEB_FETCH_AUTO|self::WEB_FETCH_PASSTHROUGH|self::WEB_FETCH_OFF
      */
@@ -220,6 +225,23 @@ final readonly class MessagesGatewayConfig
         $raw = $this->resolveToken(self::KEY_WEB_FETCH_MODE, $userId, self::DEFAULT_WEB_FETCH_MODE);
 
         return \in_array($raw, self::WEB_FETCH_MODES, true) ? $raw : self::DEFAULT_WEB_FETCH_MODE;
+    }
+
+    /**
+     * How many pages Synaplan may open in one message on a non-Anthropic route.
+     * Zero means none. A missing or unreadable value keeps the default.
+     */
+    public function webFetchMaxPerTurn(?int $userId): int
+    {
+        $raw = $this->resolveString(self::KEY_WEB_FETCH_MAX_PER_TURN, $userId, null);
+        if (null === $raw || '' === trim($raw) || !is_numeric(trim($raw))) {
+            return self::DEFAULT_WEB_FETCH_MAX_PER_TURN;
+        }
+
+        return max(
+            self::MIN_WEB_FETCH_MAX_PER_TURN,
+            min(self::MAX_WEB_FETCH_MAX_PER_TURN, (int) trim($raw)),
+        );
     }
 
     /**

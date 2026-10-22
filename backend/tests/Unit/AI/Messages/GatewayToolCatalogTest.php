@@ -7,6 +7,8 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\NativeToolRegistry;
+use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Service\Mcp\McpToolRegistry;
@@ -179,16 +181,99 @@ final class GatewayToolCatalogTest extends TestCase
         self::assertSame([AnalyzeImageTool::NAME], $catalog->nativeToolNames(5));
     }
 
+    public function testAutoOffersWebFetchOnARouteThatIsNotStillAnthropics(): void
+    {
+        $snapshot = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            webFetchMode: MessagesGatewayConfig::WEB_FETCH_AUTO,
+            webFetchMax: 3,
+        )->build($this->user(), 'session-1', []);
+
+        self::assertSame([WebFetchTool::NAME], array_column($snapshot['tools'], 'name'));
+        self::assertArrayHasKey(WebFetchTool::NAME, $snapshot['dispatch']);
+    }
+
+    public function testAutoStaysQuietWhenAnthropicStillOwnsTheServerTool(): void
+    {
+        $snapshot = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            webFetchMode: MessagesGatewayConfig::WEB_FETCH_AUTO,
+            webFetchMax: 3,
+        )->build($this->user(), 'session-1', [
+            'tools' => [['type' => 'web_fetch_20250910', 'name' => 'web_fetch', 'max_uses' => 5]],
+        ]);
+
+        self::assertSame([], $snapshot['tools']);
+    }
+
+    public function testAClientOwnedWebFetchIsLeftAlone(): void
+    {
+        $snapshot = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            webFetchMode: MessagesGatewayConfig::WEB_FETCH_AUTO,
+            webFetchMax: 3,
+        )->build($this->user(), 'session-1', [
+            'tools' => [['name' => 'web_fetch', 'input_schema' => ['type' => 'object']]],
+        ]);
+
+        self::assertSame([], $snapshot['tools']);
+    }
+
+    public function testPassthroughAndAZeroCapDoNotOfferWebFetch(): void
+    {
+        $passthrough = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            webFetchMode: MessagesGatewayConfig::WEB_FETCH_PASSTHROUGH,
+            webFetchMax: 3,
+        )->build($this->user(), 'session-1', []);
+        $zero = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            webFetchMode: MessagesGatewayConfig::WEB_FETCH_AUTO,
+            webFetchMax: 0,
+        )->build($this->user(), 'session-1', []);
+
+        self::assertSame([], $passthrough['tools']);
+        self::assertSame([], $zero['tools']);
+    }
+
+    public function testNativeToolNamesIncludeWebFetchWhenTheCapAllowsIt(): void
+    {
+        $catalog = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            webFetchMode: MessagesGatewayConfig::WEB_FETCH_AUTO,
+            webFetchMax: 3,
+        );
+
+        self::assertSame([WebFetchTool::NAME], $catalog->nativeToolNames(5));
+    }
+
     private function catalog(
         string $mode,
         bool $searchConfigured,
         string $visionMode = MessagesGatewayConfig::VISION_OFF,
         bool $visionConfigured = false,
+        string $webFetchMode = '',
+        int $webFetchMax = 0,
     ): GatewayToolCatalog {
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('isMcpToolsEnabled')->willReturn(false);
         $config->method('webSearchMode')->willReturn($mode);
         $config->method('visionMode')->willReturn($visionMode);
+        $config->method('webFetchMode')->willReturn($webFetchMode);
+        $config->method('webFetchMaxPerTurn')->willReturn($webFetchMax);
+
+        $webFetch = $this->createMock(WebFetchTool::class);
+        $webFetch->method('declaration')->willReturn([
+            'name' => WebFetchTool::NAME,
+            'description' => 'Read one public web page',
+            'input_schema' => ['type' => 'object', 'properties' => ['url' => ['type' => 'string']]],
+        ]);
 
         $webSearch = $this->createMock(WebSearchTool::class);
         $webSearch->method('isAvailable')->willReturn($searchConfigured);
@@ -208,7 +293,7 @@ final class GatewayToolCatalogTest extends TestCase
 
         return new GatewayToolCatalog(
             new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $webFetch),
             $analyzeImage,
             $config,
             $this->createMock(CacheItemPoolInterface::class),

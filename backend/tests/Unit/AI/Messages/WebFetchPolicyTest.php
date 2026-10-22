@@ -7,6 +7,7 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Messages\Tools\AnthropicServerTools;
 use App\AI\Messages\Tools\WebFetchPolicy;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class WebFetchPolicyTest extends TestCase
@@ -65,19 +66,57 @@ final class WebFetchPolicyTest extends TestCase
         self::assertSame(WebFetchPolicy::BETA_FEATURE, $result['anthropic_beta']);
     }
 
-    public function testOpenAiAliasStripsServerWebFetch(): void
+    #[DataProvider('nonAnthropicProviders')]
+    public function testNonAnthropicAutoReplacesTheServerToolWithSynaplan(string $provider): void
     {
         $result = $this->policy->apply(
             ['tools' => [WebFetchPolicy::DEFAULT_DECLARATION, ['name' => 'get_weather', 'input_schema' => ['type' => 'object']]]],
-            'openai',
+            $provider,
             MessagesGatewayConfig::WEB_FETCH_AUTO,
             null,
         );
 
-        self::assertSame(WebFetchPolicy::HANDLING_OFF, $result['handling']);
+        self::assertSame(WebFetchPolicy::HANDLING_SYNAPLAN, $result['handling']);
         self::assertTrue($result['mutated']);
         self::assertFalse($this->policy->hasServerWebFetch($result['body']));
         self::assertCount(1, $result['body']['tools']);
+        self::assertSame('get_weather', $result['body']['tools'][0]['name']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function nonAnthropicProviders(): iterable
+    {
+        yield 'openai' => ['openai'];
+        yield 'gemini' => ['gemini'];
+        yield 'groq' => ['groq'];
+    }
+
+    public function testNonAnthropicPassthroughStillDropsTheServerTool(): void
+    {
+        $result = $this->policy->apply(
+            ['tools' => [WebFetchPolicy::DEFAULT_DECLARATION]],
+            'openai',
+            MessagesGatewayConfig::WEB_FETCH_PASSTHROUGH,
+            null,
+        );
+
+        self::assertSame(WebFetchPolicy::HANDLING_OFF, $result['handling']);
+        self::assertFalse($this->policy->hasServerWebFetch($result['body']));
+    }
+
+    public function testNonAnthropicOffDropsTheServerTool(): void
+    {
+        $result = $this->policy->apply(
+            ['tools' => [WebFetchPolicy::DEFAULT_DECLARATION]],
+            'groq',
+            MessagesGatewayConfig::WEB_FETCH_OFF,
+            null,
+        );
+
+        self::assertSame(WebFetchPolicy::HANDLING_OFF, $result['handling']);
+        self::assertFalse($this->policy->hasServerWebFetch($result['body']));
     }
 
     public function testOffModeStripsEvenOnAnthropic(): void

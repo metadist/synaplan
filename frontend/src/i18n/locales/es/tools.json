@@ -424,10 +424,10 @@
     "webSearchHint": "El modo automático usa la búsqueda propia de Synaplan cuando hay un proveedor de búsqueda configurado y, si no, transfiere la petición al proveedor de IA.",
     "webSearchUnavailable": "En esta instancia no hay ningún proveedor de búsqueda configurado, así que las peticiones se transfieren al proveedor de IA. Solo Anthropic puede atenderlas.",
     "webFetchLabel": "Leer páginas web (web fetch)",
-    "webFetchModeAuto": "Automático — Anthropic obtiene la página (recomendado)",
-    "webFetchModePassthrough": "Pasar siempre web fetch a Anthropic",
+    "webFetchModeAuto": "Automático (recomendado)",
+    "webFetchModePassthrough": "Solo Anthropic lee la página",
     "webFetchModeOff": "Sin web fetch",
-    "webFetchHint": "Synaplan no descarga páginas. En modelos Anthropic el gateway mantiene o añade la herramienta web_fetch de Anthropic para que el modelo pueda abrir una URL. Otros proveedores de IA no pueden ejecutar esta herramienta.",
+    "webFetchHint": "Automático deja que Anthropic lea la página en los modelos Anthropic. En cualquier otro modelo, Synaplan abre la página, hasta el límite de abajo. Pasar la solicitud solo funciona con Anthropic.",
     "visionLabel": "Visión para los asistentes de IA conectados",
     "visionModeAuto": "Automático (recomendado)",
     "visionModeSynaplan": "Usar siempre el modelo de visión de Synaplan",
@@ -476,10 +476,11 @@
       "activeTools": {
         "title": "Ejecutándose en su nombre ahora mismo",
         "empty": "Synaplan no ejecuta ninguna herramienta propia. Los asistentes de IA conectados solo reciben las herramientas que aporta su propio programa.",
-        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide.",
+        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide. La lectura de páginas se detiene en el límite de páginas.",
         "mcpServers": "más las herramientas de 1 servidor de herramientas conectado | más las herramientas de {count} servidores de herramientas conectados",
         "tools": {
           "web_search": "Búsqueda web",
+          "web_fetch": "Leer una página web",
           "analyze_image": "Análisis de imágenes"
         }
       },
@@ -507,6 +508,10 @@
       "webSearchRounds": {
         "label": "Búsquedas web antes de responder",
         "description": "Tras este número de búsquedas en un mensaje, el asistente responde con lo que encontró y nombra cada fuente. 2 basta para una pregunta breve. Súbalo si los primeros resultados no alcanzan."
+      },
+      "webFetchPages": {
+        "label": "Páginas que abrir en un mensaje",
+        "description": "Tras este número de páginas en un mensaje, el asistente deja de abrir más y responde con lo que leyó. 3 basta para una pregunta normal. 0 significa que no abre páginas."
       },
       "imageDetail": {
         "label": "Calidad de imagen",

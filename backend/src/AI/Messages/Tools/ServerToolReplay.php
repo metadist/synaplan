@@ -33,13 +33,16 @@ final class ServerToolReplay
         }
         $name = (string) ($block['name'] ?? '');
         $id = (string) ($block['id'] ?? '');
-        // Synaplan's catalog `web_search` is a normal tool_use + tool_result.
-        // Anthropic page fetch, and any srvtoolu_* use, need *_tool_result.
-        if (AnthropicServerTools::WEB_FETCH_NAME === $name) {
-            return true;
+        // Synaplan's own `web_search` / `web_fetch` use a normal id and a
+        // normal tool_result. Only Anthropic's srvtoolu_* pair needs the
+        // server-tool result type; dropping those normal calls would hide
+        // the page Synaplan just read.
+        if (!str_starts_with($id, 'srvtoolu_')) {
+            return false;
         }
 
-        return AnthropicServerTools::WEB_SEARCH_NAME === $name && str_starts_with($id, 'srvtoolu_');
+        return AnthropicServerTools::WEB_FETCH_NAME === $name
+            || AnthropicServerTools::WEB_SEARCH_NAME === $name;
     }
 
     /**
@@ -250,5 +253,62 @@ final class ServerToolReplay
         }
 
         return $ids;
+    }
+
+    /**
+     * Drop an Anthropic server-tool use that has no matching result, so a
+     * client that also asked for `write_file` never sees an unpaired fetch.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, mixed>
+     */
+    public static function dropUnpairedServerUses(array $body): array
+    {
+        $content = $body['content'] ?? null;
+        if (!\is_array($content)) {
+            return $body;
+        }
+
+        $body['content'] = self::sanitizeAssistantContent($content);
+
+        return $body;
+    }
+
+    /**
+     * Keep Synaplan's tool uses in the history we send upstream, and leave
+     * the client's own uses (`write_file`) out until the client runs them.
+     *
+     * @param list<mixed>                $content
+     * @param list<array<string, mixed>> $clientUses
+     *
+     * @return list<mixed>
+     */
+    public static function withoutClientUses(array $content, array $clientUses): array
+    {
+        $drop = [];
+        foreach ($clientUses as $use) {
+            $id = (string) ($use['id'] ?? '');
+            if ('' !== $id) {
+                $drop[$id] = true;
+            }
+        }
+        if ([] === $drop) {
+            return $content;
+        }
+
+        $kept = [];
+        foreach ($content as $block) {
+            if (!\is_array($block)) {
+                $kept[] = $block;
+                continue;
+            }
+            if ('tool_use' === ($block['type'] ?? '') && isset($drop[(string) ($block['id'] ?? '')])) {
+                continue;
+            }
+            $kept[] = $block;
+        }
+
+        return $kept;
     }
 }

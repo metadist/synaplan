@@ -63,6 +63,21 @@ describe('MessagesGatewayAdminSettings', () => {
     mockSaveFlags.mockResolvedValue({ success: true, updated: {} })
   })
 
+  it('saves a new page limit on its own', async () => {
+    const wrapper = mountPanel(baseStatus({ web_fetch_max_per_turn: 3 }))
+    const input = wrapper.find('[data-testid="input-agents-web-fetch-pages"]')
+
+    expect((input.element as HTMLInputElement).value).toBe('3')
+    expect(input.attributes('min')).toBe('0')
+    expect(input.attributes('max')).toBe('10')
+
+    await input.setValue(4)
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(mockSaveFlags).toHaveBeenCalledWith({ web_fetch_max_per_turn: 4 })
+  })
+
   it('sends only the setting that changed', async () => {
     const wrapper = mountPanel()
 
