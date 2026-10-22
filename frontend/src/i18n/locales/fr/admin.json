@@ -1029,6 +1029,7 @@
         "MCP_MAX_ITERATIONS": "Tours d’outils",
         "WEB_SEARCH_MODE": "Recherche web",
         "WEB_FETCH_MODE": "Lecture web",
+        "KNOWLEDGE_TOOLS": "Recherche dans le dossier de connaissances",
         "VISION_MODE": "Compréhension des images",
         "VISION_IMAGE_DETAIL": "Détail de l’image",
         "VISION_MAX_IMAGES": "Images par demande",

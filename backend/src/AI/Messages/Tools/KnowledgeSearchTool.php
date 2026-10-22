@@ -11,6 +11,7 @@ use App\Security\ApiKeyScope;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RAG\KnowledgeSearchHelper;
 use App\Service\Runtime\RuntimeProfile;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
@@ -22,10 +23,12 @@ use Symfony\Component\HttpFoundation\RequestStack;
 final readonly class KnowledgeSearchTool
 {
     public const NAME = 'knowledge_search';
+    public const SEARCH_FAILED = 'The folder could not be searched right now. Answer from the passages you already have.';
 
     public function __construct(
         private KnowledgeSearchHelper $knowledge,
         private RequestStack $requests,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -54,19 +57,22 @@ final readonly class KnowledgeSearchTool
         ];
     }
 
-    public function isOffered(string $mode, ?RuntimeProfile $assistant): bool
+    /**
+     * Offered only for the key kind the mode allows, and only when this turn
+     * has a folder the caller can actually search.
+     */
+    public function isOffered(string $mode, ?RuntimeProfile $assistant, int $userId): bool
     {
-        if (MessagesGatewayConfig::KNOWLEDGE_OFF === $mode) {
-            return false;
-        }
-        if (MessagesGatewayConfig::KNOWLEDGE_DESKTOP === $mode && !$this->pairedDesktop()) {
-            return false;
-        }
-        if (MessagesGatewayConfig::KNOWLEDGE_ALL !== $mode && MessagesGatewayConfig::KNOWLEDGE_DESKTOP !== $mode) {
+        $allowed = match ($mode) {
+            MessagesGatewayConfig::KNOWLEDGE_ALL => true,
+            MessagesGatewayConfig::KNOWLEDGE_DESKTOP => $this->pairedDesktop(),
+            default => false,
+        };
+        if (!$allowed || !$this->folderPinned($assistant)) {
             return false;
         }
 
-        return $this->folderPinned($assistant);
+        return null === $this->knowledge->refusal($userId, $this->ragGroupKey(), $assistant);
     }
 
     /**
@@ -90,7 +96,12 @@ final readonly class KnowledgeSearchTool
                 $this->limit($input['limit'] ?? null),
             );
         } catch (\Throwable $e) {
-            return $this->error($query, 'The folder could not be searched: '.$e->getMessage());
+            $this->logger->warning('KnowledgeSearchTool: search failed', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($query, self::SEARCH_FAILED);
         }
 
         if (null !== $found['error']) {

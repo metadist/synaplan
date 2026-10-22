@@ -8,6 +8,7 @@ use App\AI\Messages\DesktopTurnOptions;
 use App\Entity\User;
 use App\Service\RAG\KnowledgeSearchHelper;
 use App\Service\Runtime\RuntimeProfile;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
@@ -19,10 +20,12 @@ use Symfony\Component\HttpFoundation\RequestStack;
 final readonly class ReadDocumentTool
 {
     public const NAME = 'read_document';
+    public const READ_FAILED = 'The file could not be read right now. Answer from the passages you already have.';
 
     public function __construct(
         private KnowledgeSearchHelper $knowledge,
         private RequestStack $requests,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -63,24 +66,25 @@ final readonly class ReadDocumentTool
             return $this->error('', 'read_document requires a file_id.');
         }
 
-        $around = \is_string($input['around'] ?? null) ? trim($input['around']) : null;
-        if (null !== $around && '' === $around) {
-            $around = null;
-        }
-        if (is_numeric($input['around'] ?? null)) {
-            $around = trim((string) $input['around']);
-        }
+        $rawAround = $input['around'] ?? null;
+        $around = \is_string($rawAround) || \is_int($rawAround) ? trim((string) $rawAround) : '';
 
         try {
             $read = $this->knowledge->readForTool(
                 (int) $user->getId(),
                 (int) $fileId,
-                $around,
+                '' !== $around ? $around : null,
                 $this->ragGroupKey(),
                 $assistant,
             );
         } catch (\Throwable $e) {
-            return $this->error((string) (int) $fileId, 'The file could not be read: '.$e->getMessage());
+            $this->logger->warning('ReadDocumentTool: read failed', [
+                'user_id' => $user->getId(),
+                'file_id' => (int) $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error((string) (int) $fileId, self::READ_FAILED);
         }
 
         return [

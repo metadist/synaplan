@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Messages;
 
 use App\AI\Messages\Tools\KnowledgeSearchTool;
+use App\AI\Messages\Tools\ReadDocumentTool;
 use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Security\ApiKeyScope;
@@ -12,6 +13,7 @@ use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RAG\KnowledgeSearchHelper;
 use App\Service\Runtime\RuntimeProfile;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -21,35 +23,35 @@ final class KnowledgeSearchToolTest extends TestCase
     {
         $tool = $this->tool($this->request(paired: true, folder: 'DESKTOP:personal'));
 
-        $this->assertTrue($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, null));
+        $this->assertTrue($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, null, 3));
     }
 
     public function testDesktopModeHidesTheToolFromOtherKeys(): void
     {
         $tool = $this->tool($this->request(paired: false, folder: 'DESKTOP:personal'));
 
-        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, null));
+        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, null, 3));
     }
 
     public function testAllModeOffersTheToolToOtherKeys(): void
     {
         $tool = $this->tool($this->request(paired: false, folder: 'DESKTOP:personal'));
 
-        $this->assertTrue($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_ALL, null));
+        $this->assertTrue($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_ALL, null, 3));
     }
 
     public function testOffHidesTheTool(): void
     {
         $tool = $this->tool($this->request(paired: true, folder: 'DESKTOP:personal'));
 
-        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_OFF, null));
+        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_OFF, null, 3));
     }
 
     public function testAPinnedFolderIsRequired(): void
     {
         $tool = $this->tool($this->request(paired: true, folder: null));
 
-        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_ALL, null));
+        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_ALL, null, 3));
     }
 
     public function testAssistantScopesCountAsAPinnedFolder(): void
@@ -59,7 +61,18 @@ final class KnowledgeSearchToolTest extends TestCase
             ['ownerId' => 3, 'groupKey' => 'DESKTOP:personal'],
         ], [], null, null, []);
 
-        $this->assertTrue($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, $profile));
+        $this->assertTrue($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, $profile, 3));
+    }
+
+    public function testAPinnedFolderTheCallerCannotUseIsNotOffered(): void
+    {
+        $knowledge = $this->createMock(KnowledgeSearchHelper::class);
+        $knowledge->expects($this->once())->method('refusal')
+            ->with(3, 'shared:9:contracts', null)
+            ->willReturn(KnowledgeSearchHelper::REFUSED);
+        $tool = $this->tool($this->request(paired: true, folder: 'shared:9:contracts'), $knowledge);
+
+        $this->assertFalse($tool->isOffered(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, null, 3));
     }
 
     public function testAHitKeepsTheFileAndChunkIds(): void
@@ -75,29 +88,67 @@ final class KnowledgeSearchToolTest extends TestCase
             ]],
             'error' => null,
         ]);
-        $user = $this->createStub(User::class);
-        $user->method('getId')->willReturn(3);
 
-        $result = (new KnowledgeSearchTool($knowledge, new RequestStack()))->execute(
-            ['query' => 'total', 'limit' => 50],
-            $user,
-            null,
-        );
+        $tool = new KnowledgeSearchTool($knowledge, new RequestStack(), new NullLogger());
+        $result = $tool->execute(['query' => 'total', 'limit' => 50], $this->user(), null);
 
         $this->assertFalse($result['isError']);
         $this->assertStringContainsString('file: invoice.pdf', $result['text']);
         $this->assertStringContainsString('file_id: 12', $result['text']);
         $this->assertStringContainsString('chunk_id: 34', $result['text']);
         $this->assertStringContainsString('Total 40', $result['text']);
-        $this->assertStringContainsString('when the passages above are not enough', (new KnowledgeSearchTool($knowledge, new RequestStack()))->declaration()['description']);
+        $this->assertStringContainsString('when the passages above are not enough', $tool->declaration()['description']);
     }
 
-    private function tool(Request $request): KnowledgeSearchTool
+    public function testASearchFailureDoesNotLeakTheInternalError(): void
+    {
+        $knowledge = $this->createMock(KnowledgeSearchHelper::class);
+        $knowledge->method('searchForTool')->willThrowException(new \RuntimeException('SQLSTATE[HY000] db-host-7 refused'));
+
+        $result = (new KnowledgeSearchTool($knowledge, new RequestStack(), new NullLogger()))
+            ->execute(['query' => 'total'], $this->user(), null);
+
+        $this->assertTrue($result['isError']);
+        $this->assertSame(KnowledgeSearchTool::SEARCH_FAILED, $result['text']);
+    }
+
+    public function testAReadFailureDoesNotLeakTheInternalError(): void
+    {
+        $knowledge = $this->createMock(KnowledgeSearchHelper::class);
+        $knowledge->method('readForTool')->willThrowException(new \RuntimeException('qdrant:6333 timed out'));
+
+        $result = (new ReadDocumentTool($knowledge, new RequestStack(), new NullLogger()))
+            ->execute(['file_id' => 12], $this->user(), null);
+
+        $this->assertTrue($result['isError']);
+        $this->assertSame(ReadDocumentTool::READ_FAILED, $result['text']);
+    }
+
+    public function testANumericChunkIdIsPassedOn(): void
+    {
+        $knowledge = $this->createMock(KnowledgeSearchHelper::class);
+        $knowledge->expects($this->once())->method('readForTool')
+            ->with(3, 12, '34', null, null)
+            ->willReturn(['text' => 'ok', 'isError' => false]);
+
+        (new ReadDocumentTool($knowledge, new RequestStack(), new NullLogger()))
+            ->execute(['file_id' => 12, 'around' => 34], $this->user(), null);
+    }
+
+    private function tool(Request $request, ?KnowledgeSearchHelper $knowledge = null): KnowledgeSearchTool
     {
         $stack = new RequestStack();
         $stack->push($request);
 
-        return new KnowledgeSearchTool($this->createStub(KnowledgeSearchHelper::class), $stack);
+        return new KnowledgeSearchTool($knowledge ?? $this->createStub(KnowledgeSearchHelper::class), $stack, new NullLogger());
+    }
+
+    private function user(): User
+    {
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(3);
+
+        return $user;
     }
 
     private function request(bool $paired, ?string $folder): Request

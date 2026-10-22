@@ -375,6 +375,50 @@ final class KnowledgeSearchHelperTest extends TestCase
         $this->assertStringNotContainsString('Not selected', $other['text']);
     }
 
+    public function testAFileFromASharedFolderTheSearchCoveredCanBeRead(): void
+    {
+        $scopes = $this->createMock(RagScopeResolver::class);
+        $scopes->method('resolve')->with(3, 'contracts')->willReturn([
+            new RagScope(3, 'contracts'),
+            new RagScope(9, 'contracts'),
+        ]);
+        $files = $this->createMock(FileRepository::class);
+        $files->method('find')->willReturn($this->file(9, 'contracts', 'renewal.pdf', 'Renews in May'));
+
+        $read = $this->helper($this->createStub(VectorSearchService::class), $scopes, files: $files)
+            ->readForTool(3, 20, null, 'contracts', null);
+
+        $this->assertFalse($read['isError']);
+        $this->assertStringContainsString('Renews in May', $read['text']);
+    }
+
+    public function testAnAssistantScopeWithoutAFolderCoversEveryFileOfThatOwner(): void
+    {
+        $files = $this->createMock(FileRepository::class);
+        $files->method('find')->willReturn($this->file(5, 'handbook', 'policy.md', 'Leave rules'));
+        $profile = new RuntimeProfile(null, '', null, [], [
+            ['ownerId' => 5, 'groupKey' => ''],
+        ], [], null, null, []);
+
+        $read = $this->helper($this->createStub(VectorSearchService::class), files: $files)
+            ->readForTool(3, 30, null, null, $profile);
+
+        $this->assertFalse($read['isError']);
+        $this->assertStringContainsString('Leave rules', $read['text']);
+    }
+
+    public function testAFileWithoutTextSaysSo(): void
+    {
+        $files = $this->createMock(FileRepository::class);
+        $files->method('find')->willReturn($this->file(3, 'DESKTOP:personal', 'scan.png', ''));
+
+        $read = $this->helper($this->createStub(VectorSearchService::class), files: $files)
+            ->readForTool(3, 12, null, 'DESKTOP:personal', null);
+
+        $this->assertTrue($read['isError']);
+        $this->assertSame(KnowledgeSearchHelper::NO_TEXT, $read['text']);
+    }
+
     private function helper(
         VectorSearchService $vector,
         ?RagScopeResolver $scopes = null,

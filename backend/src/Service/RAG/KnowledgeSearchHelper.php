@@ -31,6 +31,7 @@ final readonly class KnowledgeSearchHelper
     public const FILE_REFUSED = 'You cannot read this file.';
     public const PASSAGE_MISSING = 'That passage is not in this file.';
     public const NO_FOLDER = 'No knowledge folder is pinned for this message.';
+    public const NO_TEXT = 'This file has no readable text.';
 
     private const NEIGHBOUR_LINES = 40;
 
@@ -81,7 +82,7 @@ final readonly class KnowledgeSearchHelper
         ?RuntimeProfile $profile,
         int $limit,
     ): array {
-        $gate = $this->folderGate($userId, $ragGroupKey, $profile);
+        $gate = $this->refusal($userId, $ragGroupKey, $profile);
         if (null !== $gate) {
             return ['hits' => [], 'error' => $gate];
         }
@@ -110,7 +111,7 @@ final readonly class KnowledgeSearchHelper
         ?string $ragGroupKey,
         ?RuntimeProfile $profile,
     ): array {
-        $gate = $this->folderGate($userId, $ragGroupKey, $profile);
+        $gate = $this->refusal($userId, $ragGroupKey, $profile);
         if (null !== $gate) {
             return ['text' => $gate, 'isError' => true];
         }
@@ -130,6 +131,9 @@ final readonly class KnowledgeSearchHelper
 
         $name = '' !== trim($file->getFileName()) ? $file->getFileName() : 'file';
         $body = $this->window($file->getFileText(), $chunk);
+        if ('' === trim($body)) {
+            return ['text' => self::NO_TEXT, 'isError' => true];
+        }
 
         return [
             'text' => "File: {$name}\nfile_id: {$fileId}\n\n{$body}",
@@ -185,10 +189,12 @@ final readonly class KnowledgeSearchHelper
     }
 
     /**
+     * Why the folder tools cannot run on this turn, or null when they can.
+     *
      * A shared folder the caller cannot use is a refusal, with or without an
      * assistant. An assistant without that header keeps its own scopes.
      */
-    private function folderGate(int $userId, ?string $ragGroupKey, ?RuntimeProfile $profile): ?string
+    public function refusal(int $userId, ?string $ragGroupKey, ?RuntimeProfile $profile): ?string
     {
         $picker = RagScopeResolver::parseSharedPicker($ragGroupKey);
         if (null !== $picker && !$this->scopes->canUse($userId, $picker[0], $picker[1])) {
@@ -204,25 +210,37 @@ final readonly class KnowledgeSearchHelper
         return null;
     }
 
+    /**
+     * A file is readable when it lies in one of the scopes the search used,
+     * so every file_id `knowledge_search` returns can be opened.
+     */
     private function fileAllowed(File $file, int $userId, ?string $ragGroupKey, ?RuntimeProfile $profile): bool
+    {
+        foreach ($this->toolScopes($userId, $ragGroupKey, $profile) as $scope) {
+            if ($this->scopeAllowsFile($scope, $file)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<RagScope>
+     */
+    private function toolScopes(int $userId, ?string $ragGroupKey, ?RuntimeProfile $profile): array
     {
         $explicit = $this->injectionScopes($userId, $ragGroupKey, $profile);
         if (null !== $explicit) {
-            foreach ($explicit as $scope) {
-                if ($this->scopeAllowsFile($scope, $file)) {
-                    return true;
-                }
-            }
-
-            return false;
+            return $explicit;
         }
 
-        $picker = RagScopeResolver::parseSharedPicker($ragGroupKey);
-        if (null !== $picker) {
-            return $file->getUserId() === $picker[0] && $file->getGroupKey() === $picker[1];
-        }
+        $pinned = $this->pinnedScope($userId, $ragGroupKey);
 
-        return $file->getUserId() === $userId && $file->getGroupKey() === $ragGroupKey;
+        return [
+            ...(null !== $pinned ? [$pinned] : []),
+            ...$this->scopes->resolve($userId, $ragGroupKey),
+        ];
     }
 
     private function scopeAllowsFile(RagScope $scope, File $file): bool
@@ -230,16 +248,15 @@ final readonly class KnowledgeSearchHelper
         if ($scope->ownerId !== $file->getUserId()) {
             return false;
         }
-        if ([] !== $scope->fileIds) {
-            $id = $file->getId();
-            if (null === $id || !in_array($id, $scope->fileIds, true)) {
-                return false;
-            }
-
-            return null === $scope->groupKey || $scope->groupKey === $file->getGroupKey();
+        if (null !== $scope->groupKey && $scope->groupKey !== $file->getGroupKey()) {
+            return false;
         }
+        if ([] === $scope->fileIds) {
+            return true;
+        }
+        $id = $file->getId();
 
-        return $scope->groupKey === $file->getGroupKey();
+        return null !== $id && in_array($id, $scope->fileIds, true);
     }
 
     private function window(string $text, ?SearchResult $chunk): string

@@ -363,7 +363,7 @@ final readonly class GatewayToolCatalog
         }
         $search = $this->nativeTools->knowledgeSearch();
         $read = $this->nativeTools->readDocument();
-        if (null === $search || null === $read || !$search->isOffered($this->config->knowledgeTools($userId), $assistant)) {
+        if (null === $search || null === $read || !$search->isOffered($this->config->knowledgeTools($userId), $assistant, $userId)) {
             return;
         }
         if (!$this->hasClientToolNamed($requestBody, KnowledgeSearchTool::NAME)) {
