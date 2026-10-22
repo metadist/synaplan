@@ -24,6 +24,23 @@ types, red flags), [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md),
 | **Agent** | Reads the plan, writes the tests first, implements in small commits, runs every gate, writes the pull request, answers every review thread, keeps CI green, writes STATUS | Merges; uses `--admin`; pushes to `main`; re-records a snapshot without reading the diff; resolves a thread without an answer; adds AI attribution; switches a flag on in production |
 | **Copilot** | First review when a non-draft pull request opens; a re-review on request | — |
 | **Owner** | Ticks §0; answers stop-rule questions (§12); approves and merges in order; walks the journeys with the agent's walk record; flips production flags | — |
+
+**Autonomy (decided 2026-10-21): "merge-ready, then pause".** The agent
+runs one step uninterrupted — read, characterize, implement, gates, pull
+request, Copilot rounds, CI — until §11 is fully ticked, and then it
+*stops and reports*. Merging, the soak stages of §5 and production
+rollouts are planned pauses between sessions, never something a session
+waits on with the checkout occupied. A step that reaches a soak stage
+closes its STATUS entry with the soak's start date and the name of the
+signal that ends it (an event-ring summary, a capacity-page reading), so
+the next session resumes from STATUS alone.
+
+**Model routing (decided 2026-10-21).** One lead model executes every
+step of the track — style, names and context stay continuous; a second
+model may review read-only at the exits of S1, S4 and S5 and on a Copilot
+dispute (§9), but never writes to the checkout (§2, one session). A fast
+model may take AU1 and AU14, whose work is pinned by their harness and
+inventory tests. No step is executed by an auto-switching model setting.
 | **Ops** | Rolls out S0 and S5 one web node at a time in `synaplan-platform`; reads the capacity page before and after | Changes two nodes at once |
 
 ---
@@ -140,7 +157,27 @@ make -C frontend test-e2e-layout
 
 # Docker / compose / image steps (AU3, AU6, AU18, AU30, AU31) in addition
 make test-e2e-full                 # the production test image on :8001
+
+# Docs-only steps (AU0b, AU35, the `03` §1.7 / §2.3 / §7.1 hardening pull requests)
+make lint                          # the house lint (backend format, frontend lint/types)
+# plus: every relative link in each changed Markdown file resolves (the AU0 check)
+
+# Conditional E2E (AGENTS.md — the unfiltered @ci suite above is always the floor)
+(cd frontend && npm run test:e2e:firefox)      # when a @crossbrowser flow changed
+(cd frontend && npm run test:e2e:oidc -- --grep @oidc)   # when auth / OIDC changed (…:oidc-redirect likewise)
+# The OIDC script needs the `-- --grep @oidc`: CI appends the same filter
+# (grep_filter in ci.yml), and without it the run also picks up specs that
+# need an external installation (e.g. the castingdata plugin spec).
+(cd frontend && npm run test:e2e:ollama)       # when the chat-model / Ollama path changed
+# Each in a subshell, so several can run in sequence from the repository root.
+# A new file or path also updates .github/mobile-impact-policy.json and
+# tests/mobile-impact.test.mjs in the same pull request (AGENTS.md, mobile seam).
 ```
+
+For the watchdog (AU6 onward), `make -C sidecars/synaplan-watchdog test`
+includes `gofmt -l` over the sidecar (clean), `go vet` and
+`go test -race`; a formatting failure there is a gate failure like any
+other.
 
 - Snapshots are recorded only with their `UPDATE_*` variable, and the diff
   (`git diff backend/tests/Characterization/__snapshots__/`) is read line by
@@ -244,8 +281,11 @@ gh api "repos/metadist/synaplan/issues/<PR>/timeline?per_page=100" \
 | **Product question** | Ask the owner; the thread stays open until answered. |
 
 Copilot's overview is not a thread: copy its named risks into the review log
-and answer them in the description. **At most three rounds**; a fourth means
-the step is unclear and the owner decides.
+and answer them in the description. **At most three rounds** (confirmed by
+the owner 2026-10-21): within the cap the loop runs until no actionable
+finding remains; a fourth round is never requested by the agent — it means
+the step is unclear, the session pauses (§1), and the owner decides whether
+the step is re-briefed, split or re-planned.
 
 ---
 
@@ -267,6 +307,13 @@ python3 _devextras/e2e/playwright-trace-timeline.py <trace.zip>
 - **Never:** raise a timeout as a fix, add a retry loop, tag a test `@noci`,
   skip a test, merge with `--admin`.
 
+**Remote testing (decided 2026-10-21)** is three named things, in order:
+this CI on GitHub, the load cases on the `vultr-cluster` load-test
+namespace (AU8, AU34), and a read-only one-node production soak by ops
+(master plan §6). "Remote" without one of those names is not a test
+result; a session reports which of the three a step used, and load tests
+never run against production.
+
 ---
 
 ## 11. Merge-ready and hand-off
@@ -278,7 +325,11 @@ python3 _devextras/e2e/playwright-trace-timeline.py <trace.zip>
 - [ ] The description carries the final numbers, the class, the flag and,
       for egress, tools and runtime steps, the security impact.
 
-The owner merges with the title unchanged. A stacked child is moved onto the
+The agent's session ends here (§1: merge-ready, then pause): it reports
+the pull request, the sprint-test record and any soak that follows, and
+stops. The owner merges with the title unchanged; the next session — the
+owner's word, or a stacked child whose parent has merged — resumes from
+STATUS. A stacked child is moved onto the
 merge and pushed, which starts its CI:
 
 ```bash
