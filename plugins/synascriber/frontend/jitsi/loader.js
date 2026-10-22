@@ -7,8 +7,9 @@
  *     data-synaplan="https://<synaplan>" data-issuer="https://<keycloak>/realms/<realm>"
  *     data-client-id="synascriber"></script>
  *
- * Sign-in: Keycloak public client with PKCE; silent first (hidden iframe on
- * this origin's /static/synascriber-silent.html), a popup when that fails.
+ * Sign-in: Keycloak public client with PKCE; silent first (hidden iframe), a
+ * popup when that fails. Keycloak returns to the plugin's /jitsi/silent page
+ * on Synaplan, which hands the code back to this window.
  */
 (function () {
   'use strict'
@@ -23,12 +24,18 @@
     synaplan: (script.dataset.synaplan || '').replace(/\/$/, ''),
     issuer: (script.dataset.issuer || '').replace(/\/$/, ''),
     clientId: script.dataset.clientId || 'synascriber',
-    silentPath: script.dataset.silentPath || '/static/synascriber-silent.html',
   }
   if (!CONFIG.synaplan || !CONFIG.issuer) {
     return
   }
+  var SYNAPLAN_ORIGIN
+  try {
+    SYNAPLAN_ORIGIN = new URL(CONFIG.synaplan).origin
+  } catch (e) {
+    return
+  }
   var API = CONFIG.synaplan + '/api/v1/plugins/synascriber/jitsi'
+  var REDIRECT_URI = API + '/silent'
   var POLL_MS = 15000
   var SAVED_NOTICE_MS = 120000
 
@@ -187,7 +194,7 @@
   function authUrl(state, challenge, silent) {
     var params = new URLSearchParams({
       client_id: CONFIG.clientId,
-      redirect_uri: location.origin + CONFIG.silentPath,
+      redirect_uri: REDIRECT_URI,
       response_type: 'code',
       scope: 'openid',
       state: state,
@@ -207,7 +214,7 @@
         reject(new Error('timeout'))
       }, timeoutMs)
       function onMessage(event) {
-        if (event.origin !== location.origin || !event.data || event.data.type !== 'synascriber-auth') {
+        if (event.origin !== SYNAPLAN_ORIGIN || !event.data || event.data.type !== 'synascriber-auth') {
           return
         }
         var params = new URLSearchParams(event.data.search || '')
@@ -231,7 +238,7 @@
       grant_type: 'authorization_code',
       client_id: CONFIG.clientId,
       code: code,
-      redirect_uri: location.origin + CONFIG.silentPath,
+      redirect_uri: REDIRECT_URI,
       code_verifier: verifier,
     })
     return fetch(CONFIG.issuer + '/protocol/openid-connect/token', {

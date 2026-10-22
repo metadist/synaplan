@@ -11,6 +11,7 @@ Sources, Generated. Audio is never stored.
 |------|-------|---------|
 | `backend/` | this plugin | Synaplan: routes under `/api/v1/plugins/synascriber` (manifest) |
 | `frontend/jitsi/loader.js` | this plugin, served as a plugin asset | each participant's browser in Jitsi: button, dialog, captions |
+| `/api/v1/plugins/synascriber/jitsi/silent` | `backend/`, public | the page Keycloak returns to after the button's sign-in; it hands the code to the Jitsi window named in the `jitsi_url` setting, and only that window may embed it |
 | `frontend/index.js` | this plugin | Synaplan's plugin page |
 | `mod_synascriber.lua` | [sidecars/synaplan-transcriber/prosody](../../sidecars/synaplan-transcriber/prosody/) | Jitsi's Prosody: switches the bridge transcription per room |
 | transcriber | [sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/) | its own pod |

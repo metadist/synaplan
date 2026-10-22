@@ -12,11 +12,13 @@ use Plugin\SynaScriber\Service\Settings;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Called by the loader inside Jitsi, as the signed-in person (Keycloak bearer token).
+ * Called by the loader inside Jitsi, as the signed-in person (Keycloak bearer
+ * token); /silent is public, it is where Keycloak sends the browser back.
  */
 #[Route('/api/v1/plugins/synascriber/jitsi', name: 'api_plugin_synascriber_jitsi_')]
 #[OA\Tag(name: 'synaScriber Plugin')]
@@ -108,6 +110,48 @@ final class JitsiController extends AbstractController
         } catch (SessionException $e) {
             return $this->error($e);
         }
+    }
+
+    #[Route('/silent', name: 'silent', methods: ['GET'])]
+    #[OA\Get(summary: 'Where Keycloak returns after the Jitsi button\'s sign-in: hands the code to the Jitsi window and closes')]
+    #[OA\Response(response: 200, description: 'The page; only the configured Jitsi may embed it')]
+    #[OA\Response(response: 404, description: 'No Jitsi address is configured')]
+    public function silent(): Response
+    {
+        $origin = $this->settings->jitsiOrigin();
+        if ('' === $origin) {
+            throw $this->createNotFoundException('No Jitsi address is configured for meeting notes.');
+        }
+
+        $html = <<<'HTML'
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Meeting notes sign-in</title>
+              </head>
+              <body>
+                <script>
+                  (function () {
+                    var origin = %s
+                    var target = window.opener || (window.parent !== window ? window.parent : null)
+                    if (target) {
+                      target.postMessage({ type: 'synascriber-auth', search: window.location.search }, origin)
+                    }
+                    if (window.opener) {
+                      window.close()
+                    }
+                  })()
+                </script>
+              </body>
+            </html>
+            HTML;
+
+        return new Response(sprintf($html, json_encode($origin, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), 200, [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Content-Security-Policy' => 'frame-ancestors '.$origin,
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     private function error(SessionException $e, ?User $viewer = null): JsonResponse

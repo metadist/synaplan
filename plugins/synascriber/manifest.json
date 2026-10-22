@@ -11,6 +11,7 @@
   "minSynaplanVersion": "5.1.3",
   "capabilities": ["api", "frontend", "migrations"],
   "routes": [
+    {"path": "/api/v1/plugins/synascriber/jitsi/silent", "method": "GET", "description": "Public: where Keycloak returns after the Jitsi button's sign-in; hands the code to the Jitsi window named in jitsi_url"},
     {"path": "/api/v1/plugins/synascriber/jitsi/state", "method": "GET", "description": "Plugin on/off, languages, folder, and the room's active notes (Jitsi loader, Keycloak bearer)"},
     {"path": "/api/v1/plugins/synascriber/jitsi/sessions", "method": "POST", "description": "Start meeting notes in a room"},
     {"path": "/api/v1/plugins/synascriber/jitsi/sessions/{ref}/stop", "method": "POST", "description": "Stop meeting notes"},

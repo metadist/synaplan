@@ -24,6 +24,7 @@ final readonly class Settings
         'default_folder' => 'Meetings',
         'stt_url' => '',
         'prosody_url' => '',
+        'jitsi_url' => '',
         'prosody_secret' => '',
         'owner_user_id' => '0',
         'timezone' => 'Europe/Berlin',
@@ -124,6 +125,29 @@ final readonly class Settings
         return rtrim($this->get('prosody_url'), '/');
     }
 
+    public function jitsiUrl(): string
+    {
+        return $this->get('jitsi_url');
+    }
+
+    /**
+     * Scheme, host and port of Jitsi: the only window the sign-in page hands
+     * a code to, and the only one allowed to embed it. Empty when unset.
+     */
+    public function jitsiOrigin(): string
+    {
+        $url = $this->jitsiUrl();
+        if ('' === $url) {
+            return '';
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return '';
+        }
+
+        return $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
+    }
+
     public function prosodySecret(): string
     {
         return $this->get('prosody_secret');
@@ -172,7 +196,7 @@ final readonly class Settings
             'default_language' => $this->language((string) $value),
             'languages' => implode(',', array_map(fn ($l) => $this->language((string) $l), is_array($value) ? $value : explode(',', (string) $value))),
             'default_folder' => $this->sanitizeFolder((string) $value),
-            'stt_url', 'prosody_url' => $this->url((string) $value, $key),
+            'stt_url', 'prosody_url', 'jitsi_url' => $this->url((string) $value, $key),
             'prosody_secret' => (string) $value,
             'owner_user_id' => (string) max(0, (int) $value),
             'timezone' => $this->zone((string) $value),
