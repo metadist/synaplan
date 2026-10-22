@@ -33,7 +33,6 @@
         "src/Controller/FileController.php": 1887,
         "src/Controller/InboundEmailHandlerController.php": 824,
         "src/Controller/MessageController.php": 1131,
-        "src/Controller/MessagesGatewayController.php": 832,
         "src/Controller/OpenAICompatibleController.php": 862,
         "src/Controller/PromptController.php": 1869,
         "src/Controller/SubscriptionController.php": 1198,

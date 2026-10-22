@@ -501,6 +501,10 @@
         "label": "Maximale Werkzeugrunden pro Nachricht",
         "description": "Wie oft ein KI-Assistent ein Werkzeug nutzen und erneut nachdenken darf, bevor er antworten muss. Höhere Werte erlauben gründlicheres Arbeiten und kosten mehr."
       },
+      "webSearchRounds": {
+        "label": "Websuchen vor der Antwort",
+        "description": "Nach so vielen Suchen in einer Nachricht antwortet der Assistent aus dem, was er gefunden hat, und nennt jede Quelle. 2 reicht für eine kurze Frage. Erhöhen Sie den Wert, wenn die ersten Treffer nicht genügen."
+      },
       "imageDetail": {
         "label": "Bildqualität",
         "description": "Wie genau das KI-Modell ein Bild ansehen soll. Niedrige Qualität kostet deutlich weniger und reicht meist aus, um Text von einem Screenshot zu lesen. Anbieter ohne diese Wahlmöglichkeit ignorieren die Einstellung.",

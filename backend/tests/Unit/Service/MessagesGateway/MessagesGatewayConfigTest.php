@@ -37,6 +37,7 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertFalse($this->config->allowOperatorKey(1));
         $this->assertTrue($this->config->isBudgetNoticeEnabled(1));
         $this->assertSame(MessagesGatewayConfig::WEB_SEARCH_AUTO, $this->config->webSearchMode(1));
+        $this->assertSame(2, $this->config->webSearchMaxRounds(1));
         $this->assertSame(MessagesGatewayConfig::WEB_FETCH_AUTO, $this->config->webFetchMode(1));
         $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));
         $this->assertSame(MessagesGatewayConfig::DEFAULT_UPSTREAM_URL, $this->config->upstreamUrl());
@@ -162,10 +163,12 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->stubGlobalRows([
             'VISION_MAX_IMAGES' => '5000',
             'MCP_MAX_ITERATIONS' => '999',
+            'WEB_SEARCH_MAX_ROUNDS' => '99',
         ]);
 
         $this->assertSame(MessagesGatewayConfig::MAX_VISION_MAX_IMAGES, $this->config->visionMaxImages(1));
         $this->assertSame(MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS, $this->config->mcpMaxIterations(1));
+        $this->assertSame(MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS, $this->config->webSearchMaxRounds(1));
     }
 
     /**

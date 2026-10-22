@@ -800,6 +800,16 @@ per IP per hour. See [Linked platforms](ADMIN.md#linked-platforms).
 
 ---
 
+## Messages gateway (`MESSAGES_GATEWAY`)
+
+Coding-client settings. The full table and what each mode does is in
+[ANTHROPIC_COMPATIBLE_API.md](./ANTHROPIC_COMPATIBLE_API.md#feature-flags-bconfig-group-messages_gateway).
+Admins edit them under **Manage → Developer & devices → Coding clients**.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `WEB_SEARCH_MAX_ROUNDS` | `2` | Web searches in one message before the assistant must answer from the results and cite its sources. Range 1–6. A missing row uses the same default, so existing installs keep today's limit until an admin changes it. |
+
 ## AI plugs (`PLUGS`)
 
 Instance-wide extraction, web-search and rerank settings (`BCONFIG` group
