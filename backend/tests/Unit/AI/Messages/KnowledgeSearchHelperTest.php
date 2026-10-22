@@ -237,6 +237,144 @@ final class KnowledgeSearchHelperTest extends TestCase
         $this->assertNull($found['error']);
     }
 
+    public function testSharedFolderPinWithAssistantIsSearchedWhenTheCallerCanUseIt(): void
+    {
+        $scopes = $this->createMock(RagScopeResolver::class);
+        $scopes->expects($this->atLeastOnce())->method('canUse')->with(3, 9, 'contracts')->willReturn(true);
+        $vector = $this->createMock(VectorSearchService::class);
+        $vector->expects($this->once())->method('semanticSearch')->with(
+            'renewal',
+            3,
+            null,
+            5,
+            0.3,
+            $this->callback(static function (?array $explicit): bool {
+                $pinned = \is_array($explicit) ? ($explicit[1] ?? null) : null;
+
+                return \is_array($explicit)
+                    && 2 === \count($explicit)
+                    && $explicit[0] instanceof RagScope
+                    && 4 === $explicit[0]->ownerId
+                    && 'handbook' === $explicit[0]->groupKey
+                    && $pinned instanceof RagScope
+                    && 9 === $pinned->ownerId
+                    && 'contracts' === $pinned->groupKey
+                    && [] === $pinned->fileIds;
+            }),
+        )->willReturn([]);
+        $files = $this->createStub(FileRepository::class);
+        $files->method('find')->willReturn($this->file(9, 'contracts', 'renewal.pdf', 'Renews in May'));
+
+        $profile = new RuntimeProfile(null, '', null, [], [
+            ['ownerId' => 4, 'groupKey' => 'handbook'],
+        ], [], null, null, []);
+        $helper = $this->helper($vector, $scopes, files: $files);
+
+        $found = $helper->searchForTool(3, 'renewal', 'shared:9:contracts', $profile, 5);
+        $read = $helper->readForTool(3, 20, null, 'shared:9:contracts', $profile);
+
+        $this->assertNull($found['error']);
+        $this->assertFalse($read['isError']);
+        $this->assertStringContainsString('Renews in May', $read['text']);
+    }
+
+    public function testSharedFolderPinWithAssistantIsRefusedWhenTheCallerCannotUseIt(): void
+    {
+        $scopes = $this->createMock(RagScopeResolver::class);
+        $scopes->expects($this->exactly(2))->method('canUse')->with(3, 8, 'secret')->willReturn(false);
+        $vector = $this->createMock(VectorSearchService::class);
+        $vector->expects($this->never())->method('semanticSearch');
+        $files = $this->createMock(FileRepository::class);
+        $files->expects($this->never())->method('find');
+
+        $profile = new RuntimeProfile(null, '', null, [], [
+            ['ownerId' => 4, 'groupKey' => 'handbook'],
+        ], [], null, null, []);
+        $helper = $this->helper($vector, $scopes, files: $files);
+
+        $found = $helper->searchForTool(3, 'salary', 'shared:8:secret', $profile, 5);
+        $read = $helper->readForTool(3, 99, null, 'shared:8:secret', $profile);
+
+        $this->assertSame(KnowledgeSearchHelper::REFUSED, $found['error']);
+        $this->assertSame([], $found['hits']);
+        $this->assertTrue($read['isError']);
+        $this->assertSame(KnowledgeSearchHelper::REFUSED, $read['text']);
+    }
+
+    public function testOwnFolderPinWithAssistantStaysTheCallersFolder(): void
+    {
+        $scopes = $this->createMock(RagScopeResolver::class);
+        $scopes->expects($this->never())->method('canUse');
+        $vector = $this->createMock(VectorSearchService::class);
+        $vector->expects($this->once())->method('semanticSearch')->with(
+            'notes',
+            3,
+            null,
+            5,
+            0.3,
+            $this->callback(static function (?array $explicit): bool {
+                $pinned = \is_array($explicit) ? ($explicit[1] ?? null) : null;
+
+                return $pinned instanceof RagScope
+                    && 3 === $pinned->ownerId
+                    && 'DESKTOP:personal' === $pinned->groupKey;
+            }),
+        )->willReturn([]);
+
+        $profile = new RuntimeProfile(null, '', null, [], [
+            ['ownerId' => 4, 'groupKey' => 'handbook'],
+        ], [], null, null, []);
+
+        $found = $this->helper($vector, $scopes)->searchForTool(3, 'notes', 'DESKTOP:personal', $profile, 5);
+
+        $this->assertNull($found['error']);
+    }
+
+    public function testAssistantFileIdsStayOnTheSearchAndCanBeRead(): void
+    {
+        $vector = $this->createMock(VectorSearchService::class);
+        $vector->expects($this->once())->method('semanticSearch')->with(
+            'clause',
+            3,
+            null,
+            5,
+            0.3,
+            $this->callback(static function (?array $explicit): bool {
+                $scope = \is_array($explicit) ? ($explicit[0] ?? null) : null;
+
+                return $scope instanceof RagScope
+                    && 1 === \count($explicit)
+                    && 9 === $scope->ownerId
+                    && null === $scope->groupKey
+                    && [42, 43] === $scope->fileIds;
+            }),
+        )->willReturn([]);
+        $files = $this->createStub(FileRepository::class);
+        $files->method('find')->willReturnCallback(function (int $id): File {
+            if (42 === $id) {
+                return $this->file(9, 'library', 'clause.pdf', 'Clause 4', 42);
+            }
+
+            return $this->file(9, 'library', 'other.pdf', 'Not selected', 99);
+        });
+
+        $profile = new RuntimeProfile(null, '', null, [], [
+            ['ownerId' => 9, 'groupKey' => '', 'fileIds' => [42, 43]],
+        ], [], null, null, []);
+        $helper = $this->helper($vector, files: $files);
+
+        $found = $helper->searchForTool(3, 'clause', null, $profile, 5);
+        $read = $helper->readForTool(3, 42, null, null, $profile);
+        $other = $helper->readForTool(3, 99, null, null, $profile);
+
+        $this->assertNull($found['error']);
+        $this->assertFalse($read['isError']);
+        $this->assertStringContainsString('Clause 4', $read['text']);
+        $this->assertTrue($other['isError']);
+        $this->assertSame(KnowledgeSearchHelper::FILE_REFUSED, $other['text']);
+        $this->assertStringNotContainsString('Not selected', $other['text']);
+    }
+
     private function helper(
         VectorSearchService $vector,
         ?RagScopeResolver $scopes = null,
@@ -251,12 +389,17 @@ final class KnowledgeSearchHelperTest extends TestCase
         );
     }
 
-    private function file(int $ownerId, string $groupKey, string $name, string $text): File
+    private function file(int $ownerId, string $groupKey, string $name, string $text, ?int $id = null): File
     {
-        return (new File())
+        $file = (new File())
             ->setUserId($ownerId)
             ->setGroupKey($groupKey)
             ->setFileName($name)
             ->setFileText($text);
+        if (null !== $id) {
+            (new \ReflectionProperty(File::class, 'id'))->setValue($file, $id);
+        }
+
+        return $file;
     }
 }

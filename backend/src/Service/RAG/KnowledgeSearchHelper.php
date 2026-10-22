@@ -148,34 +148,57 @@ final readonly class KnowledgeSearchHelper
 
         $scopes = [];
         foreach ($profile->ragScopes as $scope) {
-            $scopes[] = new RagScope((int) $scope['ownerId'], $scope['groupKey']);
+            $groupKey = $scope['groupKey'];
+            $scopes[] = new RagScope(
+                (int) $scope['ownerId'],
+                '' === $groupKey ? null : $groupKey,
+                $scope['fileIds'] ?? [],
+            );
         }
-        if (null !== $ragGroupKey && '' !== $ragGroupKey) {
-            $scopes[] = new RagScope($userId, $ragGroupKey);
+        $pinned = $this->pinnedScope($userId, $ragGroupKey);
+        if (null !== $pinned) {
+            $scopes[] = $pinned;
         }
 
         return $scopes;
     }
 
     /**
-     * A shared folder the caller cannot use is a refusal. An assistant profile
-     * keeps the injection's scopes instead, which never open that folder.
+     * A header pin. `shared:{owner}:{folder}` is the owner's folder, and only
+     * when the caller can use it. Any other key stays the caller's own folder.
+     */
+    private function pinnedScope(int $userId, ?string $ragGroupKey): ?RagScope
+    {
+        if (null === $ragGroupKey || '' === $ragGroupKey) {
+            return null;
+        }
+
+        $picker = RagScopeResolver::parseSharedPicker($ragGroupKey);
+        if (null === $picker) {
+            return new RagScope($userId, $ragGroupKey);
+        }
+        if (!$this->scopes->canUse($userId, $picker[0], $picker[1])) {
+            return null;
+        }
+
+        return new RagScope($picker[0], $picker[1]);
+    }
+
+    /**
+     * A shared folder the caller cannot use is a refusal, with or without an
+     * assistant. An assistant without that header keeps its own scopes.
      */
     private function folderGate(int $userId, ?string $ragGroupKey, ?RuntimeProfile $profile): ?string
     {
+        $picker = RagScopeResolver::parseSharedPicker($ragGroupKey);
+        if (null !== $picker && !$this->scopes->canUse($userId, $picker[0], $picker[1])) {
+            return self::REFUSED;
+        }
         if (null !== $profile) {
             return null;
         }
         if (null === $ragGroupKey || '' === $ragGroupKey) {
             return self::NO_FOLDER;
-        }
-
-        $picker = RagScopeResolver::parseSharedPicker($ragGroupKey);
-        if (null === $picker) {
-            return null;
-        }
-        if (!$this->scopes->canUse($userId, $picker[0], $picker[1])) {
-            return self::REFUSED;
         }
 
         return null;
@@ -186,7 +209,7 @@ final readonly class KnowledgeSearchHelper
         $explicit = $this->injectionScopes($userId, $ragGroupKey, $profile);
         if (null !== $explicit) {
             foreach ($explicit as $scope) {
-                if ($scope->ownerId === $file->getUserId() && $scope->groupKey === $file->getGroupKey()) {
+                if ($this->scopeAllowsFile($scope, $file)) {
                     return true;
                 }
             }
@@ -200,6 +223,23 @@ final readonly class KnowledgeSearchHelper
         }
 
         return $file->getUserId() === $userId && $file->getGroupKey() === $ragGroupKey;
+    }
+
+    private function scopeAllowsFile(RagScope $scope, File $file): bool
+    {
+        if ($scope->ownerId !== $file->getUserId()) {
+            return false;
+        }
+        if ([] !== $scope->fileIds) {
+            $id = $file->getId();
+            if (null === $id || !in_array($id, $scope->fileIds, true)) {
+                return false;
+            }
+
+            return null === $scope->groupKey || $scope->groupKey === $file->getGroupKey();
+        }
+
+        return $scope->groupKey === $file->getGroupKey();
     }
 
     private function window(string $text, ?SearchResult $chunk): string
