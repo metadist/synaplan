@@ -1029,6 +1029,7 @@
         "MCP_MAX_ITERATIONS": "Tool rounds",
         "WEB_SEARCH_MODE": "Web search",
         "WEB_FETCH_MODE": "Web fetch",
+        "KNOWLEDGE_TOOLS": "Knowledge folder search",
         "VISION_MODE": "Image understanding",
         "VISION_IMAGE_DETAIL": "Image detail",
         "VISION_MAX_IMAGES": "Images per request",

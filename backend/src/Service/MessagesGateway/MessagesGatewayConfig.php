@@ -29,6 +29,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_WEB_SEARCH_MAX_ROUNDS = 'WEB_SEARCH_MAX_ROUNDS';
     public const KEY_WEB_FETCH_MODE = 'WEB_FETCH_MODE';
     public const KEY_WEB_FETCH_MAX_PER_TURN = 'WEB_FETCH_MAX_PER_TURN';
+    public const KEY_KNOWLEDGE_TOOLS = 'KNOWLEDGE_TOOLS';
     public const KEY_VISION_MODE = 'VISION_MODE';
 
     public const KEY_VISION_IMAGE_DETAIL = 'VISION_IMAGE_DETAIL';
@@ -74,6 +75,20 @@ final readonly class MessagesGatewayConfig
         self::WEB_FETCH_AUTO,
         self::WEB_FETCH_PASSTHROUGH,
         self::WEB_FETCH_OFF,
+    ];
+
+    /** Paired desktop keys can search a pinned folder. Other keys cannot. */
+    public const KNOWLEDGE_DESKTOP = 'desktop';
+    /** Every coding-client key can search a pinned folder. */
+    public const KNOWLEDGE_ALL = 'all';
+    /** Do not offer knowledge_search or read_document. */
+    public const KNOWLEDGE_OFF = 'off';
+    public const DEFAULT_KNOWLEDGE_TOOLS = self::KNOWLEDGE_DESKTOP;
+
+    public const KNOWLEDGE_TOOLS_MODES = [
+        self::KNOWLEDGE_OFF,
+        self::KNOWLEDGE_DESKTOP,
+        self::KNOWLEDGE_ALL,
     ];
 
     /** Synaplan vision when the resolved model cannot see images (or always, in synaplan mode); else funnel. */
@@ -242,6 +257,21 @@ final readonly class MessagesGatewayConfig
             self::MIN_WEB_FETCH_MAX_PER_TURN,
             min(self::MAX_WEB_FETCH_MAX_PER_TURN, (int) trim($raw)),
         );
+    }
+
+    /**
+     * Who may search a pinned knowledge folder from a coding client.
+     *
+     * `desktop` (default) is paired desktop keys only. `all` includes every
+     * other key. `off` offers neither tool. Unknown values keep the default.
+     *
+     * @return self::KNOWLEDGE_OFF|self::KNOWLEDGE_DESKTOP|self::KNOWLEDGE_ALL
+     */
+    public function knowledgeTools(?int $userId): string
+    {
+        $raw = $this->resolveToken(self::KEY_KNOWLEDGE_TOOLS, $userId, self::DEFAULT_KNOWLEDGE_TOOLS);
+
+        return \in_array($raw, self::KNOWLEDGE_TOOLS_MODES, true) ? $raw : self::DEFAULT_KNOWLEDGE_TOOLS;
     }
 
     /**

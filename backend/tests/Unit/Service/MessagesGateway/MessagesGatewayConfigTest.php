@@ -174,6 +174,20 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertSame(MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN, $this->config->webFetchMaxPerTurn(1));
     }
 
+    public function testKnowledgeToolsDefaultToDesktop(): void
+    {
+        $this->stubGlobalRows([]);
+
+        $this->assertSame(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, $this->config->knowledgeTools(1));
+    }
+
+    public function testUnknownKnowledgeToolsValueFallsBackToDesktop(): void
+    {
+        $this->stubGlobalRows(['KNOWLEDGE_TOOLS' => 'everyone']);
+
+        $this->assertSame(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, $this->config->knowledgeTools(1));
+    }
+
     public function testWebFetchCapOfZeroStaysZero(): void
     {
         $this->stubGlobalRows(['WEB_FETCH_MAX_PER_TURN' => '0']);

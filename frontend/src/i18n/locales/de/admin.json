@@ -1029,6 +1029,7 @@
         "MCP_MAX_ITERATIONS": "Tool-Runden",
         "WEB_SEARCH_MODE": "Websuche",
         "WEB_FETCH_MODE": "Webabruf",
+        "KNOWLEDGE_TOOLS": "Suche im Wissensordner",
         "VISION_MODE": "Bildverständnis",
         "VISION_IMAGE_DETAIL": "Bilddetail",
         "VISION_MAX_IMAGES": "Bilder pro Anfrage",

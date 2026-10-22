@@ -1025,6 +1025,7 @@
         "MCP_MAX_ITERATIONS": "Araç turları",
         "WEB_SEARCH_MODE": "Web araması",
         "WEB_FETCH_MODE": "Web okuma",
+        "KNOWLEDGE_TOOLS": "Bilgi klasöründe arama",
         "VISION_MODE": "Görüntü anlama",
         "VISION_IMAGE_DETAIL": "Görüntü ayrıntısı",
         "VISION_MAX_IMAGES": "İstek başına görüntü",

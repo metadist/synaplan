@@ -63,6 +63,19 @@ describe('MessagesGatewayAdminSettings', () => {
     mockSaveFlags.mockResolvedValue({ success: true, updated: {} })
   })
 
+  it('saves a new folder-search setting on its own', async () => {
+    const wrapper = mountPanel(baseStatus({ knowledge_tools: 'desktop' }))
+    const select = wrapper.find('[data-testid="select-agents-knowledge-tools"]')
+
+    expect((select.element as HTMLSelectElement).value).toBe('desktop')
+
+    await select.setValue('all')
+    await select.trigger('change')
+    await flushPromises()
+
+    expect(mockSaveFlags).toHaveBeenCalledWith({ knowledge_tools: 'all' })
+  })
+
   it('saves a new page limit on its own', async () => {
     const wrapper = mountPanel(baseStatus({ web_fetch_max_per_turn: 3 }))
     const input = wrapper.find('[data-testid="input-agents-web-fetch-pages"]')

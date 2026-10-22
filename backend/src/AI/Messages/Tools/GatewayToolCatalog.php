@@ -113,6 +113,11 @@ final readonly class GatewayToolCatalog
             $names[] = WebFetchTool::NAME;
         }
 
+        if ($this->offersKnowledge($userId)) {
+            $names[] = KnowledgeSearchTool::NAME;
+            $names[] = ReadDocumentTool::NAME;
+        }
+
         if ($this->offersAnalyzeImage($userId)) {
             $names[] = AnalyzeImageTool::NAME;
         }
@@ -217,6 +222,7 @@ final readonly class GatewayToolCatalog
 
         $this->appendWebSearch($snapshot, $userId, $requestBody);
         $this->appendWebFetch($snapshot, $userId, $requestBody);
+        $this->appendKnowledge($snapshot, $userId, $requestBody, $assistant);
         $this->appendAnalyzeImage($snapshot, $userId, $requestBody);
         $this->appendCodeExecution($snapshot, $user, $requestBody, $assistant);
 
@@ -343,6 +349,32 @@ final readonly class GatewayToolCatalog
     }
 
     /**
+     * Offer the folder tools only on a turn that already has a pinned folder
+     * or an assistant with knowledge scopes, and only for the key kind the
+     * setting allows. The first-turn injection stays; these are the next look.
+     *
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendKnowledge(array &$snapshot, int $userId, array $requestBody, ?RuntimeProfile $assistant): void
+    {
+        if (!$this->offersKnowledge($userId)) {
+            return;
+        }
+        $search = $this->nativeTools->knowledgeSearch();
+        $read = $this->nativeTools->readDocument();
+        if (null === $search || null === $read || !$search->isOffered($this->config->knowledgeTools($userId), $assistant, $userId)) {
+            return;
+        }
+        if (!$this->hasClientToolNamed($requestBody, KnowledgeSearchTool::NAME)) {
+            $this->addNativeTool($snapshot, $search->declaration(), KnowledgeSearchTool::NAME);
+        }
+        if (!$this->hasClientToolNamed($requestBody, ReadDocumentTool::NAME)) {
+            $this->addNativeTool($snapshot, $read->declaration(), ReadDocumentTool::NAME);
+        }
+    }
+
+    /**
      * Offer Synaplan OCR/describe whenever vision is available and the mode is
      * not `off`. Passthrough still offers the tool — it only refuses model rewrite.
      *
@@ -405,6 +437,14 @@ final readonly class GatewayToolCatalog
     {
         return MessagesGatewayConfig::WEB_FETCH_AUTO === $this->config->webFetchMode($userId)
             && $this->config->webFetchMaxPerTurn($userId) > 0;
+    }
+
+    private function offersKnowledge(int $userId): bool
+    {
+        return \in_array($this->config->knowledgeTools($userId), [
+            MessagesGatewayConfig::KNOWLEDGE_DESKTOP,
+            MessagesGatewayConfig::KNOWLEDGE_ALL,
+        ], true);
     }
 
     private function offersAnalyzeImage(int $userId): bool

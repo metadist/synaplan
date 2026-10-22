@@ -8,10 +8,14 @@ use App\AI\Messages\DesktopTurnOptions;
 use App\AI\Messages\MessagesContextInjector;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\FileRepository;
 use App\Service\Feedback\FeedbackConfigService;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\Memory\UserMemoryService;
+use App\Service\RAG\KnowledgeSearchHelper;
+use App\Service\RAG\RagScopeResolver;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -68,7 +72,7 @@ final class MessagesContextInjectorTest extends TestCase
 
         $injector = new MessagesContextInjector(
             $memory,
-            $vector,
+            $this->knowledge($vector),
             new KnowledgeContextFormatter(),
             $cache,
             new NullLogger(),
@@ -87,7 +91,23 @@ final class MessagesContextInjectorTest extends TestCase
         $this->assertIsString($first['hash']);
         $this->assertIsArray($first['body']['system']);
         $this->assertSame('You are helpful.', $first['body']['system'][0]['text']);
-        $this->assertStringContainsString('Knowledge Base Context', $first['body']['system'][1]['text']);
+        $this->assertSame(<<<'TXT'
+## Knowledge Base Context (relevant to your task):
+[Source 1] kb hit
+
+Use this context to provide accurate and specific answers.
+Cite a source as [1], [2], matching the Source numbers above. Only cite numbers from this list.
+
+
+## User Memories (relevant to this conversation):
+[ID: 1] pref: dark
+
+Only use memories that are directly relevant to the user's current question. Ignore memories that are not clearly related.
+REFERENCES: Use [Memory:ID] (clickable). Rules:
+- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].
+- Only use IDs from the list above. Never invent IDs.
+
+TXT, $first['body']['system'][1]['text']);
         $this->assertStringContainsString('User Memories', $first['body']['system'][1]['text']);
 
         $second = $injector->inject($body, $user, 'sess-1');
@@ -136,7 +156,7 @@ final class MessagesContextInjectorTest extends TestCase
 
         $injector = new MessagesContextInjector(
             $memory,
-            $vector,
+            $this->knowledge($vector),
             new KnowledgeContextFormatter(),
             $cache,
             new NullLogger(),
@@ -193,7 +213,7 @@ final class MessagesContextInjectorTest extends TestCase
 
         $injector = new MessagesContextInjector(
             $memory,
-            $vector,
+            $this->knowledge($vector),
             new KnowledgeContextFormatter(),
             $cache,
             new NullLogger(),
@@ -257,7 +277,7 @@ final class MessagesContextInjectorTest extends TestCase
 
         $injector = new MessagesContextInjector(
             $memory,
-            $vector,
+            $this->knowledge($vector),
             new KnowledgeContextFormatter(),
             $cache,
             new NullLogger(),
@@ -282,7 +302,7 @@ final class MessagesContextInjectorTest extends TestCase
 
         $injector = new MessagesContextInjector(
             $this->createMock(UserMemoryService::class),
-            $this->createMock(VectorSearchService::class),
+            $this->knowledge($this->createMock(VectorSearchService::class)),
             new KnowledgeContextFormatter(),
             $this->createMock(CacheItemPoolInterface::class),
             new NullLogger(),
@@ -295,6 +315,16 @@ final class MessagesContextInjectorTest extends TestCase
         $result = $injector->inject($body, $user, 's', 'off');
         $this->assertFalse($result['injected']);
         $this->assertSame($body, $result['body']);
+    }
+
+    private function knowledge(VectorSearchService $vector): KnowledgeSearchHelper
+    {
+        return new KnowledgeSearchHelper(
+            $vector,
+            $this->createStub(RagScopeResolver::class),
+            $this->createStub(VectorStorageFacade::class),
+            $this->createStub(FileRepository::class),
+        );
     }
 
     private function createFeedbackConfig(): FeedbackConfigService

@@ -502,6 +502,11 @@
     "webFetchModePassthrough": "Only Anthropic reads the page",
     "webFetchModeOff": "No web fetch",
     "webFetchHint": "Automatic lets Anthropic read the page on Anthropic models. On every other model, Synaplan opens the page itself, up to the limit below. Passing the request on only works for Anthropic.",
+    "knowledgeToolsLabel": "Search the pinned knowledge folder",
+    "knowledgeToolsDesktop": "Desktop only (recommended)",
+    "knowledgeToolsAll": "Every key on the coding gateway",
+    "knowledgeToolsOff": "No folder search",
+    "knowledgeToolsHint": "When a knowledge folder is pinned, the model can search it again and open a file if the first passages are not enough. Desktop only is the recommended setting.",
     "visionLabel": "Vision for connected AI assistants",
     "visionModeAuto": "Automatic (recommended)",
     "visionModeSynaplan": "Always use Synaplan's vision model",
@@ -550,11 +555,13 @@
       "activeTools": {
         "title": "Running on your behalf right now",
         "empty": "Synaplan runs no tools of its own. Connected AI assistants only get the tools their own program brings along.",
-        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it. Page reading stops at the page limit.",
+        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it. Page reading stops at the page limit. Folder search runs only while a knowledge folder is pinned.",
         "mcpServers": "plus the tools of 1 connected tool server | plus the tools of {count} connected tool servers",
         "tools": {
           "web_search": "Web search",
           "web_fetch": "Read a web page",
+          "knowledge_search": "Search the knowledge folder",
+          "read_document": "Read a file in the folder",
           "analyze_image": "Image analysis"
         }
       },

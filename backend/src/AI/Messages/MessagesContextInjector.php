@@ -8,8 +8,7 @@ use App\Entity\User;
 use App\Service\Feedback\FeedbackConfigService;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\Memory\UserMemoryService;
-use App\Service\RAG\VectorSearchService;
-use App\Service\RAG\VectorStorage\DTO\RagScope;
+use App\Service\RAG\KnowledgeSearchHelper;
 use App\Service\Runtime\RuntimeProfile;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -27,12 +26,11 @@ final readonly class MessagesContextInjector
     private const CACHE_PREFIX = 'messages_gateway_context_';
     private const CACHE_TTL = 7200;
     private const MAX_CHARS = 8000;
-    private const RAG_LIMIT = 5;
     private const MEMORY_LIMIT = 5;
 
     public function __construct(
         private UserMemoryService $userMemoryService,
-        private VectorSearchService $vectorSearchService,
+        private KnowledgeSearchHelper $knowledge,
         private KnowledgeContextFormatter $formatter,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
@@ -150,16 +148,7 @@ final readonly class MessagesContextInjector
         $vector = null !== $embedded ? $embedded['embedding'] : [];
         if ([] !== $vector) {
             try {
-                $explicit = $this->explicitScopes($userId, $desktop, $profile);
-                $ragHits = $this->vectorSearchService->semanticSearchByVector(
-                    $userId,
-                    $vector,
-                    null === $explicit ? $desktop->ragGroupKey : null,
-                    null !== $profile && null !== $profile->ragLimit ? $profile->ragLimit : self::RAG_LIMIT,
-                    null !== $profile && null !== $profile->ragMinScore ? $profile->ragMinScore : 0.3,
-                    $query,
-                    $explicit,
-                );
+                $ragHits = $this->knowledge->searchInjected($userId, $vector, $query, $desktop->ragGroupKey, $profile);
                 $rag = $this->formatter->formatRagContext($ragHits);
             } catch (\Throwable $e) {
                 $this->logger->warning('MessagesContextInjector: RAG failed', [
@@ -200,26 +189,6 @@ final readonly class MessagesContextInjector
         }
 
         return '' !== $block ? $block : null;
-    }
-
-    /**
-     * @return list<RagScope>|null
-     */
-    private function explicitScopes(int $userId, DesktopTurnOptions $desktop, ?RuntimeProfile $profile): ?array
-    {
-        if (null === $profile) {
-            return null;
-        }
-
-        $scopes = [];
-        foreach ($profile->ragScopes as $scope) {
-            $scopes[] = new RagScope((int) $scope['ownerId'], $scope['groupKey']);
-        }
-        if (null !== $desktop->ragGroupKey && '' !== $desktop->ragGroupKey) {
-            $scopes[] = new RagScope($userId, $desktop->ragGroupKey);
-        }
-
-        return $scopes;
     }
 
     /**

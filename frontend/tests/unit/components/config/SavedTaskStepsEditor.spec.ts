@@ -87,4 +87,28 @@ describe('SavedTaskStepsEditor', () => {
     )
     wrapper.unmount()
   })
+
+  it('offers only tools a step can run', async () => {
+    mockListTools.mockResolvedValue([
+      { name: 'crm_lookup', title: 'CRM', description: '', sideEffect: 'read', source: 'custom' },
+      { name: 'mcp:1:issues', title: 'Issues', description: '', sideEffect: 'read', source: 'mcp' },
+      {
+        name: 'knowledge_search',
+        title: 'Find',
+        description: '',
+        sideEffect: 'read',
+        source: 'builtin',
+      },
+    ])
+    const wrapper = mount(SavedTaskStepsEditor, {
+      props: { open: true, task: task() },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const root = document.body
+    expect(root.querySelector('[data-testid="btn-step-kind-tool:crm_lookup"]')).toBeTruthy()
+    expect(root.querySelector('[data-testid="btn-step-kind-tool:mcp:1:issues"]')).toBeTruthy()
+    expect(root.querySelector('[data-testid="btn-step-kind-tool:knowledge_search"]')).toBeNull()
+    wrapper.unmount()
+  })
 })

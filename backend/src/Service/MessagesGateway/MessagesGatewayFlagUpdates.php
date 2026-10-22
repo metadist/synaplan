@@ -32,6 +32,7 @@ final class MessagesGatewayFlagUpdates
         $enums = [
             MessagesGatewayConfig::KEY_WEB_SEARCH_MODE => MessagesGatewayConfig::WEB_SEARCH_MODES,
             MessagesGatewayConfig::KEY_WEB_FETCH_MODE => MessagesGatewayConfig::WEB_FETCH_MODES,
+            MessagesGatewayConfig::KEY_KNOWLEDGE_TOOLS => MessagesGatewayConfig::KNOWLEDGE_TOOLS_MODES,
             MessagesGatewayConfig::KEY_VISION_MODE => MessagesGatewayConfig::VISION_MODES,
             MessagesGatewayConfig::KEY_VISION_IMAGE_DETAIL => MessagesGatewayConfig::IMAGE_DETAILS,
         ];
