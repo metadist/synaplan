@@ -28,6 +28,19 @@ if ! docker inspect synaplan-backend >/dev/null 2>&1; then
   exit 1
 fi
 
+BACKEND_ENV=$(docker exec synaplan-backend printenv APP_ENV 2>/dev/null || true)
+if [[ "$BACKEND_ENV" != "dev" ]]; then
+  echo "synaplan-backend runs APP_ENV=${BACKEND_ENV:-unset}, not dev. This target only measures the dev stack." >&2
+  exit 1
+fi
+
+if docker exec synaplan-backend sh -c 'pid=$(cat /tmp/synaplan-perf-franken.pid 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null'; then
+  echo "Another make perf-runtime run is still active in synaplan-backend. Wait for it to finish." >&2
+  exit 1
+fi
+
+CHUNK_MS=400
+
 NETWORK=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' synaplan-backend)
 if [[ -z "${NETWORK}" ]]; then
   echo "Could not find the backend container network." >&2
@@ -41,6 +54,7 @@ OUT_JSON="$OUT_DIR/runtime-$STAMP.json"
 WORK=$(mktemp -d)
 STARTED=0
 MINTED=0
+WARMED=0
 
 compose() {
   docker compose -p synaplan "$@"
@@ -72,16 +86,20 @@ cleanup() {
       fi
     '
   fi
-  compose exec -T backend sh -c 'rm -rf /var/www/backend/var/cache/prod /tmp/synaplan-perf-franken.pid /tmp/synaplan-perf-franken.log /tmp/perf-worker.Caddyfile /tmp/synaplan-perf-key.json /tmp/synaplan-perf-cookie.txt /tmp/perf-runtime'
+  if [[ "$WARMED" -eq 1 ]]; then
+    compose exec -T backend rm -rf /var/www/backend/var/cache/prod
+  fi
+  compose exec -T backend sh -c 'rm -rf /tmp/synaplan-perf-franken.pid /tmp/synaplan-perf-franken.log /tmp/perf-worker.Caddyfile /tmp/synaplan-perf-key.json /tmp/synaplan-perf-cookie.txt /tmp/perf-runtime'
   rm -rf "$WORK"
   unset SYNAPLAN_API_KEY
   exit "$rc"
 }
 trap cleanup EXIT
+trap 'exit 130' INT TERM
 
 if ! compose exec -T backend php -r 'require "/var/www/backend/vendor/autoload.php"; exit(class_exists("App\\AI\\Provider\\TestProviderChunkDelay") ? 0 : 1);'; then
   echo "The running backend does not have the test-provider delay class." >&2
-  echo "This target measures the code the dev stack has mounted." >&2
+  echo "This target measures the code the dev stack has mounted. Start the stack from a checkout that contains this change (make up), then run it again." >&2
   exit 1
 fi
 
@@ -124,18 +142,19 @@ SYNAPLAN_API_KEY=${SYNAPLAN_API_KEY//$'\n'/}
 export SYNAPLAN_API_KEY
 
 echo "Warming the prod cache..."
+WARMED=1
 compose exec -T \
   -e APP_ENV=prod \
   -e APP_DEBUG=0 \
   -e SYNAPLAN_PERF_TEST_PROVIDER=1 \
-  -e SYNAPLAN_TEST_PROVIDER_CHUNK_MS=400 \
+  -e SYNAPLAN_TEST_PROVIDER_CHUNK_MS="$CHUNK_MS" \
   backend php bin/console cache:warmup
 
 compose exec -d \
   -e APP_ENV=prod \
   -e APP_DEBUG=0 \
   -e SYNAPLAN_PERF_TEST_PROVIDER=1 \
-  -e SYNAPLAN_TEST_PROVIDER_CHUNK_MS=400 \
+  -e SYNAPLAN_TEST_PROVIDER_CHUNK_MS="$CHUNK_MS" \
   -e SPIKE_WORKER_NUM=8 \
   -e SPIKE_NUM_THREADS=12 \
   backend sh -c 'cd /var/www/backend && echo $$ > /tmp/synaplan-perf-franken.pid; exec frankenphp run --config /tmp/perf-worker.Caddyfile > /tmp/synaplan-perf-franken.log 2>&1'
@@ -224,12 +243,12 @@ if [[ "$WITH_PROVIDERS" -eq 1 && -f "$ROOT/backend/.env" ]]; then
     >"$WORK/overhead.txt" || true
 fi
 
-python3 "$DIR/check_budgets.py" assemble "$WORK" "$OUT_JSON"
+python3 "$DIR/check_budgets.py" assemble "$WORK" "$OUT_JSON" "$CHUNK_MS"
 echo "Wrote $OUT_JSON"
 set +e
 python3 "$DIR/check_budgets.py" check "$OUT_JSON" "$DIR/budgets.json"
 check_rc=$?
-python3 "$DIR/check_budgets.py" expect-breach "$OUT_JSON" "$DIR/budgets.json" "health.clients1.p95_ms=1"
+python3 "$DIR/check_budgets.py" expect-breach "$OUT_JSON" "$DIR/budgets.json" "health.clients1.p95_ms=1" >/dev/null 2>&1
 breach_rc=$?
 set -e
 if [[ "$breach_rc" -ne 0 ]]; then

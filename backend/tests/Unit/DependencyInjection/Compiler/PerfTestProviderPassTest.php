@@ -60,6 +60,16 @@ final class PerfTestProviderPassTest extends TestCase
         self::assertTrue($container->hasDefinition(TestProvider::class));
     }
 
+    public function testProdDropsTheProviderWhenTheBenchmarkFlagIsOff(): void
+    {
+        $_SERVER['SYNAPLAN_PERF_TEST_PROVIDER'] = '0';
+        $container = $this->container('prod');
+
+        (new PerfTestProviderPass())->process($container);
+
+        self::assertFalse($container->hasDefinition(TestProvider::class));
+    }
+
     private function container(string $environment): ContainerBuilder
     {
         $container = new ContainerBuilder();

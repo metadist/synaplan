@@ -9,11 +9,13 @@ namespace App\AI\Provider;
  *
  * SYNAPLAN_TEST_PROVIDER_CHUNK_MS stretches the canned stream so a benchmark
  * can hold a worker without a paid provider. Unset, empty, or not a
- * non-negative number stays at 50 ms, the historical default.
+ * non-negative number stays at 50 ms, the historical default. Values above
+ * MAX_MS are capped so a typo cannot park a worker for minutes per chunk.
  */
 final class TestProviderChunkDelay
 {
     public const DEFAULT_MS = 50;
+    public const MAX_MS = 2000;
 
     public static function microseconds(): int
     {
@@ -28,6 +30,6 @@ final class TestProviderChunkDelay
             return self::DEFAULT_MS * 1000;
         }
 
-        return (int) round((float) $raw * 1000);
+        return (int) round(min((float) $raw, self::MAX_MS) * 1000);
     }
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assemble a runtime result and compare it to budgets.json.
 
-  check_budgets.py assemble <workdir> <out.json>
+  check_budgets.py assemble <workdir> <out.json> <chunk_ms>
   check_budgets.py check <result.json> <budgets.json>
   check_budgets.py expect-breach <result.json> <budgets.json> <metric=max>
 
@@ -44,7 +44,7 @@ def ms_from_seconds(summary: dict) -> float | None:
     return None
 
 
-def assemble(work: Path, out: Path) -> None:
+def assemble(work: Path, out: Path, chunk_ms: int) -> None:
     health1 = load(work / "health1.json")
     health8 = load(work / "health8.json")
     runtime = load(work / "runtime.json")
@@ -55,7 +55,7 @@ def assemble(work: Path, out: Path) -> None:
     overhead_path = work / "overhead.txt"
     result = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "chunk_ms": 400,
+        "chunk_ms": chunk_ms,
         "health": {"clients1": health1, "clients8": health8},
         "runtime_config": runtime,
         "gateway": gateway,
@@ -164,7 +164,7 @@ def main() -> int:
         return 2
     command = sys.argv[1]
     if command == "assemble":
-        assemble(Path(sys.argv[2]), Path(sys.argv[3]))
+        assemble(Path(sys.argv[2]), Path(sys.argv[3]), int(sys.argv[4]))
         return 0
     result = load(Path(sys.argv[2]))
     budgets = load(Path(sys.argv[3]))

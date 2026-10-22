@@ -111,7 +111,15 @@ function revoke(string $cookieFile): int
         return 1;
     }
 
-    return sweep($cookie) ? 0 : 1;
+    $swept = sweep($cookie);
+    [$status] = request('POST', BASE.'/api/v1/auth/logout', '', $cookie);
+    if (200 !== $status) {
+        fwrite(STDERR, 'logout failed: HTTP '.$status."\n");
+
+        return 1;
+    }
+
+    return $swept ? 0 : 1;
 }
 
 function sweep(string $cookie): bool

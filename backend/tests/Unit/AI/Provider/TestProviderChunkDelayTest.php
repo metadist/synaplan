@@ -51,6 +51,13 @@ final class TestProviderChunkDelayTest extends TestCase
         self::assertSame(400_000, TestProviderChunkDelay::microseconds());
     }
 
+    public function testLargeValuesAreCapped(): void
+    {
+        $this->setDelay('400000');
+
+        self::assertSame(TestProviderChunkDelay::MAX_MS * 1000, TestProviderChunkDelay::microseconds());
+    }
+
     public function testInvalidValuesStayAtTheDefault(): void
     {
         foreach (['nope', '', '-1'] as $raw) {
