@@ -23,6 +23,8 @@ import GatewaySettingToggle from './GatewaySettingToggle.vue'
 
 const MIN_TOOL_ROUNDS = 1
 const MAX_TOOL_ROUNDS = 32
+const MIN_WEB_SEARCH_ROUNDS = 1
+const MAX_WEB_SEARCH_ROUNDS = 6
 
 const props = defineProps<{
   form: GatewayForm
@@ -134,6 +136,19 @@ const webFetchOptions = computed(() => [
           :options="webSearchOptions"
           data-testid="select-agents-web-search"
           @update:model-value="emit('change', { web_search_mode: $event as WebSearchMode })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
+        :label="$t('messagesGateway.settings.webSearchRounds.label')"
+        :description="$t('messagesGateway.settings.webSearchRounds.description')"
+      >
+        <GatewaySettingNumber
+          :model-value="form.web_search_max_rounds"
+          :min="MIN_WEB_SEARCH_ROUNDS"
+          :max="MAX_WEB_SEARCH_ROUNDS"
+          data-testid="input-agents-web-search-rounds"
+          @change="emit('change', { web_search_max_rounds: $event })"
         />
       </GatewaySettingRow>
 

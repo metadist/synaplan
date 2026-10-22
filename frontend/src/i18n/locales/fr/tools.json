@@ -578,6 +578,10 @@
         "label": "Nombre maximal de tours d’outils par message",
         "description": "Combien de fois un assistant IA peut utiliser un outil et réfléchir encore avant de devoir répondre. Des valeurs plus élevées permettent un travail plus approfondi et coûtent plus cher."
       },
+      "webSearchRounds": {
+        "label": "Recherches web avant la réponse",
+        "description": "Après ce nombre de recherches dans un message, l’assistant répond à partir de ce qu’il a trouvé et nomme chaque source. 2 suffit pour une question courte. Augmentez-le si les premiers résultats ne suffisent pas."
+      },
       "imageDetail": {
         "label": "Qualité d’image",
         "description": "Avec quelle précision le modèle IA doit regarder une image. Une qualité basse coûte nettement moins et suffit généralement pour lire du texte sur une capture d’écran. Les fournisseurs qui n’offrent pas ce choix l’ignorent.",

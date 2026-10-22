@@ -59,8 +59,7 @@ final readonly class GatewayToolLoop
     private const MAX_TOOLS_PER_TURN = 16;
     private const WALL_CLOCK_SECONDS = 240;
     private const PING_INTERVAL_SECONDS = 15;
-    private const WEB_SEARCH_WRAP_AFTER = 2;
-    private const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user now in one or two sentences and include the http URL you used. Do not search again.';
+    public const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user\'s question now from these results, as completely as the question needs, and cite the https URLs you used. Do not search again.';
     private const EMPTY_SEARCH_RECOVERY = 'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.';
 
     public function __construct(
@@ -284,7 +283,7 @@ final readonly class GatewayToolLoop
             $webSearchRounds += $this->countWebSearches($partition['ours']);
             $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
             $body = $this->appendToolTurn($body, $content, $toolResults);
-            if ($webSearchRounds >= self::WEB_SEARCH_WRAP_AFTER) {
+            if ($webSearchRounds >= $this->config->webSearchMaxRounds($user->getId())) {
                 $body = $this->forceWrapUp($body);
             }
         }
@@ -427,7 +426,7 @@ final readonly class GatewayToolLoop
                 assistant: $this->assistantFrom($translatorContext),
             );
             $body = $this->appendToolTurn($body, $turn['content'], $toolResults);
-            if ($webSearchRounds >= self::WEB_SEARCH_WRAP_AFTER) {
+            if ($webSearchRounds >= $this->config->webSearchMaxRounds($user->getId())) {
                 $body = $this->forceWrapUp($body);
             }
         }

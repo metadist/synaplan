@@ -46,6 +46,7 @@ const form = ref<GatewayForm>({
   mcp_tools_with_client_tools: false,
   mcp_max_iterations: 8,
   web_search_mode: 'auto',
+  web_search_max_rounds: 2,
   web_fetch_mode: 'auto',
   vision_mode: 'auto',
   vision_image_detail: 'auto',
@@ -74,6 +75,7 @@ function syncFromStatus() {
     mcp_tools_enabled: status.mcp_tools_enabled ?? false,
     mcp_tools_with_client_tools: status.mcp_tools_with_client_tools ?? false,
     mcp_max_iterations: status.mcp_max_iterations ?? 8,
+    web_search_max_rounds: status.web_search_max_rounds ?? 2,
     web_search_mode: usableMode(
       status.web_search_mode ?? 'auto',
       Boolean(status.web_search_available)

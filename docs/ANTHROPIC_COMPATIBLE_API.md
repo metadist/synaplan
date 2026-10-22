@@ -62,6 +62,7 @@ search or vision:
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
 | `WEB_SEARCH_MODE` | `auto` | How to answer Anthropic’s `web_search_*` server tool — `auto`, `synaplan`, `passthrough` or `off` (see [Web search](#web-search)) |
+| `WEB_SEARCH_MAX_ROUNDS` | `2` | How many Synaplan web searches one message may run before the assistant answers from what it found, as fully as the question needs, and cites the https URLs. Range 1–6. |
 | `WEB_FETCH_MODE` | `auto` | How to handle Anthropic’s `web_fetch_*` server tool — `auto`/`passthrough` forward to Anthropic (inject if missing), or `off` (see [Web fetch](#web-fetch)) |
 | `VISION_MODE` | `auto` | Which model reads an image turn: `auto` (Synaplan PIC2TEXT when the resolved model lacks vision, otherwise passthrough), `synaplan`, `passthrough`, or `off` (see [Vision](#vision)) |
 | `VISION_IMAGE_DETAIL` | `auto` | Resolution hint for upstreams that expose one — `auto`, `low` or `high` |
@@ -110,6 +111,8 @@ Other Anthropic server tools (`code_execution_*` and friends) stay on the wire f
 | `off` | Drop the declaration instead of forwarding it. |
 
 When Synaplan runs the search it uses `BraveSearchService` in the same server-side loop as MCP tools. The client sees one continuous message; intermediate tool rounds are suppressed from the SSE stream, with keep-alive pings while a tool runs.
+
+After `WEB_SEARCH_MAX_ROUNDS` searches (default 2, the same ceiling as before), Synaplan stops offering the search tool and asks the model to answer the question completely from those results, citing every https URL it uses. Raising the limit lets a message search again with different words; it does not by itself read the pages.
 
 Synaplan stays out of the way when the client ships its own runnable tool named `web_search`.
 

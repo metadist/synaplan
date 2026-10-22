@@ -52,6 +52,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('mcpMaxIterations')->willReturn(8);
+        $config->method('webSearchMaxRounds')->willReturn(2);
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
@@ -184,7 +185,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -287,7 +288,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $client,
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
             ]),
@@ -340,7 +341,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
             ]),
@@ -411,7 +412,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
             httpExecutor: $executor,
@@ -524,7 +525,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
             httpExecutor: $executor,
@@ -635,7 +636,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -686,7 +687,8 @@ final class GatewayToolLoopTest extends TestCase
                 $this->assertSame('user', $last['role']);
                 $this->assertIsString($last['content']);
                 $this->assertStringContainsString('Do not search again', $last['content']);
-                $this->assertStringContainsString('http URL', $last['content']);
+                $this->assertStringContainsString('https URLs', $last['content']);
+                $this->assertStringNotContainsString('one or two sentences', $last['content']);
 
                 return [
                     'status' => 200,
@@ -745,7 +747,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -854,7 +856,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -915,7 +917,8 @@ final class GatewayToolLoopTest extends TestCase
                 $last = $body['messages'][array_key_last($body['messages'])];
                 $this->assertSame('user', $last['role']);
                 $this->assertIsString($last['content']);
-                $this->assertStringContainsString('http URL', $last['content']);
+                $this->assertStringContainsString('https URLs', $last['content']);
+                $this->assertStringNotContainsString('one or two sentences', $last['content']);
 
                 return [
                     'status' => 200,
@@ -1172,6 +1175,105 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertStringContainsString('https://nodejs.org', $result['body']['content'][0]['text']);
     }
 
+    public function testWrapUpAsksForACompleteSourcedAnswer(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->exactly(2))->method('execute')->willReturn([
+            'text' => 'See https://nodejs.org/en',
+            'isError' => false,
+            'query' => 'node lts',
+            'resultCount' => 1,
+        ]);
+
+        $loop = $this->webSearchLoop($webSearch);
+        $calls = 0;
+        $instruction = null;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls, &$instruction): array {
+                ++$calls;
+                if ($calls <= 2) {
+                    return $this->toolUseBody('toolu_search_'.$calls, 'web_search', ['query' => 'node lts']);
+                }
+
+                $this->assertArrayNotHasKey('tools', $body);
+                $last = $body['messages'][array_key_last($body['messages'])];
+                $instruction = $last['content'];
+
+                return $this->textBody('Node.js 24 is the current LTS. https://nodejs.org/en');
+            }
+        );
+
+        $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        $this->assertSame(GatewayToolLoop::WRAP_UP_AFTER_SEARCH, $instruction);
+        $this->assertStringNotContainsString('one or two sentences', (string) $instruction);
+    }
+
+    public function testConfiguredLimitOfThreeAllowsAThirdSearch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->exactly(3))->method('execute')->willReturn([
+            'text' => 'See https://nodejs.org/en',
+            'isError' => false,
+            'query' => 'node lts',
+            'resultCount' => 1,
+        ]);
+
+        $loop = $this->webSearchLoop($webSearch, 3);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if ($calls <= 3) {
+                    $this->assertArrayHasKey('tools', $body);
+
+                    return $this->toolUseBody('toolu_search_'.$calls, 'web_search', ['query' => 'node lts '.$calls]);
+                }
+
+                $this->assertArrayNotHasKey('tools', $body);
+
+                return $this->textBody('Node.js 24 is the current LTS. https://nodejs.org/en');
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        $this->assertSame(4, $calls);
+        $this->assertSame(200, $result['status']);
+    }
+
     public function testUnpairedWebFetchIsDroppedBeforeTheNextUpstreamCall(): void
     {
         $user = $this->createMock(User::class);
@@ -1324,7 +1426,7 @@ final class GatewayToolLoopTest extends TestCase
         ];
     }
 
-    private function webSearchLoop(WebSearchTool $webSearch): GatewayToolLoop
+    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2): GatewayToolLoop
     {
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
@@ -1336,7 +1438,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => $maxRounds]),
             $rateLimits,
             new NullLogger(),
         );

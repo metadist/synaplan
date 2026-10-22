@@ -578,6 +578,10 @@
         "label": "Maximum tool rounds per message",
         "description": "How often an AI assistant may use a tool and think again before it has to answer. Higher values allow more thorough work and cost more."
       },
+      "webSearchRounds": {
+        "label": "Web searches before an answer",
+        "description": "After this many searches in one message, the assistant answers from what it found and names each source. 2 is enough for a short question. Raise it when the first results are not enough."
+      },
       "imageDetail": {
         "label": "Image quality",
         "description": "How closely the AI model should look at an image. Low quality costs noticeably less and is usually enough to read text off a screenshot. Providers that do not offer this choice ignore it.",

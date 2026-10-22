@@ -16,6 +16,7 @@ use App\Repository\McpServerConfigRepository;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\MessagesGateway\MessagesGatewayFlagUpdates;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -92,6 +93,7 @@ final class MessagesGatewayController extends AbstractController
                     example: MessagesGatewayConfig::WEB_SEARCH_AUTO,
                 ),
                 new OA\Property(property: 'web_search_available', type: 'boolean', example: false, description: 'Whether a web search provider is configured on this instance.'),
+                new OA\Property(property: 'web_search_max_rounds', type: 'integer', example: 2, minimum: MessagesGatewayConfig::MIN_WEB_SEARCH_MAX_ROUNDS, maximum: MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS, description: 'How many web searches one message may run before the assistant answers from what it found.'),
                 new OA\Property(
                     property: 'web_fetch_mode',
                     description: 'How the gateway handles Anthropic web_fetch: auto/passthrough forward (and inject if missing) to api.anthropic.com; off drops the capability. Synaplan never fetches pages itself.',
@@ -180,20 +182,7 @@ final class MessagesGatewayController extends AbstractController
         $budget = $this->rateLimitService->checkCostBudget($user);
         $isAdmin = $this->isGranted('ROLE_ADMIN');
 
-        $keys = [];
-        foreach (self::SUPPORTED_PROVIDERS as $provider) {
-            $resolved = $this->keyResolver->resolve(
-                $provider,
-                $userId,
-                $this->config->allowOperatorKey($userId),
-            );
-            $keys[$provider] = [
-                'has_user_key' => $this->keyResolver->hasUserKey($userId, $provider),
-                'user_key_masked' => $this->keyResolver->maskedUserKey($userId, $provider),
-                'has_operator_key' => null !== $this->providerKeyStore->getKey($provider),
-                'effective_source' => $resolved['source'] ?? 'none',
-            ];
-        }
+        $keys = $this->providerKeyStatus($userId);
 
         // Use JsonResponse (not $this->json): the Symfony serializer normalizes
         // an empty stdClass to [], which breaks the frontend Zod record schema.
@@ -207,6 +196,7 @@ final class MessagesGatewayController extends AbstractController
             'server_tools' => $this->toolCatalog->nativeToolNames($userId),
             'web_search_mode' => $this->config->webSearchMode($userId),
             'web_search_available' => $this->webSearchTool->isAvailable(),
+            'web_search_max_rounds' => $this->config->webSearchMaxRounds($userId),
             'web_fetch_mode' => $this->config->webFetchMode($userId),
             'vision_mode' => $this->config->visionMode($userId),
             'vision_available' => $this->analyzeImageTool->isAvailable($userId),
@@ -540,6 +530,12 @@ final class MessagesGatewayController extends AbstractController
                     enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
                 ),
                 new OA\Property(
+                    property: 'web_search_max_rounds',
+                    type: 'integer',
+                    minimum: MessagesGatewayConfig::MIN_WEB_SEARCH_MAX_ROUNDS,
+                    maximum: MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS,
+                ),
+                new OA\Property(
                     property: 'web_fetch_mode',
                     type: 'string',
                     enum: MessagesGatewayConfig::WEB_FETCH_MODES,
@@ -609,7 +605,7 @@ final class MessagesGatewayController extends AbstractController
         }
 
         try {
-            $updated = $this->collectFlagUpdates($decoded, (int) $user->getId());
+            $updated = MessagesGatewayFlagUpdates::collect($decoded, $this->webSearchTool->isAvailable(), $this->analyzeImageTool->isAvailable((int) $user->getId()));
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
@@ -644,110 +640,24 @@ final class MessagesGatewayController extends AbstractController
     }
 
     /**
-     * Validate the submitted subset of settings. Clients address a setting by
-     * its BCONFIG name in lower case, so one map per value kind is enough.
+     * Which provider key would pay for this user, without revealing the secret.
      *
-     * @param array<mixed> $decoded
-     *
-     * @return array<string, bool|int|string> keyed by BCONFIG setting name
-     *
-     * @throws \InvalidArgumentException when a submitted value is out of range
+     * @return array<string, array{has_user_key: bool, user_key_masked: string, has_operator_key: bool, effective_source: string}>
      */
-    private function collectFlagUpdates(array $decoded, int $userId): array
+    private function providerKeyStatus(int $userId): array
     {
-        $booleans = [
-            MessagesGatewayConfig::KEY_ENABLED,
-            MessagesGatewayConfig::KEY_ALLOW_OPERATOR_KEY,
-            MessagesGatewayConfig::KEY_MCP_TOOLS_ENABLED,
-            MessagesGatewayConfig::KEY_MCP_TOOLS_WITH_CLIENT_TOOLS,
-            MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED,
-            MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED,
-            MessagesGatewayConfig::KEY_SESSION_SUMMARY_ENABLED,
-        ];
-
-        $enums = [
-            MessagesGatewayConfig::KEY_WEB_SEARCH_MODE => MessagesGatewayConfig::WEB_SEARCH_MODES,
-            MessagesGatewayConfig::KEY_WEB_FETCH_MODE => MessagesGatewayConfig::WEB_FETCH_MODES,
-            MessagesGatewayConfig::KEY_VISION_MODE => MessagesGatewayConfig::VISION_MODES,
-            MessagesGatewayConfig::KEY_VISION_IMAGE_DETAIL => MessagesGatewayConfig::IMAGE_DETAILS,
-        ];
-
-        $integers = [
-            MessagesGatewayConfig::KEY_MCP_MAX_ITERATIONS => [
-                MessagesGatewayConfig::MIN_MCP_MAX_ITERATIONS,
-                MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS,
-            ],
-            MessagesGatewayConfig::KEY_VISION_MAX_IMAGES => [
-                MessagesGatewayConfig::MIN_VISION_MAX_IMAGES,
-                MessagesGatewayConfig::MAX_VISION_MAX_IMAGES,
-            ],
-        ];
-
-        $updated = [];
-
-        foreach ($booleans as $key) {
-            $value = $this->submittedValue($decoded, $key);
-            if (null === $value) {
-                continue;
-            }
-            $bool = filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
-            if (null === $bool) {
-                throw new \InvalidArgumentException(strtolower($key).' must be a boolean.');
-            }
-            $updated[$key] = $bool;
+        $keys = [];
+        foreach (self::SUPPORTED_PROVIDERS as $provider) {
+            $resolved = $this->keyResolver->resolve($provider, $userId, $this->config->allowOperatorKey($userId));
+            $keys[$provider] = [
+                'has_user_key' => $this->keyResolver->hasUserKey($userId, $provider),
+                'user_key_masked' => $this->keyResolver->maskedUserKey($userId, $provider),
+                'has_operator_key' => null !== $this->providerKeyStore->getKey($provider),
+                'effective_source' => $resolved['source'] ?? 'none',
+            ];
         }
 
-        foreach ($enums as $key => $allowed) {
-            $value = $this->submittedValue($decoded, $key);
-            if (null === $value) {
-                continue;
-            }
-            $normalized = \is_string($value) ? strtolower(trim($value)) : '';
-            if (!\in_array($normalized, $allowed, true)) {
-                throw new \InvalidArgumentException(strtolower($key).' must be one of: '.implode(', ', $allowed));
-            }
-            $this->assertModeIsUsable($key, $normalized, $userId);
-            $updated[$key] = $normalized;
-        }
-
-        foreach ($integers as $key => [$min, $max]) {
-            $value = $this->submittedValue($decoded, $key);
-            if (null === $value) {
-                continue;
-            }
-            $int = filter_var($value, \FILTER_VALIDATE_INT);
-            if (false === $int || $int < $min || $int > $max) {
-                throw new \InvalidArgumentException(sprintf('%s must be an integer between %d and %d.', strtolower($key), $min, $max));
-            }
-            $updated[$key] = $int;
-        }
-
-        return $updated;
-    }
-
-    /**
-     * Reject a `synaplan` mode the install cannot honour — silently accepting it
-     * would leave the admin page showing a capability that never runs.
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function assertModeIsUsable(string $key, string $mode, int $userId): void
-    {
-        if (
-            MessagesGatewayConfig::KEY_WEB_SEARCH_MODE === $key
-            && MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $mode
-            && !$this->webSearchTool->isAvailable()
-        ) {
-            throw new \InvalidArgumentException('web_search_mode=synaplan requires a configured web search provider on this instance');
-        }
-
-        if (
-            MessagesGatewayConfig::KEY_VISION_MODE === $key
-            && MessagesGatewayConfig::VISION_SYNAPLAN === $mode
-            && !$this->analyzeImageTool->isAvailable($userId)
-        ) {
-            throw new \InvalidArgumentException('vision_mode=synaplan requires a configured Synaplan vision (PIC2TEXT) model');
-        }
+        return $keys;
     }
 
     /**
@@ -794,14 +704,6 @@ final class MessagesGatewayController extends AbstractController
         }
 
         return rtrim($safe, '/');
-    }
-
-    /**
-     * @param array<mixed> $decoded
-     */
-    private function submittedValue(array $decoded, string $key): mixed
-    {
-        return $decoded[strtolower($key)] ?? $decoded[$key] ?? null;
     }
 
     /**

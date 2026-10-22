@@ -504,6 +504,10 @@
         "label": "Mesaj başına en fazla araç turu",
         "description": "Bir AI asistanının yanıt vermek zorunda kalmadan önce kaç kez araç kullanıp yeniden düşünebileceği. Yüksek değerler daha titiz çalışmaya izin verir ve daha pahalıdır."
       },
+      "webSearchRounds": {
+        "label": "Yanıttan önce web aramaları",
+        "description": "Bir mesajda bu kadar aramadan sonra asistan bulduklarından yanıt verir ve her kaynağı adlandırır. Kısa bir soru için 2 yeterlidir. İlk sonuçlar yetmezse yükseltin."
+      },
       "imageDetail": {
         "label": "Görsel kalitesi",
         "description": "AI modelinin bir görsele ne kadar ayrıntılı bakacağı. Düşük kalite belirgin biçimde daha ucuzdur ve ekran görüntüsündeki metni okumak için çoğunlukla yeterlidir. Bu seçeneği sunmayan sağlayıcılar ayarı yok sayar.",

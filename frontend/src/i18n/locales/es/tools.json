@@ -504,6 +504,10 @@
         "label": "Máximo de rondas de herramientas por mensaje",
         "description": "Cuántas veces puede un asistente de IA usar una herramienta y volver a pensar antes de tener que responder. Valores más altos permiten un trabajo más minucioso y cuestan más."
       },
+      "webSearchRounds": {
+        "label": "Búsquedas web antes de responder",
+        "description": "Tras este número de búsquedas en un mensaje, el asistente responde con lo que encontró y nombra cada fuente. 2 basta para una pregunta breve. Súbalo si los primeros resultados no alcanzan."
+      },
       "imageDetail": {
         "label": "Calidad de imagen",
         "description": "Con cuánto detalle debe mirar el modelo de IA una imagen. La calidad baja cuesta bastante menos y suele bastar para leer texto de una captura. Los proveedores que no ofrecen esta opción la ignoran.",

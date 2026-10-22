@@ -54,7 +54,6 @@
         "src/Controller/MessagesApiController.php::MessagesApiController::countTokens": 71,
         "src/Controller/MessagesApiController.php::MessagesApiController::messages": 56,
         "src/Controller/MessagesApiController.php::MessagesApiController::streamResponse": 182,
-        "src/Controller/MessagesGatewayController.php::MessagesGatewayController::collectFlagUpdates": 71,
         "src/Controller/MessagesGatewayController.php::MessagesGatewayController::putFlags": 52,
         "src/Controller/MessagesGatewayController.php::MessagesGatewayController::status": 65,
         "src/Controller/MobilePurchaseController.php::MobilePurchaseController::verify": 54,

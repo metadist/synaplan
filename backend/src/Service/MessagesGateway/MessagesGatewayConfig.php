@@ -26,6 +26,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_TOOLS_WITH_CLIENT_TOOLS = 'MCP_TOOLS_WITH_CLIENT_TOOLS';
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
     public const KEY_WEB_SEARCH_MODE = 'WEB_SEARCH_MODE';
+    public const KEY_WEB_SEARCH_MAX_ROUNDS = 'WEB_SEARCH_MAX_ROUNDS';
     public const KEY_WEB_FETCH_MODE = 'WEB_FETCH_MODE';
     public const KEY_VISION_MODE = 'VISION_MODE';
 
@@ -102,6 +103,8 @@ final readonly class MessagesGatewayConfig
 
     public const MIN_MCP_MAX_ITERATIONS = 1;
     public const MAX_MCP_MAX_ITERATIONS = 32;
+    public const MIN_WEB_SEARCH_MAX_ROUNDS = 1;
+    public const MAX_WEB_SEARCH_MAX_ROUNDS = 6;
     public const MIN_VISION_MAX_IMAGES = 0;
     public const MAX_VISION_MAX_IMAGES = 100;
 
@@ -111,6 +114,7 @@ final readonly class MessagesGatewayConfig
     private const DEFAULT_MCP_TOOLS_WITH_CLIENT_TOOLS = false;
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
     private const DEFAULT_WEB_SEARCH_MODE = self::WEB_SEARCH_AUTO;
+    private const DEFAULT_WEB_SEARCH_MAX_ROUNDS = 2;
     private const DEFAULT_WEB_FETCH_MODE = self::WEB_FETCH_AUTO;
     private const DEFAULT_VISION_MODE = self::VISION_AUTO;
 
@@ -184,6 +188,21 @@ final readonly class MessagesGatewayConfig
         $raw = $this->resolveToken(self::KEY_WEB_SEARCH_MODE, $userId, self::DEFAULT_WEB_SEARCH_MODE);
 
         return \in_array($raw, self::WEB_SEARCH_MODES, true) ? $raw : self::DEFAULT_WEB_SEARCH_MODE;
+    }
+
+    /**
+     * How many Synaplan web searches one message may run before the assistant
+     * has to answer from what it found. The default keeps today's limit.
+     */
+    public function webSearchMaxRounds(?int $userId): int
+    {
+        $raw = $this->resolveString(self::KEY_WEB_SEARCH_MAX_ROUNDS, $userId, (string) self::DEFAULT_WEB_SEARCH_MAX_ROUNDS);
+        $n = (int) $raw;
+
+        return max(
+            self::MIN_WEB_SEARCH_MAX_ROUNDS,
+            min(self::MAX_WEB_SEARCH_MAX_ROUNDS, $n > 0 ? $n : self::DEFAULT_WEB_SEARCH_MAX_ROUNDS),
+        );
     }
 
     /**
