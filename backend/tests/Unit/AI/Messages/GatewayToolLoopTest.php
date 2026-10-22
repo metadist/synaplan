@@ -1489,6 +1489,97 @@ final class GatewayToolLoopTest extends TestCase
         self::assertSame([], ServerToolReplay::unpairedUseIds($result['body']['content']));
     }
 
+    public function testStreamMixedWriteFileAndWebFetchReadsThePageBeforeWriteFile(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $fetch = $this->createMock(WebFetchTool::class);
+        $fetch->expects($this->once())
+            ->method('execute')
+            ->with(['url' => 'https://nodejs.org/en'], $user)
+            ->willReturn([
+                'text' => "Title: Node.js\nURL: https://nodejs.org/en\n\nNode.js 24 is the current LTS.",
+                'isError' => false,
+                'url' => 'https://nodejs.org/en',
+            ]);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), webFetch: $fetch);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('stream')->willReturnCallback(
+            function (array $body, array $context, callable $emit) use (&$calls): MessagesUsage {
+                self::assertTrue($context['parsed_events'] ?? false);
+                ++$calls;
+                if (1 === $calls) {
+                    $this->emitStreamToolTurn($emit, [
+                        ['id' => 'toolu_fetch', 'name' => 'web_fetch', 'input' => ['url' => 'https://nodejs.org/en']],
+                        ['id' => 'toolu_write', 'name' => 'write_file', 'input' => ['path' => 'notes.md']],
+                    ]);
+
+                    return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame('assistant', $assistant['role']);
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('web_fetch', $names);
+                self::assertNotContains('write_file', $names);
+                self::assertSame('tool_result', $body['messages'][2]['content'][0]['type']);
+                self::assertStringContainsString('https://nodejs.org/en', (string) $body['messages'][2]['content'][0]['content']);
+
+                $this->emitStreamToolTurn($emit, [
+                    ['id' => 'toolu_write', 'name' => 'write_file', 'input' => ['path' => 'notes.md', 'content' => 'Node.js 24 is the current LTS.']],
+                ]);
+
+                return new MessagesUsage(20, 8, 0, 0, 'tool_use');
+            }
+        );
+
+        $events = [];
+        $usage = $loop->runStream(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Save the current Node LTS']],
+                'stream' => true,
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webFetchSnapshot(),
+            static function (string|array $chunk) use (&$events): void {
+                if (\is_array($chunk)) {
+                    $events[] = $chunk;
+                }
+            },
+        );
+
+        self::assertSame(2, $calls);
+        self::assertSame('tool_use', $usage->stopReason);
+        $names = [];
+        $partials = '';
+        foreach ($events as $event) {
+            $name = $event['data']['content_block']['name'] ?? null;
+            if (\is_string($name)) {
+                $names[] = $name;
+            }
+            $partial = $event['data']['delta']['partial_json'] ?? null;
+            if (\is_string($partial)) {
+                $partials .= $partial;
+            }
+        }
+        self::assertSame(['write_file'], $names);
+        self::assertStringContainsString('Node.js 24 is the current LTS.', $partials);
+        self::assertStringNotContainsString('{"path":"notes.md"}', $partials);
+        $types = array_map(static fn (array $event): string => (string) ($event['data']['type'] ?? ''), $events);
+        self::assertContains('message_stop', $types);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1551,6 +1642,71 @@ final class GatewayToolLoopTest extends TestCase
             $rateLimits,
             new NullLogger(),
         );
+    }
+
+    /**
+     * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
+     * @param list<array{id: string, name: string, input: array<string, mixed>}>      $tools
+     */
+    private function emitStreamToolTurn(callable $emit, array $tools): void
+    {
+        $emit([
+            'event' => 'message_start',
+            'data' => [
+                'type' => 'message_start',
+                'message' => [
+                    'id' => 'msg_stream',
+                    'type' => 'message',
+                    'role' => 'assistant',
+                    'usage' => ['input_tokens' => 8, 'output_tokens' => 0],
+                ],
+            ],
+        ]);
+        foreach ($tools as $index => $tool) {
+            $emit([
+                'event' => 'content_block_start',
+                'data' => [
+                    'type' => 'content_block_start',
+                    'index' => $index,
+                    'content_block' => [
+                        'type' => 'tool_use',
+                        'id' => $tool['id'],
+                        'name' => $tool['name'],
+                        'input' => [],
+                    ],
+                ],
+            ]);
+            $emit([
+                'event' => 'content_block_delta',
+                'data' => [
+                    'type' => 'content_block_delta',
+                    'index' => $index,
+                    'delta' => [
+                        'type' => 'input_json_delta',
+                        'partial_json' => json_encode($tool['input'], JSON_THROW_ON_ERROR),
+                    ],
+                ],
+            ]);
+            $emit([
+                'event' => 'content_block_stop',
+                'data' => [
+                    'type' => 'content_block_stop',
+                    'index' => $index,
+                ],
+            ]);
+        }
+        $emit([
+            'event' => 'message_delta',
+            'data' => [
+                'type' => 'message_delta',
+                'delta' => ['stop_reason' => 'tool_use'],
+                'usage' => ['output_tokens' => 4],
+            ],
+        ]);
+        $emit([
+            'event' => 'message_stop',
+            'data' => ['type' => 'message_stop'],
+        ]);
     }
 
     /**
