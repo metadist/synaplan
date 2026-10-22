@@ -49,6 +49,10 @@ final class MessagesGatewayFlagUpdates
                 MessagesGatewayConfig::MIN_WEB_SEARCH_MAX_ROUNDS,
                 MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS,
             ],
+            MessagesGatewayConfig::KEY_WEB_FETCH_MAX_PER_TURN => [
+                MessagesGatewayConfig::MIN_WEB_FETCH_MAX_PER_TURN,
+                MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN,
+            ],
         ];
 
         $updated = [];

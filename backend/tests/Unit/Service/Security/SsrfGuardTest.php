@@ -106,6 +106,14 @@ final class SsrfGuardTest extends TestCase
         self::assertSame([], $this->guard->pinnedIps('localhost'));
     }
 
+    public function testPinnedResolveOptionLeavesLiteralIpsAndUnusableHostsAlone(): void
+    {
+        self::assertSame([], $this->guard->pinnedResolveOption('https://8.8.8.8/page'));
+        self::assertSame([], $this->guard->pinnedResolveOption('https://[2001:4860:4860::8888]/page'));
+        self::assertSame([], $this->guard->pinnedResolveOption('https://localhost/page'));
+        self::assertSame([], $this->guard->pinnedResolveOption('not a url'));
+    }
+
     /**
      * The operator-network mode is for addresses an administrator configures
      * (a self-hosted gateway). It keeps the operator's own ranges and nothing

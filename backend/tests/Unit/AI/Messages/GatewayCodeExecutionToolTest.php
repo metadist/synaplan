@@ -8,6 +8,8 @@ use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\CodeExecutionTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\NativeToolRegistry;
+use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Service\Compute\ComputeRunGrant;
@@ -96,7 +98,7 @@ final class GatewayCodeExecutionToolTest extends TestCase
 
         return new GatewayToolCatalog(
             new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $config,
             $this->createMock(CacheItemPoolInterface::class),

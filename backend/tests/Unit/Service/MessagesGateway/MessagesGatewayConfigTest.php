@@ -39,6 +39,7 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertSame(MessagesGatewayConfig::WEB_SEARCH_AUTO, $this->config->webSearchMode(1));
         $this->assertSame(2, $this->config->webSearchMaxRounds(1));
         $this->assertSame(MessagesGatewayConfig::WEB_FETCH_AUTO, $this->config->webFetchMode(1));
+        $this->assertSame(3, $this->config->webFetchMaxPerTurn(1));
         $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));
         $this->assertSame(MessagesGatewayConfig::DEFAULT_UPSTREAM_URL, $this->config->upstreamUrl());
         $this->assertSame([], $this->config->modelAliases());
@@ -164,11 +165,20 @@ final class MessagesGatewayConfigTest extends TestCase
             'VISION_MAX_IMAGES' => '5000',
             'MCP_MAX_ITERATIONS' => '999',
             'WEB_SEARCH_MAX_ROUNDS' => '99',
+            'WEB_FETCH_MAX_PER_TURN' => '99',
         ]);
 
         $this->assertSame(MessagesGatewayConfig::MAX_VISION_MAX_IMAGES, $this->config->visionMaxImages(1));
         $this->assertSame(MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS, $this->config->mcpMaxIterations(1));
         $this->assertSame(MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS, $this->config->webSearchMaxRounds(1));
+        $this->assertSame(MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN, $this->config->webFetchMaxPerTurn(1));
+    }
+
+    public function testWebFetchCapOfZeroStaysZero(): void
+    {
+        $this->stubGlobalRows(['WEB_FETCH_MAX_PER_TURN' => '0']);
+
+        $this->assertSame(0, $this->config->webFetchMaxPerTurn(1));
     }
 
     /**

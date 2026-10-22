@@ -10,6 +10,9 @@ namespace App\AI\Messages;
  * suppresses intermediate message_start / message_delta / message_stop so the
  * client sees a single logical message.
  *
+ * Client tool_use blocks are held until message_delta. A mixed turn (Synaplan
+ * still has to read a page) drops them; a client-only turn flushes them first.
+ *
  * @phpstan-type EmitFn callable(string|array{event: string, data: array<string, mixed>}): void
  */
 final class MessagesEventEmitter
@@ -20,6 +23,13 @@ final class MessagesEventEmitter
     private array $indexMap = [];
     private bool $closed = false;
     private bool $emittedText = false;
+    private bool $holdingClientTools = false;
+    /** @var list<array{event: string, data: array<string, mixed>}> */
+    private array $held = [];
+    /** @var array<int, true> upstream indices buffered until message_delta */
+    private array $heldBlockIndices = [];
+    /** @var array<int, true> upstream indices of client tool_use blocks */
+    private array $heldClientToolIndices = [];
 
     /**
      * @param EmitFn $emit
@@ -32,6 +42,10 @@ final class MessagesEventEmitter
     public function resetTurnMapping(): void
     {
         $this->indexMap = [];
+        $this->held = [];
+        $this->heldBlockIndices = [];
+        $this->heldClientToolIndices = [];
+        $this->holdingClientTools = false;
     }
 
     /**
@@ -65,10 +79,11 @@ final class MessagesEventEmitter
         }
 
         if (str_starts_with($type, 'content_block_')) {
-            return $this->relayContentBlock($event, $data, $suppressToolNames);
+            return $this->holdOrRelayContentBlock($event, $data, $type, $suppressToolNames);
         }
 
         if ('message_delta' === $type || 'message_stop' === $type) {
+            $this->releaseHeld($isFinalTurn, $suppressToolNames);
             if (!$isFinalTurn) {
                 return false;
             }
@@ -81,6 +96,7 @@ final class MessagesEventEmitter
         }
 
         if ('error' === $type) {
+            $this->releaseHeld(true, $suppressToolNames);
             $this->emitEvent($event, $data);
 
             return true;
@@ -112,6 +128,14 @@ final class MessagesEventEmitter
      */
     public function ensureClosed(): void
     {
+        if ($this->closed) {
+            return;
+        }
+
+        if ($this->messageStarted) {
+            $this->releaseHeld(true, []);
+        }
+
         if (!$this->messageStarted || $this->closed) {
             return;
         }
@@ -123,6 +147,88 @@ final class MessagesEventEmitter
     public function nextBlockIndex(): int
     {
         return $this->nextBlockIndex;
+    }
+
+    /**
+     * Buffer a client tool_use (and anything after it) until message_delta.
+     * Server tools in the suppress list stay on the live path, which drops them.
+     *
+     * @param array<string, mixed> $data
+     * @param list<string>         $suppressToolNames
+     */
+    private function holdOrRelayContentBlock(string $event, array $data, string $type, array $suppressToolNames): bool
+    {
+        $idx = isset($data['index']) ? (int) $data['index'] : null;
+        $toolName = $this->toolUseName($type, $data);
+
+        if (null !== $toolName && '' !== $toolName && \in_array($toolName, $suppressToolNames, true)) {
+            return $this->relayContentBlock($event, $data, $suppressToolNames);
+        }
+
+        if (null !== $toolName) {
+            $this->holdingClientTools = true;
+            if (null !== $idx) {
+                $this->heldBlockIndices[$idx] = true;
+                $this->heldClientToolIndices[$idx] = true;
+            }
+            $this->held[] = ['event' => $event, 'data' => $data];
+
+            return false;
+        }
+
+        if (null !== $idx && isset($this->heldBlockIndices[$idx])) {
+            $this->held[] = ['event' => $event, 'data' => $data];
+
+            return false;
+        }
+
+        if ($this->holdingClientTools && 'content_block_start' === $type) {
+            if (null !== $idx) {
+                $this->heldBlockIndices[$idx] = true;
+            }
+            $this->held[] = ['event' => $event, 'data' => $data];
+
+            return false;
+        }
+
+        return $this->relayContentBlock($event, $data, $suppressToolNames);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function toolUseName(string $type, array $data): ?string
+    {
+        if ('content_block_start' !== $type) {
+            return null;
+        }
+        $block = $data['content_block'] ?? null;
+        if (!\is_array($block) || 'tool_use' !== ($block['type'] ?? '')) {
+            return null;
+        }
+
+        return (string) ($block['name'] ?? '');
+    }
+
+    /**
+     * @param list<string> $suppressToolNames
+     */
+    private function releaseHeld(bool $keepClientTools, array $suppressToolNames): void
+    {
+        $held = $this->held;
+        $clientTools = $this->heldClientToolIndices;
+        $this->held = [];
+        $this->heldBlockIndices = [];
+        $this->heldClientToolIndices = [];
+        $this->holdingClientTools = false;
+
+        foreach ($held as $item) {
+            $idx = isset($item['data']['index']) ? (int) $item['data']['index'] : null;
+            if (!$keepClientTools && null !== $idx && isset($clientTools[$idx])) {
+                continue;
+            }
+            $this->relayContentBlock($item['event'], $item['data'], $suppressToolNames);
+        }
     }
 
     /**

@@ -129,6 +129,25 @@ final readonly class SsrfGuard
     }
 
     /**
+     * HTTP client `resolve` option that connects a hostname to the public
+     * address this guard accepted. Without it the client resolves the name a
+     * second time, and a rebinding DNS answer could point it somewhere
+     * private. Literal IPs and names that do not resolve need no pin.
+     *
+     * @return array{resolve?: array<string, string>}
+     */
+    public function pinnedResolveOption(string $url): array
+    {
+        $host = (string) parse_url($url, \PHP_URL_HOST);
+        if ('' === $host || false !== filter_var(trim($host, '[]'), \FILTER_VALIDATE_IP)) {
+            return [];
+        }
+        $pinned = $this->pinnedIps($host);
+
+        return [] === $pinned ? [] : ['resolve' => [$host => $pinned[0]]];
+    }
+
+    /**
      * True when the IP is private, loopback, link-local, reserved or otherwise
      * not globally routable. With $allowOperatorNetwork the operator's own
      * ranges ({@see isOperatorNetworkIp}) pass; everything else that is not

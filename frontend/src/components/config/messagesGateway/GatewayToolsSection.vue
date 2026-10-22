@@ -25,6 +25,8 @@ const MIN_TOOL_ROUNDS = 1
 const MAX_TOOL_ROUNDS = 32
 const MIN_WEB_SEARCH_ROUNDS = 1
 const MAX_WEB_SEARCH_ROUNDS = 6
+const MIN_WEB_FETCH_PAGES = 0
+const MAX_WEB_FETCH_PAGES = 10
 
 const props = defineProps<{
   form: GatewayForm
@@ -62,6 +64,12 @@ const webSearchOptions = computed(() => [
   { value: 'passthrough', label: t('messagesGateway.webSearchModePassthrough') },
   { value: 'off', label: t('messagesGateway.webSearchModeOff') },
 ])
+
+/** Synaplan only opens pages itself in automatic mode; the limit means nothing otherwise. */
+const webFetchPagesDisabled = computed(() => props.form.web_fetch_mode !== 'auto')
+const webFetchPagesNote = computed(() =>
+  webFetchPagesDisabled.value ? t('messagesGateway.settings.requiresWebFetchAuto') : undefined
+)
 
 const webFetchOptions = computed(() => [
   { value: 'auto', label: t('messagesGateway.webFetchModeAuto') },
@@ -161,6 +169,22 @@ const webFetchOptions = computed(() => [
           :options="webFetchOptions"
           data-testid="select-agents-web-fetch"
           @update:model-value="emit('change', { web_fetch_mode: $event as WebFetchMode })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
+        :label="$t('messagesGateway.settings.webFetchPages.label')"
+        :description="$t('messagesGateway.settings.webFetchPages.description')"
+        :note="webFetchPagesNote"
+        :disabled="webFetchPagesDisabled"
+      >
+        <GatewaySettingNumber
+          :model-value="form.web_fetch_max_per_turn"
+          :min="MIN_WEB_FETCH_PAGES"
+          :max="MAX_WEB_FETCH_PAGES"
+          :disabled="webFetchPagesDisabled"
+          data-testid="input-agents-web-fetch-pages"
+          @change="emit('change', { web_fetch_max_per_turn: $event })"
         />
       </GatewaySettingRow>
     </div>

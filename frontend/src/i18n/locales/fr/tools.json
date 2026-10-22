@@ -498,10 +498,10 @@
     "webSearchHint": "Automatique utilise la recherche propre à Synaplan lorsqu’un fournisseur de recherche est configuré, et transmet sinon la requête au fournisseur IA.",
     "webSearchUnavailable": "Aucun fournisseur de recherche n’est configuré sur cette instance, les requêtes sont donc transmises au fournisseur IA. Seul Anthropic peut y répondre.",
     "webFetchLabel": "Lire des pages web (web fetch)",
-    "webFetchModeAuto": "Automatique — laisser Anthropic récupérer (recommandé)",
-    "webFetchModePassthrough": "Toujours transmettre le web fetch à Anthropic",
+    "webFetchModeAuto": "Automatique (recommandé)",
+    "webFetchModePassthrough": "Seul Anthropic lit la page",
     "webFetchModeOff": "Pas de web fetch",
-    "webFetchHint": "Synaplan ne télécharge pas les pages lui-même. Sur les modèles Anthropic, la passerelle conserve ou ajoute l’outil web_fetch d’Anthropic afin que le modèle puisse ouvrir une URL. Les autres fournisseurs IA ne peuvent pas exécuter cet outil.",
+    "webFetchHint": "Automatique laisse Anthropic lire la page sur les modèles Anthropic. Sur tout autre modèle, Synaplan ouvre la page, dans la limite ci-dessous. Transmettre la demande ne fonctionne qu’avec Anthropic.",
     "visionLabel": "Vision pour les assistants IA connectés",
     "visionModeAuto": "Automatique (recommandé)",
     "visionModeSynaplan": "Toujours utiliser le modèle de vision de Synaplan",
@@ -550,10 +550,11 @@
       "activeTools": {
         "title": "En cours d’exécution en votre nom",
         "empty": "Synaplan n’exécute aucun outil qui lui soit propre. Les assistants IA connectés n’obtiennent que les outils que leur propre programme apporte.",
-        "hint": "Un seul message peut encore en sauter un : un programme qui apporte son propre outil du même nom le conserve, et la recherche Web ne s’exécute que lorsque l’assistant la demande.",
+        "hint": "Un seul message peut encore en sauter un : un programme qui apporte son propre outil du même nom le conserve, et la recherche Web ne s’exécute que lorsque l’assistant la demande. La lecture de pages s’arrête à la limite de pages.",
         "mcpServers": "plus les outils de 1 serveur d’outils connecté | plus les outils de {count} serveurs d’outils connectés",
         "tools": {
           "web_search": "Recherche Web",
+          "web_fetch": "Lire une page web",
           "analyze_image": "Analyse d’image"
         }
       },
@@ -582,6 +583,10 @@
         "label": "Recherches web avant la réponse",
         "description": "Après ce nombre de recherches dans un message, l’assistant répond à partir de ce qu’il a trouvé et nomme chaque source. 2 suffit pour une question courte. Augmentez-le si les premiers résultats ne suffisent pas."
       },
+      "webFetchPages": {
+        "label": "Pages à ouvrir dans un message",
+        "description": "Après ce nombre de pages dans un message, l’assistant n’en ouvre plus et répond à partir de ce qu’il a lu. 3 suffit pour une question normale. 0 signifie qu’aucune page n’est ouverte."
+      },
       "imageDetail": {
         "label": "Qualité d’image",
         "description": "Avec quelle précision le modèle IA doit regarder une image. Une qualité basse coûte nettement moins et suffit généralement pour lire du texte sur une capture d’écran. Les fournisseurs qui n’offrent pas ce choix l’ignorent.",
@@ -607,7 +612,8 @@
         "label": "Conserver un résumé de chaque session",
         "description": "Synaplan rédige un court résumé de chaque session d’agent dans votre historique de chat, afin que vous puissiez voir plus tard ce qui a été travaillé."
       },
-      "requiresMcpTools": "Disponible une fois vos outils activés ci-dessus."
+      "requiresMcpTools": "Disponible une fois vos outils activés ci-dessus.",
+      "requiresWebFetchAuto": "S’applique uniquement lorsque la lecture de pages web est réglée sur Automatique ci-dessus."
     },
     "loadError": "Impossible de charger les réglages de Claude Code.",
     "source": {

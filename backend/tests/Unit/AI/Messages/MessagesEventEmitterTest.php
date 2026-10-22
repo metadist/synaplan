@@ -93,6 +93,100 @@ final class MessagesEventEmitterTest extends TestCase
         );
     }
 
+    public function testClientToolIsFlushedBeforeAFinalStopAndDroppedOnAMixedTurn(): void
+    {
+        $events = [];
+        $emitter = new MessagesEventEmitter(static function (array $chunk) use (&$events): void {
+            $events[] = $chunk;
+        });
+
+        $emitter->relay('message_start', [
+            'type' => 'message_start',
+            'message' => ['id' => 'm1', 'role' => 'assistant'],
+        ], isFinalTurn: false);
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 0,
+            'content_block' => ['type' => 'text', 'text' => ''],
+        ], isFinalTurn: false);
+        $emitter->relay('content_block_delta', [
+            'type' => 'content_block_delta',
+            'index' => 0,
+            'delta' => ['type' => 'text_delta', 'text' => 'Reading the page.'],
+        ], isFinalTurn: false);
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 1,
+            'content_block' => ['type' => 'tool_use', 'id' => 'toolu_fetch', 'name' => 'web_fetch', 'input' => []],
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 2,
+            'content_block' => ['type' => 'tool_use', 'id' => 'toolu_write', 'name' => 'write_file', 'input' => []],
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+        $emitter->relay('content_block_delta', [
+            'type' => 'content_block_delta',
+            'index' => 2,
+            'delta' => ['type' => 'input_json_delta', 'partial_json' => '{"path":"notes.md"}'],
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+        $emitter->relay('content_block_stop', [
+            'type' => 'content_block_stop',
+            'index' => 2,
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+
+        $beforeStop = array_map(static fn (array $e): string => (string) ($e['data']['type'] ?? ''), $events);
+        $this->assertSame(['message_start', 'content_block_start', 'content_block_delta'], $beforeStop);
+
+        $emitter->relay('message_delta', [
+            'type' => 'message_delta',
+            'delta' => ['stop_reason' => 'tool_use'],
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+
+        $afterMixed = array_map(static fn (array $e): string => (string) ($e['data']['content_block']['name'] ?? ''), $events);
+        $this->assertNotContains('write_file', $afterMixed);
+        $this->assertNotContains('web_fetch', $afterMixed);
+
+        $emitter->resetTurnMapping();
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 0,
+            'content_block' => ['type' => 'tool_use', 'id' => 'toolu_write', 'name' => 'write_file', 'input' => []],
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+        $emitter->relay('content_block_delta', [
+            'type' => 'content_block_delta',
+            'index' => 0,
+            'delta' => ['type' => 'input_json_delta', 'partial_json' => '{"path":"notes.md","content":"Node.js 24"}'],
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+        $emitter->relay('content_block_stop', [
+            'type' => 'content_block_stop',
+            'index' => 0,
+        ], isFinalTurn: false, suppressToolNames: ['web_fetch']);
+        $emitter->relay('message_delta', [
+            'type' => 'message_delta',
+            'delta' => ['stop_reason' => 'tool_use'],
+        ], isFinalTurn: true, suppressToolNames: ['web_fetch']);
+        $emitter->relay('message_stop', ['type' => 'message_stop'], isFinalTurn: true);
+
+        $names = [];
+        foreach ($events as $event) {
+            $name = $event['data']['content_block']['name'] ?? null;
+            if (\is_string($name)) {
+                $names[] = $name;
+            }
+        }
+        $this->assertSame(['write_file'], $names);
+        $types = array_map(static fn (array $e): string => (string) ($e['data']['type'] ?? ''), $events);
+        $this->assertSame('message_delta', $types[array_key_last($types) - 1]);
+        $this->assertSame('message_stop', $types[array_key_last($types)]);
+        $writeIndex = null;
+        foreach ($events as $event) {
+            if ('write_file' === ($event['data']['content_block']['name'] ?? null)) {
+                $writeIndex = $event['data']['index'];
+            }
+        }
+        $this->assertSame(1, $writeIndex);
+    }
+
     public function testEmitPing(): void
     {
         $events = [];

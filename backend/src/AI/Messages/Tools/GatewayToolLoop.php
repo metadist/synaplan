@@ -35,7 +35,7 @@ use Psr\Log\LoggerInterface;
  * owns — the user's custom HTTP tools, MCP tools via {@see McpClient}, and
  * Synaplan's built-ins such
  * as {@see WebSearchTool} — appends `tool_result` turns, and re-prompts until
- * end_turn, client-owned tools appear, or bounds are hit.
+ * end_turn, only client-owned tools remain, or bounds are hit.
  *
  * Tools the client owns are never executed here: they are relayed verbatim so
  * the client keeps driving its own loop.
@@ -64,7 +64,7 @@ final readonly class GatewayToolLoop
 
     public function __construct(
         private McpToolCatalogAdapter $catalogAdapter,
-        private WebSearchTool $webSearchTool,
+        private NativeToolRegistry $nativeTools,
         private AnalyzeImageTool $analyzeImageTool,
         private McpClient $mcpClient,
         private McpServerConfigRepository $servers,
@@ -185,6 +185,7 @@ final readonly class GatewayToolLoop
         $lastBody = null;
         $lastOkBody = null;
         $webSearchRounds = 0;
+        $pages = new WebFetchBudget($this->config->webFetchMaxPerTurn($user->getId()));
 
         for ($i = 0; $i < $maxIterations; ++$i) {
             if (microtime(true) > $deadline) {
@@ -265,12 +266,11 @@ final readonly class GatewayToolLoop
             }
 
             $partition = $this->partitionToolUses($content, $snapshot['dispatch']);
-            if ([] !== $partition['client']) {
-                // Mixed or client-owned — return verbatim; client owns the loop.
+            if ([] !== $partition['client'] && [] === $partition['ours']) {
                 return [
                     'status' => $lastStatus,
                     'headers' => $lastHeaders,
-                    'body' => $this->withUsage($lastBody, $totalUsage),
+                    'body' => $this->withUsage(ServerToolReplay::dropUnpairedServerUses($lastBody), $totalUsage),
                     'usage' => $totalUsage->withStopReason('tool_use'),
                     'iterations' => $iterations,
                 ];
@@ -281,8 +281,8 @@ final readonly class GatewayToolLoop
             }
 
             $webSearchRounds += $this->countWebSearches($partition['ours']);
-            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
-            $body = $this->appendToolTurn($body, $content, $toolResults);
+            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $pages, null, $this->assistantFrom($translatorContext));
+            $body = $this->appendToolTurn($body, ServerToolReplay::withoutClientUses($content, $partition['client']), $toolResults);
             if ($webSearchRounds >= $this->config->webSearchMaxRounds($user->getId())) {
                 $body = $this->forceWrapUp($body);
             }
@@ -340,8 +340,8 @@ final readonly class GatewayToolLoop
         $maxIterations = $this->config->mcpMaxIterations($user->getId());
         $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
         $totalUsage = new MessagesUsage();
-        $suppressNames = array_keys($snapshot['dispatch']);
         $webSearchRounds = 0;
+        $pages = new WebFetchBudget($this->config->webFetchMaxPerTurn($user->getId()));
 
         for ($i = 0; $i < $maxIterations; ++$i) {
             if (microtime(true) > $deadline) {
@@ -356,7 +356,7 @@ final readonly class GatewayToolLoop
                 $body,
                 $context,
                 $emitter,
-                $suppressNames,
+                array_keys($snapshot['dispatch']),
                 $snapshot['dispatch'],
                 relayErrors: !$canRecoverWrapUp,
             );
@@ -407,9 +407,8 @@ final readonly class GatewayToolLoop
             }
 
             $partition = $this->partitionToolUses($turn['content'], $snapshot['dispatch']);
-            if ([] !== $partition['client'] || [] === $partition['ours']) {
-                // Client owns remaining tools — already streamed (suppress list
-                // only hides ours). Close the message.
+            if ([] === $partition['ours']) {
+                // Nothing of ours left to run. Close and let the client take over.
                 $this->finishStream($emitter, $turn);
 
                 return $totalUsage->withStopReason('tool_use');
@@ -420,12 +419,13 @@ final readonly class GatewayToolLoop
                 $partition['ours'],
                 $snapshot['dispatch'],
                 $user,
+                $pages,
                 ping: static function () use ($emitter): void {
                     $emitter->emitPing();
                 },
                 assistant: $this->assistantFrom($translatorContext),
             );
-            $body = $this->appendToolTurn($body, $turn['content'], $toolResults);
+            $body = $this->appendToolTurn($body, ServerToolReplay::withoutClientUses($turn['content'], $partition['client']), $toolResults);
             if ($webSearchRounds >= $this->config->webSearchMaxRounds($user->getId())) {
                 $body = $this->forceWrapUp($body);
             }
@@ -574,9 +574,9 @@ final readonly class GatewayToolLoop
                     }
                 }
 
-                // Live-relay with suppress; if this turn later proves client-owned
-                // tool_use, those blocks were already hidden — acceptable trade-off
-                // (mixed-turn default is off; pure client tools aren't suppressed).
+                // Server tools are suppressed live. Client tools stay held in the
+                // emitter until message_delta, so a mixed turn can drop them and
+                // read the page before the client sees a write.
                 $emitter->relay($event, $data, isFinalTurn: false, suppressToolNames: $suppressNames);
 
                 return;
@@ -614,7 +614,7 @@ final readonly class GatewayToolLoop
         $isFinal = 'tool_use' !== $stopReason || $error;
         if (!$isFinal) {
             $partition = $this->partitionToolUses($content, $dispatch);
-            if ([] !== $partition['client'] || [] === $partition['ours']) {
+            if ([] === $partition['ours']) {
                 $isFinal = true;
             }
         }
@@ -692,7 +692,7 @@ final readonly class GatewayToolLoop
      *
      * @return list<array<string, mixed>> tool_result content blocks
      */
-    private function executeOurs(array $toolUses, array $dispatch, User $user, ?callable $ping = null, ?RuntimeProfile $assistant = null): array
+    private function executeOurs(array $toolUses, array $dispatch, User $user, WebFetchBudget $pages, ?callable $ping = null, ?RuntimeProfile $assistant = null): array
     {
         if (count($toolUses) > self::MAX_TOOLS_PER_TURN) {
             $toolUses = array_slice($toolUses, 0, self::MAX_TOOLS_PER_TURN);
@@ -743,7 +743,7 @@ final readonly class GatewayToolLoop
                     $results[] = $gated;
                     continue;
                 }
-                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $assistant);
+                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $pages, $assistant);
                 if (null !== $ping) {
                     $ping();
                     $lastPing = microtime(true);
@@ -909,13 +909,13 @@ final readonly class GatewayToolLoop
      *
      * @return array<string, mixed> tool_result content block
      */
-    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, ?RuntimeProfile $assistant = null): array
+    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, WebFetchBudget $pages, ?RuntimeProfile $assistant = null): array
     {
-        if (WebSearchTool::NAME === $tool) {
-            $result = $this->webSearchTool->execute($arguments);
-            $this->recordNativeUsage($user, 'WEB_SEARCH', $tool, $result['query'], $result['isError']);
+        $native = $this->nativeTools->tryExecute($tool, $arguments, $user, $pages);
+        if (null !== $native) {
+            $this->recordNativeUsage($user, $native['source'], $tool, $native['summary'], $native['isError']);
 
-            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
+            return $this->toolResultBlock($toolUseId, $this->clampToolText($native['text']), $native['isError']);
         }
 
         if (AnalyzeImageTool::NAME === $tool) {
