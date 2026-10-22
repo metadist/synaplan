@@ -886,7 +886,7 @@ services:
   # Authentication uses short-lived JWTs issued by the PHP backend.
   # ----------------------------------------------------------------------------
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
+    image: centrifugo/centrifugo:v6.10.0@sha256:58f9a182705faf353d9bbeb7986b629e5335cc3e821d0a2ca3ebd00a8f3387cc
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -1010,7 +1010,7 @@ services:
   # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
   # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
   docling:
-    image: ghcr.io/docling-project/docling-serve-cpu:v1.37.0@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.0@sha256:1b12cd923390f7f3ebca82dd3b338ff1f6d9c32777962dfa4dd34269034e931d
     container_name: synaplan-docling
     depends_on:
       backend:

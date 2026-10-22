@@ -19,7 +19,7 @@
 # digest would hard-lock every build — including Apple Silicon dev machines,
 # which now run the backend natively instead of under emulation — to that one
 # architecture.
-FROM ghcr.io/metadist/synaplan-base-php:1.2.0@sha256:1c3381bce4673afb2eb96a163c301100584ce98af4e86cbd3158b5bb694d79ef AS dev
+FROM ghcr.io/metadist/synaplan-base-php:1.2.1@sha256:e10e74c5047cd9218ad8337b8e36af928871702df4711add15669747988f8ce4 AS dev
 
 ARG APP_VERSION=dev
 
