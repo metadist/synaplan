@@ -16,6 +16,15 @@ is part of the product and is held to the product's gate. It closes no
 issue of its own; it is the step that makes the first three visible to the
 next contributor.
 
+Two bugs ride along at the owner's request (2026-10-22), so they ship in
+the same window. They have nothing to do with plugins, share no file with
+PQ1–PQ4, and can start at once:
+
+| Issue | Finding | Step |
+| ----- | ------- | ---- |
+| [#2619](https://github.com/metadist/synaplan/issues/2619) | After a reload, "Thought for N seconds" is the length of the `<think>` block divided by 100, not the measured time | PQ5 |
+| [#2606](https://github.com/metadist/synaplan/issues/2606) | The Files table widens with long names and pushes Size, Uploaded and the row actions out of the card | PQ6 |
+
 Context: [#2640](https://github.com/metadist/synaplan/issues/2640) (the
 technical owner account) is handled in
 [#2642](https://github.com/metadist/synaplan/pull/2642) and is not part of
@@ -42,6 +51,10 @@ is the deployment that consumes PQ2's image and PQ3's loader.
 | Transcriber image jobs | `transcriber-sidecar` (build, `node --test` in the image), `transcriber-publish` | Publish builds **again** for `linux/amd64,linux/arm64` under QEMU; tags `latest`, `<version>`, `<major>.<minor>`, short sha; promote retags the short sha. Tested and published are not the same bytes; a failed transcriber publish does not stop a promote. |
 | Base image | `synaplan-base-php/.github/workflows/build.yml` | Per-platform native builds pushed by digest, one `imagetools create` manifest job. The shape PQ2's arm64 and manifest jobs copy. |
 | Release classes | `.github/mobile-impact-policy.json` | `plugins/**` → backend-only; `frontend/src/**`, `frontend/package.json`, `frontend/scripts/**` → ota-candidate; `.github/**`, `frontend/eslint.config.js`, `frontend/tests/**`, `_devextras/**` → no-app-impact. An unlisted new path fails closed to store-required. |
+| Thinking duration, live | `frontend/src/services/chat/stream/messageUpdates.ts` (`appendReasoning` sets `thinkingStartedAt` on the first reasoning chunk), `frontend/src/stores/history.ts` (`closeThinkingParts` → `thinkingTime = round((now − start)/1000)`, then deletes `thinkingStartedAt`) | Measured on the client; never sent anywhere; lost on reload. |
+| Thinking duration, reload | `frontend/src/utils/messageMapper.ts` → `parseContentWithThinking`: `thinkingTime = max(3, floor(length / 100))` | The pre-#1058 estimator, unchanged since `430e4488d9`. `MessageThinking.vue` labels any `thinkingTime > 0` as "Thought for N seconds". |
+| Reasoning on the server | `backend/src/Service/Chat/Stream/StreamChunkRelay.php` opens `<think>` on the first `reasoning` chunk (`relayTypedChunk`) and closes it in `closeReasoning()` on the first text chunk or at `finish()`; `StreamCompletion::complete()` receives the relay and persists the reply | The server sees both instants the duration is made of and stores nothing about them. Per-message facts travel as `Message::setMeta` keys (`ai_chat_model`, `ai_chat_usage`, …) and `MessageApiFormatter::format` exposes them. |
+| Files table | `frontend/src/views/FilesView.vue` (2,989 lines), "Desktop table" twice (root list ~955, folder view ~1329): `table.w-full hidden sm:table`, name cell `flex min-w-0` + `truncate`, Size `w-24 hidden md:table-cell`, Uploaded `w-28 hidden lg:table-cell`, actions `w-36`, row actions `opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100` | Automatic table layout, so the name column grows with the name and `truncate` never applies; no `overflow-x-auto` either. `layout.spec.ts` "files page has no overflow" passes because the fixture has short names. |
 
 ## 0. Decision checklist
 
@@ -62,6 +75,9 @@ names the step.
 - [ ] **D12 (PQ4).** Two architecture tests guard the plugin set: every `plugins/*/manifest.json` loads through `PluginManifest::fromArray()` and its `routes[]` match the router's attribute routes for that plugin (path and method); every bundled plugin with a `backend/` has at least one test class under `backend/tests/Plugin/<Id>/`. castingdata and hello_world get the minimum test that makes the second assertion true (a controller smoke test each).
 - [ ] **D13 (PQ4).** `plugins/README.md` gains a section "Checks and tests" that names, per check, the CI job that runs it ("PHP Code Formatting", "Backend (PHP/Symfony)", "Frontend (Vue/TypeScript)", "Transcriber Sidecar (Node)") and the local `make` target, and links one green run of each as the reference. `docs/DEVELOPMENT.md` → Code Quality states that plugins are inside the gate.
 - [ ] **D14 (cross-repo).** After the first release that carries PQ2, synaplan-charts drops the short-commit pin (`images.synaplanTranscriber.tag: "92804be"`) and uses the chart's `appVersion` for both images, as #88 already prepares. That change is dschmidt's, in the #88 follow-up that also adopts #2642's contract.
+- [ ] **D15 (PQ5).** The server measures the thinking duration, not the client. `StreamChunkRelay` takes a monotonic timestamp when it opens `<think>` and when it closes it; `StreamCompletion` stores the rounded seconds as `Message::setMeta('thinking_seconds', …)` and `MessageApiFormatter::format` exposes `thinking_seconds` (nullable integer, OpenAPI-annotated, schemas regenerated). The `complete` SSE event carries the same integer, so the live bubble and the reloaded bubble show one number from one clock. The client clock in `closeThinkingParts` stays as the value shown *while* streaming and is replaced on `complete`. *Alternative:* post the client-measured integer back to the server; rejected because it needs a new write endpoint and makes the stored fact depend on the browser's clock and on the tab staying open.
+- [ ] **D16 (PQ5).** The length formula in `parseContentWithThinking` is removed. A stored message without `thinking_seconds` (every message before PQ5, and a non-streaming turn whose reasoning arrives with the answer) gets no `thinkingTime`, so the header reads `message.thinking` without a count, as #1058's closing change already intended. No migration backfills old rows: a fabricated number is the bug.
+- [ ] **D17 (PQ6).** The two copies of the desktop table in `FilesView.vue` become one component, `frontend/src/components/files/FilesTable.vue`, used by the root list and the folder view. The fix is then applied once: `table-fixed`, explicit widths for the checkbox, Size, Uploaded and actions columns, the name column takes the rest with `min-w-0` so `truncate` and the `title` tooltip take effect; no `overflow-x-auto`, because a card that scrolls sideways is the symptom with a scrollbar. Row actions keep `pointer-coarse:opacity-100`; on a fine pointer they stay hover-revealed but are now inside the card at every width. *Alternative:* patch both copies in place; rejected because the file is already ten times the component limit and the second copy is how the first regression hides.
 
 ## 1. Why — facts this plan rests on
 
@@ -70,6 +86,8 @@ names the step.
 3. The synascriber copy tables already drifted from Synaplan's wording once (the `check_owner` label survived two renames) and cannot be reached by the parity gate. Two more plugins have English-only inline text.
 4. The manifest route list was wrong for three routes until #2642 found it by accident. A test would have found it on the day it drifted.
 5. The house rules already demand all of this for `backend/` and `frontend/`; the plugins directory was simply outside every `paths:` line.
+6. The thinking header lies after a reload because the only input it has is the `<think>` text; the server watched the reasoning stream open and close and wrote nothing down. One meta key fixes the lie for every message from now on; nothing can fix it for old rows, and the honest display for them is no count (#1058's own rule).
+7. The Files table overflows because automatic table layout lets the widest name set the column width; `truncate` cannot act on a cell with no bound. The same markup exists twice in one 2,989-line file, so any fix made once is half a fix.
 
 ## 2. Target shape
 
@@ -98,10 +116,13 @@ ci.yml
 | J-PQ-2 | A participant in a French Jitsi sees the **Notes de réunion** button and the French dialog; the strings come from the plugin's `fr.json` through the bundled asset route. | synaplan-charts openDesk e2e (`notes.spec.ts`), with a language assertion added there; locally with a static page that includes the loader against the dev stack | PQ3 (cross-repo for the Jitsi half) |
 | J-PQ-3 | A contributor opens a pull request that reads an undefined variable in a plugin's PHP (a level-0 PHPStan finding; an unused local would pass level 5) and leaves plugin JavaScript unformatted. "Backend (PHP/Symfony)" and "Frontend (Vue/TypeScript)" fail with file and line. After the fix the same jobs are green. | GitHub, a throwaway draft pull request opened and closed during PQ1 | PQ1 |
 | J-PQ-4 | The owner cuts a release tag. `change-scope` says `promote`; no image is built; the transcriber's `<version>` tag resolves to exactly the two `ci-<sha>` digests of the main run; `docker buildx imagetools inspect` shows `linux/amd64` and `linux/arm64`. synaplan-charts pins that version for both images. | GitHub Actions on `main` and on the next tag; STATUS records both run ids | PQ2 |
+| J-PQ-5 | A person asks a reasoning model a question. While it thinks, the header reads "Thinking…"; when the answer starts, "Thought for N seconds" with N from the live clock; when the stream completes, N is the server's number (the two agree to the second). They reload: the same N. They open a chat from last week: the header reads "Thinking" with no count, not a number derived from the text. | the browser, dev stack with a reasoning-capable model (Groq `gpt-oss-120b` or the test model with reasoning on); two turns, one reload, one old chat | PQ5 |
+| J-PQ-6 | A person on Files has a folder with five transcripts named like `Mitschrift 2026-10-12-18-02 availableexplosionsesposedownstairs.md`. At a tablet width with the sidebar open, every row stays inside the card: the name ends in an ellipsis and shows in full on hover, Size and Uploaded drop out at the widths they already name, and the download / preview / delete actions are reachable without the page scrolling sideways. At 320 px the card list takes over as before. | the browser at 320, 640, 768, 1024 and 1440 px, light and dark, V2 design; `layout.spec.ts` extended with a long-named file | PQ6 |
 
-J-PQ-1 is the only user-visible journey in the SPA and carries the five
-exit bullets of `docs/UX_CONTRACT.md` §6 in its step row below. The other
-three are operator and contributor journeys; their proof is a CI run.
+J-PQ-1, J-PQ-5 and J-PQ-6 are user-visible journeys in the SPA and carry
+the five exit bullets of `docs/UX_CONTRACT.md` §6 in their step rows
+below. The other three are operator and contributor journeys; their proof
+is a CI run.
 
 ## 4. What we do not rebuild
 
@@ -125,6 +146,11 @@ the first commit); PQ4 waits for PQ3 (its docs describe the final state).
 | PQ2 | `ci(transcriber): publish the transcriber image like the app image` | no-app-impact | D5, D6 | #2638 |
 | PQ3 | `feat(plugins): locale files and t() for plugin frontends` | ota-candidate (`PluginView.vue`) | PQ1, **#2642 merged** (the public asset route the Jitsi loader fetches `locales/` from), D7–D11 | #2635 |
 | PQ4 | `test(plugins): bundled plugins are tested and documented like the release` | backend-only + docs | PQ3, D12, D13 | — (owner's fourth row) |
+| PQ5 | `fix(chat): "Thought for N seconds" is the measured time, on reload as well` | ota-candidate (`messageMapper.ts`, stream handlers) + backend-only (meta, formatter, OpenAPI) | D15, D16; independent of PQ1–PQ4 | #2619 |
+| PQ6 | `fix(files): the file table stays inside its card at every width` | ota-candidate (`FilesView.vue`, new `FilesTable.vue`) | D17; independent of PQ1–PQ5 | #2606 |
+
+PQ5 and PQ6 are the owner's quick bugs. They do not wait for anything and
+may merge first.
 
 ### PQ1 — static checks (#2636)
 
@@ -176,11 +202,45 @@ Exit: `make ci-local` and `make test-e2e` green; J-PQ-1 walked; the Jitsi half o
 
 Exit: `make ci-local` green; a deliberately wrong manifest route in a scratch branch makes `PluginManifestRoutesTest` fail with the path named (recorded, then discarded).
 
+### PQ5 — the thinking header tells the measured time (#2619)
+
+**User-flow:** J-PQ-5. Exit bullets per `docs/UX_CONTRACT.md` §6:
+
+1. J-PQ-5 walked in the browser: live, after `complete`, after reload, and on a pre-PQ5 message; the four headers logged in STATUS (U10).
+2. Findability: not applicable, the header is on the message it describes (U2 holds as today).
+3. Copy: no new string; `message.thoughtFor` and `message.thinking` exist in all five locales (U3, U9).
+4. Empty, error and flag-off: a message without a stored duration shows `message.thinking` with no number; a non-streaming turn stores no duration; the `complete` event without the field changes nothing on the client (U5, U8, U11).
+5. Dark, V2, 320 px: the header's layout is untouched; the walk confirms the count fits on a phone (U9).
+
+Commits:
+
+1. `fix(chat): …` — backend: `StreamChunkRelay` records `hrtime(true)` when it opens and when it closes the reasoning block and exposes `reasoningSeconds(): ?int` (null when no reasoning streamed); `StreamCompletion::complete()` writes `thinking_seconds` through `setMeta` and puts the same integer on `StreamCompleteEvent`; `MessageApiFormatter::format` returns `thinking_seconds` as a nullable integer with the OpenAPI property. Frontend: `make -C frontend generate-schemas`; `mapApiMessageRow` passes `row.thinking_seconds` into `parseContentWithThinking(content, thinkingSeconds)`, which sets `thinkingTime` only when given and no longer estimates; the `complete` handler sets `thinkingTime` on the thinking part from the event when present. Tests: a PHPUnit test on the relay (open at t0, first text at t0+4.6 s → 5; no reasoning → null; reasoning closed by `finish()` → measured to `finish`), a formatter test for the field, a Vitest for `parseContentWithThinking` (given 7 → 7; given nothing → no `thinkingTime`; a 4,950-character block alone → no `thinkingTime`), and a Vitest for the `complete` handler replacing the live value.
+2. No second commit unless the Copilot review asks for one.
+
+Exit: `make ci-local` and `make test-e2e` green (chat specs); the four headers of J-PQ-5 in STATUS; `frontend/tests/unit/stores/history.spec.ts` still passes for the live clock.
+
+### PQ6 — the Files table stays in its card (#2606)
+
+**User-flow:** J-PQ-6. Exit bullets per `docs/UX_CONTRACT.md` §6:
+
+1. J-PQ-6 walked at the five widths named in §3, light and dark, V2 (U10, U9).
+2. Findability: the row actions are inside the card at every width; on a coarse pointer they are always visible, on a fine pointer on hover and focus, as today (U2, U1).
+3. Copy: no new string; the full name is the `title` of the truncated cell, as the mobile list already does (U3).
+4. Empty, error and flag-off states are unchanged: the empty folder copy, the upload error and the hidden Generated tab render as before; the walk confirms it (U5, U8, U11).
+5. 320 px: the card list; 640 px: table with name and actions only; 768 px: Size joins; 1024 px: Uploaded joins (U9).
+
+Commits:
+
+1. `refactor(files): one FilesTable component for the root list and the folder view` — a move with no behaviour change: props for rows, selection, and the row-action builder; both call sites use it; `FilesView.vue` shrinks by the second copy.
+2. `fix(files): …` — `table-fixed`, the column widths of D17, `min-w-0` on the name cell. `layout.spec.ts` "files page has no overflow" uploads one file with a 72-character name before it measures and asserts, at the chromium-mobile and the desktop project, that the last row-actions cell's bounding box lies within the card's.
+
+Exit: `make ci-local`, `make test-e2e` and `make -C frontend test-e2e-layout` green; the walk in STATUS with one screenshot per width is not the proof, the Playwright assertion is.
+
 ## 6. Gates
 
 Every step, in this order, before the pull request is marked ready:
 
-1. `make ci-local` (unit and static). PQ3 adds `make test-e2e`; PQ2 adds `actionlint .github/workflows/ci.yml`; PQ1 and PQ3 add `node scripts/mobile-impact.mjs --base main --head HEAD`.
+1. `make ci-local` (unit and static). PQ3, PQ5 and PQ6 add `make test-e2e`; PQ6 adds `make -C frontend test-e2e-layout`; PQ5 adds `make -C frontend generate-schemas` before `vue-tsc`; PQ2 adds `actionlint .github/workflows/ci.yml`; every step that touches `frontend/` adds `node scripts/mobile-impact.mjs --base main --head HEAD`.
 2. Branch `chore/…`, `ci/…`, `feat/…`, `test/…` per step; Conventional Commit subjects as in §5; no attribution trailers (strip `Co-authored-by: Cursor` if a hook adds it).
 3. Pull request with the step's table row, the "Closes #…" line, the counts and run ids the step promises.
 4. Copilot review: every finding gets a reply on its thread, either a fixing commit (hash named) or a one-sentence reason. A finding that is right about a property the plan did not foresee goes into §10 of this file in the same pull request.
@@ -199,6 +259,10 @@ Every step, in this order, before the pull request is marked ready:
 | A skipped sidecar is mistaken for a passed one | PQ2 | The skip is accepted only in `promote` mode, where the image under the tag was tested by the main run that published its `ci-<sha>` tags; in `heavy` mode a skipped or failed sidecar blocks the push. |
 | `#2642` is not merged when PQ3 starts | PQ3 | PQ3 does not start before it; the Jitsi loader's locale fetch has no other route. Listed as a hard dependency in §5. |
 | The formatters cannot write through the read-only plugin mounts | PQ1 | `make plugins-format` runs them in one-off containers with a read-write mount; the service mounts stay read-only. |
+| The live clock and the server clock disagree by a second | PQ5 | Expected while streaming (network latency); `complete` replaces the live value, so the finished bubble and the reloaded bubble always agree. The walk records both. |
+| A provider streams reasoning and text interleaved, so `closeReasoning()` fires early | PQ5 | The duration is first `<think>` open to first close, which is what the header claims ("thought for" before the answer began). Interleaved reasoning after the first answer token is a different display question and is not counted; noted in the code comment. |
+| `FilesView.vue` has state the table reads implicitly | PQ6 | The refactor commit is behaviour-neutral and reviewed on its own; the existing `file-manage.spec.ts` (create, upload, share, delete) is the regression net before the fix commit lands. |
+| `table-fixed` clips the Size or Uploaded column on long locales | PQ6 | Widths are set for the five locales' longest label (`Hochgeladen`); the walk includes German. |
 | The arm64 runner label stops resolving if the repository goes private | PQ2 | Same comment the app job carries; same remedy (a larger arm64 runner). |
 | The Jitsi button appears later because it waits for `fr.json` | PQ3 D9 | One small same-origin fetch next to the `state` call the loader already makes; measured in the walk. The asset route caches for an hour. |
 | A locale fix takes up to an hour to reach Jitsi | PQ3 | Accepted for v1; noted in README. A `?v=<plugin version>` query is in §9. |
@@ -212,6 +276,9 @@ Every step, in this order, before the pull request is marked ready:
 - Translating `castingdata` (§9).
 - Any change to #2642's contract or to synaplan-charts (that is #88's follow-up).
 - Out-of-process plugins (row 18 of the roadmap).
+- The pipeline summary ("N steps · Xs") that is also lost on reload (#2619's notes call it a separate gap). It is not a thinking-header fact and stays open as its own issue.
+- Backfilling `thinking_seconds` for messages stored before PQ5: there is no truthful source.
+- Any other change to `FilesView.vue` than extracting the table it needs for the fix.
 
 ## 9. Later (in this order)
 
@@ -226,3 +293,4 @@ Every step, in this order, before the pull request is marked ready:
 | ---- | ------ |
 | 2026-10-22 | Plan written from issues #2635, #2636, #2638 and the owner's fourth requirement. |
 | 2026-10-22 | Copilot review of [#2644](https://github.com/metadist/synaplan/pull/2644), four findings accepted: J-PQ-3 uses an undefined-variable read (level 5 does not flag an unused local); #2642 is a hard prerequisite of PQ3; `make plugins-format` with a read-write one-off mount because the service mounts of `plugins/` are read-only; `transcriber-sidecar` is skipped in `promote` and `thin` mode and the push and gate jobs accept that skip only for `promote`. |
+| 2026-10-22 | Two bugs added at the owner's request so they ship in the same window: PQ5 (#2619, the thinking header after a reload; server-measured `thinking_seconds`, the length formula removed, no backfill) and PQ6 (#2606, the Files table; one `FilesTable.vue`, `table-fixed`, a long-named file in the layout spec). D15–D17, J-PQ-5, J-PQ-6. Both independent of PQ1–PQ4 and of each other. |

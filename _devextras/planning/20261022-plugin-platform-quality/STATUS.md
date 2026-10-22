@@ -17,8 +17,11 @@ and a CI run are entries here, not chat messages.
 | 2026-10-22 | Plugin JavaScript | 1,254 lines in four plugins, never linted | `wc -l plugins/*/frontend/*.js plugins/*/frontend/*/*.js` |
 | 2026-10-22 | PHPStan findings in plugins | not counted yet (PQ1 commit 1 records it) | — |
 | 2026-10-22 | Transcriber image tags today | `latest`, `<version>`, `<major>.<minor>`, short sha; published by a second build under QEMU | `ci.yml` `transcriber-publish` |
+| 2026-10-22 | Thinking header after reload | `max(3, floor(length / 100))` seconds; a 4,900–4,999-character block reads "49 seconds" | `frontend/src/utils/messageMapper.ts:215`; #2619 |
+| 2026-10-22 | Files desktop table | two copies in `FilesView.vue` (2,989 lines), automatic layout, no bound on the name column | `FilesView.vue` ~955 and ~1329; #2606 |
 
 ## Walks
 
-None yet. J-PQ-1 (PQ3) and J-PQ-3 (PQ1) are browser and GitHub walks;
-J-PQ-4 (PQ2) is two run ids; J-PQ-2 is walked in synaplan-charts.
+None yet. J-PQ-1 (PQ3), J-PQ-5 (PQ5) and J-PQ-6 (PQ6) are browser walks;
+J-PQ-3 (PQ1) is a GitHub walk; J-PQ-4 (PQ2) is two run ids; J-PQ-2 is
+walked in synaplan-charts.
