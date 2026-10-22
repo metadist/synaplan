@@ -11,6 +11,7 @@ use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\McpToolRegistry;
+use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -54,6 +55,7 @@ final readonly class McpFetchRunner implements TaskRunner
         private PromptService $promptService,
         private LoggerInterface $logger,
         private AtlassianToolArguments $atlassianArguments,
+        private NotionFetchArguments $notionFetch,
     ) {
     }
 
@@ -116,11 +118,12 @@ final readonly class McpFetchRunner implements TaskRunner
             return NodeResult::failed(sprintf("the tool '%s' can modify data and is not allowed (read-only)", $tool));
         }
 
-        $arguments = $this->atlassianArguments->complete(
+        $sourceText = (string) $context->message->getText();
+        $arguments = $this->notionFetch->complete(
             $server,
             $catalogTool,
-            $this->resolveArguments($node, $context),
-            (string) $context->message->getText(),
+            $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
+            $sourceText,
         );
 
         try {
@@ -258,6 +261,7 @@ final readonly class McpFetchRunner implements TaskRunner
                     continue;
                 }
                 $tools[] = $tool['name'].$this->renderArgumentHint($tool['inputSchema'])
+                    .$this->notionFetch->argumentHint($server->getUrl(), $tool['name'])
                     .('' !== $tool['description'] ? ' — '.$this->oneLine($tool['description']) : '');
             }
             if ([] === $tools) {

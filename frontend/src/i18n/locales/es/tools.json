@@ -917,6 +917,12 @@
         "about": "Guarda tu clave y secreto de Higgsfield. Las imágenes y vídeos que crees en el chat se cobrarán a tu cuenta de Higgsfield.",
         "stop": "Elimina tu clave abajo."
       },
+      "notion": {
+        "name": "Notion",
+        "tagline": "Lee y edita tus páginas de Notion en el chat.",
+        "about": "Cuando conectas Notion, la IA puede leer tus páginas. Escribir se activa aparte. Borrar y mover siguen desactivados.",
+        "stop": "Desconecta abajo. La IA ya no podrá leer ni cambiar Notion. Las páginas que ya existen se quedan."
+      },
       "mcp": {
         "name": "Servidores de herramientas (MCP)",
         "tagline": "Da a la IA herramientas de cualquier servidor MCP.",
@@ -941,6 +947,32 @@
         "about": "Crea una clave para scripts y otras apps. Cada llamada actúa en tu nombre y cuenta para tus límites.",
         "stop": "Revoca la clave abajo. Deja de funcionar al instante."
       }
+    },
+    "notion": {
+      "loading": "Cargando Notion…",
+      "loadFailed": "No se pudo cargar Notion. No se cambió nada.",
+      "retry": "Reintentar",
+      "notConnected": "Conecta Notion para que la IA pueda leer tus páginas en el chat.",
+      "connect": "Conectar Notion",
+      "connectFailed": "Notion no se conectó. No se cambió nada. Inténtalo de nuevo.",
+      "reconnectTitle": "Hay que conectar Notion otra vez antes de que la IA pueda usarlo.",
+      "reconnect": "Conectar de nuevo",
+      "connected": "Notion está conectado.",
+      "writeLabel": "La IA puede cambiar Notion",
+      "writeOn": "La IA puede crear y editar páginas en Notion sin preguntar cada vez. No puede borrar ni mover páginas.",
+      "writeOff": "La IA puede leer Notion. No cambiará nada.",
+      "writeSavedOn": "La IA ya puede crear y editar páginas de Notion sin preguntar. Sigue sin poder borrar ni mover páginas.",
+      "writeSavedOff": "Escribir está desactivado. La IA puede seguir leyendo Notion y no cambiará nada.",
+      "writeFailed": "No se guardó el ajuste. Notion no cambió. Inténtalo de nuevo.",
+      "examplesTitle": "Prueba una de estas frases en el chat",
+      "exampleRead": "Resume mi página Hoja de ruta",
+      "exampleWrite": "Crea una página llamada Notas de la reunión",
+      "tryChat": "Probarlo en el chat",
+      "disconnect": "Desconectar",
+      "disconnectTitle": "¿Desconectar Notion?",
+      "disconnectMessage": "La IA ya no podrá leer ni cambiar Notion. Las páginas que ya están en Notion se quedan. Puedes conectar de nuevo más tarde.",
+      "disconnected": "Notion está desconectado. En Notion no se cambió nada.",
+      "disconnectFailed": "Notion sigue conectado. No se cambió nada. Inténtalo de nuevo."
     },
     "linkedSteps": {
       "title": "Cómo conectar",

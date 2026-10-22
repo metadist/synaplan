@@ -71,6 +71,14 @@ class McpServerConfig
     private bool $allowWrite = false;
 
     /**
+     * When ON together with {@see $allowWrite}, mutating tools on this server
+     * run in an interactive chat without an approval card. Unattended runs
+     * and destructive tools are unchanged. OFF by default.
+     */
+    #[ORM\Column(name: 'BWRITEAUTO', type: 'boolean', options: ['default' => false])]
+    private bool $writeAuto = false;
+
+    /**
      * How this server authenticates: `none`, `bearer` (static header, default)
      * or `oauth` (RFC 9728 discovery + PKCE consent).
      */
@@ -198,6 +206,19 @@ class McpServerConfig
     public function setAllowWrite(bool $allowWrite): self
     {
         $this->allowWrite = $allowWrite;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function isWriteAuto(): bool
+    {
+        return $this->writeAuto;
+    }
+
+    public function setWriteAuto(bool $writeAuto): self
+    {
+        $this->writeAuto = $writeAuto;
         $this->touch();
 
         return $this;

@@ -917,6 +917,12 @@
         "about": "Higgsfield anahtarınızı ve gizli anahtarınızı kaydedin. Sohbette oluşturduğunuz görseller ve videolar Higgsfield hesabınıza faturalandırılır.",
         "stop": "Anahtarınızı aşağıdan kaldırın."
       },
+      "notion": {
+        "name": "Notion",
+        "tagline": "Notion sayfalarınızı sohbette okuyun ve düzenleyin.",
+        "about": "Bağladıktan sonra yapay zeka Notion sayfalarınızı okuyabilir. Yazma ayrı bir anahtardır. Silme ve taşıma kapalı kalır.",
+        "stop": "Aşağıdan bağlantıyı kesin. Yapay zeka artık Notion'u okuyamaz veya değiştiremez. Var olan sayfalar kalır."
+      },
       "mcp": {
         "name": "Araç sunucuları (MCP)",
         "tagline": "Yapay zekâya herhangi bir MCP sunucusundan araçlar verin.",
@@ -941,6 +947,32 @@
         "about": "Betikler ve diğer uygulamalar için bir anahtar oluşturun. Her çağrı sizin adınıza işler ve limitlerinizden düşülür.",
         "stop": "Aşağıdan anahtarı iptal edin. Hemen çalışmayı bırakır."
       }
+    },
+    "notion": {
+      "loading": "Notion yükleniyor…",
+      "loadFailed": "Notion yüklenemedi. Hiçbir şey değişmedi.",
+      "retry": "Yeniden deneyin",
+      "notConnected": "Yapay zekanın sohbette sayfalarınızı okuyabilmesi için Notion'u bağlayın.",
+      "connect": "Notion'u bağlayın",
+      "connectFailed": "Notion bağlanmadı. Hiçbir şey değişmedi. Yeniden deneyin.",
+      "reconnectTitle": "Yapay zeka kullanabilmeden önce Notion'u yeniden bağlamanız gerekir.",
+      "reconnect": "Yeniden bağlayın",
+      "connected": "Notion bağlı.",
+      "writeLabel": "Yapay zeka Notion'da değişiklik yapabilir",
+      "writeOn": "Yapay zeka her seferinde sormadan Notion'da sayfa oluşturabilir ve düzenleyebilir. Sayfa silemez veya taşıyamaz.",
+      "writeOff": "Yapay zeka Notion'u okuyabilir. Hiçbir şeyi değiştirmez.",
+      "writeSavedOn": "Yapay zeka artık sormadan Notion sayfaları oluşturabilir ve düzenleyebilir. Silme ve taşıma kapalı kalır.",
+      "writeSavedOff": "Yazma kapalı. Yapay zeka Notion'u okumaya devam eder ve hiçbir şeyi değiştirmez.",
+      "writeFailed": "Ayar kaydedilmedi. Notion değişmedi. Yeniden deneyin.",
+      "examplesTitle": "Sohbette bunlardan birini deneyin",
+      "exampleRead": "Yol haritası sayfamı özetle",
+      "exampleWrite": "Toplantı notları adında bir sayfa oluştur",
+      "tryChat": "Sohbette deneyin",
+      "disconnect": "Bağlantıyı kesin",
+      "disconnectTitle": "Notion bağlantısı kesilsin mi?",
+      "disconnectMessage": "Yapay zeka artık Notion'u okuyamaz veya değiştiremez. Notion'da olan sayfalar kalır. Daha sonra yeniden bağlayabilirsiniz.",
+      "disconnected": "Notion bağlantısı kesildi. Notion'da hiçbir şey değişmedi.",
+      "disconnectFailed": "Notion bağlı kalıyor. Hiçbir şey değişmedi. Yeniden deneyin."
     },
     "linkedSteps": {
       "title": "Nasıl bağlanır",

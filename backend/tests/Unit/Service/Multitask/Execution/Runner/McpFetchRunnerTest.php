@@ -16,6 +16,7 @@ use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpToolRegistry;
+use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -123,6 +124,7 @@ final class McpFetchRunnerTest extends TestCase
             $this->promptService($topicMetaRows),
             $logger ?? new NullLogger(),
             new AtlassianToolArguments($client, new NullLogger()),
+            new NotionFetchArguments(new NullLogger()),
         );
     }
 
@@ -336,6 +338,45 @@ final class McpFetchRunnerTest extends TestCase
         self::assertSame('https://deskfiler.atlassian.net', $this->lastCallArguments['cloudId'] ?? null);
         self::assertSame('IN1-1', $this->lastCallArguments['issueIdOrKey'] ?? null);
         self::assertSame('full', $this->lastCallArguments['view'] ?? null);
+    }
+
+    public function testNotionFetchKeepsOnePageIdWhenThePlanPastesTheSearchResult(): void
+    {
+        $server = $this->server();
+        $server->setUrl('https://mcp.notion.com/mcp')->setName('Notion');
+        $this->serverTools = [[
+            'name' => 'notion-fetch',
+            'description' => 'Fetch a page',
+            'inputSchema' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']],
+            'annotations' => ['readOnlyHint' => true],
+        ]];
+        $blob = (string) json_encode([
+            'type' => 'workspace_search',
+            'results' => [
+                [
+                    'id' => '39797ad6-0eb3-806d-b59e-ef7653838664',
+                    'title' => 'Metadist GmbH',
+                    'url' => 'https://app.notion.com/p/39797ad60eb3806db59eef7653838664',
+                    'type' => 'page',
+                ],
+                [
+                    'id' => '3fb97ad6-0eb3-81d3-96a3-f62d469c8531',
+                    'title' => 'Knowledge Base',
+                    'type' => 'page',
+                ],
+            ],
+        ]);
+
+        $result = $this->runner(server: $server)->run(
+            new TaskNode('n2', Capability::McpFetch, [], ['arguments' => ['id' => $blob]], [
+                'server_id' => 3,
+                'tool' => 'notion-fetch',
+            ]),
+            $this->context('Fasse die Seite Metadist GmbH zusammen'),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('39797ad6-0eb3-806d-b59e-ef7653838664', $this->lastCallArguments['id'] ?? null);
     }
 
     public function testEmptyContentStillReachesTheAnswer(): void

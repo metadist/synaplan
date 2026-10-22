@@ -45,6 +45,12 @@ final class McpOAuthController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['MCP Servers'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'return_to', type: 'string', example: '/apps/notion', description: 'App path to open after consent. Only /apps/notion and /apps/mcp are accepted.'),
+            ])
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -61,7 +67,7 @@ final class McpOAuthController extends AbstractController
             new OA\Response(response: 404, description: 'Not found'),
         ]
     )]
-    public function start(int $id, #[CurrentUser] ?User $user): JsonResponse
+    public function start(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -72,8 +78,11 @@ final class McpOAuthController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Server not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $payload = json_decode($request->getContent(), true);
+        $returnTo = is_array($payload) && is_string($payload['return_to'] ?? null) ? $payload['return_to'] : null;
+
         try {
-            $url = $this->consent->start($server, $user->getId());
+            $url = $this->consent->start($server, $user->getId(), $returnTo);
         } catch (McpOAuthException $e) {
             $status = str_contains($e->getMessage(), 'disabled by an administrator')
                 ? Response::HTTP_FORBIDDEN
@@ -102,17 +111,19 @@ final class McpOAuthController extends AbstractController
     )]
     public function callback(Request $request): Response
     {
+        $state = $request->query->get('state');
+        $returnTo = $this->consent->returnPath(is_string($state) ? $state : null);
+
         $error = $request->query->get('error');
         if (is_string($error) && '' !== $error) {
             $this->logger->warning('MCP OAuth consent was refused', ['error' => $error]);
 
-            return $this->resultRedirect(null, 'denied');
+            return $this->resultRedirect(null, 'denied', $returnTo);
         }
 
         $code = $request->query->get('code');
-        $state = $request->query->get('state');
         if (!is_string($code) || '' === $code || !is_string($state) || '' === $state) {
-            return $this->resultRedirect(null, 'missing_code');
+            return $this->resultRedirect(null, 'missing_code', $returnTo);
         }
 
         try {
@@ -122,10 +133,10 @@ final class McpOAuthController extends AbstractController
 
             $reason = str_contains($e->getMessage(), 'disabled by an administrator') ? 'disabled' : 'exchange_failed';
 
-            return $this->resultRedirect(null, $reason);
+            return $this->resultRedirect(null, $reason, $returnTo);
         }
 
-        return $this->resultRedirect($server->getId());
+        return $this->resultRedirect($server->getId(), null, $returnTo);
     }
 
     #[Route('/{id}/oauth/disconnect', name: 'disconnect', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -160,7 +171,7 @@ final class McpOAuthController extends AbstractController
         return $this->json(['success' => true]);
     }
 
-    private function resultRedirect(?int $serverId, ?string $reason = null): Response
+    private function resultRedirect(?int $serverId, ?string $reason = null, string $returnTo = McpOAuthConsentService::DEFAULT_RETURN): Response
     {
         $query = [];
         if (null !== $serverId) {
@@ -169,7 +180,10 @@ final class McpOAuthController extends AbstractController
         if (null !== $reason) {
             $query['oauth_error'] = preg_replace('/[^a-z0-9_]/i', '', $reason) ?? 'unknown';
         }
+        if (!in_array($returnTo, McpOAuthConsentService::ALLOWED_RETURN_TO, true)) {
+            $returnTo = McpOAuthConsentService::DEFAULT_RETURN;
+        }
 
-        return $this->redirect(rtrim($this->frontendUrl, '/').'/channels/mcp?'.http_build_query($query));
+        return $this->redirect(rtrim($this->frontendUrl, '/').$returnTo.'?'.http_build_query($query));
     }
 }

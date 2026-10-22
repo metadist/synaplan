@@ -914,6 +914,12 @@
         "about": "Speichere deinen Higgsfield-Schlüssel und das Secret. Bilder und Videos, die du im Chat erstellst, werden dann über dein Higgsfield-Konto abgerechnet.",
         "stop": "Entferne unten deinen Schlüssel."
       },
+      "notion": {
+        "name": "Notion",
+        "tagline": "Lies und bearbeite deine Notion-Seiten im Chat.",
+        "about": "Nach dem Verbinden kann die KI deine Notion-Seiten lesen. Schreiben schaltest du extra ein. Löschen und Verschieben bleiben aus.",
+        "stop": "Trenne die Verbindung unten. Die KI kann Notion danach nicht mehr lesen oder ändern. Vorhandene Seiten bleiben."
+      },
       "mcp": {
         "name": "Tool-Server (MCP)",
         "tagline": "Gib der KI Werkzeuge von einem MCP-Server.",
@@ -938,6 +944,32 @@
         "about": "Erstelle einen Schlüssel für Skripte und andere Apps. Jeder Aufruf handelt in deinem Namen und zählt zu deinen Limits.",
         "stop": "Widerrufe den Schlüssel unten. Er funktioniert sofort nicht mehr."
       }
+    },
+    "notion": {
+      "loading": "Notion wird geladen …",
+      "loadFailed": "Notion konnte nicht geladen werden. Es wurde nichts geändert.",
+      "retry": "Erneut versuchen",
+      "notConnected": "Verbinde Notion, damit die KI deine Seiten im Chat lesen kann.",
+      "connect": "Mit Notion verbinden",
+      "connectFailed": "Notion wurde nicht verbunden. Es wurde nichts geändert. Versuch es erneut.",
+      "reconnectTitle": "Notion muss erneut verbunden werden, bevor die KI es nutzen kann.",
+      "reconnect": "Erneut verbinden",
+      "connected": "Notion ist verbunden.",
+      "writeLabel": "Die KI darf in Notion schreiben",
+      "writeOn": "Die KI kann Seiten in Notion anlegen und ändern, ohne jedes Mal zu fragen. Löschen und Verschieben kann sie nicht.",
+      "writeOff": "Die KI kann Notion lesen. Sie ändert nichts.",
+      "writeSavedOn": "Die KI kann jetzt Notion-Seiten anlegen und ändern, ohne zu fragen. Löschen und Verschieben bleibt gesperrt.",
+      "writeSavedOff": "Schreiben ist aus. Die KI kann Notion weiter lesen und ändert nichts.",
+      "writeFailed": "Die Einstellung wurde nicht gespeichert. Notion wurde nicht geändert. Versuch es erneut.",
+      "examplesTitle": "Probier einen Satz im Chat",
+      "exampleRead": "Fasse meine Seite Roadmap zusammen",
+      "exampleWrite": "Leg eine Seite Meeting-Notizen an",
+      "tryChat": "Im Chat ausprobieren",
+      "disconnect": "Trennen",
+      "disconnectTitle": "Notion trennen?",
+      "disconnectMessage": "Die KI kann Notion danach nicht mehr lesen oder ändern. Seiten, die schon in Notion sind, bleiben. Du kannst später neu verbinden.",
+      "disconnected": "Notion ist getrennt. In Notion wurde nichts geändert.",
+      "disconnectFailed": "Notion ist weiter verbunden. Es wurde nichts geändert. Versuch es erneut."
     },
     "linkedSteps": {
       "title": "So verbindest du es",
