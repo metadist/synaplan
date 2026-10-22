@@ -9,7 +9,8 @@ measurement and a rollout are entries here, not chat messages.
 | ---- | ---- | ------------ | ----- | ----- |
 | 2026-10-21 | AU0 | [#2623](https://github.com/metadist/synaplan/pull/2623) | merged (`ce89e32a4`) | research, spike, plan; three Copilot rounds, all findings accepted |
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
-| 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | in review | `make perf-runtime` |
+| 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
+| 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | in review | probe cache and `/api/health/ready`; full PHPUnit and E2E not yet green here |
 
 ## Baselines
 
@@ -272,6 +273,54 @@ The diff touches only `_devextras/`, so the gate is the docs-only line of
 - Vitest 439 of 439 files (3,115 tests), `vue-tsc` clean.
 - `node scripts/mobile-impact.mjs --base origin/main --head HEAD`:
   exit 0, class `no-app-impact`.
+
+---
+
+## 2026-10-21 — AU2 started
+
+Started from `ce89e32a4` (#2623). Rebased onto `main` after AU0b
+([#2627](https://github.com/metadist/synaplan/pull/2627)) ticked §0, including
+the ask-first rows. AU2 itself does not change Docker, compose or the schema.
+
+Regression, run on the parent (the dev container's `WhisperService` before
+this change) with the new tests mounted:
+
+```text
+Failed asserting that 2 is identical to 1.
+WhisperServiceTest::testAvailabilityProbeStartsTheBinaryOnceWithinTheCacheLifetime
+WhisperServiceTest::testAFailedProbeStartsTheBinaryOnce
+```
+
+Two `isAvailable()` calls started `whisper` twice. On the branch the same
+tests start it once. A successful probe is cached for 300 seconds, a failed
+probe for 60. A missing binary does not use the cache. A cache outage still
+runs the probe.
+
+`GET /api/health` body is unchanged. `GET /api/health/ready` returns `status`
+and the Redis result only. In the test kernel a warmed request took 13.5 ms,
+so the functional test allows 25 ms. The 5 ms budget is `make perf-runtime`
+(AU1), on `main` as [#2628](https://github.com/metadist/synaplan/pull/2628).
+
+`HealthControllerTest` was not edited. PHPStan (full `src/` and `tests/`) and
+deptrac reported no errors. php-cs-fixer reported no changes on the four PHP
+files.
+
+Not done in this session: `make ci-local` as one command, `make test-e2e`,
+and `make perf-runtime`. A one-off `docker compose run` of the full PHPUnit
+suite exited 139 (segfault) twice at about test 740 of 9675, in a stretch
+that does not touch Whisper. The long-running dev container ran the health,
+Whisper, size-ratchet and thin-controller tests; the only failure was
+`ChatRunner::run` 129 → 132, which is on the other checkout, not in this diff.
+
+---
+
+## 2026-10-22 — Handover
+
+AU1 is on `main` ([#2628](https://github.com/metadist/synaplan/pull/2628)).
+AU2 stays open as [#2626](https://github.com/metadist/synaplan/pull/2626) for
+the owner to review and merge. What is done, what is not, and a second
+opinion on S5 and the approval-gate gap are in
+[`HANDOVER.md`](./HANDOVER.md).
 
 ---
 

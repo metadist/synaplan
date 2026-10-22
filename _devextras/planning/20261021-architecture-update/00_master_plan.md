@@ -36,6 +36,7 @@ approved in the 2026-10-21 pre-flight session (Agree column of §0).
 | [`04_capacity_and_kubernetes.md`](./04_capacity_and_kubernetes.md) | The extra part the owner asked for: the request timeline, the capacity page, the watchdog as server agent, Kubernetes probes, autoscaling and drain |
 | [`S0_protect_and_measure.md`](./S0_protect_and_measure.md) … [`S6_capacity_and_kubernetes.md`](./S6_capacity_and_kubernetes.md) | One file per sprint: one vibe brief per step, sprint test, exit criteria |
 | [`STATUS.md`](./STATUS.md) | Step log, measurements, review log |
+| [`HANDOVER.md`](./HANDOVER.md) | 2026-10-22 handover: AU1 merged, AU2 open, what is left, second opinion on S5 |
 | [`spike/`](./spike/README.md) | The 2026-10-21 runtime spike: scripts that produced every number in `02` |
 
 ---
