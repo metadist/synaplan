@@ -71,6 +71,12 @@
         <env name="SEARXNG_BASE_URL" value="" force="true" />
         <server name="OFFICE_CONVERT_URL" value="" force="true" />
         <env name="OFFICE_CONVERT_TIMEOUT_MS" value="60000" force="true" />
+        <!-- The dev container sets TELEGRAM_ENABLED=false. That beats .env.test
+             unless forced, so the channel-access test 404s locally and passes in CI. -->
+        <env name="TELEGRAM_ENABLED" value="true" force="true" />
+        <env name="TELEGRAM_API_BASE_URL" value="http://telegram-stub:3998" force="true" />
+        <env name="TELEGRAM_WEBHOOK_BASE_URL" value="https://e2e.synaplan.test" force="true" />
+        <env name="TELEGRAM_ALLOW_LOCAL_WEBHOOK" value="false" force="true" />
     </php>
 
     <testsuites>
