@@ -93,7 +93,8 @@ registration, and the frontend pins a hash of the spec.
 `GET /api/health` reports providers, Whisper and Redis. Whisper's probe
 (`whisper --help` and the model scan) is cached for five minutes when it
 succeeds and for one minute when it fails, so a health poll does not start
-a program on every call. A missing binary is not cached.
+a program on every call. The result is kept per server, because the binary
+and the models live on each server. A missing binary is not cached.
 
 `GET /api/health/ready` is the short probe for a load balancer or the
 watchdog. It pings Redis and returns `status` plus that Redis result. It

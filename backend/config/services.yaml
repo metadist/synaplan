@@ -705,6 +705,7 @@ services:
             $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
             $ffmpegBinary: '%env(FFMPEG_BINARY)%'
             $whisperEnabled: '%env(bool:WHISPER_ENABLED)%'
+            $availabilityCache: '@cache.app'
 
     # Brave Search API Service
     App\Service\Search\BraveSearchService:

@@ -204,7 +204,8 @@ readonly class WhisperService
      * The probe — `whisper --help` and the model scan — is cached for five
      * minutes when it succeeds and for one minute when it fails. A missing
      * binary or model returns at once and is not cached, so installing
-     * Whisper shows up on the next check. A cache outage still runs the probe.
+     * Whisper shows up on the next check. The result is kept per server. A
+     * cache outage still runs the probe.
      */
     public function isAvailable(): bool
     {
@@ -293,9 +294,14 @@ readonly class WhisperService
         return true;
     }
 
+    /**
+     * The pool is shared across servers, but the binary, models and FFmpeg
+     * are per server, so the host name is part of the key.
+     */
     private function availabilityCacheKey(): string
     {
         $material = implode('|', [
+            (string) gethostname(),
             $this->whisperBinary,
             $this->whisperModelsPath,
             $this->defaultModel,
