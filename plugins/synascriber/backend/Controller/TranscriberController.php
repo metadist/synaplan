@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Plugin\SynaScriber\Controller;
 
-use App\Entity\User;
 use OpenApi\Attributes as OA;
 use Plugin\SynaScriber\Service\SessionException;
 use Plugin\SynaScriber\Service\SessionService;
@@ -16,17 +15,19 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * The transcriber's session API (docs/02_architecture.md §5), called with the
- * plugin owner's API key. Every call is checked against a live session: no
- * session, no transcription.
+ * The transcriber's session API (docs/02_architecture.md §5). The transcriber
+ * has no Synaplan account: it proves itself with the shared transcriber
+ * secret (public route in security.yaml). Every call is checked against a
+ * live session: no session, no transcription.
  */
 #[Route('/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}', name: 'api_plugin_synascriber_transcriber_', requirements: ['ref' => '[A-Za-z0-9_-]{22}'])]
 #[OA\Tag(name: 'synaScriber Plugin')]
 final class TranscriberController extends AbstractController
 {
+    public const SECRET_HEADER = 'X-Transcriber-Secret';
+
     /** Seconds the transcriber waits before retrying when speech recognition is down. */
     private const RETRY_AFTER_SECONDS = 5;
 
@@ -38,6 +39,7 @@ final class TranscriberController extends AbstractController
 
     #[Route('', name: 'bind', methods: ['GET'])]
     #[OA\Get(summary: 'Bind a bridge connection to a live session (on connect and every 30 s)')]
+    #[OA\Parameter(name: 'X-Transcriber-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'meetingId', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
     #[OA\Response(response: 200, description: 'Binding', content: new OA\JsonContent(properties: [
         new OA\Property(property: 'sessionId', type: 'string'),
@@ -52,9 +54,9 @@ final class TranscriberController extends AbstractController
     ]))]
     #[OA\Response(response: 404, description: 'Unknown session')]
     #[OA\Response(response: 409, description: 'Session ended or belongs to another meeting: close the connection')]
-    public function bind(string $ref, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    public function bind(string $ref, Request $request): JsonResponse
     {
-        if (null !== $denied = $this->denied($user)) {
+        if (null !== $denied = $this->denied($request)) {
             return $denied;
         }
         try {
@@ -66,6 +68,7 @@ final class TranscriberController extends AbstractController
 
     #[Route('/audio', name: 'audio', methods: ['POST'])]
     #[OA\Post(summary: 'One speech window of one speaker (the only way audio enters Synaplan)')]
+    #[OA\Parameter(name: 'X-Transcriber-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'multipart/form-data', schema: new OA\Schema(required: ['audio', 'endpointId', 'seq', 't0Ms', 't1Ms', 'cut'], properties: [
         new OA\Property(property: 'audio', type: 'string', format: 'binary', description: 'Ogg Opus, at most 2 MB and 30 s'),
         new OA\Property(property: 'endpointId', type: 'string'),
@@ -85,9 +88,9 @@ final class TranscriberController extends AbstractController
     ]))]
     #[OA\Response(response: 409, description: 'Session does not accept audio any more')]
     #[OA\Response(response: 503, description: 'Speech recognition unavailable; retry after Retry-After seconds')]
-    public function audio(string $ref, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    public function audio(string $ref, Request $request): JsonResponse
     {
-        if (null !== $denied = $this->denied($user)) {
+        if (null !== $denied = $this->denied($request)) {
             return $denied;
         }
         try {
@@ -99,6 +102,7 @@ final class TranscriberController extends AbstractController
 
     #[Route('/preview', name: 'preview', methods: ['POST'])]
     #[OA\Post(summary: 'Live caption of the window so far: recognised, never stored')]
+    #[OA\Parameter(name: 'X-Transcriber-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'multipart/form-data', schema: new OA\Schema(required: ['audio', 'endpointId', 'seq', 't0Ms', 't1Ms'], properties: [
         new OA\Property(property: 'audio', type: 'string', format: 'binary'),
         new OA\Property(property: 'endpointId', type: 'string'),
@@ -116,9 +120,9 @@ final class TranscriberController extends AbstractController
     ]))]
     #[OA\Response(response: 403, description: 'Live captions are switched off')]
     #[OA\Response(response: 409, description: 'Session is not running')]
-    public function preview(string $ref, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    public function preview(string $ref, Request $request): JsonResponse
     {
-        if (null !== $denied = $this->denied($user)) {
+        if (null !== $denied = $this->denied($request)) {
             return $denied;
         }
         try {
@@ -130,6 +134,7 @@ final class TranscriberController extends AbstractController
 
     #[Route('/events', name: 'events', methods: ['POST'])]
     #[OA\Post(summary: 'Transcriber lifecycle event')]
+    #[OA\Parameter(name: 'X-Transcriber-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(required: ['type'], properties: [
         new OA\Property(property: 'type', type: 'string', enum: ['connected', 'speaker-start', 'speaker-stop', 'stt-failure', 'session-end', 'finished']),
         new OA\Property(property: 'endpointId', type: 'string'),
@@ -138,9 +143,9 @@ final class TranscriberController extends AbstractController
     ]))]
     #[OA\Response(response: 204, description: 'Accepted')]
     #[OA\Response(response: 404, description: 'Unknown session')]
-    public function events(string $ref, Request $request, #[CurrentUser] ?User $user): Response
+    public function events(string $ref, Request $request): Response
     {
-        if (null !== $denied = $this->denied($user)) {
+        if (null !== $denied = $this->denied($request)) {
             return $denied;
         }
         try {
@@ -182,11 +187,14 @@ final class TranscriberController extends AbstractController
         return $response;
     }
 
-    private function denied(?User $user): ?JsonResponse
+    private function denied(Request $request): ?JsonResponse
     {
-        $owner = $this->settings->ownerUserId();
-        if (!$user instanceof User || $owner <= 0 || (int) $user->getId() !== $owner) {
-            return $this->json(['error' => 'not_allowed', 'message' => 'Only the plugin owner\'s API key may call the transcriber routes.'], 403);
+        $secret = $this->settings->transcriberSecret();
+        if ('' === $secret) {
+            return $this->json(['error' => 'not_configured', 'message' => 'Meeting notes have no transcriber secret yet. An administrator sets transcriber_secret.'], 503);
+        }
+        if (!hash_equals($secret, (string) $request->headers->get(self::SECRET_HEADER, ''))) {
+            return $this->json(['error' => 'not_allowed', 'message' => 'Only the transcriber may call these routes; the transcriber secret does not match.'], 403);
         }
 
         return null;

@@ -79,3 +79,27 @@ test('element mode does not open the Jitsi socket', async () => {
     await new Promise((resolve) => server.close(resolve))
   }
 })
+
+function upgradeStatus(host, path) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://${host}${path}`, { headers: { Authorization: 'Bearer secret' } })
+    ws.on('open', () => reject(new Error('socket opened')))
+    ws.on('unexpected-response', (_request, response) => resolve(response.statusCode))
+    ws.on('error', () => {})
+  })
+}
+
+test('a missing credential refuses the Jitsi path that needs it, with a log line', async () => {
+  const lines = []
+  const server = createApp(config(), { synaplan: null, plugin: null, log: (line) => lines.push(line) })
+  const host = await listen(server)
+  try {
+    assert.equal(await upgradeStatus(host, '/transcribe?notes=Ab3dEf9hJkLmN0pQrStUvW&sessionId=m1'), 503)
+    assert.equal(await upgradeStatus(host, '/transcribe?sessionId=standup'), 503)
+    assert.equal(await upgradeStatus(host, '/transcribe?notes=too-short'), 400)
+    assert.ok(lines.some((line) => line.includes('SYNAPLAN_PLUGIN_SECRET is not set')))
+    assert.ok(lines.some((line) => line.includes('need SYNAPLAN_API_KEY')))
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})

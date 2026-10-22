@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Plugin\SynaScriber;
 
-use App\Entity\User;
 use Plugin\SynaScriber\Controller\TranscriberController;
 use Plugin\SynaScriber\Service\SessionException;
 use Plugin\SynaScriber\Service\SessionService;
@@ -17,20 +16,22 @@ final class TranscriberControllerTest extends PluginTestCase
 {
     private string $upload = '';
 
-    private function controller(?SessionService $sessions = null): TranscriberController
+    /**
+     * @param array<string, string> $settings
+     */
+    private function controller(?SessionService $sessions = null, array $settings = []): TranscriberController
     {
-        $controller = new TranscriberController($sessions ?? $this->createStub(SessionService::class), $this->settings());
+        $controller = new TranscriberController($sessions ?? $this->createStub(SessionService::class), $this->settings($settings));
         $controller->setContainer(new Container());
 
         return $controller;
     }
 
-    private function user(int $id): User
+    private static function signed(Request $request, string $secret = self::SECRET): Request
     {
-        $user = $this->createStub(User::class);
-        $user->method('getId')->willReturn($id);
+        $request->headers->set(TranscriberController::SECRET_HEADER, $secret);
 
-        return $user;
+        return $request;
     }
 
     private function windowRequest(): Request
@@ -39,7 +40,7 @@ final class TranscriberControllerTest extends PluginTestCase
         file_put_contents($this->upload, 'OggS-audio');
         $file = new UploadedFile($this->upload, 'window.ogg', 'audio/ogg', null, true);
 
-        return Request::create('/audio', 'POST', ['endpointId' => 'ep1', 'seq' => '3', 't0Ms' => '1000', 't1Ms' => '2500', 'cut' => 'pause'], [], ['audio' => $file]);
+        return self::signed(Request::create('/audio', 'POST', ['endpointId' => 'ep1', 'seq' => '3', 't0Ms' => '1000', 't1Ms' => '2500', 'cut' => 'pause'], [], ['audio' => $file]));
     }
 
     protected function tearDown(): void
@@ -60,14 +61,27 @@ final class TranscriberControllerTest extends PluginTestCase
         return $data;
     }
 
-    public function testOnlyThePluginOwnersKeyMayCall(): void
+    public function testOnlyTheTranscriberSecretMayCall(): void
     {
         $sessions = $this->createMock(SessionService::class);
         $sessions->expects(self::never())->method('bind');
         $controller = $this->controller($sessions);
 
-        self::assertSame(403, $controller->bind(self::REF, Request::create('/'), $this->user(5))->getStatusCode());
-        self::assertSame(403, $controller->bind(self::REF, Request::create('/'), null)->getStatusCode());
+        self::assertSame(403, $controller->bind(self::REF, Request::create('/'))->getStatusCode());
+        self::assertSame(403, $controller->bind(self::REF, self::signed(Request::create('/'), 'wrong'))->getStatusCode());
+        self::assertSame(403, $controller->bind(self::REF, self::signed(Request::create('/'), ''))->getStatusCode());
+    }
+
+    public function testWithoutAConfiguredSecretNothingIsAccepted(): void
+    {
+        $sessions = $this->createMock(SessionService::class);
+        $sessions->expects(self::never())->method('bind');
+        $controller = $this->controller($sessions, ['transcriber_secret' => '']);
+
+        $response = $controller->bind(self::REF, self::signed(Request::create('/'), ''));
+
+        self::assertSame(503, $response->getStatusCode());
+        self::assertSame('not_configured', self::body($response)['error']);
     }
 
     public function testAMultipartWindowReachesTheSession(): void
@@ -78,7 +92,7 @@ final class TranscriberControllerTest extends PluginTestCase
             ->with(self::REF, ['endpointId' => 'ep1', 'seq' => 3, 't0Ms' => 1000, 't1Ms' => 2500, 'audio' => 'OggS-audio', 'cut' => 'pause'])
             ->willReturn(['seq' => 3, 'text' => 'Hallo', 'dropped' => null]);
 
-        $response = $controller->audio(self::REF, $this->windowRequest(), $this->user(self::OWNER));
+        $response = $controller->audio(self::REF, $this->windowRequest());
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('Hallo', self::body($response)['text']);
@@ -90,7 +104,7 @@ final class TranscriberControllerTest extends PluginTestCase
         $sessions->method('preview')->willThrowException(new SessionException('stt_unreachable', 'The speech-to-text server did not answer.', 502));
         $controller = $this->controller($sessions);
 
-        $response = $controller->preview(self::REF, $this->windowRequest(), $this->user(self::OWNER));
+        $response = $controller->preview(self::REF, $this->windowRequest());
 
         self::assertSame(503, $response->getStatusCode());
         self::assertSame('5', $response->headers->get('Retry-After'));
@@ -103,7 +117,7 @@ final class TranscriberControllerTest extends PluginTestCase
         $sessions->method('bind')->willThrowException(new SessionException('wrong_meeting', 'These meeting notes belong to another meeting.', 409));
         $controller = $this->controller($sessions);
 
-        $response = $controller->bind(self::REF, Request::create('/?meetingId=other'), $this->user(self::OWNER));
+        $response = $controller->bind(self::REF, self::signed(Request::create('/?meetingId=other')));
 
         self::assertSame(409, $response->getStatusCode());
         self::assertNull($response->headers->get('Retry-After'));
@@ -115,9 +129,9 @@ final class TranscriberControllerTest extends PluginTestCase
         $sessions->expects(self::once())->method('event')->with(self::REF, ['type' => 'connected', 'at' => 5]);
         $controller = $this->controller($sessions);
 
-        $request = Request::create('/events', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"type":"connected","at":5}');
+        $request = self::signed(Request::create('/events', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"type":"connected","at":5}'));
 
-        self::assertSame(204, $controller->events(self::REF, $request, $this->user(self::OWNER))->getStatusCode());
+        self::assertSame(204, $controller->events(self::REF, $request)->getStatusCode());
     }
 
     public function testAnEventThatIsNotJsonIsRefused(): void
@@ -126,8 +140,8 @@ final class TranscriberControllerTest extends PluginTestCase
         $sessions->expects(self::never())->method('event');
         $controller = $this->controller($sessions);
 
-        $request = Request::create('/events', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{type: connected');
+        $request = self::signed(Request::create('/events', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{type: connected'));
 
-        self::assertSame(422, $controller->events(self::REF, $request, $this->user(self::OWNER))->getStatusCode());
+        self::assertSame(422, $controller->events(self::REF, $request)->getStatusCode());
     }
 }

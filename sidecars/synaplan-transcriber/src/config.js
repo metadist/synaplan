@@ -25,9 +25,19 @@ export function loadConfig(env) {
   }
 
   const synaplanUrl = clean(env.SYNAPLAN_URL).replace(/\/$/, '')
+  if (synaplanUrl === '') {
+    throw new Error('SYNAPLAN_URL is required')
+  }
+  // Meeting notes (the synascriber plugin) only need the shared secret. The
+  // API key is for the paths that act as a Synaplan user: Element voice
+  // messages and Jitsi captions without the plugin.
   const apiKey = clean(env.SYNAPLAN_API_KEY)
-  if (synaplanUrl === '' || apiKey === '') {
-    throw new Error('SYNAPLAN_URL and SYNAPLAN_API_KEY are required')
+  const pluginSecret = clean(env.SYNAPLAN_PLUGIN_SECRET)
+  if (apiKey === '' && pluginSecret === '') {
+    throw new Error('SYNAPLAN_PLUGIN_SECRET (meeting notes) or SYNAPLAN_API_KEY is required')
+  }
+  if (mode === 'element' && apiKey === '') {
+    throw new Error('SYNAPLAN_API_KEY is required in element mode')
   }
 
   const language = clean(env.TRANSCRIBER_LANGUAGE || 'auto').toLowerCase()
@@ -69,11 +79,12 @@ export function loadConfig(env) {
     host: clean(env.TRANSCRIBER_HOST || '0.0.0.0') || '0.0.0.0',
     port,
     jitsi,
-    element: elementRequested && matrixReady,
+    element: elementRequested && matrixReady && apiKey !== '',
     elementRequested,
     matrixReady,
     synaplanUrl,
     apiKey,
+    pluginSecret,
     model: clean(env.SYNAPLAN_STT_MODEL),
     language,
     authToken,

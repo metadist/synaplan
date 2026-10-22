@@ -30,7 +30,7 @@ final class TranscriberSessionTest extends PluginTestCase
     private function service(array $settings = [], ?WhisperClient $whisper = null, ?TranscriptWriter $writer = null): SessionService
     {
         $config = $this->settings($settings);
-        $this->store = new SessionStore($this->pluginData(), $config);
+        $this->store = new SessionStore($this->pluginData());
         $prosody = $this->createStub(ProsodyClient::class);
         $prosody->method('state')->willReturn([]);
         $participants = $this->createStub(ParticipantResolver::class);

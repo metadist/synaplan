@@ -16,9 +16,44 @@ Sources, Generated. Audio is never stored.
 | `mod_synascriber.lua` | [sidecars/synaplan-transcriber/prosody](../../sidecars/synaplan-transcriber/prosody/) | Jitsi's Prosody: switches the bridge transcription per room |
 | transcriber | [sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/) | its own pod |
 
+## Setup
+
+No account is involved: the settings, the sessions and the loader belong to
+the installation, not to a user.
+
+1. Install the plugin for every user: `DEFAULT_USER_PLUGINS=["synascriber"]`
+   (existing users: `php bin/console app:plugin:install-verified-users synascriber`).
+2. Write the settings. Secrets go in on stdin, never as arguments:
+
+   ```bash
+   echo '{"enabled": true, "stt_url": "http://whisper:8080", "prosody_url": "http://prosody:5280",
+          "jitsi_url": "https://meet.example", "prosody_secret": "…", "transcriber_secret": "…"}' \
+     | php bin/console synascriber:settings
+   ```
+
+   `--show` prints them (secrets only as set / not set). An administrator can
+   change the same settings on the plugin page.
+3. Give the transcriber `SYNAPLAN_PLUGIN_SECRET` = `transcriber_secret`. It
+   sends it as `X-Transcriber-Secret`; the transcriber routes accept nothing
+   else.
+4. Load the button in Jitsi's `head.html`:
+
+   ```html
+   <script defer src="https://<synaplan>/api/v1/plugins/synascriber/assets/jitsi/loader.js"
+     data-synaplan="https://<synaplan>" data-issuer="https://<keycloak>/realms/<realm>"
+     data-client-id="synascriber"></script>
+   ```
+
+   The older address with a user id (`/api/v1/user/<id>/plugins/synascriber/assets/…`)
+   still works.
+
+Up to 0.3.0 the first account that installed the plugin was its owner: the
+transcriber used that account's API key and the sessions were stored under
+it. `migrations/002_store_without_owner.sql` moves those sessions to the
+installation on the next install run and deletes `owner_user_id`.
+
 Deployment (Jitsi's values, the Keycloak client, the transcriber, the
 registration of the plugin): [synaplan-charts](https://github.com/metadist/synaplan-charts),
-`technical.synaplan.synascriber`. Install the plugin for every user with
-`DEFAULT_USER_PLUGINS=["synascriber"]`.
+`technical.synaplan.synascriber`.
 
 Tests: `backend/tests/Plugin/SynaScriber/`.

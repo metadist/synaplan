@@ -178,6 +178,10 @@ security:
 
         # Plugin assets (static JS/CSS files, served without auth for ES module loading)
         - { path: ^/api/v1/user/[^/]+/plugins/[^/]+/assets/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/plugins/[a-z0-9_-]+/assets/, methods: [GET], roles: PUBLIC_ACCESS }
+        # The meeting-notes transcriber has no account: the controller compares
+        # its X-Transcriber-Secret header with the plugin's transcriber_secret.
+        - { path: ^/api/v1/plugins/synascriber/public/transcriber/, roles: PUBLIC_ACCESS }
         # Where Keycloak sends the browser back after the Jitsi button's sign-in
         # (meeting notes). Only the synascriber plugin defines it (404 elsewhere);
         # the page carries no data, it hands the code to the configured Jitsi window.

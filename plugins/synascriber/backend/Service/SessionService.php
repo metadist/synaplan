@@ -690,7 +690,7 @@ final readonly class SessionService
         if (!$this->settings->isEnabled()) {
             throw new SessionException('not_enabled', 'Meeting notes are turned off by the administrator.', 403);
         }
-        if ('' === $this->settings->prosodyUrl() || '' === $this->settings->sttUrl() || $this->settings->ownerUserId() <= 0) {
+        if ('' === $this->settings->prosodyUrl() || '' === $this->settings->sttUrl() || '' === $this->settings->transcriberSecret()) {
             throw new SessionException('not_configured', 'Meeting notes are not fully set up yet. An administrator finishes the setup on the plugin page.', 503);
         }
     }

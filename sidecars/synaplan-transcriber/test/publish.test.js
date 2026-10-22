@@ -18,6 +18,25 @@ test('the end sentence names what was saved and what was not', () => {
   ]), /The meeting was not recorded/)
 })
 
+test('meeting notes need only the plugin secret; Element needs the API key', () => {
+  assert.throws(() => loadConfig({ SYNAPLAN_API_KEY: 'sk_test' }), /SYNAPLAN_URL/)
+  assert.throws(() => loadConfig({ SYNAPLAN_URL: 'http://synaplan', SYNAPLAN_API_KEY: '', SYNAPLAN_PLUGIN_SECRET: ' ' }), /SYNAPLAN_PLUGIN_SECRET .*or SYNAPLAN_API_KEY/)
+  assert.throws(() => loadConfig({ SYNAPLAN_URL: 'http://synaplan', SYNAPLAN_PLUGIN_SECRET: 'p', TRANSCRIBER_MODE: 'element' }), /SYNAPLAN_API_KEY is required in element mode/)
+
+  const notesOnly = loadConfig({
+    SYNAPLAN_URL: 'http://synaplan',
+    SYNAPLAN_PLUGIN_SECRET: 'plugin-secret',
+    TRANSCRIBER_AUTH_TOKEN: 'socket-secret',
+    MATRIX_HOMESERVER: 'https://matrix.example',
+    MATRIX_ACCESS_TOKEN: 'tok',
+    MATRIX_USER_ID: '@notes:example',
+  })
+  assert.equal(notesOnly.pluginSecret, 'plugin-secret')
+  assert.equal(notesOnly.apiKey, '')
+  assert.equal(notesOnly.jitsi, true)
+  assert.equal(notesOnly.element, false, 'Element voice messages act as a Synaplan user and stay off without a key')
+})
+
 test('openDesk mode requires a Synaplan key and can run Jitsi without Element', () => {
   assert.throws(() => loadConfig({ SYNAPLAN_URL: 'http://synaplan', SYNAPLAN_API_KEY: '' }), /SYNAPLAN_API_KEY/)
   assert.throws(

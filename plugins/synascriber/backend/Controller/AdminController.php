@@ -50,9 +50,12 @@ final class AdminController extends AbstractController
         new OA\Property(property: 'default_folder', type: 'string'),
         new OA\Property(property: 'stt_url', type: 'string'),
         new OA\Property(property: 'prosody_url', type: 'string'),
+        new OA\Property(property: 'jitsi_url', type: 'string'),
         new OA\Property(property: 'prosody_secret', type: 'string'),
-        new OA\Property(property: 'owner_user_id', type: 'integer'),
+        new OA\Property(property: 'transcriber_secret', type: 'string'),
         new OA\Property(property: 'timezone', type: 'string'),
+        new OA\Property(property: 'share_with_participants', type: 'boolean'),
+        new OA\Property(property: 'captions', type: 'boolean'),
     ]))]
     #[OA\Response(response: 200, description: 'Saved; returns the new status')]
     #[OA\Response(response: 422, description: 'A value was rejected')]
@@ -80,15 +83,13 @@ final class AdminController extends AbstractController
      */
     private function statusBody(): array
     {
-        $owner = $this->settings->ownerUserId();
-
         return [
             'settings' => $this->settings->publicView(),
             'checks' => [
-                'owner' => $owner > 0,
                 'jitsi' => '' !== $this->settings->prosodyUrl() && $this->prosody->healthy(),
                 'speech' => $this->whisper->healthy(),
                 'secret' => '' !== $this->settings->prosodySecret(),
+                'transcriber' => '' !== $this->settings->transcriberSecret(),
             ],
         ];
     }

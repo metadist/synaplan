@@ -5,8 +5,8 @@ import { createApp } from './server.js'
 import { createSynaplanClient } from './synaplan.js'
 
 const config = loadConfig(process.env)
-const synaplan = createSynaplanClient({ baseUrl: config.synaplanUrl, apiKey: config.apiKey })
-const plugin = createPluginClient({ baseUrl: config.synaplanUrl, apiKey: config.apiKey })
+const synaplan = config.apiKey ? createSynaplanClient({ baseUrl: config.synaplanUrl, apiKey: config.apiKey }) : null
+const plugin = config.pluginSecret ? createPluginClient({ baseUrl: config.synaplanUrl, secret: config.pluginSecret }) : null
 const log = (line) => {
   process.stdout.write(`${new Date().toISOString()} ${line}\n`)
 }
@@ -29,10 +29,19 @@ if (config.element) {
   })
   bot.run()
   log(`Element voice messages on as ${config.matrixUserId}`)
-} else if (config.elementRequested) {
+} else if (config.elementRequested && !config.matrixReady) {
   log('Element mode is selected, but MATRIX_HOMESERVER, MATRIX_ACCESS_TOKEN, and MATRIX_USER_ID are not all set. Voice messages stay off.')
+} else if (config.elementRequested) {
+  log('Element mode is selected, but SYNAPLAN_API_KEY is not set. Voice messages stay off.')
 }
 
 if (!config.jitsi) {
   log('Jitsi captions are off in this mode.')
+} else {
+  if (!plugin) {
+    log('SYNAPLAN_PLUGIN_SECRET is not set: Jitsi meetings cannot use the meeting-notes plugin.')
+  }
+  if (!synaplan) {
+    log('SYNAPLAN_API_KEY is not set: Jitsi captions without the meeting-notes plugin are refused.')
+  }
 }
