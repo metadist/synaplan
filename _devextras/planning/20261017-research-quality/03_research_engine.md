@@ -86,14 +86,32 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
   reader's budget. Page fetches overlap like
   `WebResearchService::deepen()` does today (first hop started for all, then
   consumed).
+- **Passages (§0 #39):** before any model sees it, the engine splits the raw
+  extracted text into numbered passages (`§1…§n`: paragraph, table row, list
+  item; a paragraph over 600 characters into sentences) and keeps the map with
+  the source's raw text. The reader sees the text with its passage numbers.
 - Reader call (`ResearchEvidenceSchema`): one source, the plan's points as the
-  lens → an **evidence card** per useful finding (§5). Readers have no tools;
-  the source text is wrapped and labelled as untrusted data (`04` §3).
-- **Quote check (deterministic):** each quote is normalised (whitespace,
-  quotes, hyphenation, decimal and thousands separators) and searched in the
-  **raw extracted text** of the source — never in a condensed version. A quote
-  that is not found is dropped; a finding with no verified quote is dropped.
-  This check is free and is the floor of citation integrity.
+  lens → an **evidence card** per useful finding (§5), each citing one or more
+  passage ids, optionally with a short quote; plus up to five **leads** —
+  links on the page that are worth reading for a point (§0 #38). Readers have
+  no tools; the source text is wrapped and labelled as untrusted data (`04` §3).
+- **Concurrent readers (§0 #37):** the reader calls of one unit run at once,
+  up to `BUDGET.<DEPTH>.READ_PARALLEL` (4 · 6 · 8), through one
+  `ConcurrentStructuredCaller` that multiplexes the HTTP requests, records
+  usage per request and checks the cancel flag before each one. Local worlds
+  use `LOCAL_PARALLEL`.
+- **Passage check (deterministic):** every cited passage id must exist in the
+  source's map; a quote, when present, is normalised (whitespace, quotes,
+  hyphenation, decimal and thousands separators) and must be found **inside
+  the cited passages of the raw extracted text** — never in a condensed
+  version. A finding with no existing passage is dropped; a quote that is not
+  found is removed from the card, the passage citation stays. The share of
+  dropped findings per reader model is recorded (`06` §3). This check is free
+  and is the floor of citation integrity.
+- **Leads:** the engine keeps a lead only when its URL is in the link list the
+  extractor took from the page itself (canonicalised); kept leads enter the
+  ledger as `found` sources with `origin: link` and the point they serve, and
+  are read like any other source (SSRF guard, robots, budget).
 - Long sources: `ContextCondenser` first narrows the text to the parts
   relevant to the points (extractive, then the **run's reader model** — the
   engine hands the model in; the condenser's own SORT → ANALYZE → CHAT order is
@@ -114,6 +132,42 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
   (reason: login wall, robots, timeout, too large, no text).
 
 ### 2.5 Reflect (lead) — the loop
+
+The lead runs in one of two modes (§0 #2); budgets, validation, stop rules and
+the quarantine are the same in both.
+
+#### 2.5a Tool mode (default where the lead model qualifies)
+
+The lead model gets the plan, the ledger summary and the budget, and five
+tools it calls natively, one or several per turn:
+
+| Tool | Arguments | Returns (never raw page or file text) |
+| ---- | --------- | ------------------------------------- |
+| `search` | `point`, `query`, `language`, `scope` | result list: id, sanitised title (120), host, kind, date, snippet (300), inside the data wrapper |
+| `read_sources` | `ids[]` (found or lead sources), `point` | one evidence card per source (facts with passage ids, leads), or `blocked` with the reason; the readers run concurrently |
+| `reread` | `source`, `question` | evidence cards for the sharper question |
+| `ask_user` | `question`, `options[]` | the answer or `skipped` (counts against the question budget; the run waits without a worker) |
+| `finish` | `reason` (`covered` · `budget` · `no_progress`), `points[]` with status and note | ends the loop |
+
+- A tool call beyond its budget does not run; it returns
+  `{"error": "budget_used", "left": {…}}` so the model can only move on to
+  `finish`. Unknown ids and repeated queries return a short error the same way.
+- **Durability:** one `round` unit is one lead turn plus the execution of its
+  tool calls. The lead conversation (tool calls and their card results) is
+  checkpointed in the run state after every unit, so a lost worker repeats at
+  most one turn.
+- **Context:** once the conversation passes 60 % of the lead's input budget
+  (§0 #31), the engine replaces older tool results with the current ledger
+  summary and keeps the tool-call records (tool-result clearing); the plan and
+  the brief stay at the top and are cached (§0 #32).
+- **Hard stops** are the engine's, not the model's: Stop / Write now, every
+  budget, the wall clock, `MAX_MODEL_CALLS`. A lead that ends a turn without a
+  tool call and without `finish` gets one reminder, then the engine finishes
+  with `no_progress`.
+- Events are the same as in round mode (`search`, `source`, `point`, and
+  `round` per lead turn), so clients do not know which mode ran.
+
+#### 2.5b Round mode (fallback)
 
 - Input: the plan, a compact ledger summary (per point: findings with source
   ids, kinds, dates, conflicts), the queries already run, the budget left.
@@ -163,23 +217,29 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
   a **Not confirmed** section lists open and thin points and conflicts with both
   sides and dates; no outside knowledge for facts; the summary answers the
   question first (`04` §4.6).
-- Standard writes in one call. Thorough writes section by section (summary
-  last, so it reflects the sections), each within the writer's output cap.
+- The report is written **in one call** whenever the writer's
+  `meta.max_output` covers the depth's word budget (§0 #42) — Standard always,
+  Thorough on every current frontier writer. A writer whose output cap is too
+  small writes section by section, **sequentially**, each call seeing the
+  sections already written, and the summary last; sections are never written
+  in parallel.
 - Evidence ids become the reader-facing numbers `[1]…[n]` per source in
   delivery (§5.3).
 - Event `writing` (section) and `section` (title) as each section is ready.
 
 ### 2.7 Check (checker)
 
-1. **Deterministic:** every cited id exists; every cited card has at least one
-   verified quote; numbers and dates in the sentence appear in the cited quotes
+1. **Deterministic:** every cited id exists; every cited card cites at least
+   one existing passage; numbers and dates in the sentence appear in the cited
+   passages
    after normalisation (`12,40` = `12.40`, `1.234,5` = `1,234.5`, units and
    percent signs stripped, dates to ISO); sentences that state facts carry a
    citation (a sentence with a number, a date or a proper name and no citation
    is flagged); a revision that introduces a fact without a citation is
    rejected and the pre-revision text kept.
 2. **Checker model** (`ResearchCheckSchema`), batched: each cited statement
-   with its quotes → `supported`, `partial` (which part is not), `unsupported`,
+   with the text of its cited passages (short excerpts, inside the data
+   wrapper — the same exposure the quotes had) → `supported`, `partial` (which part is not), `unsupported`,
    `contradicted`.
 3. **Revision:** a verdict other than `supported` never stays in the factual
    text. Thorough runs one writer revision: `partial` → only the supported
@@ -213,20 +273,35 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 
 ---
 
-## 3. Why an engine-driven loop
+## 3. Why two lead modes
 
-| | Engine-driven (structured decisions) | Model-driven (native tool calls) |
-| - | ------------------------------------ | -------------------------------- |
-| Providers | Any model with JSON output, including local models without tool calling | Only models whose tool calling works through our translators |
-| Known failure classes | JSON drift → healing retry exists | Desktop CHANGES C2, C4, C10: unserved server tools, lost `thought_signature`, Harmony "tools should have a name" |
-| Parallelism | The engine runs a decision's searches and reads together | Depends on the model emitting parallel calls |
-| Budget and progress | Engine-enforced, a plan checklist the UI can show | Inferred from tool calls |
-| Flexibility | Bounded to the action types | Open-ended |
-| Testability | Each stage is a unit with a schema; `TestProvider` replays decisions | Requires replaying multi-turn tool transcripts |
+The baseline thesis (`01` §1) is that an IDE agent is better because the model
+**drives** the work and sees every result before its next step. Round mode
+alone would not deliver that: the lead decides a batch of actions, waits for
+all of them, and can react only in the next round. Current deep-research
+systems (Anthropic's research system, Gemini Deep Research, LangChain's Open
+Deep Research — `08` §2b) all let the model call the tools. What makes the
+plan safe is not who decides, but what the tools return and who enforces the
+budget — and both stay with the engine.
 
-The model-driven variant stays a spike (`00` §9 #2) for models that pass a
-tool-call conformance suite; if it beats the engine on `06` metrics, it becomes
-a per-model option, not a replacement.
+| | Round mode (structured decisions) | Tool mode (native tool calls) |
+| - | --------------------------------- | ----------------------------- |
+| Providers | Any model with JSON output, including local models without tool calling | Models on `TOOL_MODE_MODELS` after the conformance suite |
+| Reacts to a result | Next round only | Next turn — search, look, search again |
+| Known failure classes | JSON drift → healing retry exists | Desktop CHANGES C2, C4, C10 — the reason for the conformance suite and the fallback |
+| Parallelism | The engine runs a decision's searches and reads together | Parallel tool calls per turn; `read_sources` reads concurrently either way |
+| Budget and progress | Engine-enforced | Engine-enforced inside every tool; same events |
+| Quarantine | Cards and sanitised result lists only | Same |
+| Testability | `TestProvider` replays decisions | `TestProvider` replays tool-call turns (the gateway loop tests are the precedent) |
+
+**Conformance suite** (`app:research:conformance <catalog key>`): twenty
+scripted turns on the test doubles — parallel calls, a tool error, a budget
+answer, a long tool result, `finish` with points — through the path the run
+uses: `AiFacade::chat()` with `tools`, whose providers normalise native calls
+to `ToolCall` via `ToolCallParser` (the loop precedent is
+`Service/Document/ChatToolLoop.php`). A model that passes every turn twice is added to
+`TOOL_MODE_MODELS` by RQ3; a provider change that breaks a listed model shows
+up in the next run of the suite.
 
 ---
 
@@ -242,12 +317,18 @@ BCONFIG group `RESEARCH`, global, admin-tunable; seeded insert-if-missing.
 | Results per search | 8 | 10 | 10 |
 | Sources read | ≤ 4 | ≤ 15 | ≤ 40 |
 | Pages fetched at once | 4 | 4 | 6 |
+| Reader calls at once (§0 #37) | 4 | 6 | 8 |
 | Wall clock | 60 s | 6 min | 20 min |
 | Cost cap per run (catalog currency) | 0.10 | 1.00 | 5.00 |
 | Clarifying questions | 0 | ≤ 1, only if ambiguous | ≤ 3 |
 | Plan review | none | visible, starts at once | waits for **Start research** |
 | Fact-check | deterministic only | deterministic + checker | deterministic + checker + one revision |
 | Report length | ≤ 300 words | ≤ 1,500 words | ≤ 6,000 words, section by section |
+
+These counts are **starting hypotheses** (§0 #41). External deep-research
+agents use about 80 searches for a typical task; RQ2b and RQ3 sweep searches
+and sources (Standard 10 / 20, Thorough 30 / 60), plot fact recall against cost,
+and seed the knee of the curve.
 
 Two more hard stops per depth: `MAX_ACTIONS` per reflect decision (6 / 10)
 and `MAX_MODEL_CALLS` per run (quick 6, Standard 60, Thorough 200) — the
@@ -287,9 +368,11 @@ with the role and source `RESEARCH`; searches record `WEB_SEARCH`, rerank
   ],
   "evidence": [
     { "id": "e12", "source": "s3", "point": "p2", "fact": "Base price 12.40 EUR per unit (net).",
-      "quotes": [ { "text": "Grundpreis netto 12,40 € je Einheit", "location": "Tabelle 1", "verified": true } ],
+      "passages": ["§14"],
+      "quotes": [ { "text": "Grundpreis netto 12,40 € je Einheit", "passage": "§14", "verified": true } ],
       "confidence": "high" }
   ],
+  "leads": [ { "source": "s15", "from": "s3", "point": "p3", "anchor": "Allgemeine Geschäftsbedingungen (PDF)" } ],
   "queries": [ { "point": "p2", "q": "Lieferant A Preisliste 2026", "scope": "web", "results": 10 } ],
   "budget": { "searches": [7, 30], "sources_read": [12, 40], "rounds": [3, 8], "seconds": [341, 1200],
               "cost": { "estimate": 2.10, "spent": 0.92 } },
@@ -310,8 +393,9 @@ with the role and source `RESEARCH`; searches record `WEB_SEARCH`, rerank
 
 - The report numbers **sources**, not cards: `[3]` means source s3. One
   sentence may cite several sources.
-- Opening `[3]` shows the source title, host or file, date and the exact quotes
-  used for *that* sentence, with **Open page** / **Open file**.
+- Opening `[3]` shows the source title, host or file, date and the cited
+  passages (with the quote highlighted when there is one) used for *that*
+  sentence, with **Open page** / **Open file**.
 - The sources list at the end of the report gives each source once, with what
   it was used for.
 
@@ -328,8 +412,9 @@ with the role and source `RESEARCH`; searches record `WEB_SEARCH`, rerank
   a few hundred KB after `deliver`.
 - **Execution in units (§0 #8):** `RunResearchUnit { runId, unit, seq }` on
   `async_ai_high`. One message does one bounded unit — `brief_plan`, one
-  `round` (execute the previous decision's actions, then one reflect call),
-  one `write` call or section, `check`, `deliver` — within `UNIT_SECONDS`
+  `round` (round mode: execute the previous decision's actions, then one
+  reflect call; tool mode: one lead turn plus its tool calls, §2.5a),
+  one `write` call (or one section for a small writer), `check`, `deliver` — within `UNIT_SECONDS`
   (120), writes the checkpoint, advances `seq`, dispatches the next unit and
   returns.
 - **Exactly one execution per unit, also with several workers:** before any
@@ -539,14 +624,19 @@ backend/src/Service/Research/Run/
   ResearchStateStore.php        Redis state, checkpoints, TTL
   ResearchEventLog.php          sequenced, resumable events
   ResearchOutcome.php           closed codes + params
-  Ledger/  EvidenceLedger.php · Source.php · EvidenceCard.php · QuoteVerifier.php
+  Ledger/  EvidenceLedger.php · Source.php · EvidenceCard.php · PassageSplitter.php · PassageVerifier.php
   Stage/   BriefStage · PlanStage · GatherStage · ReadStage · ReflectStage · WriteStage · CheckStage
+  Lead/    LeadModeResolver.php (auto · tools · rounds, TOOL_MODE_MODELS) · LeadToolbox.php (the five tools, budget inside each)
+           LeadConversation.php (tool-mode transcript, checkpointed, tool-result clearing)
+  ConcurrentStructuredCaller.php  concurrent reader calls over AiFacade (§0 #37)
   Source/  ResearchSourceReaderInterface.php · ResearchSourceReader.php (HTML via UrlContentService, documents via extractionChain('document', allowCloud), knowledge chunks)
            FixtureSourceReader.php (test environment only — fixture.synaplan.test)
 backend/src/Service/RAG/KnowledgeSearchHelper.php   shared by MessagesContextInjector, KnowledgeSearchTool and GatherStage (RS3, RS9)
 backend/src/Message/RunResearchUnit.php             { runId, unit, seq }
 backend/src/MessageHandler/RunResearchUnitHandler.php
 backend/src/Command/ReapResearchRunsCommand.php     app:research:reap (ScheduledJobs::LANE_TICK)
+backend/src/Command/ResearchConformanceCommand.php  app:research:conformance (tool-mode suite, §3)
+backend/src/Command/ResearchSpikeCommand.php        app:research:spike (RQ2b, in-process, eval account only; removed or kept as a dev tool after the gate)
 backend/src/Controller/ResearchApiController.php    /v1/research*
 backend/src/Controller/ResearchController.php       /api/v1/research*
 backend/src/AI/StructuredOutput/Schema/Research{Brief,Plan,Triage,Evidence,Decision,Check}Schema.php
