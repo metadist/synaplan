@@ -299,7 +299,7 @@ runs the probe.
 `GET /api/health` body is unchanged. `GET /api/health/ready` returns `status`
 and the Redis result only. In the test kernel a warmed request took 13.5 ms,
 so the functional test allows 25 ms. The 5 ms budget is `make perf-runtime`
-(AU1), which is not on this branch yet.
+(AU1), on `main` as [#2628](https://github.com/metadist/synaplan/pull/2628).
 
 `HealthControllerTest` was not edited. PHPStan (full `src/` and `tests/`) and
 deptrac reported no errors. php-cs-fixer reported no changes on the four PHP
@@ -311,6 +311,16 @@ suite exited 139 (segfault) twice at about test 740 of 9675, in a stretch
 that does not touch Whisper. The long-running dev container ran the health,
 Whisper, size-ratchet and thin-controller tests; the only failure was
 `ChatRunner::run` 129 → 132, which is on the other checkout, not in this diff.
+
+---
+
+## 2026-10-22 — Handover
+
+AU1 is on `main` ([#2628](https://github.com/metadist/synaplan/pull/2628)).
+AU2 stays open as [#2626](https://github.com/metadist/synaplan/pull/2626) for
+the owner to review and merge. What is done, what is not, and a second
+opinion on S5 and the approval-gate gap are in
+[`HANDOVER.md`](./HANDOVER.md).
 
 ---
 
