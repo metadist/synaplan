@@ -133,7 +133,9 @@ Every response to a request that declared web search carries `x-synaplan-web-sea
 
 When a client already ships an executable tool named `web_fetch` (with `input_schema`), Synaplan leaves that client tool alone.
 
-Responses carry `x-synaplan-web-fetch: passthrough|synaplan|off` when the policy chose a handler. `synaplan` means this route reads the page itself.
+Responses carry `x-synaplan-web-fetch: passthrough|synaplan|off` when the policy chose a handler. `synaplan` means this route reads the page itself; with a page limit of `0` a non-Anthropic route reports `off`.
+
+Synaplan reads pages through the same SSRF guard as every other user-initiated fetch: every redirect hop is checked, the hostname is pinned to the public address the check accepted, and private, loopback and link-local targets come back as an error tool result. Logs and the usage ledger keep the URL without its query string.
 
 ## Vision
 

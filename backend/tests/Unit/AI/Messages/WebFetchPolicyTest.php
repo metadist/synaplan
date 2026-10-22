@@ -66,6 +66,28 @@ final class WebFetchPolicyTest extends TestCase
         self::assertSame(WebFetchPolicy::BETA_FEATURE, $result['anthropic_beta']);
     }
 
+    public function testNonAnthropicAutoWithAPageLimitOfZeroIsReportedAsOff(): void
+    {
+        $result = $this->policy->apply(
+            ['tools' => [WebFetchPolicy::DEFAULT_DECLARATION]],
+            'openai',
+            MessagesGatewayConfig::WEB_FETCH_AUTO,
+            null,
+            0,
+        );
+
+        self::assertSame(WebFetchPolicy::HANDLING_OFF, $result['handling']);
+        self::assertFalse($this->policy->hasServerWebFetch($result['body']));
+    }
+
+    public function testAnthropicKeepsItsServerToolWhenSynaplanReadsNoPages(): void
+    {
+        $result = $this->policy->apply(['messages' => []], 'anthropic', MessagesGatewayConfig::WEB_FETCH_AUTO, null, 0);
+
+        self::assertSame(WebFetchPolicy::HANDLING_PASSTHROUGH, $result['handling']);
+        self::assertTrue($this->policy->hasServerWebFetch($result['body']));
+    }
+
     #[DataProvider('nonAnthropicProviders')]
     public function testNonAnthropicAutoReplacesTheServerToolWithSynaplan(string $provider): void
     {

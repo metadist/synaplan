@@ -15,8 +15,8 @@ use App\Service\MessagesGateway\MessagesGatewayConfig;
  * - on every other route, `auto` drops that server-tool declaration so the
  *   translator is not handed a shape it cannot map. {@see GatewayToolCatalog}
  *   then offers an executable `web_fetch` of the same name, which
- *   {@see WebFetchTool} runs. `passthrough` and `off` still drop it, because
- *   there is no Anthropic upstream to leave it with.
+ *   {@see WebFetchTool} runs. `passthrough`, `off` and a page limit of 0
+ *   still drop it, because there is no Anthropic upstream to leave it with.
  *
  * @phpstan-type PolicyResult array{
  *     body: array<string, mixed>,
@@ -44,6 +44,7 @@ final class WebFetchPolicy
 
     /**
      * @param array<string, mixed> $requestBody
+     * @param int                  $synaplanPages pages Synaplan may open per message; 0 means it reads none
      *
      * @return PolicyResult
      */
@@ -52,6 +53,7 @@ final class WebFetchPolicy
         string $provider,
         string $mode,
         ?string $anthropicBeta,
+        int $synaplanPages = MessagesGatewayConfig::DEFAULT_WEB_FETCH_MAX_PER_TURN,
     ): array {
         $isAnthropic = 'anthropic' === strtolower($provider);
         $declared = $this->hasServerWebFetch($requestBody);
@@ -75,7 +77,7 @@ final class WebFetchPolicy
                 return $this->result($requestBody, $anthropicBeta, self::HANDLING_NONE, false);
             }
 
-            if (MessagesGatewayConfig::WEB_FETCH_PASSTHROUGH === $mode) {
+            if (MessagesGatewayConfig::WEB_FETCH_PASSTHROUGH === $mode || $synaplanPages <= 0) {
                 if (!$declared) {
                     return $this->result($requestBody, $anthropicBeta, self::HANDLING_NONE, false);
                 }

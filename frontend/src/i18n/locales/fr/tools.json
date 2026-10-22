@@ -612,7 +612,8 @@
         "label": "Conserver un résumé de chaque session",
         "description": "Synaplan rédige un court résumé de chaque session d’agent dans votre historique de chat, afin que vous puissiez voir plus tard ce qui a été travaillé."
       },
-      "requiresMcpTools": "Disponible une fois vos outils activés ci-dessus."
+      "requiresMcpTools": "Disponible une fois vos outils activés ci-dessus.",
+      "requiresWebFetchAuto": "S’applique uniquement lorsque la lecture de pages web est réglée sur Automatique ci-dessus."
     },
     "loadError": "Impossible de charger les réglages de Claude Code.",
     "source": {

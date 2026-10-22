@@ -185,6 +185,7 @@ final readonly class GatewayToolLoop
         $lastBody = null;
         $lastOkBody = null;
         $webSearchRounds = 0;
+        $pages = new WebFetchBudget($this->config->webFetchMaxPerTurn($user->getId()));
 
         for ($i = 0; $i < $maxIterations; ++$i) {
             if (microtime(true) > $deadline) {
@@ -280,7 +281,7 @@ final readonly class GatewayToolLoop
             }
 
             $webSearchRounds += $this->countWebSearches($partition['ours']);
-            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
+            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $pages, null, $this->assistantFrom($translatorContext));
             $body = $this->appendToolTurn($body, ServerToolReplay::withoutClientUses($content, $partition['client']), $toolResults);
             if ($webSearchRounds >= $this->config->webSearchMaxRounds($user->getId())) {
                 $body = $this->forceWrapUp($body);
@@ -339,8 +340,8 @@ final readonly class GatewayToolLoop
         $maxIterations = $this->config->mcpMaxIterations($user->getId());
         $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
         $totalUsage = new MessagesUsage();
-        $suppressNames = array_keys($snapshot['dispatch']);
         $webSearchRounds = 0;
+        $pages = new WebFetchBudget($this->config->webFetchMaxPerTurn($user->getId()));
 
         for ($i = 0; $i < $maxIterations; ++$i) {
             if (microtime(true) > $deadline) {
@@ -355,7 +356,7 @@ final readonly class GatewayToolLoop
                 $body,
                 $context,
                 $emitter,
-                $suppressNames,
+                array_keys($snapshot['dispatch']),
                 $snapshot['dispatch'],
                 relayErrors: !$canRecoverWrapUp,
             );
@@ -418,6 +419,7 @@ final readonly class GatewayToolLoop
                 $partition['ours'],
                 $snapshot['dispatch'],
                 $user,
+                $pages,
                 ping: static function () use ($emitter): void {
                     $emitter->emitPing();
                 },
@@ -690,7 +692,7 @@ final readonly class GatewayToolLoop
      *
      * @return list<array<string, mixed>> tool_result content blocks
      */
-    private function executeOurs(array $toolUses, array $dispatch, User $user, ?callable $ping = null, ?RuntimeProfile $assistant = null): array
+    private function executeOurs(array $toolUses, array $dispatch, User $user, WebFetchBudget $pages, ?callable $ping = null, ?RuntimeProfile $assistant = null): array
     {
         if (count($toolUses) > self::MAX_TOOLS_PER_TURN) {
             $toolUses = array_slice($toolUses, 0, self::MAX_TOOLS_PER_TURN);
@@ -741,7 +743,7 @@ final readonly class GatewayToolLoop
                     $results[] = $gated;
                     continue;
                 }
-                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $assistant);
+                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $pages, $assistant);
                 if (null !== $ping) {
                     $ping();
                     $lastPing = microtime(true);
@@ -907,9 +909,9 @@ final readonly class GatewayToolLoop
      *
      * @return array<string, mixed> tool_result content block
      */
-    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, ?RuntimeProfile $assistant = null): array
+    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, WebFetchBudget $pages, ?RuntimeProfile $assistant = null): array
     {
-        $native = $this->nativeTools->tryExecute($tool, $arguments, $user);
+        $native = $this->nativeTools->tryExecute($tool, $arguments, $user, $pages);
         if (null !== $native) {
             $this->recordNativeUsage($user, $native['source'], $tool, $native['summary'], $native['isError']);
 

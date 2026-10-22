@@ -612,7 +612,8 @@
         "label": "Keep a summary of each session",
         "description": "Synaplan writes a short summary of every agent session to your chat history, so you can see later what was worked on."
       },
-      "requiresMcpTools": "Available once your tools are switched on above."
+      "requiresMcpTools": "Available once your tools are switched on above.",
+      "requiresWebFetchAuto": "Only applies when reading web pages is set to Automatic above."
     },
     "loadError": "Could not load the Claude Code settings.",
     "source": {

@@ -535,7 +535,8 @@
         "label": "Zusammenfassung jeder Sitzung behalten",
         "description": "Synaplan schreibt zu jeder Agenten-Sitzung eine kurze Zusammenfassung in Ihren Chat-Verlauf, damit Sie später sehen, woran gearbeitet wurde."
       },
-      "requiresMcpTools": "Verfügbar, sobald Ihre Werkzeuge oben eingeschaltet sind."
+      "requiresMcpTools": "Verfügbar, sobald Ihre Werkzeuge oben eingeschaltet sind.",
+      "requiresWebFetchAuto": "Gilt nur, wenn „Webseiten lesen“ oben auf Automatisch steht."
     },
     "loadError": "Die Claude-Code-Einstellungen konnten nicht geladen werden.",
     "source": {

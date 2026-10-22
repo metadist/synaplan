@@ -538,7 +538,8 @@
         "label": "Her oturumun özetini sakla",
         "description": "Synaplan her aracı oturumunun kısa bir özetini sohbet geçmişinize yazar, böylece sonradan neyin üzerinde çalışıldığını görebilirsiniz."
       },
-      "requiresMcpTools": "Yukarıda araçlarınızı açtığınızda kullanılabilir."
+      "requiresMcpTools": "Yukarıda araçlarınızı açtığınızda kullanılabilir.",
+      "requiresWebFetchAuto": "Yalnızca yukarıda web sayfası okuma Otomatik olarak ayarlandığında geçerlidir."
     },
     "loadError": "Claude Code ayarları yüklenemedi.",
     "source": {

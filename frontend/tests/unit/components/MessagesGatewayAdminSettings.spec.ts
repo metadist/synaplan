@@ -78,6 +78,18 @@ describe('MessagesGatewayAdminSettings', () => {
     expect(mockSaveFlags).toHaveBeenCalledWith({ web_fetch_max_per_turn: 4 })
   })
 
+  it('disables the page limit unless Synaplan reads pages itself', () => {
+    const passthrough = mountPanel(baseStatus({ web_fetch_mode: 'passthrough' }))
+    expect(
+      passthrough.find('[data-testid="input-agents-web-fetch-pages"]').attributes('disabled')
+    ).toBeDefined()
+
+    const auto = mountPanel(baseStatus({ web_fetch_mode: 'auto' }))
+    expect(
+      auto.find('[data-testid="input-agents-web-fetch-pages"]').attributes('disabled')
+    ).toBeUndefined()
+  })
+
   it('sends only the setting that changed', async () => {
     const wrapper = mountPanel()
 

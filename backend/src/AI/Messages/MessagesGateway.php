@@ -306,13 +306,13 @@ final readonly class MessagesGateway
             $bodyMutated = true;
         }
 
-        // Anthropic keeps its server tool. Every other route drops that
-        // declaration so the catalog can offer the executable replacement.
+        // Anthropic keeps its server tool; other routes get the catalog's executable web_fetch.
         $webFetch = $this->webFetchPolicy->apply(
             $requestBody,
             $resolved['provider'],
             $this->config->webFetchMode($user->getId()),
             $request->headers->get('anthropic-beta'),
+            $this->config->webFetchMaxPerTurn($user->getId()),
         );
         $requestBody = $webFetch['body'];
         if ($webFetch['mutated']) {

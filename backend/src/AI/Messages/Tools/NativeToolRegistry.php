@@ -32,10 +32,11 @@ final readonly class NativeToolRegistry
 
     /**
      * @param array<string, mixed> $arguments
+     * @param WebFetchBudget       $pages     pages left for the message this call belongs to
      *
      * @return array{text: string, isError: bool, summary: string, source: string}|null null when this registry does not own the name
      */
-    public function tryExecute(string $name, array $arguments, User $user): ?array
+    public function tryExecute(string $name, array $arguments, User $user, WebFetchBudget $pages): ?array
     {
         if (WebSearchTool::NAME === $name) {
             $result = $this->webSearch->execute($arguments);
@@ -49,7 +50,7 @@ final readonly class NativeToolRegistry
         }
 
         if (WebFetchTool::NAME === $name) {
-            $result = $this->webFetch->execute($arguments, $user);
+            $result = $this->webFetch->execute($arguments, $user, $pages);
 
             return [
                 'text' => $result['text'],

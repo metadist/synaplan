@@ -6,10 +6,10 @@ namespace App\AI\Messages\Tools;
 
 use App\Entity\User;
 use App\Service\Context\ContextCondenser;
-use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\File\FileHelper;
+use App\Service\Research\UrlContentResult;
 use App\Service\Research\UrlContentService;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Synaplan reads one web page for a Messages-gateway model that cannot use
@@ -31,15 +31,11 @@ final readonly class WebFetchTool
      */
     public const RESULT_CHAR_BUDGET = 12000;
 
-    public const PAGE_LIMIT_MESSAGE = 'page limit for this turn';
-
-    private const ATTR_USED = 'messages_gateway.web_fetch_used';
+    public const PAGE_LIMIT_MESSAGE = 'Page limit for this message reached. Answer from the pages you already read.';
 
     public function __construct(
         private UrlContentService $pages,
         private ContextCondenser $condenser,
-        private MessagesGatewayConfig $config,
-        private RequestStack $requests,
         private LoggerInterface $logger,
     ) {
     }
@@ -67,21 +63,21 @@ final readonly class WebFetchTool
 
     /**
      * Never throws. A blocked, failed or over-budget read is an error tool
-     * result the model can recover from in the same turn.
+     * result the model can recover from in the same turn. `url` is redacted
+     * (no query string) because it ends up in logs and the usage ledger.
      *
      * @param array<string, mixed> $input
      *
      * @return array{text: string, isError: bool, url: string}
      */
-    public function execute(array $input, User $user): array
+    public function execute(array $input, User $user, WebFetchBudget $budget): array
     {
         $url = \is_string($input['url'] ?? null) ? trim($input['url']) : '';
         if ('' === $url || (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://'))) {
             return $this->error($url, 'web_fetch requires an absolute http or https URL.');
         }
 
-        $max = $this->config->webFetchMaxPerTurn((int) $user->getId());
-        if (!$this->claim($max)) {
+        if (!$budget->claim()) {
             return $this->error($url, self::PAGE_LIMIT_MESSAGE);
         }
 
@@ -89,19 +85,15 @@ final readonly class WebFetchTool
             $page = $this->pages->fetchForReading($url);
         } catch (\Throwable $e) {
             $this->logger->warning('WebFetchTool: read failed', [
-                'url' => $url,
-                'error' => $e->getMessage(),
+                'url' => FileHelper::redactUrlForLogging($url),
+                'error' => $e::class,
             ]);
 
-            return $this->error($url, 'The page could not be read: '.$e->getMessage());
+            return $this->error($url, 'The page could not be read.');
         }
 
         if (!$page->success) {
-            $reason = \is_string($page->error) && '' !== $page->error
-                ? $page->error
-                : 'The page could not be read.';
-
-            return $this->error($url, $reason);
+            return $this->error($url, $this->failureText($page));
         }
 
         $text = $this->fit($page->extractedText, $url, (int) $user->getId());
@@ -111,7 +103,7 @@ final readonly class WebFetchTool
         return [
             'text' => "Title: {$title}\nURL: {$shown}\n\n{$text}",
             'isError' => false,
-            'url' => $shown,
+            'url' => FileHelper::redactUrlForLogging($shown),
         ];
     }
 
@@ -131,7 +123,7 @@ final readonly class WebFetchTool
             )->text;
         } catch (\Throwable $e) {
             $this->logger->warning('WebFetchTool: page could not be condensed', [
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
                 'error' => $e->getMessage(),
             ]);
 
@@ -140,24 +132,22 @@ final readonly class WebFetchTool
     }
 
     /**
-     * One HTTP request is one message. The count lives on that request so a
-     * worker does not keep it for the next caller.
+     * A fixed sentence per failure kind. Transport errors can carry resolver
+     * and connection details that must not reach the model.
      */
-    private function claim(int $max): bool
+    private function failureText(UrlContentResult $page): string
     {
-        $request = $this->requests->getCurrentRequest();
-        if (null === $request) {
-            return $max > 0;
-        }
-
-        $used = (int) $request->attributes->get(self::ATTR_USED, 0);
-        if ($used >= $max) {
-            return false;
-        }
-
-        $request->attributes->set(self::ATTR_USED, $used + 1);
-
-        return true;
+        return match ($page->blockedReason) {
+            'blocked_address' => 'This address is on a private or internal network, so Synaplan does not open it.',
+            'login_wall' => 'The page needs a login, so its content could not be read.',
+            'bot_blocked' => 'The site refused automated access, so its content could not be read.',
+            'unsupported_content' => 'The page is not HTML or text, so it could not be read.',
+            'no_text' => 'The page has no readable text. It may only render in a browser.',
+            'redirect_loop', 'bad_redirect' => 'The page redirects in a loop or to nowhere, so it could not be read.',
+            default => preg_match('/^HTTP \d{3}$/', (string) $page->error)
+                ? sprintf('The site answered %s, so the page could not be read.', $page->error)
+                : 'The page could not be read.',
+        };
     }
 
     /**
@@ -168,7 +158,7 @@ final readonly class WebFetchTool
         return [
             'text' => $message,
             'isError' => true,
-            'url' => $url,
+            'url' => '' === $url ? '' : FileHelper::redactUrlForLogging($url),
         ];
     }
 }

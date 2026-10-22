@@ -12,14 +12,18 @@ use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\NativeToolRegistry;
 use App\AI\Messages\Tools\ServerToolReplay;
+use App\AI\Messages\Tools\WebFetchBudget;
 use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Context\ContextCondenser;
 use App\Service\Mcp\McpClient;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Research\UrlContentResult;
+use App\Service\Research\UrlContentService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -1497,7 +1501,7 @@ final class GatewayToolLoopTest extends TestCase
         $fetch = $this->createMock(WebFetchTool::class);
         $fetch->expects($this->once())
             ->method('execute')
-            ->with(['url' => 'https://nodejs.org/en'], $user)
+            ->with(['url' => 'https://nodejs.org/en'], $user, $this->isInstanceOf(WebFetchBudget::class))
             ->willReturn([
                 'text' => "Title: Node.js\nURL: https://nodejs.org/en\n\nNode.js 24 is the current LTS.",
                 'isError' => false,
@@ -1580,6 +1584,68 @@ final class GatewayToolLoopTest extends TestCase
         self::assertContains('message_stop', $types);
     }
 
+    public function testStreamPageLimitHoldsAcrossToolRounds(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $pages = $this->createMock(UrlContentService::class);
+        $pages->expects($this->once())
+            ->method('fetchForReading')
+            ->willReturn(new UrlContentResult(
+                url: 'https://example.com/one',
+                extractedText: 'First page.',
+                title: 'One',
+                hostname: 'example.com',
+                success: true,
+                finalUrl: 'https://example.com/one',
+            ));
+        $fetch = new WebFetchTool($pages, $this->createStub(ContextCondenser::class), new NullLogger());
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), webFetch: $fetch, webFetchMax: 1);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('stream')->willReturnCallback(
+            function (array $body, array $context, callable $emit) use (&$calls): MessagesUsage {
+                ++$calls;
+                if (1 === $calls) {
+                    $this->emitStreamToolTurn($emit, [['id' => 'toolu_a', 'name' => 'web_fetch', 'input' => ['url' => 'https://example.com/one']]]);
+
+                    return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+                }
+                if (2 === $calls) {
+                    $this->emitStreamToolTurn($emit, [['id' => 'toolu_b', 'name' => 'web_fetch', 'input' => ['url' => 'https://example.com/two']]]);
+
+                    return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+                }
+
+                $last = $body['messages'][\count($body['messages']) - 1]['content'][0];
+                self::assertTrue($last['is_error'] ?? false);
+                self::assertStringContainsString(WebFetchTool::PAGE_LIMIT_MESSAGE, (string) $last['content']);
+                $this->emitStreamToolTurn($emit, [['id' => 'toolu_w', 'name' => 'write_file', 'input' => ['path' => 'a.md']]]);
+
+                return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+            }
+        );
+
+        $loop->runStream(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Read two pages']],
+                'stream' => true,
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webFetchSnapshot(),
+            static function (): void {
+            },
+        );
+
+        self::assertSame(3, $calls);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1626,7 +1692,7 @@ final class GatewayToolLoopTest extends TestCase
         ];
     }
 
-    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2, ?WebFetchTool $webFetch = null): GatewayToolLoop
+    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2, ?WebFetchTool $webFetch = null, int $webFetchMax = 3): GatewayToolLoop
     {
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
@@ -1638,7 +1704,7 @@ final class GatewayToolLoopTest extends TestCase
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => $maxRounds]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => $maxRounds, 'webFetchMaxPerTurn' => $webFetchMax]),
             $rateLimits,
             new NullLogger(),
         );

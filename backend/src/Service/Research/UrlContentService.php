@@ -491,7 +491,7 @@ final readonly class UrlContentService
 
     private function startReadingRequest(string $url): ResponseInterface
     {
-        return $this->httpClient->request('GET', $url, [
+        return $this->httpClient->request('GET', $url, $this->ssrfGuard->pinnedResolveOption($url) + [
             'timeout' => self::READ_TIMEOUT_SECONDS,
             'max_redirects' => 0,
             'headers' => [
