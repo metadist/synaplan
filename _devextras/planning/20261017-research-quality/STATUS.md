@@ -12,7 +12,7 @@ chat message.
 | RQ2 | planned | Eval corpus, judges, calibration, B0 baseline |
 | RS1 | planned | Gateway wrap-up answers fully; round limit from config |
 | RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. UC-04 / UC-04b not measured |
-| RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. UC-05 / UC-05e / UC-06 not measured |
+| RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. UC-05e (≥ 2 searches) and the UC-05 / UC-06 timings are still open |
 | RS4 | planned | PDFs and office files from web search — §0 #12 |
 | RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |
 | RQ2b | planned | Spike with both lead modes vs B1+ and B4, budget sweep, go / no-go — §0 #40 |
@@ -37,6 +37,33 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-22 — RS3 manual walk (not the desktop runner)
+
+A walk, not a use-case run. `06_evaluation.md` still wants UC-05, UC-05e and
+UC-06 from the desktop runner; this entry only records what one paired key
+did against the local dev stack.
+
+Stack: local `docker compose` on the m4 context. synaplan
+`feat/knowledge-folder-as-a-tool` at `c9534c70e`. `KNOWLEDGE_TOOLS=desktop`
+(owner 0). Model `openai/gpt-oss-20b` on Groq, operator key. Command:
+`POST /v1/messages` with `Authorization: Bearer` (a paired desktop key) and
+`x-synaplan-rag-group-key: Wissensordner`.
+
+Folder `Wissensordner`, three files, each vectorized as one chunk
+(`BFILES` 19–21): `projektcode.txt` (“ZEBRA-41”), `budget.txt` (“73.900 €”),
+`kickoff.txt` (“14. März”).
+
+| Turn | Question | Result | Evidence |
+| ---- | -------- | ------ | -------- |
+| 1 | “Nenne Projektcode, Budget und Kickoff-Datum.” | Answer contains all three planted facts, cited as the injected passages. No tool call. | Response `chatcmpl-46ac7822-1276-4486-8aaf-54dae13a11ab`, 648 in / 182 out. `BUSELOG` 814 is `MESSAGES` only |
+| 2 | “Die Textstellen oben reichen nicht. Suche im angehefteten Ordner nach dem Budget und lies die gefundene Datei vollständig.” | Answer quotes the whole budget file, including “Andere Beträge gelten nicht.” | Response `chatcmpl-5a974f2b-2e72-435a-adb6-b9a13bc703cd`, 2403 in / 351 out. `BUSELOG` 818 `tool:knowledge_search` success, 819 `tool:read_document` success |
+
+Not measured: time to first token (UC-05 before / after), a question that
+makes the model search twice on its own (UC-05e asks for `knowledge_search`
+≥ 2), and UC-06. The desktop use-case runner was not used.
 
 ---
 
