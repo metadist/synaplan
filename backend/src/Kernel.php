@@ -3,6 +3,7 @@
 namespace App;
 
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
+use App\DependencyInjection\Compiler\PerfTestProviderPass;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\DependencyInjection\FeatureModuleTagPass;
 use App\Plug\DependencyInjection\PlugDeclarationCheckPass;
@@ -10,6 +11,7 @@ use App\Plug\Extraction\ContentExtractorInterface;
 use App\Plug\Rerank\RerankProviderInterface;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
@@ -109,6 +111,7 @@ class Kernel extends BaseKernel
         // refuses duplicate ids at compile time.
         $container->registerForAutoconfiguration(FeatureModuleInterface::class)->addTag(FeatureModuleTagPass::TAG);
         $container->addCompilerPass(new FeatureModuleTagPass());
+        $container->addCompilerPass(new PerfTestProviderPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 100);
 
         // Nested-transaction savepoints are required by dama/doctrine-test-bundle
         // on MariaDB/MySQL. We register the compiler pass conditionally because

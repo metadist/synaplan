@@ -1,4 +1,4 @@
-.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal
+.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal perf-runtime
 
 up: ## Start the stack (status page first, then remaining images)
 	./scripts/compose-up.sh
@@ -77,3 +77,6 @@ build: ## Build everything (frontend app + widget)
 deps: ## Install all dependencies (backend + frontend)
 	$(MAKE) -C backend deps
 	$(MAKE) -C frontend deps
+
+perf-runtime: ## Runtime benchmarks on the dev stack. ARGS=--with-providers opts into paid providers.
+	./_devextras/perf/runtime/run.sh $(ARGS)

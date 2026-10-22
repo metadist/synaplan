@@ -8,14 +8,37 @@ measurement and a rollout are entries here, not chat messages.
 | Date | Step | Pull request | State | Notes |
 | ---- | ---- | ------------ | ----- | ----- |
 | 2026-10-21 | AU0 | [#2623](https://github.com/metadist/synaplan/pull/2623) | merged (`ce89e32a4`) | research, spike, plan; three Copilot rounds, all findings accepted |
-| 2026-10-21 | AU0b | this pull request | open | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
+| 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
+| 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | in review | `make perf-runtime` |
 
 ## Baselines
 
 | Date | What | Value | Source |
 | ---- | ---- | ----- | ------ |
-| 2026-10-21 | Size ledger (`make -C backend metrics`) | to be recorded by AU1 | — |
+| 2026-10-21 | Size ledger (`make -C backend metrics`) | not re-counted; `TestProvider.php` stayed at 1044 lines | AU1 |
 | 2026-10-21 | Runtime measurements | `02_measurements.md` §1–§4 | `spike/` |
+| 2026-10-21 | Health p95, 1 client, worker mode | 5.9 ms and 6.5 ms | `make perf-runtime`, two runs |
+| 2026-10-21 | Health p95, 8 clients, worker mode | 35.9 ms and 35.7 ms | recorded; the 15 ms budget is the idle row |
+| 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
+| 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
+| 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-21 — Runtime benchmark (AU1)
+
+`make perf-runtime` on the dev stack, worker mode, `test-model` at 400 ms
+per chunk. Two runs, about a minute apart. The idle health row (1 client)
+stays under 15 ms and the two runs are within 20% of each other, as are the
+8-client health row and runtime-config throughput. Gateway time to first
+token moved from 9.3 ms to 13.0 ms. The saturated probe is still seconds,
+which is the single pool; that budget starts after AU3.
+
+`app:perf:chat-stream` was not run: the seeded admin's chat model is
+Anthropic, and the target does not call a paid provider unless
+`--with-providers` is set. A budget forced to 1 ms makes the checker exit
+non-zero. After each run the prod cache is gone, the temporary API key is
+gone, and only the dev server's FrankenPHP is left.
 
 ---
 

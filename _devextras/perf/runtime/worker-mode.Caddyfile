@@ -12,6 +12,7 @@
 			file /var/www/backend/public/index.php
 			num {$SPIKE_WORKER_NUM:8}
 			env APP_RUNTIME App\Runtime\FrankenPhpRuntime
+			env SYNAPLAN_TEST_PROVIDER_CHUNK_MS {$SYNAPLAN_TEST_PROVIDER_CHUNK_MS:50}
 		}
 	}
 	order php_server before file_server
