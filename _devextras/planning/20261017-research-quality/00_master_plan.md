@@ -6,7 +6,10 @@ a similar quality for research with agentic looping and better prompting —
 combining models for summarizing, sorting and indexing with models for
 creation, modification and enhancement?"* The measured baseline is in
 [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md). Tick §0 before the
-first product PR.
+first product PR. **Revised 2026-10-22** after the architecture review in
+[`08_review.md`](./08_review.md) §2b: the lead drives tools itself where the
+model allows it (§0 #2), a spike and go / no-go gate before Phase C (§0 #40),
+and §0 #37–#42.
 **Priority:** Row 21 of [`../ROADMAP.md`](../ROADMAP.md), not started. Its
 place among the queued rows is the owner's call. Phase B (quick wins on
 today's paths) is small and can run beside any track.
@@ -21,11 +24,15 @@ into a Word document, slides, a table or an email.
    research eval corpus, record today's numbers.
 2. **Phase B — quick wins on today's paths (RS1–RS4, RD1).** Remove the
    ceilings that make today's answers short and unsourced.
-3. **Phase C — the research engine (RS5–RS10, RQ3).** A server-side research
+3. **Gate — spike and go / no-go (RQ2b, §0 #40).** A console-only spike of the
+   engine with both lead modes, measured against today's paths after Phase B
+   and an external deep-research reference. Phase C starts only if the spike
+   wins by the margin in §0 #40.
+4. **Phase C — the research engine (RS5–RS10, RQ3).** A server-side research
    run: brief → plan → gather → read → reflect (loop) → write → check.
-4. **Phase D — the Desktop research surface (RD2–RD9).** Research chip in
+5. **Phase D — the Desktop research surface (RD2–RD9).** Research chip in
    Chat, plan card, live progress, report with sources, "Turn into…".
-5. **Phase E — web chat and Saved Tasks (RW1–RW3).** Same engine, same card.
+6. **Phase E — web chat and Saved Tasks (RW1–RW3).** Same engine, same card.
 
 **Why now:** The answer to the owner's question is *yes, for research* — and
 the gap is not the models. Synaplan's catalog already holds the frontier
@@ -45,7 +52,8 @@ RD3–RD9, RW1–RW2.
 **Class:** RQ0, RQ2 `no-app-impact`; RQ3, RS*, RW3 `backend-only`; RW1–RW2
 `ota-candidate`; RQ1 and RD* are pull requests in `synaplan-desktop` (its own
 `make ci-local` gate, no mobile class).
-**Prerequisite:** none for Phases A and B. Phase C needs §0 #1–#9 ticked.
+**Prerequisite:** none for Phases A and B. Phase C needs §0 #1–#9 ticked and
+the go decision of §0 #40 recorded in STATUS.
 Phase D needs RD2 (the 2,050-line `ChatView.vue` split first).
 **Serves:** use cases 10 (sovereign expert research: citation fidelity,
 abstention, sovereignty as a job-wide setting), 5 (tender matrix with a
@@ -63,7 +71,7 @@ and its open Q8 for research runs.
 | [`05_journeys_and_ui.md`](./05_journeys_and_ui.md) | Journeys J-RQ-1…10, wireframes, copy in five locales, the five questions, empty / error / flag-off states |
 | [`06_evaluation.md`](./06_evaluation.md) | The quality harness: corpus, metrics, judges, baselines, targets, the use cases UC-11…UC-16 |
 | [`07_sprints.md`](./07_sprints.md) | One brief per step: goal, reads, touches, tests first, brief to paste, docs, exit criteria |
-| [`08_review.md`](./08_review.md) | The 2026-10-17 plan review: gaps, forgotten work, regression risks with their guards, installation findings, what changed |
+| [`08_review.md`](./08_review.md) | The 2026-10-17 plan review: gaps, forgotten work, regression risks with their guards, installation findings, what changed; §2b the 2026-10-22 architecture review against current deep-research systems |
 | [`09_installations.md`](./09_installations.md) | Every way Synaplan is installed — dev, CI, single-node cloud, air-gapped, EU, minimal, Kubernetes, three-node production — what research does there, the degradation copy, the tests per profile, upgrade / rollback, the documentation matrix |
 | [`10_contracts.md`](./10_contracts.md) | The shapes to code against: six schemas, endpoints, events, execution units, every BCONFIG key, PHP / Rust / Vue contracts, fixtures, log and usage fields |
 | [`STATUS.md`](./STATUS.md) | Step log and measured numbers |
@@ -75,10 +83,13 @@ and its open Q8 for research runs.
 **What we build:** a **research run** on the Synaplan server. It turns a
 question into a short brief, a plan of three to seven points, searches the web
 and the person's knowledge folders, lets cheap models read each source with the
-question as the lens and return **evidence cards** with verbatim quotes, lets
-one frontier model look at what is still missing and search again, writes the
-report from the evidence only, and has a model from a *different provider*
-check every cited statement. Synaplan Desktop gets it first as a **Research**
+question as the lens and return **evidence cards** that cite numbered passages
+of the source, lets one frontier model **drive the search itself** — it calls
+`search`, `read_sources` and `finish` as tools, as an IDE agent does, while the
+engine enforces budgets and returns only evidence cards — writes the report
+from the evidence only, and has a model from a *different provider* check every
+cited statement. Models without reliable tool calling (local ones among them)
+get the same run in fixed rounds of JSON decisions (§0 #2). Synaplan Desktop gets it first as a **Research**
 chip in Chat; the web chat gets the same engine and the same card later.
 
 Before the engine, Phase B removes today's ceilings, because most questions
@@ -170,7 +181,7 @@ what the sentence claims is worse than no research feature.
 | # | Decision | Default | Agree? |
 | - | -------- | ------- | ------ |
 | 1 | **The research engine runs on the Synaplan server.** Desktop and the web app are clients of one engine. Desktop's own agent loop stays for local file and skill work and gets the Phase B improvements. | Proposed | |
-| 2 | **Engine-driven loop with structured decisions.** The lead model returns a JSON "next actions" decision each round; the engine executes searches and reads (in parallel where possible). Works with any chat model that returns JSON — including local models whose provider has no native tool calling (`OllamaProvider`). A model-driven tool loop is a later spike for models that pass a tool-call conformance suite (§9). | Proposed | |
+| 2 | **The lead runs in two modes with one set of guardrails.** **Tool mode** (default for lead models on `RESEARCH.TOOL_MODE_MODELS`, the catalog keys that passed the conformance suite `app:research:conformance`): the lead calls `search`, `read_sources`, `reread`, `ask_user` and `finish` as native tools and sees each result before its next step, the way an IDE agent works. **Round mode** (fallback for every other model, including `OllamaProvider` without native tool calling): one JSON "next actions" decision per round, executed by the engine. In both modes the engine executes every tool, enforces every budget inside the tool (a call beyond the budget returns "budget used" instead of running), validates ids, and returns only search result lists (sanitised titles and snippets) and evidence cards — never raw page or file text — so the quarantine of #3 holds unchanged. `RESEARCH.LEAD_MODE` (`auto` · `tools` · `rounds`) lets an admin force one. The spike (RQ2b) and RQ3 measure both modes; if tool mode does not beat round mode on `06` metrics, `auto` resolves to `rounds`. | Proposed (changed 2026-10-22) | |
 | 3 | **Readers quarantine untrusted text.** Only readers see raw page and file text; they have no tools and return evidence cards. The lead, writer and checker see evidence cards only. This is both the cost lever and the prompt-injection defence. | Proposed | |
 | 4 | **Two new model slots: `DEFAULTMODEL.READ` (reading sources) and `DEFAULTMODEL.VERIFY` (fact-checking).** Both `chat`-tagged. Fallbacks READ → SORT → ANALYZE → CHAT and VERIFY → ANALYZE → CHAT. VERIFY prefers a provider family different from the writer's. Lead and writer use the chat's model (web) or the project's Chat model (Desktop); a Thorough preset may name a stronger lead inside the world, and the run says which model it used. Seeded insert-if-missing with catalog keys by RQ3 (until then the fallbacks apply). Alternative without new slots: reader = ANALYZE (today Claude Sonnet 5 — about 3 to 20 times the reading cost, depending on the reader it replaces, `02` §6). | Proposed | |
 | 5 | **People choose how thorough, not which models.** Two depths in the UI: **Standard** (default, about 3 minutes) and **Thorough** (about 15 minutes); after a Standard report, **Go deeper** continues with the Thorough budget on the same evidence. An internal `quick` depth serves follow-up questions and Saved Task steps. Normal chat ("Ask") stays the fast path. Budgets in BCONFIG `RESEARCH.BUDGET.<depth>.*` (`03` §4). | Proposed | |
@@ -179,7 +190,7 @@ what the sentence claims is worse than no research feature.
 | 8 | **Runs execute as short units on `async_ai_high`** — one Messenger message per unit of work (brief + plan, one reflect round, one section, the check), each ≤ `RESEARCH.UNIT_SECONDS` (120), re-dispatching the next; so the single worker process every install runs today (`messenger:consume async_ai_high async_extract async_index --time-limit=3600 --memory-limit=512M`) keeps serving saved tasks, media and indexing between units, checkpoints come for free, and a memory-limit restart loses at most one unit. `RESEARCH.MAX_ACTIVE_RUNS` per install (5), at most one active Thorough run per person. A dedicated transport and worker stays a **Docker / Helm change — ask first**, only if RQ3 measures a queue wait people notice. | Proposed | |
 | 9 | **API:** `/v1/research*` for paired keys (covered by `desktop:messages` — no new scope, no re-pair) and `/api/v1/research*` for the web session, both thin controllers over one service; complete OpenAPI; Desktop vendors `research-contract/` fixtures with a checksum test. `protocol: 1` untouched. | Proposed | |
 | 10 | **Plan review and questions.** Standard starts at once with the plan visible and stoppable. Thorough shows the plan and waits for **Start research**. At most three clarifying questions, multiple choice with **Skip** — in Thorough, and in Standard only when the brief marks the question as ambiguous. Reuse the ask-the-user card pattern. **One timeout rule:** an unanswered question is treated as skipped after 10 minutes and the run continues; only an unconfirmed plan ends a run (`stopped_waiting` after 24 hours). | Proposed | |
-| 11 | **Citations and fact-check.** Every factual sentence cites evidence; every evidence quote must be found verbatim in its source (deterministic check, no model); a second model checks each cited statement; unsupported statements are removed or moved to **Not confirmed**; the report states the result in one sentence ("35 of 37 statements are backed by a source. 2 were removed."). | Proposed | |
+| 11 | **Citations and fact-check.** Every factual sentence cites evidence; every finding cites numbered passages of its source that exist, and any quote it carries must be found inside those passages (deterministic check, no model — #39); a second model checks each cited statement; unsupported statements are removed or moved to **Not confirmed**; the report states the result in one sentence ("35 of 37 statements are backed by a source. 2 were removed."). | Proposed | |
 | 12 | **Research runs read PDFs and office files found on the web** through the extraction chain (Tika), capped (20 MB, 15 s, character budget). Plain-chat deep search gets it only behind `WEB_SEARCH.READ_DOCUMENTS`, default off until RQ2 shows a gain. | Proposed | |
 | 13 | **Untrusted data, read-only engine.** Source text is delimited and labelled as data in every reader prompt; the engine performs no write, send or purchase; any later write goes through `ToolExecutionGate` / Approvals. | Locked | |
 | 14 | **Hybrid knowledge search for research:** keyword + meaning, fused with RRF, then rerank. Keyword leg first through a Qdrant full-text payload index (no MariaDB schema change). A MariaDB FULLTEXT index only if measured better — **schema change, ask first**. | Proposed | |
@@ -205,6 +216,12 @@ what the sentence claims is worse than no research feature.
 | 34 | **Documentation is part of every step.** Each step names its in-repo docs; user docs ship as three `synaplan-docs` pull requests (RX1–RX3) per the matrix in `09` §6; the Helm README note rides with RX2. | Proposed | |
 | 35 | **Module off hides new work, not the person's data.** `capabilities`, start, `input` and `followups` answer 404 and no UI shows (U11); `GET`, events, `cancel` and `DELETE` keep working for the caller's own runs until their TTL, so a `stopped_by_admin` outcome and its partial findings stay readable and deletable. Active runs stop after their current unit with the report of what was found. | Proposed | |
 | 36 | **One execution per unit, with any number of workers; the web report is delivered by the server.** Each unit takes an atomic claim (`SET NX PX` lease with a token) before any paid call and writes its checkpoint fenced by that token; the next unit is dispatched with a short `DelayStamp` so the single consumer also serves extraction and indexing between units. A web run carries its `chat_id`; the `deliver` unit writes the assistant message and the report file into that chat itself, so a closed tab never loses a report. Cancel is checked before every paid call; a request already in flight may still be billed and the copy says so. | Proposed | |
+| 37 | **Reader calls run concurrently in v1**, not later. `AiFacade` has no concurrent chat call today, so a Standard run's 15 reader calls would run one after another (about 1.5–2.5 minutes of reading alone, against a 3-minute target). A `ConcurrentStructuredCaller` sends up to `BUDGET.<DEPTH>.READ_PARALLEL` (4 · 6 · 8) reader requests at once through Symfony HttpClient's multiplexing, inside one unit, with the same usage recording and cancel check per request. Local worlds keep `LOCAL_PARALLEL` (1). | Ask (provider-layer change) | |
+| 38 | **Readers return links worth following.** An evidence card may carry up to five `leads` (URL, anchor text, point) — only URLs the engine finds in the page's own extracted link list, so a page cannot invent a target. Leads enter the ledger as `found` sources with origin `link` and pass the SSRF guard when read. This covers the common case "landing page → PDF / price list". | Proposed (2026-10-22) | |
+| 39 | **Citations point at numbered passages, not free-text quotes.** The engine splits the raw extracted text into numbered passages (paragraph, table row, list item; long paragraphs into sentences) before the reader sees it; the reader cites passage ids (`§12`) and may add a short quote. Verification: the passage exists, and a quote, when present, is found inside it after normalisation. This removes the main failure of verbatim quotes (near-miss copies dropped as invented) and gives the source drawer an exact location for free. The share of dropped findings is an eval metric (`06` §3). | Proposed (2026-10-22) | |
+| 40 | **Go / no-go before Phase C.** After Phase B, the spike RQ2b (a console command, no API, no units, no UI) runs both lead modes on the frozen smoke set against B0, **B1+** (today's gateway loop after RS1–RS3 with a frontier model and raised round limits — the "Cursor-like" path we already have) and **B4** (an external deep-research agent as a reference point, eval only). RS6 starts only if the best spike arm beats B1+ by ≥ 10 points on fact recall **or** reaches the citation-precision target of `06` §5 where B1+ does not, at no more than twice B1+'s cost. Otherwise Phase C shrinks to citations and fact-check around the gateway loop, and the owner decides the rest. | Ask (owner) | |
+| 41 | **Budgets are hypotheses, measured as a curve.** The counts in `03` §4 are starting values. RQ2b and RQ3 sweep searches and sources read (Standard 10 / 20, Thorough 30 / 60) and record fact recall against cost; the seeded budget is the knee of that curve. Reference: external deep-research agents use about 80 searches for a typical task, and token spend explains most of the quality difference between research agents (`08` §2b). | Proposed (2026-10-22) | |
+| 42 | **The report is written in one call when it fits.** The writer writes the whole report in one call whenever its `meta.max_output` covers the depth's word budget; section-by-section writing is the fallback for smaller models, and then sequential with the previous sections in context — never parallel sections, which read as disjoint. | Proposed (2026-10-22) | |
 
 ---
 
@@ -271,8 +288,11 @@ Synaplan backend              ▼
   Brief ─► Plan ─► ┌ Gather ─► Read ─► Reflect ┐ ─► Write ─► Check ─► Deliver
   sorter   lead    │ sorter    readers  lead   │    writer    checker
                    └──────── loop until covered or budget ──┘
+     Loop:   tool mode — the lead calls search / read_sources / reread / finish itself;
+             round mode — one JSON decision per round (fallback, §0 #2)
      Gather: WebSearchGateway (query fan-out) · knowledge: VectorSearch + keyword (RRF) + RerankStage
-     Read:   UrlContentService (HTML) · extraction chain (PDF, office) · knowledge chunks → evidence cards
+     Read:   UrlContentService (HTML) · extraction chain (PDF, office) · knowledge chunks
+             → numbered passages → concurrent readers → evidence cards with passage ids and leads
   EvidenceLedger + ResearchEventLog (Redis, TTL 48 h, sequence numbers, resumable)
   RateLimitService budget check per phase · usage per role (source RESEARCH)
 ```
@@ -354,9 +374,11 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | RS3 | `feat(messages): search the pinned knowledge folder as a tool` | backend-only | RQ1 |
 | RS4 | `feat(search): read PDFs and office files that web search finds` | backend-only | RQ2, §0 #12 |
 | RD1 | `feat(chat): file tools in every chat, a stronger agent prompt and full-length answers` (in `synaplan-desktop`) | desktop | RQ1, §0 #26 |
-| **Phase C — the research engine** | | | |
+| **Gate — spike and go / no-go** | | | |
+| RQ2b | `test(research): research spike with both lead modes against today's paths` | no-app-impact | RQ2, RS1–RS3, §0 #40 |
+| **Phase C — the research engine** (only after the go of §0 #40) | | | |
 | RS5 | `feat(models): model slots for reading sources and fact-checking` | backend-only | §0 #4 |
-| RS6 | `feat(research): research runs that plan, read and write a cited report` | backend-only | RS5, RQ2, §0 #1–#3, #7–#9, #19, #27–#28, #30–#32, #35–#36 |
+| RS6 | `feat(research): research runs that plan, read and write a cited report` | backend-only | RS5, RQ2b go, §0 #1–#3, #7–#9, #19, #27–#28, #30–#32, #35–#39 |
 | RS7 | `feat(research): search again until every point of the plan is covered` | backend-only | RS6, §0 #10 |
 | RS8 | `feat(research): fact-check every cited statement with a second model` | backend-only | RS6, §0 #11 |
 | RS9 | `feat(rag): keyword plus meaning search for research and knowledge_search` | backend-only | RS6, §0 #14 |
@@ -381,7 +403,10 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | RX3 | `docs: research in the web chat and its administration` | docs | RW1, RW2 |
 
 Phase B is useful on its own: normal chat answers fully, reads pages on every
-model and can search a knowledge folder more than once. Phase D starts when
+model and can search a knowledge folder more than once. It also produces the
+strongest cheap competitor of the engine (arm B1+), which is why the gate
+RQ2b sits between Phase B and Phase C: the spike's prompts and stage classes
+may be reused by RS6, but none of its code is a product path. Phase D starts when
 RS6 is merged behind the flag; RD2 and RD7 can start at once. The
 installation profiles each step must hold on are in
 [`09_installations.md`](./09_installations.md) §2 and §4.
@@ -452,11 +477,14 @@ cd src-tauri && cargo run -p synaplan-core --example usecases -- --quick   # plu
 
 | Risk | Mitigation |
 | ---- | ---------- |
-| A citation points to a source that does not say it | Verbatim quote check (deterministic), second-provider checker, unsupported statements removed or listed under Not confirmed, citation precision is a gate metric (`06`) |
+| A citation points to a source that does not say it | Passage check (deterministic, §0 #39), second-provider checker, unsupported statements removed or listed under Not confirmed, citation precision is a gate metric (`06`) |
 | Prompt injection from a web page or file | Readers quarantine text and have no tools; delimiters; the lead never sees raw text; the run is read-only (§0 #3, #13) |
 | Cost runs away on Thorough | Estimate before start, cap per depth, budget check per phase, one active Thorough run per person, Stop always works |
-| Runs feel slow | Fast tier for sorting and reading, parallel page fetches (existing first-hop overlap), live progress, the window can close, Standard is the default |
-| Tool-calling bugs across providers (desktop CHANGES C2, C4, C10) | Structured JSON decisions instead of native tool calls (§0 #2); healing retry; a role that keeps failing is reported, not looped |
+| Runs feel slow | Fast tier for sorting and reading, parallel page fetches (existing first-hop overlap), concurrent reader calls (§0 #37), live progress, the window can close, Standard is the default |
+| Tool-calling bugs across providers (desktop CHANGES C2, C4, C10) | Tool mode only for models on `TOOL_MODE_MODELS` after the conformance suite; round mode as the fallback (§0 #2); healing retry; a role that keeps failing is reported, not looped |
+| The lead in tool mode over-searches or never stops (spawning work for trivial questions) | Every tool enforces the budget and answers "budget used"; `MAX_MODEL_CALLS`; effort-scaling rules in the lead prompt (`04` §4.5a); the wall clock ends the loop and the writer writes with what exists |
+| The engine is built and does not beat Phase B | Go / no-go after the spike (§0 #40); B1+ and B4 arms in every comparison |
+| Verbatim quotes are dropped although the finding is right | Passage-id citations (§0 #39); dropped-finding share is a metric |
 | Sovereignty leak through an "auto" role | World rule (§0 #6), explicit models from Desktop, fail closed, models listed on every run |
 | Condensing drops the decisive detail | Quotes with locations, `reread` action with a sharper question, writer can request a source again |
 | Redis flush loses a running run | Honest failure with the sources already streamed kept by the client; "Start again" seeds them (`03` §6) |
@@ -496,11 +524,12 @@ cd src-tauri && cargo run -p synaplan-core --example usecases -- --quick   # plu
 | # | What | Why it waits |
 | - | ---- | ------------ |
 | 1 | **Read files on this computer during a run** without uploading them: the run asks, Desktop reads inside its allowlist and returns the text (client-executed tools over the run's input endpoint) | Needs the engine and its input channel (RS7); a privacy choice people should see first in J-RQ-3 |
-| 2 | **Model-driven research agent** (the lead calls tools itself) for models that pass a tool-call conformance suite | §0 #2; a spike with eval numbers, branch never merged |
-| 3 | **Parallel readers** fanned out over worker processes | Measure RQ3 latency first; `DagExecutor` parallel mode is the precedent |
+| 2 | **Point researchers** — one sub-loop per plan point on a mid-tier model (search → read → search again, two or three iterations) that returns condensed findings to the lead, the orchestrator-worker shape of current deep-research systems | Only if RQ3 shows the lead's rounds are the bottleneck; it widens what sees untrusted snippets (queries could carry knowledge-folder text to a search provider), so it needs its own injection and exfiltration tests |
+| 3 | **Units fanned out over several worker processes** | Concurrent reader calls inside a unit come first (§0 #37); measure RQ3 latency; `DagExecutor` parallel mode is the precedent |
 | 4 | **A local index on Desktop** (search local folders without sending them) | Needs a local embedding runtime — native dependency, ask first |
 | 5 | **Research packs**: "Market scan", "Regulation watch", "Supplier comparison", "Literature review" as assistants with research rules | After RQ3 shows which prompts and budgets work |
 | 6 | **Share a report** (Share dialog, new kind) | UX contract §4.1 consequence copy per kind |
 | 7 | **Research over cloud folders** (Nextcloud, OpenCloud) | Cloud file sharing (row 9) |
 | 8 | **Academic and news sources** (OpenAlex, Crossref, arXiv, news APIs) as search adapters | Web search plug port, after the corpus shows the gap |
 | 9 | **Figures and tables in PDFs as evidence** (vision on rendered pages) | `PIC2TEXT` cost per page; measure on the tender corpus |
+| 10 | **An external deep-research agent as an optional engine** for cloud worlds (for example the Gemini Deep Research agent on the Interactions API) behind the same run contract | B4 shows whether it is worth it; sovereignty (US-hosted, its own search) and its citation format need the world rule and the passage check first |

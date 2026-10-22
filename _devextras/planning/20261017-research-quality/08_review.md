@@ -125,6 +125,65 @@ were factual corrections to this review's own claims.
 
 ---
 
+## 2b. Architecture review against current deep-research systems (2026-10-22)
+
+**Scope:** the plan as merged in
+[#2541](https://github.com/metadist/synaplan/pull/2541) at `39631f29c`,
+checked against the code on `main` and against how current deep-research
+systems are built. Code facts re-checked: `GatewayToolLoop::WEB_SEARCH_WRAP_AFTER = 2`,
+the two-sentence `WRAP_UP_AFTER_SEARCH`, `WALL_CLOCK_SECONDS = 240`;
+`AiFacade::chat()` returns native `tool_calls` (normalised by
+`ToolCallParser`; `Service/Document/ChatToolLoop.php` already runs a native
+tool loop on it); `AiFacade` has no concurrent chat call (only `embedBatch`).
+
+**External references:**
+[Anthropic — How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)
+(orchestrator-worker; the model drives tools; token use explains about 80 % of
+the performance variance on BrowseComp; multi-agent runs use about 15× the
+tokens of a chat; start evaluating with about 20 queries; a final citation
+step; human testers found agents preferring SEO content farms),
+[LangChain — Open Deep Research](https://www.langchain.com/blog/open-deep-research)
+and [Learning the Bitter Lesson](https://rlancemartin.github.io/2025/07/30/bitter_lesson/)
+(a plan-and-execute workflow was replaced by tool-calling researchers because
+it was too rigid; sections written in parallel read as disjoint — write once
+at the end),
+[Gemini Deep Research agent](https://ai.google.dev/gemini-api/docs/deep-research)
+(a callable deep-research agent, about 80 searches and 1–3 USD for a typical
+task), [Anthropic — Effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+(tool-result clearing, compaction),
+[DeepResearch Bench](https://deepresearch-bench.github.io/) (RACE, FACT) and
+[BrowseComp-Plus](https://arxiv.org/abs/2508.06600) (fixed corpus for
+reproducible comparison).
+
+### Findings
+
+| # | Sev | Finding | Evidence | Resolution | Where |
+| - | --- | ------- | -------- | ---------- | ----- |
+| X1 | **A** | **The design contradicted its own thesis.** `01` §1 says an IDE agent is better because the model drives the tools and sees every result; §0 #2 then let the engine drive in fixed rounds and parked the model-driven loop as a "spike, never merged". Every current deep-research system lets the model call the tools; LangChain removed exactly this kind of workflow for being rigid. The safety the plan wants (quarantine, budgets, read-only) does not depend on who decides — it depends on what the tools return and who enforces the budget. | `00` §0 #2 and §9 #2 as merged; `AiFacade` already supports native tool calls | Two lead modes with one set of guardrails: **tool mode** for lead models that pass a conformance suite, **round mode** as fallback (local models, weak tool calling). Tools execute in the engine, enforce the budget, return only cards and sanitised result lists. | `00` §0 #2, `03` §2.5, §3, `04` §4.5a, `10` §1.5a |
+| X2 | **A** | **No proof the engine beats what Phase B already gives.** After RS1–RS3 the gateway is a model-driven loop with `web_search`, `web_fetch` and `knowledge_search` — the strongest cheap competitor of the engine — but no arm measured it, and Phase C (≈ 20 PRs across three repositories) would start without that comparison. | `06` §5 arms B0–B3 as merged | Spike RQ2b (console only) with both lead modes against **B1+** (Phase B gateway loop, frontier model, raised rounds) and **B4** (external deep-research agent as reference); a written go / no-go before RS6. | `00` §0 #40, §5, `06` §5, `07` RQ2b |
+| X3 | **B** | **Readers would run one after another.** "Parallel readers" sat under Later; `AiFacade` has no concurrent chat call, so a Standard run's 15 reader calls would take about 1.5–2.5 minutes alone against a 3-minute p50 target, and a Thorough run's 40 much more. | `AiFacade.php` (only `embedBatch`); `00` §9 #3 as merged | Concurrent reader calls inside a unit in v1 (`ConcurrentStructuredCaller`, `READ_PARALLEL`); fan-out over workers stays Later. Ask-first (provider layer). | `00` §0 #37, `03` §2.4, `10` §4, §5 |
+| X4 | **B** | **Verbatim quotes would drop correct findings.** Models routinely copy quotes with small deviations; the raw-text check would drop those findings as invented, and "location" was free text. | `03` §2.4 as merged | Numbered passages: the engine splits the source, the reader cites passage ids and may add a short quote checked inside the passage; dropped-finding share is a metric. | `00` §0 #39, `03` §2.4, §2.7, `04` §4.4, §4.7, `10` §1.4 |
+| X5 | **B** | **Readers could not follow a link.** The common case "landing page → PDF / price list / terms" needed a new search instead of one read. | `03` §2.4 as merged | Up to five leads per card, only from the page's own extracted link list, read like any other source. | `00` §0 #38, `03` §2.4, `04` §4.4 |
+| X6 | **B** | **Budgets were fixed before measurement and look low.** Standard ≤ 10 searches, Thorough ≤ 30, against about 80 for a typical external deep-research task, while token spend is the largest quality factor. | `03` §4; Anthropic and Gemini references above | Budgets as hypotheses; RQ2b and RQ3 sweep them and seed the knee of the recall-against-cost curve. | `00` §0 #41, `03` §4, `07` RQ3 |
+| X7 | **C** | **Thorough wrote section by section.** Independent section calls read as disjoint; current writers have 128k output. | `03` §2.6 as merged | One call when the writer's output cap fits; sequential sections only as fallback. | `00` §0 #42, `03` §2.6, `10` §3 |
+| X8 | **C** | **The eval would start late.** 40 items plus two-person κ calibration before the first number; small sets already show the large early effects. | `06` §2, `07` RQ2 as merged | A 20-item starter set with B0 and B4 first; the full set and calibration before RQ3. | `06` §2, `07` RQ2 |
+| X9 | **C** | **The lead prompt lacked effort scaling and source-quality heuristics** — the two most cited early failure modes (over-investing in simple questions, preferring content farms). | `04` §4.5 as merged | `tools:research_lead` with "start wide, then narrow", effort per question type, primary over SEO sources, parallel calls. | `04` §4.5a |
+
+### What changed
+
+| File | Change |
+| ---- | ------ |
+| `00_master_plan.md` | Status note; phases with the gate; "Start here"; §0 #2 rewritten, #11 passages, new #37–#42; prerequisite; target shape; step table with RQ2b; risks; Later #2, #3, #10 |
+| `02_model_roles.md` | Lead requirement (tool calling → tool mode); bake-off stage 2b (lead mode); B1+ and B4 in stage 4; reader metrics |
+| `03_research_engine.md` | Passages, concurrent readers, leads (§2.4); tool mode and round mode (§2.5); one-call writing (§2.6); passage-based check (§2.7); §3 rewritten with the conformance suite; budgets as hypotheses (§4); ledger example; unit description; code shape |
+| `04_prompting.md` | Reader prompt with passages and leads; `tools:research_lead`; checker on passages; tests for tool-mode replays and conformance |
+| `06_evaluation.md` | Public yardsticks; 20-item starter set; passage integrity, dropped findings, search efficiency; arms B1+, B4, S-R, S-T; the go / no-go rule; target vs B1+ |
+| `07_sprints.md` | RQ2 starter set and arms; new RQ2b; RS6 passages, leads, concurrency, one-call writing; RS7 both modes and conformance; RQ3 `TOOL_MODE_MODELS`, budget curve |
+| `10_contracts.md` | Evidence schema with passages and leads; lead tools and `ResearchFinishSchema`; state evidence shape; units; BCONFIG keys; PHP contracts; commands |
+| `STATUS.md` | RQ2b row; review entry |
+
+---
+
 ## 3. Open for the owner (new or changed ask-first rows)
 
 | Row | Question |
@@ -136,3 +195,6 @@ were factual corrections to this review's own claims.
 | §0 #35 | Module off: new work 404, the person's existing runs stay readable and deletable until their TTL |
 | §0 #36 | Atomic unit claims, server-side delivery of web reports into `chat_id`, cancel before every paid call |
 | RX1–RX3 | Three pull requests in `synaplan-docs`, one per phase |
+| §0 #2 | Tool mode as the default for qualified lead models, round mode as fallback (2026-10-22) |
+| §0 #37 | Concurrent reader calls through HTTP multiplexing in the provider layer (small provider change) |
+| §0 #40 | The go / no-go rule after the spike, and the eval budget for arm B4 (an external deep-research agent, about 1–3 USD per item) |

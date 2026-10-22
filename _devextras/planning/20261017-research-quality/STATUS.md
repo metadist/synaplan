@@ -15,9 +15,10 @@ chat message.
 | RS3 | planned | `knowledge_search` and `read_document` in the gateway |
 | RS4 | planned | PDFs and office files from web search — §0 #12 |
 | RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |
+| RQ2b | planned | Spike with both lead modes vs B1+ and B4, budget sweep, go / no-go — §0 #40 |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
 | RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
-| RS7 | planned | Reflect loop, questions, plan review, resume — §0 #10 |
+| RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
@@ -36,6 +37,23 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-22 — architecture review (RQ0, third pass)
+
+Full review in [`08_review.md`](./08_review.md) §2b: the plan checked against
+current deep-research systems (Anthropic's research system, LangChain Open
+Deep Research, the Gemini Deep Research agent) and re-checked against `main`.
+Not committed yet; local working-tree changes for the owner's review.
+
+| Finding | Evidence | Change |
+| ------- | -------- | ------ |
+| The engine-driven loop contradicted the plan's own thesis (the model should drive the tools) | `01` §1 vs `00` §0 #2; `AiFacade::chat()` already returns native `tool_calls`, `ChatToolLoop` uses them | Two lead modes: tool mode for qualified leads, round mode as fallback; guardrails stay in the engine (§0 #2) |
+| No proof the engine beats Phase B's gateway loop | no B1+ arm in `06` §5 | Spike RQ2b with arms B1+ and B4 and a go / no-go before RS6 (§0 #40) |
+| Readers would run sequentially | `AiFacade` has no concurrent chat call | Concurrent reader calls in v1 (§0 #37) |
+| Verbatim quotes drop correct findings | `03` §2.4 | Numbered passages and passage-id citations (§0 #39) |
+| Readers could not follow links; budgets fixed before measurement; parallel-section writing | `03` §2.4, §4, §2.6 | Leads (§0 #38), budget curve (§0 #41), one-call writing (§0 #42) |
 
 ---
 
