@@ -7,7 +7,7 @@ and a CI run are entries here, not chat messages.
 
 | Date | Step | Pull request | State | Notes |
 | ---- | ---- | ------------ | ----- | ----- |
-| 2026-10-22 | PQ0 | — | in review | plan; Copilot rounds and run id to follow |
+| 2026-10-22 | PQ0 | [#2644](https://github.com/metadist/synaplan/pull/2644) | in review | plan; Copilot round 1: four findings, all accepted (§10); All Checks Passed green on the first head |
 
 ## Baselines
 

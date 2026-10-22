@@ -96,7 +96,7 @@ ci.yml
 | -- | ------- | --------- | ---- |
 | J-PQ-1 | An administrator whose Synaplan is German opens **Apps → Meeting notes**. Every label is German. In Preferences they switch to French; the plugin page shows French without a reload. A key present in English but missing in French would show English, never a raw key (the parity gate makes that case impossible for bundled plugins). Switching back is the undo. | the browser, dev stack, `hello_world` and `synascriber` installed | PQ3 |
 | J-PQ-2 | A participant in a French Jitsi sees the **Notes de réunion** button and the French dialog; the strings come from the plugin's `fr.json` through the bundled asset route. | synaplan-charts openDesk e2e (`notes.spec.ts`), with a language assertion added there; locally with a static page that includes the loader against the dev stack | PQ3 (cross-repo for the Jitsi half) |
-| J-PQ-3 | A contributor opens a pull request that adds an unused variable to a plugin's PHP and leaves plugin JavaScript unformatted. "Backend (PHP/Symfony)" and "Frontend (Vue/TypeScript)" fail with file and line. After the fix the same jobs are green. | GitHub, a throwaway draft pull request opened and closed during PQ1 | PQ1 |
+| J-PQ-3 | A contributor opens a pull request that reads an undefined variable in a plugin's PHP (a level-0 PHPStan finding; an unused local would pass level 5) and leaves plugin JavaScript unformatted. "Backend (PHP/Symfony)" and "Frontend (Vue/TypeScript)" fail with file and line. After the fix the same jobs are green. | GitHub, a throwaway draft pull request opened and closed during PQ1 | PQ1 |
 | J-PQ-4 | The owner cuts a release tag. `change-scope` says `promote`; no image is built; the transcriber's `<version>` tag resolves to exactly the two `ci-<sha>` digests of the main run; `docker buildx imagetools inspect` shows `linux/amd64` and `linux/arm64`. synaplan-charts pins that version for both images. | GitHub Actions on `main` and on the next tag; STATUS records both run ids | PQ2 |
 
 J-PQ-1 is the only user-visible journey in the SPA and carries the five
@@ -123,7 +123,7 @@ the first commit); PQ4 waits for PQ3 (its docs describe the final state).
 | PQ0 | `docs(planning): plugin platform quality — static checks, transcriber image, i18n hook, tested plugins` | no-app-impact | — | — |
 | PQ1 | `chore(plugins): PHPStan, php-cs-fixer, ESLint and Prettier cover plugins/` | ota-candidate (`frontend/package.json`, `frontend/scripts/**`) | D1–D4 | #2636 |
 | PQ2 | `ci(transcriber): publish the transcriber image like the app image` | no-app-impact | D5, D6 | #2638 |
-| PQ3 | `feat(plugins): locale files and t() for plugin frontends` | ota-candidate (`PluginView.vue`) | PQ1, D7–D11 | #2635 |
+| PQ3 | `feat(plugins): locale files and t() for plugin frontends` | ota-candidate (`PluginView.vue`) | PQ1, **#2642 merged** (the public asset route the Jitsi loader fetches `locales/` from), D7–D11 | #2635 |
 | PQ4 | `test(plugins): bundled plugins are tested and documented like the release` | backend-only + docs | PQ3, D12, D13 | — (owner's fourth row) |
 
 ### PQ1 — static checks (#2636)
@@ -132,19 +132,19 @@ Three commits in one pull request so the review sees logic apart from
 reformatting:
 
 1. `chore(plugins): …` — `phpstan.neon` gets `/plugins` with the excludes of D3; `.php-cs-fixer.dist.php` adds the plugins directory when it exists (`/plugins`, else `dirname(__DIR__).'/plugins'`), so the CI lint job (no symlink) and the dev container (no `../plugins`) both find it; `frontend/eslint.plugins.config.js` and `frontend/scripts/lint-plugins.mjs` as in D4; `npm run lint` and `format:check` call the script; `docker-compose.yml` mounts `./plugins:/plugins:ro` into `frontend` (D2); `.github/mobile-impact-policy.json` lists the new config file under no-app-impact; `plugins/README.md` item 6 corrected (D1) and a new item 8 names the checks.
-2. `style(plugins): php-cs-fixer and prettier over plugins/` — the mechanical output of `composer lint:fix` and `prettier --write`, nothing else. `loader.js` (817 lines) will reformat; the commit is isolated so the diff of commit 1 and 3 stays readable.
+2. `style(plugins): php-cs-fixer and prettier over plugins/` — the mechanical output of the two formatters, nothing else. `loader.js` (817 lines) will reformat; the commit is isolated so the diff of commit 1 and 3 stays readable. The service containers mount `plugins/` read-only (`backend` today, `frontend` after D2), so the formatters cannot write through them: commit 1 adds a `make plugins-format` target that runs php-cs-fixer and Prettier in one-off containers from the same images with a read-write `plugins/` mount (`docker compose run --rm --no-deps -v ./plugins:/plugins:rw …`), and the normal mounts stay read-only. The check targets (`make -C backend lint`, `make -C frontend lint`) only read.
 3. `fix(plugins): PHPStan level 5 findings in the bundled plugins` — each finding fixed in place. The PR body lists the count before (from `composer phpstan` on commit 1) and after.
 
 Exit: `make ci-local` green with plugins inside; J-PQ-3 walked with a draft PR that is red for the right reason and green after the fix (run ids in STATUS); `node scripts/mobile-impact.mjs --base main --head HEAD` classifies the PR as expected.
 
 ### PQ2 — transcriber image (#2638)
 
-- `transcriber-sidecar`: build with buildx for `linux/amd64` to a tar (`type=docker,dest=`), load it, run `node --test` in it, upload the tar as `transcriber-image` (retention 1 day). Keeps running on every pull request.
-- `transcriber-push-amd64`: push on `main` and on tags, `heavy` mode: download the tar, tag `ci-<sha>-amd64`, push with the same retry loop the app job uses, output `ref` and `digest`. `promote` mode: inspect the existing tag. Gated on `transcriber-sidecar` success.
+- `transcriber-sidecar`: gains `needs: [change-scope]` and `if: mode == 'heavy'`, like `docker-build`. Today it builds on every run, including a promote tag, which would contradict J-PQ-4; `thin` runs (catalog pins only) do not touch the sidecar either. In `heavy` mode it builds with buildx for `linux/amd64` to a tar (`type=docker,dest=`), loads it, runs `node --test` in it, uploads the tar as `transcriber-image` (retention 1 day). Every pull request that is not `thin` still runs it.
+- `transcriber-push-amd64`: push on `main` and on tags; `always() && !cancelled()` with explicit result checks, as `docker-push-amd64` does, so a sidecar that was **skipped** is accepted only when `mode == 'promote'` and a sidecar that **failed** blocks in every mode. `heavy`: download the tar, tag `ci-<sha>-amd64`, push with the same retry loop the app job uses, output `ref` and `digest`. `promote`: inspect the existing tag.
 - `transcriber-push-arm64`: `runs-on: ubuntu-26.04-arm`, build and push `ci-<sha>-arm64`, output `digest`; `promote` inspects.
 - `transcriber-manifest`: `imagetools create` the two digests under `latest` (default branch) or `<version>`, `<major>.<minor>`, `<major>` (tags); verify with `scripts/resolve-manifest-digest.sh` (parameterised by image reference already). Gated like `docker-manifest`: never moves a tag when the sidecar tests failed.
 - `change-scope`: the promote check requires the transcriber's two `ci-<sha>` tags next to the app's.
-- `all-checks-passed`: the three new jobs join `needs`; the old `transcriber-publish` is removed with its short-sha tag.
+- `all-checks-passed`: the three new jobs join `needs`; its result check treats a skipped `transcriber-sidecar` the way it already treats a skipped `docker-build` (allowed in `thin` and `promote`, a failure never). The old `transcriber-publish` is removed with its short-sha tag.
 - `sidecars/synaplan-transcriber/README.md` and `docs/OPENDESK_MEETING_NOTES.md` name the tags that exist.
 
 Exit: workflow validated with `actionlint` (installed on the host for this step); the pull request's run shows the sidecar job uploading the tar; after merge, the main run publishes `ci-<sha>-amd64`, `ci-<sha>-arm64`, `latest`; the next release tag promotes without a build (J-PQ-4, both run ids in STATUS); `imagetools inspect <version>` lists exactly two platforms.
@@ -196,6 +196,9 @@ Every step, in this order, before the pull request is marked ready:
 | PHPStan's `/plugins` does not exist on a host run | PQ1 D3 | Tooling runs in the container or in CI by house rule; a host run fails loudly with the missing path, which is the honest outcome. Documented in `plugins/README.md`. |
 | The `style:` commit of `loader.js` hides a logic change | PQ1 | Commit 2 is produced only by the two formatters, with no hand edits; the reviewer can regenerate it. |
 | A promote tag arrives before the transcriber's main publish finished | PQ2 | `change-scope` requires all four `ci-<sha>` tags; otherwise the tag run falls back to `heavy` and rebuilds, as today for the app image. |
+| A skipped sidecar is mistaken for a passed one | PQ2 | The skip is accepted only in `promote` mode, where the image under the tag was tested by the main run that published its `ci-<sha>` tags; in `heavy` mode a skipped or failed sidecar blocks the push. |
+| `#2642` is not merged when PQ3 starts | PQ3 | PQ3 does not start before it; the Jitsi loader's locale fetch has no other route. Listed as a hard dependency in §5. |
+| The formatters cannot write through the read-only plugin mounts | PQ1 | `make plugins-format` runs them in one-off containers with a read-write mount; the service mounts stay read-only. |
 | The arm64 runner label stops resolving if the repository goes private | PQ2 | Same comment the app job carries; same remedy (a larger arm64 runner). |
 | The Jitsi button appears later because it waits for `fr.json` | PQ3 D9 | One small same-origin fetch next to the `state` call the loader already makes; measured in the walk. The asset route caches for an hour. |
 | A locale fix takes up to an hour to reach Jitsi | PQ3 | Accepted for v1; noted in README. A `?v=<plugin version>` query is in §9. |
@@ -222,3 +225,4 @@ Every step, in this order, before the pull request is marked ready:
 | Date | Change |
 | ---- | ------ |
 | 2026-10-22 | Plan written from issues #2635, #2636, #2638 and the owner's fourth requirement. |
+| 2026-10-22 | Copilot review of [#2644](https://github.com/metadist/synaplan/pull/2644), four findings accepted: J-PQ-3 uses an undefined-variable read (level 5 does not flag an unused local); #2642 is a hard prerequisite of PQ3; `make plugins-format` with a read-write one-off mount because the service mounts of `plugins/` are read-only; `transcriber-sidecar` is skipped in `promote` and `thin` mode and the push and gate jobs accept that skip only for `promote`. |
