@@ -286,14 +286,20 @@ jobs:
           docker run --rm -v "$PWD/test:/app/test:ro" synaplan-transcriber:ci node --test
 
   # ghcr.io/metadist/synaplan-transcriber, for synaplan-charts (meeting notes
-  # deployed with Synaplan). Published from main and release tags only, after
-  # the sidecar's tests; the same Dockerfile they ran in.
+  # deployed with Synaplan). Built and pushed from main and develop after the
+  # sidecar's tests, from the same Dockerfile they ran in. A promote tag does
+  # not rebuild: it moves the version tags onto the image the main run
+  # already published under its short commit, the same rule as docker-manifest
+  # applies to the app image. Only a missing short-commit tag falls back to a
+  # build on the tag.
   transcriber-publish:
     name: Publish Transcriber Image
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [change-scope, transcriber-sidecar]
-    if: github.event_name == 'push' && needs.change-scope.outputs.mode == 'heavy'
+    if: >-
+      github.event_name == 'push' &&
+      (needs.change-scope.outputs.mode == 'heavy' || needs.change-scope.outputs.mode == 'promote')
     permissions:
       contents: read
       packages: write
@@ -324,7 +330,41 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=,format=short
 
+      - name: Reuse the image main already published
+        id: reuse
+        if: needs.change-scope.outputs.mode == 'promote'
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          source="${REGISTRY_IMAGE}:${GITHUB_SHA::7}"
+          if ! docker buildx imagetools inspect "$source" >/dev/null 2>&1; then
+            echo "::notice::${source} was not published by the main run; building on the tag instead"
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          args=()
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            [ "$image" != "$source" ] || continue
+            args+=(--tag "$image")
+          done <<< "$IMAGE_TAGS"
+          docker buildx imagetools create "${args[@]}" "$source"
+          expected="$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' "$source")"
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            [ "$image" != "$source" ] || continue
+            actual="$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' "$image")"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::${image} resolves to ${actual}, expected ${expected}"
+              exit 1
+            fi
+          done <<< "$IMAGE_TAGS"
+          echo "reused=true" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
+        if: steps.reuse.outputs.reused != 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: sidecars/synaplan-transcriber
