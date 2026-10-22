@@ -65,6 +65,7 @@ search or vision:
 | `WEB_SEARCH_MAX_ROUNDS` | `2` | How many Synaplan web searches one message may run before the assistant answers from what it found, as fully as the question needs, and cites the https URLs. Range 1–6. |
 | `WEB_FETCH_MODE` | `auto` | Who reads a page. `auto`: Anthropic on Anthropic routes, Synaplan on every other route. `passthrough`: only Anthropic. `off`: drop the tool (see [Web fetch](#web-fetch)) |
 | `WEB_FETCH_MAX_PER_TURN` | `3` | How many pages Synaplan may open in one message on a non-Anthropic route. Range 0–10. `0` opens none. Anthropic routes keep Anthropic’s own limit |
+| `KNOWLEDGE_TOOLS` | `desktop` | Who can search a pinned knowledge folder. `desktop`: paired desktop keys. `all`: every coding client. `off`: neither tool. A folder still has to be pinned on the message (see [Knowledge tools](#knowledge-tools)) |
 | `VISION_MODE` | `auto` | Which model reads an image turn: `auto` (Synaplan PIC2TEXT when the resolved model lacks vision, otherwise passthrough), `synaplan`, `passthrough`, or `off` (see [Vision](#vision)) |
 | `VISION_IMAGE_DETAIL` | `auto` | Resolution hint for upstreams that expose one — `auto`, `low` or `high` |
 | `VISION_MAX_IMAGES` | `0` | Max image blocks forwarded per request, newest kept; `0` means unlimited |
@@ -136,6 +137,19 @@ When a client already ships an executable tool named `web_fetch` (with `input_sc
 Responses carry `x-synaplan-web-fetch: passthrough|synaplan|off` when the policy chose a handler. `synaplan` means this route reads the page itself; with a page limit of `0` a non-Anthropic route reports `off`.
 
 Synaplan reads pages through the same SSRF guard as every other user-initiated fetch: every redirect hop is checked, the hostname is pinned to the public address the check accepted, and private, loopback and link-local targets come back as an error tool result. Logs and the usage ledger keep the URL without its query string.
+
+### Knowledge tools
+
+When a message pins a knowledge folder (`x-synaplan-rag-group-key`) or an assistant that already has knowledge folders, and `KNOWLEDGE_TOOLS` allows the key, Synaplan offers two tools it runs itself:
+
+| Tool | What it does |
+| ---- | ------------ |
+| `knowledge_search` | Searches that folder again. Returns the file name, file id, chunk id, score and text. At most 10 passages. |
+| `read_document` | Reads one file from that folder. `around` is a chunk id from the search; omitting it reads the start of the file. A short file comes back whole. |
+
+The first-turn passages stay. The tool descriptions say to use them when those passages are not enough. A folder shared as “Can view”, or a folder the caller does not have, comes back as an error and is not searched. `desktop` (the default) limits this to paired desktop keys. `all` includes every other coding client. `off` offers neither tool. `POST /v1/chat/completions` does not run them.
+
+The client never has to answer these calls. A turn that also asks for a client tool such as `write_file` still returns only that client tool.
 
 ## Vision
 

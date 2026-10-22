@@ -103,6 +103,13 @@ final class MessagesGatewayController extends AbstractController
                 ),
                 new OA\Property(property: 'web_fetch_max_per_turn', type: 'integer', example: 3, minimum: MessagesGatewayConfig::MIN_WEB_FETCH_MAX_PER_TURN, maximum: MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN, description: 'How many pages Synaplan may open in one message. Anthropic routes keep their own limit.'),
                 new OA\Property(
+                    property: 'knowledge_tools',
+                    description: 'Who can search a pinned knowledge folder. desktop: paired desktop keys. all: every coding client. off: neither tool is offered. A folder still has to be pinned on the message.',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::KNOWLEDGE_TOOLS_MODES,
+                    example: MessagesGatewayConfig::KNOWLEDGE_DESKTOP,
+                ),
+                new OA\Property(
                     property: 'vision_mode',
                     description: 'How the gateway handles image turns: auto (Synaplan vision when the resolved model lacks vision, otherwise passthrough), synaplan, passthrough, or off.',
                     type: 'string',
@@ -200,6 +207,7 @@ final class MessagesGatewayController extends AbstractController
             'web_search_max_rounds' => $this->config->webSearchMaxRounds($userId),
             'web_fetch_mode' => $this->config->webFetchMode($userId),
             'web_fetch_max_per_turn' => $this->config->webFetchMaxPerTurn($userId),
+            'knowledge_tools' => $this->config->knowledgeTools($userId),
             'vision_mode' => $this->config->visionMode($userId),
             'vision_available' => $this->analyzeImageTool->isAvailable($userId),
             'vision_image_detail' => $this->config->visionImageDetail($userId),
@@ -547,6 +555,11 @@ final class MessagesGatewayController extends AbstractController
                     type: 'integer',
                     minimum: MessagesGatewayConfig::MIN_WEB_FETCH_MAX_PER_TURN,
                     maximum: MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN,
+                ),
+                new OA\Property(
+                    property: 'knowledge_tools',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::KNOWLEDGE_TOOLS_MODES,
                 ),
                 new OA\Property(
                     property: 'vision_mode',

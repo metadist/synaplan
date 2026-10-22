@@ -810,6 +810,7 @@ Admins edit them under **Manage → Developer & devices → Coding clients**.
 | ------- | ------- | ------- |
 | `WEB_SEARCH_MAX_ROUNDS` | `2` | Web searches in one message before the assistant must answer from the results and cite its sources. Range 1–6. A missing row uses the same default, so existing installs keep today's limit until an admin changes it. |
 | `WEB_FETCH_MAX_PER_TURN` | `3` | Pages Synaplan may open in one message on a non-Anthropic route. Range 0–10. `0` opens none. Anthropic routes keep Anthropic’s own limit. A missing row uses 3. |
+| `KNOWLEDGE_TOOLS` | `desktop` | Who can search a pinned knowledge folder from a coding client. `desktop` (paired desktop keys), `all`, or `off`. A missing row uses `desktop`. The folder still has to be pinned on the message. |
 
 ## AI plugs (`PLUGS`)
 

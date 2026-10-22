@@ -107,6 +107,8 @@ else — so a stolen laptop is a *revoke*, not an account takeover. Enforcement 
 central (`App\Security\ApiKeyScopeSubscriber`); the vocabulary and prefix map
 live in `App\Security\ApiKeyScope`.
 
+When a message pins a knowledge folder, a paired desktop key can ask Synaplan to search that folder again (`knowledge_search`) and to read one file in it (`read_document`). Synaplan runs both inside the gateway. Desktop does not answer them. Other coding-client keys do not get the tools until an admin sets `KNOWLEDGE_TOOLS` to `all`. See [Knowledge tools](ANTHROPIC_COMPATIBLE_API.md#knowledge-tools).
+
 The **Outlook add-in (Synamail)** is the other integration that mints restricted
 keys (`messages:*`, `chats:*`, `files:*`, `rag:*` — issued by its connect flow
 since before enforcement existed). The map covers its surface too:

@@ -7,7 +7,9 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\KnowledgeSearchTool;
 use App\AI\Messages\Tools\NativeToolRegistry;
+use App\AI\Messages\Tools\ReadDocumentTool;
 use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
@@ -253,6 +255,53 @@ final class GatewayToolCatalogTest extends TestCase
         self::assertSame([WebFetchTool::NAME], $catalog->nativeToolNames(5));
     }
 
+    public function testKnowledgeToolsStayOffWhenTheFlagIsOff(): void
+    {
+        $catalog = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            knowledgeMode: MessagesGatewayConfig::KNOWLEDGE_OFF,
+            knowledge: $this->knowledgeTool(offered: true),
+        );
+
+        self::assertSame([], $catalog->build($this->user(), 'session-1', [])['tools']);
+    }
+
+    public function testKnowledgeToolsFollowTheKeyKind(): void
+    {
+        $hidden = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            knowledgeMode: MessagesGatewayConfig::KNOWLEDGE_DESKTOP,
+            knowledge: $this->knowledgeTool(offered: false),
+        )->build($this->user(), 'session-1', []);
+        $shown = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            searchConfigured: false,
+            knowledgeMode: MessagesGatewayConfig::KNOWLEDGE_ALL,
+            knowledge: $this->knowledgeTool(offered: true),
+        )->build($this->user(), 'session-1', []);
+
+        self::assertSame([], $hidden['tools']);
+        self::assertSame(
+            [KnowledgeSearchTool::NAME, ReadDocumentTool::NAME],
+            array_column($shown['tools'], 'name'),
+        );
+    }
+
+    private function knowledgeTool(bool $offered): KnowledgeSearchTool
+    {
+        $tool = $this->createMock(KnowledgeSearchTool::class);
+        $tool->method('isOffered')->willReturn($offered);
+        $tool->method('declaration')->willReturn([
+            'name' => KnowledgeSearchTool::NAME,
+            'description' => 'Search the pinned knowledge folder when the passages above are not enough.',
+            'input_schema' => ['type' => 'object'],
+        ]);
+
+        return $tool;
+    }
+
     private function catalog(
         string $mode,
         bool $searchConfigured,
@@ -260,6 +309,8 @@ final class GatewayToolCatalogTest extends TestCase
         bool $visionConfigured = false,
         string $webFetchMode = '',
         int $webFetchMax = 0,
+        string $knowledgeMode = '',
+        ?KnowledgeSearchTool $knowledge = null,
     ): GatewayToolCatalog {
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('isMcpToolsEnabled')->willReturn(false);
@@ -267,6 +318,7 @@ final class GatewayToolCatalogTest extends TestCase
         $config->method('visionMode')->willReturn($visionMode);
         $config->method('webFetchMode')->willReturn($webFetchMode);
         $config->method('webFetchMaxPerTurn')->willReturn($webFetchMax);
+        $config->method('knowledgeTools')->willReturn($knowledgeMode);
 
         $webFetch = $this->createMock(WebFetchTool::class);
         $webFetch->method('declaration')->willReturn([
@@ -293,12 +345,24 @@ final class GatewayToolCatalogTest extends TestCase
 
         return new GatewayToolCatalog(
             new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $webFetch),
+            new NativeToolRegistry($webSearch, $webFetch, $knowledge, $knowledge ? $this->readDocumentTool() : null),
             $analyzeImage,
             $config,
             $this->createMock(CacheItemPoolInterface::class),
             new NullLogger(),
         );
+    }
+
+    private function readDocumentTool(): ReadDocumentTool
+    {
+        $tool = $this->createMock(ReadDocumentTool::class);
+        $tool->method('declaration')->willReturn([
+            'name' => ReadDocumentTool::NAME,
+            'description' => 'Read one file in the pinned knowledge folder when the passages above are not enough.',
+            'input_schema' => ['type' => 'object'],
+        ]);
+
+        return $tool;
     }
 
     private function user(): User&MockObject

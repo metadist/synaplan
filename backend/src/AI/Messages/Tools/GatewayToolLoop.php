@@ -911,7 +911,7 @@ final readonly class GatewayToolLoop
      */
     private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, WebFetchBudget $pages, ?RuntimeProfile $assistant = null): array
     {
-        $native = $this->nativeTools->tryExecute($tool, $arguments, $user, $pages);
+        $native = $this->nativeTools->tryExecute($tool, $arguments, $user, $pages, $assistant);
         if (null !== $native) {
             $this->recordNativeUsage($user, $native['source'], $tool, $native['summary'], $native['isError']);
 

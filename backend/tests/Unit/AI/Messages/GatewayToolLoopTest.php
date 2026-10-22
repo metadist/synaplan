@@ -10,6 +10,7 @@ use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\KnowledgeSearchTool;
 use App\AI\Messages\Tools\NativeToolRegistry;
 use App\AI\Messages\Tools\ServerToolReplay;
 use App\AI\Messages\Tools\WebFetchBudget;
@@ -1692,7 +1693,103 @@ final class GatewayToolLoopTest extends TestCase
         ];
     }
 
-    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2, ?WebFetchTool $webFetch = null, int $webFetchMax = 3): GatewayToolLoop
+    public function testMixedWriteFileAndKnowledgeSearchDoesNotReturnAnUnpairedSearch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $search = $this->createMock(KnowledgeSearchTool::class);
+        $search->expects($this->once())
+            ->method('execute')
+            ->willReturn([
+                'text' => "file: invoice.pdf\nfile_id: 12\nchunk_id: 34\nscore: 0.81\n\nTotal 40",
+                'isError' => false,
+                'summary' => 'invoice total',
+            ]);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), knowledge: $search);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_search',
+                                    'name' => 'knowledge_search',
+                                    'input' => ['query' => 'invoice total'],
+                                ],
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_write',
+                                    'name' => 'write_file',
+                                    'input' => ['path' => 'notes.md'],
+                                ],
+                            ],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('knowledge_search', $names);
+                self::assertNotContains('write_file', $names);
+                self::assertStringContainsString('file_id: 12', (string) $body['messages'][2]['content'][0]['content']);
+
+                return $this->toolUseBody('toolu_write', 'write_file', ['path' => 'notes.md']);
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Save the invoice total']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            [
+                'tools' => [[
+                    'name' => 'knowledge_search',
+                    'description' => 'Search the pinned folder',
+                    'input_schema' => ['type' => 'object'],
+                ]],
+                'dispatch' => [
+                    'knowledge_search' => [
+                        'kind' => GatewayToolCatalog::KIND_NATIVE,
+                        'serverId' => 0,
+                        'tool' => 'knowledge_search',
+                        'annotations' => ['readOnlyHint' => true],
+                    ],
+                ],
+                'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
+            ],
+        );
+
+        self::assertSame(2, $calls);
+        $returned = array_map(
+            static fn (array $block): string => (string) ($block['name'] ?? ''),
+            $result['body']['content'],
+        );
+        self::assertSame(['write_file'], $returned);
+        self::assertSame([], ServerToolReplay::unpairedUseIds($result['body']['content']));
+    }
+
+    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2, ?WebFetchTool $webFetch = null, int $webFetchMax = 3, ?KnowledgeSearchTool $knowledge = null): GatewayToolLoop
     {
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
@@ -1700,7 +1797,7 @@ final class GatewayToolLoopTest extends TestCase
 
         return new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $webFetch ?? $this->createMock(WebFetchTool::class)),
+            new NativeToolRegistry($webSearch, $webFetch ?? $this->createMock(WebFetchTool::class), $knowledge),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),

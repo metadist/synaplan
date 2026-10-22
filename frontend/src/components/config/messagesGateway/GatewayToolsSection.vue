@@ -8,6 +8,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
+  KnowledgeToolsMode,
   MessagesGatewaySettings,
   MessagesGatewayStatus,
   WebFetchMode,
@@ -75,6 +76,12 @@ const webFetchOptions = computed(() => [
   { value: 'auto', label: t('messagesGateway.webFetchModeAuto') },
   { value: 'passthrough', label: t('messagesGateway.webFetchModePassthrough') },
   { value: 'off', label: t('messagesGateway.webFetchModeOff') },
+])
+
+const knowledgeOptions = computed(() => [
+  { value: 'desktop', label: t('messagesGateway.knowledgeToolsDesktop') },
+  { value: 'all', label: t('messagesGateway.knowledgeToolsAll') },
+  { value: 'off', label: t('messagesGateway.knowledgeToolsOff') },
 ])
 </script>
 
@@ -185,6 +192,18 @@ const webFetchOptions = computed(() => [
           :disabled="webFetchPagesDisabled"
           data-testid="input-agents-web-fetch-pages"
           @change="emit('change', { web_fetch_max_per_turn: $event })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
+        :label="$t('messagesGateway.knowledgeToolsLabel')"
+        :description="$t('messagesGateway.knowledgeToolsHint')"
+      >
+        <GatewaySettingSelect
+          :model-value="form.knowledge_tools"
+          :options="knowledgeOptions"
+          data-testid="select-agents-knowledge-tools"
+          @update:model-value="emit('change', { knowledge_tools: $event as KnowledgeToolsMode })"
         />
       </GatewaySettingRow>
     </div>

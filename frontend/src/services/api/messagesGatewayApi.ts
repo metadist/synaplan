@@ -75,6 +75,8 @@ export type MessagesGatewaySettings = z.infer<typeof put_api_messages_gateway_pu
 export type WebSearchMode = NonNullable<MessagesGatewaySettings['web_search_mode']>
 /** How the gateway forwards Anthropic's `web_fetch` to api.anthropic.com. */
 export type WebFetchMode = NonNullable<MessagesGatewaySettings['web_fetch_mode']>
+/** Who may search a pinned knowledge folder from the coding gateway. */
+export type KnowledgeToolsMode = NonNullable<MessagesGatewaySettings['knowledge_tools']>
 /** Which model reads an image turn that reaches the gateway. */
 export type VisionMode = NonNullable<MessagesGatewaySettings['vision_mode']>
 /** Resolution hint forwarded to upstreams that support it. */

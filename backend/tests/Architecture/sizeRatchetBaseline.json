@@ -131,7 +131,6 @@
     },
     "methodLines": {
         "src/AI/Health/ModelHealthOverview.php::ModelHealthOverview::build": 131,
-        "src/AI/Messages/MessagesContextInjector.php::MessagesContextInjector::sessionBlock": 109,
         "src/AI/Messages/MessagesGateway.php::MessagesGateway::prepare": 284,
         "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::collectStreamedTurn": 191,
         "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::executeOurs": 125,

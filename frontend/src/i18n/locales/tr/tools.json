@@ -428,6 +428,11 @@
     "webFetchModePassthrough": "Sayfayı yalnızca Anthropic okur",
     "webFetchModeOff": "Web fetch yok",
     "webFetchHint": "Otomatik, Anthropic modellerinde sayfayı Anthropic'in okumasını sağlar. Diğer her modelde sayfayı Synaplan açar, aşağıdaki sınıra kadar. İsteği iletmek yalnızca Anthropic ile çalışır.",
+    "knowledgeToolsLabel": "Sabitlenmiş bilgi klasöründe ara",
+    "knowledgeToolsDesktop": "Yalnızca Desktop (önerilen)",
+    "knowledgeToolsAll": "Ağ geçidindeki her anahtar",
+    "knowledgeToolsOff": "Klasör araması yok",
+    "knowledgeToolsHint": "Bir bilgi klasörü sabitlendiğinde, ilk parçalar yetmezse model klasörde yeniden arayabilir ve bir dosya açabilir. Yalnızca Desktop önerilen ayardır.",
     "visionLabel": "Bağlı AI asistanları için görüntü anlama",
     "visionModeAuto": "Otomatik (önerilen)",
     "visionModeSynaplan": "Her zaman Synaplan'ın görüntü modelini kullan",
@@ -476,11 +481,13 @@
       "activeTools": {
         "title": "Şu anda sizin adınıza çalışıyor",
         "empty": "Synaplan kendi araçlarından hiçbirini çalıştırmıyor. Bağlı AI asistanları yalnızca kendi programlarının sunduğu araçları alır.",
-        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca asistan istediğinde çalışır. Sayfa okuma, sayfa sınırında durur.",
+        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca asistan istediğinde çalışır. Sayfa okuma, sayfa sınırında durur. Klasör araması yalnızca bir bilgi klasörü sabitliyken çalışır.",
         "mcpServers": "ayrıca 1 bağlı araç sunucusunun araçları | ayrıca {count} bağlı araç sunucusunun araçları",
         "tools": {
           "web_search": "Web araması",
           "web_fetch": "Web sayfası oku",
+          "knowledge_search": "Bilgi klasöründe ara",
+          "read_document": "Klasördeki bir dosyayı oku",
           "analyze_image": "Görüntü analizi"
         }
       },
