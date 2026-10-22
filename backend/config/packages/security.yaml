@@ -178,6 +178,10 @@ security:
 
         # Plugin assets (static JS/CSS files, served without auth for ES module loading)
         - { path: ^/api/v1/user/[^/]+/plugins/[^/]+/assets/, roles: PUBLIC_ACCESS }
+        # Where Keycloak sends the browser back after the Jitsi button's sign-in
+        # (meeting notes). Only the synascriber plugin defines it (404 elsewhere);
+        # the page carries no data, it hands the code to the configured Jitsi window.
+        - { path: ^/api/v1/plugins/synascriber/jitsi/silent$, methods: [GET], roles: PUBLIC_ACCESS }
 
         # Public guest trial chat endpoints (no auth required)
         - { path: ^/api/v1/guest/, roles: PUBLIC_ACCESS }

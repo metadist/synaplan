@@ -285,6 +285,94 @@ jobs:
           docker build -t synaplan-transcriber:ci .
           docker run --rm -v "$PWD/test:/app/test:ro" synaplan-transcriber:ci node --test
 
+  # ghcr.io/metadist/synaplan-transcriber, for synaplan-charts (meeting notes
+  # deployed with Synaplan). Built and pushed from main and develop after the
+  # sidecar's tests, from the same Dockerfile they ran in. A promote tag does
+  # not rebuild: it moves the version tags onto the image the main run
+  # already published under its short commit, the same rule as docker-manifest
+  # applies to the app image. Only a missing short-commit tag falls back to a
+  # build on the tag.
+  transcriber-publish:
+    name: Publish Transcriber Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [change-scope, transcriber-sidecar]
+    if: >-
+      github.event_name == 'push' &&
+      (needs.change-scope.outputs.mode == 'heavy' || needs.change-scope.outputs.mode == 'promote')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,format=short
+
+      - name: Reuse the image main already published
+        id: reuse
+        if: needs.change-scope.outputs.mode == 'promote'
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          source="${REGISTRY_IMAGE}:${GITHUB_SHA::7}"
+          if ! docker buildx imagetools inspect "$source" >/dev/null 2>&1; then
+            echo "::notice::${source} was not published by the main run; building on the tag instead"
+            echo "reused=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          args=()
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            [ "$image" != "$source" ] || continue
+            args+=(--tag "$image")
+          done <<< "$IMAGE_TAGS"
+          docker buildx imagetools create "${args[@]}" "$source"
+          expected="$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' "$source")"
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            [ "$image" != "$source" ] || continue
+            actual="$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' "$image")"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::${image} resolves to ${actual}, expected ${expected}"
+              exit 1
+            fi
+          done <<< "$IMAGE_TAGS"
+          echo "reused=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        if: steps.reuse.outputs.reused != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: sidecars/synaplan-transcriber
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
   voice-sidecar:
     name: Voice Sidecar (Node)
     runs-on: ubuntu-latest
