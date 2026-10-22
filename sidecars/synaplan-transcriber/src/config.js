@@ -32,9 +32,9 @@ export function loadConfig(env) {
   // API key is for the paths that act as a Synaplan user: Element voice
   // messages and Jitsi captions without the plugin.
   const apiKey = clean(env.SYNAPLAN_API_KEY)
-  const pluginSecret = clean(env.SYNAPLAN_PLUGIN_SECRET)
-  if (apiKey === '' && pluginSecret === '') {
-    throw new Error('SYNAPLAN_PLUGIN_SECRET (meeting notes) or SYNAPLAN_API_KEY is required')
+  const transcriberSecret = clean(env.SYNAPLAN_TRANSCRIBER_SECRET)
+  if (apiKey === '' && transcriberSecret === '') {
+    throw new Error('SYNAPLAN_TRANSCRIBER_SECRET (meeting notes) or SYNAPLAN_API_KEY is required')
   }
   if (mode === 'element' && apiKey === '') {
     throw new Error('SYNAPLAN_API_KEY is required in element mode')
@@ -84,7 +84,7 @@ export function loadConfig(env) {
     matrixReady,
     synaplanUrl,
     apiKey,
-    pluginSecret,
+    transcriberSecret,
     model: clean(env.SYNAPLAN_STT_MODEL),
     language,
     authToken,

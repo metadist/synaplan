@@ -6,7 +6,7 @@ import { createSynaplanClient } from './synaplan.js'
 
 const config = loadConfig(process.env)
 const synaplan = config.apiKey ? createSynaplanClient({ baseUrl: config.synaplanUrl, apiKey: config.apiKey }) : null
-const plugin = config.pluginSecret ? createPluginClient({ baseUrl: config.synaplanUrl, secret: config.pluginSecret }) : null
+const plugin = config.transcriberSecret ? createPluginClient({ baseUrl: config.synaplanUrl, secret: config.transcriberSecret }) : null
 const log = (line) => {
   process.stdout.write(`${new Date().toISOString()} ${line}\n`)
 }
@@ -39,7 +39,7 @@ if (!config.jitsi) {
   log('Jitsi captions are off in this mode.')
 } else {
   if (!plugin) {
-    log('SYNAPLAN_PLUGIN_SECRET is not set: Jitsi meetings cannot use the meeting-notes plugin.')
+    log('SYNAPLAN_TRANSCRIBER_SECRET is not set: Jitsi meetings cannot use the meeting-notes plugin.')
   }
   if (!synaplan) {
     log('SYNAPLAN_API_KEY is not set: Jitsi captions without the meeting-notes plugin are refused.')

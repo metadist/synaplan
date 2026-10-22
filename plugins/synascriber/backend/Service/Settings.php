@@ -201,7 +201,7 @@ final readonly class Settings
             'languages' => implode(',', array_map(fn ($l) => $this->language((string) $l), is_array($value) ? $value : explode(',', (string) $value))),
             'default_folder' => $this->sanitizeFolder((string) $value),
             'stt_url', 'prosody_url', 'jitsi_url' => $this->url((string) $value, $key),
-            'prosody_secret', 'transcriber_secret' => (string) $value,
+            'prosody_secret', 'transcriber_secret' => $this->secret($value, $key),
             'timezone' => $this->zone((string) $value),
             default => throw new \InvalidArgumentException(sprintf('Unknown synascriber setting "%s".', $key)),
         };
@@ -212,6 +212,19 @@ final readonly class Settings
         $value = strtolower(trim($value));
         if (!in_array($value, self::SUPPORTED_LANGUAGES, true)) {
             throw new \InvalidArgumentException(sprintf('Language "%s" is not supported; use one of %s.', $value, implode(', ', self::SUPPORTED_LANGUAGES)));
+        }
+
+        return $value;
+    }
+
+    /**
+     * A secret is taken as given, but only as a string: a cast would turn
+     * `true` into the credential "1" and an array into "Array".
+     */
+    private function secret(mixed $value, string $key): string
+    {
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException(sprintf('Setting "%s" must be a string.', $key));
         }
 
         return $value;

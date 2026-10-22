@@ -58,6 +58,18 @@ final class SettingsCommandTest extends PluginTestCase
         self::assertStringContainsString('Nothing was stored', $tester->getDisplay());
     }
 
+    public function testASecretThatIsNotAStringStoresNothing(): void
+    {
+        foreach (['{"transcriber_secret": true}', '{"transcriber_secret": []}', '{"transcriber_secret": 1}', '{"prosody_secret": {"a": 1}}'] as $raw) {
+            $tester = $this->tester();
+            $tester->setInputs([$raw]);
+
+            self::assertSame(Command::FAILURE, $tester->execute([]), $raw);
+            self::assertSame([], $this->stored, $raw);
+            self::assertStringContainsString('must be a string', $tester->getDisplay());
+        }
+    }
+
     public function testInputThatIsNotAnObjectIsRefused(): void
     {
         foreach (['', 'not json', '["enabled"]', '"enabled"'] as $raw) {

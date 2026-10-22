@@ -166,7 +166,7 @@ export function createApp(config, { synaplan, plugin = null, log = () => {} } = 
         return
       }
       if (!plugin) {
-        log(`Notes ${notesRef}: SYNAPLAN_PLUGIN_SECRET is not set, connection refused.`)
+        log(`Notes ${notesRef}: SYNAPLAN_TRANSCRIBER_SECRET is not set, connection refused.`)
         refuse(socket, 503, 'Service Unavailable')
         return
       }

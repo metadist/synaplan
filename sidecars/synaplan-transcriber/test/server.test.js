@@ -97,7 +97,7 @@ test('a missing credential refuses the Jitsi path that needs it, with a log line
     assert.equal(await upgradeStatus(host, '/transcribe?notes=Ab3dEf9hJkLmN0pQrStUvW&sessionId=m1'), 503)
     assert.equal(await upgradeStatus(host, '/transcribe?sessionId=standup'), 503)
     assert.equal(await upgradeStatus(host, '/transcribe?notes=too-short'), 400)
-    assert.ok(lines.some((line) => line.includes('SYNAPLAN_PLUGIN_SECRET is not set')))
+    assert.ok(lines.some((line) => line.includes('SYNAPLAN_TRANSCRIBER_SECRET is not set')))
     assert.ok(lines.some((line) => line.includes('need SYNAPLAN_API_KEY')))
   } finally {
     await new Promise((resolve) => server.close(resolve))

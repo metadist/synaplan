@@ -33,7 +33,7 @@ the installation, not to a user.
 
    `--show` prints them (secrets only as set / not set). An administrator can
    change the same settings on the plugin page.
-3. Give the transcriber `SYNAPLAN_PLUGIN_SECRET` = `transcriber_secret`. It
+3. Give the transcriber `SYNAPLAN_TRANSCRIBER_SECRET` = `transcriber_secret`. It
    sends it as `X-Transcriber-Secret`; the transcriber routes accept nothing
    else.
 4. Load the button in Jitsi's `head.html`:
@@ -47,10 +47,34 @@ the installation, not to a user.
    The older address with a user id (`/api/v1/user/<id>/plugins/synascriber/assets/…`)
    still works.
 
+### Secrets
+
+Three shared secrets, each between two parties. One value may appear under
+more than one name; the names say where it is set.
+
+| Secret | Held by | Set as |
+|--------|---------|--------|
+| transcriber secret | plugin ↔ transcriber | plugin setting `transcriber_secret`; transcriber env `SYNAPLAN_TRANSCRIBER_SECRET`, sent as header `X-Transcriber-Secret` |
+| Prosody secret | plugin ↔ Jitsi's Prosody module | plugin setting `prosody_secret`; Prosody env `SYNASCRIBER_SECRET` |
+| transcriber token | Jitsi's Jicofo ↔ transcriber | Jicofo's transcription `Authorization: Bearer …`; transcriber env `TRANSCRIBER_AUTH_TOKEN` |
+
+`SYNAPLAN_API_KEY` is not one of them: the transcriber needs it only for
+the paths that act as a Synaplan user (Element voice messages, Jitsi
+captions without this plugin).
+
+### Upgrading from 0.3.0
+
 Up to 0.3.0 the first account that installed the plugin was its owner: the
 transcriber used that account's API key and the sessions were stored under
-it. `migrations/002_store_without_owner.sql` moves those sessions to the
-installation on the next install run and deletes `owner_user_id`.
+it. Plugin 0.4.0 refuses that path on both ends, so a deployment moves in
+lockstep: set `transcriber_secret` and give the transcriber
+`SYNAPLAN_TRANSCRIBER_SECRET` in the same rollout, or meeting notes answer
+`not_configured` until both are there. `migrations/002_store_without_owner.sql`
+moves the stored sessions to the installation and deletes `owner_user_id`;
+plugin migrations run on every install for every user, so the file is
+idempotent and a rerun changes nothing. The owner's API key row in
+`BAPIKEYS` stays; it authorises nothing on the plugin routes any more and
+can be deleted from the API keys page.
 
 Deployment (Jitsi's values, the Keycloak client, the transcriber, the
 registration of the plugin): [synaplan-charts](https://github.com/metadist/synaplan-charts),
