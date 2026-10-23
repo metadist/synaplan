@@ -5,8 +5,9 @@ Three phases, so the caller can measure between them without a request of
 this script in the way:
 
   prepare  signs in through POST /api/v1/auth/login, refuses unless the
-           models the turns will use (chat, sorting, memory) are served by
-           the test provider, and opens one chat per stream; the session and
+           models the turns will use (chat, sorting, memory, and any model a
+           topic prompt names) are served by the test provider, and opens
+           one chat per stream; the session and
            every chat id are written to --state as soon as they exist
   stream   reads GET /api/v1/messages/stream for every chat at once until
            the turn's terminal event; prints one JSON object
@@ -121,6 +122,13 @@ def assert_test_models(base: urllib.parse.ParseResult, cookie: str, test_models:
         if model_id not in test_models:
             raise SystemExit(f"The {capability} model resolves to model {model_id}, not the test provider. "
                              "Refusing to call a paid provider.")
+    # The topic prompt a turn is routed to answers with its own model before
+    # the CHAT default when it names one (aiModel > 0).
+    for prompt in get_json(base, cookie, "/api/v1/prompts").get("prompts") or []:
+        model_id = (prompt.get("metadata") or {}).get("aiModel")
+        if isinstance(model_id, int) and model_id > 0 and model_id not in test_models:
+            raise SystemExit(f"The {prompt.get('topic')} prompt answers with model {model_id}, not the test "
+                             "provider. Refusing to call a paid provider.")
 
 
 def save_state(state: pathlib.Path, cookie: str, chats: list[int]) -> None:

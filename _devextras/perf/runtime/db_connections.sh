@@ -8,7 +8,8 @@
 #
 # No paid provider: before it opens a chat, stream_turns.py asks the measured
 # FrankenPHP which chat, sorting and memory models the demo user's turns will
-# use and refuses unless all three are the test provider; that FrankenPHP runs
+# use and refuses unless all three are the test provider and no topic prompt
+# answers with a model of its own outside it; that FrankenPHP runs
 # without Qdrant (so no memory search embeds the question); and the run fails
 # if the usage ledger shows a call to any other provider.
 #
