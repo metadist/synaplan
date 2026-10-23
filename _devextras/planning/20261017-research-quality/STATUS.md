@@ -9,8 +9,8 @@ chat message.
 | ---- | ----- | ---- |
 | RQ0 | done | Plan, baseline research, model roles, engine, prompts, journeys, evaluation, step briefs; registered as roadmap row 21 |
 | RQ1 | planned | Desktop use cases re-run against `main`; CHANGES Done list (synaplan-desktop) |
-| RQ2 | planned | Eval corpus, judges, calibration, B0 baseline |
-| RS1 | planned | Gateway wrap-up answers fully; round limit from config |
+| RQ2 | in progress | Eval corpus, scorer, test doubles and `app:research:eval` are in the working tree. B0 starter set is recorded below. B4 was stopped on cost and is not scored; it does not decide this step |
+| RS1 | in progress | Gateway wrap-up answers fully; round limit from config. Merged in #2637. UC-03 / UC-04 not measured |
 | RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. UC-04 / UC-04b not measured |
 | RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. UC-05e (≥ 2 searches) and the UC-05 / UC-06 timings are still open |
 | RS4 | planned | PDFs and office files from web search — §0 #12 |
@@ -37,6 +37,38 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-22 — RQ2 B0 on the starter set
+
+Live run, not a fixture replay. Account is admin user id 1. The chat model is
+that account's default (Claude Sonnet 5.5). Web search is Brave. Knowledge
+folder `rq2-eval` holds the three generated files `preisliste.txt`,
+`protokoll.txt` and `rahmenvertrag.txt`. The older `Wissensordner` files were
+not used.
+
+Stack: local `docker compose` on the m4 context. synaplan `test/research-eval-corpus`
+at `0de94b240`, with the eval command still uncommitted. Report:
+`backend/var/research-eval/2026-10-22-b0.md`.
+
+```bash
+docker compose exec -T backend php bin/console app:research:eval \
+  --corpus=full --arm=b0 --user=1 --folder=rq2-eval \
+  --frozen=var/research-eval/frozen/2026-10-22-b0 \
+  --report=var/research-eval/2026-10-22-b0.md
+```
+
+| Date | Step | Arm | Corpus | Depth | Recall | Citation precision | Coverage | Abstention | Cost p50 | Time p50 / p95 | Command |
+| ---- | ---- | --- | ------ | ----- | ------ | ------------------ | -------- | ---------- | -------- | -------------- | ------- |
+| 2026-10-22 | RQ2 | B0 | starter 20 | standard | 0.95 | not judged | not judged | both traps avoided the forbidden sentence | not recorded | 4865 ms / 17819 ms | `app:research:eval --corpus=full --arm=b0` |
+
+Recall is the mean over the 19 items that have a match string. `sci-02` ("What
+is the chemical symbol of water?") is 0.00 because the answer did not contain
+`H2O`. Every other scored item is 1.00. `trap-01` has no match string, so it
+is not in the mean; it did not use the forbidden sentence. The chat calls did
+not write a cost row, so no cost is entered. Times are the median and the 95th
+percentile of the 20 row durations in the report.
 
 ---
 

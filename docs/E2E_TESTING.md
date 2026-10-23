@@ -498,3 +498,21 @@ Tests import `test` from `../test-setup`, which provides worker-scoped auth:
   ```bash
   make format && make lint && make test
   ```
+
+---
+
+## 13. Research fixtures
+
+PHPUnit never calls the live web for research. Two doubles exist only in the
+`test` environment:
+
+* `TestWebSearchAdapter` answers from `backend/tests/Fixtures/research/search/<slug>.json`.
+  Each file has a `query` and a `results` list. Result URLs use
+  `https://fixture.synaplan.test/<page>`. An unknown query is an empty set.
+* `FixtureSourceReader` serves `backend/tests/Fixtures/research/pages/<page>`
+  for that host and refuses every other host without a network call.
+
+To add a page: drop the HTML or text file in `pages/`, and add a search JSON
+whose result URL ends with that file name. The synthetic knowledge files for
+the eval corpus come from `app:research:eval --write-documents=DIR`. Upload
+those into the evaluation account; the command does not upload them.

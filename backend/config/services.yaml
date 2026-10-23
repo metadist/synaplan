@@ -308,6 +308,9 @@ services:
             - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
             # One pulse per Telegram turn. Its callbacks are not services.
             - '../src/Service/Telegram/TelegramTypingPulse.php'
+            # Research-eval doubles exist only in the test environment (RQ2).
+            - '../src/Plug/WebSearch/Adapter/TestWebSearchAdapter.php'
+            - '../src/Service/Research/Run/Source/FixtureSourceReader.php'
 
     # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
     # the project dir for Symfony Process cwd. Alias binds the interface.
@@ -1600,4 +1603,14 @@ when@test:
         # Centrifugo instance.
         App\Realtime\Publisher\RealtimePublisherInterface:
             alias: App\Realtime\Publisher\NullPublisher
+
+        # Fixture web search and fixture pages. Absent from dev and prod:
+        # the classes are excluded from the resource above.
+        App\Plug\WebSearch\Adapter\TestWebSearchAdapter:
+            arguments:
+                $fixturesDir: '%kernel.project_dir%/tests/Fixtures/research/search'
+            tags: ['app.plug.web_search']
+        App\Service\Research\Run\Source\FixtureSourceReader:
+            arguments:
+                $pagesDir: '%kernel.project_dir%/tests/Fixtures/research/pages'
 
