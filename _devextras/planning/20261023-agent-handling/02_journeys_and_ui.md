@@ -51,7 +51,8 @@ sentence on what to choose instead.
 1. Assistants → Tasks. "Monday supplier digest" shows **Running · step 2 of 4
    · Reading 6 mails** (live).
 2. Ada clicks **Stop** → confirm dialog (`useDialog`, danger): "Stop this run?
-   Steps already finished stay done. Nothing else will be sent."
+   Steps already finished stay done, and no new step starts. A step that is
+   running right now may still finish, including a message it is sending."
 3. Card: **Stopped by you at 09:14. Steps 1–2 finished. The summary e-mail was
    not sent.** Link: **Open the run's chat**.
 
@@ -312,7 +313,7 @@ stdout).
 | Helpers section | "No helpers. Add an assistant this one may hand work to." + **Add helper** | "Researcher is no longer available to you." | Section absent |
 | Skills section | "No skills yet. Add instructions this assistant can look up." + **Add skill** | Validator sentence (J-AH-7) | Section absent |
 | Notes tab | "Nothing noted yet. Notes appear after the assistant has worked with you." | "Notes could not be loaded." + **Try again** | Tab absent |
-| Task card (AH5) | — | "Could not stop the run. It will stop at the next step." | Stop is part of the card whenever Saved Tasks are on (no new flag) |
+| Task card (AH5) | — | "Stopping could not be confirmed, so the run may keep going." + **Try again**. "It stops before its next step" is shown only after the server acknowledged the stop (cancellation flag set). | Stop is part of the card whenever Saved Tasks are on (no new flag) |
 | Telegram row (AH6) | "Synaplan (default)" preselected | "This assistant can no longer answer here: {reason}." | Row absent when assistants are off |
 | Help me write (AH7) | Placeholder example | J-AH-3 failure sentence | Field absent when assistants are off |
 

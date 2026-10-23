@@ -24,6 +24,11 @@ queued ──► running ──► completed
   ledger of executed and not-executed writes.
 - `waiting_for_you` has a `reason`: `approval` · `question` · `plan_review`
   (reserved for research runs).
+- The working-time budget (§6 `RUNS.MAX_MINUTES*`) is consumed only in
+  `running`. `queued` and `waiting_for_you` have their own deadline: the
+  approval expires after 72 h, a question after 24 h; when it passes, the run
+  goes to `stopped` with the reason in its outcome. Resuming after an answer
+  continues with the minutes that were left.
 - A run never stays `running` without a live claim: the reaper (shared kernel)
   re-dispatches a unit once, then sets `interrupted`.
 
@@ -46,6 +51,7 @@ queued ──► running ──► completed
 | `BWAITREASON` | varchar(16) null | §1 |
 | `BJOB` | text | the job as written by the person (≤ 8,000 characters) |
 | `BOUTCOME` | text null | outcome sentence |
+| `BLEDGER` | json null | executed and not-executed writes as labels (`{done[], notDone[]}`); updated after every write step and final at terminal, so the ledger outlives the 48 h Redis copies and a Redis flush |
 | `BSTEPS` / `BCOSTMICRO` | int / bigint | counters (cost in micro-euros) |
 | `BCREATED` / `BSTARTED` / `BFINISHED` | int | unix seconds |
 | `BIDEMPOTENCY` | varchar(64) null | unique per user, 24 h semantics enforced in code |
@@ -60,10 +66,14 @@ Galera-safe `CREATE TABLE IF NOT EXISTS` via `addSql` (AGENTS.md). Erasure:
 | Key | Content | TTL |
 | --- | ------- | --- |
 | `run:{uuid}:events` | Redis Stream of events (§3), ids `0-{seq}` | 48 h after terminal |
-| `run:{uuid}:checkpoint` | serialized loop state: messages so far (compacted), ledger, budgets used | 48 h |
+| `run:{uuid}:checkpoint` | serialized loop state: messages so far (compacted), ledger, budgets used | no TTL while the run is not terminal (including `waiting_for_you` up to the 72 h approval expiry); 48 h after terminal |
 | `run:{uuid}:claim` | `SET NX PX` lease with unit token | lease |
 | `run:{uuid}:hints` | list of pending hints | until consumed |
 | `run:{uuid}:cancel` | flag checked before every paid call | 48 h |
+
+A Redis flush while a run is not terminal loses its checkpoint; the reaper
+then ends the run as `interrupted` with the durable ledger written so far
+(§2.1 `BLEDGER`), never as a silent stop.
 | `runs:active:{userId}` / `runs:active` | counters for §0 #12 | — |
 
 ## 3. Events
@@ -99,9 +109,9 @@ complete OpenAPI.
 | --------------- | ---- | ------- |
 | `POST /api/v1/saved-tasks/{id}/runs/{runId}/stop` | AH4 | Stop a running Saved Task run; `200 {status, outcome}` |
 | `GET /api/v1/runs/capabilities` | AH10 | `{enabled, skills, notes, helpers, check, limits{…}}`; 404 when the module is off |
-| `POST /api/v1/runs` | AH10 | `{assistantId, chatId?, job, fileIds?[]}` + `Idempotency-Key` → `201 {uuid, status}` or `202 {status: "queued"}` |
+| `POST /api/v1/runs` | AH10 | `{assistantId, chatId?, job, fileIds?[]}` + `Idempotency-Key` → `201 {uuid, status}` or `202 {uuid, status: "queued", reason}`; the uuid is in both, so the chat card can open, follow and stop a queued run |
 | `GET /api/v1/runs?status=&assistantId=&cursor=` | AH10 | the caller's runs (and helper runs under them), newest first |
-| `GET /api/v1/runs/{uuid}` | AH10 | one run with its children summary and ledger |
+| `GET /api/v1/runs/{uuid}` | AH10 | one run with its children summary and ledger; the ledger comes from `BRUNS.BLEDGER`, so it is there for the whole 90-day retention, with or without Redis |
 | `GET /api/v1/runs/{uuid}/events?after=` | AH10 | SSE, §3 |
 | `POST /api/v1/runs/{uuid}/stop` | AH10 | idempotent; stops children |
 | `POST /api/v1/runs/{uuid}/hint` | AH10 | `{text}` ≤ 2,000 characters |
@@ -143,7 +153,7 @@ wrap-up.
 | --- | ------- | ------- |
 | `RUNS.ENABLED` | 0 | module switch (env pin `FEATURE_RUNS_ENABLED`) |
 | `RUNS.UNIT_SECONDS` | 120 | shared kernel unit cap |
-| `RUNS.MAX_STEPS` / `RUNS.MAX_MINUTES` / `RUNS.MAX_MINUTES_UNATTENDED` | 30 / 15 / 30 | per run |
+| `RUNS.MAX_STEPS` / `RUNS.MAX_MINUTES` / `RUNS.MAX_MINUTES_UNATTENDED` | 30 / 15 / 30 | per run; minutes count `running` time only — `queued` and `waiting_for_you` are excluded (§1) |
 | `RUNS.MAX_COST_EUR` | 1.00 | per run, helpers included |
 | `RUNS.MAX_ACTIVE_PER_PERSON` / `RUNS.MAX_ACTIVE` | 3 / 20 | queued beyond |
 | `RUNS.HELPERS_ENABLED` / `RUNS.MAX_HELPERS` / `RUNS.MAX_PARALLEL_HELPERS` / `RUNS.MAX_HELPER_DEPTH` | 0 / 6 / 3 / 2 | §0 #14 |
@@ -161,8 +171,28 @@ migration `UPDATE` (AGENTS.md).
 
 ## 7. `agent.v2`
 
-Additive to `agent.v1` (`DTO/AgentDefinitionV1.php`); v1 documents are
-upgraded on read with these defaults.
+Additive to `agent.v1` (`DTO/AgentDefinitionV1.php`). A v1 document is
+upgraded on read by keeping every field it has — models, skills, triggers
+and all — and adding only the new sections, empty and off:
+
+```json
+{
+  "schema": "agent.v2",
+  "skills": { "packs": [] },
+  "helpers": [],
+  "notes": { "personal": true, "shared": true },
+  "run": { "worksOnItsOwn": false, "maxSteps": null, "maxMinutes": null, "maxCostEur": null },
+  "check": { "enabled": false, "onWrites": false }
+}
+```
+
+`null` limits mean the install's `RUNS.*` defaults (§6). No existing agent
+gains a helper, a skill pack, a trigger or autonomous runs by the upgrade
+(§0 #8: runs start from an explicit choice). Notes keep the switches of
+§0 #18 and are still gated by `RUNS.NOTES_ENABLED`.
+
+A configured example — an agent its owner has set up for runs, not a
+default:
 
 ```json
 {

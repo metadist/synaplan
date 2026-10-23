@@ -14,10 +14,12 @@ on screen and, where a number is given, measured with
 - **Themes (3):** light, dark, OLED (`useTheme.ts`: `light | dark | oled |
   system`).
 - **Widths:** 1440 px for the visual pass, 320 px for overflow.
-- **Contrast:** every visible element with its own text, foreground
-  blended with its own and its ancestors' opacity, background blended down
-  to the first opaque ancestor. AA = 4.5:1, 3:1 for large text. Disabled
-  controls are skipped (WCAG exempts them).
+- **Contrast:** every visible element with its own text (one character
+  counts), rendered from the root down: each ancestor paints its
+  background, and each opacity group fades its whole subtree — text and
+  background together — before it is laid over what is behind it. AA =
+  4.5:1, 3:1 for large text. Disabled controls and hidden subtrees
+  (`aria-hidden`, `inert`, `hidden`) are skipped.
 - **Headings:** computed `font-size` / `font-weight` of every `h1`–`h5`,
   plus the text directly under it.
 - **Code census:** `rg` over `frontend/src` for the patterns behind the
@@ -26,7 +28,11 @@ on screen and, where a number is given, measured with
 Two measurement traps, both fixed in the script before the numbers below
 were taken: Tailwind v4 emits `oklch()` colours (the first run skipped
 them), and the route transition fades the page in (a first dark-theme run
-reported primary text at 3.2:1 because it measured mid-fade).
+reported primary text at 3.2:1 because it measured mid-fade). A third,
+found in the Copilot review of #2664, is fixed since: fading only the text
+of an opacity group overstates contrast (5.3:1 claimed, 3.98:1 rendered).
+No settled page had an ancestor with opacity below 1, so the numbers below
+did not change (STATUS, re-verification entry).
 
 ## 2. What is already good
 

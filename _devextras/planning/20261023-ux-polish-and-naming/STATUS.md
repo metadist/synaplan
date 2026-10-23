@@ -68,3 +68,16 @@ run in the page through CDP `Runtime.evaluate`.
    shell, Outlook add-in (`01` §5).
 
 Undo: theme set back to light; no data was created or changed.
+
+### 2026-10-23 — audit script re-verified after the Copilot review
+
+After the per-group opacity compositing and the one-character fix
+([#2664](https://github.com/metadist/synaplan/pull/2664)): `__uxAuditSelfTest()`
+returned `{ ok: true, opacityGroup: 3.98, anchor: 21 }` in the dev app. A
+re-run on `/apps`, `/statistics` and `/channels/widgets` (light, 573 px
+window) reproduced the walk's rows exactly — Statistics "No limit" 2.22 and
+"Active" 3.20; Chat widgets "Active" 2.91, "0 AI" 3.99, "0 Human" 2.52,
+"0 Waiting" 2.53, "0 Internal" 4.16 — plus three rows from the closed mobile
+drawer (`aside[aria-hidden="true"]`: Account, Logout, History). Those are not
+on screen; the script now skips `aria-hidden` / `inert` / `hidden` subtrees,
+and Apps reads 0 again.
