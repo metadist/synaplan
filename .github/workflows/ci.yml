@@ -245,7 +245,10 @@ jobs:
   compute-sidecar:
     name: Compute Sidecar (Go)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The build and the tests finish in about a minute. The extra time is for
+    # Setup Go: a stalled toolchain download used the whole 10 minutes and the
+    # job was cancelled before a test ran (run 39932073566).
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
