@@ -45,6 +45,26 @@ class CloudPickupFile
         $this->fileId = $fileId;
     }
 
+    public function getOwnerId(): int
+    {
+        return $this->ownerId;
+    }
+
+    public function getInstanceId(): string
+    {
+        return $this->instanceId;
+    }
+
+    public function getRemoteId(): string
+    {
+        return $this->remoteId;
+    }
+
+    public function getVersion(): string
+    {
+        return $this->version;
+    }
+
     public function getFileId(): int
     {
         return $this->fileId;

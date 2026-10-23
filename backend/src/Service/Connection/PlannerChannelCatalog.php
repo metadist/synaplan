@@ -157,12 +157,17 @@ final readonly class PlannerChannelCatalog
             $this->persistKey($connection, $key);
         }
 
+        $capabilities = self::capabilitiesForKind($kind);
+        if ('webdav' === $connection->getType()) {
+            $capabilities[] = 'folder_fetch';
+        }
+
         return new PlannerChannel(
             $key,
             $kind,
             $connection->getName(),
             $id,
-            self::capabilitiesForKind($kind),
+            $capabilities,
         );
     }
 
@@ -249,7 +254,7 @@ final readonly class PlannerChannelCatalog
     public static function capabilitiesForKind(string $kind): array
     {
         return match ($kind) {
-            PlannerChannel::KIND_FOLDER => ['save_to_folder', 'folder_fetch'],
+            PlannerChannel::KIND_FOLDER => ['save_to_folder'],
             PlannerChannel::KIND_CALENDAR => ['calendar_event'],
             PlannerChannel::KIND_MAIL => ['email_search', 'email_me'],
             default => [],

@@ -44,6 +44,7 @@ final readonly class PickupService
         private RedisService $redis,
         private DeliveryNotifier $notifier,
         private AuditLogWriter $audit,
+        private PlatformLinksConfig $platformLinks,
     ) {
     }
 
@@ -54,6 +55,9 @@ final readonly class PickupService
      */
     public function open(int $ownerId, int $identityId, array $selector, string $mode): array
     {
+        if (!$this->platformLinks->isEnabled($ownerId)) {
+            return $this->refused('unreachable', 'Synaplan is not linked to this cloud. Nothing was read.');
+        }
         $identity = $this->identities->find($identityId);
         if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $ownerId || null === $identity->getId()) {
             return $this->refused('unauthorized', 'Nothing was read.');
@@ -131,8 +135,7 @@ final readonly class PickupService
         $upload = [];
         $reuse = [];
         $skip = [];
-        $bytes = 0;
-        $accepted = 0;
+        $namesOnly = CloudPickup::MODE_LIST === $pickup->getMode();
         foreach (array_slice($items, 0, 500) as $item) {
             if (!is_array($item) || !is_string($item['id'] ?? null)) {
                 continue;
@@ -144,75 +147,69 @@ final readonly class PickupService
             if (strlen($remoteId) > 255 || strlen($version) > 255) {
                 continue;
             }
-            if ($size > self::MAX_FILE_BYTES) {
-                $skip[] = ['id' => $remoteId, 'reason' => 'too_large'];
-                continue;
-            }
             if (!$this->nameMatches($pickup, $name)) {
                 $skip[] = ['id' => $remoteId, 'reason' => 'type_not_read'];
                 continue;
             }
-            if ($accepted >= self::MAX_FILES || $bytes + $size > self::MAX_BYTES) {
+            if ($namesOnly) {
+                $pickup->rememberName($name);
+                continue;
+            }
+            if ($size > self::MAX_FILE_BYTES) {
+                $skip[] = ['id' => $remoteId, 'reason' => 'too_large'];
+                continue;
+            }
+            if ($pickup->acceptCount() >= self::MAX_FILES || $pickup->acceptBytes() + $size > self::MAX_BYTES) {
                 $skip[] = ['id' => $remoteId, 'reason' => 'over_limit'];
                 continue;
             }
-            $held = $this->held->findHeld($pickup->getOwnerId(), $instance->getInstanceId(), $remoteId, $version);
-            if ($held instanceof CloudPickupFile) {
-                $reuse[] = ['id' => $remoteId, 'file_id' => $held->getFileId()];
-                $pickup->rememberFile($held->getFileId());
+            $reuseId = $this->reusable($pickup, $instance, $remoteId, $version);
+            if (null !== $reuseId) {
+                $reuse[] = ['id' => $remoteId, 'file_id' => $reuseId];
+                $pickup->rememberFile($reuseId);
                 $pickup->rememberName($name);
-                $bytes += $size;
-                ++$accepted;
+                $pickup->addAccepted(1, $size);
                 continue;
             }
-            $upload[] = $remoteId;
+            $upload[$remoteId] = $size;
             $pickup->rememberName($name);
-            $bytes += $size;
-            ++$accepted;
+            $pickup->addAccepted(1, $size);
         }
         $pickup->addListed(count($items));
         $this->pickups->save($pickup);
-        $this->redis->set(self::UPLOAD_PREFIX.$id, json_encode($upload, JSON_THROW_ON_ERROR), self::TTL);
+        $this->rememberUploads($id, $upload);
 
-        return ['upload' => $upload, 'reuse' => $reuse, 'skip' => $skip];
+        return ['upload' => array_keys($upload), 'reuse' => $reuse, 'skip' => $skip];
     }
 
     public function storeFile(PlatformInstance $instance, int $id, string $remoteId, string $version, string $bytes, string $name, string $mime): int
     {
         $pickup = $this->requireClaimed($instance, $id);
-        $allowed = json_decode((string) $this->redis->get(self::UPLOAD_PREFIX.$id), true);
-        if (strlen($remoteId) > 255 || strlen($version) > 255 || !is_array($allowed) || !in_array($remoteId, $allowed, true)) {
+        if (CloudPickup::MODE_LIST === $pickup->getMode()) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'not_requested');
         }
-        if (strlen($bytes) > self::MAX_FILE_BYTES) {
+        $allowed = json_decode((string) $this->redis->get(self::UPLOAD_PREFIX.$id), true);
+        $reserved = is_array($allowed) ? $this->reservedBytes($allowed, $remoteId) : null;
+        if (strlen($remoteId) > 255 || strlen($version) > 255 || null === $reserved) {
+            throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'not_requested');
+        }
+        $existing = $this->reusable($pickup, $instance, $remoteId, $version);
+        if (null !== $existing) {
+            return $existing;
+        }
+        $actual = strlen($bytes);
+        if ($actual > self::MAX_FILE_BYTES) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'too_large');
         }
-        $stored = $this->storage->storeRawContent($bytes, $pickup->getOwnerId(), '' !== $name ? $name : 'file', $mime);
-        if (true !== $stored['success']) {
-            throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'unreachable');
+        $extra = max(0, $actual - $reserved);
+        if ($pickup->acceptBytes() + $extra > self::MAX_BYTES) {
+            throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'over_limit');
         }
-        $file = new File();
-        $file->setUserId($pickup->getOwnerId());
-        $file->setFilePath($stored['path']);
-        $file->setFileName($name);
-        $file->setFileSize($stored['size']);
-        $file->setFileMime($mime);
-        $file->setFileType(pathinfo($name, PATHINFO_EXTENSION) ?: 'bin');
-        $file->setStatus('complete');
-        $file->setSource($this->sourceFor($instance));
-        $file->setSourceId($remoteId);
-        $file->setSourceEtag($version);
-        $file->setIncoming(false);
-        $file->setEphemeral(true);
-        $this->em->persist($file);
-        $this->em->flush();
-        $fileId = (int) $file->getId();
-        $this->held->save(new CloudPickupFile($pickup->getOwnerId(), $instance->getInstanceId(), $remoteId, $version, $fileId));
-        $pickup->rememberFile($fileId);
-        $pickup->addSent();
-        $this->pickups->save($pickup);
+        if ($extra > 0) {
+            $pickup->addAccepted(0, $extra);
+        }
 
-        return $fileId;
+        return $this->placeCopy($pickup, $instance, $remoteId, $version, $bytes, $name, $mime);
     }
 
     /**
@@ -281,19 +278,32 @@ final readonly class PickupService
     public function find(int $id): ?CloudPickup
     {
         $pickup = $this->pickups->find($id);
+        if (!$pickup instanceof CloudPickup) {
+            return null;
+        }
+        // The runner saved this row. A later claim arrives in another request,
+        // so the copy still in this unit of work is stale until it is re-read.
+        if ($this->em->contains($pickup)) {
+            $this->em->refresh($pickup);
+        }
 
-        return $pickup instanceof CloudPickup ? $pickup : null;
+        return $pickup;
     }
 
     /**
      * Linked clouds this person may read, named the way the planner names channels.
      *
+     * @param list<string> $usedChannels keys already taken by other folder channels
+     *
      * @return list<array{identity_id: int, channel: string, host: string, client: string, folders: list<string>}>
      */
-    public function readableLinks(int $ownerId): array
+    public function readableLinks(int $ownerId, array $usedChannels = []): array
     {
+        if (!$this->platformLinks->isEnabled($ownerId)) {
+            return [];
+        }
         $out = [];
-        $used = [];
+        $used = $usedChannels;
         foreach ($this->identities->findByUserId($ownerId) as $identity) {
             if (null === $identity->getId() || '' === $identity->getInstanceId()) {
                 continue;
@@ -323,13 +333,16 @@ final readonly class PickupService
         return $out;
     }
 
-    public function identityForChannel(int $ownerId, string $channel): ?int
+    /**
+     * @param list<string> $usedChannels
+     */
+    public function identityForChannel(int $ownerId, string $channel, array $usedChannels = []): ?int
     {
         $needle = PlannerChannelCatalog::sanitize($channel);
         if ('' === $needle) {
             return null;
         }
-        foreach ($this->readableLinks($ownerId) as $link) {
+        foreach ($this->readableLinks($ownerId, $usedChannels) as $link) {
             if ($link['channel'] === $needle) {
                 return $link['identity_id'];
             }
@@ -400,11 +413,136 @@ final readonly class PickupService
         if (!$pickup instanceof CloudPickup) {
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
         }
-        if ($pickup->getInstanceId() !== $instance->getInstanceId()) {
+        if (!$instance->isActive() || $pickup->getInstanceId() !== $instance->getInstanceId()) {
+            throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
+        }
+        $identity = $this->identities->find($pickup->getIdentityId());
+        if (!$identity instanceof ExternalIdentity
+            || $identity->getUserId() !== $pickup->getOwnerId()
+            || $identity->getInstanceId() !== $instance->getInstanceId()) {
             throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
         }
 
         return $pickup;
+    }
+
+    /**
+     * @param array<string, int> $upload remote id => reserved size
+     */
+    private function rememberUploads(int $id, array $upload): void
+    {
+        $known = json_decode((string) $this->redis->get(self::UPLOAD_PREFIX.$id), true);
+        $map = [];
+        if (is_array($known) && !array_is_list($known)) {
+            foreach ($known as $remoteId => $size) {
+                if (is_string($remoteId) && is_numeric($size)) {
+                    $map[$remoteId] = (int) $size;
+                }
+            }
+        }
+        foreach ($upload as $remoteId => $size) {
+            $map[$remoteId] = $size;
+        }
+        $this->redis->set(self::UPLOAD_PREFIX.$id, json_encode($map, JSON_THROW_ON_ERROR), self::TTL);
+    }
+
+    /**
+     * @param array<mixed> $allowed
+     */
+    private function reservedBytes(array $allowed, string $remoteId): ?int
+    {
+        if (array_is_list($allowed)) {
+            return in_array($remoteId, $allowed, true) ? 0 : null;
+        }
+        if (!array_key_exists($remoteId, $allowed) || !is_numeric($allowed[$remoteId])) {
+            return null;
+        }
+
+        return (int) $allowed[$remoteId];
+    }
+
+    private function reusable(CloudPickup $pickup, PlatformInstance $instance, string $remoteId, string $version): ?int
+    {
+        $held = $this->held->findHeld($pickup->getOwnerId(), $instance->getInstanceId(), $remoteId, $version);
+        if (!$held instanceof CloudPickupFile) {
+            return null;
+        }
+        if ($this->copyStillHeld($held)) {
+            return $held->getFileId();
+        }
+        $this->forget($held);
+
+        return null;
+    }
+
+    private function copyStillHeld(CloudPickupFile $held): bool
+    {
+        $file = $this->em->find(File::class, $held->getFileId());
+
+        return $file instanceof File
+            && '' !== $file->getFilePath()
+            && $this->storage->fileExists($file->getFilePath());
+    }
+
+    private function forget(CloudPickupFile $held): void
+    {
+        $file = $this->em->find(File::class, $held->getFileId());
+        $this->em->remove($held);
+        if ($file instanceof File) {
+            $path = $file->getFilePath();
+            $this->em->remove($file);
+            if ('' !== $path) {
+                $this->storage->deleteFile($path);
+            }
+        }
+        $this->em->flush();
+    }
+
+    private function placeCopy(CloudPickup $pickup, PlatformInstance $instance, string $remoteId, string $version, string $bytes, string $name, string $mime): int
+    {
+        $stored = $this->storage->storeRawContent($bytes, $pickup->getOwnerId(), '' !== $name ? $name : 'file', $mime);
+        if (true !== $stored['success']) {
+            throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'unreachable');
+        }
+        $file = new File();
+        $file->setUserId($pickup->getOwnerId());
+        $file->setFilePath($stored['path']);
+        $file->setFileName($name);
+        $file->setFileSize($stored['size']);
+        $file->setFileMime($mime);
+        $file->setFileType(pathinfo($name, PATHINFO_EXTENSION) ?: 'bin');
+        $file->setStatus('complete');
+        $file->setSource($this->sourceFor($instance));
+        $file->setSourceId($remoteId);
+        $file->setSourceEtag($version);
+        $file->setIncoming(false);
+        $file->setEphemeral(true);
+        $this->em->persist($file);
+        $this->em->flush();
+        $fileId = (int) $file->getId();
+        if (!$this->held->insertIgnore(new CloudPickupFile($pickup->getOwnerId(), $instance->getInstanceId(), $remoteId, $version, $fileId))) {
+            $this->discardWorkingCopy($file, $stored['path']);
+            $winner = $this->reusable($pickup, $instance, $remoteId, $version);
+            if (null === $winner) {
+                throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'unreachable');
+            }
+
+            return $winner;
+        }
+        $pickup->rememberFile($fileId);
+        $pickup->addSent();
+        $this->pickups->save($pickup);
+
+        return $fileId;
+    }
+
+    private function discardWorkingCopy(File $file, string $path): void
+    {
+        $this->em->remove($file);
+        $this->em->flush();
+        if ('' !== $path) {
+            $this->storage->deleteFile($path);
+        }
     }
 
     private function requireClaimed(PlatformInstance $instance, int $id): CloudPickup

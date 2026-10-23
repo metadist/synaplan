@@ -6,8 +6,10 @@ namespace App\Service\Dav;
 
 use App\Service\Security\SsrfGuard;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpClient\Response\StreamableInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Minimal WebDAV client (connector plan 07 C10): PROPFIND to verify,
@@ -128,14 +130,15 @@ final readonly class WebDavClient
     }
 
     /**
-     * @throws DavException
+     * @throws DavException when the server answers with an error, or the body
+     *                      grows past $maxBytes (0 means no cap)
      */
-    public function get(DavTarget $target, string $path): string
+    public function get(DavTarget $target, string $path, int $maxBytes = 0): string
     {
-        $response = $this->request($target, 'GET', $path);
-        $this->assertSuccess($response['status'], 'GET', $path);
+        $response = $this->send($target, 'GET', $path);
+        $this->assertSuccess($response->getStatusCode(), 'GET', $path);
 
-        return $response['body'];
+        return $this->readCapped($response, $maxBytes);
     }
 
     /**
@@ -155,41 +158,76 @@ final readonly class WebDavClient
         $folderName = trim($folder, '/');
         foreach ($document->getElementsByTagNameNS('DAV:', 'response') as $response) {
             $href = '';
-            $name = '';
-            $size = 0;
-            $collection = false;
-            foreach ($response->childNodes as $child) {
-                if (!$child instanceof \DOMElement) {
-                    continue;
-                }
-                if ('href' === $child->localName) {
-                    $href = rawurldecode($child->textContent);
-                }
-                if ('propstat' !== $child->localName) {
-                    continue;
-                }
-                $prop = $child->getElementsByTagNameNS('DAV:', 'prop')->item(0);
-                if (!$prop instanceof \DOMElement) {
-                    continue;
-                }
-                $display = $prop->getElementsByTagNameNS('DAV:', 'displayname')->item(0);
-                $length = $prop->getElementsByTagNameNS('DAV:', 'getcontentlength')->item(0);
-                $type = $prop->getElementsByTagNameNS('DAV:', 'resourcetype')->item(0);
-                $name = $display instanceof \DOMNode ? trim($display->textContent) : '';
-                $size = $length instanceof \DOMNode && is_numeric(trim($length->textContent)) ? (int) trim($length->textContent) : 0;
-                $collection = $type instanceof \DOMElement && $type->getElementsByTagNameNS('DAV:', 'collection')->length > 0;
+            $hrefNode = $response->getElementsByTagNameNS('DAV:', 'href')->item(0);
+            if ($hrefNode instanceof \DOMNode) {
+                $href = trim($hrefNode->textContent);
             }
-            if ($collection || '' === $name) {
+            $filename = $this->hrefBasename($href);
+            $props = $this->successfulProps($response);
+            if ($props['collection'] || '' === $filename || str_contains($filename, '..')) {
                 continue;
             }
-            $relative = trim($folderName.'/'.ltrim($name, '/'), '/');
-            if (str_ends_with(rtrim($href, '/'), $folderName) && '' !== $folderName) {
-                continue;
-            }
-            $out[] = ['name' => $name, 'path' => $relative, 'size' => $size];
+            $name = '' !== $props['name'] ? $props['name'] : $filename;
+            $out[] = [
+                'name' => $name,
+                'path' => trim($folderName.'/'.$filename, '/'),
+                'size' => $props['size'],
+            ];
         }
 
         return $out;
+    }
+
+    /**
+     * @return array{name: string, size: int, collection: bool}
+     */
+    private function successfulProps(\DOMElement $response): array
+    {
+        $name = '';
+        $size = 0;
+        $collection = false;
+        foreach ($response->getElementsByTagNameNS('DAV:', 'propstat') as $propstat) {
+            if (!$this->propstatOk($propstat)) {
+                continue;
+            }
+            $prop = $propstat->getElementsByTagNameNS('DAV:', 'prop')->item(0);
+            if (!$prop instanceof \DOMElement) {
+                continue;
+            }
+            $display = $prop->getElementsByTagNameNS('DAV:', 'displayname')->item(0);
+            if ($display instanceof \DOMNode && '' !== trim($display->textContent)) {
+                $name = trim($display->textContent);
+            }
+            $length = $prop->getElementsByTagNameNS('DAV:', 'getcontentlength')->item(0);
+            if ($length instanceof \DOMNode && is_numeric(trim($length->textContent))) {
+                $size = (int) trim($length->textContent);
+            }
+            $type = $prop->getElementsByTagNameNS('DAV:', 'resourcetype')->item(0);
+            if ($type instanceof \DOMElement && $type->getElementsByTagNameNS('DAV:', 'collection')->length > 0) {
+                $collection = true;
+            }
+        }
+
+        return ['name' => $name, 'size' => $size, 'collection' => $collection];
+    }
+
+    private function propstatOk(\DOMElement $propstat): bool
+    {
+        $status = $propstat->getElementsByTagNameNS('DAV:', 'status')->item(0);
+        if (!$status instanceof \DOMNode || '' === trim($status->textContent)) {
+            return true;
+        }
+
+        return str_contains($status->textContent, '200');
+    }
+
+    private function hrefBasename(string $href): string
+    {
+        $path = parse_url($href, \PHP_URL_PATH);
+        $path = is_string($path) && '' !== $path ? $path : $href;
+        $name = rawurldecode(basename(rtrim($path, '/')));
+
+        return str_contains($name, '/') || str_contains($name, '\\') ? '' : $name;
     }
 
     /**
@@ -201,9 +239,23 @@ final readonly class WebDavClient
      */
     private function request(DavTarget $target, string $method, string $path, array $headers = [], ?string $body = null): array
     {
+        $response = $this->send($target, $method, $path, $headers, $body);
+
+        return [
+            'status' => $response->getStatusCode(),
+            'body' => $response->getContent(false),
+        ];
+    }
+
+    /**
+     * @param array<string, string> $headers
+     *
+     * @throws DavException
+     */
+    private function send(DavTarget $target, string $method, string $path, array $headers = [], ?string $body = null): ResponseInterface
+    {
         $url = $this->buildUrl($target->baseUrl, $path);
         $insecureLocal = $this->allowsInsecureLocal();
-
         $scheme = strtolower((string) parse_url($url, \PHP_URL_SCHEME));
         if ('https' !== $scheme && !($insecureLocal && 'http' === $scheme)) {
             throw new DavException(0, 'Only https:// WebDAV addresses are allowed');
@@ -213,21 +265,46 @@ final readonly class WebDavClient
         }
 
         try {
-            $response = $this->httpClient->request($method, $url, [
+            return $this->httpClient->request($method, $url, [
                 'auth_basic' => [$target->username, $target->password],
                 'headers' => $headers,
                 'body' => $body ?? '',
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 0,
             ]);
-
-            return [
-                'status' => $response->getStatusCode(),
-                'body' => $response->getContent(false),
-            ];
         } catch (TransportExceptionInterface $e) {
             throw new DavException(0, sprintf('Could not reach %s: %s', $target->host(), $e->getMessage()));
         }
+    }
+
+    /**
+     * @throws DavException
+     */
+    private function readCapped(ResponseInterface $response, int $maxBytes): string
+    {
+        if ($maxBytes > 0 && $response instanceof StreamableInterface) {
+            $stream = $response->toStream();
+            $body = '';
+            while (!feof($stream)) {
+                $chunk = fread($stream, 8192);
+                if (!is_string($chunk) || '' === $chunk) {
+                    break;
+                }
+                $body .= $chunk;
+                if (strlen($body) > $maxBytes) {
+                    throw new DavException(0, 'This file is larger than the limit and was not kept');
+                }
+            }
+
+            return $body;
+        }
+
+        $body = $response->getContent(false);
+        if ($maxBytes > 0 && strlen($body) > $maxBytes) {
+            throw new DavException(0, 'This file is larger than the limit and was not kept');
+        }
+
+        return $body;
     }
 
     /**

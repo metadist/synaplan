@@ -10,6 +10,7 @@ use App\Entity\Message;
 use App\Repository\ConnectionRepository;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Credential\CredentialVaultInterface;
+use App\Service\Dav\DavException;
 use App\Service\Dav\WebDavClient;
 use App\Service\File\FileStorageService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -82,6 +83,31 @@ final class FolderFetchRunnerTest extends TestCase
         self::assertTrue($result->metadata['partial']);
         self::assertStringContainsString('larger than 100 MB', (string) $result->text);
         self::assertCount(1, $result->files);
+    }
+
+    public function testALaterReadFailureKeepsTheFilesAlreadyFetched(): void
+    {
+        $webDav = $this->createStub(WebDavClient::class);
+        $webDav->method('list')->willReturn([
+            ['name' => 'notes.txt', 'path' => 'Docs/notes.txt', 'size' => 5],
+            ['name' => 'later.txt', 'path' => 'Docs/later.txt', 'size' => 5],
+        ]);
+        $webDav->method('get')->willReturnCallback(static function (): string {
+            static $calls = 0;
+            ++$calls;
+            if ($calls > 1) {
+                throw new DavException(0, 'Could not reach files.example.org');
+            }
+
+            return 'hello';
+        });
+
+        $result = $this->webDavRunner($webDav)->run($this->node(['mode' => 'fetch', 'folder' => 'Docs']), $this->context());
+
+        self::assertTrue($result->isSuccessful());
+        self::assertTrue($result->metadata['partial']);
+        self::assertCount(1, $result->files);
+        self::assertStringContainsString('could not be read', (string) $result->text);
     }
 
     public function testARefusedScopeReturnsTheSentenceAndDoesNotWait(): void

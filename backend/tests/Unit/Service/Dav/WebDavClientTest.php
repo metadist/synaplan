@@ -157,6 +157,39 @@ final class WebDavClientTest extends TestCase
         self::assertSame('hello', $client->get($this->target(), 'Docs/notes.txt'));
     }
 
+    public function testGetStopsWhenTheBodyPassesTheCap(): void
+    {
+        $client = $this->client([new MockResponse('hello', ['http_code' => 200])]);
+
+        $this->expectException(DavException::class);
+        $client->get($this->target(), 'Docs/notes.txt', 4);
+    }
+
+    public function testListUsesTheHrefNameAndIgnoresAFailedPropstat(): void
+    {
+        $xml = <<<'XML'
+            <?xml version="1.0"?>
+            <d:multistatus xmlns:d="DAV:">
+              <d:response>
+                <d:href>/remote.php/dav/files/ada/Docs/MyDocs</d:href>
+                <d:propstat><d:status>HTTP/1.1 200 OK</d:status><d:prop>
+                  <d:displayname>Annual report</d:displayname>
+                  <d:getcontentlength>4</d:getcontentlength>
+                </d:prop></d:propstat>
+                <d:propstat><d:status>HTTP/1.1 404 Not Found</d:status><d:prop>
+                  <d:displayname></d:displayname>
+                </d:prop></d:propstat>
+              </d:response>
+            </d:multistatus>
+            XML;
+        $client = $this->client([new MockResponse($xml, ['http_code' => 207])]);
+
+        self::assertSame(
+            [['name' => 'Annual report', 'path' => 'Docs/MyDocs', 'size' => 4]],
+            $client->list($this->target(), 'Docs'),
+        );
+    }
+
     private function target(): DavTarget
     {
         return new DavTarget(self::BASE_URL, 'ada', self::PASSWORD);

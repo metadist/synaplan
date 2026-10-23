@@ -40,6 +40,20 @@ class CloudPickupFileRepository extends ServiceEntityRepository
             ->execute();
     }
 
+    /**
+     * Inserts the mapping unless this person already holds that version.
+     * The database decides the race; a lost insert leaves the entity manager open.
+     */
+    public function insertIgnore(CloudPickupFile $file): bool
+    {
+        $affected = $this->getEntityManager()->getConnection()->executeStatement(
+            'INSERT IGNORE INTO BCLOUDPICKUPFILES (BOWNERID, BINSTANCEID, BREMOTEID, BVERSION, BFILEID) VALUES (?, ?, ?, ?, ?)',
+            [$file->getOwnerId(), $file->getInstanceId(), $file->getRemoteId(), $file->getVersion(), $file->getFileId()],
+        );
+
+        return $affected > 0;
+    }
+
     public function save(CloudPickupFile $file): void
     {
         $this->getEntityManager()->persist($file);

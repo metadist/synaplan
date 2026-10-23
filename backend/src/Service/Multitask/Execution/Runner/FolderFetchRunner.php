@@ -76,7 +76,7 @@ final readonly class FolderFetchRunner implements TaskRunner
         $mode = 'list' === ($node->params['mode'] ?? null) ? CloudPickup::MODE_LIST : CloudPickup::MODE_FETCH;
         $channel = is_string($node->params['channel'] ?? null) ? trim($node->params['channel']) : '';
 
-        $identityId = '' !== $channel ? $this->pickups->identityForChannel($userId, $channel) : null;
+        $identityId = '' !== $channel ? $this->pickups->identityForChannel($userId, $channel, $this->usedChannels($userId)) : null;
         if (null !== $identityId) {
             return $this->fromCloud($userId, $identityId, $folder, $pattern, $mode, $channel);
         }
@@ -181,34 +181,43 @@ final readonly class FolderFetchRunner implements TaskRunner
     {
         $files = [];
         $skippedLarge = 0;
+        $skippedLimit = 0;
         $bytes = 0;
+        $stopped = false;
         foreach ($matched as $row) {
-            if (count($files) >= PickupService::MAX_FILES || $bytes + $row['size'] > PickupService::MAX_BYTES) {
-                break;
-            }
             if ($row['size'] > PickupService::MAX_FILE_BYTES) {
                 ++$skippedLarge;
                 continue;
             }
+            if (count($files) >= PickupService::MAX_FILES || $bytes + $row['size'] > PickupService::MAX_BYTES) {
+                ++$skippedLimit;
+                continue;
+            }
             try {
-                $body = $this->webDav->get($target, $row['path']);
-            } catch (DavException) {
-                return NodeResult::failed('Synaplan could not reach '.$target->host().'. Nothing was read.');
+                $body = $this->webDav->get($target, $row['path'], PickupService::MAX_FILE_BYTES);
+            } catch (DavException $e) {
+                if (str_contains($e->getMessage(), 'larger than the limit')) {
+                    ++$skippedLarge;
+                    continue;
+                }
+                $stopped = true;
+                break;
             }
             $stored = $this->storeWorkingCopy($connection, $body, $row['name'], $row['path']);
             if (null === $stored) {
-                return NodeResult::failed('Synaplan could not keep a copy of '.$row['name'].'. Nothing else was read.');
+                $stopped = true;
+                break;
             }
             $files[] = $stored;
             $bytes += strlen($body);
         }
-        if ([] === $files) {
-            return NodeResult::failed('No files in '.$relative.' matched. Nothing was read.');
-        }
         $where = $this->where($label, $relative);
-        if ($skippedLarge > 0) {
+        if ([] === $files) {
+            return NodeResult::failed($this->nothingRead($where, $skippedLarge, $skippedLimit));
+        }
+        if ($skippedLarge > 0 || $skippedLimit > 0 || $stopped) {
             return NodeResult::ok(
-                'Read '.count($files).' of '.(count($files) + $skippedLarge).' files from '.$where.'; '.$skippedLarge.' were larger than 100 MB and were left out.',
+                $this->partialSentence($where, count($files), count($files) + $skippedLarge + $skippedLimit, $skippedLarge, $skippedLimit, $stopped),
                 $files,
                 ['folder_fetch' => true, 'partial' => true],
             );
@@ -301,18 +310,81 @@ final readonly class FolderFetchRunner implements TaskRunner
             return [] === $names ? 'Read the names from '.$where.'.' : implode("\n", $names);
         }
         $large = 0;
+        $over = 0;
         foreach ($pickup->skipped() as $row) {
             if ('too_large' === ($row['reason'] ?? null)) {
                 ++$large;
             }
+            if ('over_limit' === ($row['reason'] ?? null)) {
+                ++$over;
+            }
         }
-        if ($large > 0) {
-            $listed = max($pickup->getListed(), $attached + $large);
-
-            return 'Read '.$attached.' of '.$listed.' files from '.$where.'; '.$large.' were larger than 100 MB and were left out.';
+        if ($large > 0 || $over > 0) {
+            return $this->partialSentence($where, $attached, max($pickup->getListed(), $attached + $large + $over), $large, $over, false);
         }
 
         return 'Read '.$attached.' files from '.$where.'.';
+    }
+
+    private function nothingRead(string $where, int $large, int $over): string
+    {
+        if ($large > 0 && 0 === $over) {
+            return 'Every file in '.$where.' is larger than 100 MB. Nothing was read.';
+        }
+        if ($over > 0) {
+            return $where.' has more files than one run can take. Nothing was read.';
+        }
+
+        return 'No files in '.$where.' matched. Nothing was read.';
+    }
+
+    private function partialSentence(string $where, int $read, int $total, int $large, int $over, bool $stopped): string
+    {
+        $why = [];
+        if ($large > 0) {
+            $why[] = $large.' '.($large > 1 ? 'were' : 'was').' larger than 100 MB and left out';
+        }
+        if ($over > 0) {
+            $why[] = $over.' '.($over > 1 ? 'were' : 'was').' past the limit for one run and left out';
+        }
+        if ($stopped) {
+            $why[] = 'the rest could not be read';
+        }
+
+        return 'Read '.$read.' of '.$total.' files from '.$where.$this->because($why).'.';
+    }
+
+    /**
+     * @param list<string> $reasons
+     */
+    private function because(array $reasons): string
+    {
+        if ([] === $reasons) {
+            return '';
+        }
+        if (1 === count($reasons)) {
+            return '; '.$reasons[0];
+        }
+        $last = array_pop($reasons);
+
+        return '; '.implode(', ', $reasons).', and '.$last;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function usedChannels(int $userId): array
+    {
+        try {
+            $used = [];
+            foreach ($this->channels->forUser($userId) as $channel) {
+                $used[] = $channel->key;
+            }
+
+            return $used;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function nameMatches(string $pattern, string $name): bool
@@ -336,7 +408,16 @@ final readonly class FolderFetchRunner implements TaskRunner
         }
         try {
             $lines = [];
-            foreach ($this->pickups->readableLinks($userId) as $link) {
+            $used = [];
+            foreach ($this->channels->ofKind($userId, PlannerChannel::KIND_FOLDER) as $channel) {
+                $connection = $this->connections->findByIdAndOwner($channel->connectionId, $userId);
+                if (!$connection instanceof Connection || 'webdav' !== $connection->getType()) {
+                    continue;
+                }
+                $used[] = $channel->key;
+                $lines[] = sprintf('  - "%s": connected folder %s. params.channel="%s".', $channel->key, $channel->label, $channel->key);
+            }
+            foreach ($this->pickups->readableLinks($userId, $used) as $link) {
                 $folders = [] === $link['folders'] ? 'only what they watch' : implode(', ', $link['folders']);
                 $lines[] = sprintf(
                     '  - "%s": linked %s at %s. Synaplan may read: %s. params.channel="%s".',
@@ -346,9 +427,6 @@ final readonly class FolderFetchRunner implements TaskRunner
                     $folders,
                     $link['channel'],
                 );
-            }
-            foreach ($this->channels->ofKind($userId, PlannerChannel::KIND_FOLDER) as $channel) {
-                $lines[] = sprintf('  - "%s": connected folder %s. params.channel="%s".', $channel->key, $channel->label, $channel->key);
             }
         } catch (\Throwable) {
             return null;

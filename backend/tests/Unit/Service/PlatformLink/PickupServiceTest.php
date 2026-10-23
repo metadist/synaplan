@@ -19,6 +19,7 @@ use App\Service\Iam\AuditLogWriter;
 use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\DeliveryNotifier;
 use App\Service\PlatformLink\PickupService;
+use App\Service\PlatformLink\PlatformLinksConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -118,6 +119,11 @@ final class PickupServiceTest extends TestCase
         );
         $samePickup = $this->pickup(3);
         $samePickup->markClaimed();
+        $file = (new File())->setFilePath('07/a.pdf');
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('find')->willReturn($file);
+        $storage = $this->createStub(FileStorageService::class);
+        $storage->method('fileExists')->willReturn(true);
         $same = $this->createStub(CloudPickupRepository::class);
         $same->method('find')->willReturn($samePickup);
         $otherPickup = $this->pickup(4, 'pi_other');
@@ -126,10 +132,14 @@ final class PickupServiceTest extends TestCase
         $other->method('find')->willReturn($otherPickup);
         $redis = $this->createStub(RedisService::class);
 
-        $reused = $this->service(pickups: $same, held: $held, redis: $redis)->listing($this->instance(), 3, [
+        $reused = $this->service(pickups: $same, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->instance(), 3, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
-        $uploaded = $this->service(pickups: $other, held: $held, redis: $redis)->listing($this->instance('pi_other'), 4, [
+        $otherIdentity = $this->identity();
+        $otherIdentity->setInstanceId('pi_other');
+        $otherIdentities = $this->createStub(ExternalIdentityRepository::class);
+        $otherIdentities->method('find')->willReturn($otherIdentity);
+        $uploaded = $this->service(pickups: $other, identities: $otherIdentities, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->instance('pi_other'), 4, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
 
@@ -212,13 +222,123 @@ final class PickupServiceTest extends TestCase
             }
         });
         $held = $this->createMock(CloudPickupFileRepository::class);
-        $held->expects(self::once())->method('save');
+        $held->expects(self::once())->method('insertIgnore')->willReturn(true);
 
         $fileId = $this->service($pickups, held: $held, storage: $storage, em: $em, redis: $redis)
             ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
 
         self::assertSame(42, $fileId);
         self::assertSame([42], $pickup->fileIds());
+    }
+
+    public function testLinkingTurnedOffNeverOpensATicket(): void
+    {
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->expects(self::never())->method('save');
+
+        $result = $this->service($pickups, links: $this->links(false))->open(7, 4, ['folder_path' => 'Docs'], 'fetch');
+
+        self::assertFalse($result['ok']);
+        self::assertStringContainsString('Nothing was read.', $result['sentence']);
+    }
+
+    public function testANamesOnlyPickupDoesNotAskForUploads(): void
+    {
+        $pickup = new CloudPickup(7, 4, 'pi_abc', CloudPickup::MODE_LIST, ['folder_path' => 'Docs']);
+        (new \ReflectionProperty(CloudPickup::class, 'id'))->setValue($pickup, 3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+
+        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+            ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+        ]);
+
+        self::assertSame([], $answer['upload']);
+        self::assertSame(['a.pdf'], $pickup->names());
+    }
+
+    public function testALaterListingKeepsTheEarlierCount(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickup->addAccepted(PickupService::MAX_FILES, 0);
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+
+        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+            ['id' => 'remote-9', 'version' => 'v1', 'name' => 'b.pdf', 'size' => 10],
+        ]);
+
+        self::assertSame([['id' => 'remote-9', 'reason' => 'over_limit']], $answer['skip']);
+    }
+
+    public function testAMissingWorkingCopyIsUploadedAgain(): void
+    {
+        $held = $this->createStub(CloudPickupFileRepository::class);
+        $held->method('findHeld')->willReturn(new CloudPickupFile(7, 'pi_abc', 'remote-1', 'v1', 99));
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('find')->willReturn(null);
+
+        $answer = $this->service(pickups: $pickups, held: $held, em: $em)->listing($this->instance(), 3, [
+            ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+        ]);
+
+        self::assertSame(['remote-1'], $answer['upload']);
+        self::assertSame([], $answer['reuse']);
+    }
+
+    public function testFindRereadsAPickupAnotherRequestUpdated(): void
+    {
+        $pickup = $this->pickup(9);
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('contains')->willReturn(true);
+        $em->expects(self::once())->method('refresh')->willReturnCallback(static function () use ($pickup): void {
+            (new \ReflectionProperty(CloudPickup::class, 'state'))->setValue($pickup, CloudPickup::STATE_DONE);
+        });
+
+        $found = $this->service($pickups, em: $em)->find(9);
+
+        self::assertInstanceOf(CloudPickup::class, $found);
+        self::assertSame(CloudPickup::STATE_DONE, $found->getState());
+    }
+
+    public function testALostUploadRaceReturnsTheCopyThatWon(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $winner = new CloudPickupFile(7, 'pi_abc', 'remote-1', 'v1', 77);
+        $held = $this->createStub(CloudPickupFileRepository::class);
+        $held->method('insertIgnore')->willReturn(false);
+        $held->method('findHeld')->willReturn($winner);
+        $file = (new File())->setFilePath('07/a.txt');
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('find')->willReturn($file);
+        $em->method('persist')->willReturnCallback(static function (object $entity): void {
+            if ($entity instanceof File) {
+                (new \ReflectionProperty(File::class, 'id'))->setValue($entity, 42);
+            }
+        });
+        $storage = $this->createStub(FileStorageService::class);
+        $storage->method('storeRawContent')->willReturn([
+            'success' => true, 'path' => '07/a.txt', 'size' => 2, 'mime' => 'text/plain', 'error' => null,
+        ]);
+        $storage->method('fileExists')->willReturn(true);
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('get')->willReturn('["remote-1"]');
+
+        $fileId = $this->service($pickups, held: $held, storage: $storage, em: $em, redis: $redis)
+            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+
+        self::assertSame(77, $fileId);
     }
 
     private function service(
@@ -229,18 +349,36 @@ final class PickupServiceTest extends TestCase
         ?FileStorageService $storage = null,
         ?EntityManagerInterface $em = null,
         ?RedisService $redis = null,
+        ?PlatformLinksConfig $links = null,
     ): PickupService {
         return new PickupService(
             $pickups ?? $this->createStub(CloudPickupRepository::class),
             $held ?? $this->createStub(CloudPickupFileRepository::class),
-            $identities ?? $this->createStub(ExternalIdentityRepository::class),
+            $identities ?? $this->identities(),
             $platforms ?? $this->platforms(),
             $storage ?? $this->createStub(FileStorageService::class),
             $em ?? $this->createStub(EntityManagerInterface::class),
             $redis ?? $this->createStub(RedisService::class),
             $this->createStub(DeliveryNotifier::class),
             $this->createStub(AuditLogWriter::class),
+            $links ?? $this->links(),
         );
+    }
+
+    private function links(bool $enabled = true): PlatformLinksConfig
+    {
+        $links = $this->createStub(PlatformLinksConfig::class);
+        $links->method('isEnabled')->willReturn($enabled);
+
+        return $links;
+    }
+
+    private function identities(): ExternalIdentityRepository
+    {
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('find')->willReturn($this->identity());
+
+        return $identities;
     }
 
     private function platforms(): PlatformInstanceRepository

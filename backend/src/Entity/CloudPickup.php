@@ -62,6 +62,12 @@ class CloudPickup
     #[ORM\Column(name: 'BNAMES', type: 'text', nullable: true)]
     private ?string $names = null;
 
+    #[ORM\Column(name: 'BACCEPTCOUNT', type: 'integer', options: ['default' => 0])]
+    private int $acceptCount = 0;
+
+    #[ORM\Column(name: 'BACCEPTBYTES', type: 'integer', options: ['default' => 0])]
+    private int $acceptBytes = 0;
+
     #[ORM\Column(name: 'BERRORCODE', length: 64, nullable: true)]
     private ?string $errorCode = null;
 
@@ -204,6 +210,22 @@ class CloudPickup
         $ids = $this->fileIds();
         $ids[] = $fileId;
         $this->fileIds = json_encode(array_values(array_unique($ids)), JSON_THROW_ON_ERROR);
+    }
+
+    public function acceptCount(): int
+    {
+        return $this->acceptCount;
+    }
+
+    public function acceptBytes(): int
+    {
+        return $this->acceptBytes;
+    }
+
+    public function addAccepted(int $files, int $bytes): void
+    {
+        $this->acceptCount += $files;
+        $this->acceptBytes += $bytes;
     }
 
     public function rememberName(string $name): void
