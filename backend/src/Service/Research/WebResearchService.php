@@ -138,7 +138,7 @@ final readonly class WebResearchService
                     'stage' => 'fetching',
                 ]);
             }
-            $fetchedPages[$index] = $this->readSelectedPage($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index], $userId);
+            $fetchedPages[$index] = $this->readSelectedPage($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index], $userId, $started);
         }
 
         foreach ($fetchedPages as $index => $page) {
@@ -322,10 +322,12 @@ final readonly class WebResearchService
         return $this->urlContentService->startReading($url);
     }
 
-    private function readSelectedPage(string $url, int $maxChars, ?ResponseInterface $firstHop, ?int $userId): UrlContentResult
+    private function readSelectedPage(string $url, int $maxChars, ?ResponseInterface $firstHop, ?int $userId, float $started): UrlContentResult
     {
         if (null !== $this->sourceReader && ResearchSourceReader::isDocumentUrl($url)) {
-            return $this->sourceReader->fetchForDeepen($url, $maxChars, $userId);
+            $remainingSeconds = max(1, (int) floor(self::READ_DEADLINE_SECONDS - (microtime(true) - $started)));
+
+            return $this->sourceReader->fetchForDeepen($url, $maxChars, $userId, $remainingSeconds);
         }
 
         return $this->urlContentService->fetchForReading($url, $maxChars, $firstHop);

@@ -98,6 +98,46 @@ final class ResearchSourceReaderTest extends TestCase
         self::assertSame('scanned article 72', $read->text);
     }
 
+    public function testWebSearchReadNeverCallsVisionAndPassesTheBudget(): void
+    {
+        $pdf = $this->tempFile('%PDF-1.4 scan');
+        $fetcher = $this->createMock(DocumentFetcher::class);
+        $fetcher->expects(self::once())->method('fetch')
+            ->with('https://example.com/scan.pdf', 'pdf', 6)
+            ->willReturn(DownloadedDocument::saved($pdf));
+        $cloud = $this->createMock(CloudDocumentReader::class);
+        $cloud->expects(self::never())->method('read');
+
+        $page = $this->reader($fetcher, $cloud, '')->fetchForDeepen('https://example.com/scan.pdf', 5000, 7, 6);
+
+        self::assertFalse($page->success);
+        self::assertSame('unreadable', $page->blockedReason);
+        self::assertFileDoesNotExist($pdf);
+    }
+
+    public function testOfficeZipThatUnpacksPastTheCapIsNotExtracted(): void
+    {
+        $chunkBytes = 16 * 1024 * 1024;
+        $chunk = $this->tempFile(str_repeat('a', $chunkBytes));
+        $path = sys_get_temp_dir().'/rs4-bomb-'.bin2hex(random_bytes(4)).'.docx';
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($path, \ZipArchive::CREATE));
+        $entries = intdiv(ResearchSourceReader::MAX_UNZIPPED_BYTES, $chunkBytes) + 1;
+        for ($entry = 0; $entry < $entries; ++$entry) {
+            $zip->addFile($chunk, 'word/part'.$entry.'.xml');
+        }
+        $zip->close();
+        unlink($chunk);
+        $fetcher = $this->createMock(DocumentFetcher::class);
+        $fetcher->method('fetch')->willReturn(DownloadedDocument::saved($path));
+
+        $read = $this->reader($fetcher, $this->createMock(CloudDocumentReader::class), 'never')->read('https://example.com/bomb.docx');
+
+        self::assertTrue($read->blocked);
+        self::assertSame('too_large', $read->reason);
+        self::assertFileDoesNotExist($path);
+    }
+
     public function testSecondReadOfTheSameUrlDoesNotDownloadAgain(): void
     {
         $pdf = $this->tempFile('%PDF-1.4 cached');

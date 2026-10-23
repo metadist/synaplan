@@ -13,7 +13,7 @@ chat message.
 | RS1 | in progress | Gateway wrap-up answers fully; round limit from config. Merged in #2637. UC-03 / UC-04 not measured |
 | RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. UC-04 / UC-04b not measured |
 | RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. UC-05e (≥ 2 searches) and the UC-05 / UC-06 timings are still open |
-| RS4 | done | Document reader behind `WEB_SEARCH.READ_DOCUMENTS`. Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23). The only PDF was outside the 3-page cap, so the flag stays off. |
+| RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (web search reads locally, no vision). Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23), but no run opened a document: the only PDF was outside the 3-page cap. Done needs one smoke item whose top 3 results include a PDF, measured flag off and on. The flag stays off. |
 | RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |
 | RQ2b | planned | Spike with both lead modes vs B1+ and B4, budget sweep, go / no-go — §0 #40 |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
@@ -75,7 +75,8 @@ docker compose exec -T backend php bin/console app:research:eval \
 Both runs read the same HTML pages. The only document URL was
 `https://www.datenschutz-bayern.de/datenschutzreform2018/OH_Loeschung.pdf`
 on reg-02, at result 8. The page cap is 3, so it was not opened either time.
-No chat cost row was written. The flag stays off.
+No chat cost row was written. This run shows the flag does not hurt HTML
+reads; it does not measure document reading. The flag stays off.
 
 ---
 

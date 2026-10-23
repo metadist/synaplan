@@ -172,9 +172,74 @@ final class GuardedDocumentDownloadTest extends TestCase
         self::assertTrue($result->ok);
         self::assertStringEndsWith('.pdf', $result->path);
         self::assertSame('%PDF-1.4', (string) file_get_contents($result->path));
-        self::assertEquals(GuardedDocumentDownload::TIMEOUT_SECONDS, $seen['timeout']);
-        self::assertEquals(GuardedDocumentDownload::TIMEOUT_SECONDS, $seen['max_duration']);
+        self::assertLessThanOrEqual(GuardedDocumentDownload::TIMEOUT_SECONDS, $seen['timeout']);
+        self::assertGreaterThan(GuardedDocumentDownload::TIMEOUT_SECONDS - 1, $seen['timeout']);
+        self::assertLessThanOrEqual(GuardedDocumentDownload::TIMEOUT_SECONDS, $seen['max_duration']);
         self::assertSame(0, $seen['max_redirects']);
+        unlink($result->path);
+    }
+
+    public function testCallerBudgetLowersTheCap(): void
+    {
+        $seen = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen = $options;
+
+            return new MockResponse('%PDF-1.4');
+        });
+
+        $result = $this->download($client, blocked: false)->fetch('https://example.com/report.pdf', 'pdf', 4);
+
+        self::assertTrue($result->ok);
+        self::assertLessThanOrEqual(4, $seen['max_duration']);
+        unlink($result->path);
+    }
+
+    public function testHtmlBehindAPdfLinkIsNotTreatedAsTheDocument(): void
+    {
+        $client = new MockHttpClient([new MockResponse('<html><body>Please sign in</body></html>')]);
+
+        $result = $this->download($client, blocked: false)->fetch('https://example.com/report.pdf', 'pdf');
+
+        self::assertFalse($result->ok);
+        self::assertSame('unsupported_content', $result->reason);
+    }
+
+    public function testDocxMustBeAZip(): void
+    {
+        $client = new MockHttpClient([new MockResponse('not a zip')]);
+
+        $result = $this->download($client, blocked: false)->fetch('https://example.com/contract.docx', 'docx');
+
+        self::assertSame('unsupported_content', $result->reason);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function redirectProvider(): iterable
+    {
+        yield 'dot segments' => ['../other/c.pdf?v=2', 'https://example.com/docs/other/c.pdf?v=2'];
+        yield 'query only' => ['?download=1', 'https://example.com/docs/files/a.pdf?download=1'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('redirectProvider')]
+    public function testFollowsRelativeRedirectLocations(string $location, string $expected): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$requested, $location): MockResponse {
+            $requested[] = $url;
+            if (1 === \count($requested)) {
+                return new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: '.$location]]);
+            }
+
+            return new MockResponse('%PDF-1.4');
+        });
+
+        $result = $this->download($client, blocked: false)->fetch('https://example.com/docs/files/a.pdf', 'pdf');
+
+        self::assertTrue($result->ok);
+        self::assertSame($expected, $requested[1]);
         unlink($result->path);
     }
 

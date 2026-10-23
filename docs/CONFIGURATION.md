@@ -835,7 +835,7 @@ migration to roll out a new default.
 | `WEB_SEARCH.USER_OVERRIDE_ALLOWED` | `0` | When `1`, Settings shows **Use my own search** |
 | `WEB_SEARCH.TIMEOUT_MS` | `8000` | Per-provider HTTP timeout |
 | `WEB_SEARCH.MAX_CONTENT_CHARS` | `4000` | Truncate full-page text (`tavily`, `exa`, `firecrawl`) |
-| `WEB_SEARCH.READ_DOCUMENTS` | `0` | When `1`, web search may open PDF and Office links (`pdf`, `doc`, `docx`, `xls`, `xlsx`, `ppt`, `pptx`). A missing row stays off. The download is not saved to the person's library. Each download stops at 20 MB or 15 seconds. A PDF with no text layer can be sent to the vision model; a local-only read never does that. File upload is unchanged. |
+| `WEB_SEARCH.READ_DOCUMENTS` | `0` | When `1`, web search may open PDF and Office links (`pdf`, `doc`, `docx`, `xls`, `xlsx`, `ppt`, `pptx`). A missing row stays off. The download is not saved to the person's library. Each download stops at 20 MB, at 15 seconds, or when the search's 25-second read budget runs out. A body that does not match the file type (for example an HTML login page behind a `.pdf` link) is skipped. Office files that unpack past 100 MB are skipped. Text is extracted locally only: a scanned PDF with no text layer is reported as unreadable and is never sent to a vision model. File upload is unchanged. |
 | `RERANK.ENABLED` | `0` | Off until a live eval wins; chat search is unchanged while off |
 | `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` (capped at 100) before rerank |
 | `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this; keep embedding order |
