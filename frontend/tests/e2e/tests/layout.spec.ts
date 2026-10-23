@@ -463,6 +463,30 @@ test.describe('@ci @layout UI guard — key pages', () => {
     await expect(page.locator(selectors.files.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expectNoHorizontalOverflow(page, 'files')
 
+    const longName = 'Mitschrift-2026-10-12-availableexplosionsesposedownstairs-notes.md'
+    await page.locator(selectors.files.fileInput).setInputFiles({
+      name: longName,
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('# notes\n'),
+    })
+    await page.locator(selectors.files.uploadButton).click()
+    await expect(page.getByText(longName).first()).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
+    await expectNoHorizontalOverflow(page, 'files long name')
+    const card = await page.locator('[data-testid="section-table"]').boundingBox()
+    const row = await page
+      .locator(
+        '[data-testid="files-table"] [data-testid="item-file"], [data-testid="section-table"] [data-testid="item-file"]'
+      )
+      .last()
+      .boundingBox()
+    expect(card, 'files card').not.toBeNull()
+    expect(row, 'file row').not.toBeNull()
+    if (card && row) {
+      expect(row.x + row.width, 'file row stays inside the card').toBeLessThanOrEqual(
+        card.x + card.width + 1
+      )
+    }
+
     if (isMobileViewport(page)) {
       const uploadBtn = page.locator(selectors.files.uploadButton)
       await uploadBtn.scrollIntoViewIfNeeded()

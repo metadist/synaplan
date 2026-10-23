@@ -951,131 +951,27 @@
                   </div>
                 </div>
 
-                <!-- Desktop table -->
-                <table class="w-full hidden sm:table">
-                  <thead>
-                    <tr class="border-b border-light-border/30 dark:border-dark-border/8">
-                      <th class="p-0 w-9 align-middle">
-                        <div class="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            :checked="allSelected"
-                            class="checkbox-brand"
-                            @change="toggleSelectAll"
-                          />
-                        </div>
-                      </th>
-                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
-                        {{ $t('files.name') }}
-                      </th>
-                      <th
-                        class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24 hidden md:table-cell"
-                      >
-                        {{ $t('files.size') }}
-                      </th>
-                      <th
-                        class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28 hidden lg:table-cell"
-                      >
-                        {{ $t('files.uploaded') }}
-                      </th>
-                      <th class="w-36"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(file, index) in paginatedFiles"
-                      :key="file.id"
-                      class="group hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
-                      :class="
-                        index === paginatedFiles.length - 1 &&
-                        (visibleFolders.length > 0 || totalPages > 1)
-                          ? ''
-                          : 'border-b border-light-border/10 dark:border-dark-border/5'
-                      "
-                      data-testid="item-file"
-                    >
-                      <td class="py-2.5 px-2">
-                        <input
-                          type="checkbox"
-                          :checked="selectedFileIds.includes(file.id)"
-                          class="checkbox-brand"
-                          @change="toggleFileSelection(file.id)"
-                        />
-                      </td>
-                      <td class="py-2.5 px-3">
-                        <div class="flex items-center gap-3 min-w-0">
-                          <div
-                            class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            :class="getFileColorClass()"
-                          >
-                            <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
-                          </div>
-                          <div class="flex flex-col gap-1 min-w-0">
-                            <span class="text-sm txt-primary truncate" :title="file.filename">{{
-                              displayName(file)
-                            }}</span>
-                            <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
-                              <button
-                                v-if="file.source && file.chat_id"
-                                type="button"
-                                class="inline-flex min-w-0 max-w-full px-2 py-0.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand)]"
-                                :title="$t('files.openInChat')"
-                                :data-testid="`btn-open-in-chat-${file.id}`"
-                                @click="openInChat(file)"
-                              >
-                                <FileSourceBadge :source="file.source" />
-                              </button>
-                              <FileSourceBadge v-else-if="file.source" :source="file.source" />
-                              <FileVectorPill
-                                :state="vectorStateOf(file)"
-                                :chunk-count="file.chunk_count ?? file.chunks ?? 0"
-                                :group-key="file.group_key"
-                              />
-                              <button
-                                v-if="file.group_key"
-                                class="inline-flex items-center gap-1 text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
-                                @click="enterFolder(file.group_key!)"
-                              >
-                                <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
-                                {{ file.group_key }}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td
-                        class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden md:table-cell"
-                      >
-                        {{ formatFileSize(file.file_size) }}
-                      </td>
-                      <td
-                        class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden lg:table-cell"
-                      >
-                        {{ file.uploaded_date }}
-                      </td>
-                      <td class="py-2.5 px-3">
-                        <div
-                          class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                        >
-                          <FolderMoveMenu
-                            :open="folderMenuOpen === file.id"
-                            :folders="displayedFolders"
-                            :can-remove="!!file.group_key"
-                            @toggle="toggleFolderMenu(file.id)"
-                            @move="moveFileToFolder(file.id, $event)"
-                            @remove="removeFileFromFolder(file.id)"
-                          />
-                          <FileMakeSearchableButton
-                            :file="file"
-                            :busy="isDescribing(file.id)"
-                            @activate="describeAndSort(file)"
-                          />
-                          <FileRowActions :actions="rowActions(file)" />
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <FilesTable
+                  :files="paginatedFiles"
+                  :selected-ids="selectedFileIds"
+                  :all-selected="allSelected"
+                  :borderless-last="visibleFolders.length > 0 || totalPages > 1"
+                  show-folder-link
+                  organize
+                  :current-folder="null"
+                  :folders="displayedFolders"
+                  :folder-menu-open="folderMenuOpen"
+                  :describing="isDescribing"
+                  :actions-for="rowActions"
+                  @toggle-all="toggleSelectAll"
+                  @toggle-one="toggleFileSelection"
+                  @open-chat="openInChat"
+                  @enter-folder="enterFolder"
+                  @toggle-menu="toggleFolderMenu"
+                  @move="moveFileToFolder"
+                  @remove="removeFileFromFolder"
+                  @describe="describeAndSort"
+                />
 
                 <!-- Count sits under the list, on the same row as the pages. -->
                 <div
@@ -1325,125 +1221,25 @@
                 </div>
               </div>
 
-              <!-- Desktop table -->
-              <table class="w-full hidden sm:table">
-                <thead>
-                  <tr class="border-b border-light-border/30 dark:border-dark-border/8">
-                    <th class="p-0 w-9 align-middle">
-                      <div class="flex items-center justify-center">
-                        <input
-                          type="checkbox"
-                          :checked="allSelected"
-                          class="checkbox-brand"
-                          @change="toggleSelectAll"
-                        />
-                      </div>
-                    </th>
-                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
-                      {{ $t('files.name') }}
-                    </th>
-                    <th
-                      class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24 hidden md:table-cell"
-                    >
-                      {{ $t('files.size') }}
-                    </th>
-                    <th
-                      class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28 hidden lg:table-cell"
-                    >
-                      {{ $t('files.uploaded') }}
-                    </th>
-                    <th class="w-32"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="(file, index) in paginatedFiles"
-                    :key="file.id"
-                    class="group hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
-                    :class="
-                      index === paginatedFiles.length - 1 && totalPages > 1
-                        ? ''
-                        : 'border-b border-light-border/10 dark:border-dark-border/5'
-                    "
-                    data-testid="item-file"
-                  >
-                    <td class="py-2.5 px-2">
-                      <input
-                        type="checkbox"
-                        :checked="selectedFileIds.includes(file.id)"
-                        class="checkbox-brand"
-                        @change="toggleFileSelection(file.id)"
-                      />
-                    </td>
-                    <td class="py-2.5 px-3">
-                      <div class="flex items-center gap-3 min-w-0">
-                        <div
-                          class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          :class="getFileColorClass()"
-                        >
-                          <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
-                        </div>
-                        <div class="flex flex-col gap-1 min-w-0">
-                          <span class="text-sm txt-primary truncate" :title="file.filename">{{
-                            displayName(file)
-                          }}</span>
-                          <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
-                            <button
-                              v-if="file.source && file.chat_id"
-                              type="button"
-                              class="inline-flex min-w-0 max-w-full px-2 py-0.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand)]"
-                              :title="$t('files.openInChat')"
-                              :data-testid="`btn-open-in-chat-${file.id}`"
-                              @click="openInChat(file)"
-                            >
-                              <FileSourceBadge :source="file.source" />
-                            </button>
-                            <FileSourceBadge v-else-if="file.source" :source="file.source" />
-                            <FileVectorPill
-                              :state="vectorStateOf(file)"
-                              :chunk-count="file.chunk_count ?? file.chunks ?? 0"
-                              :group-key="file.group_key"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td
-                      class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden md:table-cell"
-                    >
-                      {{ formatFileSize(file.file_size) }}
-                    </td>
-                    <td
-                      class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden lg:table-cell"
-                    >
-                      {{ file.uploaded_date }}
-                    </td>
-                    <td class="py-2.5 px-3">
-                      <div
-                        class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                      >
-                        <FolderMoveMenu
-                          v-if="!openSharedFolder"
-                          :open="folderMenuOpen === file.id"
-                          :folders="displayedFolders"
-                          :current-folder="openFolder"
-                          :can-remove="!!file.group_key"
-                          @toggle="toggleFolderMenu(file.id)"
-                          @move="moveFileToFolder(file.id, $event)"
-                          @remove="removeFileFromFolder(file.id)"
-                        />
-                        <FileMakeSearchableButton
-                          v-if="!openSharedFolder"
-                          :file="file"
-                          :busy="isDescribing(file.id)"
-                          @activate="describeAndSort(file)"
-                        />
-                        <FileRowActions :actions="rowActions(file)" />
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <FilesTable
+                :files="paginatedFiles"
+                :selected-ids="selectedFileIds"
+                :all-selected="allSelected"
+                :borderless-last="totalPages > 1"
+                :organize="openSharedFolder === null"
+                :current-folder="openFolder"
+                :folders="displayedFolders"
+                :folder-menu-open="folderMenuOpen"
+                :describing="isDescribing"
+                :actions-for="rowActions"
+                @toggle-all="toggleSelectAll"
+                @toggle-one="toggleFileSelection"
+                @open-chat="openInChat"
+                @toggle-menu="toggleFolderMenu"
+                @move="moveFileToFolder"
+                @remove="removeFileFromFolder"
+                @describe="describeAndSort"
+              />
 
               <!-- Pagination -->
               <div
@@ -1603,9 +1399,9 @@ import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
 import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
-import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
 import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
+import FilesTable from '@/components/files/FilesTable.vue'
 import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
 import { Icon } from '@iconify/vue'
 import {
