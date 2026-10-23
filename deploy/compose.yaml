@@ -589,7 +589,7 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
+    image: centrifugo/centrifugo:v6.10.0@sha256:58f9a182705faf353d9bbeb7986b629e5335cc3e821d0a2ca3ebd00a8f3387cc
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
