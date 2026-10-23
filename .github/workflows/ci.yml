@@ -92,20 +92,44 @@ jobs:
               fi
             fi
           elif [ "$EVENT_NAME" = pull_request ]; then
-            # previous_filename is set when a file was renamed. The new path
-            # alone would hide a file that left a sidecar directory.
-            files="$(
-              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
-                --jq '.[] | .filename, (.previous_filename // empty)'
+            # F is the new path. P is previous_filename, set on a rename, so a
+            # file that left a sidecar directory is still visible. A list that
+            # reaches the API cap is incomplete, so it becomes __unknown__.
+            listed="$(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+                --jq '.[] | "F\t\(.filename)", (select(.previous_filename != null and .previous_filename != "") | "P\t\(.previous_filename)")'
             )"
+            files="$(node --input-type=module -e '
+              import { diffListTruncated } from "./scripts/ci-change-scope.mjs"
+              const lines = process.argv[1].split("\n").filter(Boolean)
+              const entries = lines.filter((line) => line.startsWith("F\t")).length
+              if (diffListTruncated("pull_request", entries)) {
+                console.error(`Pull request file list has ${entries} entries, at the API cap. Testing every sidecar.`)
+                process.stdout.write("__unknown__\n")
+              } else {
+                process.stdout.write(lines.map((line) => line.slice(2)).join("\n"))
+              }
+            ' "$listed")"
           elif [ "$EVENT_NAME" = push ]; then
             if [[ "${BEFORE:-}" =~ ^0+$ ]] || [ -z "${BEFORE:-}" ]; then
               files="__unknown__"
-            elif ! files="$(
+            elif ! listed="$(
               gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${SHA}" \
-                --jq '.files[] | .filename, (.previous_filename // empty)'
+                --jq '.files[] | "F\t\(.filename)", (select(.previous_filename != null and .previous_filename != "") | "P\t\(.previous_filename)")'
             )"; then
               files="__unknown__"
+            else
+              files="$(node --input-type=module -e '
+                import { diffListTruncated } from "./scripts/ci-change-scope.mjs"
+                const lines = process.argv[1].split("\n").filter(Boolean)
+                const entries = lines.filter((line) => line.startsWith("F\t")).length
+                if (diffListTruncated("push", entries)) {
+                  console.error(`Compare file list has ${entries} entries, at the API cap. Testing every sidecar.`)
+                  process.stdout.write("__unknown__\n")
+                } else {
+                  process.stdout.write(lines.map((line) => line.slice(2)).join("\n"))
+                }
+              ' "$listed")"
             fi
           else
             files="__unknown__"

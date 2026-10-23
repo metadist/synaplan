@@ -16,7 +16,9 @@
 // Sidecar jobs (compute, transcriber, voice) are not part of "full tests".
 // Each runs only when the diff touches that sidecar, or when the diff is
 // unknown, or when this file or ci.yml changed. A rename counts both the
-// new path and the previous path. A thin or promote run skips
+// new path and the previous path. A file list that hits the GitHub cap
+// (3,000 on a pull request, 300 on a compare) is treated as unknown.
+// A thin or promote run skips
 // them: those trees were already tested. The Go suite itself is not reduced.
 // A sidecar this diff asked for must succeed. A skip is accepted only when
 // it was not asked for. The socket guard stays in the lint job, because it
@@ -34,6 +36,25 @@ import { CATALOG_PATHS } from './read-release-version.mjs'
 
 const PLAIN_RELEASE_TAG_REF = /^refs\/tags\/v\d+\.\d+\.\d+$/
 const UNKNOWN_CHANGE = '__unknown__'
+
+/** GitHub stops listing files past these counts, with no truncation flag. */
+export const GITHUB_DIFF_ENTRY_CAP = {
+  pull_request: 3000,
+  push: 300,
+}
+
+/**
+ * True when a file list is long enough that later paths may be missing.
+ * An event with no known cap fails closed.
+ */
+export const diffListTruncated = (eventName, entryCount) => {
+  const cap = GITHUB_DIFF_ENTRY_CAP[eventName]
+  if (cap == null) {
+    return true
+  }
+
+  return Number(entryCount) >= cap
+}
 
 export const PIN_PATH_PREFIXES = ['deploy/umbrel/synaplan/', 'deploy/casaos/Synaplan/']
 

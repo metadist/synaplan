@@ -10,6 +10,7 @@ import {
   isPinOnlyChange,
   isPinPath,
   runCli,
+  diffListTruncated,
   sidecarResultOk,
   sidecarsForChange,
 } from '../scripts/ci-change-scope.mjs'
@@ -174,6 +175,14 @@ test('an unknown diff or a CI rule change tests every sidecar', () => {
       files.join(',') || '(empty)'
     )
   }
+})
+
+test('a file list at the GitHub cap is incomplete', () => {
+  assert.equal(diffListTruncated('pull_request', 2999), false)
+  assert.equal(diffListTruncated('pull_request', 3000), true)
+  assert.equal(diffListTruncated('push', 299), false)
+  assert.equal(diffListTruncated('push', 300), true)
+  assert.equal(diffListTruncated('workflow_dispatch', 1), true)
 })
 
 test('a rename out of a sidecar still selects it when the old path is listed', () => {
