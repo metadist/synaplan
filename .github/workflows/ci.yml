@@ -43,6 +43,9 @@ jobs:
       reason: ${{ steps.classify.outputs.reason }}
       app-version: ${{ steps.version.outputs.version }}
       source_run_id: ${{ steps.classify.outputs.source_run_id }}
+      compute: ${{ steps.classify.outputs.compute }}
+      transcriber: ${{ steps.classify.outputs.transcriber }}
+      voice: ${{ steps.classify.outputs.voice }}
     permissions:
       contents: read
       actions: read
@@ -115,10 +118,17 @@ jobs:
           )"
           mode="$(printf '%s\n' "$result" | sed -n 's/^mode=//p' | head -n1)"
           reason="$(printf '%s\n' "$result" | sed -n 's/^reason=//p' | head -n1)"
+          compute="$(printf '%s\n' "$result" | sed -n 's/^compute=//p' | head -n1)"
+          transcriber="$(printf '%s\n' "$result" | sed -n 's/^transcriber=//p' | head -n1)"
+          voice="$(printf '%s\n' "$result" | sed -n 's/^voice=//p' | head -n1)"
           echo "mode=${mode}" >> "$GITHUB_OUTPUT"
           echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+          echo "compute=${compute}" >> "$GITHUB_OUTPUT"
+          echo "transcriber=${transcriber}" >> "$GITHUB_OUTPUT"
+          echo "voice=${voice}" >> "$GITHUB_OUTPUT"
           echo "source_run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
           echo "CI change scope: ${mode} — ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Sidecar tests: compute=${compute} transcriber=${transcriber} voice=${voice}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve application version
         id: version
@@ -245,6 +255,8 @@ jobs:
   compute-sidecar:
     name: Compute Sidecar (Go)
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.compute == 'true'
     # The build and the tests finish in about a minute. The extra time is for
     # Setup Go: a stalled toolchain download used the whole 10 minutes and the
     # job was cancelled before a test ran (run 39932073566).
@@ -273,6 +285,8 @@ jobs:
   transcriber-sidecar:
     name: Transcriber Sidecar (Node)
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.transcriber == 'true'
     timeout-minutes: 10
 
     steps:
@@ -302,7 +316,10 @@ jobs:
     needs: [change-scope, transcriber-sidecar]
     if: >-
       github.event_name == 'push' &&
-      (needs.change-scope.outputs.mode == 'heavy' || needs.change-scope.outputs.mode == 'promote')
+      (
+        needs.change-scope.outputs.mode == 'promote' ||
+        (needs.change-scope.outputs.mode == 'heavy' && needs.transcriber-sidecar.result == 'success')
+      )
     permissions:
       contents: read
       packages: write
@@ -379,6 +396,8 @@ jobs:
   voice-sidecar:
     name: Voice Sidecar (Node)
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.voice == 'true'
     timeout-minutes: 10
 
     steps:
@@ -1644,7 +1663,7 @@ jobs:
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
-      needs.compute-sidecar.result == 'success' &&
+      (needs.compute-sidecar.result == 'success' || needs.compute-sidecar.result == 'skipped') &&
       needs.change-scope.outputs.mode != 'thin' &&
       (
         needs.change-scope.outputs.mode == 'promote' ||
@@ -1890,7 +1909,7 @@ jobs:
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
-      needs.compute-sidecar.result == 'success' &&
+      (needs.compute-sidecar.result == 'success' || needs.compute-sidecar.result == 'skipped') &&
       needs.docker-push-amd64.result == 'success' &&
       needs.docker-push-arm64.result == 'success' &&
       (
@@ -2542,9 +2561,9 @@ jobs:
           require "PHP Code Formatting" "$LINT"
           require "Deployment Templates (AWS)" "$TEMPLATES"
           require "Mobile Release Tooling" "$MOBILE"
-          require "Compute Sidecar (Go)" "$COMPUTE"
-          require "Transcriber Sidecar (Node)" "$TRANSCRIBER"
-          require "Voice Sidecar (Node)" "$VOICE"
+          allow_skip "Compute Sidecar (Go)" "$COMPUTE"
+          allow_skip "Transcriber Sidecar (Node)" "$TRANSCRIBER"
+          allow_skip "Voice Sidecar (Node)" "$VOICE"
 
           allow_skip "Backend (PHP/Symfony)" "$BACKEND"
           allow_skip "Backend (minimal)" "$BACKEND_MINIMAL"

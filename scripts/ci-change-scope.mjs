@@ -13,6 +13,12 @@
 //              images; do not rebuild or retest the same tree.
 //   heavy    — everything else. Full tests, and on main/tags the publish path.
 //
+// Sidecar jobs (compute, transcriber, voice) are not part of "full tests".
+// Each runs only when the diff touches that sidecar, or when the diff is
+// unknown, or when this file or ci.yml changed. A thin or promote run skips
+// them: those trees were already tested. A failed sidecar is still a failed
+// run; a skipped one is not.
+//
 // The pin path list is the catalog reader plus the Umbrel package prefix the
 // rollout guard already allows, so a sixth pin file cannot be forgotten here
 // without also being forgotten there.
@@ -37,6 +43,54 @@ export const isPinPath = (path) => {
     return true
   }
   return PIN_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
+
+/** Paths that exercise one sidecar's own CI job. A prefix matches a directory. */
+export const SIDECAR_PATHS = {
+  compute: ['sidecars/synaplan-compute/', 'scripts/check-no-docker-sock.sh'],
+  transcriber: ['sidecars/synaplan-transcriber/'],
+  voice: ['sidecars/synaplan-voice/'],
+}
+
+/** Changing the rule itself retests every sidecar. */
+const SIDECAR_RULE_PATHS = ['.github/workflows/ci.yml', 'scripts/ci-change-scope.mjs']
+
+const normalizeFiles = (files) =>
+  [...new Set((files ?? []).map((file) => String(file).trim()).filter(Boolean))]
+
+const matchesSidecar = (path, prefixes) =>
+  prefixes.some((prefix) => (prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix))
+
+/**
+ * Which sidecar jobs this diff needs. Fail closed: an empty or unreadable
+ * diff, a release tag that must rebuild, or a change to the CI rule tests
+ * every sidecar. Thin and promote skip them.
+ *
+ * @returns {{ compute: boolean, transcriber: boolean, voice: boolean }}
+ */
+export const sidecarsForChange = ({ eventName, ref, files = [], mode }) => {
+  const none = { compute: false, transcriber: false, voice: false }
+  const all = { compute: true, transcriber: true, voice: true }
+  if (mode === 'thin' || mode === 'promote') {
+    return none
+  }
+  if (eventName === 'push' && String(ref ?? '').startsWith('refs/tags/')) {
+    return all
+  }
+
+  const paths = normalizeFiles(files)
+  if (paths.length === 0 || paths.includes(UNKNOWN_CHANGE)) {
+    return all
+  }
+  if (paths.some((path) => SIDECAR_RULE_PATHS.includes(path))) {
+    return all
+  }
+
+  return {
+    compute: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.compute)),
+    transcriber: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.transcriber)),
+    voice: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.voice)),
+  }
 }
 
 export const isPinOnlyChange = (files) => {
@@ -97,13 +151,24 @@ const readFiles = (arguments_) => {
 }
 
 export const runCli = (arguments_ = []) => {
+  const eventName = readOption(arguments_, '--event')
+  const ref = readOption(arguments_, '--ref')
+  const files = readFiles(arguments_)
   const result = classifyCiChangeScope({
-    eventName: readOption(arguments_, '--event'),
-    ref: readOption(arguments_, '--ref'),
-    files: readFiles(arguments_),
+    eventName,
+    ref,
+    files,
     canPromote: readOption(arguments_, '--can-promote') === 'true',
   })
-  return `mode=${result.mode}\nreason=${result.reason}\n`
+  const sidecars = sidecarsForChange({ eventName, ref, files, mode: result.mode })
+  return [
+    `mode=${result.mode}`,
+    `reason=${result.reason}`,
+    `compute=${sidecars.compute}`,
+    `transcriber=${sidecars.transcriber}`,
+    `voice=${sidecars.voice}`,
+    '',
+  ].join('\n')
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

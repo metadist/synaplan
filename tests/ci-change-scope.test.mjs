@@ -10,6 +10,7 @@ import {
   isPinOnlyChange,
   isPinPath,
   runCli,
+  sidecarsForChange,
 } from '../scripts/ci-change-scope.mjs'
 
 const catalogFiles = [...CATALOG_PATHS]
@@ -120,6 +121,73 @@ test('keeps a pre-release tag on the full publish path', () => {
     mode: 'heavy',
     reason: 'non-plain tag; full publish path',
   })
+})
+
+test('a docs-only diff tests no sidecar', () => {
+  assert.deepEqual(
+    sidecarsForChange({
+      eventName: 'pull_request',
+      ref: 'refs/pull/2651/merge',
+      files: ['_devextras/planning/AGENTS.md'],
+      mode: 'heavy',
+    }),
+    { compute: false, transcriber: false, voice: false }
+  )
+})
+
+test('each sidecar runs only for its own paths', () => {
+  assert.equal(
+    sidecarsForChange({
+      eventName: 'pull_request',
+      ref: 'refs/pull/1/merge',
+      files: ['sidecars/synaplan-compute/main.go'],
+      mode: 'heavy',
+    }).compute,
+    true
+  )
+  assert.equal(
+    sidecarsForChange({
+      eventName: 'pull_request',
+      ref: 'refs/pull/1/merge',
+      files: ['sidecars/synaplan-transcriber/src/index.js'],
+      mode: 'heavy',
+    }).transcriber,
+    true
+  )
+  assert.equal(
+    sidecarsForChange({
+      eventName: 'pull_request',
+      ref: 'refs/pull/1/merge',
+      files: ['frontend/src/App.vue', 'sidecars/synaplan-voice/src/index.js'],
+      mode: 'heavy',
+    }).voice,
+    true
+  )
+})
+
+test('an unknown diff or a CI rule change tests every sidecar', () => {
+  for (const files of [[], ['__unknown__'], ['.github/workflows/ci.yml']]) {
+    assert.deepEqual(
+      sidecarsForChange({ eventName: 'pull_request', ref: 'refs/pull/1/merge', files, mode: 'heavy' }),
+      { compute: true, transcriber: true, voice: true },
+      files.join(',') || '(empty)'
+    )
+  }
+})
+
+test('thin and promote skip sidecars; a rebuild tag does not', () => {
+  assert.deepEqual(
+    sidecarsForChange({ eventName: 'push', ref: 'refs/heads/main', files: ['frontend/src/App.vue'], mode: 'thin' }),
+    { compute: false, transcriber: false, voice: false }
+  )
+  assert.equal(
+    sidecarsForChange({ eventName: 'push', ref: 'refs/tags/v4.7.1', mode: 'promote' }).compute,
+    false
+  )
+  assert.equal(
+    sidecarsForChange({ eventName: 'push', ref: 'refs/tags/v4.7.1', mode: 'heavy' }).compute,
+    true
+  )
 })
 
 test('the CLI writes mode and reason for a pin-only diff', () => {
