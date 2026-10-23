@@ -40,6 +40,20 @@ chat message.
 
 ---
 
+## 2026-10-23 — run storage and run kernel shared with agent handling (row 25)
+
+The owner approved, in the agent-handling decision session
+([`../20261023-agent-handling/00_master_plan.md`](../20261023-agent-handling/00_master_plan.md)
+§0 #5 and #9), one table **`BRUNS`** for assistant runs and research runs
+(column `BKIND` = `assistant` · `research`). It replaces the `BRESEARCHRUNS`
+alternative of §0 #7 here; §0 #7's default (Redis only in v1) is not changed
+by this entry — whether RS6 writes `BRUNS` rows is decided when RS6 starts.
+The run machinery (units, claims, checkpoints, event log, reaper, delivery)
+is shared as `App\Service\Run\*`: whichever of RS6 and AH8 is built first
+creates it, and the other adopts it. Nothing in RS1–RS4, RD1 or RQ2b changes.
+
+---
+
 ## 2026-10-23 — RQ2b spike against B1+
 
 Live runs on the evaluation account (admin user id 1). Chat model is that
