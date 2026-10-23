@@ -43,6 +43,9 @@ jobs:
       reason: ${{ steps.classify.outputs.reason }}
       app-version: ${{ steps.version.outputs.version }}
       source_run_id: ${{ steps.classify.outputs.source_run_id }}
+      compute: ${{ steps.classify.outputs.compute }}
+      transcriber: ${{ steps.classify.outputs.transcriber }}
+      voice: ${{ steps.classify.outputs.voice }}
     permissions:
       contents: read
       actions: read
@@ -89,18 +92,44 @@ jobs:
               fi
             fi
           elif [ "$EVENT_NAME" = pull_request ]; then
-            files="$(
-              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
-                --jq '.[].filename'
+            # F is the new path. P is previous_filename, set on a rename, so a
+            # file that left a sidecar directory is still visible. A list that
+            # reaches the API cap is incomplete, so it becomes __unknown__.
+            listed="$(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+                --jq '.[] | "F\t\(.filename)", (select(.previous_filename != null and .previous_filename != "") | "P\t\(.previous_filename)")'
             )"
+            files="$(node --input-type=module -e '
+              import { diffListTruncated } from "./scripts/ci-change-scope.mjs"
+              const lines = process.argv[1].split("\n").filter(Boolean)
+              const entries = lines.filter((line) => line.startsWith("F\t")).length
+              if (diffListTruncated("pull_request", entries)) {
+                console.error(`Pull request file list has ${entries} entries, at the API cap. Testing every sidecar.`)
+                process.stdout.write("__unknown__\n")
+              } else {
+                process.stdout.write(lines.map((line) => line.slice(2)).join("\n"))
+              }
+            ' "$listed")"
           elif [ "$EVENT_NAME" = push ]; then
             if [[ "${BEFORE:-}" =~ ^0+$ ]] || [ -z "${BEFORE:-}" ]; then
               files="__unknown__"
-            elif ! files="$(
+            elif ! listed="$(
               gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${SHA}" \
-                --jq '.files[].filename'
+                --jq '.files[] | "F\t\(.filename)", (select(.previous_filename != null and .previous_filename != "") | "P\t\(.previous_filename)")'
             )"; then
               files="__unknown__"
+            else
+              files="$(node --input-type=module -e '
+                import { diffListTruncated } from "./scripts/ci-change-scope.mjs"
+                const lines = process.argv[1].split("\n").filter(Boolean)
+                const entries = lines.filter((line) => line.startsWith("F\t")).length
+                if (diffListTruncated("push", entries)) {
+                  console.error(`Compare file list has ${entries} entries, at the API cap. Testing every sidecar.`)
+                  process.stdout.write("__unknown__\n")
+                } else {
+                  process.stdout.write(lines.map((line) => line.slice(2)).join("\n"))
+                }
+              ' "$listed")"
             fi
           else
             files="__unknown__"
@@ -115,10 +144,17 @@ jobs:
           )"
           mode="$(printf '%s\n' "$result" | sed -n 's/^mode=//p' | head -n1)"
           reason="$(printf '%s\n' "$result" | sed -n 's/^reason=//p' | head -n1)"
+          compute="$(printf '%s\n' "$result" | sed -n 's/^compute=//p' | head -n1)"
+          transcriber="$(printf '%s\n' "$result" | sed -n 's/^transcriber=//p' | head -n1)"
+          voice="$(printf '%s\n' "$result" | sed -n 's/^voice=//p' | head -n1)"
           echo "mode=${mode}" >> "$GITHUB_OUTPUT"
           echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+          echo "compute=${compute}" >> "$GITHUB_OUTPUT"
+          echo "transcriber=${transcriber}" >> "$GITHUB_OUTPUT"
+          echo "voice=${voice}" >> "$GITHUB_OUTPUT"
           echo "source_run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
           echo "CI change scope: ${mode} — ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Sidecar tests: compute=${compute} transcriber=${transcriber} voice=${voice}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve application version
         id: version
@@ -161,6 +197,12 @@ jobs:
       - name: Run code formatting check
         working-directory: backend
         run: composer lint
+
+      # C2 scans the whole tree, so it stays on every pull request. It does not
+      # belong in the Go sidecar job: that job is skipped when the sidecar
+      # itself did not change, and a docker.sock mount can land in any file.
+      - name: No docker.sock outside the compute service
+        run: ./scripts/check-no-docker-sock.sh
 
       # Host-side deployment helpers (deploy/scripts/lib.sh), including the
       # first-admin preflight. The suite stubs `compose()`/`resolved_app_image()`,
@@ -245,7 +287,14 @@ jobs:
   compute-sidecar:
     name: Compute Sidecar (Go)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    needs: [change-scope]
+    if: needs.change-scope.outputs.compute == 'true'
+    # The suite is unchanged: go test -race, vet, and the no-shell guard.
+    # Those finish in about a minute. The extra time is only for Setup Go,
+    # which has used a whole 10 minute job and been cancelled before a test
+    # ran (runs 39931921178 and 39932073566). Fewer tests would not have
+    # helped: the tests had not started.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -264,12 +313,11 @@ jobs:
           go build ./...
           make lint test
 
-      - name: No docker.sock outside the compute service (C2)
-        run: ./scripts/check-no-docker-sock.sh
-
   transcriber-sidecar:
     name: Transcriber Sidecar (Node)
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.transcriber == 'true'
     timeout-minutes: 10
 
     steps:
@@ -291,15 +339,28 @@ jobs:
   # not rebuild: it moves the version tags onto the image the main run
   # already published under its short commit, the same rule as docker-manifest
   # applies to the app image. Only a missing short-commit tag falls back to a
-  # build on the tag.
+  # build on the tag. Promote skips the test job, so this condition uses
+  # !cancelled(). Without that, GitHub treats the skip as a failed dependency
+  # and never moves the release tags.
   transcriber-publish:
     name: Publish Transcriber Image
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [change-scope, transcriber-sidecar]
     if: >-
+      !cancelled() &&
       github.event_name == 'push' &&
-      (needs.change-scope.outputs.mode == 'heavy' || needs.change-scope.outputs.mode == 'promote')
+      needs.change-scope.result == 'success' &&
+      (
+        (
+          needs.change-scope.outputs.mode == 'promote' &&
+          (needs.transcriber-sidecar.result == 'success' || needs.transcriber-sidecar.result == 'skipped')
+        ) ||
+        (
+          needs.change-scope.outputs.mode == 'heavy' &&
+          needs.transcriber-sidecar.result == 'success'
+        )
+      )
     permissions:
       contents: read
       packages: write
@@ -376,6 +437,8 @@ jobs:
   voice-sidecar:
     name: Voice Sidecar (Node)
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.voice == 'true'
     timeout-minutes: 10
 
     steps:
@@ -1641,7 +1704,10 @@ jobs:
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
-      needs.compute-sidecar.result == 'success' &&
+      (
+        (needs.change-scope.outputs.compute == 'true' && needs.compute-sidecar.result == 'success') ||
+        (needs.change-scope.outputs.compute != 'true' && (needs.compute-sidecar.result == 'success' || needs.compute-sidecar.result == 'skipped'))
+      ) &&
       needs.change-scope.outputs.mode != 'thin' &&
       (
         needs.change-scope.outputs.mode == 'promote' ||
@@ -1887,7 +1953,10 @@ jobs:
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
-      needs.compute-sidecar.result == 'success' &&
+      (
+        (needs.change-scope.outputs.compute == 'true' && needs.compute-sidecar.result == 'success') ||
+        (needs.change-scope.outputs.compute != 'true' && (needs.compute-sidecar.result == 'success' || needs.compute-sidecar.result == 'skipped'))
+      ) &&
       needs.docker-push-amd64.result == 'success' &&
       needs.docker-push-arm64.result == 'success' &&
       (
@@ -2496,9 +2565,12 @@ jobs:
     name: All Checks Passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, voice-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, voice-sidecar, transcriber-publish, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
+      - name: Checkout the gate rules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Check for failures
         if: ${{ !cancelled() }}
         env:
@@ -2510,8 +2582,12 @@ jobs:
           TEMPLATES: ${{ needs.deployment-templates.result }}
           MOBILE: ${{ needs.mobile-tooling.result }}
           COMPUTE: ${{ needs.compute-sidecar.result }}
+          COMPUTE_NEEDED: ${{ needs.change-scope.outputs.compute }}
           TRANSCRIBER: ${{ needs.transcriber-sidecar.result }}
+          TRANSCRIBER_NEEDED: ${{ needs.change-scope.outputs.transcriber }}
+          TRANSCRIBER_PUBLISH: ${{ needs.transcriber-publish.result }}
           VOICE: ${{ needs.voice-sidecar.result }}
+          VOICE_NEEDED: ${{ needs.change-scope.outputs.voice }}
           BACKEND: ${{ needs.backend.result }}
           BACKEND_MINIMAL: ${{ needs.backend-minimal.result }}
           OPENAPI_IDENTICAL: ${{ needs.openapi-identical.result }}
@@ -2539,9 +2615,23 @@ jobs:
           require "PHP Code Formatting" "$LINT"
           require "Deployment Templates (AWS)" "$TEMPLATES"
           require "Mobile Release Tooling" "$MOBILE"
-          require "Compute Sidecar (Go)" "$COMPUTE"
-          require "Transcriber Sidecar (Node)" "$TRANSCRIBER"
-          require "Voice Sidecar (Node)" "$VOICE"
+          # Same rule as sidecarResultOk: a sidecar this diff asked for must
+          # succeed. A skipped job is acceptable only when it was not asked for.
+          # Cancelled and failed are never acceptable.
+          node --input-type=module -e '
+            import { sidecarResultOk } from "./scripts/ci-change-scope.mjs"
+            const rows = [
+              ["Compute Sidecar (Go)", process.env.COMPUTE_NEEDED, process.env.COMPUTE],
+              ["Transcriber Sidecar (Node)", process.env.TRANSCRIBER_NEEDED, process.env.TRANSCRIBER],
+              ["Voice Sidecar (Node)", process.env.VOICE_NEEDED, process.env.VOICE],
+            ]
+            for (const [name, needed, result] of rows) {
+              if (!sidecarResultOk(needed, result)) {
+                console.error(`::error::${name} was ${result || "missing"} (needed=${needed || "false"})`)
+                process.exit(1)
+              }
+            }
+          '
 
           allow_skip "Backend (PHP/Symfony)" "$BACKEND"
           allow_skip "Backend (minimal)" "$BACKEND_MINIMAL"
@@ -2559,6 +2649,7 @@ jobs:
           allow_skip "Update the Default Release Version" "$REL_PIN"
           allow_skip "Deploy Cloudflare Worker" "$CF_DEPLOY"
           allow_skip "Cloudflare Worker Check" "$CF_CHECK"
+          allow_skip "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
           allow_skip "Carry OpenAPI Spec Forward" "$OPENAPI"
 
           case "$MODE" in
@@ -2576,6 +2667,9 @@ jobs:
                 require "Publish arm64 Image" "$PUSH_ARM64"
                 require "Publish Multi-Arch Manifest" "$MANIFEST"
                 require "Deploy Cloudflare Worker" "$CF_DEPLOY"
+                if [ "$TRANSCRIBER_NEEDED" = true ]; then
+                  require "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
+                fi
               fi
               if [ "$EVENT" = pull_request ]; then
                 require "Cloudflare Worker Check" "$CF_CHECK"
@@ -2585,6 +2679,7 @@ jobs:
             thin)
               ;;
             promote)
+              require "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
               require "Publish amd64 Image" "$PUSH_AMD64"
               require "Publish arm64 Image" "$PUSH_ARM64"
               require "Publish Multi-Arch Manifest" "$MANIFEST"
