@@ -122,6 +122,11 @@ enum Capability: string
     case AskUser = 'ask_user';
 
     /**
+     * Read files from a connected folder into this run.
+     */
+    case FolderFetch = 'folder_fetch';
+
+    /**
      * Capabilities that exist only for the Steps editor (flag-gated at validate).
      *
      * @return list<string>
@@ -166,6 +171,7 @@ enum Capability: string
             self::Condition => 'text',
             self::CodeRun => 'compute',
             self::AskUser => 'text',
+            self::FolderFetch => 'search',
         };
     }
 
@@ -204,7 +210,8 @@ enum Capability: string
             self::OutboundWebhook,
             self::Condition,
             self::CodeRun,
-            self::AskUser => null,
+            self::AskUser,
+            self::FolderFetch => null,
         };
     }
 

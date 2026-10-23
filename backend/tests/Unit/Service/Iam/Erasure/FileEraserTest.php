@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Service\Iam\Erasure;
 
 use App\Entity\File;
 use App\Repository\CloudDeliveryRepository;
+use App\Repository\CloudPickupFileRepository;
+use App\Repository\CloudPickupRepository;
 use App\Repository\DocumentRevisionRepository;
 use App\Repository\FileRepository;
 use App\Service\File\FileStorageService;
@@ -30,6 +32,16 @@ final class FileEraserTest extends TestCase
             ->willReturnCallback(static function () use (&$order): void {
                 $order[] = 'deliveries';
             });
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->expects(self::once())->method('deleteForUser')->with(42)
+            ->willReturnCallback(static function () use (&$order): void {
+                $order[] = 'pickups';
+            });
+        $pickupFiles = $this->createMock(CloudPickupFileRepository::class);
+        $pickupFiles->expects(self::once())->method('deleteForUser')->with(42)
+            ->willReturnCallback(static function () use (&$order): void {
+                $order[] = 'pickup files';
+            });
         $revisions = $this->createMock(DocumentRevisionRepository::class);
         $revisions->expects(self::once())->method('deleteForUser')->with(42)
             ->willReturnCallback(static function () use (&$order): void {
@@ -49,12 +61,12 @@ final class FileEraserTest extends TestCase
         });
 
         $erasure = new UserErasure(42, 'ada@example.test');
-        (new FileEraser($em, $files, $revisions, $deliveries, $storage, new NullLogger()))->erase($erasure);
+        (new FileEraser($em, $files, $revisions, $deliveries, $pickups, $pickupFiles, $storage, new NullLogger()))->erase($erasure);
 
-        self::assertSame(['deliveries', 'revisions', 'file row'], $order, 'No byte may be deleted before the commit.');
+        self::assertSame(['deliveries', 'pickups', 'pickup files', 'revisions', 'file row'], $order, 'No byte may be deleted before the commit.');
         foreach ($erasure->pendingCleanups() as $cleanup) {
             $cleanup();
         }
-        self::assertSame(['deliveries', 'revisions', 'file row', 'bytes 42/2026/10/report.pdf'], $order);
+        self::assertSame(['deliveries', 'pickups', 'pickup files', 'revisions', 'file row', 'bytes 42/2026/10/report.pdf'], $order);
     }
 }

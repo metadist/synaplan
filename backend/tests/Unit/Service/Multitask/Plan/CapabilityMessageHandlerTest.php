@@ -44,6 +44,7 @@ final class CapabilityMessageHandlerTest extends TestCase
             'condition' => null,
             'code_run' => null,
             'ask_user' => null,
+            'folder_fetch' => null,
         ];
 
         $actual = [];

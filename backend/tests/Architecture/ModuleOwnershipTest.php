@@ -200,6 +200,10 @@ final class ModuleOwnershipTest extends TestCase
         'messages_gateway' => [
             'MESSAGES_GATEWAY_UPSTREAM_URL',
         ],
+        // How long a run waits for a linked cloud to send the files it was asked for.
+        'cloud_pickup' => [
+            'PICKUP_WAIT_SEC',
+        ],
         // Set by every CI runner, not by operators; only keeps automated runs off real servers.
         'ci_runtime' => [
             'CI',

@@ -107,6 +107,92 @@ final readonly class WebDavClient
     }
 
     /**
+     * Children of a folder. Each row is a file, not the folder itself.
+     *
+     * @return list<array{name: string, path: string, size: int}>
+     *
+     * @throws DavException
+     */
+    public function list(DavTarget $target, string $path): array
+    {
+        $response = $this->request($target, 'PROPFIND', $path, [
+            'Depth' => '1',
+            'Content-Type' => 'application/xml; charset=utf-8',
+        ], <<<'XML'
+            <?xml version="1.0" encoding="UTF-8"?>
+            <d:propfind xmlns:d="DAV:"><d:prop><d:displayname/><d:getcontentlength/><d:resourcetype/></d:prop></d:propfind>
+            XML);
+        $this->assertSuccess($response['status'], 'PROPFIND', $path);
+
+        return $this->parseListing($response['body'], $path);
+    }
+
+    /**
+     * @throws DavException
+     */
+    public function get(DavTarget $target, string $path): string
+    {
+        $response = $this->request($target, 'GET', $path);
+        $this->assertSuccess($response['status'], 'GET', $path);
+
+        return $response['body'];
+    }
+
+    /**
+     * @return list<array{name: string, path: string, size: int}>
+     */
+    private function parseListing(string $xml, string $folder): array
+    {
+        $document = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $loaded = $document->loadXML($xml);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        if (!$loaded) {
+            return [];
+        }
+        $out = [];
+        $folderName = trim($folder, '/');
+        foreach ($document->getElementsByTagNameNS('DAV:', 'response') as $response) {
+            $href = '';
+            $name = '';
+            $size = 0;
+            $collection = false;
+            foreach ($response->childNodes as $child) {
+                if (!$child instanceof \DOMElement) {
+                    continue;
+                }
+                if ('href' === $child->localName) {
+                    $href = rawurldecode($child->textContent);
+                }
+                if ('propstat' !== $child->localName) {
+                    continue;
+                }
+                $prop = $child->getElementsByTagNameNS('DAV:', 'prop')->item(0);
+                if (!$prop instanceof \DOMElement) {
+                    continue;
+                }
+                $display = $prop->getElementsByTagNameNS('DAV:', 'displayname')->item(0);
+                $length = $prop->getElementsByTagNameNS('DAV:', 'getcontentlength')->item(0);
+                $type = $prop->getElementsByTagNameNS('DAV:', 'resourcetype')->item(0);
+                $name = $display instanceof \DOMNode ? trim($display->textContent) : '';
+                $size = $length instanceof \DOMNode && is_numeric(trim($length->textContent)) ? (int) trim($length->textContent) : 0;
+                $collection = $type instanceof \DOMElement && $type->getElementsByTagNameNS('DAV:', 'collection')->length > 0;
+            }
+            if ($collection || '' === $name) {
+                continue;
+            }
+            $relative = trim($folderName.'/'.ltrim($name, '/'), '/');
+            if (str_ends_with(rtrim($href, '/'), $folderName) && '' !== $folderName) {
+                continue;
+            }
+            $out[] = ['name' => $name, 'path' => $relative, 'size' => $size];
+        }
+
+        return $out;
+    }
+
+    /**
      * @param array<string, string> $headers
      *
      * @return array{status: int, body: string}

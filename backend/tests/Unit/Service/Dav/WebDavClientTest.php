@@ -119,6 +119,44 @@ final class WebDavClientTest extends TestCase
         self::assertSame('http://nextcloud/remote.php/dav/files/ada', $captured[0]['url']);
     }
 
+    public function testListReturnsFilesAndSkipsTheFolderItself(): void
+    {
+        $xml = <<<'XML'
+            <?xml version="1.0"?>
+            <d:multistatus xmlns:d="DAV:">
+              <d:response>
+                <d:href>/remote.php/dav/files/ada/Docs</d:href>
+                <d:propstat><d:prop>
+                  <d:displayname>Docs</d:displayname>
+                  <d:resourcetype><d:collection/></d:resourcetype>
+                </d:prop></d:propstat>
+              </d:response>
+              <d:response>
+                <d:href>/remote.php/dav/files/ada/Docs/notes.txt</d:href>
+                <d:propstat><d:prop>
+                  <d:displayname>notes.txt</d:displayname>
+                  <d:getcontentlength>12</d:getcontentlength>
+                  <d:resourcetype></d:resourcetype>
+                </d:prop></d:propstat>
+              </d:response>
+            </d:multistatus>
+            XML;
+        $captured = [];
+        $client = $this->client([new MockResponse($xml, ['http_code' => 207])], $captured);
+
+        $rows = $client->list($this->target(), 'Docs');
+
+        self::assertSame('PROPFIND', $captured[0]['method']);
+        self::assertSame([['name' => 'notes.txt', 'path' => 'Docs/notes.txt', 'size' => 12]], $rows);
+    }
+
+    public function testGetReturnsTheBody(): void
+    {
+        $client = $this->client([new MockResponse('hello', ['http_code' => 200])]);
+
+        self::assertSame('hello', $client->get($this->target(), 'Docs/notes.txt'));
+    }
+
     private function target(): DavTarget
     {
         return new DavTarget(self::BASE_URL, 'ada', self::PASSWORD);
