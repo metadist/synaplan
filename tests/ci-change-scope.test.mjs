@@ -10,6 +10,7 @@ import {
   isPinOnlyChange,
   isPinPath,
   runCli,
+  sidecarResultOk,
   sidecarsForChange,
 } from '../scripts/ci-change-scope.mjs'
 
@@ -173,6 +174,27 @@ test('an unknown diff or a CI rule change tests every sidecar', () => {
       files.join(',') || '(empty)'
     )
   }
+})
+
+test('a compose or socket-guard change does not pull in the Go suite', () => {
+  const result = sidecarsForChange({
+    eventName: 'pull_request',
+    ref: 'refs/pull/1/merge',
+    files: ['docker-compose.yml', 'deploy/compose.yaml'],
+    mode: 'heavy',
+  })
+
+  assert.equal(result.compute, false)
+})
+
+test('a required sidecar must succeed; a skipped one is only ok when it was not required', () => {
+  assert.equal(sidecarResultOk(true, 'success'), true)
+  assert.equal(sidecarResultOk('true', 'skipped'), false)
+  assert.equal(sidecarResultOk('true', 'cancelled'), false)
+  assert.equal(sidecarResultOk('true', 'failure'), false)
+  assert.equal(sidecarResultOk('false', 'skipped'), true)
+  assert.equal(sidecarResultOk(false, 'success'), true)
+  assert.equal(sidecarResultOk('', 'cancelled'), false)
 })
 
 test('thin and promote skip sidecars; a rebuild tag does not', () => {

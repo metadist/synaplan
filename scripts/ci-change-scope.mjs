@@ -45,9 +45,13 @@ export const isPinPath = (path) => {
   return PIN_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix))
 }
 
-/** Paths that exercise one sidecar's own CI job. A prefix matches a directory. */
+/**
+ * Paths that exercise one sidecar's own CI job. A prefix matches a directory.
+ * The socket guard is not here: it scans every file, so the lint job
+ * runs it on every pull request.
+ */
 export const SIDECAR_PATHS = {
-  compute: ['sidecars/synaplan-compute/', 'scripts/check-no-docker-sock.sh'],
+  compute: ['sidecars/synaplan-compute/'],
   transcriber: ['sidecars/synaplan-transcriber/'],
   voice: ['sidecars/synaplan-voice/'],
 }
@@ -91,6 +95,19 @@ export const sidecarsForChange = ({ eventName, ref, files = [], mode }) => {
     transcriber: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.transcriber)),
     voice: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.voice)),
   }
+}
+
+/**
+ * A sidecar this diff asked for must succeed. A skipped job is acceptable
+ * only when it was not asked for. Cancelled and failed never are.
+ */
+export const sidecarResultOk = (needed, result) => {
+  const required = needed === true || needed === 'true'
+  if (required) {
+    return result === 'success'
+  }
+
+  return result === 'success' || result === 'skipped'
 }
 
 export const isPinOnlyChange = (files) => {
