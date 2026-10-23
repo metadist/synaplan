@@ -8,13 +8,13 @@ chat message.
 | Step | State | Note |
 | ---- | ----- | ---- |
 | RQ0 | done | Plan, baseline research, model roles, engine, prompts, journeys, evaluation, step briefs; registered as roadmap row 21 |
-| RQ1 | planned | Desktop use cases re-run against `main`; CHANGES Done list (synaplan-desktop) |
+| RQ1 | done | Full desktop use-case run `V42D2` on 2026-10-23 against local `main`. 5 passed, 6 failed. Recorded below. |
 | RQ2 | in progress | Eval corpus, scorer, test doubles and `app:research:eval` are in the working tree. B0 starter set is recorded below. B4 was stopped on cost and is not scored; it does not decide this step |
-| RS1 | in progress | Gateway wrap-up answers fully; round limit from config. Merged in #2637. UC-03 / UC-04 not measured |
-| RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. UC-04 / UC-04b not measured |
-| RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. UC-05e (≥ 2 searches) and the UC-05 / UC-06 timings are still open |
+| RS1 | in progress | Gateway wrap-up answers fully; round limit from config. Merged in #2637. Run `V42D2`: UC-04 passed. UC-03 failed (46/51). Sonnet 5.5 and gpt-oss-120b answered with a source in 3 rounds. Not done. |
+| RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. Run `V42D2`: UC-04 passed on Sonnet 5.5, gpt-oss-120b and mistral-large-4. UC-04b is not in the runner. Not done. |
+| RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. Run `V42D2`: UC-05 passed (ready in 132 ms, UC-05d hit after Ready). UC-06 facts 0/3. UC-05e is not in the runner. Not done. |
 | RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (web search reads locally, no vision). Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23), but no run opened a document: the only PDF was outside the 3-page cap. Done needs one smoke item whose top 3 results include a PDF, measured flag off and on. The flag stays off. |
-| RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |
+| RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | planned | Spike with both lead modes vs B1+ and B4, budget sweep, go / no-go — §0 #40 |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
 | RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
@@ -37,6 +37,72 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-23 — RQ1 full desktop use-case run
+
+Measurement only. No product code changed. The local stack was checked out
+on synaplan `main` before the run. A fresh harness was paired for
+`admin@synaplan.com`. Target `http://localhost:8000`. Run id `V42D2`.
+Report: `synaplan-desktop/_extras/planning/20260917-desktop-use-case-test-plan/runs/20261023081938.json`.
+
+```bash
+cd synaplan-desktop/src-tauri
+cargo run -p synaplan-core --example usecases -- --full
+```
+
+| Repo | SHA |
+| ---- | --- |
+| synaplan | `bb70055b055e773b4ed6b205c63b77e7b479aa72` |
+| synaplan-desktop | `12e2510f035fc6776c34642e74007023d4119bd6` |
+
+5 passed, 6 failed, 0 skipped, 1533 s. 51 of 62 chat models were available.
+
+| Case | Result |
+| ---- | ------ |
+| UC-00 | FAIL. VECTORIZE `ollama:bge-m3:vectorize` is `provider_unavailable`. No SOUND2TEXT or TEXT2SOUND default. |
+| UC-01 | FAIL. 46/51 answered `PONG`. Empty text: `mistral:mistral-large-4:chat`. `model_unavailable`: four Hugging Face Kimi rows. |
+| UC-02 | FAIL. 46/51 wrote `hello.md`. `google:gemini-2.5-flash-lite:chat` left the file missing. Same four Hugging Face rows unavailable. |
+| UC-03 | FAIL. 46/51 answered with a source. Sonnet 5.5 and gpt-oss-120b did, in 3 rounds. `mistral-large-4` ended on the wrap-up sentence with no URL. `gemini-3.7-flash` used 5 rounds (ceiling 4). |
+| UC-04 | PASS. 3/3 wrote `sources.md` (Sonnet 5.5, gpt-oss-120b, mistral-large-4). |
+| UC-05 | PASS. 3/3 named the fact. Ready in 132 ms. UC-05d hit after Ready in the same thread. |
+| UC-06 | FAIL. 7/7 ready in 7.9 s, 37.72 MB/min, 0/3 facts. |
+| UC-07 | FAIL. No dictation model. |
+| UC-08 | PASS. |
+| UC-09 | PASS. 616 words, `truncated=true`. |
+| UC-10 | PASS. 4 failures, plain copy. |
+
+`CHANGES.md` moved C1, C2, C3a and C5 to Done because those gates were green. C3b, C4, C6, C7, C8, C9 and C10 stay open. RS1, RS2 and RS3 stay in progress.
+
+---
+
+## 2026-10-23 — RD1 B1 smoke, before and after
+
+Both exports used the workspace default chat model `anthropic:claude-sonnet-5-5:chat`, web search on, no skill. The catalog route does not send `maxOutput`, so plain chat uses 8,192. Agent turns are not streamed. Ten items finished in about a minute either way, so the missing stream did not slow this set.
+
+The before binary was compiled before the prompt change. The after binary includes it. Both HEADs are the commits below; the desktop working tree holds the uncommitted RD1 change.
+
+```bash
+cd synaplan-desktop/src-tauri
+cargo run -p synaplan-core --example usecases -- --research-corpus /path/to/backend/tests/Eval/research/corpus.json
+```
+
+| | Before | After |
+| --- | --- | --- |
+| Run | `7A1D7` | `VSZSV` |
+| File | `runs/b1-7A1D7.json` | `runs/b1-VSZSV.json` |
+| Time | 54 s | 62 s |
+| synaplan | `bb70055b055e773b4ed6b205c63b77e7b479aa72` | same |
+| synaplan-desktop | `12e2510f035fc6776c34642e74007023d4119bd6` | same |
+
+Scored with `app:research:eval --corpus=smoke --arm=b1 --import=<file>` on the local stack. Fact recall is **0.78** on both (9 items with match strings). `doc-01` and `mix-01` are 0.00: the harness has no contract to read. `trap-01` abstained both times. The other seven items are 1.00. The `ms` column is 0 because an import is not a live answer.
+
+Quick set `9RDYA` (2026-10-23T09:40:11Z, `--quick`, 458 s, report `runs/20261023094011.json`): 9 passed, 4 failed. UC-01, UC-02, UC-03, UC-04, UC-04-de, UC-05, UC-08, UC-09 and UC-10 passed. UC-00, UC-06 and UC-07 failed for the same local reasons as `V42D2`. UC-03-de failed 6/7: `groq:openai/gpt-oss-120b:chat` returned the gateway wrap-up sentence and no URL. The same case passed 7/7 on a second run (`--only UC-03-de`, report `/tmp/synaplan-uc03-de-rerun/runs/20261023094334.json`, copied to `runs/uc03-de-rerun-20261023094334.json`). That second run is not the ledger.
+
+UC-01 first token was not slower than `V42D2`. Sonnet 5.5 ttft 1179 ms / total 1191 ms (was 3145 / 3146). gpt-oss-120b ttft 530 ms / total 530 ms (was 2072 / 2072). Plain chat now uses 8,192 tokens. UC-09 finished: 2795 words, `end_turn`.
+
+`make ci-local` in synaplan-desktop passed on this working tree (lint, vue-tsc, Vitest 204, clippy, 227 Rust tests, frontend build, workspace clippy, cargo build). J-RQ-1 has not been walked in the desktop window. RD1 stays in progress.
 
 ---
 
