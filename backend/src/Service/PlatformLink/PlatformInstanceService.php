@@ -123,7 +123,7 @@ final readonly class PlatformInstanceService
             'host' => $instance->getHost(),
             'client' => $instance->getClient(),
             'delivery_url' => $instance->getDeliveryUrl() ?? '',
-            'capabilities' => ['deliveries'],
+            'capabilities' => ['deliveries', 'pickups', 'read_scope'],
             'notify_keys' => $this->notifyKeys->publicKeys(),
         ];
     }

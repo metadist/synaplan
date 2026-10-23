@@ -243,6 +243,9 @@ parameters:
     # per-instance password set this to true.
     env(BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE): 'false'
 
+    # How long a run waits for a linked cloud to send the files it was asked for.
+    env(PICKUP_WAIT_SEC): '600'
+
     # Live voice stays off until an operator points at the sidecar and sets a secret.
     env(LIVE_VOICE_GATEWAY_URL): ''
     env(LIVE_VOICE_GATEWAY_SECRET): ''

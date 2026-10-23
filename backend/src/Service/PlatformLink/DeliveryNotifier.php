@@ -33,6 +33,14 @@ final readonly class DeliveryNotifier
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function pickup(PlatformInstance $instance, int $pickupId): ?array
+    {
+        return $this->client->post($instance, 'pickup', (string) $pickupId);
+    }
+
+    /**
      * Queues the notice. The caller has already committed the revocation, so
      * a slow or unreachable cloud cannot hold that write open.
      */

@@ -45,6 +45,10 @@ class ExternalIdentity
     #[ORM\Column(name: 'BLASTSEEN', type: 'bigint', options: ['default' => 0])]
     private int $lastSeen = 0;
 
+    /** JSON mirror of what this person lets Synaplan read in the cloud. */
+    #[ORM\Column(name: 'BREADSCOPE', type: 'text', nullable: true)]
+    private ?string $readScope = null;
+
     public function __construct()
     {
         $this->created = time();
@@ -155,5 +159,34 @@ class ExternalIdentity
             'outlook' => 'Outlook',
             default => $this->source,
         };
+    }
+
+    /**
+     * @return array{mode: string, folders: list<array{id: string, path: string}>}
+     */
+    public function readScope(): array
+    {
+        $decoded = null !== $this->readScope ? json_decode($this->readScope, true) : null;
+        $mode = is_array($decoded) && is_string($decoded['mode'] ?? null) ? $decoded['mode'] : 'watched';
+        $folders = [];
+        foreach (is_array($decoded['folders'] ?? null) ? $decoded['folders'] : [] as $folder) {
+            if (!is_array($folder)) {
+                continue;
+            }
+            $folders[] = [
+                'id' => is_string($folder['id'] ?? null) ? $folder['id'] : '',
+                'path' => is_string($folder['path'] ?? null) ? $folder['path'] : '',
+            ];
+        }
+
+        return ['mode' => $mode, 'folders' => $folders];
+    }
+
+    /**
+     * @param array{mode: string, folders: list<array{id: string, path: string}>} $scope
+     */
+    public function setReadScope(array $scope): void
+    {
+        $this->readScope = json_encode($scope, JSON_THROW_ON_ERROR);
     }
 }

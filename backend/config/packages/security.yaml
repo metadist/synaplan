@@ -155,6 +155,8 @@ security:
         - { path: ^/api/v1/platform-links/instances$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/instances/self$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/deliveries/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/pickups/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/read-scope$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
 

@@ -219,7 +219,7 @@ class PlatformInstance
      */
     public function setAppCapabilities(array $names): void
     {
-        $known = array_values(array_intersect([self::CAPABILITY_DELIVERIES], $names));
+        $known = array_values(array_intersect([self::CAPABILITY_DELIVERIES, 'pickups', 'read_scope'], $names));
         $this->appCapabilities = [] === $known ? null : json_encode($known, JSON_THROW_ON_ERROR);
     }
 
@@ -229,5 +229,13 @@ class PlatformInstance
             && is_string($this->deliveryUrl)
             && '' !== $this->deliveryUrl
             && in_array(self::CAPABILITY_DELIVERIES, $this->getAppCapabilities(), true);
+    }
+
+    public function reports(string $capability): bool
+    {
+        return $this->isActive()
+            && is_string($this->deliveryUrl)
+            && '' !== $this->deliveryUrl
+            && in_array($capability, $this->getAppCapabilities(), true);
     }
 }
