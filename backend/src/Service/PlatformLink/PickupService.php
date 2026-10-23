@@ -30,6 +30,9 @@ final readonly class PickupService
     private const UPLOAD_PREFIX = 'pickup:upload:';
     private const TTL = 600;
     private const HOUR_LIMIT = 20;
+    /** Longer than the ticket and the run's wait together. */
+    private const SWEEP_AFTER = 1200;
+    private const UNCONFIRMED = 'unconfirmed';
     public const MAX_FILES = 50;
     public const MAX_BYTES = 209715200;
     public const MAX_FILE_BYTES = 104857600;
@@ -56,7 +59,7 @@ final readonly class PickupService
     public function open(int $ownerId, int $identityId, array $selector, string $mode): array
     {
         if (!$this->platformLinks->isEnabled($ownerId)) {
-            return $this->refused('unreachable', 'Synaplan is not linked to this cloud. Nothing was read.');
+            return $this->refused('not_linked', 'Synaplan is not linked to this cloud. Nothing was read.');
         }
         $identity = $this->identities->find($identityId);
         if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $ownerId || null === $identity->getId()) {
@@ -220,7 +223,7 @@ final readonly class PickupService
     public function result(PlatformInstance $instance, int $id, array $body): array
     {
         $pickup = $this->requireOwn($instance, $id);
-        if (in_array($pickup->getState(), [CloudPickup::STATE_DONE, CloudPickup::STATE_PARTIAL, CloudPickup::STATE_FAILED], true)) {
+        if ($this->isSettled($pickup)) {
             return ['state' => $pickup->getState()];
         }
         $status = is_string($body['status'] ?? null) ? $body['status'] : '';
@@ -335,8 +338,10 @@ final readonly class PickupService
 
     /**
      * @param list<string> $usedChannels
+     *
+     * @return array{identity_id: int, channel: string, host: string, client: string, folders: list<string>}|null
      */
-    public function identityForChannel(int $ownerId, string $channel, array $usedChannels = []): ?int
+    public function linkForChannel(int $ownerId, string $channel, array $usedChannels = []): ?array
     {
         $needle = PlannerChannelCatalog::sanitize($channel);
         if ('' === $needle) {
@@ -344,11 +349,40 @@ final readonly class PickupService
         }
         foreach ($this->readableLinks($ownerId, $usedChannels) as $link) {
             if ($link['channel'] === $needle) {
-                return $link['identity_id'];
+                return $link;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The run stopped waiting. A pickup still open fails, and its ticket goes,
+     * so a late claim or upload is refused instead of landing in no run.
+     */
+    public function giveUp(int $id): void
+    {
+        $pickup = $this->find($id);
+        if (!$pickup instanceof CloudPickup || $this->isSettled($pickup)) {
+            return;
+        }
+        $pickup->finish(CloudPickup::STATE_FAILED, $pickup->getListed(), $pickup->getSent(), $pickup->skipped(), self::UNCONFIRMED);
+        $this->pickups->save($pickup);
+        $this->redis->delete(self::TICKET_PREFIX.$id);
+    }
+
+    /**
+     * Fails pickups no run is waiting for any more (the runner crashed or the
+     * worker restarted), so every ledger row ends in a terminal state.
+     */
+    public function sweep(): int
+    {
+        return $this->pickups->failOpenOlderThan(time() - self::SWEEP_AFTER, self::UNCONFIRMED);
+    }
+
+    private function isSettled(CloudPickup $pickup): bool
+    {
+        return in_array($pickup->getState(), [CloudPickup::STATE_DONE, CloudPickup::STATE_PARTIAL, CloudPickup::STATE_FAILED], true);
     }
 
     /**

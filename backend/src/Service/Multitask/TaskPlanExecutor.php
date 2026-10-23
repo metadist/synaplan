@@ -14,6 +14,7 @@ use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Execution\CardTrace;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
@@ -945,11 +946,7 @@ final readonly class TaskPlanExecutor
                 'error' => $error,
                 'query' => $query,
                 'resultsCount' => $resultsCount,
-                'step_input' => is_string($metadata['step_input'] ?? null) ? $metadata['step_input'] : null,
-                'step_output' => is_string($metadata['step_output'] ?? null) ? $metadata['step_output'] : null,
-                'step_output_truncated' => true === ($metadata['step_output_truncated'] ?? false),
-                'duration_ms' => is_int($metadata['duration_ms'] ?? null) ? $metadata['duration_ms'] : null,
-                'ask_user' => is_array($metadata['ask_user'] ?? null) ? $metadata['ask_user'] : null,
+                ...CardTrace::fromArray($metadata),
             ]);
         };
     }
@@ -986,11 +983,7 @@ final readonly class TaskPlanExecutor
                 'error' => is_string($card['error'] ?? null) ? $card['error'] : null,
                 'query' => is_string($card['query'] ?? null) ? $card['query'] : null,
                 'resultsCount' => is_int($card['resultsCount'] ?? null) ? $card['resultsCount'] : null,
-                'step_input' => is_string($card['step_input'] ?? null) ? $card['step_input'] : null,
-                'step_output' => is_string($card['step_output'] ?? null) ? $card['step_output'] : null,
-                'step_output_truncated' => true === ($card['step_output_truncated'] ?? false),
-                'duration_ms' => is_int($card['duration_ms'] ?? null) ? $card['duration_ms'] : null,
-                'ask_user' => is_array($card['ask_user'] ?? null) ? $card['ask_user'] : null,
+                ...CardTrace::fromArray($card),
             ];
         }
 

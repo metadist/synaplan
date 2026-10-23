@@ -9,6 +9,7 @@ import type { AIModel, Capability } from '@/types/ai-models'
 import MessageText from '@/components/MessageText.vue'
 import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
 import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
+import FolderFetchCard from '@/components/multitask/FolderFetchCard.vue'
 
 const props = defineProps<{
   card: TaskCard
@@ -42,6 +43,7 @@ function submitAsk(): void {
 const aiConfigStore = useAiConfigStore()
 
 const iconForKind = computed(() => {
+  if (props.card.capability === 'folder_fetch') return 'heroicons:folder'
   switch (props.card.kind) {
     case 'image':
       return 'mdi:image-outline'
@@ -82,6 +84,11 @@ const showSkeleton = computed(
 // Stop is wired only for media (MediaCancellationStore). Compute cancellation
 // goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
 const isComputeKind = computed(() => props.card.kind === 'compute')
+// A folder read with its summary renders its own body; an older card without
+// one keeps the generic body.
+const folderRead = computed(() =>
+  props.card.capability === 'folder_fetch' ? props.card.folderRead : undefined
+)
 
 const canCancel = computed(
   () => !props.isReadonly && isMediaKind.value && props.card.state === 'running'
@@ -340,6 +347,8 @@ const outputShown = computed(() =>
       @followup="emit('followup', $event)"
     />
 
+    <FolderFetchCard v-else-if="folderRead" :read="folderRead" />
+
     <div v-else-if="card.state === 'failed'" class="space-y-2">
       <!-- Specific backend error when available, generic copy otherwise -->
       <p class="text-sm txt-muted break-words" data-testid="task-card-error">
@@ -426,7 +435,7 @@ const outputShown = computed(() =>
       {{ $t('taskPlan.cancelledBody') }}
     </div>
 
-    <template v-else>
+    <template v-else-if="!folderRead">
       <!-- Search card: compact summary (query + source count). The full results
            are shown in the Sources dropdown on the message body, so the card only
            needs a one-liner — QA feedback PR #1076 points 2 & 4. -->

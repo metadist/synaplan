@@ -34,6 +34,18 @@ class CloudPickupRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    /**
+     * Fails only rows that are still open. A result that landed between the
+     * check and the write is left alone.
+     */
+    public function failOpenOlderThan(int $createdBefore, string $errorCode): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BCLOUDPICKUPS SET BSTATE = ?, BERRORCODE = ?, BFINISHED = ? WHERE BSTATE IN (?, ?) AND BCREATED < ?',
+            [CloudPickup::STATE_FAILED, $errorCode, time(), CloudPickup::STATE_QUEUED, CloudPickup::STATE_CLAIMED, $createdBefore],
+        );
+    }
+
     public function countSince(int $ownerId, int $createdAfter): int
     {
         return (int) $this->createQueryBuilder('p')

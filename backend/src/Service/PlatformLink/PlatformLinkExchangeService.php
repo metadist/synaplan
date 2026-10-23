@@ -170,7 +170,7 @@ final readonly class PlatformLinkExchangeService
     }
 
     /**
-     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, can_copy: bool}>
+     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, can_copy: bool, can_read: bool, read_scope: array{mode: string, folders: list<string>}}>
      */
     public function listForUser(int $userId): array
     {
@@ -202,10 +202,28 @@ final readonly class PlatformLinkExchangeService
                 'created' => $identity->getCreated(),
                 'last_seen' => $identity->getLastSeen(),
                 'can_copy' => $instance->canReceiveCopies(),
+                'can_read' => $instance->reports('pickups'),
+                'read_scope' => $this->readScopeOf($identity),
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * @return array{mode: string, folders: list<string>}
+     */
+    private function readScopeOf(ExternalIdentity $identity): array
+    {
+        $scope = $identity->readScope();
+        $folders = [];
+        foreach ($scope['folders'] as $folder) {
+            if ('' !== $folder['path']) {
+                $folders[] = $folder['path'];
+            }
+        }
+
+        return ['mode' => in_array($scope['mode'], ['watched', 'allowed', 'all'], true) ? $scope['mode'] : 'watched', 'folders' => $folders];
     }
 
     /**

@@ -712,7 +712,8 @@
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi",
       "save_to_folder": "Klasöre kaydet",
-      "code_run": "Dosyanızla çalışılıyor"
+      "code_run": "Dosyanızla çalışılıyor",
+      "folder_fetch": "Dosya okuma"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",
@@ -725,7 +726,42 @@
     "askSkip": "Atla",
     "askNeedAnswer": "Bir seçenek seçin veya bir yanıt yazın.",
     "askFailed": "Çalışma devam edemedi. Yeni bir mesaj gönderin.",
-    "askReadOnly": "Yalnızca sahibi yanıtlayabilir. Soruyu yine de okuyabilirsiniz."
+    "askReadOnly": "Yalnızca sahibi yanıtlayabilir. Soruyu yine de okuyabilirsiniz.",
+    "folderRead": {
+      "reading": "{app} içinden dosyalar okunuyor…",
+      "progress": "{read} / {total}",
+      "read": "{app} › {folder} içinden {count} dosya okundu",
+      "readAnywhere": "{app} içinden {count} dosya okundu",
+      "listed": "{app} › {folder} içinde {count} dosya bulundu",
+      "listedAnywhere": "{app} içinde {count} dosya bulundu",
+      "tooLarge": "{count} dosya 100 MB’tan büyüktü ve dışarıda bırakıldı.",
+      "overLimit": "{count} dosya bir çalıştırmanın sınırını (50 dosya, 200 MB) aştı ve dışarıda bırakıldı.",
+      "unreadable": "{count} dosya okunamadı.",
+      "stopped": "Geri kalanı okunamadı.",
+      "refused": "Synaplan, {app} içindeki {folder} klasörünü okuyamaz. Hiçbir şey okunmadı.",
+      "refusedAnywhere": "Synaplan bunu {app} içinde okuyamaz. Hiçbir şey okunmadı.",
+      "refusedHint": "Klasörü {app} içinde açın ve “Synaplan'ın bu klasörü okumasına izin ver” seçeneğini seçin.",
+      "notFound": "{app} içinde açabileceğiniz {folder} adlı bir klasör yok. Hiçbir şey okunmadı.",
+      "notFoundHint": "Klasör adını kontrol edin.",
+      "unreachable": "Synaplan {host} adresine ulaşamadı. Hiçbir şey okunmadı.",
+      "unreachableHint": "Dosyaları sohbete ekleyin ya da yöneticinizden Synaplan'ın {app} uygulamasına ulaşmasına izin vermesini isteyin.",
+      "nothing": "{folder} içinde eşleşen dosya yoktu. Sonraki adımlar çalışmadı.",
+      "nothingAnywhere": "Eşleşen dosya yoktu. Sonraki adımlar çalışmadı.",
+      "nothingRead": "{app} › {folder} içinden hiçbir şey okunmadı.",
+      "nothingReadAnywhere": "{app} içinden hiçbir şey okunmadı.",
+      "busy": "Synaplan bu saat içinde {app} uygulamasından çok sık okudu. Hiçbir şey okunmadı. Daha sonra yeniden deneyin.",
+      "notConnected": "Synaplan'ın bu adla bağlı bir klasörü yok. Hiçbir şey okunmadı.",
+      "notConnectedHint": "Uygulamalar bölümünden bir klasör bağlayın veya bulutunuzu orada bağlayın.",
+      "openIn": "{app} içinde aç",
+      "filesLabel": "Okunan dosyalar",
+      "showAll": "Tümünü göster ({count})",
+      "showFewer": "Daha az göster",
+      "skippedReason": {
+        "too_large": "{name} — 100 MB’tan büyük",
+        "over_limit": "{name} — bir çalıştırmanın sınırını aşıyor",
+        "other": "{name} — okunamadı"
+      }
+    }
   },
   "processing": {
     "timeline": {

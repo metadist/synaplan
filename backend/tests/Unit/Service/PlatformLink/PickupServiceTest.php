@@ -239,7 +239,46 @@ final class PickupServiceTest extends TestCase
         $result = $this->service($pickups, links: $this->links(false))->open(7, 4, ['folder_path' => 'Docs'], 'fetch');
 
         self::assertFalse($result['ok']);
+        self::assertSame('not_linked', $result['error']);
         self::assertStringContainsString('Nothing was read.', $result['sentence']);
+    }
+
+    public function testARunThatStopsWaitingFailsThePickupAndDropsItsTicket(): void
+    {
+        $pickup = $this->pickup(9);
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $pickups->expects(self::once())->method('save');
+        $redis = $this->createMock(RedisService::class);
+        $redis->expects(self::once())->method('delete')->with('pickup:ticket:9');
+
+        $this->service($pickups, redis: $redis)->giveUp(9);
+
+        self::assertSame(CloudPickup::STATE_FAILED, $pickup->getState());
+        self::assertSame('unconfirmed', $pickup->getErrorCode());
+    }
+
+    public function testAFinishedPickupIsNotGivenUp(): void
+    {
+        $pickup = $this->pickup(9);
+        $pickup->finish(CloudPickup::STATE_DONE, 1, 1, [], null);
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $pickups->expects(self::never())->method('save');
+
+        $this->service($pickups)->giveUp(9);
+
+        self::assertSame(CloudPickup::STATE_DONE, $pickup->getState());
+    }
+
+    public function testTheSweepFailsPickupsNoRunWaitsFor(): void
+    {
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->expects(self::once())->method('failOpenOlderThan')
+            ->with(self::lessThanOrEqual(time() - 1200), 'unconfirmed')
+            ->willReturn(2);
+
+        self::assertSame(2, $this->service($pickups)->sweep());
     }
 
     public function testANamesOnlyPickupDoesNotAskForUploads(): void
