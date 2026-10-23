@@ -3,7 +3,7 @@
  * dialog and the banner inside openDesk's Jitsi. Included from Jitsi's
  * head.html:
  *
- *   <script defer src="https://<synaplan>/api/v1/user/<owner>/plugins/synascriber/assets/jitsi/loader.js"
+ *   <script defer src="https://<synaplan>/api/v1/plugins/synascriber/assets/jitsi/loader.js"
  *     data-synaplan="https://<synaplan>" data-issuer="https://<keycloak>/realms/<realm>"
  *     data-client-id="synascriber"></script>
  *

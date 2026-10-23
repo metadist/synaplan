@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { muxOpusPackets, opusPacketSamples } from './oggOpus.js'
 
 const ROUTE = '/api/v1/plugins/synascriber/public/transcriber/sessions'
+const SECRET_HEADER = 'X-Transcriber-Secret'
 
 /** 128 random bits, base64url, no padding. */
 const REF_PATTERN = /^[A-Za-z0-9_-]{22}$/
@@ -46,16 +47,17 @@ function httpError(status, body, retryAfter) {
 }
 
 /**
- * Client for the synaScriber plugin's public transcriber routes.
- * The bearer token is the transcriber token; the plugin checks every call
- * against a live session.
+ * Client for the synaScriber plugin's public transcriber routes. The
+ * transcriber has no Synaplan account: it sends the shared secret the plugin
+ * stores as transcriber_secret, and the plugin checks every call against a
+ * live session.
  */
-export function createPluginClient({ baseUrl, apiKey, fetchImpl = fetch }) {
+export function createPluginClient({ baseUrl, secret, fetchImpl = fetch }) {
   const root = `${baseUrl.replace(/\/$/, '')}${ROUTE}`
 
   async function call(path, options = {}) {
     const headers = new Headers(options.headers || {})
-    headers.set('Authorization', `Bearer ${apiKey}`)
+    headers.set(SECRET_HEADER, secret)
     const response = await fetchImpl(`${root}${path}`, { ...options, headers })
     let body = {}
     try {

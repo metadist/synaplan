@@ -13,13 +13,16 @@ use Plugin\SynaScriber\Service\Settings;
 abstract class PluginTestCase extends TestCase
 {
     protected const REF = 'Ab3dEf9hJkLmN0pQrStUvW';
-    protected const OWNER = 1;
+    protected const SECRET = 'transcriber-test-secret';
 
     /** @var array<string, array<string, array<string, mixed>>> data type => data key => row */
     protected array $rows = [];
 
     /** @var array<string, string> */
     protected array $config = [];
+
+    /** @var list<int> user ids plugin_data was read or written under */
+    protected array $dataOwners = [];
 
     /**
      * Settings over an in-memory config table; values not set fall back to
@@ -29,7 +32,7 @@ abstract class PluginTestCase extends TestCase
      */
     protected function settings(array $values = []): Settings
     {
-        $this->config = ['owner_user_id' => (string) self::OWNER, 'enabled' => '1', 'stt_url' => 'http://stt.test'] + $values;
+        $this->config = $values + ['transcriber_secret' => self::SECRET, 'enabled' => '1', 'stt_url' => 'http://stt.test'];
         $repository = $this->createStub(ConfigRepository::class);
         $repository->method('getValue')->willReturnCallback(
             fn (int $owner, string $group, string $setting): ?string => $this->config[$setting] ?? null,
@@ -47,10 +50,15 @@ abstract class PluginTestCase extends TestCase
         $clean = static fn (string $key): string => preg_replace('/[^a-z0-9_]/', '', strtolower(trim($key))) ?? '';
         $data = $this->createStub(PluginDataService::class);
         $data->method('get')->willReturnCallback(
-            fn (int $user, string $plugin, string $type, string $key): ?array => $this->rows[$type][$key] ?? null,
+            function (int $user, string $plugin, string $type, string $key): ?array {
+                $this->dataOwners[] = $user;
+
+                return $this->rows[$type][$key] ?? null;
+            },
         );
         $data->method('set')->willReturnCallback(
             function (int $user, string $plugin, string $type, string $key, array $row) use ($clean): void {
+                $this->dataOwners[] = $user;
                 $this->rows[$clean($type)][$clean($key)] = $row;
             },
         );

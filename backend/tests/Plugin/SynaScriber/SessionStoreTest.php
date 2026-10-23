@@ -10,7 +10,7 @@ final class SessionStoreTest extends PluginTestCase
 {
     private function store(): SessionStore
     {
-        return new SessionStore($this->pluginData(), $this->settings());
+        return new SessionStore($this->pluginData());
     }
 
     public function testMixedCaseRefIsStoredUnderACleanKeyAndFoundAgain(): void
@@ -59,5 +59,17 @@ final class SessionStoreTest extends PluginTestCase
 
         self::assertSame([], $store->segments(self::REF));
         self::assertNotNull($store->find(self::REF));
+    }
+
+    public function testEverythingIsStoredUnderTheInstallationNotUnderAnAccount(): void
+    {
+        $store = $this->store();
+        $this->seedSession($store);
+        $store->markRoom('weekly', self::REF);
+        $store->addSegment(self::REF, ['at' => 1, 'speaker' => 'ep1', 'seq' => 1, 'text' => 'x']);
+        $store->find(self::REF);
+
+        self::assertNotSame([], $this->dataOwners);
+        self::assertSame([SessionStore::STORE_OWNER], array_values(array_unique($this->dataOwners)));
     }
 }

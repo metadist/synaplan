@@ -26,13 +26,13 @@ final readonly class Settings
         'prosody_url' => '',
         'jitsi_url' => '',
         'prosody_secret' => '',
-        'owner_user_id' => '0',
+        'transcriber_secret' => '',
         'timezone' => 'Europe/Berlin',
         'share_with_participants' => '1',
         'captions' => '1',
     ];
 
-    private const SECRET_KEYS = ['prosody_secret'];
+    private const SECRET_KEYS = ['prosody_secret', 'transcriber_secret'];
 
     public function __construct(private ConfigRepository $config)
     {
@@ -88,11 +88,6 @@ final readonly class Settings
     public function captionsOn(): bool
     {
         return '1' === $this->get('captions');
-    }
-
-    public function ownerUserId(): int
-    {
-        return (int) $this->get('owner_user_id');
     }
 
     public function defaultLanguage(): string
@@ -153,6 +148,15 @@ final readonly class Settings
         return $this->get('prosody_secret');
     }
 
+    /**
+     * What the transcriber sends in X-Transcriber-Secret. Separate from the
+     * Prosody secret: that one is held by Jitsi, this one by the transcriber.
+     */
+    public function transcriberSecret(): string
+    {
+        return $this->get('transcriber_secret');
+    }
+
     public function timezone(): \DateTimeZone
     {
         try {
@@ -197,8 +201,7 @@ final readonly class Settings
             'languages' => implode(',', array_map(fn ($l) => $this->language((string) $l), is_array($value) ? $value : explode(',', (string) $value))),
             'default_folder' => $this->sanitizeFolder((string) $value),
             'stt_url', 'prosody_url', 'jitsi_url' => $this->url((string) $value, $key),
-            'prosody_secret' => (string) $value,
-            'owner_user_id' => (string) max(0, (int) $value),
+            'prosody_secret', 'transcriber_secret' => $this->secret($value, $key),
             'timezone' => $this->zone((string) $value),
             default => throw new \InvalidArgumentException(sprintf('Unknown synascriber setting "%s".', $key)),
         };
@@ -209,6 +212,19 @@ final readonly class Settings
         $value = strtolower(trim($value));
         if (!in_array($value, self::SUPPORTED_LANGUAGES, true)) {
             throw new \InvalidArgumentException(sprintf('Language "%s" is not supported; use one of %s.', $value, implode(', ', self::SUPPORTED_LANGUAGES)));
+        }
+
+        return $value;
+    }
+
+    /**
+     * A secret is taken as given, but only as a string: a cast would turn
+     * `true` into the credential "1" and an array into "Array".
+     */
+    private function secret(mixed $value, string $key): string
+    {
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException(sprintf('Setting "%s" must be a string.', $key));
         }
 
         return $value;

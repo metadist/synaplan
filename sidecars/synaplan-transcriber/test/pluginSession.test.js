@@ -192,6 +192,7 @@ test('the plugin client uses the public route, meeting id, and multipart audio',
     const form = options.body instanceof FormData ? options.body : null
     seen.push({
       url,
+      secret: options.headers.get('X-Transcriber-Secret'),
       auth: options.headers.get('Authorization'),
       method: options.method || 'GET',
       idempotencyKey: options.headers.get('Idempotency-Key'),
@@ -208,7 +209,7 @@ test('the plugin client uses the public route, meeting id, and multipart audio',
     }
     return new Response(JSON.stringify({ error: 'not_active' }), { status: 404 })
   }
-  const client = createPluginClient({ baseUrl: 'https://synaplan.example/', apiKey: 'sk_test', fetchImpl })
+  const client = createPluginClient({ baseUrl: 'https://synaplan.example/', secret: 'plugin-secret', fetchImpl })
 
   assert.equal(await client.bind(REF, 'meet-1'), null)
   assert.deepEqual(
@@ -226,7 +227,8 @@ test('the plugin client uses the public route, meeting id, and multipart audio',
   await client.event(REF, { type: 'connected', at: 5 })
 
   assert.equal(seen[0].url, `https://synaplan.example/api/v1/plugins/synascriber/public/transcriber/sessions/${REF}?meetingId=meet-1`)
-  assert.equal(seen[0].auth, 'Bearer sk_test')
+  assert.equal(seen[0].secret, 'plugin-secret')
+  assert.equal(seen[0].auth, null, 'no API key goes to the plugin routes')
   assert.equal(seen[1].method, 'POST')
   assert.equal(seen[1].endpointId, 'ada')
   assert.equal(seen[1].seq, '4')
@@ -242,7 +244,7 @@ test('503 answers carry Retry-After onto the error', async () => {
     status: 503,
     headers: { 'Retry-After': '2' },
   })
-  const client = createPluginClient({ baseUrl: 'https://synaplan.example', apiKey: 'sk_test', fetchImpl })
+  const client = createPluginClient({ baseUrl: 'https://synaplan.example', secret: 'plugin-secret', fetchImpl })
   await assert.rejects(
     () => client.window(REF, {
       endpointId: 'ada',
@@ -516,7 +518,7 @@ test('the plugin client previews with multipart audio; anything but 200 is no ca
       ? new Response(JSON.stringify({ seq: 2, text: ' Hallo ', dropped: null, speechEndMs: 640, segmentEndsMs: [320, 640, 'x'] }), { status })
       : new Response(JSON.stringify({ error: 'captions_off' }), { status })
   }
-  const client = createPluginClient({ baseUrl: 'https://synaplan.example', apiKey: 'sk_test', fetchImpl })
+  const client = createPluginClient({ baseUrl: 'https://synaplan.example', secret: 'plugin-secret', fetchImpl })
   const fields = { endpointId: 'ada', seq: 2, t0Ms: 0, t1Ms: 1000, audio: Buffer.from('OggS') }
 
   assert.deepEqual(await client.preview(REF, fields), { text: 'Hallo', dropped: null, speechEndMs: 640, segmentEndsMs: [320, 640] })
