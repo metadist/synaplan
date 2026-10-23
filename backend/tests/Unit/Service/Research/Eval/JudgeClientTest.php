@@ -36,4 +36,26 @@ final class JudgeClientTest extends TestCase
         $this->assertSame('present', $present[0]['verdict']);
         $this->assertSame('uncertain', $other[0]['verdict']);
     }
+
+    public function testATaggedModelReachesTheProviderIntact(): void
+    {
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects($this->once())->method('chat')->with(
+            $this->anything(),
+            4,
+            ['provider' => 'ollama', 'model' => 'judge:8b'],
+        )->willReturn(['content' => 'absent']);
+
+        $verdicts = (new JudgeClient($ai, dirname(__DIR__, 5)))->judgeFact('Claim', 'Report', ['ollama:judge:8b'], 4);
+
+        $this->assertSame('absent', $verdicts[0]['verdict']);
+    }
+
+    public function testAPlaceholderInsideTheClaimIsNotReplaced(): void
+    {
+        $prompt = (new JudgeClient($this->createStub(AiFacade::class), dirname(__DIR__, 5)))
+            ->factPrompt('Literal {report} text', 'A report.');
+
+        $this->assertStringContainsString('Literal {report} text', $prompt);
+    }
 }

@@ -33,6 +33,12 @@ final class ScorerTest extends TestCase
         $this->assertFalse($this->scorer->containsAll('See section 170.', ['17']));
     }
 
+    public function testAdjacentYearsAreNotMergedIntoOneNumber(): void
+    {
+        $this->assertSame('2023 2024', $this->scorer->normalise('2023 2024'));
+        $this->assertTrue($this->scorer->containsAll('Between 2023 2024 it changed.', ['2024']));
+    }
+
     public function testFactRecallIsTheShareOfMatchedGoldRows(): void
     {
         $item = $this->item([['id' => 'g1', 'assertion' => 'A', 'kind' => 'fact', 'match' => ['ZEBRA-41', '72']]]);

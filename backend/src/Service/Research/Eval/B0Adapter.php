@@ -11,22 +11,25 @@ use App\Service\Message\Processing\TurnWebSearch;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\ChatPromptBlocks;
 use App\Service\RAG\ChatKnowledgeContextLoader;
-use App\Service\Research\WebResearchService;
 use Psr\Log\LoggerInterface;
 
 /**
- * Today's web chat: a forced web-search vote, the turn's search, page reading,
- * the chat's knowledge loader, then the chat answer.
+ * Today's web chat: a forced web-search vote, the turn's search and page
+ * reading, the chat's knowledge loader, then the chat answer.
  *
- * The message is not saved. Search results are saved by the turn only when
- * the message already has an id, so this arm writes usage on the evaluation
- * account and nothing else.
+ * Pages are read only when the turn reads them, so a disabled page reader
+ * scores as it ships. The message is not saved. Search results are saved by
+ * the turn only when the message already has an id, so this arm writes usage
+ * on the evaluation account and nothing else.
  */
 final readonly class B0Adapter
 {
+    private const READ_PAGES_VOTE = 3;
+    private const KNOWLEDGE_LIMIT = 5;
+    private const KNOWLEDGE_MIN_SCORE = 0.3;
+
     public function __construct(
         private TurnWebSearch $web,
-        private WebResearchService $pages,
         private ChatKnowledgeContextLoader $knowledge,
         private AiFacade $ai,
         private ModelConfigService $models,
@@ -37,12 +40,13 @@ final readonly class B0Adapter
     public function answer(CorpusItem $item, int $userId, ?string $folder, ?FrozenStore $frozen): string
     {
         $stored = $frozen?->get($item->id);
-        $search = null;
-        $knowledge = '';
         if (null !== $stored) {
             $search = $stored['search'];
             $knowledge = $stored['knowledge'];
         } else {
+            if ($item->knowledge && (null === $folder || '' === trim($folder))) {
+                throw new \RuntimeException('This item reads a knowledge folder. Pass --folder. Nothing was sent.');
+            }
             [$search, $knowledge] = $this->gather($item, $userId, $folder);
             $frozen?->put($item->id, ['search' => $search, 'knowledge' => $knowledge]);
         }
@@ -75,7 +79,7 @@ final readonly class B0Adapter
         $search = $item->web ? $this->search($message, $item) : null;
         $knowledge = '';
         if ($item->knowledge) {
-            $loaded = $this->knowledge->load($message, 'general', $folder, 5, 0.3, null, true);
+            $loaded = $this->knowledge->load($message, 'general', $folder, self::KNOWLEDGE_LIMIT, self::KNOWLEDGE_MIN_SCORE, null, true);
             $knowledge = \is_string($loaded['context'] ?? null) ? $loaded['context'] : '';
         }
 
@@ -110,7 +114,7 @@ final readonly class B0Adapter
             [
                 'topic' => 'general',
                 'web_search' => true,
-                'read_pages' => 3,
+                'read_pages' => self::READ_PAGES_VOTE,
                 'language' => $item->language,
             ],
             [],
@@ -119,13 +123,7 @@ final readonly class B0Adapter
             new TurnStatus(null, $this->logger),
         );
         $search = $ran['searchResults'] ?? null;
-        if (!\is_array($search)) {
-            return null;
-        }
-        if ([] === ($search['results'] ?? []) || isset($search['pages_read'])) {
-            return $search;
-        }
 
-        return $this->pages->deepen($search, $item->question, $message->getUserId(), null, 3);
+        return \is_array($search) ? $search : null;
     }
 }

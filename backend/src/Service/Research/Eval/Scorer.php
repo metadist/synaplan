@@ -38,7 +38,7 @@ final readonly class Scorer
     {
         $text = mb_strtolower($text);
         $text = preg_replace_callback(
-            '/\d{1,3}(?:[.,\s]\d{3})+/u',
+            '/(?<!\d)\d{1,3}(?:[.,\s]\d{3})+(?!\d)/u',
             static fn (array $match): string => preg_replace('/[.,\s]/', '', $match[0]) ?? $match[0],
             $text,
         ) ?? $text;

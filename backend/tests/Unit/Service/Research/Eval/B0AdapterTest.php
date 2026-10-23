@@ -13,13 +13,12 @@ use App\Service\Research\Eval\B0Adapter;
 use App\Service\Research\Eval\CorpusFacts;
 use App\Service\Research\Eval\CorpusItem;
 use App\Service\Research\Eval\FrozenStore;
-use App\Service\Research\WebResearchService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 final class B0AdapterTest extends TestCase
 {
-    public function testAWebItemForcesTheSearchVoteAndReadsPagesOnce(): void
+    public function testAWebItemForcesTheSearchVoteAndUsesThePagesTheTurnRead(): void
     {
         $web = $this->createMock(TurnWebSearch::class);
         $web->expects($this->once())->method('run')->willReturnCallback(
@@ -34,17 +33,12 @@ final class B0AdapterTest extends TestCase
                     'classification' => [],
                     'searchResults' => [
                         'query' => 'act',
-                        'results' => [['title' => 'Act', 'url' => 'https://example.com/act']],
+                        'results' => [['title' => 'Act', 'url' => 'https://example.com/act', 'page_content' => '2024/1689']],
+                        'pages_read' => 1,
                     ],
                 ];
             },
         );
-        $pages = $this->createMock(WebResearchService::class);
-        $pages->expects($this->once())->method('deepen')->willReturn([
-            'query' => 'act',
-            'results' => [['title' => 'Act', 'url' => 'https://example.com/act', 'page_content' => '2024/1689']],
-            'pages_read' => 1,
-        ]);
         $knowledge = $this->createMock(ChatKnowledgeContextLoader::class);
         $knowledge->expects($this->never())->method('load');
         $ai = $this->createMock(AiFacade::class);
@@ -54,7 +48,7 @@ final class B0AdapterTest extends TestCase
             ['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5'],
         )->willReturn(['content' => 'Regulation 2024/1689.']);
 
-        $text = $this->adapter($web, $pages, $knowledge, $ai)->answer($this->item(true, false), 7, null, null);
+        $text = $this->adapter($web, $knowledge, $ai)->answer($this->item(true, false), 7, null, null);
 
         $this->assertSame('Regulation 2024/1689.', $text);
     }
@@ -70,13 +64,11 @@ final class B0AdapterTest extends TestCase
         ]);
         $web = $this->createMock(TurnWebSearch::class);
         $web->expects($this->never())->method('run');
-        $pages = $this->createMock(WebResearchService::class);
-        $pages->expects($this->never())->method('deepen');
-        $ai = $this->createMock(AiFacade::class);
+        $ai = $this->createStub(AiFacade::class);
         $ai->method('chat')->willReturn(['content' => 'From the frozen page.']);
 
         try {
-            $text = $this->adapter($web, $pages, $this->createStub(ChatKnowledgeContextLoader::class), $ai)
+            $text = $this->adapter($web, $this->createStub(ChatKnowledgeContextLoader::class), $ai)
                 ->answer($this->item(true, false), 7, null, $store);
             $this->assertSame('From the frozen page.', $text);
         } finally {
@@ -99,12 +91,11 @@ final class B0AdapterTest extends TestCase
             null,
             true,
         )->willReturn(['context' => 'Kündigungsfrist: drei Monate', 'sources' => []]);
-        $ai = $this->createMock(AiFacade::class);
+        $ai = $this->createStub(AiFacade::class);
         $ai->method('chat')->willReturn(['content' => 'drei Monate']);
 
         $text = $this->adapter(
             $web,
-            $this->createStub(WebResearchService::class),
             $knowledge,
             $ai,
         )->answer($this->item(false, true), 7, 'contracts', null);
@@ -112,18 +103,29 @@ final class B0AdapterTest extends TestCase
         $this->assertSame('drei Monate', $text);
     }
 
+    public function testAKnowledgeItemWithoutAFolderSendsNothing(): void
+    {
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects($this->never())->method('chat');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Pass --folder. Nothing was sent.');
+
+        $this->adapter($this->createStub(TurnWebSearch::class), $this->createStub(ChatKnowledgeContextLoader::class), $ai)
+            ->answer($this->item(false, true), 7, null, null);
+    }
+
     private function adapter(
         TurnWebSearch $web,
-        WebResearchService $pages,
         ChatKnowledgeContextLoader $knowledge,
         AiFacade $ai,
     ): B0Adapter {
-        $models = $this->createMock(ModelConfigService::class);
-        $models->method('getDefaultModel')->with('CHAT', 7)->willReturn(379);
-        $models->method('getProviderForModel')->with(379)->willReturn('anthropic');
-        $models->method('getModelName')->with(379)->willReturn('claude-sonnet-5-5');
+        $models = $this->createStub(ModelConfigService::class);
+        $models->method('getDefaultModel')->willReturnMap([['CHAT', 7, 379]]);
+        $models->method('getProviderForModel')->willReturnMap([[379, 'anthropic']]);
+        $models->method('getModelName')->willReturnMap([[379, 'claude-sonnet-5-5']]);
 
-        return new B0Adapter($web, $pages, $knowledge, $ai, $models, new NullLogger());
+        return new B0Adapter($web, $knowledge, $ai, $models, new NullLogger());
     }
 
     private function item(bool $web, bool $knowledge): CorpusItem

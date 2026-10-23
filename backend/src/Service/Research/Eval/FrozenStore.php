@@ -17,6 +17,9 @@ final readonly class FrozenStore
     }
 
     /**
+     * A damaged record fails the item. Replaying it live would silently mix
+     * a fresh web into a frozen run.
+     *
      * @return FrozenPayload|null
      */
     public function get(string $itemId): ?array
@@ -28,11 +31,11 @@ final readonly class FrozenStore
 
         try {
             $decoded = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
+        } catch (\JsonException $e) {
+            throw new \RuntimeException('The frozen record for '.$itemId.' is not valid JSON. Delete '.$path.' to record it again.', 0, $e);
         }
         if (!\is_array($decoded)) {
-            return null;
+            throw new \RuntimeException('The frozen record for '.$itemId.' is not an object. Delete '.$path.' to record it again.');
         }
 
         $search = $decoded['search'] ?? null;

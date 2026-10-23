@@ -38,6 +38,33 @@ final class ExternalArmTest extends TestCase
         $this->assertSame('Regulation 2024/1689.', $text);
     }
 
+    public function testB1PlusSendsTheGatewayModelWhenGiven(): void
+    {
+        $client = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
+            $body = json_decode((string) $options['body'], true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame('http://gateway.test/v1/messages', $url);
+            $this->assertSame('eval-model', $body['model'] ?? null);
+
+            return new MockResponse(json_encode([
+                'content' => [['type' => 'text', 'text' => 'Answer.']],
+            ], JSON_THROW_ON_ERROR));
+        });
+
+        $text = (new B1PlusAdapter($client))->answer($this->item(), 'http://gateway.test/', 'key', null, 'eval-model');
+
+        $this->assertSame('Answer.', $text);
+    }
+
+    public function testB1PlusExplainsANonJsonAnswer(): void
+    {
+        $client = new MockHttpClient(new MockResponse('<html>Bad gateway</html>', ['http_code' => 502]));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('The gateway did not answer with JSON (status 502).');
+
+        (new B1PlusAdapter($client))->answer($this->item(), 'http://gateway.test', 'key', null);
+    }
+
     public function testB4SendsNothingWithoutAnEndpoint(): void
     {
         $client = new MockHttpClient(function (): MockResponse {

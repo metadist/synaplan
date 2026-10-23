@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Eval;
 
+use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -14,6 +15,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class B4Adapter
 {
+    /** Deep-research agents take up to half an hour per question. */
+    private const TIMEOUT_SECONDS = 2100;
+
     public function __construct(
         private HttpClientInterface $http,
     ) {
@@ -26,17 +30,21 @@ final readonly class B4Adapter
         }
 
         $response = $this->http->request('POST', $endpoint, [
-            'timeout' => 2100,
-            'max_duration' => 2100,
+            'timeout' => self::TIMEOUT_SECONDS,
+            'max_duration' => self::TIMEOUT_SECONDS,
             'json' => [
                 'item_id' => $item->id,
                 'question' => $item->question,
             ],
         ]);
         $status = $response->getStatusCode();
-        $body = $response->toArray(false);
         if ($status >= 400) {
-            throw new \RuntimeException('The external agent rejected the question.');
+            throw new \RuntimeException('The external agent rejected the question (status '.$status.').');
+        }
+        try {
+            $body = $response->toArray(false);
+        } catch (DecodingExceptionInterface) {
+            throw new \RuntimeException('The external agent did not answer with JSON. It must return {"text":"..."}.');
         }
         $text = $body['text'] ?? null;
         if (!\is_string($text) || '' === trim($text)) {

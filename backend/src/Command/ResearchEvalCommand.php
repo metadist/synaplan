@@ -27,6 +27,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 final class ResearchEvalCommand extends Command
 {
     private const DEFAULT_CORPUS = 'tests/Eval/research/corpus.json';
+    private const API_KEY_ENV = 'RESEARCH_EVAL_API_KEY';
 
     public function __construct(
         private readonly EvalRunner $runner,
@@ -41,14 +42,15 @@ final class ResearchEvalCommand extends Command
         $this
             ->addOption('corpus', null, InputOption::VALUE_REQUIRED, 'smoke, full, or a path to a corpus file', 'smoke')
             ->addOption('arm', null, InputOption::VALUE_REQUIRED, 'b0, b1, b1plus or b4')
-            ->addOption('user', null, InputOption::VALUE_REQUIRED, 'Evaluation account id. Required for a live b0 or b1plus run.')
+            ->addOption('user', null, InputOption::VALUE_REQUIRED, 'Evaluation account id. Required for a live b0 run and for --judges.')
             ->addOption('repeat', null, InputOption::VALUE_REQUIRED, 'Run each live item this many times and average the recall', '1')
             ->addOption('import', null, InputOption::VALUE_REQUIRED, 'JSON file of reports (id, text). Required for b1. Skips the live arm.')
             ->addOption('frozen', null, InputOption::VALUE_REQUIRED, 'Directory of recorded searches. The first run writes it; later runs replay it.')
             ->addOption('report', null, InputOption::VALUE_REQUIRED, 'Where to write the Markdown report')
             ->addOption('folder', null, InputOption::VALUE_REQUIRED, 'Knowledge folder key for items that read documents')
             ->addOption('gateway-url', null, InputOption::VALUE_REQUIRED, 'Base URL for b1plus, without /v1/messages')
-            ->addOption('api-key', null, InputOption::VALUE_REQUIRED, 'Evaluation API key for b1plus')
+            ->addOption('api-key', null, InputOption::VALUE_REQUIRED, 'Evaluation API key for b1plus. Prefer the '.self::API_KEY_ENV.' env var; an option stays in the shell history')
+            ->addOption('gateway-model', null, InputOption::VALUE_REQUIRED, 'Model for b1plus, provider id or service:providerId:tag. Only a paired desktop key may omit it')
             ->addOption('b4-endpoint', null, InputOption::VALUE_REQUIRED, 'External agent URL that returns {"text":"..."}')
             ->addOption('judges', null, InputOption::VALUE_REQUIRED, 'Comma-separated judge keys, provider:model')
             ->addOption('write-documents', null, InputOption::VALUE_REQUIRED, 'Write the synthetic knowledge files and stop');
@@ -85,7 +87,8 @@ final class ResearchEvalCommand extends Command
             live: new EvalLiveTarget(
                 $this->optionalString($input->getOption('folder')),
                 $this->optionalString($input->getOption('gateway-url')),
-                $this->optionalString($input->getOption('api-key')),
+                $this->optionalString($input->getOption('api-key')) ?? $this->optionalString($_SERVER[self::API_KEY_ENV] ?? getenv(self::API_KEY_ENV)),
+                $this->optionalString($input->getOption('gateway-model')),
                 $this->optionalString($input->getOption('b4-endpoint')),
                 '' === $judges ? [] : array_values(array_filter(array_map('trim', explode(',', $judges)))),
             ),

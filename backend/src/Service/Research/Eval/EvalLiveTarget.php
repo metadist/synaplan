@@ -16,6 +16,7 @@ final readonly class EvalLiveTarget
         public ?string $folder,
         public ?string $gatewayUrl,
         public ?string $apiKey,
+        public ?string $gatewayModel,
         public ?string $b4Endpoint,
         public array $judges,
     ) {

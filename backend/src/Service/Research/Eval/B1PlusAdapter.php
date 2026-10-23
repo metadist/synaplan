@@ -5,24 +5,30 @@ declare(strict_types=1);
 namespace App\Service\Research\Eval;
 
 use App\AI\Messages\DesktopTurnOptions;
+use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * One question through POST /v1/messages, the gateway loop after Phase B.
  *
  * The key is an evaluation key. A knowledge item also sends the folder header.
+ * Without a model only a paired desktop key resolves one; any other key needs
+ * --gateway-model.
  */
 final readonly class B1PlusAdapter
 {
+    private const MAX_TOKENS = 4096;
+    private const TIMEOUT_SECONDS = 600;
+
     public function __construct(
         private HttpClientInterface $http,
     ) {
     }
 
-    public function answer(CorpusItem $item, string $gatewayUrl, string $apiKey, ?string $folder): string
+    public function answer(CorpusItem $item, string $gatewayUrl, string $apiKey, ?string $folder, ?string $model = null): string
     {
         if ('' === trim($gatewayUrl) || '' === trim($apiKey)) {
-            throw new \RuntimeException('B1+ needs --gateway-url and --api-key. Nothing was sent.');
+            throw new \RuntimeException('B1+ needs --gateway-url and an API key (--api-key or RESEARCH_EVAL_API_KEY). Nothing was sent.');
         }
         if ($item->knowledge && (null === $folder || '' === trim($folder))) {
             throw new \RuntimeException('This item reads a knowledge folder. Pass --folder. Nothing was sent.');
@@ -36,20 +42,30 @@ final readonly class B1PlusAdapter
         if (null !== $folder && '' !== trim($folder)) {
             $headers[DesktopTurnOptions::HEADER_RAG_GROUP_KEY] = $folder;
         }
+        $body = [
+            'max_tokens' => self::MAX_TOKENS,
+            'messages' => [
+                ['role' => 'user', 'content' => $item->question],
+            ],
+        ];
+        if (null !== $model && '' !== trim($model)) {
+            $body['model'] = trim($model);
+        }
 
         $response = $this->http->request('POST', rtrim($gatewayUrl, '/').'/v1/messages', [
             'headers' => $headers,
-            'json' => [
-                'max_tokens' => 4096,
-                'messages' => [
-                    ['role' => 'user', 'content' => $item->question],
-                ],
-            ],
+            'json' => $body,
+            'timeout' => self::TIMEOUT_SECONDS,
+            'max_duration' => self::TIMEOUT_SECONDS,
         ]);
         $status = $response->getStatusCode();
-        $body = $response->toArray(false);
+        try {
+            $decoded = $response->toArray(false);
+        } catch (DecodingExceptionInterface) {
+            throw new \RuntimeException('The gateway did not answer with JSON (status '.$status.'). Check --gateway-url.');
+        }
         if ($status >= 400) {
-            $error = $body['error'] ?? null;
+            $error = $decoded['error'] ?? null;
             $message = \is_array($error) && \is_string($error['message'] ?? null)
                 ? $error['message']
                 : 'The gateway rejected the question.';
@@ -57,7 +73,7 @@ final readonly class B1PlusAdapter
         }
 
         $text = '';
-        foreach ($body['content'] ?? [] as $block) {
+        foreach ($decoded['content'] ?? [] as $block) {
             if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
                 $text .= (string) $block['text'];
             }

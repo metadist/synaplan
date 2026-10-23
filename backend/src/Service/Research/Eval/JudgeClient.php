@@ -27,7 +27,7 @@ final readonly class JudgeClient
         }
         $template = (string) file_get_contents($path);
 
-        return str_replace(['{assertion}', '{report}'], [$assertion, $report], $template);
+        return strtr($template, ['{assertion}' => $assertion, '{report}' => $report]);
     }
 
     /**
@@ -55,13 +55,16 @@ final readonly class JudgeClient
     }
 
     /**
+     * The model keeps everything after the provider, so an Ollama tag such
+     * as "llama3:8b" reaches the provider intact.
+     *
      * @return array{0: string, 1: string}
      */
     private function parse(string $key): array
     {
-        $parts = explode(':', $key);
-        if (\count($parts) < 2 || '' === $parts[0] || '' === $parts[1]) {
-            throw new \RuntimeException('A judge key looks like provider:model.');
+        $parts = explode(':', $key, 2);
+        if (2 !== \count($parts) || '' === $parts[0] || '' === $parts[1]) {
+            throw new \RuntimeException('A judge key looks like provider:model. Got "'.$key.'".');
         }
 
         return [$parts[0], $parts[1]];

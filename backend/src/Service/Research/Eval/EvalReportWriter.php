@@ -12,30 +12,22 @@ namespace App\Service\Research\Eval;
  */
 final readonly class EvalReportWriter
 {
-    /**
-     * @param list<ReportRow> $rows
-     * @param list<string>    $judgeNotes
-     */
-    public function write(string $path, string $arm, string $corpusLabel, string $command, array $rows, array $judgeNotes): string
+    public function write(string $path, string $text): void
     {
         $dir = \dirname($path);
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            throw new \RuntimeException('Could not create the report directory.');
+            throw new \RuntimeException('Could not create the report directory '.$dir.'.');
         }
-
-        $text = $this->render($arm, $corpusLabel, $command, $rows, $judgeNotes);
         if (false === file_put_contents($path, $text)) {
-            throw new \RuntimeException('Could not write the report.');
+            throw new \RuntimeException('Could not write the report to '.$path.'.');
         }
-
-        return $text;
     }
 
     /**
      * @param list<ReportRow> $rows
      * @param list<string>    $judgeNotes
      */
-    public function render(string $arm, string $corpusLabel, string $command, array $rows, array $judgeNotes): string
+    public function render(string $arm, string $corpusLabel, string $command, array $rows, array $judgeNotes = []): string
     {
         $lines = [
             '# Research eval',
@@ -60,11 +52,11 @@ final readonly class EvalReportWriter
             }
             $lines[] = sprintf(
                 '| %s | %s | %s | %d | %s |',
-                $row['id'],
+                $this->cell($row['id']),
                 null === $row['recall'] ? 'n/a' : number_format($row['recall'], 2, '.', ''),
                 $row['abstained'] ? 'yes' : 'no',
                 $row['ms'],
-                $row['error'] ?? '',
+                $this->cell($row['error'] ?? ''),
             );
         }
         $lines[] = '';
@@ -73,14 +65,26 @@ final readonly class EvalReportWriter
         if ($failed > 0) {
             $lines[] = $failed.' item'.(1 === $failed ? '' : 's').' failed before they could be scored.';
         }
-        $lines[] = 'Judged metrics are included only when --judges is set and a judge answers.';
+        $lines[] = 'The ms column is the mean answer time per attempt; judge calls are not included.';
+        if ([] === $judgeNotes) {
+            $lines[] = 'Judged metrics are included only when --judges is set and a judge answers.';
+        } else {
+            $lines[] = '';
+            $lines[] = '## Judges';
+            $lines[] = '';
+            foreach ($judgeNotes as $note) {
+                $lines[] = '- '.$note;
+            }
+        }
         $lines[] = '';
 
-        $text = implode("\n", $lines);
-        if ([] !== $judgeNotes) {
-            $text .= "\n".implode("\n", $judgeNotes)."\n";
-        }
+        return implode("\n", $lines);
+    }
 
-        return $text;
+    private function cell(string $value): string
+    {
+        $flat = preg_replace('/\s+/u', ' ', $value) ?? $value;
+
+        return str_replace('|', '\|', trim($flat));
     }
 }
