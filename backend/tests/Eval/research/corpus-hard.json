@@ -1,0 +1,220 @@
+[
+    {
+        "id": "hard-01",
+        "category": "science",
+        "language": "en",
+        "question": "Who received the 2026 Nobel Prize in Physics, at which university does the laureate work, and which observatory is the prize about?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "The 2026 Nobel Prize in Physics went to Francis Halzen.", "kind": "fact", "match": ["Halzen"] },
+            { "id": "g2", "assertion": "Halzen works at the University of Wisconsin–Madison.", "kind": "fact", "match": ["Wisconsin"] },
+            { "id": "g3", "assertion": "The prize is about the IceCube Neutrino Observatory.", "kind": "fact", "match": ["IceCube"] }
+        ],
+        "preferred_sources": ["nobelprize.org", "kva.se"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": true,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-02",
+        "category": "science",
+        "language": "en",
+        "question": "Who shared the 2026 Nobel Prize in Chemistry, and for what discovery?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Henri B. Kagan is a 2026 chemistry laureate.", "kind": "fact", "match": ["Kagan"] },
+            { "id": "g2", "assertion": "Kenso Soai is a 2026 chemistry laureate.", "kind": "fact", "match": ["Soai"] },
+            { "id": "g3", "assertion": "The prize is for the discovery of non-linear effects and autocatalysis in asymmetric organic synthesis.", "kind": "fact", "match": ["autocatalysis"] }
+        ],
+        "preferred_sources": ["nobelprize.org", "kva.se"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-03",
+        "category": "local",
+        "language": "fr",
+        "question": "Qui a reçu le prix Nobel de littérature 2026, et de quel pays vient cette personne ?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Anne Carson received the 2026 Nobel Prize in Literature.", "kind": "fact", "match": ["Carson"] },
+            { "id": "g2", "assertion": "Anne Carson is Canadian.", "kind": "fact", "match": ["canad"] }
+        ],
+        "preferred_sources": ["nobelprize.org", "svenskaakademien.se"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-04",
+        "category": "comparison",
+        "language": "en",
+        "question": "Who won the 2026 Sveriges Riksbank Prize in Economic Sciences, and at which university does each laureate work?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Robert E. Hall is a 2026 laureate and works at Stanford University.", "kind": "fact", "match": ["Hall", "Stanford"] },
+            { "id": "g2", "assertion": "Michael Woodford is a 2026 laureate and works at Columbia University.", "kind": "fact", "match": ["Woodford", "Columbia"] }
+        ],
+        "preferred_sources": ["nobelprize.org", "kva.se", "riksbank.se"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": true,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-05",
+        "category": "local",
+        "language": "de",
+        "question": "Wer hat den Deutschen Buchpreis 2026 gewonnen, und mit welchem Roman?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Shida Bazyar gewann den Deutschen Buchpreis 2026.", "kind": "fact", "match": ["Bazyar"] },
+            { "id": "g2", "assertion": "Der Roman heißt „Die Lücken“.", "kind": "fact", "match": ["Lücken"] }
+        ],
+        "preferred_sources": ["deutscher-buchpreis.de"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": true,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-06",
+        "category": "local",
+        "language": "es",
+        "question": "¿Quién ganó el Premio Planeta 2026 y con qué novela?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Isabel Allende ganó el Premio Planeta 2026.", "kind": "fact", "match": ["Allende"] },
+            { "id": "g2", "assertion": "La novela es «La hora antes del alba».", "kind": "fact", "match": ["hora antes del alba"] }
+        ],
+        "preferred_sources": ["premioplaneta.es", "planeta.es"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-07",
+        "category": "technical",
+        "language": "en",
+        "question": "What is the newest PHP 8.5 patch release as of late October 2026, and which CVEs does it fix?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "The newest PHP 8.5 release is 8.5.12, released on 21 October 2026.", "kind": "fact", "match": ["8.5.12"] },
+            { "id": "g2", "assertion": "It fixes CVE-2026-109618.", "kind": "fact", "match": ["CVE-2026-109618"] },
+            { "id": "g3", "assertion": "It fixes CVE-2026-109619.", "kind": "fact", "match": ["CVE-2026-109619"] }
+        ],
+        "preferred_sources": ["php.net"],
+        "valid_until": "2026-11-04",
+        "trap": null,
+        "smoke": true,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-08",
+        "category": "technical",
+        "language": "en",
+        "question": "Which release candidate of PHP 8.6.0 is the latest as of late October 2026, and which release candidate comes next?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "The latest is PHP 8.6.0 RC4, released on 21 October 2026.", "kind": "fact", "match": ["RC4"] },
+            { "id": "g2", "assertion": "The next is RC5, the last release candidate, planned for 5 November 2026.", "kind": "fact", "match": ["RC5"] }
+        ],
+        "preferred_sources": ["php.net"],
+        "valid_until": "2026-11-04",
+        "trap": null,
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-09",
+        "category": "current",
+        "language": "en",
+        "question": "What are the ECB deposit facility rate and the main refinancing operations rate as of late October 2026?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "The deposit facility rate is 2.50 % with effect from 16 September 2026.", "kind": "fact", "match": ["2.5"] },
+            { "id": "g2", "assertion": "The main refinancing operations rate is 2.65 %.", "kind": "fact", "match": ["2.65"] }
+        ],
+        "preferred_sources": ["ecb.europa.eu"],
+        "valid_until": "2026-10-28",
+        "trap": null,
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-10",
+        "category": "mixed",
+        "language": "en",
+        "question": "How many years older is the 2026 Nobel laureate in chemistry Henri B. Kagan than the 2026 Nobel laureate in literature?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Henri B. Kagan was born in 1930.", "kind": "fact", "match": ["1930"] },
+            { "id": "g2", "assertion": "The literature laureate Anne Carson was born in 1950.", "kind": "fact", "match": ["Carson", "1950"] },
+            { "id": "g3", "assertion": "Kagan (15 December 1930) is about 19.5 years older than Carson (21 June 1950), 19 full years.", "kind": "fact", "match": ["19"] }
+        ],
+        "preferred_sources": ["nobelprize.org"],
+        "valid_until": null,
+        "trap": null,
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-11",
+        "category": "trap",
+        "language": "en",
+        "question": "Confirm that the ECB deposit facility rate is still 2.00 % in October 2026.",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "The rate is 2.50 % since 16 September 2026; the ECB raised rates in 2026.", "kind": "fact", "match": ["2.5"] }
+        ],
+        "preferred_sources": ["ecb.europa.eu"],
+        "valid_until": "2026-10-28",
+        "trap": { "kind": "outdated", "forbidden": ["is still 2.00", "remains at 2.00", "confirmed: 2.00"] },
+        "smoke": true,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    },
+    {
+        "id": "hard-12",
+        "category": "trap",
+        "language": "de",
+        "question": "Warum hat Haruki Murakami den Literaturnobelpreis 2026 bekommen?",
+        "depth": "standard",
+        "sources": { "web": true, "knowledge": false },
+        "gold": [
+            { "id": "g1", "assertion": "Den Literaturnobelpreis 2026 erhielt Anne Carson, nicht Haruki Murakami.", "kind": "fact", "match": ["Carson"] }
+        ],
+        "preferred_sources": ["nobelprize.org"],
+        "valid_until": null,
+        "trap": { "kind": "nonexistent", "forbidden": ["Murakami erhielt den Literaturnobelpreis 2026", "Murakami hat den Literaturnobelpreis 2026 bekommen, weil"] },
+        "smoke": false,
+        "written_by": "agent",
+        "checked_on": "2026-10-23"
+    }
+]

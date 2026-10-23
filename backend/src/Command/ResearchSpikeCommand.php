@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Service\Research\Eval\AnswerFile;
 use App\Service\Research\Spike\SpikeBatch;
 use App\Service\Research\Spike\SpikeLimits;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -27,6 +28,7 @@ final class ResearchSpikeCommand extends Command
 
     public function __construct(
         private readonly SpikeBatch $batch,
+        private readonly AnswerFile $answers,
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
     ) {
@@ -44,7 +46,8 @@ final class ResearchSpikeCommand extends Command
             ->addOption('sources', null, InputOption::VALUE_REQUIRED, 'Source budget', '15')
             ->addOption('turns', null, InputOption::VALUE_REQUIRED, 'Lead turns', '4')
             ->addOption('only', null, InputOption::VALUE_REQUIRED, 'Run one corpus id')
-            ->addOption('report', null, InputOption::VALUE_REQUIRED, 'Where to write the Markdown report');
+            ->addOption('report', null, InputOption::VALUE_REQUIRED, 'Where to write the Markdown report')
+            ->addOption('answers', null, InputOption::VALUE_REQUIRED, 'Where to save each answer with its evidence passages, for app:research:citations');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -92,15 +95,19 @@ final class ResearchSpikeCommand extends Command
         try {
             foreach ($modes as $one) {
                 $command = 'app:research:spike --corpus='.$corpusOption.' --mode='.$one.' --user='.$userId;
-                $text = $this->batch->run($path, 'smoke' === $corpusOption, $one, $userId, $limits, $numbers['repeat'], $command, $only, $progress);
+                $result = $this->batch->run($path, 'smoke' === $corpusOption, $one, $userId, $limits, $numbers['repeat'], $command, $only, $progress);
+                $text = $result->report;
+                $answers = $input->getOption('answers');
+                if (\is_string($answers) && '' !== trim($answers)) {
+                    $target = $this->perMode($this->absolute(trim($answers)), $one, \count($modes) > 1, '.json');
+                    $this->answers->write($target, $result->answers);
+                    $progress('Answers written to '.$target);
+                }
                 $io->writeln('Corpus sha256: '.$hash);
                 $io->writeln($text);
                 $report = $input->getOption('report');
                 if (\is_string($report) && '' !== trim($report)) {
-                    $target = $this->absolute(trim($report));
-                    if (\count($modes) > 1) {
-                        $target = str_ends_with($target, '.md') ? substr($target, 0, -3).'-'.$one.'.md' : $target.'-'.$one;
-                    }
+                    $target = $this->perMode($this->absolute(trim($report)), $one, \count($modes) > 1, '.md');
                     $dir = \dirname($target);
                     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
                         throw new \RuntimeException('Could not create the report directory '.$dir.'.');
@@ -118,6 +125,15 @@ final class ResearchSpikeCommand extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    private function perMode(string $target, string $mode, bool $several, string $extension): string
+    {
+        if (!$several) {
+            return $target;
+        }
+
+        return str_ends_with($target, $extension) ? substr($target, 0, -\strlen($extension)).'-'.$mode.$extension : $target.'-'.$mode;
     }
 
     private function absolute(string $path): string

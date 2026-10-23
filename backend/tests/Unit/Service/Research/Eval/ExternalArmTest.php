@@ -55,6 +55,37 @@ final class ExternalArmTest extends TestCase
         $this->assertSame('Answer.', $text);
     }
 
+    public function testB1PlusDeclaresWebSearchAndKeepsCitationUrls(): void
+    {
+        $client = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
+            $body = json_decode((string) $options['body'], true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame([['type' => 'web_search_20250305', 'name' => 'web_search']], $body['tools'] ?? null);
+
+            return new MockResponse(json_encode([
+                'content' => [
+                    ['type' => 'server_tool_use', 'name' => 'web_search'],
+                    ['type' => 'text', 'text' => 'It is 2024/1689.', 'citations' => [['url' => 'https://eur-lex.example/a'], ['url' => 'https://eur-lex.example/a']]],
+                ],
+            ], JSON_THROW_ON_ERROR));
+        });
+
+        $text = (new B1PlusAdapter($client))->answer($this->item(), 'http://gateway.test', 'key', null, null, true);
+
+        $this->assertSame('It is 2024/1689. ([source](https://eur-lex.example/a))', $text);
+    }
+
+    public function testB1PlusSendsNoToolsWithoutWebSearch(): void
+    {
+        $client = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
+            $body = json_decode((string) $options['body'], true, 512, JSON_THROW_ON_ERROR);
+            $this->assertArrayNotHasKey('tools', $body);
+
+            return new MockResponse(json_encode(['content' => [['type' => 'text', 'text' => 'Answer.']]], JSON_THROW_ON_ERROR));
+        });
+
+        $this->assertSame('Answer.', (new B1PlusAdapter($client))->answer($this->item(), 'http://gateway.test', 'key', null));
+    }
+
     public function testB1PlusExplainsANonJsonAnswer(): void
     {
         $client = new MockHttpClient(new MockResponse('<html>Bad gateway</html>', ['http_code' => 502]));
