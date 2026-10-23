@@ -56,6 +56,31 @@ export const diffListTruncated = (eventName, entryCount) => {
   return Number(entryCount) >= cap
 }
 
+/**
+ * Turn the workflow's F/P listing into paths. The listing arrives on stdin,
+ * never as a process argument: a pull request near the 3,000 cap is larger
+ * than the command-line limit. A capped list becomes the unknown marker.
+ */
+export const decodeListedDiff = (eventName, text) => {
+  const lines = String(text ?? '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+  const entries = lines.filter((line) => line.startsWith('F\t')).length
+  if (diffListTruncated(eventName, entries)) {
+    return { truncated: true, entries, paths: [UNKNOWN_CHANGE] }
+  }
+
+  return {
+    truncated: false,
+    entries,
+    paths: lines
+      .filter((line) => line.startsWith('F\t') || line.startsWith('P\t'))
+      .map((line) => line.slice(2))
+      .filter(Boolean),
+  }
+}
+
 export const PIN_PATH_PREFIXES = ['deploy/umbrel/synaplan/', 'deploy/casaos/Synaplan/']
 
 export const isPinPath = (path) => {

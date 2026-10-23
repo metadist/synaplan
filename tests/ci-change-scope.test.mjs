@@ -10,6 +10,7 @@ import {
   isPinOnlyChange,
   isPinPath,
   runCli,
+  decodeListedDiff,
   diffListTruncated,
   sidecarResultOk,
   sidecarsForChange,
@@ -175,6 +176,22 @@ test('an unknown diff or a CI rule change tests every sidecar', () => {
       files.join(',') || '(empty)'
     )
   }
+})
+
+test('a listed diff is decoded from text, and a capped one is unknown', () => {
+  const renamed = decodeListedDiff(
+    'pull_request',
+    'F\tarchive/transcriber-index.js\nP\tsidecars/synaplan-transcriber/src/index.js\n'
+  )
+  assert.equal(renamed.truncated, false)
+  assert.deepEqual(renamed.paths, [
+    'archive/transcriber-index.js',
+    'sidecars/synaplan-transcriber/src/index.js',
+  ])
+
+  const capped = decodeListedDiff('push', Array.from({ length: 300 }, (_, i) => `F\tfile-${i}.txt`).join('\n'))
+  assert.equal(capped.truncated, true)
+  assert.deepEqual(capped.paths, ['__unknown__'])
 })
 
 test('a file list at the GitHub cap is incomplete', () => {
