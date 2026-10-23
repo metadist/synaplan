@@ -191,6 +191,106 @@ final class MessagesEventEmitterTest extends TestCase
         $this->assertSame(1, $writeIndex);
     }
 
+    public function testEnsureClosedNamesHiddenToolsWhenTheFinalDeltaNeverArrived(): void
+    {
+        $events = [];
+        $emitter = new MessagesEventEmitter(static function (array $chunk) use (&$events): void {
+            $events[] = $chunk;
+        });
+
+        $emitter->relay('message_start', [
+            'type' => 'message_start',
+            'message' => ['id' => 'm1', 'role' => 'assistant'],
+        ], isFinalTurn: false);
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 0,
+            'content_block' => ['type' => 'tool_use', 'id' => 't1', 'name' => 'web_search', 'input' => []],
+        ], isFinalTurn: false, suppressToolNames: ['web_search', 'web_fetch']);
+        $emitter->relay('message_delta', [
+            'type' => 'message_delta',
+            'delta' => ['stop_reason' => 'tool_use'],
+        ], isFinalTurn: false);
+        $emitter->relay('message_stop', ['type' => 'message_stop'], isFinalTurn: false);
+
+        $emitter->resetTurnMapping();
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 0,
+            'content_block' => ['type' => 'tool_use', 'id' => 't2', 'name' => 'web_fetch', 'input' => []],
+        ], isFinalTurn: false, suppressToolNames: ['web_search', 'web_fetch']);
+        $emitter->relay('message_delta', [
+            'type' => 'message_delta',
+            'delta' => ['stop_reason' => 'tool_use'],
+        ], isFinalTurn: false);
+
+        $emitter->ensureClosed();
+        $emitter->ensureClosed();
+
+        $types = array_map(static fn (array $e): string => (string) ($e['data']['type'] ?? ''), $events);
+        $this->assertSame(['message_start', 'message_delta', 'message_stop'], $types);
+        $this->assertSame(['web_search', 'web_fetch'], $events[1]['data']['delta']['synaplan_server_tools']);
+    }
+
+    public function testEnsureClosedDoesNotRepeatToolsAlreadySentOnTheFinalDelta(): void
+    {
+        $events = [];
+        $emitter = new MessagesEventEmitter(static function (array $chunk) use (&$events): void {
+            $events[] = $chunk;
+        });
+
+        $emitter->relay('message_start', [
+            'type' => 'message_start',
+            'message' => ['id' => 'm1', 'role' => 'assistant'],
+        ], isFinalTurn: false);
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 0,
+            'content_block' => ['type' => 'tool_use', 'id' => 't1', 'name' => 'web_search', 'input' => []],
+        ], isFinalTurn: false, suppressToolNames: ['web_search']);
+        $emitter->relay('message_delta', [
+            'type' => 'message_delta',
+            'delta' => ['stop_reason' => 'end_turn'],
+        ], isFinalTurn: true);
+
+        $emitter->ensureClosed();
+
+        $deltas = array_values(array_filter(
+            $events,
+            static fn (array $event): bool => 'message_delta' === ($event['data']['type'] ?? ''),
+        ));
+        $this->assertCount(1, $deltas);
+        $this->assertSame(
+            ['stop_reason' => 'end_turn', 'synaplan_server_tools' => ['web_search']],
+            $deltas[0]['data']['delta'],
+        );
+        $types = array_map(static fn (array $e): string => (string) ($e['data']['type'] ?? ''), $events);
+        $this->assertSame('message_stop', $types[array_key_last($types)]);
+    }
+
+    public function testEnsureClosedWithoutHiddenToolsEmitsOnlyMessageStop(): void
+    {
+        $events = [];
+        $emitter = new MessagesEventEmitter(static function (array $chunk) use (&$events): void {
+            $events[] = $chunk;
+        });
+
+        $emitter->relay('message_start', [
+            'type' => 'message_start',
+            'message' => ['id' => 'm1', 'role' => 'assistant'],
+        ], isFinalTurn: false);
+        $emitter->relay('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => 0,
+            'content_block' => ['type' => 'text', 'text' => ''],
+        ], isFinalTurn: false);
+
+        $emitter->ensureClosed();
+
+        $types = array_map(static fn (array $e): string => (string) ($e['data']['type'] ?? ''), $events);
+        $this->assertSame(['message_start', 'content_block_start', 'message_stop'], $types);
+    }
+
     public function testEmitPing(): void
     {
         $events = [];
