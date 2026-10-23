@@ -53,6 +53,16 @@ final class MessageApiFormatterUsageTest extends TestCase
         return $m;
     }
 
+    public function testThinkingSecondsComeFromMetaAndStayAbsentOtherwise(): void
+    {
+        $with = $this->makeOutMessage();
+        $with->setMeta('thinking_seconds', '7');
+        self::assertSame(7, $this->formatter->format($with)['thinking_seconds']);
+
+        $without = $this->makeOutMessage();
+        self::assertNull($this->formatter->format($without)['thinking_seconds']);
+    }
+
     public function testUsageSerializedWithTokensCostAndModelKey(): void
     {
         $m = $this->makeOutMessage();

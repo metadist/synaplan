@@ -156,7 +156,8 @@ export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
  */
 export function parseContentWithThinking(
   content: string,
-  role: 'user' | 'assistant' = 'assistant'
+  role: 'user' | 'assistant' = 'assistant',
+  thinkingSeconds: number | null = null
 ): Part[] {
   if (role === 'user') {
     content = collapseApiToolTurn(content)
@@ -210,14 +211,12 @@ export function parseContentWithThinking(
   // If there are thinking blocks, extract them
   if (thinkingBlocks.length > 0) {
     // Add thinking blocks
-    thinkingBlocks.forEach((block) => {
-      // Estimate thinking time based on content length (rough approximation)
-      const thinkingTime = Math.max(3, Math.floor(block.content.length / 100))
-      parts.push({
-        type: 'thinking',
-        content: block.content,
-        thinkingTime,
-      })
+    thinkingBlocks.forEach((block, index) => {
+      const part: Part = { type: 'thinking', content: block.content }
+      if (index === 0 && typeof thinkingSeconds === 'number' && thinkingSeconds > 0) {
+        part.thinkingTime = thinkingSeconds
+      }
+      parts.push(part)
     })
 
     // Remove thinking blocks from content
@@ -312,6 +311,7 @@ export interface ApiLoadedMessageRow {
   searchResults?: Message['searchResults']
   multitask?: boolean
   quotedText?: string | null
+  thinking_seconds?: number | null
   quotedMessageId?: number | null
   agentId?: number | null
   file?: { path: string; type: string }
@@ -408,7 +408,7 @@ function askUserFrom(value: unknown): import('@/stores/history').TaskCard['askUs
 export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   const role = m.direction === 'IN' ? 'user' : 'assistant'
 
-  const parts = parseContentWithThinking(m.text || '', role)
+  const parts = parseContentWithThinking(m.text || '', role, m.thinking_seconds ?? null)
 
   // Add generated file (image/video/audio) as part if present.
   // Issue #625: assign a stable `partId` on load so the `<audio>` /
