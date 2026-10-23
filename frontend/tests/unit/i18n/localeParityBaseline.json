@@ -569,33 +569,6 @@
       "subscription.manage.paymentFailedTitle",
       "subscription.manage.statusIncompleteExpired",
       "subscription.selfHosted",
-      "widget.assistant",
-      "widget.chatUnavailable",
-      "widget.chatUnavailablePlaceholder",
-      "widget.dismissPrivacy",
-      "widget.downloadFailed",
-      "widget.downloadFile",
-      "widget.exportAttachment",
-      "widget.exportAttachments",
-      "widget.exportChat",
-      "widget.exportChatId",
-      "widget.exportDate",
-      "widget.exportFooter",
-      "widget.exportMessageCount",
-      "widget.humanHandoff.button",
-      "widget.humanHandoff.failed",
-      "widget.humanHandoff.successNotified",
-      "widget.humanHandoff.successQueued",
-      "widget.humanHandoff.tooltip",
-      "widget.privacyNotice",
-      "widget.privacyNoticePersonalized",
-      "widget.privacyPolicyLink",
-      "widget.senderAgent",
-      "widget.senderAi",
-      "widget.senderSystem",
-      "widget.senderVisitor",
-      "widget.sending",
-      "widget.you",
       "widgetSessions.continueFailed",
       "widgetSessions.handbackNotice",
       "widgetSessions.internalShort",
@@ -994,7 +967,9 @@
       "widgets.testChat",
       "widgets.viewSessions"
     ],
-    "notInEnglish": ["widget.continueFailed"]
+    "notInEnglish": [
+      "widget.continueFailed"
+    ]
   },
   "fr": {
     "missingFromLocale": [],
@@ -1429,33 +1404,6 @@
       "subscription.manage.paymentFailedCta",
       "subscription.manage.paymentFailedTitle",
       "subscription.manage.statusIncompleteExpired",
-      "widget.assistant",
-      "widget.chatUnavailable",
-      "widget.chatUnavailablePlaceholder",
-      "widget.dismissPrivacy",
-      "widget.downloadFailed",
-      "widget.downloadFile",
-      "widget.exportAttachment",
-      "widget.exportAttachments",
-      "widget.exportChat",
-      "widget.exportChatId",
-      "widget.exportDate",
-      "widget.exportFooter",
-      "widget.exportMessageCount",
-      "widget.humanHandoff.button",
-      "widget.humanHandoff.failed",
-      "widget.humanHandoff.successNotified",
-      "widget.humanHandoff.successQueued",
-      "widget.humanHandoff.tooltip",
-      "widget.privacyNotice",
-      "widget.privacyNoticePersonalized",
-      "widget.privacyPolicyLink",
-      "widget.senderAgent",
-      "widget.senderAi",
-      "widget.senderSystem",
-      "widget.senderVisitor",
-      "widget.sending",
-      "widget.you",
       "widgetSessions.continueFailed",
       "widgetSessions.handbackNotice",
       "widgetSessions.internalShort",
@@ -1854,6 +1802,8 @@
       "widgets.testChat",
       "widgets.viewSessions"
     ],
-    "notInEnglish": ["widget.continueFailed"]
+    "notInEnglish": [
+      "widget.continueFailed"
+    ]
   }
 }
