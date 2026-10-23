@@ -179,7 +179,8 @@ final readonly class PickupService
         $this->pickups->save($pickup);
         $this->rememberUploads($id, $upload);
 
-        return ['upload' => array_keys($upload), 'reuse' => $reuse, 'skip' => $skip];
+        // Numeric remote ids (Nextcloud file ids) became integer keys above.
+        return ['upload' => array_map('strval', array_keys($upload)), 'reuse' => $reuse, 'skip' => $skip];
     }
 
     public function storeFile(PlatformInstance $instance, int $id, string $remoteId, string $version, string $bytes, string $name, string $mime): int

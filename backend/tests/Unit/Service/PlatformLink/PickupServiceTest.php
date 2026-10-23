@@ -242,6 +242,20 @@ final class PickupServiceTest extends TestCase
         self::assertStringContainsString('Nothing was read.', $result['sentence']);
     }
 
+    public function testNumericRemoteIdsComeBackAsStrings(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+
+        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+            ['id' => '1027191588', 'version' => 'v1', 'name' => 'inv-0101.txt', 'size' => 76],
+        ]);
+
+        self::assertSame(['1027191588'], $answer['upload']);
+    }
+
     public function testANamesOnlyPickupDoesNotAskForUploads(): void
     {
         $pickup = new CloudPickup(7, 4, 'pi_abc', CloudPickup::MODE_LIST, ['folder_path' => 'Docs']);
