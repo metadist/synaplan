@@ -367,6 +367,7 @@ final readonly class PickupService
                 'type' => 'document',
                 'local_path' => $file->getFilePath(),
                 'name' => $file->getFileName(),
+                'file_id' => $id,
             ];
         }
 

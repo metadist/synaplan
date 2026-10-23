@@ -595,3 +595,37 @@ Findings:
 
    A link made with 1.6.x surviving the upgrade was checked on the dev stack
    when CF1.3c was built.
+
+**2026-10-23 (#2665, files read from a folder reach the next step).** Account
+`demo@synaplan.com` with the WebDAV connection "nextcloud folder (ada)" to the
+dev Nextcloud, folder `Invoices` with three `.txt` invoices. Prompt: "Please
+take the invoice files in my Nextcloud folder Invoices, read every one of
+them, and then give me one table with the vendor, the invoice date and the
+total amount of each invoice, sorted by date. …" Planner Claude Sonnet 5
+(switched from `gpt-oss-120b` for the walk and back), answers Groq
+`gpt-oss-120b`, each confirmed in `BUSELOG`.
+
+- Before (chat 2919): the folder was read, `extract_text` failed with "no
+  extractable text found in attachments", the document step was skipped
+  ("dependency 'n2' did not complete"), and the answer only named the files.
+- Chat 3039: the plan wired only `$n1.file` into file analysis, so the
+  table had one row and no word about the other two. A step after a folder
+  read now gets every file of it.
+- Chat 3042: the document step got all three files but not their text and
+  wrote a CSV with only the header row. Document generation now attaches
+  them with their text, like uploads.
+- Chat 3043: folder read, then the document. `invoices.xlsx` holds exactly
+  the three rows, sorted by date (Nordwind GmbH 2026-10-02 1,240.00 EUR;
+  Ostsee Logistik 2026-10-09 386.50 EUR; Nordwind GmbH 2026-10-17
+  2,015.75 EUR), and the run looks the same after a reload.
+- Chat 3035: folder read, then file work. File work cannot run on this
+  machine: the local Compute sidecar answers `docker_unavailable`. The run
+  did receive the three files (927 bytes in: the script and three 76-byte
+  files). Its answer said only "Read 3 files …"; it now adds "I could not
+  finish the answer. File work could not finish. Nothing new was saved."
+  (unit test on the same plan, not re-walked).
+
+Found, not fixed here: in five of nine runs the planner sent a single chat
+step and the chat model claimed to read the folder, twice with an invented
+table "exactly as they appear in the invoice files" —
+[#2667](https://github.com/metadist/synaplan/issues/2667).

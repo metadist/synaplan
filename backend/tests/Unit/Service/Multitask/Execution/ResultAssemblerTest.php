@@ -420,6 +420,47 @@ final class ResultAssemblerTest extends TestCase
         );
     }
 
+    public function testAFolderReadAloneIsNotPassedOffAsTheAnswer(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'folder_fetch'],
+                ['id' => 'n2', 'capability' => 'code_run', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('Read 3 files from Nextcloud › Invoices.', [['path' => '/api/v1/files/uploads/02/a.txt', 'type' => 'document']]));
+        $ctx->setResult('n2', NodeResult::failed('File work could not finish. Nothing new was saved.'));
+        $ctx->setResult('n3', NodeResult::skipped('Skipped because an earlier step did not finish.'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame(
+            "Read 3 files from Nextcloud › Invoices.\n\nI could not finish the answer. File work could not finish. Nothing new was saved.",
+            $result['content'],
+        );
+    }
+
+    public function testExtractedTextAloneSaysTheAnswerWasNotFinishedInTheRunsLanguage(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'de', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'extract_text'],
+                ['id' => 'n2', 'capability' => 'document_generation', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ctx = $this->context('mach eine Tabelle', 'de');
+        $ctx->setResult('n1', NodeResult::ok('ACME, 2026-10-01, 12.00'));
+        $ctx->setResult('n2', NodeResult::failed('The document could not be created.'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertStringEndsWith('Ich konnte die Antwort nicht fertigstellen. The document could not be created.', $result['content']);
+    }
+
     public function testBestEffortIgnoresAFailedHiddenStep(): void
     {
         $plan = TaskPlan::fromArray([

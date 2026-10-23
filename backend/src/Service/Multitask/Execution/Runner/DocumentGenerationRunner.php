@@ -10,8 +10,10 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\UnreadSourceGuard;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Multitask\Execution\InputFileText;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepFiles;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -42,6 +44,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         private ChatHandler $handler,
         private LoggerInterface $logger,
         private UnreadSourceGuard $unreadSourceGuard,
+        private ?InputFileText $fileText = null,
     ) {
     }
 
@@ -97,6 +100,9 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         $synthetic = $this->syntheticMessage($context, $prompt, $language);
+        // Files an earlier step read from a folder reach the document like
+        // uploads: attached, with their text.
+        $this->fileText?->attachTo($synthetic, StepFiles::of($node, $context, $inputs));
 
         // Force the officemaker topic so ChatHandler loads the file-generation
         // prompt (the one that emits {"BFILEPATH":...,"BFILETEXT":...}) and the

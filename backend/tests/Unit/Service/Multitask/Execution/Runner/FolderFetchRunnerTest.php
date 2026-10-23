@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\Entity\CloudPickup;
 use App\Entity\Connection;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConnectionRepository;
 use App\Service\Connection\PlannerChannelCatalog;
@@ -52,6 +53,7 @@ final class FolderFetchRunnerTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertSame('07/notes.txt', $result->files[0]['local_path']);
+        self::assertSame(42, $result->files[0]['file_id']);
         self::assertStringContainsString('Read 1 files', (string) $result->text);
     }
 
@@ -186,13 +188,19 @@ final class FolderFetchRunnerTest extends TestCase
         ]);
         $pickups = $this->createStub(PickupService::class);
         $pickups->method('identityForChannel')->willReturn(null);
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(static function (object $entity): void {
+            if ($entity instanceof File) {
+                (new \ReflectionProperty(File::class, 'id'))->setValue($entity, 42);
+            }
+        });
 
         return new FolderFetchRunner(
             $connections,
             $vault,
             $webDav,
             $storage,
-            $this->createStub(EntityManagerInterface::class),
+            $em,
             $pickups,
             $this->createStub(PlannerChannelCatalog::class),
             0,

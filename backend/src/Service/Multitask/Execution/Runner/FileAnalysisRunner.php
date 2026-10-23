@@ -10,8 +10,10 @@ use App\Repository\FileRepository;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
+use App\Service\Multitask\Execution\InputFileText;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepFiles;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -39,6 +41,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
         private ?ConversationFileCatalog $conversationFiles = null,
         private ?FileRepository $fileRepository = null,
         private ?ChatErrorPresenter $errorPresenter = null,
+        private ?InputFileText $fileText = null,
     ) {
     }
 
@@ -73,7 +76,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
         // "skipped". When the inbound message already carries its own files the
         // user's upload wins; otherwise fall back to the upstream-generated file.
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
-            $this->attachUpstreamFile($synthetic, $inputs);
+            $this->attachUpstreamFile($synthetic, StepFiles::of($node, $context, $inputs));
         }
 
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
@@ -170,11 +173,16 @@ final readonly class FileAnalysisRunner implements TaskRunner
      * `/api/v1/files/uploads/...` form to a relative upload path itself, so
      * surfacing one path is enough to route a generated image to the vision model.
      *
-     * @param array<string, mixed> $inputs
+     * @param list<array<mixed>> $descriptors {@see StepFiles::of()}
      */
-    private function attachUpstreamFile(Message $message, array $inputs): void
+    private function attachUpstreamFile(Message $message, array $descriptors): void
     {
-        $descriptor = $this->firstUpstreamFile($inputs);
+        // Files an earlier step stored (a folder read, a cloud pickup) are
+        // attached like uploads, every one of them.
+        if (null !== $this->fileText && $this->fileText->attachTo($message, $descriptors) > 0) {
+            return;
+        }
+        $descriptor = $descriptors[0] ?? null;
         if (null === $descriptor) {
             return;
         }
@@ -244,58 +252,6 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $this->logger->info('FileAnalysisRunner: analyzing conversation file by path', [
             'path' => $pick->relativePath,
         ]);
-    }
-
-    /**
-     * Find the first upstream file descriptor among the resolved inputs. The
-     * `prompt`/`text` inputs are skipped; every other value is scanned because it
-     * may be a single descriptor or a list of them.
-     *
-     * @param array<string, mixed> $inputs
-     *
-     * @return array<string, mixed>|null
-     */
-    private function firstUpstreamFile(array $inputs): ?array
-    {
-        foreach ($inputs as $key => $value) {
-            if ('prompt' === $key || 'text' === $key) {
-                continue;
-            }
-            $descriptor = $this->findDescriptor($value);
-            if (null !== $descriptor) {
-                return $descriptor;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Recursively locate the first file descriptor (an array carrying a `path` or
-     * `local_path`) inside a resolved input value.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function findDescriptor(mixed $value): ?array
-    {
-        if (!is_array($value)) {
-            return null;
-        }
-
-        $hasPath = (isset($value['local_path']) && is_string($value['local_path']) && '' !== $value['local_path'])
-            || (isset($value['path']) && is_string($value['path']) && '' !== $value['path']);
-        if ($hasPath) {
-            return $value;
-        }
-
-        foreach ($value as $item) {
-            $descriptor = $this->findDescriptor($item);
-            if (null !== $descriptor) {
-                return $descriptor;
-            }
-        }
-
-        return null;
     }
 
     private function stringInput(mixed $value): ?string
