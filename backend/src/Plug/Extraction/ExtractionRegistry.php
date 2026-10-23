@@ -81,4 +81,26 @@ final class ExtractionRegistry
 
         return $resolved;
     }
+
+    /**
+     * Document chain with cloud adapters removed when `$allowCloud` is false.
+     *
+     * `$hasCloudStt` on {@see chain()} only switches the audio chain and is
+     * not reused here. Builtin keys such as `pdf_vision` are not adapters, so
+     * {@see chain()} already skips them; an adapter that returns
+     * {@see ContentExtractorInterface::runsInCloud()} is dropped as well.
+     *
+     * @return list<ContentExtractorInterface>
+     */
+    public function chainFor(string $family, bool $allowCloud): array
+    {
+        if ($allowCloud) {
+            return $this->chain($family);
+        }
+
+        return array_values(array_filter(
+            $this->chain($family),
+            static fn (ContentExtractorInterface $adapter): bool => !$adapter->runsInCloud(),
+        ));
+    }
 }

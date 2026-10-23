@@ -33,6 +33,7 @@ final readonly class PlugConfigService
     public const KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED = 'WEB_SEARCH.USER_OVERRIDE_ALLOWED';
     public const KEY_WEB_SEARCH_TIMEOUT_MS = 'WEB_SEARCH.TIMEOUT_MS';
     public const KEY_WEB_SEARCH_MAX_CONTENT_CHARS = 'WEB_SEARCH.MAX_CONTENT_CHARS';
+    public const KEY_WEB_SEARCH_READ_DOCUMENTS = 'WEB_SEARCH.READ_DOCUMENTS';
     public const KEY_WEB_SEARCH_READ_PAGES_ENABLED = 'WEB_SEARCH.READ_PAGES_ENABLED';
     public const KEY_WEB_SEARCH_READ_PAGES_MAX = 'WEB_SEARCH.READ_PAGES_MAX';
     public const KEY_WEB_SEARCH_READ_PAGES_BUDGET_CHARS = 'WEB_SEARCH.READ_PAGES_BUDGET_CHARS';
@@ -343,6 +344,17 @@ final readonly class PlugConfigService
     public function webSearchMaxContentChars(): int
     {
         return $this->readInt(self::KEY_WEB_SEARCH_MAX_CONTENT_CHARS, self::DEFAULT_WEB_SEARCH_MAX_CONTENT_CHARS);
+    }
+
+    /**
+     * Whether a web search may download PDFs and Office files.
+     * A missing row stays off. Turning this on does not change file upload.
+     */
+    public function isWebSearchReadDocumentsEnabled(): bool
+    {
+        $raw = $this->readGlobal(self::KEY_WEB_SEARCH_READ_DOCUMENTS, '0');
+
+        return true === filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
     }
 
     /** Whether a web search also READS the top result pages (deep research). */

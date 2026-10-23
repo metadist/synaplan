@@ -20,5 +20,14 @@ interface ContentExtractorInterface
 
     public function extract(ExtractionRequest $request): ExtractionResult;
 
+    /**
+     * True when this adapter calls an AI provider.
+     *
+     * Self-hosted adapters (Tika, Docling, native text) stay false. The file
+     * upload path does not read this flag. {@see ExtractionRegistry::chainFor()}
+     * drops a true adapter when a local world must not leave the machine.
+     */
+    public function runsInCloud(): bool;
+
     public function health(): PlugHealth;
 }

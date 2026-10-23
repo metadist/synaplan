@@ -835,6 +835,7 @@ migration to roll out a new default.
 | `WEB_SEARCH.USER_OVERRIDE_ALLOWED` | `0` | When `1`, Settings shows **Use my own search** |
 | `WEB_SEARCH.TIMEOUT_MS` | `8000` | Per-provider HTTP timeout |
 | `WEB_SEARCH.MAX_CONTENT_CHARS` | `4000` | Truncate full-page text (`tavily`, `exa`, `firecrawl`) |
+| `WEB_SEARCH.READ_DOCUMENTS` | `0` | When `1`, web search may open PDF and Office links (`pdf`, `doc`, `docx`, `xls`, `xlsx`, `ppt`, `pptx`). A missing row stays off. The download is not saved to the person's library. Each download stops at 20 MB or 15 seconds. A PDF with no text layer can be sent to the vision model; a local-only read never does that. File upload is unchanged. |
 | `RERANK.ENABLED` | `0` | Off until a live eval wins; chat search is unchanged while off |
 | `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` (capped at 100) before rerank |
 | `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this; keep embedding order |
