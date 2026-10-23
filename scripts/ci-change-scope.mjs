@@ -16,8 +16,10 @@
 // Sidecar jobs (compute, transcriber, voice) are not part of "full tests".
 // Each runs only when the diff touches that sidecar, or when the diff is
 // unknown, or when this file or ci.yml changed. A thin or promote run skips
-// them: those trees were already tested. A failed sidecar is still a failed
-// run; a skipped one is not.
+// them: those trees were already tested. The Go suite itself is not reduced.
+// A sidecar this diff asked for must succeed. A skip is accepted only when
+// it was not asked for. The socket guard stays in the lint job, because it
+// scans every file.
 //
 // The pin path list is the catalog reader plus the Umbrel package prefix the
 // rollout guard already allows, so a sixth pin file cannot be forgotten here
