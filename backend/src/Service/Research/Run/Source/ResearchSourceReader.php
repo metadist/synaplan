@@ -25,6 +25,13 @@ final class ResearchSourceReader implements ResearchSourceReaderInterface
     public const CACHE_SECONDS = 3600;
     private const CACHE_LIMIT = 200;
 
+    /**
+     * Uncompressed `word/document.xml` budget. The download cap only limits
+     * the zip on disk; {@see \ZipArchive::getFromName()} would otherwise
+     * materialize the whole entry.
+     */
+    public const MAX_DOCX_XML_BYTES = 20 * 1024 * 1024;
+
     /** @var list<string> */
     public const DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
 
@@ -248,9 +255,16 @@ final class ResearchSourceReader implements ResearchSourceReaderInterface
         if (true !== $zip->open($path)) {
             return '';
         }
-        $xml = $zip->getFromName('word/document.xml');
+        $stat = $zip->statName('word/document.xml');
+        if (!\is_array($stat) || $stat['size'] > self::MAX_DOCX_XML_BYTES) {
+            $zip->close();
+
+            return '';
+        }
+        // The length stops a central-directory size of 0 from expanding without a bound.
+        $xml = $zip->getFromName('word/document.xml', self::MAX_DOCX_XML_BYTES + 1);
         $zip->close();
-        if (!\is_string($xml) || '' === $xml) {
+        if (!\is_string($xml) || '' === $xml || \strlen($xml) > self::MAX_DOCX_XML_BYTES) {
             return '';
         }
         $withBreaks = str_replace(['</w:p>', '<w:tab/>', '<w:br/>'], ["\n", "\t", "\n"], $xml);

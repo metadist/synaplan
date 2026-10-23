@@ -174,7 +174,7 @@ final readonly class GuardedDocumentDownload implements DocumentFetcher
 
     private static function absoluteLocation(string $current, string $location): string
     {
-        if (str_starts_with($location, 'http://') || str_starts_with($location, 'https://')) {
+        if (1 === preg_match('#^https?://#i', $location)) {
             return $location;
         }
         $parts = parse_url($current);
@@ -184,6 +184,11 @@ final readonly class GuardedDocumentDownload implements DocumentFetcher
         $origin = $parts['scheme'].'://'.$parts['host'];
         if (isset($parts['port'])) {
             $origin .= ':'.$parts['port'];
+        }
+        // A scheme-relative Location (`//cdn.example/...`) names a new host.
+        // Treating it as a path joins it onto the original origin.
+        if (str_starts_with($location, '//')) {
+            return $parts['scheme'].':'.$location;
         }
         if (str_starts_with($location, '/')) {
             return $origin.$location;

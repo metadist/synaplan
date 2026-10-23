@@ -49,6 +49,23 @@ final class ResearchSourceReaderTest extends TestCase
         self::assertFileDoesNotExist($docx);
     }
 
+    public function testADocxWhoseXmlExceedsTheUncompressedCapIsNotExpanded(): void
+    {
+        $docx = $this->oversizedDocx();
+        $fetcher = $this->createMock(DocumentFetcher::class);
+        $fetcher->expects(self::once())->method('fetch')->willReturn(DownloadedDocument::saved($docx));
+        $cloud = $this->createMock(CloudDocumentReader::class);
+        $cloud->expects(self::never())->method('read');
+        $reader = $this->reader($fetcher, $cloud, 'should not be used');
+
+        $read = $reader->read('https://example.com/bomb.docx', false);
+
+        self::assertTrue($read->blocked);
+        self::assertSame('unreadable', $read->reason);
+        self::assertSame('', $read->text);
+        self::assertFileDoesNotExist($docx);
+    }
+
     public function testLocalPdfWithNoTextNeverCallsVision(): void
     {
         $pdf = $this->tempFile('%PDF-1.4 empty');
@@ -197,6 +214,33 @@ final class ResearchSourceReaderTest extends TestCase
             .'</w:t></w:r></w:p></w:body></w:document>';
         $zip->addFromString('word/document.xml', $xml);
         $zip->close();
+
+        return $path;
+    }
+
+    private function oversizedDocx(): string
+    {
+        $xmlPath = tempnam(sys_get_temp_dir(), 'rs4xml');
+        self::assertNotFalse($xmlPath);
+        $handle = fopen($xmlPath, 'wb');
+        self::assertNotFalse($handle);
+        fwrite($handle, '<?xml version="1.0"?><w:document><w:body><w:p><w:t>');
+        $remaining = ResearchSourceReader::MAX_DOCX_XML_BYTES;
+        $chunk = str_repeat('A', 1024 * 1024);
+        while ($remaining > 0) {
+            $piece = $remaining >= \strlen($chunk) ? $chunk : substr($chunk, 0, $remaining);
+            fwrite($handle, $piece);
+            $remaining -= \strlen($piece);
+        }
+        fwrite($handle, '</w:t></w:p></w:body></w:document>');
+        fclose($handle);
+
+        $path = sys_get_temp_dir().'/rs4-'.bin2hex(random_bytes(4)).'.docx';
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($path, \ZipArchive::CREATE));
+        $zip->addFile($xmlPath, 'word/document.xml');
+        $zip->close();
+        unlink($xmlPath);
 
         return $path;
     }

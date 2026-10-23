@@ -28,6 +28,84 @@ final class GuardedDocumentDownloadTest extends TestCase
         self::assertSame('blocked_address', $result->reason);
     }
 
+    public function testFollowsAProtocolRelativeRedirectToTheNamedHost(): void
+    {
+        $seen = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$seen): MockResponse {
+            $seen[] = $url;
+            if (1 === \count($seen)) {
+                return new MockResponse('', [
+                    'http_code' => 302,
+                    'response_headers' => ['Location: //cdn.example.com/file.pdf'],
+                ]);
+            }
+
+            return new MockResponse('%PDF-1.4');
+        });
+        $download = $this->download($client, blocked: false);
+
+        $result = $download->fetch('https://example.com:8443/docs/report.pdf', 'pdf');
+
+        self::assertTrue($result->ok);
+        self::assertSame([
+            'https://example.com:8443/docs/report.pdf',
+            'https://cdn.example.com/file.pdf',
+        ], $seen);
+        unlink($result->path);
+    }
+
+    public function testFollowsAMixedCaseAbsoluteRedirect(): void
+    {
+        $seen = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$seen): MockResponse {
+            $seen[] = $url;
+            if (1 === \count($seen)) {
+                return new MockResponse('', [
+                    'http_code' => 302,
+                    'response_headers' => ['Location: HTTPS://cdn.example.com/file.pdf'],
+                ]);
+            }
+
+            return new MockResponse('%PDF-1.4');
+        });
+        $download = $this->download($client, blocked: false);
+
+        $result = $download->fetch('https://example.com/docs/report.pdf', 'pdf');
+
+        self::assertTrue($result->ok);
+        self::assertSame([
+            'https://example.com/docs/report.pdf',
+            'https://cdn.example.com/file.pdf',
+        ], $seen);
+        unlink($result->path);
+    }
+
+    public function testFollowsASameHostAbsolutePathRedirect(): void
+    {
+        $seen = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$seen): MockResponse {
+            $seen[] = $url;
+            if (1 === \count($seen)) {
+                return new MockResponse('', [
+                    'http_code' => 302,
+                    'response_headers' => ['Location: /files/a.pdf'],
+                ]);
+            }
+
+            return new MockResponse('%PDF-1.4');
+        });
+        $download = $this->download($client, blocked: false);
+
+        $result = $download->fetch('https://example.com:8443/docs/report.pdf', 'pdf');
+
+        self::assertTrue($result->ok);
+        self::assertSame([
+            'https://example.com:8443/docs/report.pdf',
+            'https://example.com:8443/files/a.pdf',
+        ], $seen);
+        unlink($result->path);
+    }
+
     public function testDoesNotFollowARedirectOntoAPrivateAddress(): void
     {
         $client = new MockHttpClient(function (string $method, string $url): MockResponse {
