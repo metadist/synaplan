@@ -268,6 +268,19 @@ has.
 3. Every stream transcript snapshot unchanged; chat, widget and gateway E2E
    specs green.
 
+### As delivered (2026-10-23)
+
+The release sits right before the provider stream in `ChatReplyGenerator`
+(web chat and widget), once more on the stream's first chunk (provider setup
+can reconnect), and after every `StreamedResponse`
+(`StreamedResponseConnectionRelease`), not in the orchestrator and the
+gateways: the orchestrator's pre-call work needs the database, and the
+gateway call paths are frozen in the size ledger. Their before-call release
+moves to the AI call pipeline (AU10, AU12). The functional test of the brief
+is replaced by unit tests and a live count, because tests run inside a DAMA
+transaction. Details and the numbers (8 streams: 8 held while streaming → 0):
+STATUS 2026-10-23.
+
 ---
 
 ## AU6 — A watchdog on every server reports its capacity (no-app-impact)

@@ -28,6 +28,7 @@ use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Infrastructure\DatabaseConnectionRelease;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\Memory\ChatMemoryContextLoader;
 use App\Service\Memory\MemoryExtractionDispatcher;
@@ -137,7 +138,7 @@ final class ChatHandlerFactory
             new ChatSystemPromptAssembler($sections, $documents, $messages, $logger),
             $messages,
             new ChatRequestOptions($structuredOutputConfig, $rateLimitService),
-            new ChatReplyGenerator($aiFacade, $documents, $logger, new ProviderTranscriptCapture()),
+            new ChatReplyGenerator($aiFacade, $documents, $logger, new ProviderTranscriptCapture(), new DatabaseConnectionRelease(new StubConnectionRegistry(), $logger)),
             $documents,
             new RoutingHandoffResolver($toolCallingTranslator, $toolCallParser, $routingToolset, $logger),
             new PendingMemoryExtraction($memoryExtractionDispatcher, $perfPipelineFlag, $logger),

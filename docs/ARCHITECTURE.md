@@ -162,6 +162,20 @@ flowchart LR
   apps read them. A new event is a `feat:` with frontend work.
 - **Stop.** `CancelledTurns` flags a turn the caller owns and stores the
   partial answer the client sends.
+- **Database.** A FrankenPHP worker keeps its Doctrine connections between
+  requests, so a held connection follows every worker, streaming or idle.
+  `DatabaseConnectionRelease` closes every open connection that is outside a
+  transaction; Doctrine reconnects on the next query. `ChatReplyGenerator`
+  calls it right before the provider stream of a chat answer (web chat and
+  widget) and once more on the stream's first chunk, because provider setup
+  (endpoint, credentials) can reconnect in between;
+  `StreamedResponseConnectionRelease` calls it on `terminate`
+  after every `StreamedResponse`, so a worker idle between streams holds
+  none. The gateways (`/v1/chat/completions`, `/v1/messages`) and file
+  analysis give theirs back only after the response for now: their
+  provider calls run through `AiFacade` and the gateway loops, which the
+  size ledger freezes; the before-call release joins the AI call pipeline
+  (architecture update, S1).
 
 `tests/Characterization/StreamTranscriptCharacterizationTest.php` locks the
 ordered event names and payload shapes of six turns; a split that changes a

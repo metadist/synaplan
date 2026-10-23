@@ -1,5 +1,9 @@
 # Handover — 2026-10-22
 
+> **Update 2026-10-23:** AU2 ([#2626](https://github.com/metadist/synaplan/pull/2626))
+> merged on 2026-10-22; AU5 is the next step in progress. The step log in
+> [`STATUS.md`](./STATUS.md) is current; this file is the 2026-10-22 snapshot.
+
 For the owner, so the track can continue from here. Step log:
 [`STATUS.md`](./STATUS.md). Plan: [`00_master_plan.md`](./00_master_plan.md).
 
