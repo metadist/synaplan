@@ -35,6 +35,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class FileAnalysisRunner implements TaskRunner
 {
+    private const MAX_LEGACY_FILES = 20;
+
     public function __construct(
         private FileAnalysisHandler $handler,
         private LoggerInterface $logger,
@@ -66,6 +68,8 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $prompt = $this->stringInput($inputs['prompt'] ?? $inputs['text'] ?? null);
 
         $synthetic = $this->syntheticMessage($context, $prompt);
+        $stepFiles = StepFiles::of($node, $context, $inputs);
+        $this->attachStoredFiles($synthetic, $stepFiles, $context);
 
         // Issue #1080: a DAG can chain image_generation → file_analysis →
         // text2sound, so the file to analyze may be produced by an UPSTREAM node
@@ -76,7 +80,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
         // "skipped". When the inbound message already carries its own files the
         // user's upload wins; otherwise fall back to the upstream-generated file.
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
-            $this->attachUpstreamFile($synthetic, StepFiles::of($node, $context, $inputs));
+            $this->attachUpstreamFile($synthetic, $stepFiles);
         }
 
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
@@ -163,6 +167,28 @@ final readonly class FileAnalysisRunner implements TaskRunner
     }
 
     /**
+     * Files an earlier step stored (a folder read, a cloud pickup) join the
+     * turn's own uploads, every one of them, with their text. A legacy single
+     * upload moves into the file list first, because the analysis reads that
+     * list instead of the legacy fields once it has entries.
+     *
+     * @param list<array<mixed>> $descriptors {@see StepFiles::of()}
+     */
+    private function attachStoredFiles(Message $message, array $descriptors, NodeContext $context): void
+    {
+        if (null === $this->fileText || [] === StepFiles::storedIds($descriptors)) {
+            return;
+        }
+        $messageId = $context->message->getId();
+        if ($message->getFiles()->isEmpty() && $message->getFile() > 0 && null !== $this->fileRepository && null !== $messageId) {
+            foreach ($this->fileRepository->findFilesByMessageIds((int) $message->getUserId(), [$messageId], self::MAX_LEGACY_FILES) as $legacy) {
+                $message->addFile($legacy);
+            }
+        }
+        $this->fileText->attachTo($message, $descriptors);
+    }
+
+    /**
      * Lift the first resolved upstream file descriptor out of the node's inputs
      * onto the synthetic message's legacy single-file fields (issue #1080).
      *
@@ -177,12 +203,9 @@ final readonly class FileAnalysisRunner implements TaskRunner
      */
     private function attachUpstreamFile(Message $message, array $descriptors): void
     {
-        // Files an earlier step stored (a folder read, a cloud pickup) are
-        // attached like uploads, every one of them.
-        if (null !== $this->fileText && $this->fileText->attachTo($message, $descriptors) > 0) {
-            return;
-        }
-        $descriptor = $descriptors[0] ?? null;
+        // A stored file is attached by id or not at all, never by its path.
+        $paths = array_values(array_filter($descriptors, static fn (array $descriptor): bool => !isset($descriptor['file_id'])));
+        $descriptor = $paths[0] ?? null;
         if (null === $descriptor) {
             return;
         }

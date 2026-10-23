@@ -443,6 +443,28 @@ final class ResultAssemblerTest extends TestCase
         );
     }
 
+    public function testARunWaitingForApprovalOrStoppedByAConditionIsNotCalledUnfinished(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'folder_fetch'],
+                ['id' => 'n2', 'capability' => 'email_me', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2']],
+            ],
+        ]);
+        $waiting = $this->context();
+        $waiting->setResult('n1', NodeResult::ok('Read 3 files from Nextcloud › Invoices.'));
+        $waiting->setResult('n2', NodeResult::waitingApproval(41));
+        $stopped = $this->context();
+        $stopped->setResult('n1', NodeResult::ok('Read 3 files from Nextcloud › Invoices.'));
+        $stopped->setResult('n2', NodeResult::stopped());
+        $stopped->setResult('n3', NodeResult::skipped('Skipped because the condition was not met.'));
+
+        self::assertStringNotContainsString('I could not finish the answer.', $this->assembler->assemble($plan, $waiting)['content']);
+        self::assertSame('Read 3 files from Nextcloud › Invoices.', $this->assembler->assemble($plan, $stopped)['content']);
+    }
+
     public function testExtractedTextAloneSaysTheAnswerWasNotFinishedInTheRunsLanguage(): void
     {
         $plan = TaskPlan::fromArray([

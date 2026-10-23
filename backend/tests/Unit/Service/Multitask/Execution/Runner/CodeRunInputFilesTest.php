@@ -30,14 +30,14 @@ final class CodeRunInputFilesTest extends TestCase
 
         $ids = $this->ids($node, $this->folderRead([11, 12]), ['file' => ['local_path' => '02/f11.csv', 'file_id' => 11]]);
 
-        self::assertSame([11, 12], $ids);
+        self::assertSame([21, 11, 12], $ids);
     }
 
-    public function testTheFilesAFolderReadProducedAreMountedWithoutWiring(): void
+    public function testTheFilesAFolderReadProducedAreMountedNextToTheUploads(): void
     {
         $node = new TaskNode('n2', Capability::CodeRun, ['n1']);
 
-        self::assertSame([11, 12], $this->ids($node, $this->folderRead([11, 12])));
+        self::assertSame([21, 11, 12], $this->ids($node, $this->folderRead([11, 12])));
     }
 
     public function testFilesOfOtherStepsAreNotMountedUnlessWired(): void

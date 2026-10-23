@@ -58,4 +58,43 @@ final class DocumentGenerationRunnerTest extends TestCase
         self::assertStringContainsString('Ostsee Logistik, Date: 2026-10-09, Total: 386.50 EUR', $seen->getAllFilesText());
         self::assertStringContainsString('Date: 2026-10-17, Total: 2,015.75 EUR', $seen->getAllFilesText());
     }
+
+    public function testAFileWithoutTextIsNamedOnTheDocumentStep(): void
+    {
+        $files = [$this->storedFile(370, 'inv-0101.txt'), $this->storedFile(371, 'scan.png')];
+        $handler = $this->createStub(ChatHandler::class);
+        $handler->method('handle')->willReturn(['metadata' => ['generated_file' => ['path' => '02/invoices.csv', 'filename' => 'invoices.csv']]]);
+
+        $result = $this->generate($handler, $files, ['inv-0101.txt' => 'Vendor: Nordwind GmbH, Total: 1,240.00 EUR']);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('Document created: invoices.csv. No text was found in scan.png, so it is not in the document.', $result->text);
+    }
+
+    public function testNoReadableFileMeansNoDocument(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::never())->method('handle');
+
+        $result = $this->generate($handler, [$this->storedFile(371, 'scan.png'), $this->storedFile(372, 'photo.jpg')], []);
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('Synaplan found no text in scan.png, photo.jpg. No document was made.', $result->error);
+    }
+
+    /**
+     * @param list<File>            $files
+     * @param array<string, string> $texts
+     */
+    private function generate(ChatHandler $handler, array $files, array $texts): NodeResult
+    {
+        $context = new NodeContext($this->owner(), [], self::OWNER, ['language' => 'en']);
+        $context->setResult('n1', NodeResult::ok('Read files.', array_map(
+            static fn (File $file): array => ['local_path' => $file->getFilePath(), 'name' => $file->getFileName(), 'file_id' => (int) $file->getId()],
+            $files,
+        ), ['folder_fetch' => true]));
+        $runner = new DocumentGenerationRunner($handler, new NullLogger(), $this->createStub(UnreadSourceGuard::class), $this->inputFileText($files, $texts));
+
+        return $runner->run(new TaskNode('n2', Capability::DocumentGeneration, ['n1'], ['prompt' => 'One table of the invoices.']), $context);
+    }
 }

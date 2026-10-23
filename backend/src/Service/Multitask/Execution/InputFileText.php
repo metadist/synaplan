@@ -22,6 +22,9 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class InputFileText
 {
+    /** Names listed in a sentence; the rest are counted. */
+    private const NAMES_IN_TEXT = 5;
+
     public function __construct(
         private FileRepository $files,
         private UserRepository $users,
@@ -63,29 +66,51 @@ final readonly class InputFileText
     }
 
     /**
-     * Attach the stored files among the descriptors to a step's message, the
-     * way an upload is attached: documents with their text, images and audio
-     * as they are for the vision and speech paths. Returns how many.
+     * Attach the stored files among the descriptors to a step's message the
+     * way an upload is attached, with their text: documents, audio and video
+     * always, images when other files come along or the step needs text. An
+     * image-only bundle keeps the direct vision path.
      *
      * @param list<array<mixed>> $descriptors {@see StepFiles::of()}
+     *
+     * @return list<string> names of attached files whose text could not be read
      */
-    public function attachTo(Message $message, array $descriptors): int
+    public function attachTo(Message $message, array $descriptors, bool $imagesAsText = false): array
     {
-        $attached = 0;
+        $files = [];
         foreach ($descriptors as $descriptor) {
             $file = $this->file($descriptor, (int) $message->getUserId());
-            if (!$file instanceof File) {
-                continue;
+            if ($file instanceof File) {
+                $files[] = $file;
             }
-            $type = strtolower($file->getFileType());
-            if (!in_array($type, MessagePreProcessor::IMAGE_EXTENSIONS, true) && !in_array($type, MessagePreProcessor::AUDIO_EXTENSIONS, true)) {
-                $this->ensure($file);
+        }
+        $imagesAsText = $imagesAsText || [] !== array_filter($files, static fn (File $file): bool => !self::isImage($file));
+        $unread = [];
+        foreach ($files as $file) {
+            if ((!self::isImage($file) || $imagesAsText) && '' === trim($this->ensure($file))) {
+                $unread[] = $file->getFileName();
             }
             $message->addFile($file);
-            ++$attached;
         }
 
-        return $attached;
+        return $unread;
+    }
+
+    /**
+     * "a.pdf, b.png and 3 more" for a sentence about files.
+     *
+     * @param list<string> $names
+     */
+    public static function listNames(array $names): string
+    {
+        $named = array_values(array_filter($names, static fn (string $name): bool => '' !== $name));
+        if ([] === $named) {
+            return 1 === count($names) ? 'the file' : count($names).' files';
+        }
+        $shown = array_slice($named, 0, self::NAMES_IN_TEXT);
+        $rest = count($names) - count($shown);
+
+        return implode(', ', $shown).($rest > 0 ? ' and '.$rest.' more' : '');
     }
 
     public function ensure(File $file): string
@@ -117,6 +142,11 @@ final readonly class InputFileText
         $this->bill($file);
 
         return $text;
+    }
+
+    private static function isImage(File $file): bool
+    {
+        return in_array(strtolower($file->getFileType()), MessagePreProcessor::IMAGE_EXTENSIONS, true);
     }
 
     private function bill(File $file): void

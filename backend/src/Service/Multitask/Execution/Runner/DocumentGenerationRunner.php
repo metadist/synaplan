@@ -100,9 +100,10 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         $synthetic = $this->syntheticMessage($context, $prompt, $language);
-        // Files an earlier step read from a folder reach the document like
-        // uploads: attached, with their text.
-        $this->fileText?->attachTo($synthetic, StepFiles::of($node, $context, $inputs));
+        $unread = $this->attachStepFiles($synthetic, $node, $context, $inputs);
+        if ([] !== $unread && '' === trim($synthetic->getAllFilesText())) {
+            return NodeResult::failed('Synaplan found no text in '.InputFileText::listNames($unread).'. No document was made.');
+        }
 
         // Force the officemaker topic so ChatHandler loads the file-generation
         // prompt (the one that emits {"BFILEPATH":...,"BFILETEXT":...}) and the
@@ -158,7 +159,31 @@ final readonly class DocumentGenerationRunner implements TaskRunner
 
         $filename = is_string($metadata['generated_file']['filename'] ?? null) ? $metadata['generated_file']['filename'] : 'document';
 
-        return NodeResult::ok('Document created: '.$filename, [$descriptor], $metadata);
+        return NodeResult::ok($this->createdText($filename, $unread), [$descriptor], $metadata);
+    }
+
+    /**
+     * Files an earlier step read from a folder reach the document like
+     * uploads: attached, with their text. Returns the ones whose text could
+     * not be read.
+     *
+     * @param array<string, mixed> $inputs already-resolved node inputs
+     *
+     * @return list<string>
+     */
+    private function attachStepFiles(Message $message, TaskNode $node, NodeContext $context, array $inputs): array
+    {
+        return $this->fileText?->attachTo($message, StepFiles::of($node, $context, $inputs), imagesAsText: true) ?? [];
+    }
+
+    /**
+     * @param list<string> $unread files left out because no text was found
+     */
+    private function createdText(string $filename, array $unread): string
+    {
+        $text = 'Document created: '.$filename;
+
+        return [] === $unread ? $text : $text.'. No text was found in '.InputFileText::listNames($unread).', so it is not in the document.';
     }
 
     /**

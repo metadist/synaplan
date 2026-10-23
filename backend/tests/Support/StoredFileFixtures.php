@@ -65,12 +65,17 @@ trait StoredFileFixtures
         );
     }
 
-    private function owner(string $text = 'make one table of these invoices'): Message
+    /**
+     * The turn's message, with what the person uploaded to it.
+     *
+     * @param list<File> $uploads
+     */
+    private function owner(string $text = 'make one table of these invoices', array $uploads = []): Message
     {
         $message = $this->createStub(Message::class);
         $message->method('getUserId')->willReturn(self::OWNER);
         $message->method('getText')->willReturn($text);
-        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection($uploads));
 
         return $message;
     }

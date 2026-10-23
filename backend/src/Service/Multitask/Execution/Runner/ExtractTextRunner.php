@@ -23,9 +23,6 @@ use App\Service\Multitask\Skill\SkillDescriptor;
  */
 final readonly class ExtractTextRunner implements TaskRunner
 {
-    /** Names listed in a failure sentence; the rest are counted. */
-    private const NAMES_IN_TEXT = 5;
-
     public function __construct(
         private InputFileText $fileText,
     ) {
@@ -70,11 +67,11 @@ final readonly class ExtractTextRunner implements TaskRunner
 
         if ('' === $text) {
             return NodeResult::failed([] !== $empty
-                ? 'Synaplan found no text in '.$this->names($empty).'.'
+                ? 'Synaplan found no text in '.InputFileText::listNames($empty).'.'
                 : 'There was no file to read text from.');
         }
         if ([] !== $empty && [] !== $parts) {
-            $text .= "\n\nNo text was found in ".$this->names($empty).'.';
+            $text .= "\n\nNo text was found in ".InputFileText::listNames($empty).'.';
         }
 
         return NodeResult::ok($text, [], ['source' => 'preprocessed_extraction']);
@@ -91,20 +88,5 @@ final readonly class ExtractTextRunner implements TaskRunner
         $path = $file['local_path'] ?? $file['path'] ?? null;
 
         return is_string($path) ? basename($path) : '';
-    }
-
-    /**
-     * @param list<string> $names
-     */
-    private function names(array $names): string
-    {
-        $named = array_values(array_filter($names, static fn (string $name): bool => '' !== $name));
-        if ([] === $named) {
-            return 1 === count($names) ? 'the file' : count($names).' files';
-        }
-        $shown = array_slice($named, 0, self::NAMES_IN_TEXT);
-        $rest = count($names) - count($shown);
-
-        return implode(', ', $shown).($rest > 0 ? ' and '.$rest.' more' : '');
     }
 }

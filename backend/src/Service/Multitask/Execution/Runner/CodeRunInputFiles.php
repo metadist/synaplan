@@ -10,9 +10,9 @@ use App\Service\Multitask\Execution\StepFiles;
 use App\Service\Multitask\Plan\TaskNode;
 
 /**
- * The files a file-work step mounts into the sandbox, first match wins:
- * the ids the plan named; the stored files the step works on
- * ({@see StepFiles}); the turn's own attachments.
+ * The files a file-work step mounts into the sandbox: the ids the plan
+ * named, or else the turn's own attachments together with the stored files
+ * the step works on ({@see StepFiles}).
  */
 final readonly class CodeRunInputFiles
 {
@@ -39,9 +39,11 @@ final readonly class CodeRunInputFiles
         if ([] !== $ids) {
             return $ids;
         }
-        $ids = StepFiles::storedIds(StepFiles::of($node, $context, $inputs));
 
-        return [] !== $ids ? $ids : $this->attachments($context, $userId);
+        return array_values(array_unique([
+            ...$this->attachments($context, $userId),
+            ...StepFiles::storedIds(StepFiles::of($node, $context, $inputs)),
+        ]));
     }
 
     /**
