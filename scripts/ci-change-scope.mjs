@@ -15,7 +15,8 @@
 //
 // Sidecar jobs (compute, transcriber, voice) are not part of "full tests".
 // Each runs only when the diff touches that sidecar, or when the diff is
-// unknown, or when this file or ci.yml changed. A thin or promote run skips
+// unknown, or when this file or ci.yml changed. A rename counts both the
+// new path and the previous path. A thin or promote run skips
 // them: those trees were already tested. The Go suite itself is not reduced.
 // A sidecar this diff asked for must succeed. A skip is accepted only when
 // it was not asked for. The socket guard stays in the lint job, because it

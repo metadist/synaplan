@@ -176,6 +176,26 @@ test('an unknown diff or a CI rule change tests every sidecar', () => {
   }
 })
 
+test('a rename out of a sidecar still selects it when the old path is listed', () => {
+  const destinationOnly = sidecarsForChange({
+    eventName: 'pull_request',
+    ref: 'refs/pull/1/merge',
+    files: ['archive/transcriber-index.js'],
+    mode: 'heavy',
+  })
+  assert.equal(destinationOnly.transcriber, false)
+
+  const withPreviousPath = sidecarsForChange({
+    eventName: 'pull_request',
+    ref: 'refs/pull/1/merge',
+    files: ['archive/transcriber-index.js', 'sidecars/synaplan-transcriber/src/index.js'],
+    mode: 'heavy',
+  })
+  assert.equal(withPreviousPath.transcriber, true)
+  assert.equal(withPreviousPath.compute, false)
+  assert.equal(withPreviousPath.voice, false)
+})
+
 test('a compose or socket-guard change does not pull in the Go suite', () => {
   const result = sidecarsForChange({
     eventName: 'pull_request',

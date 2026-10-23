@@ -92,16 +92,18 @@ jobs:
               fi
             fi
           elif [ "$EVENT_NAME" = pull_request ]; then
+            # previous_filename is set when a file was renamed. The new path
+            # alone would hide a file that left a sidecar directory.
             files="$(
               gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
-                --jq '.[].filename'
+                --jq '.[] | .filename, (.previous_filename // empty)'
             )"
           elif [ "$EVENT_NAME" = push ]; then
             if [[ "${BEFORE:-}" =~ ^0+$ ]] || [ -z "${BEFORE:-}" ]; then
               files="__unknown__"
             elif ! files="$(
               gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${SHA}" \
-                --jq '.files[].filename'
+                --jq '.files[] | .filename, (.previous_filename // empty)'
             )"; then
               files="__unknown__"
             fi
@@ -313,17 +315,27 @@ jobs:
   # not rebuild: it moves the version tags onto the image the main run
   # already published under its short commit, the same rule as docker-manifest
   # applies to the app image. Only a missing short-commit tag falls back to a
-  # build on the tag.
+  # build on the tag. Promote skips the test job, so this condition uses
+  # !cancelled(). Without that, GitHub treats the skip as a failed dependency
+  # and never moves the release tags.
   transcriber-publish:
     name: Publish Transcriber Image
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [change-scope, transcriber-sidecar]
     if: >-
+      !cancelled() &&
       github.event_name == 'push' &&
+      needs.change-scope.result == 'success' &&
       (
-        needs.change-scope.outputs.mode == 'promote' ||
-        (needs.change-scope.outputs.mode == 'heavy' && needs.transcriber-sidecar.result == 'success')
+        (
+          needs.change-scope.outputs.mode == 'promote' &&
+          (needs.transcriber-sidecar.result == 'success' || needs.transcriber-sidecar.result == 'skipped')
+        ) ||
+        (
+          needs.change-scope.outputs.mode == 'heavy' &&
+          needs.transcriber-sidecar.result == 'success'
+        )
       )
     permissions:
       contents: read
@@ -2529,7 +2541,7 @@ jobs:
     name: All Checks Passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, voice-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, voice-sidecar, transcriber-publish, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Checkout the gate rules
@@ -2549,6 +2561,7 @@ jobs:
           COMPUTE_NEEDED: ${{ needs.change-scope.outputs.compute }}
           TRANSCRIBER: ${{ needs.transcriber-sidecar.result }}
           TRANSCRIBER_NEEDED: ${{ needs.change-scope.outputs.transcriber }}
+          TRANSCRIBER_PUBLISH: ${{ needs.transcriber-publish.result }}
           VOICE: ${{ needs.voice-sidecar.result }}
           VOICE_NEEDED: ${{ needs.change-scope.outputs.voice }}
           BACKEND: ${{ needs.backend.result }}
@@ -2612,6 +2625,7 @@ jobs:
           allow_skip "Update the Default Release Version" "$REL_PIN"
           allow_skip "Deploy Cloudflare Worker" "$CF_DEPLOY"
           allow_skip "Cloudflare Worker Check" "$CF_CHECK"
+          allow_skip "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
           allow_skip "Carry OpenAPI Spec Forward" "$OPENAPI"
 
           case "$MODE" in
@@ -2629,6 +2643,9 @@ jobs:
                 require "Publish arm64 Image" "$PUSH_ARM64"
                 require "Publish Multi-Arch Manifest" "$MANIFEST"
                 require "Deploy Cloudflare Worker" "$CF_DEPLOY"
+                if [ "$TRANSCRIBER_NEEDED" = true ]; then
+                  require "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
+                fi
               fi
               if [ "$EVENT" = pull_request ]; then
                 require "Cloudflare Worker Check" "$CF_CHECK"
@@ -2638,6 +2655,7 @@ jobs:
             thin)
               ;;
             promote)
+              require "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
               require "Publish amd64 Image" "$PUSH_AMD64"
               require "Publish arm64 Image" "$PUSH_ARM64"
               require "Publish Multi-Arch Manifest" "$MANIFEST"
