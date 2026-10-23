@@ -6,10 +6,11 @@
 # chunk), and counts the connections from the backend's address before,
 # during and after the streams. Leaves the stack as found.
 #
-# No paid provider: the demo user's chat, sorting and memory models must be the
-# test provider, the measured FrankenPHP runs without Qdrant (so no memory
-# search embeds the question), and the run fails if the usage ledger shows a
-# call to any other provider.
+# No paid provider: before it opens a chat, stream_turns.py asks the measured
+# FrankenPHP which chat, sorting and memory models the demo user's turns will
+# use and refuses unless all three are the test provider; that FrankenPHP runs
+# without Qdrant (so no memory search embeds the question); and the run fails
+# if the usage ledger shows a call to any other provider.
 #
 #   _devextras/perf/runtime/db_connections.sh [streams]
 set -euo pipefail
@@ -42,15 +43,6 @@ if docker exec synaplan-backend sh -c 'pid=$(cat /tmp/synaplan-perf-franken.pid 
   echo "A make perf-runtime run is active in synaplan-backend. Wait for it to finish." >&2
   exit 1
 fi
-# A turn is sorted (SORT), answered (CHAT) and has its memories mined
-# afterwards (MEM).
-for setting in CHAT SORT MEM; do
-  service=$(sql "SELECT m.BSERVICE FROM BCONFIG c JOIN BMODELS m ON m.BID = CAST(c.BVALUE AS SIGNED) WHERE c.BGROUP='DEFAULTMODEL' AND c.BSETTING='$setting' AND c.BOWNERID IN (0, $DEMO_USER) ORDER BY c.BOWNERID DESC LIMIT 1;")
-  if [[ "$service" != "test" ]]; then
-    echo "The demo user's $setting model is not the test provider (${service:-unset}). Refusing to call a paid provider." >&2
-    exit 1
-  fi
-done
 
 NETWORK=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' synaplan-backend)
 BACKEND_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' synaplan-backend)
@@ -61,7 +53,7 @@ SAMPLER=0
 
 turns() {
   docker run --rm --network "$NETWORK" -v "$DIR":/work:ro -v "$WORK":/state -w /work -e SYNAPLAN_PERF_PASSWORD \
-    python:3.12-alpine python stream_turns.py "$1" --state /state/turns.state \
+    python:3.12-alpine python stream_turns.py "$@" --state /state/turns.state \
     --base http://synaplan-backend:8090 --streams "$STREAMS"
 }
 
@@ -117,7 +109,7 @@ for _ in $(seq 1 60); do
 done
 
 START=$(sql "SELECT UNIX_TIMESTAMP();")
-turns prepare
+turns prepare "--test-models=$(sql "SELECT GROUP_CONCAT(BID) FROM BMODELS WHERE LOWER(BSERVICE) = 'test';")"
 BEFORE=$(held)
 ( while true; do held >>"$WORK/samples"; sleep 1; done ) &
 SAMPLER=$!

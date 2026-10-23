@@ -4,8 +4,10 @@
 Three phases, so the caller can measure between them without a request of
 this script in the way:
 
-  prepare  signs in through POST /api/v1/auth/login and opens one chat per
-           stream; writes the session and the chat ids to --state
+  prepare  signs in through POST /api/v1/auth/login, refuses unless the
+           models the turns will use (chat, sorting, memory) are served by
+           the test provider, and opens one chat per stream; the session and
+           every chat id are written to --state as soon as they exist
   stream   reads GET /api/v1/messages/stream for every chat at once until
            the turn's terminal event; prints one JSON object
   cleanup  deletes the chats and the state file
@@ -100,12 +102,42 @@ def run_turn(base, cookie, chat_id, message, gate, record):
     record["duration"] = time.monotonic() - started
 
 
-def prepare(base: urllib.parse.ParseResult, state: pathlib.Path, email: str, streams: int) -> int:
-    cookie = sign_in(base, email, os.environ.get("SYNAPLAN_PERF_PASSWORD", "demo123"))
-    chats = [new_chat(base, cookie) for _ in range(streams)]
+def get_json(base: urllib.parse.ParseResult, cookie: str, path: str) -> dict:
+    conn = connect(base, 30)
+    conn.request("GET", path, headers={"Cookie": cookie, "Accept": "application/json"})
+    resp = conn.getresponse()
+    body = json.loads(resp.read() or b"{}")
+    conn.close()
+    if resp.status != 200:
+        raise SystemExit(f"GET {path} answered HTTP {resp.status}")
+    return body
+
+
+def assert_test_models(base: urllib.parse.ParseResult, cookie: str, test_models: set[int]) -> None:
+    """Refuse unless the app resolves every model a turn uses to a test-provider model."""
+    defaults = get_json(base, cookie, "/api/v1/config/models/defaults").get("defaults") or {}
+    for capability in ("CHAT", "SORT", "MEM"):
+        model_id = defaults.get(capability)
+        if model_id not in test_models:
+            raise SystemExit(f"The {capability} model resolves to model {model_id}, not the test provider. "
+                             "Refusing to call a paid provider.")
+
+
+def save_state(state: pathlib.Path, cookie: str, chats: list[int]) -> None:
     fd = os.open(state, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as handle:
         json.dump({"cookie": cookie, "chats": chats}, handle)
+
+
+def prepare(base: urllib.parse.ParseResult, state: pathlib.Path, email: str, streams: int,
+            test_models: set[int]) -> int:
+    cookie = sign_in(base, email, os.environ.get("SYNAPLAN_PERF_PASSWORD", "demo123"))
+    assert_test_models(base, cookie, test_models)
+    chats: list[int] = []
+    save_state(state, cookie, chats)
+    for _ in range(streams):
+        chats.append(new_chat(base, cookie))
+        save_state(state, cookie, chats)
     return 0
 
 
@@ -140,12 +172,14 @@ def main() -> int:
     parser.add_argument("--email", default="demo@synaplan.com")
     parser.add_argument("--streams", type=int, default=8)
     parser.add_argument("--message", default="Tell me a short story about a lighthouse.")
+    parser.add_argument("--test-models", default="", help="comma-separated ids of the test provider's models")
     args = parser.parse_args()
 
     base = urllib.parse.urlparse(args.base)
     state = pathlib.Path(args.state)
     if args.phase == "prepare":
-        return prepare(base, state, args.email, args.streams)
+        test_models = {int(model_id) for model_id in args.test_models.split(",") if model_id.strip()}
+        return prepare(base, state, args.email, args.streams, test_models)
 
     saved = json.loads(state.read_text())
     if args.phase == "stream":

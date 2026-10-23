@@ -27,10 +27,13 @@ the backend's address (`information_schema.PROCESSLIST`): once after the
 chats are opened, once a second while the turns stream, and three seconds
 after the last one ended, before the chats are deleted.
 
-No paid provider is called. The script refuses to run unless the demo user's
-chat, sorting and memory models are the test provider; the measured
-FrankenPHP runs with an empty `QDRANT_URL`, so no memory search embeds the
-question; and the run fails if the usage ledger (`BUSELOG`) shows a call to
-any other provider (`calls_to_other_providers`). It cleans up like
-`make perf-runtime`: the second FrankenPHP is stopped, the `var/cache/prod`
-it warmed is removed, and the chats it opened are deleted.
+No paid provider is called. Before it opens a chat, the script asks the
+measured FrankenPHP which chat, sorting and memory models the demo user's
+turns will use (`/api/v1/config/models/defaults`, the same resolution as
+generation: group policies, allow-list, fallbacks) and refuses unless all
+three are the test provider; that FrankenPHP runs with an empty
+`QDRANT_URL`, so no memory search embeds the question; and the run fails if
+the usage ledger (`BUSELOG`) shows a call to any other provider
+(`calls_to_other_providers`). It cleans up like `make perf-runtime`: the
+second FrankenPHP is stopped, the `var/cache/prod` it warmed is removed, and
+every chat it opened is deleted, also after a run that failed half-way.
