@@ -85,10 +85,12 @@ const showSkeleton = computed(
 // goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
 const isComputeKind = computed(() => props.card.kind === 'compute')
 // A folder read with its summary renders its own body; an older card without
-// one keeps the generic body.
-const folderRead = computed(() =>
-  props.card.capability === 'folder_fetch' ? props.card.folderRead : undefined
-)
+// one keeps the generic body. A live "reading" summary only belongs to a
+// running step: a step that failed without a final summary shows its error.
+const folderRead = computed(() => {
+  const read = props.card.capability === 'folder_fetch' ? props.card.folderRead : undefined
+  return read?.outcome === 'reading' && props.card.state !== 'running' ? undefined : read
+})
 
 const canCancel = computed(
   () => !props.isReadonly && isMediaKind.value && props.card.state === 'running'

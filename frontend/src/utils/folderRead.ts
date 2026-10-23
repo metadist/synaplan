@@ -23,6 +23,12 @@ export interface FolderReadSkip {
   reason: string
 }
 
+export interface FolderReadLeftOut {
+  tooLarge: number
+  overLimit: number
+  other: number
+}
+
 export interface FolderRead {
   outcome: FolderReadOutcome
   app: string
@@ -31,9 +37,11 @@ export interface FolderRead {
   folder: string
   read: number
   total: number
+  /** Names read or listed; may be fewer than `read` when the list was capped. */
   files: string[]
+  /** Names left out; may be fewer than the `leftOut` totals when capped. */
   skipped: FolderReadSkip[]
-  stopped: boolean
+  leftOut: FolderReadLeftOut
   openUrl: string | null
 }
 
@@ -85,9 +93,27 @@ export function parseFolderRead(value: unknown): FolderRead | undefined {
     total: Math.max(count(value.total), read),
     files,
     skipped,
-    stopped: value.stopped === true,
+    leftOut: leftOutFrom(value.left_out, skipped),
     openUrl: safeUrl(value.open_url),
   }
+}
+
+/** Exact totals from the backend; an older card only has the names to count. */
+function leftOutFrom(value: unknown, skipped: FolderReadSkip[]): FolderReadLeftOut {
+  if (isRecord(value)) {
+    return {
+      tooLarge: count(value.too_large),
+      overLimit: count(value.over_limit),
+      other: count(value.unreadable),
+    }
+  }
+  let tooLarge = 0
+  let overLimit = 0
+  for (const row of skipped) {
+    if (row.reason === 'too_large') tooLarge++
+    else if (row.reason === 'over_limit') overLimit++
+  }
+  return { tooLarge, overLimit, other: skipped.length - tooLarge - overLimit }
 }
 
 /** The folder reads a task run recorded, from its saved card snapshot. */
@@ -101,17 +127,7 @@ export function folderReadsFromSnapshot(snapshot: { cards?: unknown[] } | null):
   return reads
 }
 
-/** How many left-out files each reason accounts for. */
-export function skipCounts(read: FolderRead): {
-  tooLarge: number
-  overLimit: number
-  other: number
-} {
-  let tooLarge = 0
-  let overLimit = 0
-  for (const row of read.skipped) {
-    if (row.reason === 'too_large') tooLarge++
-    else if (row.reason === 'over_limit') overLimit++
-  }
-  return { tooLarge, overLimit, other: read.skipped.length - tooLarge - overLimit }
+/** How many files were left out, over all reasons. */
+export function leftOutTotal(read: FolderRead): number {
+  return read.leftOut.tooLarge + read.leftOut.overLimit + read.leftOut.other
 }

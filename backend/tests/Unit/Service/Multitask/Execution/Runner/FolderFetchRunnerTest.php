@@ -106,6 +106,7 @@ final class FolderFetchRunnerTest extends TestCase
         $webDav->method('list')->willReturn([
             ['name' => 'notes.txt', 'path' => 'Docs/notes.txt', 'size' => 5],
             ['name' => 'later.txt', 'path' => 'Docs/later.txt', 'size' => 5],
+            ['name' => 'last.txt', 'path' => 'Docs/last.txt', 'size' => 5],
         ]);
         $webDav->method('get')->willReturnCallback(static function (): string {
             static $calls = 0;
@@ -122,8 +123,14 @@ final class FolderFetchRunnerTest extends TestCase
         self::assertTrue($result->isSuccessful());
         self::assertTrue($result->metadata['partial']);
         self::assertCount(1, $result->files);
-        self::assertStringContainsString('could not be read', (string) $result->text);
-        self::assertTrue($result->metadata['folder_read']['stopped']);
+        self::assertSame('Read 1 of 3 files from Nextcloud › Docs: notes.txt; 2 could not be read.', $result->text);
+        $read = $result->metadata['folder_read'];
+        self::assertSame([1, 3], [$read['read'], $read['total']]);
+        self::assertSame([
+            ['name' => 'later.txt', 'reason' => 'unreadable'],
+            ['name' => 'last.txt', 'reason' => 'unreadable'],
+        ], $read['skipped']);
+        self::assertSame(['too_large' => 0, 'over_limit' => 0, 'unreadable' => 2], $read['left_out']);
     }
 
     public function testARefusedScopeReturnsTheSentenceAndDoesNotWait(): void
@@ -157,7 +164,7 @@ final class FolderFetchRunnerTest extends TestCase
         $pickups->method('linkForChannel')->willReturn($this->link());
         $pickups->method('open')->willReturn(['ok' => true, 'error' => '', 'pickup_id' => 9, 'sentence' => '']);
         $pickups->method('find')->willReturn($pickup);
-        $pickups->expects(self::once())->method('giveUp')->with(9);
+        $pickups->expects(self::once())->method('giveUp')->with(9)->willReturn(true);
 
         $result = $this->cloudRunner($pickups)->run($this->node(['channel' => 'nextcloud', 'folder' => 'Docs']), $this->context());
 
@@ -166,10 +173,36 @@ final class FolderFetchRunnerTest extends TestCase
         self::assertSame(FolderRead::UNREACHABLE, $result->metadata['folder_read']['outcome']);
     }
 
+    public function testAResultThatLandsWhileGivingUpIsUsed(): void
+    {
+        $open = new CloudPickup(1, 4, 'pi_abc', CloudPickup::MODE_FETCH, ['folder_path' => 'Docs']);
+        $done = new CloudPickup(1, 4, 'pi_abc', CloudPickup::MODE_FETCH, ['folder_path' => 'Docs']);
+        $done->finish(CloudPickup::STATE_DONE, 1, 1, [], null);
+        $pickups = $this->createStub(PickupService::class);
+        $pickups->method('linkForChannel')->willReturn($this->link());
+        $pickups->method('open')->willReturn(['ok' => true, 'error' => '', 'pickup_id' => 9, 'sentence' => '']);
+        $pickups->method('find')->willReturnOnConsecutiveCalls($open, $done);
+        $pickups->method('giveUp')->willReturn(false);
+        $pickups->method('producedFiles')->willReturn([
+            ['path' => '/api/v1/files/uploads/07/a.pdf', 'type' => 'document', 'local_path' => '07/a.pdf', 'name' => 'a.pdf'],
+        ]);
+
+        $result = $this->cloudRunner($pickups)->run($this->node(['channel' => 'nextcloud', 'folder' => 'Docs']), $this->context());
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(FolderRead::READ, $result->metadata['folder_read']['outcome']);
+        self::assertCount(1, $result->files);
+    }
+
     public function testWaitingForTheCloudReportsProgressOnTheCard(): void
     {
         $pickup = new CloudPickup(1, 4, 'pi_abc', CloudPickup::MODE_FETCH, ['folder_path' => 'Docs']);
-        $pickup->addAccepted(52, 0);
+        $pickup->addAccepted(50, 0);
+        $pickup->addSkipped([
+            ['id' => 'r51', 'name' => 'scan-1.tiff', 'reason' => 'too_large'],
+            ['id' => 'r52', 'name' => 'scan-2.tiff', 'reason' => 'over_limit'],
+            ['id' => 'r53', 'name' => 'notes.md', 'reason' => 'type_not_read'],
+        ]);
         $pickup->rememberFile(7);
         $pickups = $this->createStub(PickupService::class);
         $pickups->method('linkForChannel')->willReturn($this->link());

@@ -737,7 +737,7 @@
       "tooLarge": "{count} archivo superaba los 100 MB y se dejó fuera. | {count} archivos superaban los 100 MB y se dejaron fuera.",
       "overLimit": "{count} archivo superaba el límite de una ejecución (50 archivos, 200 MB) y se dejó fuera. | {count} archivos superaban el límite de una ejecución (50 archivos, 200 MB) y se dejaron fuera.",
       "unreadable": "No se pudo leer {count} archivo. | No se pudieron leer {count} archivos.",
-      "stopped": "El resto no se pudo leer.",
+      "moreNotListed": "{count} archivo más no aparece en la lista. | {count} archivos más no aparecen en la lista.",
       "refused": "Synaplan no puede leer {folder} en tu {app}. No se leyó nada.",
       "refusedAnywhere": "Synaplan no puede leer esto en tu {app}. No se leyó nada.",
       "refusedHint": "Abre la carpeta en {app} y elige «Permitir que Synaplan lea esta carpeta».",

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { FolderRead } from '@/utils/folderRead'
-import { skipCounts } from '@/utils/folderRead'
+import { leftOutTotal } from '@/utils/folderRead'
 
 const props = defineProps<{
   read: FolderRead
@@ -37,7 +37,7 @@ const headline = computed(() => {
       return t('taskPlan.folderRead.unreachable', named)
     case 'nothing':
       // Files that were there but too large or past the limit are not "no match".
-      return r.skipped.length > 0
+      return leftOutTotal(r) > 0
         ? t(`taskPlan.folderRead.nothingRead${where}`, named)
         : t(`taskPlan.folderRead.nothing${where}`, named)
     case 'busy':
@@ -56,13 +56,13 @@ const progress = computed(() =>
 const shownNames = computed(() =>
   showsAll.value ? props.read.files : props.read.files.slice(0, CHIPS)
 )
-const hiddenCount = computed(() => props.read.files.length - shownNames.value.length)
+const hiddenCount = computed(() => (showsAll.value ? 0 : props.read.read - shownNames.value.length))
 const canExpand = computed(
   () => props.full !== true && (props.read.files.length > CHIPS || props.read.skipped.length > 0)
 )
 
 const skipLines = computed(() => {
-  const counts = skipCounts(props.read)
+  const counts = props.read.leftOut
   const lines: string[] = []
   if (counts.tooLarge > 0) {
     lines.push(t('taskPlan.folderRead.tooLarge', { count: counts.tooLarge }, counts.tooLarge))
@@ -73,9 +73,14 @@ const skipLines = computed(() => {
   if (counts.other > 0) {
     lines.push(t('taskPlan.folderRead.unreadable', { count: counts.other }, counts.other))
   }
-  if (props.read.stopped) lines.push(t('taskPlan.folderRead.stopped'))
   return lines
 })
+
+/** Names the record could not keep: the counts stay exact, the lists are capped. */
+const unlistedFiles = computed(() => Math.max(0, props.read.read - props.read.files.length))
+const unlistedSkips = computed(() =>
+  Math.max(0, leftOutTotal(props.read) - props.read.skipped.length)
+)
 
 const hint = computed(() => {
   const named = { app: app.value }
@@ -122,6 +127,9 @@ function reasonKey(reason: string): string {
       </li>
       <li v-if="hiddenCount > 0" class="px-1 py-1 text-xs txt-muted">+{{ hiddenCount }}</li>
     </ul>
+    <p v-if="showsAll && unlistedFiles > 0" class="text-xs txt-muted">
+      {{ t('taskPlan.folderRead.moreNotListed', { count: unlistedFiles }, unlistedFiles) }}
+    </p>
     <p v-for="line in skipLines" :key="line" class="text-sm txt-secondary break-words">
       {{ line }}
     </p>
@@ -132,6 +140,9 @@ function reasonKey(reason: string): string {
     >
       <li v-for="row in read.skipped" :key="row.name" class="break-words">
         {{ t(`taskPlan.folderRead.skippedReason.${reasonKey(row.reason)}`, { name: row.name }) }}
+      </li>
+      <li v-if="unlistedSkips > 0" class="txt-muted">
+        {{ t('taskPlan.folderRead.moreNotListed', { count: unlistedSkips }, unlistedSkips) }}
       </li>
     </ul>
     <button
@@ -144,7 +155,7 @@ function reasonKey(reason: string): string {
       {{
         expanded
           ? t('taskPlan.folderRead.showFewer')
-          : t('taskPlan.folderRead.showAll', { count: read.files.length + read.skipped.length })
+          : t('taskPlan.folderRead.showAll', { count: read.read + leftOutTotal(read) })
       }}
     </button>
     <p v-if="hint" class="text-sm txt-secondary break-words" data-testid="folder-read-hint">

@@ -51,7 +51,7 @@
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
         "src/Service/Multitask/Execution/Runner/CodeRunRunner.php": 1162,
-        "src/Service/Multitask/TaskPlanExecutor.php": 1140,
+        "src/Service/Multitask/TaskPlanExecutor.php": 1056,
         "src/Service/Notification/DiscordNotificationService.php": 1066,
         "src/Service/RateLimitService.php": 866,
         "src/Service/Research/UrlContentService.php": 1258,

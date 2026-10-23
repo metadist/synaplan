@@ -24,8 +24,11 @@ final readonly class FolderRead
     public const BUSY = 'busy';
     public const NOT_CONNECTED = 'not_connected';
 
-    /** Names a card carries; the step text keeps the rest for the answer. */
-    private const MAX_NAMES = 100;
+    /**
+     * Names a card and a run's record keep per list. The counts stay exact
+     * beyond it, and the card says how many more there were.
+     */
+    private const MAX_NAMES = 500;
 
     public function __construct(
         public string $app,
@@ -60,8 +63,14 @@ final readonly class FolderRead
      *
      * @return array{folder_fetch: true, folder_read: array<string, mixed>}
      */
-    public function metadata(string $outcome, int $read = 0, int $total = 0, array $files = [], array $skipped = [], bool $stopped = false): array
+    public function metadata(string $outcome, int $read = 0, int $total = 0, array $files = [], array $skipped = []): array
     {
+        $leftOut = ['too_large' => 0, 'over_limit' => 0, 'unreadable' => 0];
+        foreach ($skipped as $row) {
+            $reason = isset($leftOut[$row['reason']]) ? $row['reason'] : 'unreadable';
+            ++$leftOut[$reason];
+        }
+
         return [
             'folder_fetch' => true,
             'folder_read' => [
@@ -71,10 +80,10 @@ final readonly class FolderRead
                 'host' => $this->host,
                 'folder' => $this->folder,
                 'read' => $read,
-                'total' => max($total, $read),
+                'total' => max($total, $read + count($skipped)),
                 'files' => array_slice($files, 0, self::MAX_NAMES),
                 'skipped' => array_slice($skipped, 0, self::MAX_NAMES),
-                'stopped' => $stopped,
+                'left_out' => $leftOut,
                 'open_url' => $this->openUrl,
             ],
         ];

@@ -727,7 +727,7 @@
       "tooLarge": "{count} Datei war größer als 100 MB und wurde ausgelassen. | {count} Dateien waren größer als 100 MB und wurden ausgelassen.",
       "overLimit": "{count} Datei lag über dem Limit für einen Lauf (50 Dateien, 200 MB) und wurde ausgelassen. | {count} Dateien lagen über dem Limit für einen Lauf (50 Dateien, 200 MB) und wurden ausgelassen.",
       "unreadable": "{count} Datei konnte nicht gelesen werden. | {count} Dateien konnten nicht gelesen werden.",
-      "stopped": "Der Rest konnte nicht gelesen werden.",
+      "moreNotListed": "{count} weitere Datei ist nicht aufgeführt. | {count} weitere Dateien sind nicht aufgeführt.",
       "refused": "Synaplan darf {folder} in deinem {app} nicht lesen. Es wurde nichts gelesen.",
       "refusedAnywhere": "Synaplan darf das in deinem {app} nicht lesen. Es wurde nichts gelesen.",
       "refusedHint": "Öffne den Ordner in {app} und wähle „Synaplan diesen Ordner lesen lassen“.",

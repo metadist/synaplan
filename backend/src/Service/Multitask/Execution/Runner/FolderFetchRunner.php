@@ -129,7 +129,7 @@ final readonly class FolderFetchRunner implements TaskRunner
                 return $this->fromPickup($pickup, $source);
             }
             if ($pickup instanceof CloudPickup) {
-                $reported = $this->reportProgress($context, $nodeId, $source, count($pickup->fileIds()), $pickup->acceptCount(), $reported);
+                $reported = $this->reportProgress($context, $nodeId, $source, count($pickup->fileIds()), $this->matchingSoFar($pickup), $reported);
             }
             if ($this->waitSeconds <= 0) {
                 break;
@@ -137,9 +137,31 @@ final readonly class FolderFetchRunner implements TaskRunner
             usleep(200000);
         } while (microtime(true) < $deadline);
 
-        $this->pickups->giveUp($opened['pickup_id']);
+        if (!$this->pickups->giveUp($opened['pickup_id'])) {
+            // The cloud's result landed between the last look and giving up.
+            $pickup = $this->pickups->find($opened['pickup_id']);
+            if ($pickup instanceof CloudPickup && $this->settled($pickup)) {
+                return $this->fromPickup($pickup, $source);
+            }
+        }
 
         return NodeResult::failed('Synaplan could not reach '.$this->hostOf($source).' in time. Nothing was read.', $source->metadata(FolderRead::UNREACHABLE));
+    }
+
+    /**
+     * The files of this folder the run asked for: the ones it takes plus the
+     * ones it leaves out for size or the run limit ("12 of 52").
+     */
+    private function matchingSoFar(CloudPickup $pickup): int
+    {
+        $leftOut = 0;
+        foreach ($pickup->skipped() as $row) {
+            if (in_array($row['reason'] ?? null, ['too_large', 'over_limit'], true)) {
+                ++$leftOut;
+            }
+        }
+
+        return $pickup->acceptCount() + $leftOut;
     }
 
     private function fromPickup(CloudPickup $pickup, FolderRead $source): NodeResult
@@ -169,7 +191,7 @@ final readonly class FolderFetchRunner implements TaskRunner
         $total = count($files) + count($skipped);
         if ([] !== $skipped || CloudPickup::STATE_PARTIAL === $pickup->getState()) {
             return NodeResult::ok(
-                $this->partialSentence($where, $names, $total, $skipped, false),
+                $this->partialSentence($where, $names, $total, $skipped),
                 $files,
                 $source->metadata(FolderRead::PARTIAL, count($files), $total, $names, $skipped) + ['partial' => true],
             );
@@ -222,11 +244,13 @@ final readonly class FolderFetchRunner implements TaskRunner
         $names = [];
         $skipped = [];
         $bytes = 0;
-        $stopped = false;
+        $unreachable = false;
         $reported = '';
         foreach ($matched as $row) {
-            if ($stopped) {
-                break;
+            if ($unreachable) {
+                // Once the folder stops answering, the rest is named, not dropped.
+                $skipped[] = ['name' => $row['name'], 'reason' => 'unreadable'];
+                continue;
             }
             if ($row['size'] > PickupService::MAX_FILE_BYTES) {
                 $skipped[] = ['name' => $row['name'], 'reason' => 'too_large'];
@@ -240,16 +264,14 @@ final readonly class FolderFetchRunner implements TaskRunner
             try {
                 $body = $this->webDav->get($target, $row['path'], PickupService::MAX_FILE_BYTES);
             } catch (DavException $e) {
-                if (str_contains($e->getMessage(), 'larger than the limit')) {
-                    $skipped[] = ['name' => $row['name'], 'reason' => 'too_large'];
-                    continue;
-                }
-                $stopped = true;
+                $tooLarge = str_contains($e->getMessage(), 'larger than the limit');
+                $skipped[] = ['name' => $row['name'], 'reason' => $tooLarge ? 'too_large' : 'unreadable'];
+                $unreachable = !$tooLarge;
                 continue;
             }
             $stored = $this->storeWorkingCopy($connection, $body, $row['name'], $row['path']);
             if (null === $stored) {
-                $stopped = true;
+                $skipped[] = ['name' => $row['name'], 'reason' => 'unreadable'];
                 continue;
             }
             $files[] = $stored;
@@ -260,15 +282,15 @@ final readonly class FolderFetchRunner implements TaskRunner
         $total = count($matched);
         if ([] === $files) {
             return NodeResult::failed(
-                $stopped ? 'Synaplan could not reach '.$target->host().'. Nothing was read.' : $this->nothingRead($where, $skipped),
-                $source->metadata($stopped ? FolderRead::UNREACHABLE : FolderRead::NOTHING, 0, $total, [], $skipped, $stopped),
+                $unreachable ? 'Synaplan could not reach '.$target->host().'. Nothing was read.' : $this->nothingRead($where, $skipped),
+                $source->metadata($unreachable ? FolderRead::UNREACHABLE : FolderRead::NOTHING, 0, $total, [], $skipped),
             );
         }
-        if ([] !== $skipped || $stopped) {
+        if ([] !== $skipped) {
             return NodeResult::ok(
-                $this->partialSentence($where, $names, $total, $skipped, $stopped),
+                $this->partialSentence($where, $names, $total, $skipped),
                 $files,
-                $source->metadata(FolderRead::PARTIAL, count($files), $total, $names, $skipped, $stopped) + ['partial' => true],
+                $source->metadata(FolderRead::PARTIAL, count($files), $total, $names, $skipped) + ['partial' => true],
             );
         }
 
@@ -395,7 +417,7 @@ final readonly class FolderFetchRunner implements TaskRunner
      * @param list<string>                              $names
      * @param list<array{name: string, reason: string}> $skipped
      */
-    private function partialSentence(string $where, array $names, int $total, array $skipped, bool $stopped): string
+    private function partialSentence(string $where, array $names, int $total, array $skipped): string
     {
         $large = count(array_filter($skipped, static fn (array $row): bool => 'too_large' === $row['reason']));
         $over = count(array_filter($skipped, static fn (array $row): bool => 'over_limit' === $row['reason']));
@@ -409,9 +431,6 @@ final readonly class FolderFetchRunner implements TaskRunner
         }
         if ($other > 0) {
             $why[] = $other.' could not be read';
-        }
-        if ($stopped) {
-            $why[] = 'the rest could not be read';
         }
 
         return 'Read '.count($names).' of '.max($total, count($names)).' files from '.$where.$this->nameList($names).$this->because($why).'.';

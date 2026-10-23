@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { folderReadsFromSnapshot, parseFolderRead, skipCounts } from '@/utils/folderRead'
+import { folderReadsFromSnapshot, leftOutTotal, parseFolderRead } from '@/utils/folderRead'
 
 const wire = {
   outcome: 'partial',
@@ -11,7 +11,7 @@ const wire = {
   total: 14,
   files: ['inv-0101.pdf', '', 3],
   skipped: [{ name: 'scan.tiff', reason: 'too_large' }, { name: '' }, 'x'],
-  stopped: false,
+  left_out: { too_large: 1, over_limit: 0, unreadable: 1 },
   open_url: 'https://files.example.org/index.php/apps/files/?dir=%2FInvoices%2F2026',
 }
 
@@ -27,7 +27,7 @@ describe('parseFolderRead', () => {
       total: 14,
       files: ['inv-0101.pdf'],
       skipped: [{ name: 'scan.tiff', reason: 'too_large' }],
-      stopped: false,
+      leftOut: { tooLarge: 1, overLimit: 0, other: 1 },
       openUrl: 'https://files.example.org/index.php/apps/files/?dir=%2FInvoices%2F2026',
     })
   })
@@ -49,9 +49,19 @@ describe('parseFolderRead', () => {
 })
 
 describe('folder read helpers', () => {
-  it('counts what was left out by reason', () => {
+  it('takes the exact left-out counts the backend sent', () => {
     const read = parseFolderRead({
       ...wire,
+      left_out: { too_large: 600, over_limit: 2, unreadable: 0 },
+    })
+    expect(read?.leftOut).toEqual({ tooLarge: 600, overLimit: 2, other: 0 })
+    expect(read && leftOutTotal(read)).toBe(602)
+  })
+
+  it('counts the names on an older card without left-out counts', () => {
+    const read = parseFolderRead({
+      ...wire,
+      left_out: undefined,
       skipped: [
         { name: 'a', reason: 'too_large' },
         { name: 'b', reason: 'over_limit' },
@@ -59,7 +69,7 @@ describe('folder read helpers', () => {
         { name: 'd', reason: 'unreadable' },
       ],
     })
-    expect(read && skipCounts(read)).toEqual({ tooLarge: 1, overLimit: 2, other: 1 })
+    expect(read?.leftOut).toEqual({ tooLarge: 1, overLimit: 2, other: 1 })
   })
 
   it('finds the folder reads in a task run snapshot', () => {

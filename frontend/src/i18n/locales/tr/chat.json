@@ -737,7 +737,7 @@
       "tooLarge": "{count} dosya 100 MB’tan büyüktü ve dışarıda bırakıldı.",
       "overLimit": "{count} dosya bir çalıştırmanın sınırını (50 dosya, 200 MB) aştı ve dışarıda bırakıldı.",
       "unreadable": "{count} dosya okunamadı.",
-      "stopped": "Geri kalanı okunamadı.",
+      "moreNotListed": "{count} dosya daha listelenmedi.",
       "refused": "Synaplan, {app} içindeki {folder} klasörünü okuyamaz. Hiçbir şey okunmadı.",
       "refusedAnywhere": "Synaplan bunu {app} içinde okuyamaz. Hiçbir şey okunmadı.",
       "refusedHint": "Klasörü {app} içinde açın ve “Synaplan'ın bu klasörü okumasına izin ver” seçeneğini seçin.",

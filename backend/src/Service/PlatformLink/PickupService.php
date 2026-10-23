@@ -138,6 +138,7 @@ final readonly class PickupService
         $upload = [];
         $reuse = [];
         $skip = [];
+        $names = [];
         $namesOnly = CloudPickup::MODE_LIST === $pickup->getMode();
         foreach (array_slice($items, 0, 500) as $item) {
             if (!is_array($item) || !is_string($item['id'] ?? null)) {
@@ -150,6 +151,7 @@ final readonly class PickupService
             if (strlen($remoteId) > 255 || strlen($version) > 255) {
                 continue;
             }
+            $names[$remoteId] = $name;
             if (!$this->nameMatches($pickup, $name)) {
                 $skip[] = ['id' => $remoteId, 'reason' => 'type_not_read'];
                 continue;
@@ -179,6 +181,10 @@ final readonly class PickupService
             $pickup->addAccepted(1, $size);
         }
         $pickup->addListed(count($items));
+        $pickup->addSkipped(array_map(
+            static fn (array $row): array => ['id' => $row['id'], 'name' => $names[$row['id']] ?? '', 'reason' => $row['reason']],
+            $skip,
+        ));
         $this->pickups->save($pickup);
         $this->rememberUploads($id, $upload);
 
@@ -236,17 +242,46 @@ final readonly class PickupService
         if (null === $state) {
             return ['state' => $pickup->getState()];
         }
-        $skipped = is_array($body['skipped'] ?? null) ? $body['skipped'] : [];
-        $pickup->finish(
+        $reported = is_array($body['skipped'] ?? null) ? array_values(array_filter($body['skipped'], 'is_array')) : [];
+        $skipped = self::withReported($pickup->skipped(), $reported);
+        $this->pickups->finishIfOpen(
+            $id,
             $state,
-            is_numeric($body['listed'] ?? null) ? (int) $body['listed'] : $pickup->getListed(),
-            is_numeric($body['sent'] ?? null) ? (int) $body['sent'] : $pickup->getSent(),
-            array_values(array_filter($skipped, 'is_array')),
             is_string($body['error_code'] ?? null) ? $body['error_code'] : null,
+            is_numeric($body['listed'] ?? null) ? (int) $body['listed'] : null,
+            is_numeric($body['sent'] ?? null) ? (int) $body['sent'] : null,
+            [] !== $skipped ? $skipped : null,
         );
-        $this->pickups->save($pickup);
+        $this->em->refresh($pickup);
 
         return ['state' => $pickup->getState()];
+    }
+
+    /**
+     * The rows Synaplan recorded while listing carry the names; the app may add
+     * files it could not send. One row per file id, the recorded one first.
+     *
+     * @param list<array<mixed>> $recorded
+     * @param list<array<mixed>> $reported
+     *
+     * @return list<array<mixed>>
+     */
+    private static function withReported(array $recorded, array $reported): array
+    {
+        $seen = [];
+        foreach ($recorded as $row) {
+            if (is_string($row['id'] ?? null)) {
+                $seen[$row['id']] = true;
+            }
+        }
+        foreach ($reported as $row) {
+            $rowId = is_string($row['id'] ?? null) ? $row['id'] : null;
+            if (null === $rowId || !isset($seen[$rowId])) {
+                $recorded[] = $row;
+            }
+        }
+
+        return $recorded;
     }
 
     /**
@@ -358,17 +393,17 @@ final readonly class PickupService
 
     /**
      * The run stopped waiting. A pickup still open fails, and its ticket goes,
-     * so a late claim or upload is refused instead of landing in no run.
+     * so a late claim or upload is refused instead of landing in no run. False
+     * when a result landed first; the caller then reads that result.
      */
-    public function giveUp(int $id): void
+    public function giveUp(int $id): bool
     {
-        $pickup = $this->find($id);
-        if (!$pickup instanceof CloudPickup || $this->isSettled($pickup)) {
-            return;
+        if (!$this->pickups->finishIfOpen($id, CloudPickup::STATE_FAILED, self::UNCONFIRMED)) {
+            return false;
         }
-        $pickup->finish(CloudPickup::STATE_FAILED, $pickup->getListed(), $pickup->getSent(), $pickup->skipped(), self::UNCONFIRMED);
-        $this->pickups->save($pickup);
         $this->redis->delete(self::TICKET_PREFIX.$id);
+
+        return true;
     }
 
     /**

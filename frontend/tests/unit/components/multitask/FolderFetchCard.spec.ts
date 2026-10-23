@@ -16,7 +16,7 @@ function read(overrides: Partial<FolderRead> = {}): FolderRead {
     total: 12,
     files: Array.from({ length: 12 }, (_, i) => `inv-${String(i + 1).padStart(4, '0')}.pdf`),
     skipped: [],
-    stopped: false,
+    leftOut: { tooLarge: 0, overLimit: 0, other: 0 },
     openUrl: 'https://files.example.org/index.php/apps/files/?dir=%2FInvoices%2F2026',
     ...overrides,
   }
@@ -59,6 +59,7 @@ describe('FolderFetchCard', () => {
             { name: 'scan.tiff', reason: 'too_large' },
             { name: 'old.tiff', reason: 'too_large' },
           ],
+          leftOut: { tooLarge: 2, overLimit: 0, other: 0 },
         }),
         full: true,
       },
@@ -106,6 +107,7 @@ describe('FolderFetchCard', () => {
           read: 0,
           files: [],
           skipped: [{ name: 'scan.tiff', reason: 'too_large' }],
+          leftOut: { tooLarge: 1, overLimit: 0, other: 0 },
         }),
       },
     })
@@ -114,6 +116,31 @@ describe('FolderFetchCard', () => {
       'Nothing was read from Nextcloud › Invoices/2026.'
     )
     expect(wrapper.text()).toContain('1 file was larger than 100 MB and was left out.')
+  })
+
+  it('keeps exact counts when the names were capped', () => {
+    const wrapper = mount(FolderFetchCard, {
+      props: {
+        read: read({
+          outcome: 'partial',
+          read: 520,
+          total: 1024,
+          files: Array.from({ length: 500 }, (_, i) => `scan-${i}.pdf`),
+          skipped: Array.from({ length: 500 }, (_, i) => ({
+            name: `big-${i}.tiff`,
+            reason: 'too_large',
+          })),
+          leftOut: { tooLarge: 504, overLimit: 0, other: 0 },
+        }),
+        full: true,
+      },
+    })
+
+    expect(wrapper.text()).toContain('504 files were larger than 100 MB and were left out.')
+    expect(wrapper.text()).toContain('20 more files are not listed.')
+    expect(wrapper.get('[data-testid="folder-read-skipped"]').text()).toContain(
+      '4 more files are not listed.'
+    )
   })
 
   it('counts while the cloud sends files', () => {
@@ -162,5 +189,27 @@ describe('TaskCard with a folder read', () => {
     expect(wrapper.find('[data-testid="folder-read-card"]').exists()).toBe(true)
     expect(wrapper.findComponent({ name: 'TaskCardMedia' }).exists()).toBe(false)
     expect(wrapper.text()).toContain('Reading files')
+  })
+
+  it('shows the error, not a stale count, when a read fails mid-way', () => {
+    setActivePinia(createPinia())
+    const wrapper = mount(TaskCard, {
+      props: {
+        card: {
+          nodeId: 'n1',
+          capability: 'folder_fetch',
+          kind: 'search',
+          state: 'failed',
+          error: 'This step stopped before it finished.',
+          folderRead: read({ outcome: 'reading', read: 12, total: 52, files: [] }),
+        },
+      },
+      global: { stubs: { MessageText: true, TaskCardMedia: true } },
+    })
+
+    expect(wrapper.find('[data-testid="folder-read-card"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="task-card-error"]').text()).toBe(
+      'This step stopped before it finished.'
+    )
   })
 })

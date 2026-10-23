@@ -108,6 +108,7 @@ final readonly class TaskPlanExecutor
         Capability::CodeRun,
         Capability::McpFetch,
         Capability::McpAction,
+        Capability::FolderFetch,
     ];
 
     public function __construct(
@@ -853,15 +854,9 @@ final readonly class TaskPlanExecutor
 
     /**
      * Wrap the client progress callback so per-node progress also updates
-     * BMESSAGE_TASKS (#1142 / #1343). Terminal `task_update` rows store status
-     * plus settled card body (text/url/error/search summary); `task_chunk` /
-     * `task_file` accumulate content so a mid-turn reload can rebuild completed
-     * cards with the same payload the live SSE session showed.
-     *
-     * The wrapped callback always forwards the event verbatim first — persistence
-     * is a side effect and must never alter or drop the client stream. Returns
-     * the original callback unchanged when there is nothing to track (no
-     * streaming client, or the message has no id yet).
+     * BMESSAGE_TASKS ({@see TaskProgressRecorder}). Returns the original
+     * callback unchanged when there is nothing to track (no streaming client,
+     * or the message has no id yet).
      */
     private function wrapProgressForPersistence(?int $messageId, ?callable $progressCallback): ?callable
     {
@@ -869,86 +864,7 @@ final readonly class TaskPlanExecutor
             return $progressCallback;
         }
 
-        $terminal = ['done', 'failed', 'skipped', 'waiting_approval'];
-        /** @var array<string, string> $chunkText */
-        $chunkText = [];
-        /** @var array<string, string> $fileUrls */
-        $fileUrls = [];
-        /** @var array<string, string> $fileTypes */
-        $fileTypes = [];
-
-        return function (array $event) use ($progressCallback, $messageId, $terminal, &$chunkText, &$fileUrls, &$fileTypes): void {
-            $progressCallback($event);
-
-            $status = $event['status'] ?? null;
-            $metadata = $event['metadata'] ?? null;
-            if (!is_array($metadata)) {
-                return;
-            }
-            $nodeId = $metadata['node_id'] ?? null;
-            if (!is_string($nodeId) || '' === $nodeId) {
-                return;
-            }
-
-            if ('task_chunk' === $status) {
-                $chunk = $metadata['chunk'] ?? null;
-                if (is_string($chunk) && '' !== $chunk) {
-                    $chunkText[$nodeId] = ($chunkText[$nodeId] ?? '').$chunk;
-                }
-
-                return;
-            }
-
-            if ('task_file' === $status) {
-                $url = $metadata['url'] ?? null;
-                if (is_string($url) && '' !== $url) {
-                    $fileUrls[$nodeId] = $url;
-                }
-                $type = $metadata['type'] ?? null;
-                if (is_string($type) && '' !== $type) {
-                    $fileTypes[$nodeId] = $type;
-                }
-
-                return;
-            }
-
-            if ('task_update' !== $status) {
-                return;
-            }
-            $state = $metadata['state'] ?? null;
-            if (!is_string($state) || !in_array($state, $terminal, true)) {
-                return;
-            }
-
-            $text = is_string($metadata['text'] ?? null) && '' !== $metadata['text']
-                ? $metadata['text']
-                : ($chunkText[$nodeId] ?? null);
-            $url = is_string($metadata['url'] ?? null) && '' !== $metadata['url']
-                ? $metadata['url']
-                : ($fileUrls[$nodeId] ?? null);
-            $type = is_string($metadata['type'] ?? null) && '' !== $metadata['type']
-                ? $metadata['type']
-                : ($fileTypes[$nodeId] ?? null);
-            $error = is_string($metadata['error'] ?? null) && '' !== $metadata['error']
-                ? $metadata['error']
-                : null;
-            $query = is_string($metadata['query'] ?? null) && '' !== $metadata['query']
-                ? $metadata['query']
-                : null;
-            $resultsCount = is_int($metadata['results_count'] ?? null)
-                ? $metadata['results_count']
-                : null;
-
-            $this->store->updateNodeStatus($messageId, $nodeId, $state, [
-                'text' => $text,
-                'url' => $url,
-                'type' => $type,
-                'error' => $error,
-                'query' => $query,
-                'resultsCount' => $resultsCount,
-                ...CardTrace::fromArray($metadata),
-            ]);
-        };
+        return new TaskProgressRecorder($this->store, $messageId, $progressCallback(...));
     }
 
     /**
