@@ -80,7 +80,7 @@ function sizeOf(bytes: number): string {
         >
           {{ t('files.uploaded') }}
         </th>
-        <th class="w-36"></th>
+        <th class="w-52"></th>
       </tr>
     </thead>
     <tbody>
@@ -147,7 +147,7 @@ function sizeOf(bytes: number): string {
         <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs txt-secondary md:table-cell">
           {{ sizeOf(file.file_size) }}
         </td>
-        <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs txt-secondary lg:table-cell">
+        <td class="hidden px-3 py-2.5 text-xs txt-secondary lg:table-cell">
           {{ file.uploaded_date }}
         </td>
         <td class="px-3 py-2.5">

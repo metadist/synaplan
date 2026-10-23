@@ -470,20 +470,16 @@ test.describe('@ci @layout UI guard — key pages', () => {
       buffer: Buffer.from('# notes\n'),
     })
     await page.locator(selectors.files.uploadButton).click()
-    await expect(page.getByText(longName).first()).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
+    const row = page.locator('[data-testid="item-file"]:visible').filter({ hasText: longName })
+    await expect(row).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
     await expectNoHorizontalOverflow(page, 'files long name')
-    const card = await page.locator('[data-testid="section-table"]').boundingBox()
-    const row = await page
-      .locator(
-        '[data-testid="files-table"] [data-testid="item-file"], [data-testid="section-table"] [data-testid="item-file"]'
-      )
-      .last()
-      .boundingBox()
-    expect(card, 'files card').not.toBeNull()
-    expect(row, 'file row').not.toBeNull()
-    if (card && row) {
-      expect(row.x + row.width, 'file row stays inside the card').toBeLessThanOrEqual(
-        card.x + card.width + 1
+    const cardBox = await page.locator('[data-testid="section-table"]').boundingBox()
+    const rowBox = await row.boundingBox()
+    expect(cardBox, 'files card').not.toBeNull()
+    expect(rowBox, 'the uploaded file row').not.toBeNull()
+    if (cardBox && rowBox) {
+      expect(rowBox.x + rowBox.width, 'file row stays inside the card').toBeLessThanOrEqual(
+        cardBox.x + cardBox.width + 1
       )
     }
 
