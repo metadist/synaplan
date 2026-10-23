@@ -30,18 +30,22 @@ final class Pickups
         $request = $claim['body'];
         $person = (string) ($request['external_id'] ?? '');
         $selector = is_array($request['selector'] ?? null) ? $request['selector'] : [];
-        $folder = Store::cleanPath((string) ($selector['folder_path'] ?? ''));
+        $profile = (string) $this->store->state()['profile'];
+        $folder = $this->folder($person, $profile, $selector);
+        if (null === $folder) {
+            return $this->finish($base, ['status' => 'failed', 'error_code' => 'not_found', 'listed' => 0, 'sent' => 0]);
+        }
         if (!$this->mayRead($person, $folder)) {
             return $this->finish($base, ['status' => 'failed', 'error_code' => 'outside_scope', 'listed' => 0, 'sent' => 0]);
         }
-        if ('' !== $folder && !$this->store->folderExists($person, $folder)) {
-            return $this->finish($base, ['status' => 'failed', 'error_code' => 'not_found', 'listed' => 0, 'sent' => 0]);
-        }
 
-        $profile = (string) $this->store->state()['profile'];
+        $since = self::since($selector['changed_since'] ?? null);
         $byId = [];
         $items = [];
         foreach ($this->store->files($person, $folder, true === ($selector['recursive'] ?? false)) as $file) {
+            if ($file['modified'] < $since) {
+                continue;
+            }
             $bytes = (string) $this->store->read($person, $file['path']);
             $remoteId = Profile::remoteId($profile, $person, $file['path']);
             $byId[$remoteId] = ['path' => $file['path'], 'bytes' => $bytes];
@@ -61,6 +65,12 @@ final class Pickups
 
         $sent = 0;
         $skipped = [];
+        foreach (is_array($listing['body']['skip'] ?? null) ? $listing['body']['skip'] : [] as $skip) {
+            $remoteId = is_array($skip) ? (string) ($skip['id'] ?? '') : '';
+            if (isset($byId[$remoteId])) {
+                $skipped[] = ['id' => $remoteId, 'name' => basename($byId[$remoteId]['path']), 'reason' => (string) ($skip['reason'] ?? '')];
+            }
+        }
         $upload = is_array($listing['body']['upload'] ?? null) ? $listing['body']['upload'] : [];
         foreach ($upload as $remoteId) {
             $file = is_string($remoteId) ? ($byId[$remoteId] ?? null) : null;
@@ -74,16 +84,49 @@ final class Pickups
             if (200 === $stored['status']) {
                 ++$sent;
             } else {
-                $skipped[] = ['id' => $remoteId, 'reason' => (string) ($stored['body']['error'] ?? 'unreadable')];
+                $skipped[] = ['id' => $remoteId, 'name' => basename($file['path']), 'reason' => (string) ($stored['body']['error'] ?? 'unreadable')];
             }
         }
+        // A file the pattern did not match was not asked for; anything else
+        // left out makes the read partial.
+        $missing = array_filter($skipped, static fn (array $row): bool => 'type_not_read' !== $row['reason']);
 
         return $this->finish($base, [
-            'status' => [] === $skipped ? 'done' : 'partial',
+            'status' => [] === $missing ? 'done' : 'partial',
             'listed' => count($items),
             'sent' => $sent,
             'skipped' => $skipped,
         ]);
+    }
+
+    /**
+     * The folder a selector names: by remote id when it carries one (an
+     * unknown id is null), else by path.
+     *
+     * @param array<mixed> $selector
+     */
+    private function folder(string $person, string $profile, array $selector): ?string
+    {
+        $id = is_string($selector['folder_id'] ?? null) ? $selector['folder_id'] : '';
+        if ('' !== $id) {
+            return $this->store->folderById($person, $profile, $id);
+        }
+        $path = Store::cleanPath((string) ($selector['folder_path'] ?? ''));
+
+        return '' === $path || $this->store->folderExists($person, $path) ? $path : null;
+    }
+
+    /**
+     * `changed_since` as a cut-off time: "7d", "12h", "2w"; anything else
+     * means no cut-off.
+     */
+    private static function since(mixed $value): int
+    {
+        if (!is_string($value) || 1 !== preg_match('/^(\d+)([hdw])$/', $value, $m)) {
+            return 0;
+        }
+
+        return time() - (int) $m[1] * ['h' => 3600, 'd' => 86400, 'w' => 604800][$m[2]];
     }
 
     /**

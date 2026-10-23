@@ -46,20 +46,47 @@ final class Deliveries
         if (null === $bytes) {
             return $this->finish($base, ['status' => 'failed', 'error_code' => 'unreachable']);
         }
-        $target = is_array($copy['target'] ?? null) ? $copy['target'] : [];
-        $name = (string) ($copy['name'] ?? 'file');
-        $folder = Store::cleanPath((string) ($target['ref'] ?? ''));
-        $path = $this->place($person, '' !== $folder ? $folder : self::kindFolder($name), $name, (string) ($copy['on_conflict'] ?? 'rename'));
-        $this->store->put($person, $path, $bytes);
-        $this->store->recordWritten(['person' => $person, 'path' => $path, 'delivery' => $id, 'size' => strlen($bytes)]);
         $state = $this->store->state();
+        $profile = (string) $state['profile'];
+        $name = (string) ($copy['name'] ?? 'file');
+        $folder = $this->folder($person, $profile, is_array($copy['target'] ?? null) ? $copy['target'] : [], $name);
+        if (null === $folder) {
+            return $this->finish($base, ['status' => 'failed', 'error_code' => 'not_found']);
+        }
+        // Choosing the name and writing the file are one step: two copies of
+        // "report.pdf" at once must end as two files.
+        $path = $this->store->locked('files-'.$person, function () use ($person, $folder, $name, $copy, $bytes, $id): string {
+            $path = $this->place($person, $folder, $name, (string) ($copy['on_conflict'] ?? 'rename'));
+            $this->store->put($person, $path, $bytes);
+            $this->store->recordWritten(['person' => $person, 'path' => $path, 'delivery' => $id, 'size' => strlen($bytes)]);
+
+            return $path;
+        });
 
         return $this->finish($base, [
             'status' => 'delivered',
             'remote_path' => '/'.$path,
-            'remote_id' => Profile::remoteId((string) $state['profile'], $person, $path),
+            'remote_id' => Profile::remoteId($profile, $person, $path),
             'open_url' => $state['fixture_url'].'/files/'.rawurlencode($person).'/'.implode('/', array_map('rawurlencode', explode('/', $path))),
         ]);
+    }
+
+    /**
+     * Where a copy goes: the folder a remote id names (`folder_id`,
+     * `next_to`), the person's own root (`personal_folder`), or the kind
+     * folder for the file (`kind_folder`, the default). Null for an unknown id.
+     *
+     * @param array<mixed> $target
+     */
+    private function folder(string $person, string $profile, array $target, string $name): ?string
+    {
+        $ref = is_string($target['ref'] ?? null) ? $target['ref'] : '';
+
+        return match ($target['kind'] ?? 'kind_folder') {
+            'folder_id', 'next_to' => '' !== $ref ? $this->store->folderById($person, $profile, $ref) : null,
+            'personal_folder' => '',
+            default => self::kindFolder($name),
+        };
     }
 
     private static function kindFolder(string $name): string
@@ -81,14 +108,15 @@ final class Deliveries
     private function place(string $person, string $folder, string $name, string $onConflict): string
     {
         $name = '' !== Store::cleanPath(basename($name)) ? basename($name) : 'file';
-        $path = $folder.'/'.$name;
+        $prefix = '' !== $folder ? $folder.'/' : '';
+        $path = $prefix.$name;
         if (!$this->store->exists($person, $path) || ('replace_own' === $onConflict && $this->store->wroteThis($person, $path))) {
             return $path;
         }
         $stem = pathinfo($name, PATHINFO_FILENAME);
         $ext = pathinfo($name, PATHINFO_EXTENSION);
         for ($n = 2; ; ++$n) {
-            $candidate = $folder.'/'.$stem.' ('.$n.')'.('' !== $ext ? '.'.$ext : '');
+            $candidate = $prefix.$stem.' ('.$n.')'.('' !== $ext ? '.'.$ext : '');
             if (!$this->store->exists($person, $candidate)) {
                 return $candidate;
             }

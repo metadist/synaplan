@@ -17,7 +17,7 @@ not a chat message.
 | E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` merged ([#2566](https://github.com/metadist/synaplan/pull/2566)); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open. The Nextcloud e2e (CF1.3b part 3) runs on the plain test stack plus Redis meanwhile |
 | E-7 Developer docs | all | any | planned | after the stack it documents is green |
 | E-8 Refresh policy | STATUS | — | recurring | monthly or on `max-version` change |
-| E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | **in review** · issue [#2669](https://github.com/metadist/synaplan/issues/2669) | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); plays copies (CF3.1), pickups (CF3.6) and linking; extended by every core brief |
+| E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | **in review** · [#2674](https://github.com/metadist/synaplan/pull/2674) · issue [#2669](https://github.com/metadist/synaplan/issues/2669) | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); plays copies (CF3.1), pickups (CF3.6) and linking; extended by every core brief |
 | CF-S1 OpenCloud web extension points | `synaplan-opencloud` | P1 (before CF3.1) | planned | timebox 2 days |
 | CF-S2 Nextcloud organisation login (`user_oidc`) | `synaplan-nextcloud` | P1 (start) | planned | decides CF2.6; records the `azp` Nextcloud would send |
 | CF-S3 OpenCloud unattended access | `synaplan-opencloud` | P1 (before CF3.1) | planned | Includes the watch index at the cap (row 41) |

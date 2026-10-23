@@ -50,8 +50,8 @@ final class Store
     }
 
     /**
-     * Read, change and write the state under one lock: the built-in server
-     * runs several workers.
+     * Read, change and write the state; readers see the old or the new
+     * file, never half of one.
      *
      * @param callable(array<string, mixed>): array<string, mixed> $change
      *
@@ -59,16 +59,33 @@ final class Store
      */
     public function update(callable $change): array
     {
-        $lock = fopen($this->root.'/state.lock', 'c');
+        return $this->locked('state', function () use ($change): array {
+            $state = $change($this->state());
+            $this->publish('state.json', $state);
+
+            return $state;
+        });
+    }
+
+    /**
+     * Run one read-change-write under a named lock: the built-in server runs
+     * several workers.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function locked(string $name, callable $work): mixed
+    {
+        $lock = fopen($this->root.'/'.preg_replace('/[^a-z0-9_-]/i', '_', $name).'.lock', 'c');
         if (false === $lock) {
-            throw new \RuntimeException('The fixture cannot lock its state in '.$this->root.'.');
+            throw new \RuntimeException('The fixture cannot lock '.$name.' in '.$this->root.'.');
         }
         flock($lock, LOCK_EX);
         try {
-            $state = $change($this->state());
-            file_put_contents($this->root.'/state.json', json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
-
-            return $state;
+            return $work();
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
@@ -150,13 +167,53 @@ final class Store
     }
 
     /**
+     * Every folder of a person, as paths relative to the person's root (the
+     * root itself is '').
+     *
+     * @return list<string>
+     */
+    public function folders(string $person): array
+    {
+        $root = $this->absolute($person, '');
+        if (!is_dir($root)) {
+            return [''];
+        }
+        $out = [''];
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($iterator as $entry) {
+            if ($entry instanceof \SplFileInfo && $entry->isDir()) {
+                $out[] = ltrim(substr($entry->getPathname(), strlen($root)), '/');
+            }
+        }
+        sort($out);
+
+        return $out;
+    }
+
+    /**
+     * The folder a remote folder id names, or null when the person has none.
+     */
+    public function folderById(string $person, string $profile, string $id): ?string
+    {
+        foreach ($this->folders($person) as $folder) {
+            if (Profile::remoteId($profile, $person, $folder) === $id) {
+                return $folder;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<string, mixed> $entry
      */
     public function recordWritten(array $entry): void
     {
-        $written = $this->written();
-        $written[] = $entry + ['at' => time()];
-        file_put_contents($this->root.'/written.json', json_encode($written, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $this->locked('written', function () use ($entry): void {
+            $written = $this->written();
+            $written[] = $entry + ['at' => time()];
+            $this->publish('written.json', $written);
+        });
     }
 
     /**
@@ -206,8 +263,8 @@ final class Store
      */
     public static function person(string $externalId): string
     {
-        if (1 !== preg_match('/^[A-Za-z0-9._@-]{1,64}$/', $externalId)) {
-            throw new FixtureException(400, 'bad_person', 'A person id has 1 to 64 letters, digits or . _ @ -.');
+        if (1 !== preg_match('/^[A-Za-z0-9._@-]{1,64}$/', $externalId) || str_starts_with($externalId, '.')) {
+            throw new FixtureException(400, 'bad_person', 'A person id has 1 to 64 letters, digits or . _ @ - and does not start with a dot.');
         }
 
         return $externalId;
@@ -251,6 +308,18 @@ final class Store
             'links' => [],
             'pending' => [],
         ];
+    }
+
+    /**
+     * Write a whole file next to its final name, then rename it into place.
+     *
+     * @param array<mixed> $data
+     */
+    private function publish(string $file, array $data): void
+    {
+        $temp = $this->root.'/'.$file.'.'.bin2hex(random_bytes(4)).'.tmp';
+        file_put_contents($temp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        rename($temp, $this->root.'/'.$file);
     }
 
     private static function env(string $name, string $default): string

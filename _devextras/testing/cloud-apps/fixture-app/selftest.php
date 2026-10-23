@@ -55,6 +55,8 @@ $refused = static function (callable $call): bool {
 };
 $check('a path may not leave the person\'s files', $refused(static fn () => Store::cleanPath('Invoices/../../etc/passwd')));
 $check('a person id may not carry a path', $refused(static fn () => Store::person('../ada')));
+$check('a person id may not be ".."', $refused(static fn () => Store::person('..')));
+$check('a person id may not be "."', $refused(static fn () => Store::person('.')));
 
 $root = sys_get_temp_dir().'/cloud-fixture-selftest-'.bin2hex(random_bytes(4));
 $store = new Store($root);
@@ -62,8 +64,16 @@ $store->put('ada', 'Invoices/inv-0101.txt', 'Vendor: Nordwind GmbH');
 $store->put('ada', 'Invoices/2026/inv-0102.txt', 'Vendor: Ostsee Logistik');
 $check('a folder lists its files', ['Invoices/inv-0101.txt'] === array_column($store->files('ada', 'Invoices', false), 'path'));
 $check('a recursive folder lists every file', 2 === count($store->files('ada', 'Invoices')));
+$check('a folder is found by its remote id', 'Invoices/2026' === $store->folderById('ada', 'sso', Profile::remoteId('sso', 'ada', 'Invoices/2026')));
+$check('an unknown folder id is not a folder', null === $store->folderById('ada', 'keyed', '42'));
+$check('the root has an id too', '' === $store->folderById('ada', 'keyed', Profile::remoteId('keyed', 'ada', '')));
+$store->update(static fn (array $s): array => ['profile' => 'sso'] + $s);
+$check('state is written whole and read back', 'sso' === $store->state()['profile']);
+$store->recordWritten(['person' => 'ada', 'path' => 'Synaplan/Documents/a.pdf']);
+$check('the written ledger keeps an entry', $store->wroteThis('ada', 'Synaplan/Documents/a.pdf'));
 $store->reset();
 rmdir($root.'/files');
+array_map('unlink', glob($root.'/*.lock') ?: []);
 rmdir($root);
 
 printf("\n%s\n", 0 === $failed ? 'All checks passed.' : $failed.' check(s) failed.');
