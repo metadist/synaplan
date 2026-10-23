@@ -463,6 +463,26 @@ test.describe('@ci @layout UI guard — key pages', () => {
     await expect(page.locator(selectors.files.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expectNoHorizontalOverflow(page, 'files')
 
+    const longName = 'Mitschrift-2026-10-12-availableexplosionsesposedownstairs-notes.md'
+    await page.locator(selectors.files.fileInput).setInputFiles({
+      name: longName,
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('# notes\n'),
+    })
+    await page.locator(selectors.files.uploadButton).click()
+    const row = page.locator('[data-testid="item-file"]:visible').filter({ hasText: longName })
+    await expect(row).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
+    await expectNoHorizontalOverflow(page, 'files long name')
+    const cardBox = await page.locator('[data-testid="section-table"]').boundingBox()
+    const rowBox = await row.boundingBox()
+    expect(cardBox, 'files card').not.toBeNull()
+    expect(rowBox, 'the uploaded file row').not.toBeNull()
+    if (cardBox && rowBox) {
+      expect(rowBox.x + rowBox.width, 'file row stays inside the card').toBeLessThanOrEqual(
+        cardBox.x + cardBox.width + 1
+      )
+    }
+
     if (isMobileViewport(page)) {
       const uploadBtn = page.locator(selectors.files.uploadButton)
       await uploadBtn.scrollIntoViewIfNeeded()
