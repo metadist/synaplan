@@ -19,6 +19,11 @@ log. It is edited in place — no new dated roadmap files, no redirect stubs.
   before implementation.
 - Release class per step: `no-app-impact`, `backend-only`,
   `ota-candidate`, `store-required` (`.github/mobile-impact-policy.json`).
+- Implementation of a plan follows [`AGENTS.md`](./AGENTS.md): use the
+  local stack and its provider keys to walk a journey, and take one
+  branch, commit, push and pull request per topic, green before the next.
+  A finished plan moves into `YYYY-archive/`, and that pass also moves
+  older plans that are already implemented.
 
 ## Binding
 
