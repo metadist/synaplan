@@ -59,7 +59,8 @@ final class CitationPassages
                 ++$unreadable;
                 continue;
             }
-            $texts[] = mb_substr(implode("\n", $this->best($statement, $passages)), 0, self::CHARS_PER_URL);
+            $best = $this->best($statement, $passages);
+            $texts[] = mb_substr(implode("\n", [] === $best ? \array_slice($passages, 0, self::PASSAGES_PER_URL) : $best), 0, self::CHARS_PER_URL);
         }
         if ([] === $texts) {
             return ['status' => $unknown > 0 ? 'unknown_ref' : 'unreadable', 'passage' => ''];

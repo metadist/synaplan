@@ -97,7 +97,7 @@ final class CitationExtractor
         $parts = preg_split('/(?<=[.!?])\s+/u', $line, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $out = [];
         foreach ($parts as $part) {
-            $markersOnly = '' === trim((string) preg_replace([self::EVIDENCE, self::NUMBERED, '/[.,;\s]/u'], '', $part));
+            $markersOnly = '' === trim((string) preg_replace([self::EVIDENCE, self::NUMBERED, self::LINK, self::BARE_URL, '/[().,;\s]/u'], '', $part));
             $afterAbbreviation = [] !== $out && 1 === preg_match(self::ABBREVIATION_END, $out[\count($out) - 1]);
             if (($markersOnly || $afterAbbreviation) && [] !== $out) {
                 $out[\count($out) - 1] .= ' '.$part;
