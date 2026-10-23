@@ -99,6 +99,7 @@ final class SpikeEngine
             ['role' => 'user', 'content' => $question],
         ];
         $reminded = false;
+        $rejectedFinish = false;
         for ($turn = 0; $turn < $limits->turns; ++$turn) {
             $reply = $this->speak($messages, $this->tools(), $userId, $board);
             if ([] === $reply->calls) {
@@ -123,25 +124,30 @@ final class SpikeEngine
                 'content' => $reply->content,
                 'tool_calls' => array_map(static fn (SpikeToolCall $call): array => $call->toMessage(), $reply->calls),
             ];
+            $finishCalls = [];
             foreach ($reply->calls as $call) {
                 if ('finish' === $call->name) {
-                    if ($searchedThisTurn || ('none' !== $board->unreadSummary() && [] === $board->cards && !$reminded)) {
-                        $reminded = true;
-                        $messages[] = [
-                            'role' => 'tool',
-                            'tool_call_id' => '' !== $call->id ? $call->id : 'call_spike',
-                            'content' => '{"error":"unread_sources","unread":'.$this->jsonList($board->unreadSummary()).'}',
-                        ];
-                        continue;
-                    }
-
-                    return;
+                    $finishCalls[] = $call;
+                    continue;
                 }
                 $messages[] = [
                     'role' => 'tool',
                     'tool_call_id' => '' !== $call->id ? $call->id : 'call_spike',
                     'content' => $this->toolResult($call, $board, $plan, $limits, $language, $userId),
                 ];
+            }
+            foreach ($finishCalls as $call) {
+                if ($searchedThisTurn || ('none' !== $board->unreadSummary() && [] === $board->cards && !$rejectedFinish)) {
+                    $rejectedFinish = true;
+                    $messages[] = [
+                        'role' => 'tool',
+                        'tool_call_id' => '' !== $call->id ? $call->id : 'call_spike',
+                        'content' => '{"error":"unread_sources","unread":'.$this->jsonList($board->unreadSummary()).'}',
+                    ];
+                    continue;
+                }
+
+                return;
             }
         }
     }
@@ -173,7 +179,7 @@ final class SpikeEngine
         $stalls = 0;
         $rejectedEmptyFinish = false;
         for ($turn = 0; $turn < $limits->turns; ++$turn) {
-            $before = \count($board->cards);
+            $before = \count($board->cards) + \count($board->sources);
             $goal = (string) ($brief['goal'] ?? '');
             if ($rejectedEmptyFinish) {
                 $goal .= 'none' === $board->unreadSummary()
@@ -210,7 +216,7 @@ final class SpikeEngine
                 continue;
             }
             $this->runActions($actions, $board, $plan, $limits, $language, $userId);
-            if (\count($board->cards) === $before) {
+            if (\count($board->cards) + \count($board->sources) === $before) {
                 ++$stalls;
                 if ($stalls > 1) {
                     return;
