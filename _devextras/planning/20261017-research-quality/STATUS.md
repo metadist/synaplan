@@ -111,6 +111,13 @@ clause. Citation precision was not judged. The recorded spike cost is above
 twice the B1+ window. Phase C is re-planned around the gateway loop before any
 RS6 code. RQ2b stays in progress until this sentence is accepted.
 
+The S-T rows above ran with tool declarations that had no argument schema.
+The spike now declares `query`, `ids`, `source`, `question` and `reason`, and
+the root cause of the empty-argument rejection is fixed in
+`AnthropicProvider` (an empty tool input is sent as `{}`). Tool-mode recall
+was not re-measured after that change. It cannot change the fact-recall
+clause, because B1+ plus 10 points is above 1.
+
 ## 2026-10-23 — RQ1 full desktop use-case run
 
 Measurement only. No product code changed. The local stack was checked out

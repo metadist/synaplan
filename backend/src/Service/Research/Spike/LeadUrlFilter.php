@@ -49,7 +49,7 @@ final class LeadUrlFilter
             return null;
         }
 
-        $host = strtolower($parts['host']);
+        $host = strtolower($parts['host']).(isset($parts['port']) ? ':'.$parts['port'] : '');
         $path = $parts['path'] ?? '';
         if ('/' === $path) {
             $path = '';

@@ -58,41 +58,48 @@ final class ResearchSpikeCommand extends Command
         }
         $mode = (string) $input->getOption('mode');
         if (!\in_array($mode, ['rounds', 'tools', 'both'], true)) {
-            $io->error('Pass --mode with rounds, tools or both.');
+            $io->error('Pass --mode with rounds, tools or both. Nothing was sent.');
 
             return Command::FAILURE;
         }
 
+        $numbers = [];
+        foreach (['searches' => 0, 'sources' => 0, 'turns' => 1, 'repeat' => 1] as $name => $min) {
+            $value = $input->getOption($name);
+            if (!\is_string($value) || !ctype_digit($value) || (int) $value < $min) {
+                $io->error(sprintf('Pass --%s as a whole number of at least %d. Nothing was sent.', $name, $min));
+
+                return Command::FAILURE;
+            }
+            $numbers[$name] = (int) $value;
+        }
+
         $corpusOption = (string) $input->getOption('corpus');
         $path = \in_array($corpusOption, ['smoke', 'full'], true) ? $this->projectDir.'/'.self::DEFAULT_CORPUS : $this->absolute($corpusOption);
-        $hash = is_file($path) ? hash_file('sha256', $path) : '';
-        $limits = new SpikeLimits(
-            max(0, (int) $input->getOption('searches')),
-            max(0, (int) $input->getOption('sources')),
-            max(1, (int) $input->getOption('turns')),
-        );
+        if (!is_file($path)) {
+            $io->error('The corpus file '.$path.' does not exist. Nothing was sent.');
+
+            return Command::FAILURE;
+        }
+        $hash = (string) hash_file('sha256', $path);
+        $limits = new SpikeLimits($numbers['searches'], $numbers['sources'], $numbers['turns']);
         $modes = 'both' === $mode ? ['rounds', 'tools'] : [$mode];
+        $only = $input->getOption('only');
+        $only = \is_string($only) && '' !== trim($only) ? trim($only) : null;
+        $progress = static function (string $line) use ($io): void {
+            $io->getErrorStyle()->writeln($line);
+        };
         try {
             foreach ($modes as $one) {
                 $command = 'app:research:spike --corpus='.$corpusOption.' --mode='.$one.' --user='.$userId;
-                $only = $input->getOption('only');
-                $text = $this->batch->run(
-                    $path,
-                    'smoke' === $corpusOption,
-                    $one,
-                    $userId,
-                    $limits,
-                    max(1, (int) $input->getOption('repeat')),
-                    $command,
-                    \is_string($only) && '' !== trim($only) ? trim($only) : null,
-                );
+                $text = $this->batch->run($path, 'smoke' === $corpusOption, $one, $userId, $limits, $numbers['repeat'], $command, $only, $progress);
                 $io->writeln('Corpus sha256: '.$hash);
                 $io->writeln($text);
                 $report = $input->getOption('report');
                 if (\is_string($report) && '' !== trim($report)) {
-                    $target = $this->absolute($report);
+                    $target = $this->absolute(trim($report));
                     if (\count($modes) > 1) {
-                        $target = preg_replace('/\.md$/', '-'.$one.'.md', $target) ?? $target;
+                        $target = str_ends_with($target, '.md') ? substr($target, 0, -3).'-'.$one.'.md' : $target.'-'.$one;
                     }
                     $dir = \dirname($target);
                     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
@@ -101,6 +108,7 @@ final class ResearchSpikeCommand extends Command
                     if (false === file_put_contents($target, 'Corpus sha256: '.$hash."\n\n".$text)) {
                         throw new \RuntimeException('Could not write the report to '.$target.'.');
                     }
+                    $progress('Report written to '.$target);
                 }
             }
         } catch (\RuntimeException $e) {

@@ -22,7 +22,10 @@ final readonly class SpikeBatch
     ) {
     }
 
-    public function run(string $corpusPath, bool $smokeOnly, string $mode, int $userId, SpikeLimits $limits, int $repeat, string $command, ?string $only = null): string
+    /**
+     * @param (\Closure(string): void)|null $progress receives one line per finished item
+     */
+    public function run(string $corpusPath, bool $smokeOnly, string $mode, int $userId, SpikeLimits $limits, int $repeat, string $command, ?string $only = null, ?\Closure $progress = null): string
     {
         $items = $this->corpus->load($corpusPath, $smokeOnly);
         if (null !== $only) {
@@ -47,7 +50,9 @@ final readonly class SpikeBatch
             [$row, $answer] = $this->row($item, $mode, $userId, $limits, $repeat);
             $rows[] = $row;
             $answers[] = $answer;
-            fwrite(STDERR, $item->id.' '.$mode.' recall '.(null === $row['recall'] ? 'n/a' : number_format($row['recall'], 2, '.', '')).' '.$row['ms']."ms\n");
+            if (null !== $progress) {
+                $progress($item->id.' '.$mode.' recall '.(null === $row['recall'] ? 'n/a' : number_format($row['recall'], 2, '.', '')).' '.$row['ms'].'ms'.(null !== $row['error'] ? ' error: '.$row['error'] : ''));
+            }
         }
         $label = ($smokeOnly ? 'smoke' : 'starter').' ('.\count($items).' items)';
 

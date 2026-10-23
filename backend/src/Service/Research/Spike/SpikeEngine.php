@@ -132,7 +132,7 @@ final class SpikeEngine
                 }
                 $messages[] = [
                     'role' => 'tool',
-                    'tool_call_id' => '' !== $call->id ? $call->id : 'call_spike',
+                    'tool_call_id' => $call->toMessage()['id'],
                     'content' => $this->toolResult($call, $board, $plan, $limits, $language, $userId),
                 ];
             }
@@ -141,7 +141,7 @@ final class SpikeEngine
                     $rejectedFinish = true;
                     $messages[] = [
                         'role' => 'tool',
-                        'tool_call_id' => '' !== $call->id ? $call->id : 'call_spike',
+                        'tool_call_id' => $call->toMessage()['id'],
                         'content' => '{"error":"unread_sources","unread":'.$this->jsonList($board->unreadSummary()).'}',
                     ];
                     continue;
@@ -251,6 +251,9 @@ final class SpikeEngine
         }
     }
 
+    /**
+     * @param array<string, mixed> $plan
+     */
     private function toolResult(SpikeToolCall $call, SpikeBoard $board, array $plan, SpikeLimits $limits, string $language, int $userId): string
     {
         if ('search' === $call->name) {
@@ -277,7 +280,10 @@ final class SpikeEngine
     private function search(string $query, SpikeBoard $board, SpikeLimits $limits, int $userId, bool $reportBudget): string
     {
         $query = trim($query);
-        if ('' === $query || $board->hasQuery($query)) {
+        if ('' === $query) {
+            return '{"error":"empty_query"}';
+        }
+        if ($board->hasQuery($query)) {
             return '{"error":"repeated_query"}';
         }
         if ($board->searchesLeft <= 0) {
@@ -307,6 +313,7 @@ final class SpikeEngine
         foreach ($ids as $id) {
             $source = $board->sources[$id] ?? null;
             if (null === $source) {
+                $cards[] = ['source' => $id, 'error' => 'unknown_source'];
                 continue;
             }
             if ($board->readsLeft <= 0) {
@@ -424,13 +431,37 @@ final class SpikeEngine
      */
     private function tools(): array
     {
-        $object = ['type' => 'object'];
+        $sourceId = ['type' => 'string', 'description' => 'A source id from a search result, like s1.'];
 
         return [
-            ['type' => 'function', 'function' => ['name' => 'search', 'description' => 'Search the web for one query.', 'parameters' => $object]],
-            ['type' => 'function', 'function' => ['name' => 'read_sources', 'description' => 'Read sources by id.', 'parameters' => $object]],
-            ['type' => 'function', 'function' => ['name' => 'reread', 'description' => 'Read one source again for a sharper question.', 'parameters' => $object]],
-            ['type' => 'function', 'function' => ['name' => 'finish', 'description' => 'Stop gathering.', 'parameters' => $object]],
+            $this->tool('search', 'Search the web for one query.', [
+                'query' => ['type' => 'string', 'description' => 'Short search query with exact names and years.'],
+            ], ['query']),
+            $this->tool('read_sources', 'Read sources by id and get evidence cards back.', [
+                'ids' => ['type' => 'array', 'items' => $sourceId, 'minItems' => 1],
+            ], ['ids']),
+            $this->tool('reread', 'Read one source again for a sharper question.', [
+                'source' => $sourceId,
+                'question' => ['type' => 'string', 'description' => 'What to look for this time.'],
+            ], ['source', 'question']),
+            $this->tool('finish', 'Stop gathering.', [
+                'reason' => ['type' => 'string', 'enum' => ['covered', 'budget', 'no_progress']],
+            ], ['reason']),
         ];
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $properties
+     * @param list<string>                        $required
+     *
+     * @return array<string, mixed>
+     */
+    private function tool(string $name, string $description, array $properties, array $required): array
+    {
+        return ['type' => 'function', 'function' => [
+            'name' => $name,
+            'description' => $description,
+            'parameters' => ['type' => 'object', 'properties' => $properties, 'required' => $required],
+        ]];
     }
 }

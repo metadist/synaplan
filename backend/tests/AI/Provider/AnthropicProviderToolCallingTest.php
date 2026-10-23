@@ -65,6 +65,36 @@ class AnthropicProviderToolCallingTest extends TestCase
         $this->assertSame(['type' => 'auto'], $captured['tool_choice']);
     }
 
+    public function testAToolCallWithoutArgumentsIsSentBackAsAnObject(): void
+    {
+        $body = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$body): MockResponse {
+            $body = (string) ($options['body'] ?? '');
+
+            return new MockResponse((string) json_encode([
+                'content' => [['type' => 'text', 'text' => 'Done']],
+                'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+            ]));
+        });
+
+        $this->makeProvider($client)->chat(
+            [
+                ['role' => 'user', 'content' => 'Hi'],
+                ['role' => 'assistant', 'content' => '', 'tool_calls' => [[
+                    'id' => 'toolu_1',
+                    'type' => 'function',
+                    'function' => ['name' => 'handoff_mediamaker', 'arguments' => '{}'],
+                ]]],
+                ['role' => 'tool', 'tool_call_id' => 'toolu_1', 'content' => '{"ok":true}'],
+            ],
+            ['model' => 'claude-haiku-4-5'] + $this->toolOptions(),
+        );
+
+        $this->assertIsString($body);
+        $this->assertStringContainsString('"input":{}', $body);
+        $this->assertStringNotContainsString('"input":[]', $body);
+    }
+
     public function testToolUseBlocksComeBackAsToolCallsAndStayOutOfTheAnswerText(): void
     {
         $client = new MockHttpClient(static fn (): MockResponse => new MockResponse((string) json_encode([

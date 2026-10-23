@@ -23,9 +23,7 @@ final readonly class SpikeToolCall
      */
     public function toMessage(): array
     {
-        // An empty object decodes as [] and is sent back as a JSON array.
-        // Anthropic rejects that, so an empty argument list is a one-key object.
-        $payload = [] === $this->arguments ? ['ok' => true] : $this->arguments;
+        $payload = [] === $this->arguments ? new \stdClass() : $this->arguments;
 
         return [
             'id' => '' !== $this->id ? $this->id : 'call_spike',
@@ -43,7 +41,7 @@ final readonly class SpikeToolCall
     public static function fromProvider(mixed $call): ?self
     {
         if ($call instanceof ToolCall) {
-            return new self($call->id, $call->name, $call->arguments);
+            return new self('' !== $call->id ? $call->id : 'call_'.bin2hex(random_bytes(6)), $call->name, $call->arguments);
         }
         if (!\is_array($call)) {
             return null;
@@ -58,8 +56,10 @@ final readonly class SpikeToolCall
             $arguments = [];
         }
 
+        $id = (string) ($call['id'] ?? '');
+
         return new self(
-            (string) ($call['id'] ?? ''),
+            '' !== $id ? $id : 'call_'.bin2hex(random_bytes(6)),
             (string) ($function['name'] ?? $call['name'] ?? ''),
             $arguments,
         );

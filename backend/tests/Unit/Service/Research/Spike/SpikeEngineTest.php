@@ -84,6 +84,45 @@ final class SpikeEngineTest extends TestCase
         self::assertSame([], $sources->queries);
     }
 
+    public function testRoundModeDropsASearchPastTheBudget(): void
+    {
+        $chat = new ScriptedSpikeChat([
+            $this->jsonTurn('{"goal":"Act number","language":"en"}'),
+            $this->jsonTurn('{"points":[{"id":"p1","title":"Act number","queries":["eu ai act"]}]}'),
+            $this->jsonTurn('{"actions":[{"type":"search","query":"eu ai act"}],"finish":null}'),
+            $this->jsonTurn('{"actions":[{"type":"search","query":"ai act number"}],"finish":null}'),
+            $this->jsonTurn('No search.'),
+        ]);
+        $sources = new ScriptedSpikeSources();
+
+        $answer = $this->engine($chat, $sources)->answer('What is the act number?', new SpikeLimits(0, 2, 4), 'rounds', 1);
+
+        self::assertSame(0, $answer->searches);
+        self::assertSame([], $sources->queries);
+        self::assertSame('No search.', $answer->report);
+    }
+
+    public function testToolModeDeclaresArgumentsAndReportsAnUnknownSource(): void
+    {
+        $chat = new ScriptedSpikeChat([
+            $this->jsonTurn('{"goal":"Act number","language":"en"}'),
+            $this->jsonTurn('{"points":[{"id":"p1","title":"Act number","queries":["eu ai act"]}]}'),
+            new SpikeTurn('', [new SpikeToolCall('c1', 'read_sources', ['ids' => ['s7']])]),
+            new SpikeTurn('', [new SpikeToolCall('c2', 'finish', ['reason' => 'no_progress'])]),
+            $this->jsonTurn('Not confirmed.'),
+        ]);
+        $sources = new ScriptedSpikeSources();
+
+        $answer = $this->engine($chat, $sources)->answer('What is the act number?', new SpikeLimits(2, 2, 4), 'tools', 1);
+
+        self::assertSame(0, $answer->reads);
+        self::assertSame([], $sources->reads);
+        self::assertTrue($this->saw($chat, 'unknown_source'));
+        $search = $chat->tools[2][0]['function'] ?? [];
+        self::assertSame('search', $search['name'] ?? null);
+        self::assertSame(['query'], $search['parameters']['required'] ?? null);
+    }
+
     private function engine(SpikeChat $chat, SpikeSources $sources): SpikeEngine
     {
         $prompts = new PromptBook();
@@ -117,6 +156,9 @@ final class ScriptedSpikeChat implements SpikeChat
     /** @var list<list<array<string, mixed>>> */
     public array $seen = [];
 
+    /** @var list<list<array<string, mixed>>> */
+    public array $tools = [];
+
     /**
      * @param list<SpikeTurn> $turns
      */
@@ -128,6 +170,7 @@ final class ScriptedSpikeChat implements SpikeChat
     public function complete(array $messages, array $tools, int $userId): SpikeTurn
     {
         $this->seen[] = $messages;
+        $this->tools[] = $tools;
 
         return array_shift($this->turns) ?? new SpikeTurn('{}', []);
     }
