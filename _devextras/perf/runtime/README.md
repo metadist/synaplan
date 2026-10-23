@@ -17,3 +17,15 @@ the test provider, for the same reason.
 
 The dev stack serves whatever checkout it has mounted. The delay class has
 to be in that tree or the worker cannot stretch `test-model`.
+
+## Database connections held by streams
+
+`db_connections.sh [streams]` (default 8) starts the same worker-mode
+FrankenPHP with 8 workers, streams that many slow in-app chat turns as the
+demo user through `stream_turns.py`, and counts the MariaDB connections from
+the backend's address before, during and three seconds after the streams
+(`information_schema.PROCESSLIST`, once a second). It refuses to run unless
+the demo user's chat model is the test provider, so no paid provider is
+called, and it cleans up like `make perf-runtime`: the second FrankenPHP is
+stopped and the `var/cache/prod` it warmed is removed. The chats it opens are
+deleted at the end.

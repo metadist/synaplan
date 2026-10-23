@@ -10,7 +10,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU0 | [#2623](https://github.com/metadist/synaplan/pull/2623) | merged (`ce89e32a4`) | research, spike, plan; three Copilot rounds, all findings accepted |
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
-| 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | in review | probe cache and `/api/health/ready`; full PHPUnit and E2E not yet green here |
+| 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
+| 2026-10-23 | AU5 | pending | in progress | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 → ≤ 1 connections |
 
 ## Baselines
 
@@ -23,6 +24,76 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-23 — AU5: a waiting stream gives its database connection back
+
+State at the start (`main` at `ac9b97c6f`): AU0, AU0b, AU1 and AU2 merged;
+no open pull request touches S0. The 2026-10-22 handover still lists AU2 as
+open; it merged the same day.
+
+**Measured** with `_devextras/perf/runtime/db_connections.sh 8` on the dev
+stack: worker-mode FrankenPHP with 8 workers, 8 parallel in-app chat turns
+as the demo user on `test-model` (400 ms per chunk, no paid provider), MariaDB
+connections from the backend's address counted once a second.
+
+| | Before (`main`) | After (this branch) |
+| - | --------------: | ------------------: |
+| Turns done | 8 of 8, 11.7 s | 8 of 8, 11.6 s |
+| Connections before the streams | 1 | 1 |
+| Connections during the streams, max / median | **8 / 8** | **1 / 0** |
+| Connections 3 s after the streams | **8** | **1** |
+
+The one remaining connection is the dev backend's own (classic mode), which
+was there before the run started.
+
+**Proof.** `ChatReplyGeneratorConnectionReleaseTest`: the provider stream
+starts only after the connection was closed; a buffered answer keeps its
+connection. Mutation: with the release call removed, the first test fails
+("the connection is still open when the provider stream starts"); restored.
+`DatabaseConnectionReleaseTest` (open and outside a transaction ⇒ closed; in a
+transaction or already closed ⇒ left alone; every connection of the registry,
+`default` and `read`) and `StreamedResponseConnectionReleaseTest` (after a
+`StreamedResponse` ⇒ released; after a short response ⇒ kept; last on
+`terminate`).
+
+**As delivered, different from the brief (S0 AU5).**
+
+- The brief's functional test ("`isConnected()` false inside the provider
+  callback") cannot run: the test suite wraps every test in a DAMA
+  transaction, and the release must never close a connection inside a
+  transaction. The proof is the unit tests above plus the live measurement.
+- The brief puts the before-wait release into the orchestrator, the widget
+  stream and both gateways. The orchestrator runs the pre-call work
+  (classification, history, knowledge) that needs the database, so the
+  release sits right before the provider stream instead, in
+  `ChatReplyGenerator` — that covers web chat and widget answers. The
+  gateways reach the provider through `AiFacade`, `OpenAICompatibleController`,
+  `OpenAiGatewayToolLoop`, `GatewayToolLoop` and `MessagesGateway`, all frozen
+  in the size ledger (file length or constructor), so they cannot take the
+  call without growing; the same holds for file analysis through
+  `AnalysisReply`. Their before-call release becomes a before-hook of the AI
+  call pipeline (AU10, AU12).
+- Added: `StreamedResponseConnectionRelease` closes the connections after
+  every `StreamedResponse`. Without it a stream worker keeps its connection
+  while idle (Symfony's idle-connection listener only acts on that worker's
+  next request, after 600 s), which is what AU3's second pool would double.
+  It also covers the gateway, file-analysis, TTS, dictation and MCP streams
+  once they end.
+
+**Gate** (rebased on `a9f75713b`): php-cs-fixer, PHPStan, deptrac, PHPUnit
+9,911 tests, Prettier, ESLint, `lint:container`, mobile-impact `backend-only`.
+The local test and dev databases first needed this week's migrations
+(`BCLOUDPICKUPS`, `BREADSCOPE`). `make test-e2e`: 149 passed, 14 failed, all
+of them outside this change. 11 are on the known-local list (guest chat,
+subscription, Telegram, WhatsApp, workspace tab). The other three fail the
+same way with `main` checked out at the same base: `chat.spec.ts:20` (the
+reply is stored; the page stays empty after the reload) and
+`live-voice-activity-filter.spec.ts:9` fail every time, and
+`multitask.spec.ts:27` failed 2 of 8 repeats on both `main` and this branch
+(the sorter sometimes skips the planner). `main`'s CI is green, so all three
+are local only.
 
 ---
 

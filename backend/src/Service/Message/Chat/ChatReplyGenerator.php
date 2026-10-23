@@ -10,6 +10,7 @@ use App\AI\Stream\StreamChunk;
 use App\AI\Stream\VisibleAnswer;
 use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Document\ChatDocumentOutput;
+use App\Service\Infrastructure\DatabaseConnectionRelease;
 use App\Service\Message\ProgressCallback;
 use Psr\Log\LoggerInterface;
 
@@ -35,6 +36,7 @@ final readonly class ChatReplyGenerator
         private ChatDocumentOutput $documents,
         private LoggerInterface $logger,
         private ProviderTranscriptCapture $transcripts,
+        private DatabaseConnectionRelease $connections,
     ) {
     }
 
@@ -165,6 +167,9 @@ final readonly class ChatReplyGenerator
             if ($capture) {
                 $this->transcripts->record($messages);
             }
+            // The worker now waits on the provider for the whole answer; the
+            // reply is stored afterwards on a fresh connection.
+            $this->connections->release('chat stream');
             $metadata = $this->aiFacade->chatStream($messages, $answer, $message->getUserId(), $aiOptions);
         }
         $this->transcripts->seal();
