@@ -13,7 +13,7 @@ chat message.
 | RS1 | in progress | Gateway wrap-up answers fully; round limit from config. Merged in #2637. UC-03 / UC-04 not measured |
 | RS2 | in progress | `web_fetch` run by Synaplan on non-Anthropic `/v1/messages` routes. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, decided 2026-10-22: that endpoint never sees Anthropic’s server-tool declaration, and its constructor is frozen at 13 parameters. UC-04 / UC-04b not measured |
 | RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. UC-05e (≥ 2 searches) and the UC-05 / UC-06 timings are still open |
-| RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (default off). Flag-on vs flag-off smoke (reg-01, reg-02, sci-01) is not measured. The flag stays off. |
+| RS4 | done | Document reader behind `WEB_SEARCH.READ_DOCUMENTS`. Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23). The only PDF was outside the 3-page cap, so the flag stays off. |
 | RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |
 | RQ2b | planned | Spike with both lead modes vs B1+ and B4, budget sweep, go / no-go — §0 #40 |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
@@ -37,6 +37,45 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-23 — RS4 flag on vs off
+
+Live runs, not a fixture replay. Account is admin user id 1. The chat model is
+that account's default (Claude Sonnet 5.5). Web search is Brave. The three
+smoke items do not read the knowledge folder.
+
+Stack: local `docker compose` on the m4 context. synaplan
+`feat/web-search-read-documents` at `2b4dd17b6`. The flag row was missing
+before the on-run, which reads as off. It was set to `1` for the second run
+and set back to `0` afterwards. Reports:
+`backend/var/research-eval/2026-10-23-rs4-off.md` and
+`backend/var/research-eval/2026-10-23-rs4-on.md`.
+
+```bash
+docker compose exec -T backend php bin/console app:research:eval \
+  --corpus=/tmp/rs4-corpus.json --arm=b0 --user=1 \
+  --frozen=var/research-eval/frozen/2026-10-23-rs4-off \
+  --report=var/research-eval/2026-10-23-rs4-off.md
+
+docker compose exec -T backend php bin/console app:research:eval \
+  --corpus=/tmp/rs4-corpus.json --arm=b0 --user=1 \
+  --frozen=var/research-eval/frozen/2026-10-23-rs4-on \
+  --report=var/research-eval/2026-10-23-rs4-on.md
+```
+
+`/tmp/rs4-corpus.json` is reg-01, reg-02 and sci-01 copied from the starter corpus.
+
+| Flag | reg-01 | reg-02 | sci-01 | Mean recall |
+| ---- | ------ | ------ | ------ | ----------- |
+| off | 1.00 in 18651 ms | 1.00 in 7638 ms | 1.00 in 3882 ms | 1.00 |
+| on | 1.00 in 17738 ms | 1.00 in 7660 ms | 1.00 in 3683 ms | 1.00 |
+
+Both runs read the same HTML pages. The only document URL was
+`https://www.datenschutz-bayern.de/datenschutzreform2018/OH_Loeschung.pdf`
+on reg-02, at result 8. The page cap is 3, so it was not opened either time.
+No chat cost row was written. The flag stays off.
 
 ---
 
