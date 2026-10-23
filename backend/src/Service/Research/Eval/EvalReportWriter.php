@@ -14,15 +14,16 @@ final readonly class EvalReportWriter
 {
     /**
      * @param list<ReportRow> $rows
+     * @param list<string>    $judgeNotes
      */
-    public function write(string $path, string $arm, string $corpusLabel, string $command, array $rows): string
+    public function write(string $path, string $arm, string $corpusLabel, string $command, array $rows, array $judgeNotes): string
     {
         $dir = \dirname($path);
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new \RuntimeException('Could not create the report directory.');
         }
 
-        $text = $this->render($arm, $corpusLabel, $command, $rows);
+        $text = $this->render($arm, $corpusLabel, $command, $rows, $judgeNotes);
         if (false === file_put_contents($path, $text)) {
             throw new \RuntimeException('Could not write the report.');
         }
@@ -32,8 +33,9 @@ final readonly class EvalReportWriter
 
     /**
      * @param list<ReportRow> $rows
+     * @param list<string>    $judgeNotes
      */
-    public function render(string $arm, string $corpusLabel, string $command, array $rows): string
+    public function render(string $arm, string $corpusLabel, string $command, array $rows, array $judgeNotes): string
     {
         $lines = [
             '# Research eval',
@@ -74,6 +76,11 @@ final readonly class EvalReportWriter
         $lines[] = 'Judged metrics are included only when --judges is set and a judge answers.';
         $lines[] = '';
 
-        return implode("\n", $lines);
+        $text = implode("\n", $lines);
+        if ([] !== $judgeNotes) {
+            $text .= "\n".implode("\n", $judgeNotes)."\n";
+        }
+
+        return $text;
     }
 }

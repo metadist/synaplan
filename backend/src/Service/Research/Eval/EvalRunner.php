@@ -44,15 +44,11 @@ final readonly class EvalRunner
         }
 
         $label = $request->smokeOnly ? 'smoke ('.\count($items).' items)' : 'full ('.\count($items).' items)';
-        $text = $this->reports->render($request->arm, $label, $request->commandLine, $rows);
-        if ([] !== $judgeNotes) {
-            $text .= "\n".implode("\n", $judgeNotes)."\n";
-        }
         if (null !== $request->files->reportPath) {
-            $this->reports->write($request->files->reportPath, $request->arm, $label, $request->commandLine, $rows);
+            return $this->reports->write($request->files->reportPath, $request->arm, $label, $request->commandLine, $rows, $judgeNotes);
         }
 
-        return $text;
+        return $this->reports->render($request->arm, $label, $request->commandLine, $rows, $judgeNotes);
     }
 
     private function guard(EvalRequest $request): void
@@ -139,7 +135,13 @@ final readonly class EvalRunner
             return;
         }
         foreach ($item->facts->entries as $entry) {
-            $verdicts = $this->judges->judgeFact($entry['assertion'], $text, $request->live->judges, $request->userId);
+            try {
+                $verdicts = $this->judges->judgeFact($entry['assertion'], $text, $request->live->judges, $request->userId);
+            } catch (\Throwable $e) {
+                $judgeNotes[] = $item->id.' '.$entry['id'].' judge failed: '.$e->getMessage();
+
+                continue;
+            }
             foreach ($verdicts as $verdict) {
                 $judgeNotes[] = $item->id.' '.$entry['id'].' '.$verdict['judge'].': '.$verdict['verdict'];
             }
