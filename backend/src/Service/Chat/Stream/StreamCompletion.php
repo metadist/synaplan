@@ -28,6 +28,16 @@ final readonly class StreamCompletion
     /** Message meta: seconds from the first reasoning chunk to the first answer token. */
     public const THINKING_SECONDS = 'thinking_seconds';
 
+    /**
+     * A continuation appends to the message that already has a duration.
+     * Writing the continuation's own seconds would replace that one, and
+     * reload would show it on the first thinking block.
+     */
+    public static function measuredDuration(?int $seconds, bool $continuation): ?int
+    {
+        return $continuation ? null : $seconds;
+    }
+
     public function __construct(
         private StreamTurnFinisher $finisher,
         private StreamUsageRecorder $usage,
@@ -53,7 +63,9 @@ final readonly class StreamCompletion
         $chatTitle = $this->finisher->titleChat($turn, $state->chat);
         $usage = $this->usage->recordStreamedReply($turn, $state, $reply->outgoing, $metadata, $classification, $reply->text, $reply->generatedFile);
 
-        $thinkingSeconds = $relay->reasoningSeconds();
+        // A continuation appends to the original message. Its own reasoning
+        // must not replace the duration already stored for the first block.
+        $thinkingSeconds = self::measuredDuration($relay->reasoningSeconds(), null !== $state->continued);
         if (null !== $thinkingSeconds) {
             $reply->outgoing->setMeta(self::THINKING_SECONDS, (string) $thinkingSeconds);
             $this->entityManager->flush();
