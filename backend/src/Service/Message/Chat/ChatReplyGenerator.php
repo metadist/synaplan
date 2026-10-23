@@ -170,7 +170,7 @@ final readonly class ChatReplyGenerator
             // The worker now waits on the provider for the whole answer; the
             // reply is stored afterwards on a fresh connection.
             $this->connections->release('chat stream');
-            $metadata = $this->aiFacade->chatStream($messages, $answer, $message->getUserId(), $aiOptions);
+            $metadata = $this->aiFacade->chatStream($messages, $this->connections->releaseOnFirstCall($answer, 'chat stream'), $message->getUserId(), $aiOptions);
         }
         $this->transcripts->seal();
         $turn->perfTimer->stop('provider_total');

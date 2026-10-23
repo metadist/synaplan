@@ -13,6 +13,8 @@ use Psr\Log\NullLogger;
 
 final class DatabaseConnectionReleaseTest extends TestCase
 {
+    private bool $connected = true;
+
     public function testAnOpenConnectionOutsideATransactionIsClosed(): void
     {
         $open = $this->connection(connected: true, inTransaction: false, expectClose: true);
@@ -66,6 +68,33 @@ final class DatabaseConnectionReleaseTest extends TestCase
         $quiet = $this->createMock(LoggerInterface::class);
         $quiet->expects(self::never())->method('debug');
         (new DatabaseConnectionRelease(new StubConnectionRegistry(), $quiet))->release('chat stream');
+    }
+
+    public function testAWrappedCallbackReleasesOnItsFirstCallOnlyAndForwardsEverything(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('isConnected')->willReturnCallback(fn (): bool => $this->connected);
+        $connection->method('isTransactionActive')->willReturn(false);
+        $connection->expects(self::once())->method('close')->willReturnCallback(function (): void {
+            $this->connected = false;
+        });
+
+        $calls = [];
+        $wrapped = (new DatabaseConnectionRelease(new StubConnectionRegistry(['default' => $connection]), new NullLogger()))
+            ->releaseOnFirstCall(static function (string $chunk, array $metadata = []) use (&$calls): string {
+                $calls[] = [$chunk, $metadata];
+
+                return strtoupper($chunk);
+            }, 'chat stream');
+        self::assertTrue($this->connected, 'wrapping alone must not release');
+
+        self::assertSame('HEL', $wrapped('hel', ['type' => 'text']));
+        self::assertFalse($this->connected);
+
+        $this->connected = true;
+        self::assertSame('LO', $wrapped('lo'));
+        self::assertTrue($this->connected, 'a later call must not release again');
+        self::assertSame([['hel', ['type' => 'text']], ['lo', []]], $calls);
     }
 
     private function connection(bool $connected, bool $inTransaction, bool $expectClose): Connection

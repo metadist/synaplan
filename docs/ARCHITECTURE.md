@@ -167,7 +167,9 @@ flowchart LR
   `DatabaseConnectionRelease` closes every open connection that is outside a
   transaction; Doctrine reconnects on the next query. `ChatReplyGenerator`
   calls it right before the provider stream of a chat answer (web chat and
-  widget), and `StreamedResponseConnectionRelease` calls it on `terminate`
+  widget) and once more on the stream's first chunk, because provider setup
+  (endpoint, credentials) can reconnect in between;
+  `StreamedResponseConnectionRelease` calls it on `terminate`
   after every `StreamedResponse`, so a worker idle between streams holds
   none. The gateways (`/v1/chat/completions`, `/v1/messages`) and file
   analysis give theirs back only after the response for now: their

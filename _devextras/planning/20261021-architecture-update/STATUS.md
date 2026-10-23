@@ -11,7 +11,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
 | 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
-| 2026-10-23 | AU5 | pending | in progress | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 → ≤ 1 connections |
+| 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | in review | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
 
 ## Baselines
 
@@ -35,23 +35,35 @@ open; it merged the same day.
 
 **Measured** with `_devextras/perf/runtime/db_connections.sh 8` on the dev
 stack: worker-mode FrankenPHP with 8 workers, 8 parallel in-app chat turns
-as the demo user on `test-model` (400 ms per chunk, no paid provider), MariaDB
-connections from the backend's address counted once a second.
+as the demo user on `test-model` (400 ms per chunk), MariaDB connections from
+the backend's address counted once a second. "Before" is the same branch with
+`main`'s backend code.
 
 | | Before (`main`) | After (this branch) |
 | - | --------------: | ------------------: |
-| Turns done | 8 of 8, 11.7 s | 8 of 8, 11.6 s |
-| Connections before the streams | 1 | 1 |
-| Connections during the streams, max / median | **8 / 8** | **1 / 0** |
-| Connections 3 s after the streams | **8** | **1** |
+| Turns done | 8 of 8, 11.5 s | 8 of 8, 11.6 s |
+| Connections after the chats were opened | 1 | 1 |
+| Connections per second while the turns ran | 1, then 8 for 11 s | 1, 8, then **0** for 10 s |
+| Connections 3 s after the streams | **8** | **0** |
+| Calls to a provider other than the test provider | none | none |
 
-The one remaining connection is the dev backend's own (classic mode), which
-was there before the run started.
+The single 8 on the branch is the second after the turns started: all eight
+classify and load their history at once, before the provider is called.
+
+A first version of the script (Copilot review, round 1) checked only the chat
+model and measured with Qdrant on: every turn then also embedded the question
+for memory search through the `VECTORIZE` model (Cloudflare `bge-m3` on this
+install), 17 small paid calls in total, and the chats were deleted before the
+idle sample. Both are fixed; the numbers above are from the fixed script.
 
 **Proof.** `ChatReplyGeneratorConnectionReleaseTest`: the provider stream
-starts only after the connection was closed; a buffered answer keeps its
-connection. Mutation: with the release call removed, the first test fails
-("the connection is still open when the provider stream starts"); restored.
+starts only after the connection was closed; a connection that provider setup
+reopens is closed by the first chunk, and a later chunk leaves it alone; a
+buffered answer keeps its connection. Mutation: with the release call
+removed, the first test fails ("the connection is still open when the
+provider stream starts"); with the first-chunk wrapper removed, the second
+fails ("the connection reopened by provider setup is still open after the
+first chunk"); both restored.
 `DatabaseConnectionReleaseTest` (open and outside a transaction ⇒ closed; in a
 transaction or already closed ⇒ left alone; every connection of the registry,
 `default` and `read`) and `StreamedResponseConnectionReleaseTest` (after a
@@ -68,7 +80,9 @@ transaction or already closed ⇒ left alone; every connection of the registry,
   stream and both gateways. The orchestrator runs the pre-call work
   (classification, history, knowledge) that needs the database, so the
   release sits right before the provider stream instead, in
-  `ChatReplyGenerator` — that covers web chat and widget answers. The
+  `ChatReplyGenerator`, and once more on the stream's first chunk, because
+  provider setup (endpoint and credential lookups) can reconnect in between —
+  that covers web chat and widget answers. The
   gateways reach the provider through `AiFacade`, `OpenAICompatibleController`,
   `OpenAiGatewayToolLoop`, `GatewayToolLoop` and `MessagesGateway`, all frozen
   in the size ledger (file length or constructor), so they cannot take the
@@ -432,3 +446,6 @@ opinion on S5 and the approval-gate gap are in
 | 2026-10-21 | #2627 | 1 | The conditional E2E commands cannot run in sequence after the first `cd frontend` | Defect. Each command now runs in a subshell from the repository root (`01` §6) |
 | 2026-10-21 | #2627 | 1 | The attach-token and relay-header drills were assigned to AU30, which introduces neither | Defect. Grant-reuse stays AU30; token tamper/expiry and the external `X-Synaplan-Relay` drill move to AU31 (`03` §7.1 #5, S5 AU31 goal and exit criteria) |
 | 2026-10-21 | #2627 | 3 (overview) | The documented local OIDC gate omits CI's `--grep @oidc`, so it also runs specs needing an external installation | Defect (overview finding, verified against `ci.yml` grep_filter and `frontend/package.json`). `01` §6 now documents `npm run test:e2e:oidc -- --grep @oidc`. Round 3 otherwise approved with no open issues; the three-round cap is reached, so the re-review of this fix is the owner's decision (`01` §9) |
+| 2026-10-23 | #2661 | 1 | Provider setup can reconnect after the release, so the connection is held for the rest of the answer | Defect, confirmed (`OpenAICompatibleProvider::clientForCall()` reads the endpoint from `BCONFIG`). `DatabaseConnectionRelease::releaseOnFirstCall()` wraps the stream callback: the first chunk releases once more, later chunks never; regression test with a reconnecting provider, mutation-checked |
+| 2026-10-23 | #2661 | 1 | The benchmark's guard checks only the chat model | Defect, confirmed and worse: every turn also embedded the question for memory search through Cloudflare (17 calls in `BUSELOG`). Guard now covers chat, sorting and memory models; the measured FrankenPHP runs without Qdrant; the run fails on any ledger call to another provider. Re-run: none |
+| 2026-10-23 | #2661 | 1 | The chats were deleted before the idle sample | Defect. `stream_turns.py` has `prepare`, `stream`, `cleanup` phases; the idle sample is taken with no request in between, the chats are deleted after it. Re-run: 0 connections after the streams |

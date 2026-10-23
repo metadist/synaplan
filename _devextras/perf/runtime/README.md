@@ -23,9 +23,14 @@ to be in that tree or the worker cannot stretch `test-model`.
 `db_connections.sh [streams]` (default 8) starts the same worker-mode
 FrankenPHP with 8 workers, streams that many slow in-app chat turns as the
 demo user through `stream_turns.py`, and counts the MariaDB connections from
-the backend's address before, during and three seconds after the streams
-(`information_schema.PROCESSLIST`, once a second). It refuses to run unless
-the demo user's chat model is the test provider, so no paid provider is
-called, and it cleans up like `make perf-runtime`: the second FrankenPHP is
-stopped and the `var/cache/prod` it warmed is removed. The chats it opens are
-deleted at the end.
+the backend's address (`information_schema.PROCESSLIST`): once after the
+chats are opened, once a second while the turns stream, and three seconds
+after the last one ended, before the chats are deleted.
+
+No paid provider is called. The script refuses to run unless the demo user's
+chat, sorting and memory models are the test provider; the measured
+FrankenPHP runs with an empty `QDRANT_URL`, so no memory search embeds the
+question; and the run fails if the usage ledger (`BUSELOG`) shows a call to
+any other provider (`calls_to_other_providers`). It cleans up like
+`make perf-runtime`: the second FrankenPHP is stopped, the `var/cache/prod`
+it warmed is removed, and the chats it opened are deleted.

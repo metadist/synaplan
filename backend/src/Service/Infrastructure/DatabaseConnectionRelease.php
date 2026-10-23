@@ -51,4 +51,26 @@ final readonly class DatabaseConnectionRelease
 
         return $closed;
     }
+
+    /**
+     * Wraps a stream callback so that its first call releases once more.
+     * Provider setup (endpoint, credentials, health state) can query the
+     * database after the release before the call and reopen a connection,
+     * which would then stay open for the rest of the answer. Only the first
+     * call releases: a callback that queries per chunk keeps its connection
+     * instead of reconnecting on every chunk.
+     */
+    public function releaseOnFirstCall(callable $callback, string $reason): \Closure
+    {
+        $released = false;
+
+        return function (mixed ...$arguments) use ($callback, $reason, &$released): mixed {
+            if (!$released) {
+                $released = true;
+                $this->release($reason);
+            }
+
+            return $callback(...$arguments);
+        };
+    }
 }

@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Hold N in-app chat streams open at once, signed in as one user.
 
-Signs in through POST /api/v1/auth/login, opens one chat per stream and reads
-GET /api/v1/messages/stream until the turn's terminal event. A turn counts as
-done only when its `complete` event arrived. Prints one JSON object.
+Three phases, so the caller can measure between them without a request of
+this script in the way:
 
-The password is read from SYNAPLAN_PERF_PASSWORD and never printed.
+  prepare  signs in through POST /api/v1/auth/login and opens one chat per
+           stream; writes the session and the chat ids to --state
+  stream   reads GET /api/v1/messages/stream for every chat at once until
+           the turn's terminal event; prints one JSON object
+  cleanup  deletes the chats and the state file
+
+A turn counts as done only when its `complete` event arrived. The password is
+read from SYNAPLAN_PERF_PASSWORD and never printed.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ import argparse
 import http.client
 import json
 import os
+import pathlib
 import statistics
 import threading
 import time
@@ -93,8 +100,42 @@ def run_turn(base, cookie, chat_id, message, gate, record):
     record["duration"] = time.monotonic() - started
 
 
+def prepare(base: urllib.parse.ParseResult, state: pathlib.Path, email: str, streams: int) -> int:
+    cookie = sign_in(base, email, os.environ.get("SYNAPLAN_PERF_PASSWORD", "demo123"))
+    chats = [new_chat(base, cookie) for _ in range(streams)]
+    fd = os.open(state, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        json.dump({"cookie": cookie, "chats": chats}, handle)
+    return 0
+
+
+def stream(base: urllib.parse.ParseResult, cookie: str, chats: list[int], message: str) -> int:
+    gate = threading.Event()
+    records = [{} for _ in chats]
+    threads = [threading.Thread(target=run_turn, args=(base, cookie, chat_id, message, gate, rec))
+               for chat_id, rec in zip(chats, records)]
+    for t in threads:
+        t.start()
+    gate.set()
+    for t in threads:
+        t.join()
+
+    done = [r for r in records if r.get("status") == 200 and r.get("complete") and not r.get("error")]
+    durations = [r["duration"] for r in done]
+    print(json.dumps({
+        "streams": len(chats),
+        "done": len(done),
+        "failed": [{k: r.get(k) for k in ("status", "error")} for r in records if r not in done],
+        "duration_p50_s": round(statistics.median(durations), 2) if durations else None,
+        "duration_max_s": round(max(durations), 2) if durations else None,
+    }))
+    return 0 if len(done) == len(chats) else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("phase", choices=("prepare", "stream", "cleanup"))
+    parser.add_argument("--state", required=True, help="file the three phases share")
     parser.add_argument("--base", default="http://synaplan-backend:8090")
     parser.add_argument("--email", default="demo@synaplan.com")
     parser.add_argument("--streams", type=int, default=8)
@@ -102,30 +143,18 @@ def main() -> int:
     args = parser.parse_args()
 
     base = urllib.parse.urlparse(args.base)
-    cookie = sign_in(base, args.email, os.environ.get("SYNAPLAN_PERF_PASSWORD", "demo123"))
-    chats = [new_chat(base, cookie) for _ in range(args.streams)]
-    gate = threading.Event()
-    records = [{} for _ in chats]
-    threads = [threading.Thread(target=run_turn, args=(base, cookie, chat_id, args.message, gate, rec))
-               for chat_id, rec in zip(chats, records)]
-    for t in threads:
-        t.start()
-    gate.set()
-    for t in threads:
-        t.join()
-    for chat_id in chats:
-        delete_chat(base, cookie, chat_id)
+    state = pathlib.Path(args.state)
+    if args.phase == "prepare":
+        return prepare(base, state, args.email, args.streams)
 
-    done = [r for r in records if r.get("status") == 200 and r.get("complete") and not r.get("error")]
-    durations = [r["duration"] for r in done]
-    print(json.dumps({
-        "streams": args.streams,
-        "done": len(done),
-        "failed": [{k: r.get(k) for k in ("status", "error")} for r in records if r not in done],
-        "duration_p50_s": round(statistics.median(durations), 2) if durations else None,
-        "duration_max_s": round(max(durations), 2) if durations else None,
-    }))
-    return 0 if len(done) == args.streams else 1
+    saved = json.loads(state.read_text())
+    if args.phase == "stream":
+        return stream(base, saved["cookie"], saved["chats"], args.message)
+
+    for chat_id in saved["chats"]:
+        delete_chat(base, saved["cookie"], chat_id)
+    state.unlink()
+    return 0
 
 
 if __name__ == "__main__":

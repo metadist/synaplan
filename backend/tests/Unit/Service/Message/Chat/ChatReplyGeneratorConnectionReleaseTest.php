@@ -37,7 +37,30 @@ final class ChatReplyGeneratorConnectionReleaseTest extends TestCase
                 return ['provider' => 'test', 'model' => 'test-model', 'usage' => []];
             });
 
-        $reply = $this->generator($aiFacade, $this->connection(expectClose: true))
+        $reply = $this->generator($aiFacade, $this->connection(closes: 1))
+            ->stream($this->turn(), $this->model(), [['role' => 'user', 'content' => 'Hi']], [], static function (): void {}, false, null);
+
+        self::assertSame('Hello', $reply->content);
+    }
+
+    public function testAConnectionReopenedByProviderSetupIsGivenBackOnTheFirstChunk(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->expects(self::once())->method('chatStream')
+            ->willReturnCallback(function (array $messages, callable $callback): array {
+                // Provider setup reads its endpoint and credentials.
+                $this->closed = false;
+                $callback('Hel');
+                self::assertTrue($this->closed, 'the connection reopened by provider setup is still open after the first chunk');
+
+                $this->closed = false;
+                $callback('lo');
+                self::assertFalse($this->closed, 'a later chunk released the connection again');
+
+                return ['provider' => 'test', 'model' => 'test-model', 'usage' => []];
+            });
+
+        $reply = $this->generator($aiFacade, $this->connection(closes: 2))
             ->stream($this->turn(), $this->model(), [['role' => 'user', 'content' => 'Hi']], [], static function (): void {}, false, null);
 
         self::assertSame('Hello', $reply->content);
@@ -49,7 +72,7 @@ final class ChatReplyGeneratorConnectionReleaseTest extends TestCase
         $aiFacade->method('chat')->willReturn(['content' => 'Hello', 'provider' => 'test', 'model' => 'test-model']);
         $aiFacade->expects(self::never())->method('chatStream');
 
-        $this->generator($aiFacade, $this->connection(expectClose: false))
+        $this->generator($aiFacade, $this->connection(closes: 0))
             ->complete($this->turn(), $this->model(), [['role' => 'user', 'content' => 'Hi']], [], [], null);
     }
 
@@ -67,12 +90,12 @@ final class ChatReplyGeneratorConnectionReleaseTest extends TestCase
         );
     }
 
-    private function connection(bool $expectClose): Connection
+    private function connection(int $closes): Connection
     {
         $connection = $this->createMock(Connection::class);
         $connection->method('isConnected')->willReturnCallback(fn (): bool => !$this->closed);
         $connection->method('isTransactionActive')->willReturn(false);
-        $connection->expects($expectClose ? self::once() : self::never())->method('close')
+        $connection->expects(self::exactly($closes))->method('close')
             ->willReturnCallback(function (): void {
                 $this->closed = true;
             });
