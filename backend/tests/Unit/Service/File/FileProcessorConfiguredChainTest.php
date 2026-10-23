@@ -405,6 +405,11 @@ final class FileProcessorConfiguredChainTest extends TestCase
                 throw $this->error;
             }
 
+            public function runsInCloud(): bool
+            {
+                return false;
+            }
+
             public function health(): PlugHealth
             {
                 return PlugHealth::available();

@@ -62,6 +62,7 @@ final readonly class PlugsConfigSeeder implements SeederInterface
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED, 'value' => '0'],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_WEB_SEARCH_TIMEOUT_MS, 'value' => (string) PlugConfigService::DEFAULT_WEB_SEARCH_TIMEOUT_MS],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_WEB_SEARCH_MAX_CONTENT_CHARS, 'value' => (string) PlugConfigService::DEFAULT_WEB_SEARCH_MAX_CONTENT_CHARS],
+            ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_WEB_SEARCH_READ_DOCUMENTS, 'value' => '0'],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_CANDIDATES_MULTIPLIER, 'value' => (string) PlugConfigService::DEFAULT_RERANK_MULTIPLIER],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_LATENCY_BUDGET_MS, 'value' => (string) PlugConfigService::DEFAULT_RERANK_LATENCY_MS],

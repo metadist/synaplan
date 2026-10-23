@@ -57,6 +57,11 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
                 ]);
             }
 
+            public function runsInCloud(): bool
+            {
+                return false;
+            }
+
             public function health(): PlugHealth
             {
                 return PlugHealth::available();
@@ -106,6 +111,11 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
                 throw new \RuntimeException('sidecar down for '.$request->ext);
             }
 
+            public function runsInCloud(): bool
+            {
+                return false;
+            }
+
             public function health(): PlugHealth
             {
                 return PlugHealth::available();
@@ -153,6 +163,11 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
             public function extract(ExtractionRequest $request): ExtractionResult
             {
                 return ExtractionResult::of('aaaaaaa', 'docling', ['file' => basename($request->absolutePath)]);
+            }
+
+            public function runsInCloud(): bool
+            {
+                return false;
             }
 
             public function health(): PlugHealth
@@ -226,6 +241,11 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
             public function extract(ExtractionRequest $request): ExtractionResult
             {
                 throw new \RuntimeException('sidecar down for '.$request->ext);
+            }
+
+            public function runsInCloud(): bool
+            {
+                return false;
             }
 
             public function health(): PlugHealth

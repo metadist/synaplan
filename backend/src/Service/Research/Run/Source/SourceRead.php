@@ -17,4 +17,14 @@ final readonly class SourceRead
         public string $reason,
     ) {
     }
+
+    public function trimmed(int $maxChars): self
+    {
+        $text = mb_substr($this->text, 0, max(0, $maxChars));
+        if ($text === $this->text) {
+            return $this;
+        }
+
+        return new self($this->url, $this->blocked, $text, $this->reason);
+    }
 }

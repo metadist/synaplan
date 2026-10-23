@@ -7,7 +7,9 @@ namespace App\Service\Research;
 use App\Plug\PlugConfigService;
 use App\Service\Context\CondensedText;
 use App\Service\Context\ContextCondenser;
+use App\Service\Research\Run\Source\ResearchSourceReader;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Turns "10 search snippets" into evidence: reads the top result pages,
@@ -44,6 +46,7 @@ final readonly class WebResearchService
         private ContextCondenser $condenser,
         private PlugConfigService $plugConfig,
         private LoggerInterface $logger,
+        private ?ResearchSourceReader $sourceReader = null,
     ) {
     }
 
@@ -100,7 +103,7 @@ final readonly class WebResearchService
         // slow news sites cost the slowest one, not the sum of all three.
         $firstHops = [];
         foreach ($selected as $index => $url) {
-            $firstHops[$index] = $this->urlContentService->startReading($url);
+            $firstHops[$index] = $this->startSelectedRead($url);
         }
 
         if (null !== $onProgress) {
@@ -135,7 +138,7 @@ final readonly class WebResearchService
                     'stage' => 'fetching',
                 ]);
             }
-            $fetchedPages[$index] = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index]);
+            $fetchedPages[$index] = $this->readSelectedPage($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index], $userId, $started);
         }
 
         foreach ($fetchedPages as $index => $page) {
@@ -310,12 +313,38 @@ final readonly class WebResearchService
         return in_array($registrable, self::SKIP_HOSTS, true);
     }
 
+    private function startSelectedRead(string $url): ?ResponseInterface
+    {
+        if (ResearchSourceReader::isDocumentUrl($url)) {
+            return null;
+        }
+
+        return $this->urlContentService->startReading($url);
+    }
+
+    private function readSelectedPage(string $url, int $maxChars, ?ResponseInterface $firstHop, ?int $userId, float $started): UrlContentResult
+    {
+        if (null !== $this->sourceReader && ResearchSourceReader::isDocumentUrl($url)) {
+            $remainingSeconds = max(1, (int) floor(self::READ_DEADLINE_SECONDS - (microtime(true) - $started)));
+
+            return $this->sourceReader->fetchForDeepen($url, $maxChars, $userId, $remainingSeconds);
+        }
+
+        return $this->urlContentService->fetchForReading($url, $maxChars, $firstHop);
+    }
+
     private function isFileUrl(string $url): bool
     {
         $path = strtolower((string) parse_url($url, PHP_URL_PATH));
         $extension = pathinfo($path, PATHINFO_EXTENSION);
+        if ('' === $extension || !in_array($extension, self::SKIP_EXTENSIONS, true)) {
+            return false;
+        }
+        if (null === $this->sourceReader || !ResearchSourceReader::isDocumentExtension($extension)) {
+            return true;
+        }
 
-        return '' !== $extension && in_array($extension, self::SKIP_EXTENSIONS, true);
+        return !$this->plugConfig->isWebSearchReadDocumentsEnabled();
     }
 
     private function registrableDomain(string $host): string

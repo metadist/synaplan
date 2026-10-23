@@ -79,6 +79,11 @@ final readonly class DoclingExtractor implements ContentExtractorInterface
         );
     }
 
+    public function runsInCloud(): bool
+    {
+        return false;
+    }
+
     public function health(): PlugHealth
     {
         return $this->client->health();

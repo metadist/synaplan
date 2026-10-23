@@ -37,6 +37,7 @@ final class PlugsConfigSeederTest extends TestCase
             PlugConfigService::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED => '0',
             PlugConfigService::KEY_WEB_SEARCH_TIMEOUT_MS => '8000',
             PlugConfigService::KEY_WEB_SEARCH_MAX_CONTENT_CHARS => '4000',
+            PlugConfigService::KEY_WEB_SEARCH_READ_DOCUMENTS => '0',
             PlugConfigService::KEY_RERANK_ENABLED => '0',
             PlugConfigService::KEY_RERANK_CANDIDATES_MULTIPLIER => '4',
             PlugConfigService::KEY_RERANK_LATENCY_BUDGET_MS => '800',
