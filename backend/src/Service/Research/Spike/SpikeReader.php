@@ -25,7 +25,7 @@ final class SpikeReader
     /**
      * @param list<array{id: string, title: string}> $points
      *
-     * @return array{cards: list<array{point: string, fact: string, quote: ?string}>, leads: list<string>, dropped: int, kept: int, blocked: ?string, note: string, inputTokens: int, outputTokens: int}
+     * @return array{cards: list<array{point: string, fact: string, quote: ?string, passage: string}>, leads: list<string>, dropped: int, kept: int, blocked: ?string, note: string, inputTokens: int, outputTokens: int}
      */
     public function read(string $text, array $links, array $points, string $language, int $userId, ?string $sharper = null): array
     {
@@ -71,6 +71,7 @@ final class SpikeReader
                 'point' => \is_string($point) ? $point : 'p1',
                 'fact' => $kept->fact,
                 'quote' => $kept->quote,
+                'passage' => $this->passageText($kept->passageIds, $passages),
             ];
         }
 
@@ -84,6 +85,22 @@ final class SpikeReader
             'inputTokens' => $turn->inputTokens,
             'outputTokens' => $turn->outputTokens,
         ];
+    }
+
+    /**
+     * @param list<string>  $ids
+     * @param list<Passage> $passages
+     */
+    private function passageText(array $ids, array $passages): string
+    {
+        $texts = [];
+        foreach ($passages as $passage) {
+            if (\in_array($passage->id, $ids, true)) {
+                $texts[] = $passage->text;
+            }
+        }
+
+        return implode("\n", $texts);
     }
 
     /**

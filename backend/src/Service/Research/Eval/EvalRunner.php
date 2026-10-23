@@ -9,6 +9,8 @@ namespace App\Service\Research\Eval;
  *
  * A failed item is a row with the sentence the arm raised. It is not scored
  * as a wrong answer. A failed judge is a note; it never fails the item.
+ *
+ * @phpstan-import-type SavedAnswer from AnswerFile
  */
 final readonly class EvalRunner
 {
@@ -24,6 +26,7 @@ final readonly class EvalRunner
         private JudgeClient $judges,
         private EvalReportWriter $reports,
         private SyntheticDocumentGenerator $documents,
+        private AnswerFile $answers = new AnswerFile(),
     ) {
     }
 
@@ -45,8 +48,12 @@ final readonly class EvalRunner
         $frozen = null !== $request->files->frozenDir ? new FrozenStore($request->files->frozenDir) : null;
         $rows = [];
         $judgeNotes = [];
+        $saved = [];
         foreach ($items as $item) {
-            $rows[] = $this->row($request, $item, $imported, $frozen, $judgeNotes);
+            $rows[] = $this->row($request, $item, $imported, $frozen, $judgeNotes, $saved);
+        }
+        if (null !== $request->files->answersPath) {
+            $this->answers->write($request->files->answersPath, $saved);
         }
 
         $label = ($request->smokeOnly ? 'smoke' : 'full').' ('.\count($items).' items)';
@@ -81,10 +88,11 @@ final readonly class EvalRunner
     /**
      * @param array<string, string>|null $imported
      * @param list<string>               $judgeNotes
+     * @param list<SavedAnswer>          $saved
      *
      * @return array{id: string, recall: float|null, abstained: bool, ms: int, error: string|null}
      */
-    private function row(EvalRequest $request, CorpusItem $item, ?array $imported, ?FrozenStore $frozen, array &$judgeNotes): array
+    private function row(EvalRequest $request, CorpusItem $item, ?array $imported, ?FrozenStore $frozen, array &$judgeNotes, array &$saved): array
     {
         $recalls = [];
         $abstainedEvery = true;
@@ -104,6 +112,7 @@ final readonly class EvalRunner
                 $answerNs += hrtime(true) - $started;
                 ++$attempts;
             }
+            $saved[] = ['id' => $item->id, 'arm' => $request->arm, 'run' => $i + 1, 'text' => $text, 'evidence' => []];
             $score = $this->scorer->score($item, $text);
             $abstainedEvery = $abstainedEvery && $score['abstained'];
             if (null !== $score['recall']) {
@@ -140,7 +149,7 @@ final readonly class EvalRunner
 
         return match ($request->arm) {
             'b0' => $this->b0->answer($item, $request->userId, $live->folder, $frozen),
-            'b1plus' => $this->b1Plus->answer($item, (string) $live->gatewayUrl, (string) $live->apiKey, $live->folder, $live->gatewayModel),
+            'b1plus' => $this->b1Plus->answer($item, (string) $live->gatewayUrl, (string) $live->apiKey, $live->folder, $live->gatewayModel, $live->webSearch),
             'b4' => $this->b4->answer($item, (string) $live->b4Endpoint),
             default => throw new \RuntimeException('This arm needs --import. Nothing was sent.'),
         };

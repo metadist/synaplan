@@ -14,18 +14,23 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * The key is an evaluation key. A knowledge item also sends the folder header.
  * Without a model only a paired desktop key resolves one; any other key needs
  * --gateway-model.
+ *
+ * With web search the request declares Anthropic's web_search server tool,
+ * as a desktop client does; the gateway answers it with its own search when
+ * one is configured. Citations on a text block become Markdown links.
  */
 final readonly class B1PlusAdapter
 {
     private const MAX_TOKENS = 4096;
     private const TIMEOUT_SECONDS = 600;
+    private const WEB_SEARCH_TOOL = ['type' => 'web_search_20250305', 'name' => 'web_search'];
 
     public function __construct(
         private HttpClientInterface $http,
     ) {
     }
 
-    public function answer(CorpusItem $item, string $gatewayUrl, string $apiKey, ?string $folder, ?string $model = null): string
+    public function answer(CorpusItem $item, string $gatewayUrl, string $apiKey, ?string $folder, ?string $model = null, bool $webSearch = false): string
     {
         if ('' === trim($gatewayUrl) || '' === trim($apiKey)) {
             throw new \RuntimeException('B1+ needs --gateway-url and an API key (--api-key or RESEARCH_EVAL_API_KEY). Nothing was sent.');
@@ -51,6 +56,9 @@ final readonly class B1PlusAdapter
         if (null !== $model && '' !== trim($model)) {
             $body['model'] = trim($model);
         }
+        if ($webSearch) {
+            $body['tools'] = [self::WEB_SEARCH_TOOL];
+        }
 
         $response = $this->http->request('POST', rtrim($gatewayUrl, '/').'/v1/messages', [
             'headers' => $headers,
@@ -75,7 +83,7 @@ final readonly class B1PlusAdapter
         $text = '';
         foreach ($decoded['content'] ?? [] as $block) {
             if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
-                $text .= (string) $block['text'];
+                $text .= (string) $block['text'].$this->citationLinks($block['citations'] ?? null);
             }
         }
         if ('' === trim($text)) {
@@ -83,5 +91,21 @@ final readonly class B1PlusAdapter
         }
 
         return trim($text);
+    }
+
+    private function citationLinks(mixed $citations): string
+    {
+        if (!\is_array($citations)) {
+            return '';
+        }
+        $links = [];
+        foreach ($citations as $citation) {
+            $url = \is_array($citation) ? ($citation['url'] ?? null) : null;
+            if (\is_string($url) && str_starts_with($url, 'http')) {
+                $links[$url] = '[source]('.$url.')';
+            }
+        }
+
+        return [] === $links ? '' : ' ('.implode(' ', $links).')';
     }
 }

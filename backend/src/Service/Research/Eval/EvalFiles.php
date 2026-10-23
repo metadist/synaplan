@@ -14,6 +14,7 @@ final readonly class EvalFiles
         public ?string $frozenDir,
         public ?string $reportPath,
         public ?string $documentsDir,
+        public ?string $answersPath = null,
     ) {
     }
 }

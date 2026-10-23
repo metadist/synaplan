@@ -47,11 +47,13 @@ final class ResearchEvalCommand extends Command
             ->addOption('import', null, InputOption::VALUE_REQUIRED, 'JSON file of reports (id, text). Required for b1. Skips the live arm.')
             ->addOption('frozen', null, InputOption::VALUE_REQUIRED, 'Directory of recorded searches. The first run writes it; later runs replay it.')
             ->addOption('report', null, InputOption::VALUE_REQUIRED, 'Where to write the Markdown report')
+            ->addOption('answers', null, InputOption::VALUE_REQUIRED, 'Where to save each answer, for app:research:citations')
             ->addOption('folder', null, InputOption::VALUE_REQUIRED, 'Knowledge folder key for items that read documents')
             ->addOption('gateway-url', null, InputOption::VALUE_REQUIRED, 'Base URL for b1plus, without /v1/messages')
             ->addOption('api-key', null, InputOption::VALUE_REQUIRED, 'Evaluation API key for b1plus. Prefer the '.self::API_KEY_ENV.' env var; an option stays in the shell history')
             ->addOption('gateway-model', null, InputOption::VALUE_REQUIRED, 'Model for b1plus, provider id or service:providerId:tag. Only a paired desktop key may omit it')
             ->addOption('b4-endpoint', null, InputOption::VALUE_REQUIRED, 'External agent URL that returns {"text":"..."}')
+            ->addOption('web-search', null, InputOption::VALUE_NONE, 'b1plus declares the web_search tool, as a desktop client does')
             ->addOption('judges', null, InputOption::VALUE_REQUIRED, 'Comma-separated judge keys, provider:model')
             ->addOption('write-documents', null, InputOption::VALUE_REQUIRED, 'Write the synthetic knowledge files and stop');
     }
@@ -91,14 +93,16 @@ final class ResearchEvalCommand extends Command
                 $this->optionalString($input->getOption('gateway-model')),
                 $this->optionalString($input->getOption('b4-endpoint')),
                 '' === $judges ? [] : array_values(array_filter(array_map('trim', explode(',', $judges)))),
+                (bool) $input->getOption('web-search'),
             ),
             files: new EvalFiles(
                 $this->optionalPath($input->getOption('import')),
                 $this->optionalPath($input->getOption('frozen')),
                 $this->optionalPath($input->getOption('report')),
                 $this->optionalPath($input->getOption('write-documents')),
+                $this->optionalPath($input->getOption('answers')),
             ),
-            commandLine: 'app:research:eval --corpus='.$corpusOption.' --arm='.(string) $input->getOption('arm'),
+            commandLine: 'app:research:eval --corpus='.$corpusOption.' --arm='.(string) $input->getOption('arm').($input->getOption('web-search') ? ' --web-search' : ''),
         );
     }
 
