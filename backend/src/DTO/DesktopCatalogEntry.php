@@ -23,6 +23,13 @@ use OpenApi\Attributes as OA;
             enum: ['provider_unavailable', 'not_pulled'],
             example: null,
         ),
+        new OA\Property(
+            property: 'maxOutput',
+            type: 'integer',
+            nullable: true,
+            description: 'Provider output ceiling from meta.max_output. Omitted when unknown. Desktop caps plain chat at min(maxOutput, 16384), or 8192 when absent.',
+            example: 16384,
+        ),
     ],
 )]
 final class DesktopCatalogEntry

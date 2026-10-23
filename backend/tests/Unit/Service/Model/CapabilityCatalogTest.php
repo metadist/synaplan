@@ -35,7 +35,7 @@ final class CapabilityCatalogTest extends TestCase
 
     public function testForUserReturnsEightGroupsCatalogKeysAndKeepsUnavailable(): void
     {
-        $chat = $this->model(11, 'Ollama', 'llama3.2', 'Llama 3.2', 'chat', selectable: 1);
+        $chat = $this->model(11, 'Ollama', 'llama3.2', 'Llama 3.2', 'chat', selectable: 1, maxOutput: 16384);
         $embed = $this->model(12, 'Ollama', 'bge-m3', 'bge-m3', 'vectorize', selectable: 1);
         $hidden = $this->model(13, 'Ollama', 'system-sorter', 'Sorter', 'chat', selectable: 0);
         $rerank = $this->model(14, 'Jina', 'jina-rerank', 'Rerank', 'rerank', selectable: 1);
@@ -71,6 +71,7 @@ final class CapabilityCatalogTest extends TestCase
         $this->assertSame('ollama', $chatRows[0]['service']);
         $this->assertTrue($chatRows[0]['available']);
         $this->assertNull($chatRows[0]['unavailableReason']);
+        $this->assertSame(16384, $chatRows[0]['maxOutput']);
 
         $this->assertSame($chatRows, $payload['capabilities']['ANALYZE']);
 
@@ -79,6 +80,7 @@ final class CapabilityCatalogTest extends TestCase
         $this->assertSame('ollama:bge-m3:vectorize', $embedRows[0]['id']);
         $this->assertFalse($embedRows[0]['available']);
         $this->assertSame('not_pulled', $embedRows[0]['unavailableReason']);
+        $this->assertArrayNotHasKey('maxOutput', $embedRows[0]);
 
         $this->assertSame(
             CapabilityCatalog::PLATFORM_VECTORIZE_KEY,
@@ -149,6 +151,7 @@ final class CapabilityCatalogTest extends TestCase
         string $name,
         string $tag,
         int $selectable,
+        ?int $maxOutput = null,
     ): Model&MockObject {
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
@@ -160,6 +163,7 @@ final class CapabilityCatalogTest extends TestCase
         $model->method('getActive')->willReturn(1);
         $model->method('isHiddenBecauseFree')->willReturn(false);
         $model->method('getFeatures')->willReturn([]);
+        $model->method('getMaxOutputTokens')->willReturn($maxOutput);
 
         return $model;
     }

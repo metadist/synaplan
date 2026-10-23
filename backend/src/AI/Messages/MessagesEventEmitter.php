@@ -30,6 +30,10 @@ final class MessagesEventEmitter
     private array $heldBlockIndices = [];
     /** @var array<int, true> upstream indices of client tool_use blocks */
     private array $heldClientToolIndices = [];
+    /** @var array<string, true> server tools hidden from the client, across every turn */
+    private array $hiddenToolNames = [];
+    /** True once those names have been written onto a client-visible message_delta. */
+    private bool $hiddenToolsAnnounced = false;
 
     /**
      * @param EmitFn $emit
@@ -87,6 +91,9 @@ final class MessagesEventEmitter
             if (!$isFinalTurn) {
                 return false;
             }
+            if ('message_delta' === $type) {
+                $data = $this->withHiddenTools($data);
+            }
             $this->emitEvent($event, $data);
             if ('message_stop' === $type) {
                 $this->closed = true;
@@ -125,6 +132,10 @@ final class MessagesEventEmitter
     /**
      * Ensure the stream has a message_stop if we opened a message and the
      * upstream never delivered a final one (e.g. loop aborted).
+     *
+     * Loop exhaustion, the wall-clock break, and wrap-up recovery close here
+     * without a relayed final message_delta. Name the hidden server tools on
+     * a delta first, or the client never learns that Synaplan searched or read.
      */
     public function ensureClosed(): void
     {
@@ -138,6 +149,13 @@ final class MessagesEventEmitter
 
         if (!$this->messageStarted || $this->closed) {
             return;
+        }
+
+        if (!$this->hiddenToolsAnnounced && [] !== $this->hiddenToolNames) {
+            $this->emitEvent('message_delta', $this->withHiddenTools([
+                'type' => 'message_delta',
+                'delta' => [],
+            ]));
         }
 
         $this->emitEvent('message_stop', ['type' => 'message_stop']);
@@ -250,6 +268,7 @@ final class MessagesEventEmitter
                     if (null !== $upstreamIndex) {
                         $this->indexMap[$upstreamIndex] = -1;
                     }
+                    $this->hiddenToolNames[$name] = true;
 
                     return false;
                 }
@@ -333,6 +352,28 @@ final class MessagesEventEmitter
             'index' => $idx,
         ]);
         $this->emittedText = true;
+    }
+
+    /**
+     * The client never saw these blocks; name them on a message_delta so it
+     * can still tell that Synaplan searched or read on its behalf.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    private function withHiddenTools(array $data): array
+    {
+        if ($this->hiddenToolsAnnounced || [] === $this->hiddenToolNames) {
+            return $data;
+        }
+
+        $delta = \is_array($data['delta'] ?? null) ? $data['delta'] : [];
+        $delta['synaplan_server_tools'] = array_keys($this->hiddenToolNames);
+        $data['delta'] = $delta;
+        $this->hiddenToolsAnnounced = true;
+
+        return $data;
     }
 
     /**

@@ -1583,6 +1583,15 @@ final class GatewayToolLoopTest extends TestCase
         self::assertStringNotContainsString('{"path":"notes.md"}', $partials);
         $types = array_map(static fn (array $event): string => (string) ($event['data']['type'] ?? ''), $events);
         self::assertContains('message_stop', $types);
+        $serverTools = [];
+        foreach ($events as $event) {
+            $listed = $event['data']['delta']['synaplan_server_tools'] ?? null;
+            if (\is_array($listed)) {
+                $serverTools = $listed;
+            }
+        }
+        self::assertContains('web_fetch', $serverTools);
+        self::assertNotContains('write_file', $serverTools);
     }
 
     public function testStreamPageLimitHoldsAcrossToolRounds(): void
