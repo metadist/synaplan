@@ -1,0 +1,15 @@
+# Research plan
+
+Plan research that answers the brief completely, with sources.
+
+Today is [TODAY]. Depth: standard, 1–3 points.
+<brief>[BRIEF]</brief>
+
+Return JSON only:
+- points: 1–3 points that together answer the goal. Each:
+  - id: p1, p2, …
+  - title: 3–8 words a non-expert understands.
+  - queries: 1–3 search queries. Exact names, numbers and years. No question words.
+- outline: section titles, starting with the summary and ending with "Not confirmed".
+
+Points must not overlap. Put the point the goal depends on most first.

@@ -15,7 +15,7 @@ chat message.
 | RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. Run `V42D2`: UC-05 passed (ready in 132 ms, UC-05d hit after Ready). UC-06 facts 0/3. UC-05e is not in the runner. Not done. |
 | RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (web search reads locally, no vision). Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23), but no run opened a document: the only PDF was outside the 3-page cap. Done needs one smoke item whose top 3 results include a PDF, measured flag off and on. The flag stays off. |
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
-| RQ2b | planned | Spike with both lead modes vs B1+ and B4, budget sweep, go / no-go — §0 #40 |
+| RQ2b | in progress | Starter set scored 2026-10-23. Better spike arm does not beat B1+ by 10 points. Citation precision not judged. B4 not run. Go / no-go sentence below, not yet accepted |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
 | RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
 | RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
@@ -39,6 +39,77 @@ chat message.
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
 
 ---
+
+## 2026-10-23 — RQ2b spike against B1+
+
+Live runs on the evaluation account (admin user id 1). Chat model is that
+account's default, Claude Sonnet 5.5 (`BMODELS` 379, catalog price 2 / 10 USD
+per 1M prompt / completion tokens). Web search is Brave. Corpus sha256
+`56c371a25e01520f6d601da376b3df4a11ff6d3c245f8a8eb532a99624c844fa`.
+Working tree `feat/research-spike` at `8f4e069beb74`, spike code uncommitted.
+Stack: local `docker compose` on the m4 context.
+
+The spike does not open a knowledge folder. `doc-01`, `doc-02` and `doc-03`
+are errors and stay out of the mean. `mix-01` and `mix-02` run on the web
+only. B1+ was given folder `rq2-eval`. Citation precision and coverage were
+not judged (`--judges` was not set). Passage check dropped 0 findings on every
+arm below; a kept finding had a real passage id. Reader calls in one batch
+run one after another. B4 was not run: there is no `--b4-endpoint`.
+
+`sci-01` and `mix-02` failed in the first tool-mode pass because an empty tool
+argument was sent back as a JSON array. They were run again after that fix.
+The 20/30 sweep is entirely after the fix. Reports:
+`backend/var/research-eval/rq2b-starter.log`,
+`rq2b-sci-01.md`, `rq2b-mix-02.md`, `rq2b-b1plus.log`, `rq2b-sweep.log`.
+
+```bash
+docker compose exec -T backend php bin/console app:research:spike \
+  --corpus=full --mode=both --user=1 --repeat=2 \
+  --report=var/research-eval/rq2b-starter.md
+
+docker compose exec -T backend php bin/console app:research:spike \
+  --corpus=full --mode=tools --user=1 --repeat=2 --only=sci-01 \
+  --report=var/research-eval/rq2b-sci-01.md
+
+docker compose exec -T backend php bin/console app:research:spike \
+  --corpus=full --mode=tools --user=1 --repeat=2 --only=mix-02 \
+  --report=var/research-eval/rq2b-mix-02.md
+
+docker compose exec -T backend php bin/console app:research:eval \
+  --corpus=full --arm=b1plus --user=1 --repeat=2 \
+  --gateway-url=http://127.0.0.1:80 --folder=rq2-eval \
+  --report=var/research-eval/rq2b-b1plus.md
+
+docker compose exec -T backend php bin/console app:research:spike \
+  --corpus=full --mode=both --user=1 --repeat=1 --searches=20 --sources=30 \
+  --report=var/research-eval/rq2b-sweep.md
+```
+
+| Date | Step | Arm | Corpus | Depth | Recall | Citation precision | Coverage | Abstention | Cost | Time p50 / p95 | Command |
+| ---- | ---- | --- | ------ | ----- | ------ | ------------------ | -------- | ---------- | ---- | -------------- | ------- |
+| 2026-10-23 | RQ2b | S-R | starter 20 | 10 searches, 15 sources, repeat 2 | 0.63 across 16 | not judged | not judged | both traps abstained; trap-02 recall 0.00 | 0.44 USD sum of per-item mean token costs. No usage row | 17168 / 28316 ms | `app:research:spike --corpus=full --mode=rounds --repeat=2` |
+| 2026-10-23 | RQ2b | S-T | starter 20 | 10 searches, 15 sources, repeat 2 | 0.81 across 16 | not judged | not judged | both traps abstained; trap-02 recall 1.00 | p50 0.045 USD, sum 0.75 USD, from mean tokens. No usage row | 26613 / 37785 ms | `app:research:spike --corpus=full --mode=tools --repeat=2`, then `--only=sci-01` and `--only=mix-02` |
+| 2026-10-23 | RQ2b | S-R | starter 20 | 20 searches, 30 sources, repeat 1 | 0.56 across 16 | not judged | not judged | both traps abstained; trap-02 recall 1.00 | p50 0.014 USD, sum 0.39 USD, from tokens. No usage row | 16936 / 42395 ms | `app:research:spike --corpus=full --mode=rounds --repeat=1 --searches=20 --sources=30` |
+| 2026-10-23 | RQ2b | S-T | starter 20 | 20 searches, 30 sources, repeat 1 | 0.81 across 16 | not judged | not judged | both traps abstained; trap-02 recall 1.00 | p50 0.059 USD, sum 1.10 USD, from tokens. No usage row | 28263 / 58355 ms | `app:research:spike --corpus=full --mode=tools --repeat=1 --searches=20 --sources=30` |
+| 2026-10-23 | RQ2b | B1+ | starter 20 | gateway, repeat 2 | 0.92 across 19 | not judged | not judged | both traps abstained; trap-02 recall 1.00 | 0.38 USD across 120 usage rows in the command window (115840 prompt, 14940 completion). Not a per-item p50 | 3195 / 5426 ms | `app:research:eval --corpus=full --arm=b1plus --repeat=2 --folder=rq2-eval` |
+| 2026-10-23 | RQ2b | B4 | starter 20 | — | not run | not judged | not judged | not run | not run | not run | no `--b4-endpoint` |
+
+Spike token cost uses the catalog price of model 379 on the mean prompt and
+completion tokens of each item. It does not include Brave. The spike wrote no
+`BUSELOG` row. B1+ cost is the sum of `BUSELOG.BCOST` from 12:48:50 to
+12:51:20 UTC on 2026-10-23.
+
+On the 14 web items that are not mixed, tool mode and B1+ are both 0.93.
+Raising the budget from 10/15 to 20/30 did not raise tool-mode recall. Tool
+mode at 10/15 used on average 1.5 searches and 2.5 sources. At 20/30 it used
+1.8 searches and 4.6 sources.
+
+**Go / no-go (§0 #40), for the owner to accept.** No-go. The better spike arm
+is tool mode at 0.81. B1+ is 0.92. That is not 10 points higher, and 0.92 plus
+10 points is above 1, so no rerun on this corpus can clear the fact-recall
+clause. Citation precision was not judged. The recorded spike cost is above
+twice the B1+ window. Phase C is re-planned around the gateway loop before any
+RS6 code. RQ2b stays in progress until this sentence is accepted.
 
 ## 2026-10-23 — RQ1 full desktop use-case run
 
