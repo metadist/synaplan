@@ -69,6 +69,10 @@ final class MessagesEventEmitterTest extends TestCase
         );
         $this->assertSame(0, $events[1]['data']['index']);
         $this->assertSame(0, $events[2]['data']['index']);
+        $this->assertSame(
+            ['stop_reason' => 'end_turn', 'synaplan_server_tools' => ['mcp__1__rag_search']],
+            $events[3]['data']['delta'],
+        );
     }
 
     public function testEmitAssistantTextWhenTheUpstreamSentNothing(): void

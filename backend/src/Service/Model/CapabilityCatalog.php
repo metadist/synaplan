@@ -99,6 +99,7 @@ final readonly class CapabilityCatalog
                 'name' => $model->getName(),
                 'available' => $available,
                 'unavailableReason' => $unavailableReason,
+                'maxOutput' => $model->getMaxOutputTokens(),
             ];
 
             foreach ($groups as $group) {
@@ -194,7 +195,7 @@ final readonly class CapabilityCatalog
     /**
      * @param array<string, mixed> $row
      *
-     * @return array{id: string, providerId: string, service: string, name: string, available: bool, unavailableReason: string|null}
+     * @return array{id: string, providerId: string, service: string, name: string, available: bool, unavailableReason: string|null, maxOutput?: int}
      */
     private static function toEntry(array $row): array
     {
@@ -202,7 +203,7 @@ final readonly class CapabilityCatalog
         $providerId = (string) ($row['providerId'] ?? '');
         $tag = (string) ($row['tag'] ?? '');
 
-        return [
+        $entry = [
             'id' => GroupPolicyService::catalogKey($service, $providerId, $tag),
             'providerId' => $providerId,
             'service' => strtolower($service),
@@ -212,6 +213,14 @@ final readonly class CapabilityCatalog
                 ? $row['unavailableReason']
                 : null,
         ];
+        // Omitted when the model row has no output ceiling, so older clients
+        // keep today's behaviour and Desktop falls back to 8,192.
+        $maxOutput = $row['maxOutput'] ?? null;
+        if (is_int($maxOutput) && $maxOutput > 0) {
+            $entry['maxOutput'] = $maxOutput;
+        }
+
+        return $entry;
     }
 
     /**

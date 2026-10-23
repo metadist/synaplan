@@ -30,6 +30,8 @@ final class MessagesEventEmitter
     private array $heldBlockIndices = [];
     /** @var array<int, true> upstream indices of client tool_use blocks */
     private array $heldClientToolIndices = [];
+    /** @var array<string, true> server tools hidden from the client, across every turn */
+    private array $hiddenToolNames = [];
 
     /**
      * @param EmitFn $emit
@@ -86,6 +88,13 @@ final class MessagesEventEmitter
             $this->releaseHeld($isFinalTurn, $suppressToolNames);
             if (!$isFinalTurn) {
                 return false;
+            }
+            if ('message_delta' === $type && [] !== $this->hiddenToolNames) {
+                // The client never saw these blocks; name them so it can still
+                // tell that Synaplan searched or read on its behalf.
+                $delta = \is_array($data['delta'] ?? null) ? $data['delta'] : [];
+                $delta['synaplan_server_tools'] = array_keys($this->hiddenToolNames);
+                $data['delta'] = $delta;
             }
             $this->emitEvent($event, $data);
             if ('message_stop' === $type) {
@@ -250,6 +259,7 @@ final class MessagesEventEmitter
                     if (null !== $upstreamIndex) {
                         $this->indexMap[$upstreamIndex] = -1;
                     }
+                    $this->hiddenToolNames[$name] = true;
 
                     return false;
                 }
