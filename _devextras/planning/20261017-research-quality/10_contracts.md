@@ -487,6 +487,10 @@ interface ResearchSourceReaderInterface { public function read(Source $source, R
 final readonly class ResearchSourceReader implements ResearchSourceReaderInterface {}   // HTML via UrlContentService, documents via extractionChain('document', allowCloud), knowledge chunks
 final readonly class FixtureSourceReader implements ResearchSourceReaderInterface {}    // test env: fixture.synaplan.test → files
 
+RQ2 ships a smaller stub of that interface: `read(string $url): SourceRead`.
+RS6 replaces the stub with the signature above. The fixture host stays
+`fixture.synaplan.test`, and any other host is refused without a network call.
+
 final readonly class ResearchOutcome { public string $code; public array $params; public function text(): string; }
 ```
 

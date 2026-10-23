@@ -1,0 +1,74 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Service\Research\Eval;
+
+use App\Service\Research\Eval\B1Importer;
+use App\Service\Research\Eval\B1PlusAdapter;
+use App\Service\Research\Eval\B4Adapter;
+use App\Service\Research\Eval\CorpusFacts;
+use App\Service\Research\Eval\CorpusItem;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+
+final class ExternalArmTest extends TestCase
+{
+    public function testB1PlusSendsNothingWithoutAKey(): void
+    {
+        $client = new MockHttpClient(function (): MockResponse {
+            $this->fail('A request was sent.');
+        });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Nothing was sent.');
+
+        (new B1PlusAdapter($client))->answer($this->item(), '', '', null);
+    }
+
+    public function testB1PlusReadsTheGatewayText(): void
+    {
+        $client = new MockHttpClient(static fn (): MockResponse => new MockResponse(json_encode([
+            'content' => [['type' => 'text', 'text' => 'Regulation 2024/1689.']],
+        ], JSON_THROW_ON_ERROR)));
+
+        $text = (new B1PlusAdapter($client))->answer($this->item(), 'http://gateway.test', 'key', null);
+
+        $this->assertSame('Regulation 2024/1689.', $text);
+    }
+
+    public function testB4SendsNothingWithoutAnEndpoint(): void
+    {
+        $client = new MockHttpClient(function (): MockResponse {
+            $this->fail('A request was sent.');
+        });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Nothing was sent.');
+
+        (new B4Adapter($client))->answer($this->item(), '');
+    }
+
+    public function testAnImportMapsIdsToReportText(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'import');
+        $this->assertIsString($path);
+        file_put_contents($path, json_encode([
+            'items' => [['id' => 'fact-01', 'text' => '2024/1689']],
+        ], JSON_THROW_ON_ERROR));
+
+        try {
+            $loaded = (new B1Importer())->load($path);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame(['fact-01' => '2024/1689'], $loaded);
+    }
+
+    private function item(): CorpusItem
+    {
+        return new CorpusItem('fact-01', 'current', 'en', 'Question', 'standard', true, false, new CorpusFacts([], [], []), true, null);
+    }
+}
