@@ -37,8 +37,20 @@ function renderFinalAnswer(data: StreamUpdatePayload, turn: StreamTurn): void {
   }
 }
 
+/** The server's measured seconds replace the live clock, so reload shows the same number. */
+function applyMeasuredThinking(message: Message, data: StreamUpdatePayload): void {
+  if (typeof data.thinking_seconds !== 'number' || data.thinking_seconds <= 0) {
+    return
+  }
+  const part = message.parts.find((candidate) => candidate.type === 'thinking')
+  if (part) {
+    part.thinkingTime = data.thinking_seconds
+  }
+}
+
 /** What both variants store on a finished answer. The finished plan freezes its cards. */
 function applyFinishedAnswer(message: Message, data: StreamUpdatePayload, turn: StreamTurn): void {
+  applyMeasuredThinking(message, data)
   applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
   if (message.taskPlan) {
     message.taskPlan.active = false

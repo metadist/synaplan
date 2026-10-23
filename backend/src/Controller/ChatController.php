@@ -901,7 +901,7 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'direction', type: 'string', enum: ['IN', 'OUT']),
                                     new OA\Property(property: 'timestamp', type: 'integer'),
                                     new OA\Property(property: 'topic', type: 'string'),
-                                    new OA\Property(property: 'language', type: 'string'),
+                                    new OA\Property(property: 'language', type: 'string'), new OA\Property(property: 'thinking_seconds', type: 'integer', nullable: true, description: 'Seconds from the first reasoning chunk to the first answer token. Null when the turn stored no duration.'),
                                     new OA\Property(property: 'provider', type: 'string'),
                                     new OA\Property(
                                         property: 'file',

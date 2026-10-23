@@ -37,16 +37,46 @@ final class StreamChunkRelay
 
     private string $reasoningBuffer = '';
     private bool $hasReasoningStarted = false;
+
+    /** Nanoseconds (hrtime) when the reasoning block opened and first closed. */
+    private ?int $reasoningOpenedNs = null;
+    private ?int $reasoningClosedNs = null;
+
+    /** @var \Closure(): int|null */
+    private ?\Closure $clock;
     private string $jsonBuffer = '';
     private bool $isBufferingJson = false;
     private bool $fileGenAnnounced = false;
     private ?string $fileGenFilename = null;
 
+    /**
+     * @param \Closure(): int|null $clock monotonic nanoseconds; tests pass their own
+     */
     public function __construct(
         private readonly SseWriter $sse,
         private readonly MediaCancellationStore $cancellationStore,
         private readonly string $trackId,
+        ?\Closure $clock = null,
     ) {
+        $this->clock = $clock;
+    }
+
+    /**
+     * Seconds from the first reasoning chunk to the first answer token
+     * (or to finish(), when the answer never started). Null when this turn
+     * streamed no reasoning. Reasoning that arrives after the answer has
+     * started is not counted: the header says how long was thought before
+     * the answer.
+     */
+    public function reasoningSeconds(): ?int
+    {
+        if (null === $this->reasoningOpenedNs || null === $this->reasoningClosedNs) {
+            return null;
+        }
+
+        $elapsed = ($this->reasoningClosedNs - $this->reasoningOpenedNs) / 1_000_000_000;
+
+        return max(1, (int) round($elapsed));
     }
 
     /**
@@ -80,11 +110,7 @@ final class StreamChunkRelay
      */
     public function finish(): void
     {
-        if ($this->hasReasoningStarted) {
-            $this->reasoningBuffer .= '</think>';
-            $this->sse->send('data', ['chunk' => $this->reasoningBuffer]);
-            $this->responseText .= $this->reasoningBuffer;
-        }
+        $this->closeReasoning();
 
         $this->streamedVisibleText = $this->responseText;
         if ($this->isBufferingJson && '' !== trim($this->jsonBuffer)) {
@@ -123,6 +149,7 @@ final class StreamChunkRelay
         if (!$this->hasReasoningStarted) {
             $this->reasoningBuffer = '<think>';
             $this->hasReasoningStarted = true;
+            $this->reasoningOpenedNs ??= $this->now();
             // A status the moment the model starts reasoning, so the bubble
             // does not sit empty for the whole reasoning window. No message:
             // the client localizes the label itself.
@@ -239,12 +266,20 @@ final class StreamChunkRelay
         }
     }
 
+    private function now(): int
+    {
+        $clock = $this->clock ?? static fn (): int => hrtime(true);
+
+        return $clock();
+    }
+
     private function closeReasoning(): void
     {
         if (!$this->hasReasoningStarted) {
             return;
         }
 
+        $this->reasoningClosedNs ??= $this->now();
         $this->reasoningBuffer .= '</think>';
         $this->sse->send('data', ['chunk' => $this->reasoningBuffer]);
         $this->responseText .= $this->reasoningBuffer;

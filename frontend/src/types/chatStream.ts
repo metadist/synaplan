@@ -151,6 +151,8 @@ export interface StreamUpdatePayload {
   url?: string
   type?: string
   truncated?: boolean
+  /** Measured reasoning seconds, sent with `complete`. Absent when the turn stored none. */
+  thinking_seconds?: number | null
   metadata?: StreamEventMetadata
   links?: StreamLinkItem[]
   generatedFile?: StreamGeneratedFile

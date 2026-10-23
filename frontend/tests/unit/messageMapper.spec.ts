@@ -648,6 +648,19 @@ describe('messageMapper (issue #1070)', () => {
   })
 })
 
+describe('parseContentWithThinking duration', () => {
+  it('uses the stored seconds and never the length of the block', async () => {
+    const { parseContentWithThinking } = await import('@/utils/messageMapper')
+    const block = `<think>${'x'.repeat(4950)}</think>Answer`
+
+    const stored = parseContentWithThinking(block, 'assistant', 7)
+    expect(stored.find((part) => part.type === 'thinking')).toMatchObject({ thinkingTime: 7 })
+
+    const legacy = parseContentWithThinking(block, 'assistant')
+    expect(legacy.find((part) => part.type === 'thinking')?.thinkingTime).toBeUndefined()
+  })
+})
+
 describe('parseContentWithThinking JSON results', () => {
   it('maps a standalone chat-list payload to a json part on reload', async () => {
     const { parseContentWithThinking } = await import('@/utils/messageMapper')

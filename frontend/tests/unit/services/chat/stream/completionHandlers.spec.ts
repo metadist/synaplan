@@ -16,6 +16,32 @@ const generatedFile = {
 }
 
 describe('member completion', () => {
+  it('replaces the live thinking clock with the measured seconds', () => {
+    const turn = fakeMemberTurn(
+      assistantMessage({
+        parts: [{ type: 'thinking', content: 'hmm', thinkingTime: 1, isStreaming: true }],
+      })
+    )
+
+    memberCompletionHandlers.complete(
+      { status: 'complete', messageId: 9, thinking_seconds: 7 },
+      turn
+    )
+
+    expect(turn.message()?.parts[0]).toMatchObject({ thinkingTime: 7 })
+    expect(turn.message()?.parts[0]).not.toHaveProperty('isStreaming')
+  })
+
+  it('keeps the live clock when complete carries no duration', () => {
+    const turn = fakeMemberTurn(
+      assistantMessage({ parts: [{ type: 'thinking', content: 'hmm', thinkingTime: 1 }] })
+    )
+
+    memberCompletionHandlers.complete({ status: 'complete', messageId: 9 }, turn)
+
+    expect(turn.message()?.parts[0]?.thinkingTime).toBe(1)
+  })
+
   it('renders the final text and settles the stored turn', () => {
     const turn = fakeMemberTurn(
       assistantMessage({ parts: [{ type: 'text', content: '' }, { type: 'tts_loading' }] })

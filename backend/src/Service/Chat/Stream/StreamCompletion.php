@@ -10,6 +10,7 @@ use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
 use App\Service\Realtime\SseWriter;
 use App\Service\Widget\WidgetSessionService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -24,6 +25,9 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class StreamCompletion
 {
+    /** Message meta: seconds from the first reasoning chunk to the first answer token. */
+    public const THINKING_SECONDS = 'thinking_seconds';
+
     public function __construct(
         private StreamTurnFinisher $finisher,
         private StreamUsageRecorder $usage,
@@ -33,6 +37,7 @@ final readonly class StreamCompletion
         private GuestSessionService $guestSessionService,
         private LoggerInterface $logger,
         private ProviderTranscriptCapture $transcripts,
+        private EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -48,7 +53,16 @@ final readonly class StreamCompletion
         $chatTitle = $this->finisher->titleChat($turn, $state->chat);
         $usage = $this->usage->recordStreamedReply($turn, $state, $reply->outgoing, $metadata, $classification, $reply->text, $reply->generatedFile);
 
+        $thinkingSeconds = $relay->reasoningSeconds();
+        if (null !== $thinkingSeconds) {
+            $reply->outgoing->setMeta(self::THINKING_SECONDS, (string) $thinkingSeconds);
+            $this->entityManager->flush();
+        }
+
         $event = $this->completeEvent($turn, $classification, $metadata, $reply, $usage, $chatTitle);
+        if (null !== $thinkingSeconds) {
+            $event->set('thinking_seconds', $thinkingSeconds);
+        }
         if ('length' === $relay->finishReason) {
             $event->set('truncated', true);
         }
