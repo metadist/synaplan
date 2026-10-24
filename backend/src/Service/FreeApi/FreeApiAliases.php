@@ -22,6 +22,19 @@ final class FreeApiAliases
         'free-image' => 'text2pic',
     ];
 
+    /**
+     * A second row for an alias, same provider id, different tag.
+     *
+     * Memory extraction only lists tag `mem`. The sorter alias is that model
+     * (fast, cheap chat), so it is also imported as `mem`. The id sent to the
+     * Demo stays `free-sort`.
+     *
+     * @var array<string, list<string>>
+     */
+    public const ADDITIONAL_TAGS = [
+        'free-sort' => ['mem'],
+    ];
+
     /** @var array<string, string> DEFAULTMODEL capability => alias */
     public const BINDINGS = [
         'CHAT' => 'free-chat',
@@ -34,6 +47,16 @@ final class FreeApiAliases
         'PIC2TEXT' => 'free-vision',
         'TEXT2PIC' => 'free-image',
         'VECTORIZE' => 'free-embed',
+    ];
+
+    /**
+     * Tag a purpose binds when the alias has more than one row.
+     * Absent means {@see TAGS}.
+     *
+     * @var array<string, string>
+     */
+    public const BINDING_TAGS = [
+        'MEM' => 'mem',
     ];
 
     /** Changing the embedding model would orphan every stored vector, so it only moves while none exist. */

@@ -29,7 +29,7 @@ final readonly class ModelImportApplier
      */
     public const ALLOWED_TAGS = [
         'chat', 'vectorize', 'pic2text', 'rerank', 'sound2text',
-        'text2sound', 'text2pic', 'text2vid', 'analyze',
+        'text2sound', 'text2pic', 'text2vid', 'analyze', 'mem',
     ];
 
     private const MAX_PROVIDER_ID = 96;
