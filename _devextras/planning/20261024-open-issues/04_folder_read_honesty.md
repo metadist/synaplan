@@ -48,9 +48,10 @@ Journey: **J-OI-4**.
 
 Exit (UX contract §6):
 
-1. J-OI-4 walked on the dev stack when the folder is connected. If it
-   is not, STATUS says so and the unit test is the proof for this pull
-   request. Do not invent the walk.
+1. **J-OI-4 walked in the browser** when the dev folder is connected.
+   If it is not, record the blocker in STATUS and leave this exit open.
+   Planner and instruction unit tests are required but do not replace
+   the walk (U10).
 2. The plan card is where the person sees that a read happened. The
    refusal sentence is in the answer itself.
 3. One sentence, five locales if the sentence is a fixed string. If the
@@ -68,10 +69,19 @@ Exit (UX contract §6):
   `folder_fetch` for that folder. Look at the planner prompt and
   `Capability::FolderFetch` before adding a new heuristic. Prefer the
   prompt if a fixture already shows the model can emit the step.
-- Answer: the chat step's instructions include the list of files this
-  turn actually received. When that list is empty, the instruction
-  forbids claiming a read and requires one sentence that no file was
-  read. Do not add a second model call to police the answer.
+- Answer: when the user asked for **connected-folder file content** and
+  this turn received no file bodies (no `folder_fetch`, or fetch returned
+  nothing), the model instruction forbids presenting table rows, totals,
+  or vendors as if they came from those files, and requires one sentence
+  that the folder was not read. **Scope this guard to that case** — an
+  ordinary chat turn with no attachments must not gain a blanket
+  "nothing was read" line.
+  - Apply the instruction on **both** chat execution paths: the multitask
+    chat step **and** a planner-produced lone `chat` step that still
+    runs through `ChatHandler` / `ChatSystemPromptAssembler` (not only
+    the chat-node builder). Name the classes after reading the tree.
+  - Include the list of files actually attached when there are any. Do not
+    add a second model call to police the answer.
 - Do not hide memories. The bug is the claim, not the memory.
 
 A second bug found while doing this (for example a wrong folder id) is
@@ -83,9 +93,17 @@ A planner fixture: the channel list contains the folder, the user text
 asks for the files' contents, the plan must include `folder_fetch`.
 Red on current `main` if the fixture's plan is a lone `chat` step.
 
-A second test on the chat-step instruction builder: with no file body
-attached, the instruction contains the refusal requirement; with a file
-body attached, it does not.
+Instruction tests (two fixtures):
+
+- Folder-content request, no file bodies: refusal requirement present.
+- Same builder, ordinary chat with no folder ask and no files: refusal
+  **absent**.
+- File bodies attached for a folder read: refusal absent; file list
+  present.
+
+A third fixture: planner emits a lone `chat` step for a folder-content
+ask — the instruction on the `ChatHandler` path still carries the
+refusal when no files were loaded.
 
 Name the classes in the test file after reading them. Do not add a
 retry or a second plan pass.

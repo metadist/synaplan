@@ -69,15 +69,29 @@ second heading.
 
 ## Change
 
-- On a successful preview, compare listed ids with rows previously
-  imported from that endpoint (the import meta already stored on the
-  model). Ids missing from the list: set inactive and selectable off,
-  and store `withdrawn: true` in the row's import meta. Do not delete.
-- A listed id clears `withdrawn` and does not turn a row back on by
-  itself (the admin turned it off).
-- A preview that fails the endpoint check writes no meta.
+- On a successful **import preview / refresh**, compare listed ids with
+  rows previously imported from that endpoint (import meta on the model).
+  Ids missing from the list are **withdrawn**, not deleted.
+- **Reuse the existing reconciliation path** where possible:
+  `ImportedModelListingCheck` already re-lists sources on
+  `app:model:health-check` and applies changes through
+  `ModelAutoDisabler`, which honours `MODELHEALTH.AUTO_DISABLE_ENABLED`
+  and records which rows automation disabled so operator toggles win and
+  a returning model can be restored. Do not bypass that with a one-off
+  `active = 0` in the preview handler — preview refresh and the
+  scheduled check should share one disable/restore policy (same
+  provenance rules, same `withdrawn` / health meta).
+  - Store `withdrawn: true` (or the meta field the listing check already
+    uses) so the admin sentence matches automation.
+  - A listed id clears the withdrawn marker; it does **not** turn a row
+    back on by itself when the admin had disabled it.
+- A preview that fails the endpoint check writes no meta (same C7 rule as
+  the listing check: unreachable source marks nothing).
 - The catalog name cell shows provider and endpoint when another row
   has the same name.
+- Sprint 02 applies when the admin removes a withdrawn default: effective
+  `getDefaultModel('VECTORIZE')` after withdrawal follows the same note
+  as in `02_delete_default_model.md`.
 
 ## Test
 

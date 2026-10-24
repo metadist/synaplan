@@ -34,8 +34,9 @@ Journey: **J-OI-2**.
 4. Repeat with a model that is the only one for its job: the row is
    gone, and the toast says that job has no model until you pick one
    on this page.
-5. Search (the embedding default) is the clear case, never a silent
-   switch. See the rule below.
+5. Search (the embedding default): the stored binding is cleared, not
+   reassigned to another model on this page. See the rule below for what
+   runtime resolution may still do until the admin picks Search again.
 
 Exit (UX contract §6):
 
@@ -49,18 +50,48 @@ Exit (UX contract §6):
 
 ## Rules
 
-- Read every `DEFAULTMODEL` row whose value is this id, including other
-  people's overrides (`BOWNERID ≠ 0`).
-- For each row except `VECTORIZE`, pick a replacement: active,
-  selectable, not retired, not the deleted id, whose
-  `PickerCapabilities::forTag` includes that row's setting. Same service
-  first, then any other service. Skip a model the health table marks
-  offline. For a person's row (`BOWNERID ≠ 0`), skip a model that
-  person's group policy forbids; if none remain, clear that row.
-- `VECTORIZE` is never reassigned here. Switching the embedding model
-  rebuilds the search index, and that decision already has its own
-  screen (`ModelAlternatives::defaultCapability` says the same). Clear
-  the row.
+- **Find every binding** that points at this model before moving anything.
+  Today `deleteModel` only counts `BCONFIG` rows whose `BVALUE` is the
+  numeric id string. That misses group defaults and catalog keys.
+  - Every `BCONFIG` row in group `DEFAULTMODEL` whose stored value
+    resolves to this id through
+    `GroupPolicyService::modelIdFromStored()` (numeric id **or**
+    catalog key such as `groq:…:chat`).
+  - Every `BGROUPCONFIG` row in group `DEFAULTMODEL` whose stored value
+    resolves the same way (group policy uses the same resolver chain as
+    `ModelConfigService::eachDefaultModelId()`).
+  - Include per-user overrides (`BOWNERID ≠ 0`) and owner `0`.
+- **Replacement** (every binding except `VECTORIZE`, see below): pick
+  another model for the same **setting** (the `BSETTING` / policy key,
+  e.g. `CHAT`, `PLAN`, `TOOLS`, `SUMMARIZE`).
+  - Do **not** use `PickerCapabilities::forTag()` on the deleted model
+    alone. That helper describes picker columns, not every
+    `DEFAULTMODEL` slot: a chat-tagged model lists `CHAT`, `SORT`, and
+    `ANALYZE` but seeded rows also use `PLAN`, `TOOLS`, and `SUMMARIZE`.
+    Use the same setting → tag map as
+    `ModelConfigService` (`CAPABILITY_TAGS` / emergency fallback), then
+    require the candidate to fit that setting the way
+    `ModelAlternatives::fits()` does (tag + features).
+  - Candidate must be active, selectable, not retired, not the deleted
+    id, not marked offline in the health table, and
+    **`ModelConfigService::isConfiguredModelUsable()`** (same bar as
+    `ModelAlternatives::forModel()` — a row with no provider key is not
+    a valid replacement).
+  - Same service first, then any other service. For a user-owned row,
+    skip models that user's group policy forbids; if none remain, clear
+    that row.
+- **`VECTORIZE`**: never write a replacement id here. Switching the
+  embedding model rebuilds the search index; the health UI already
+  treats embed rows that way (`ModelAlternatives::defaultCapability`
+  returns null for vectorize). **Clear** the stored binding only.
+  - After the row is gone, `getConfiguredDefaultModel('VECTORIZE')`
+    must be null. **`getDefaultModel('VECTORIZE')` may still return
+    another embedding** via `firstUsableModelForCapability()` — that
+    is today's runtime behaviour and also affects sprint 06 when a
+    row is marked withdrawn. The toast and J-OI-2 step 5 must say that
+    Search has no default **on this page** until the admin picks one;
+    do not imply the stored default moved. Add a regression test on
+    both methods after delete.
 - Then delete the model, in the same flush. A failure leaves both the
   model and the old defaults in place.
 - Do not start an embedding reindex.
@@ -89,8 +120,8 @@ A delete that moves nothing and clears nothing keeps `modelDeleted`.
 ```json
 {
   "success": true,
-  "moved": [{ "setting": "CHAT", "ownerId": 0, "modelId": 12, "modelName": "…" }],
-  "cleared": [{ "setting": "VECTORIZE", "ownerId": 0 }]
+  "moved": [{ "setting": "CHAT", "scope": "global", "ownerId": 0, "modelId": 12, "modelName": "…" }],
+  "cleared": [{ "setting": "VECTORIZE", "scope": "global", "ownerId": 0 }]
 }
 ```
 
@@ -108,7 +139,20 @@ today). It fails on current `main` because delete throws
 - The same, with no other chat model: delete succeeds, the config row
   is gone.
 - A `VECTORIZE` default and another embedding model: delete succeeds,
-  the vectorize row is gone, the other embedding model was not written.
+  the vectorize row is gone, the other embedding model was not written,
+  `getConfiguredDefaultModel('VECTORIZE')` is null; assert
+  `getDefaultModel('VECTORIZE')` separately (documented, not silently
+  assumed to match the toast).
+- A `TOOLS` default (chat capability, not in `PickerCapabilities::forTag`
+  for CHAT alone) with another usable chat model: the binding moves, not
+  clears.
+- A default stored as a **catalog key** string, not a numeric id: delete
+  still finds and moves or clears it.
+- A **group** `DEFAULTMODEL.TOOLS` binding pointing at the model: moved
+  or cleared and listed in the API response with `scope: "group"` and
+  the group id.
+- Replacement skips a candidate whose provider has no key; the next
+  usable candidate wins, or the row clears.
 - A model that is not a default: delete succeeds, no config row changes.
 
 ## Files

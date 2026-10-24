@@ -39,7 +39,11 @@ Journey: **J-OI-3**.
 
 Exit (UX contract §6):
 
-1. J-OI-3 walked, or the unit test plus the reason the client was down.
+1. **J-OI-3 walked in the browser** (U10): menu label, toast, Sent to
+   line, and Open in ownCloud on the same file row, light and dark.
+   Unit tests prove the kind map; they do not replace the walk. If the
+   reference client is down, record the blocker in STATUS and leave this
+   exit open — do not mark the sprint done on tests alone.
 2. The file stays in the library; Sent to is on the same row.
 3. The existing `files.push.done` sentence, with `{name}` = ownCloud.
    Five locales for the new kind label only.
