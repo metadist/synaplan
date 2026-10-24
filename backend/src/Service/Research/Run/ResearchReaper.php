@@ -31,6 +31,7 @@ final readonly class ResearchReaper
         private ResearchEventLog $events,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private ResearchReportPoster $reports,
     ) {
     }
 
@@ -214,34 +215,19 @@ final readonly class ResearchReaper
     }
 
     /**
-     * Take the claim of the unit the run is waiting on, change the stored
-     * run, and checkpoint it. Null when someone else holds the claim, the
-     * run moved on meanwhile, or the change was refused.
+     * A run the reaper closes still reaches its chat, so nobody waits on a
+     * report that will never come.
      *
      * @param \Closure(ResearchRunState): bool $change false leaves the run as it is
      */
     private function underClaim(ResearchRunState $state, \Closure $change): ?ResearchRunState
     {
-        $runId = $state->ref->id;
-        $seq = $state->expectedSeq;
-        $token = $this->store->claim($runId, $seq, ResearchUnitWorker::LEASE_MS);
-        if (null === $token) {
-            return null;
-        }
-        try {
-            $fresh = $this->store->load($runId);
-            if (null === $fresh || $fresh->status->isTerminal() || $fresh->expectedSeq !== $seq || !$change($fresh)) {
-                $this->store->release($runId, $seq, $token);
-
-                return null;
-            }
-        } catch (\Throwable $e) {
-            $this->store->release($runId, $seq, $token);
-
-            throw $e;
+        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, $change);
+        if (null !== $saved && $saved->status->isTerminal()) {
+            $this->reports->deliver($saved);
         }
 
-        return $this->store->checkpoint($fresh, $token) ? $fresh : null;
+        return $saved;
     }
 
     /**

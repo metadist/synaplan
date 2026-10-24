@@ -151,6 +151,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "research": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "searxng": {
                     "configured": "bool",
                     "gated": "bool"
@@ -366,6 +370,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "research": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "searxng": {
                     "configured": "bool",
                     "gated": "bool"
@@ -578,6 +586,10 @@
                     "gated": "bool"
                 },
                 "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "research": {
                     "configured": "bool",
                     "gated": "bool"
                 },

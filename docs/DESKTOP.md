@@ -97,7 +97,7 @@ Historically any `sk_*` key had **full** account access. Desktop pairing does
 
 | Scope | Grants |
 | ----- | ------ |
-| `desktop:messages` | `/v1/*` (chat/messages, models, token count) |
+| `desktop:messages` | `/v1/*` (chat/messages, models, token count, research) |
 | `desktop:mcp` | `/mcp` (the two agent tools + the base MCP tools) |
 | `desktop:files` | `/api/v1/files*` (upload the result artifact, list/download what the owner already may) |
 | `desktop:jobs` | `/api/v1/desktop/*` (check-in / report, job status) |

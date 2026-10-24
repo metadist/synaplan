@@ -516,6 +516,17 @@ Pin a Task Prompt and run it on demand or on a schedule. Configured via
 |-------------|---------|-------------|
 | `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs, AI Instructions chrome, and the Connections page. Widget chat never runs Saved Tasks. When the flag is off, `app:saved-tasks:tick` is a no-op. |
 
+## Research (BCONFIG)
+
+Long research runs. Off until an administrator turns them on. `RESEARCH_ENABLED=1`
+pins the switch on and `RESEARCH_ENABLED=0` pins it off. See `docs/RESEARCH.md`.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `RESEARCH / ENABLED` | `0` | Master switch. Off means a new run cannot start. An existing run can still be read, stopped and deleted. |
+| `RESEARCH / MAX_ACTIVE_RUNS` | `5` | How many of one person's runs may be going at once. |
+| `RESEARCH / MAX_ACTIVE_THOROUGH_PER_USER` | `1` | How many thorough runs one person may have going at once. |
+
 ---
 
 ## Microsoft 365 connector (BCONFIG)

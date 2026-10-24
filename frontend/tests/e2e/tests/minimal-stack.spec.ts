@@ -78,7 +78,8 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(expectedIds).toContain('federation')
     expect(expectedIds).toContain('live_voice')
     expect(expectedIds).toContain('freeapi')
-    expect(expectedIds).toHaveLength(19)
+    expect(expectedIds).toContain('research')
+    expect(expectedIds).toHaveLength(20)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -163,7 +164,8 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(ids).toContain('federation')
     expect(ids).toContain('live_voice')
     expect(ids).toContain('freeapi')
-    expect(ids).toHaveLength(19)
+    expect(ids).toContain('research')
+    expect(ids).toHaveLength(20)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
@@ -171,6 +173,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(modules.compute?.configured).toBe(false)
     expect(modules.federation?.configured).toBe(false)
     expect(modules.live_voice?.configured).toBe(false)
+    expect(modules.research?.configured).toBe(false)
     for (const id of ids) {
       expect(modules[id]?.configured, `${id} configured`).toBe(false)
       expect(modules[id]?.gated, `${id} gated`).toBe(true)

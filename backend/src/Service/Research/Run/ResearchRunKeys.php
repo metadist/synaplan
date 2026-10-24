@@ -15,6 +15,12 @@ interface ResearchRunKeys
     public function set(string $key, string $value, int $ttlSeconds): bool;
 
     /**
+     * Store the value only when the key is free. False when it already holds
+     * a value, so two identical starts share one run.
+     */
+    public function setIfAbsent(string $key, string $value, int $ttlSeconds): bool;
+
+    /**
      * Take the lease and index it in one write. True when this caller took it.
      * False when the lease is already held.
      */

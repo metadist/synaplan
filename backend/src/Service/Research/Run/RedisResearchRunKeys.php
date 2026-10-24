@@ -102,6 +102,11 @@ LUA;
         return true;
     }
 
+    public function setIfAbsent(string $key, string $value, int $ttlSeconds): bool
+    {
+        return $this->redis->setIfAbsent($key, $value, $ttlSeconds);
+    }
+
     public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
     {
         $result = $this->redis->eval(

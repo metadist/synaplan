@@ -1372,6 +1372,9 @@
     "chat_artifacts": {
       "label": "Vista previa de HTML y SVG"
     },
+    "research": {
+      "label": "Investigación"
+    },
     "freeapi": {
       "label": "Demo de Synaplan"
     }

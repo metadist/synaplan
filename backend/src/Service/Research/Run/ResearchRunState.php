@@ -15,6 +15,12 @@ final class ResearchRunState
 {
     public ?\DateTimeImmutable $expiresAt = null;
 
+    /** The run this one continues, when it is a follow-up. */
+    public ?string $parent = null;
+
+    /** The start key, so deleting the run also forgets the retry. */
+    public ?string $idempotencyKey = null;
+
     public function __construct(
         public readonly ResearchRunRef $ref,
         public ResearchStatus $status,
@@ -65,6 +71,8 @@ final class ResearchRunState
             'outcome' => $this->outcome?->toArray(),
             'ledger' => $this->ledger->toArray(),
             'budget' => $this->budget->export(),
+            'parent' => $this->parent,
+            'idempotency_key' => $this->idempotencyKey,
         ];
     }
 
@@ -135,6 +143,10 @@ final class ResearchRunState
         if (is_string($expiresAt) && '' !== $expiresAt) {
             $state->expiresAt = new \DateTimeImmutable($expiresAt);
         }
+        $parent = $data['parent'] ?? null;
+        $state->parent = is_string($parent) && ResearchIds::isValid($parent) ? $parent : null;
+        $idempotency = $data['idempotency_key'] ?? null;
+        $state->idempotencyKey = is_string($idempotency) && '' !== $idempotency ? $idempotency : null;
 
         return $state;
     }

@@ -112,6 +112,8 @@ final class ApiKeyScopeTest extends TestCase
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/models/catalog'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/assistants'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/media/generate'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/research'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/research/rr_0123456789abcdef'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/audio/speech'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/mcp'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/desktop/jobs'));
