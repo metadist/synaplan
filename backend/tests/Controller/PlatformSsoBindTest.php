@@ -102,6 +102,46 @@ final class PlatformSsoBindTest extends WebTestCase
         self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);
     }
 
+    public function testARevokedInstanceBlocksBearerTokensEvenWhenIdentityRowsWereRemoved(): void
+    {
+        $this->client->disableReboot();
+        $person = $this->person();
+        $this->installToken($person['sub'], $person['email']);
+        $instance = $this->register();
+
+        $this->client->request('GET', '/v1/models', server: ['HTTP_AUTHORIZATION' => 'Bearer good.token.value']);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $admin = $this->createUser('cf22-revoke-admin-'.uniqid().'@synaplan.internal', 'ADMIN', 'external');
+        $this->authenticateClient($this->client, $admin);
+        $this->client->request('DELETE', '/api/v1/admin/platform-links/instances/'.$instance['instance_id']);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $this->client->getCookieJar()->clear();
+
+        $this->client->request('GET', '/v1/models', server: ['HTTP_AUTHORIZATION' => 'Bearer good.token.value']);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);
+    }
+
+    public function testBindRejectsWhenAnotherAccountAlreadyOwnsThatIdentity(): void
+    {
+        $this->client->disableReboot();
+        $first = $this->person();
+        $second = $this->person();
+        $this->installTokens([
+            'good.token.value' => $first,
+            'second.token.value' => $second,
+        ]);
+        $instance = $this->register();
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('second.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertSame('identity_conflict', $this->json()['code']);
+    }
+
     public function testBearerReachesChatAndModelsAndIsRefusedElsewhere(): void
     {
         $this->client->disableReboot();
@@ -194,26 +234,39 @@ final class PlatformSsoBindTest extends WebTestCase
 
     private function installToken(string $sub, string $email): void
     {
+        $this->installTokens(['good.token.value' => ['sub' => $sub, 'email' => $email]]);
+    }
+
+    /**
+     * @param array<string, array{sub: string, email: string}> $peopleByToken
+     */
+    private function installTokens(array $peopleByToken): void
+    {
         $tokens = $this->createStub(OidcTokenService::class);
         $tokens->method('validateBearerToken')->willReturnCallback(
-            static function (string $token) use ($sub, $email): ?array {
-                $claims = [
-                    'sub' => $sub,
-                    'email' => $email,
+            static function (string $token) use ($peopleByToken): ?array {
+                if ('bad.azp.token' === $token) {
+                    return [
+                        'sub' => 'bad',
+                        'email' => 'bad@synaplan.internal',
+                        'iss' => self::ISSUER,
+                        'preferred_username' => 'ada',
+                        'azp' => 'someone-else',
+                    ];
+                }
+
+                $person = $peopleByToken[$token] ?? null;
+                if (!is_array($person)) {
+                    return null;
+                }
+
+                return [
+                    'sub' => $person['sub'],
+                    'email' => $person['email'],
                     'iss' => self::ISSUER,
                     'preferred_username' => 'ada',
                     'azp' => self::AZP,
                 ];
-                if ('good.token.value' === $token) {
-                    return $claims;
-                }
-                if ('bad.azp.token' === $token) {
-                    $claims['azp'] = 'someone-else';
-
-                    return $claims;
-                }
-
-                return null;
             }
         );
         static::getContainer()->set(OidcTokenService::class, $tokens);

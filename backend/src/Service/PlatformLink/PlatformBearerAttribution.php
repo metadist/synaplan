@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\PlatformLink;
 
+use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
@@ -36,8 +37,26 @@ final readonly class PlatformBearerAttribution
             return;
         }
 
+        $instances = $this->instances->findByOidcClientId($azp);
+        if ([] === $instances) {
+            return;
+        }
+
         $matched = [];
-        foreach ($this->instances->findByOidcClientId($azp) as $instance) {
+        $hasActiveInstance = false;
+        $onlyRevokedInstances = true;
+        foreach ($instances as $instance) {
+            if ($instance->isActive()) {
+                $hasActiveInstance = true;
+                $onlyRevokedInstances = false;
+            } elseif (PlatformInstance::STATUS_REVOKED !== $instance->getStatus()) {
+                $onlyRevokedInstances = false;
+            }
+
+            if (!$instance->isActive()) {
+                continue;
+            }
+
             foreach ($this->identities->findForUserOnInstance((int) $userId, $instance->getClient(), $instance->getInstanceId()) as $row) {
                 if ($row->isOff()) {
                     throw new PlatformDisconnectedException();
@@ -47,6 +66,10 @@ final readonly class PlatformBearerAttribution
         }
 
         if ([] === $matched) {
+            if (!$hasActiveInstance && $onlyRevokedInstances) {
+                throw new PlatformDisconnectedException();
+            }
+
             return;
         }
 

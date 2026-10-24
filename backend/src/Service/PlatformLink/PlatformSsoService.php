@@ -61,6 +61,9 @@ final readonly class PlatformSsoService
         if ($existing instanceof ExternalIdentity && $existing->isOff()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
         }
+        if ($existing instanceof ExternalIdentity && $existing->getUserId() !== (int) $user->getId()) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'identity_conflict', 'This person is already linked to another Synaplan account.');
+        }
 
         $row = $this->identities->upsert(
             (int) $user->getId(),
@@ -129,6 +132,9 @@ final readonly class PlatformSsoService
         }
 
         if ($canonical instanceof ExternalIdentity) {
+            if ($canonical->getUserId() !== $userId) {
+                throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_owner', 'This key does not belong to that person.');
+            }
             $canonical->setApiKeyId($keyId);
             $this->identities->remove($legacy);
 

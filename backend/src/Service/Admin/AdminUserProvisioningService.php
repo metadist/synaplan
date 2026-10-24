@@ -241,13 +241,20 @@ final class AdminUserProvisioningService
                 }
             }
 
-            $byDetails = $this->findByExternalIdentity($source, $legacyId);
-            if ($byDetails instanceof User) {
-                return $byDetails;
+            if ($this->isServerScopedLegacyId($legacyId)) {
+                $byDetails = $this->findByExternalIdentity($source, $legacyId);
+                if ($byDetails instanceof User) {
+                    return $byDetails;
+                }
             }
         }
 
-        return $this->findByExternalIdentity($source, $uid);
+        return null;
+    }
+
+    private function isServerScopedLegacyId(string $legacyId): bool
+    {
+        return str_contains($legacyId, ':');
     }
 
     /**
@@ -292,10 +299,18 @@ final class AdminUserProvisioningService
         $apiKey->setStatus('active');
         $apiKey->setScopes([] !== $scopes ? array_values($scopes) : ['*']);
 
-        $this->apiKeyRepository->save($apiKey);
         if (null !== $instance) {
-            $this->bindMintedKey($user, $apiKey, $instance);
+            $this->requireIdentityOnInstance($user, $instance);
         }
+
+        $this->em->wrapInTransaction(function () use ($apiKey, $user, $instance): void {
+            $this->apiKeyRepository->save($apiKey, false);
+            $this->em->flush();
+            if (null !== $instance) {
+                $this->bindMintedKey($user, $apiKey, $instance, false);
+            }
+            $this->em->flush();
+        });
 
         $this->logger->info('Minted API key on behalf of user', [
             'user_id' => $user->getId(),
@@ -306,7 +321,19 @@ final class AdminUserProvisioningService
         return ['entity' => $apiKey, 'plainKey' => $plainKey];
     }
 
-    private function bindMintedKey(User $user, ApiKey $apiKey, PlatformInstance $instance): void
+    private function requireIdentityOnInstance(User $user, PlatformInstance $instance): void
+    {
+        $rows = $this->externalIdentityRepository->findForUserOnInstance(
+            (int) $user->getId(),
+            $instance->getClient(),
+            $instance->getInstanceId(),
+        );
+        if (!($rows[0] ?? null) instanceof ExternalIdentity) {
+            throw new \InvalidArgumentException('This user has no identity on this cloud.');
+        }
+    }
+
+    private function bindMintedKey(User $user, ApiKey $apiKey, PlatformInstance $instance, bool $flush = true): void
     {
         $keyId = $apiKey->getId();
         if (null === $keyId) {
@@ -327,7 +354,9 @@ final class AdminUserProvisioningService
         if (null === $row->getMode()) {
             $row->setMode(ExternalIdentity::MODE_PROVISION);
         }
-        $this->em->flush();
+        if ($flush) {
+            $this->em->flush();
+        }
     }
 
     /**

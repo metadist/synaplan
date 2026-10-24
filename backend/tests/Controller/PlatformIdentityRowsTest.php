@@ -158,6 +158,56 @@ final class PlatformIdentityRowsTest extends WebTestCase
         self::assertCount(1, $this->rowsFor((int) $user->getId(), 'nextcloud'));
     }
 
+    public function testTheSameBareUidOnTwoInstancesDoesNotReuseTheOtherCloudsAccount(): void
+    {
+        $instanceA = $this->register('nextcloud');
+        $instanceB = $this->register('nextcloud');
+        $this->patch($instanceA, 'srv-a', null);
+        $this->patch($instanceB, 'srv-b', null);
+        $admin = $this->createUser('cf22-admin-isolate-'.uniqid().'@synaplan.internal', 'ADMIN');
+        $this->authenticateClient($this->client, $admin);
+
+        $first = $this->provision($instanceA, 'nextcloud', 'shared-uid', 'cf22-a-'.uniqid().'@synaplan.internal');
+        $second = $this->provision($instanceB, 'nextcloud', 'shared-uid', 'cf22-b-'.uniqid().'@synaplan.internal');
+
+        self::assertTrue($second['created']);
+        self::assertNotSame($first['user']['id'], $second['user']['id']);
+    }
+
+    public function testAdoptionRejectsWhenTheCanonicalRowBelongsToSomeoneElse(): void
+    {
+        $instance = $this->register('nextcloud');
+        $this->patch($instance, 'nc-srv', null);
+        $owner = $this->createUser('cf22-legacy-owner-'.uniqid().'@synaplan.internal');
+        $this->identity($owner, 'nextcloud', '', 'nc-srv:p2', ExternalIdentity::MODE_PROVISION);
+        $other = $this->createUser('cf22-canonical-owner-'.uniqid().'@synaplan.internal');
+        $this->identity($other, 'nextcloud', (string) $instance['instance_id'], 'p2', ExternalIdentity::MODE_LINK);
+        $ownerKey = $this->keyFor($owner);
+
+        $this->adopt($instance, 'p2', $ownerKey, Response::HTTP_FORBIDDEN);
+        self::assertSame('not_owner', $this->json()['code']);
+        self::assertNotNull($this->findRow('nextcloud', '', 'nc-srv:p2'));
+    }
+
+    public function testMintingAKeyWithoutAnIdentityOnTheInstanceDoesNotLeaveAnOrphanKey(): void
+    {
+        $instance = $this->register('nextcloud');
+        $admin = $this->createUser('cf22-admin-mint-'.uniqid().'@synaplan.internal', 'ADMIN');
+        $this->authenticateClient($this->client, $admin);
+        $user = $this->createUser('cf22-no-row-'.uniqid().'@synaplan.internal');
+        $before = count($this->em->getRepository(ApiKey::class)->findBy(['ownerId' => $user->getId()]));
+
+        $this->client->request('POST', '/api/v1/admin/users/'.$user->getId().'/api-keys', server: $this->instanceHeaders($instance) + [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: (string) json_encode([
+            'name' => 'cf22',
+            'scopes' => ['chat'],
+        ]));
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $this->em->clear();
+        self::assertSame($before, count($this->em->getRepository(ApiKey::class)->findBy(['ownerId' => $user->getId()])));
+    }
+
     public function testProvisioningAfterAdoptionDoesNotWriteASecondRow(): void
     {
         $instance = $this->register('nextcloud');
