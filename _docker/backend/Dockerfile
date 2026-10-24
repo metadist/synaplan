@@ -176,5 +176,9 @@ COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 # Required because runtime/frankenphp-symfony does not yet support Symfony 8.
 COPY _docker/backend/synaplan-worker-mode.Caddyfile \
     /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
+# Pools are imported from the site php_server. Without this file the
+# entrypoint leaves that listener in classic mode (worker_threads 0).
+COPY _docker/backend/synaplan-php-workers.Caddyfile \
+    /usr/local/etc/php/templates/synaplan-php-workers.Caddyfile
 
 # EXPOSE 80 and ENTRYPOINT ["docker-entrypoint.sh"] are inherited from the `dev` stage.

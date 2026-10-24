@@ -26,18 +26,19 @@ test.describe('@busy a full stream pool answers at once', () => {
 
     const streamUrl = `${api}/api/v1/messages/stream?chatId=${chatId}&message=${encodeURIComponent('Tell me a short story about a lighthouse.')}`
     const started = Date.now()
+    const healthPromise = request
+      .get(`${api}/api/health`, { timeout: 5_000 })
+      .then((response) => ({ response, elapsedMs: Date.now() - started }))
     const [first, second, health] = await Promise.all([
       request.get(streamUrl, { timeout: 30_000 }),
       request.get(streamUrl, { timeout: 15_000 }),
-      request.get(`${api}/api/health`, { timeout: 5_000 }),
+      healthPromise,
     ])
 
     const statuses = [first.status(), second.status()].sort((a, b) => a - b)
     expect(statuses, 'one stream is admitted and the other is refused').toEqual([200, 503])
-    expect(health.ok(), 'the api pool still answers /api/health').toBeTruthy()
-    expect(Date.now() - started, 'the short request was not held for the stream').toBeLessThan(
-      5_000
-    )
+    expect(health.response.ok(), 'the api pool still answers /api/health').toBeTruthy()
+    expect(health.elapsedMs, 'the short request was not held for the stream').toBeLessThan(5_000)
 
     const busy = first.status() === 503 ? first : second
     expect(busy.headers()['retry-after']).toBe('5')
