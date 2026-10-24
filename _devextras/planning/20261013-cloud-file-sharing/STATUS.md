@@ -45,7 +45,7 @@ not a chat message.
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF1.4-oco Five locales, core words — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.5 OpenCloud chat, media, binary save | `synaplan-opencloud` | P2 | planned | needs CF2.2 (D18); may run during P1 (row 34) |
-| CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | planned | Schema ask recorded; rows 6 and 43 |
+| CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | **in review** | Walk 2026-10-24 below |
 | CF2.2 Canonical identity rows, SSO bind, attribution, bearer on chat | `synaplan` | P1 | planned | D8, D15, D18; adoption of provisioned rows (row 39) |
 | CF2.3 Background key, `cloud:watch`, scope map | `synaplan` | P1 | planned |  |
 | CF2.4 Lifecycle endpoint | `synaplan` | P1 | planned | D16; never deletes an account still in use (row 38, C18) |
@@ -687,3 +687,33 @@ Found and fixed in the same PR: the settings folder picker had no Choose
 button and could never finish, and the preferences save read the request
 body only when `copy_folder` was missing — the framework hands that one
 over as a parameter, so the read setting silently never saved.
+
+**2026-10-24 (CF2.1, instance columns, capabilities both ways, delivery
+origin).** In review. `BPLATFORMINSTANCES` gains `BREACHABLE`,
+`BOIDCCLIENTID`, `BAPPVERSION`, `BAPPROVEDHOSTS` and `BSERVERID` (raw
+`ADD COLUMN IF NOT EXISTS`); `PATCH instances/self` also takes
+`oidc_client_id`, `app_version` and `server_id`, filters reported
+capabilities to the names of `02` §8.1, and probes the saved delivery
+address (one unsigned ping, any HTTP answer counts) into `BREACHABLE`.
+`GET instances/self` returns the stored `app_capabilities` and
+`reachable`. The delivery-origin rule gains the approved-hostnames rule
+(private addresses allowed, loopback and link-local never). The admin
+Platform instances tab shows the app version and "Synaplan can reach this
+cloud", and approves a delivery hostname from the row.
+
+Walk (dev stacks, 2026-10-24): a save in the Nextcloud admin settings
+re-announced `http://nextcloud/…/api/v1/inbound`; the probe stored
+`BREACHABLE = 1` for the live Nextcloud instance. As
+`admin@synaplan.com` under Admin → Users → Platform instances, that row
+reads "Synaplan can reach this cloud."; **Approve host** asked
+"nextcloud is on a private network (172.19.0.19). Synaplan will call it
+to deliver copies and requests. Approve only clouds you run.", and
+confirming stored `BAPPROVEDHOSTS = ["nextcloud"]` and showed the chip.
+Removing it from the chip stored `NULL` again.
+
+Local gate: lint, PHPStan, deptrac, frontend lint, `vue-tsc` and the
+frontend tests green. The backend suite keeps five failures that also
+occur without this change (three `LongRouteListTest` entrypoint checks,
+one search, one research-budget test — none of their files differ from
+`main`); the migration was applied to the local test database first, as
+CI does on a fresh one.

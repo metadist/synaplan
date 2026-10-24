@@ -46,7 +46,7 @@ final class AdminPlatformInstanceController extends AbstractController
                             property: 'instances',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'client', 'host', 'status', 'registeredBy', 'created', 'lastSeen'],
+                                required: ['id', 'client', 'host', 'status', 'registeredBy', 'created', 'lastSeen', 'deliveryUrl', 'deliveryHost', 'reachable', 'appVersion', 'appCapabilities', 'approvedHosts'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'string', example: 'pi_ab12cd34ef56'),
                                     new OA\Property(property: 'client', type: 'string', example: 'nextcloud'),
@@ -55,6 +55,13 @@ final class AdminPlatformInstanceController extends AbstractController
                                     new OA\Property(property: 'registeredBy', type: 'integer', example: 1),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'lastSeen', type: 'integer', format: 'int64'),
+                                    new OA\Property(property: 'deliveryUrl', type: 'string'),
+                                    new OA\Property(property: 'deliveryHost', type: 'string'),
+                                    new OA\Property(property: 'deliveryIp', type: 'string', nullable: true),
+                                    new OA\Property(property: 'reachable', type: 'boolean', nullable: true),
+                                    new OA\Property(property: 'appVersion', type: 'string'),
+                                    new OA\Property(property: 'appCapabilities', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'approvedHosts', type: 'array', items: new OA\Items(type: 'string')),
                                 ]
                             )
                         ),
@@ -113,6 +120,95 @@ final class AdminPlatformInstanceController extends AbstractController
 
         try {
             $this->instanceService->approve($instanceId, $user, $request->getClientIp() ?? '');
+        } catch (PlatformInstanceNotFoundException) {
+            return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
+        } catch (PlatformLinkValidationException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true]);
+    }
+
+    #[Route('/{instanceId}/approved-hosts', name: 'approve_host', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/platform-links/instances/{instanceId}/approved-hosts',
+        operationId: 'approvePlatformInstanceHost',
+        summary: 'Approve one private hostname for delivery to this instance',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'instanceId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['hostname'], properties: [
+            new OA\Property(property: 'hostname', type: 'string', example: 'files.example.lan'),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'Hostname approved', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+            ])),
+            new OA\Response(response: 400, description: 'Hostname cannot be approved'),
+            new OA\Response(response: 403, description: 'Not an administrator'),
+            new OA\Response(response: 404, description: 'Feature disabled or unknown instance'),
+        ]
+    )]
+    public function approveHost(string $instanceId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user);
+        if (!$user instanceof User || !$user->isAdmin()) {
+            return $this->json(['success' => false, 'error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+        $body = json_decode($request->getContent(), true);
+
+        try {
+            $this->instanceService->approveHost(
+                $instanceId,
+                is_array($body) && is_string($body['hostname'] ?? null) ? $body['hostname'] : '',
+                $user,
+                $request->getClientIp() ?? '',
+            );
+        } catch (PlatformInstanceNotFoundException) {
+            return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
+        } catch (PlatformLinkValidationException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true]);
+    }
+
+    #[Route('/{instanceId}/approved-hosts', name: 'remove_approved_host', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/admin/platform-links/instances/{instanceId}/approved-hosts',
+        operationId: 'removePlatformInstanceHost',
+        summary: 'Remove an approved delivery hostname from this instance',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'instanceId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['hostname'], properties: [
+            new OA\Property(property: 'hostname', type: 'string', example: 'files.example.lan'),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'Hostname removed', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+            ])),
+            new OA\Response(response: 403, description: 'Not an administrator'),
+            new OA\Response(response: 404, description: 'Feature disabled or unknown instance'),
+        ]
+    )]
+    public function removeApprovedHost(string $instanceId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user);
+        if (!$user instanceof User || !$user->isAdmin()) {
+            return $this->json(['success' => false, 'error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+        $body = json_decode($request->getContent(), true);
+
+        try {
+            $this->instanceService->removeApprovedHost(
+                $instanceId,
+                is_array($body) && is_string($body['hostname'] ?? null) ? $body['hostname'] : '',
+                $user,
+                $request->getClientIp() ?? '',
+            );
         } catch (PlatformInstanceNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
         } catch (PlatformLinkValidationException $e) {

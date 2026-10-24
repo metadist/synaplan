@@ -106,7 +106,7 @@ final class PlatformInstanceController extends AbstractController
                 response: 200,
                 description: 'Instance status',
                 content: new OA\JsonContent(
-                    required: ['success', 'status', 'host', 'client', 'delivery_url', 'capabilities', 'notify_keys'],
+                    required: ['success', 'status', 'host', 'client', 'delivery_url', 'capabilities', 'app_capabilities', 'notify_keys'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'status', type: 'string', example: 'pending'),
@@ -114,6 +114,8 @@ final class PlatformInstanceController extends AbstractController
                         new OA\Property(property: 'client', type: 'string', example: 'nextcloud'),
                         new OA\Property(property: 'delivery_url', type: 'string', example: 'https://files.example.org/index.php/apps/synaplan_integration/api/v1/inbound'),
                         new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['deliveries']),
+                        new OA\Property(property: 'app_capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['deliveries'], description: 'Features the app itself reported.'),
+                        new OA\Property(property: 'reachable', type: 'boolean', nullable: true, description: 'Whether the last delivery probe got an answer; null when never probed.'),
                         new OA\Property(
                             property: 'notify_keys',
                             type: 'array',
@@ -164,13 +166,17 @@ final class PlatformInstanceController extends AbstractController
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'delivery_url', type: 'string'),
+                    new OA\Property(property: 'delivery_url', type: 'string', description: 'Address Synaplan calls. Saving it probes the address; the answer carries reachable.'),
                     new OA\Property(
                         property: 'app_capabilities',
                         type: 'array',
                         items: new OA\Items(type: 'string'),
                         example: ['deliveries'],
+                        description: 'Features this app supports. Names the core does not know are ignored.',
                     ),
+                    new OA\Property(property: 'oidc_client_id', type: 'string', description: 'The OIDC client this cloud\'s tokens name as azp.'),
+                    new OA\Property(property: 'app_version', type: 'string', example: '2.0.0'),
+                    new OA\Property(property: 'server_id', type: 'string', description: 'The cloud\'s own instance id.'),
                 ]
             )
         ),
@@ -188,7 +194,11 @@ final class PlatformInstanceController extends AbstractController
         $body = is_array($body) ? $body : [];
         $hasUrl = array_key_exists('delivery_url', $body);
         $hasCapabilities = array_key_exists('app_capabilities', $body);
-        if (!$hasUrl && !$hasCapabilities) {
+        $hasField = $hasUrl || $hasCapabilities
+            || array_key_exists('oidc_client_id', $body)
+            || array_key_exists('app_version', $body)
+            || array_key_exists('server_id', $body);
+        if (!$hasField) {
             return $this->json(['success' => false, 'error' => 'Nothing to save.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
         $url = $hasUrl && is_string($body['delivery_url']) ? $body['delivery_url'] : ($hasUrl ? '' : null);
@@ -196,6 +206,9 @@ final class PlatformInstanceController extends AbstractController
         if ($hasCapabilities && is_array($body['app_capabilities'])) {
             $capabilities = array_values(array_filter($body['app_capabilities'], 'is_string'));
         }
+        $text = static fn (string $field): ?string => array_key_exists($field, $body)
+            ? (is_string($body[$field]) ? $body[$field] : '')
+            : null;
 
         try {
             $saved = $this->deliveryAddress->update(
@@ -203,6 +216,9 @@ final class PlatformInstanceController extends AbstractController
                 (string) $request->headers->get('X-Instance-Secret', ''),
                 $url,
                 $capabilities,
+                $text('oidc_client_id'),
+                $text('app_version'),
+                $text('server_id'),
             );
         } catch (PlatformInstanceNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);

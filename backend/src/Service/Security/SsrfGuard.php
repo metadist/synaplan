@@ -96,6 +96,18 @@ final readonly class SsrfGuard
     }
 
     /**
+     * Every A and AAAA answer for a hostname, unfiltered. Callers that
+     * approve private targets use this to refuse a name when any answer
+     * lands somewhere forbidden.
+     *
+     * @return list<string>
+     */
+    public function resolvedIps(string $host): array
+    {
+        return $this->resolveIps(strtolower(trim($host, "[] \t")));
+    }
+
+    /**
      * Public A/AAAA (or the literal IP) after the same private/reserved filter
      * as {@see isBlockedHost}. Empty when the name does not resolve or every
      * answer is blocked. Callers that already passed {@see isBlockedHost} get
