@@ -67,6 +67,14 @@ final class ImportedModelListingCheckTest extends KernelTestCase
         self::assertSame(ModelHealth::SOURCE_LISTING, $goneHealth->getSource());
         self::assertSame('not offered by endpoint', $goneHealth->getMessage());
 
+        $this->em->clear();
+        $gone = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::GONE]);
+        self::assertInstanceOf(Model::class, $gone);
+        self::assertTrue(true === ($gone->getJson()['meta']['import']['withdrawn'] ?? false));
+        $present = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::PRESENT]);
+        self::assertInstanceOf(Model::class, $present);
+        self::assertFalse(true === ($present->getJson()['meta']['import']['withdrawn'] ?? false));
+
         $presentHealth = $this->healthFor(self::PRESENT);
         self::assertInstanceOf(ModelHealth::class, $presentHealth);
         self::assertSame(ModelHealthState::Online, $presentHealth->getState());

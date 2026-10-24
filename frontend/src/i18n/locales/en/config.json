@@ -97,6 +97,7 @@
       "descriptionHeader": "DESCRIPTION",
       "admin": {
         "catalogSubtitle": "Search and edit the system model catalog.",
+        "withdrawn": "No longer offered by {provider}. It is still here until you remove it.",
         "bulkImportSubtitle": "Generate and apply SQL from provider docs (advanced).",
         "addModels": "Bulk import (SQL)",
         "urlsLabel": "URLs (one per line)",

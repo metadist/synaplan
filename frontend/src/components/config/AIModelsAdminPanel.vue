@@ -251,10 +251,12 @@
                 >
                   {{ m.providerId }}
                 </td>
-                <td class="py-2 px-2 text-xs font-medium">
-                  <div class="flex items-center gap-1.5">
-                    <span :class="['txt-primary', !m.providerAvailable && 'opacity-50']">
-                      {{ m.name }}
+                <td class="py-2 px-2 text-xs font-medium min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span
+                      :class="['txt-primary break-words', !m.providerAvailable && 'opacity-50']"
+                    >
+                      {{ catalogModelLabel(m, adminModels) }}
                     </span>
                     <span
                       v-if="hasToolUse(m.json)"
@@ -273,6 +275,13 @@
                       {{ availabilityBadge(m) }}
                     </span>
                   </div>
+                  <p
+                    v-if="isWithdrawnModel(m)"
+                    class="mt-1 text-[10px] txt-secondary break-words"
+                    data-testid="model-withdrawn"
+                  >
+                    {{ t('config.aiModels.admin.withdrawn', { provider: m.service }) }}
+                  </p>
                 </td>
                 <td class="py-2 px-2 text-center">
                   <span
@@ -502,6 +511,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
 import { modelDeletionMessage } from '@/components/config/modelDeletionCopy'
+import { catalogModelLabel, isWithdrawnModel } from '@/components/config/catalogModelLabel'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 

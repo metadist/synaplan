@@ -10,8 +10,8 @@ here, not a chat message.
 | 02 | [#2679](https://github.com/metadist/synaplan/issues/2679) | PR [#2704](https://github.com/metadist/synaplan/pull/2704) |
 | 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | PR [#2706](https://github.com/metadist/synaplan/pull/2706); J-OI-3 walked 2026-10-24 |
 | 04 | [#2667](https://github.com/metadist/synaplan/issues/2667) | PR [#2707](https://github.com/metadist/synaplan/pull/2707); J-OI-4 walked 2026-10-24 |
-| 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | in progress |
-| 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | not started |
+| 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | PR [#2709](https://github.com/metadist/synaplan/pull/2709) |
+| 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | PR [#2710](https://github.com/metadist/synaplan/pull/2710); J-OI-5 walked 2026-10-24 |
 
 #2635, #2636 and #2638 stay on row 24. They are not rows here.
 
@@ -60,3 +60,27 @@ of Invoices (no WebDAV).
   vendors.
 - Local run:
   `cd frontend/tests/e2e && npx playwright test open-issues-walks.spec.ts --project=chromium-noci`.
+
+### 2026-10-24 — J-OI-5
+
+Account `admin@synaplan.com`. AI infrastructure → Model catalog.
+Temporary endpoint `joi5` (`http://host.docker.internal:8791/v1`, auth none)
+listed two models, both named Echo:
+
+```json
+{"object":"list","data":[{"id":"echo-keep","name":"Echo"},{"id":"echo-gone","name":"Echo"}]}
+```
+
+`GET /v1/models` has no unavailable or suspended field. Absence from the
+list is the signal. Imported both (ids 400 and 401). Then the list kept
+only `echo-keep`. Import models again (the preview refresh).
+
+- Both name cells read **Echo · OpenAICompatible · joi5**.
+- `echo-gone` shows **No longer offered by OpenAICompatible. It is still
+  here until you remove it.** `echo-keep` does not.
+- With `MODELHEALTH.AUTO_DISABLE_ENABLED` off (the default), `echo-gone`
+  stayed active (`BACTIVE=1`) and only the withdrawn marker was set.
+- With the switch on, the same refresh set `BACTIVE=0` on `echo-gone`
+  and left `echo-keep` active. The switch was set back to `0`.
+- Delete of the withdrawn row (401) succeeded. Both test rows and the
+  endpoint were removed afterwards.
