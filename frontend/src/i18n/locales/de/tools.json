@@ -965,6 +965,12 @@
       "copy": "Adresse kopieren",
       "copied": "Adresse kopiert",
       "copyFailed": "Die Adresse konnte nicht kopiert werden. Markiere sie und kopiere sie von Hand."
+    },
+    "readScope": {
+      "line": "Synaplan darf lesen: {what}.",
+      "watched": "die Ordner, die du beobachtest",
+      "allowed": "die Ordner, die du beobachtest, {folders}",
+      "all": "alle deine Dateien"
     }
   }
 }

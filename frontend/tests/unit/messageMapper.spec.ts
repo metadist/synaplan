@@ -133,6 +133,41 @@ describe('messageMapper (issue #1070)', () => {
       expect(message.taskPlan?.cards[0].text).toBe('Summary content')
     })
 
+    it('rebuilds a folder read with its summary and step trace', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          multitask: true,
+          taskPlan: {
+            reply_node: 'n2',
+            cards: [
+              {
+                nodeId: 'n1',
+                capability: 'folder_fetch',
+                kind: 'search',
+                state: 'done',
+                step_input: '{"folder":"Docs"}',
+                duration_ms: 1200,
+                folder_read: {
+                  outcome: 'read',
+                  label: 'Nextcloud',
+                  folder: 'Docs',
+                  read: 1,
+                  total: 1,
+                  files: ['a.pdf'],
+                },
+              },
+            ],
+          },
+        })
+      )
+
+      expect(message.taskPlan?.cards[0]).toMatchObject({
+        stepInput: '{"folder":"Docs"}',
+        durationMs: 1200,
+        folderRead: { outcome: 'read', label: 'Nextcloud', folder: 'Docs', files: ['a.pdf'] },
+      })
+    })
+
     it('rebuilds taskPlan card with media url and normalizes it', () => {
       const message = mapApiMessageRow(
         baseRow({
@@ -632,6 +667,28 @@ describe('messageMapper (issue #1070)', () => {
       })
       expect(msg.taskPlan?.cards[2]).toMatchObject({
         error: 'provider timeout',
+      })
+    })
+
+    it('keeps a running folder read with its progress', () => {
+      const msg = mapInProgressTurn(
+        turn({
+          cards: [
+            {
+              nodeId: 'n1',
+              capability: 'folder_fetch',
+              kind: 'search',
+              state: 'running',
+              folder_read: { outcome: 'reading', label: 'Nextcloud', read: 3, total: 9 },
+            },
+          ],
+        })
+      )
+
+      expect(msg.taskPlan?.cards[0].folderRead).toMatchObject({
+        outcome: 'reading',
+        read: 3,
+        total: 9,
       })
     })
 

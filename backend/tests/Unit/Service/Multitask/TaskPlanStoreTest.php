@@ -176,6 +176,26 @@ final class TaskPlanStoreTest extends TestCase
         self::assertSame('/uploads/a.mp3', $ref['url']);
     }
 
+    public function testAFolderReadSummarySurvivesTheRoundTrip(): void
+    {
+        $stored = null;
+        $this->connection->method('update')->willReturnCallback(function (string $table, array $data) use (&$stored): int {
+            $stored = $data['BRESULTREF'];
+
+            return 1;
+        });
+        $summary = ['outcome' => 'partial', 'read' => 1, 'total' => 2, 'skipped' => [['name' => 'big.pdf', 'reason' => 'too_large']]];
+
+        $this->store->updateNodeStatus(42, 'n1', 'done', ['text' => 'Read 1 of 2 files', 'folder_read' => $summary]);
+        $this->connection->method('fetchAllAssociative')->willReturn([
+            ['BNODEID' => 'n1', 'BCAPABILITY' => 'folder_fetch', 'BSTATUS' => 'done', 'BRESULTREF' => $stored, 'BERROR' => null],
+        ]);
+        $cards = $this->store->loadCards(42);
+
+        self::assertSame($summary, $cards[0]['folder_read']);
+        self::assertSame('Read 1 of 2 files', $cards[0]['text']);
+    }
+
     public function testUpdateNodeStatusKeepsTextWhenUtf8WasCutMidCharacter(): void
     {
         $captured = [];

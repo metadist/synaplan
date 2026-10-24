@@ -301,7 +301,7 @@ final readonly class DagExecutor
         }
 
         if ($result->isWaitingApproval()) {
-            $this->emitState($progressCallback, $node, 'waiting_approval', array_merge($result->metadata, $this->stepTraceMetadata($result)));
+            $this->emitState($progressCallback, $node, 'waiting_approval', array_merge($result->metadata, CardTrace::fromResult($result)));
 
             return;
         }
@@ -688,7 +688,7 @@ final readonly class DagExecutor
             $extra['used_workspace'] = true;
         }
 
-        return array_merge($extra, $this->stepTraceMetadata($result));
+        return array_merge($extra, CardTrace::fromResult($result));
     }
 
     /**
@@ -719,7 +719,7 @@ final readonly class DagExecutor
                 $extra['results_count'] = $result->metadata['results_count'];
             }
 
-            return array_merge($extra, $this->stepTraceMetadata($result));
+            return array_merge($extra, CardTrace::fromResult($result));
         }
 
         $extra = [];
@@ -741,32 +741,7 @@ final readonly class DagExecutor
             $extra['query'] = $query;
         }
 
-        return array_merge($extra, $this->stepTraceMetadata($result));
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function stepTraceMetadata(NodeResult $result): array
-    {
-        $extra = [];
-        $input = $result->metadata['step_input'] ?? null;
-        if (is_string($input) && '' !== $input) {
-            $extra['step_input'] = $input;
-        }
-        $output = $result->metadata['step_output'] ?? null;
-        if (is_string($output) && '' !== $output) {
-            $extra['step_output'] = $output;
-        }
-        if (true === ($result->metadata['step_output_truncated'] ?? false)) {
-            $extra['step_output_truncated'] = true;
-        }
-        $duration = $result->metadata['duration_ms'] ?? null;
-        if (is_int($duration)) {
-            $extra['duration_ms'] = $duration;
-        }
-
-        return $extra;
+        return array_merge($extra, CardTrace::fromResult($result));
     }
 
     /**

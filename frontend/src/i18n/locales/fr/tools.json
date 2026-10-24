@@ -1042,6 +1042,12 @@
       "copy": "Copier l’adresse",
       "copied": "Adresse copiée",
       "copyFailed": "L’adresse n’a pas pu être copiée. Sélectionnez-la et copiez-la à la main."
+    },
+    "readScope": {
+      "line": "Synaplan peut lire : {what}.",
+      "watched": "les dossiers que vous surveillez",
+      "allowed": "les dossiers que vous surveillez, {folders}",
+      "all": "tous vos fichiers"
     }
   }
 }

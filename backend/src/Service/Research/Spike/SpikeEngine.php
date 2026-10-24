@@ -41,6 +41,7 @@ final class SpikeEngine
             $board->readLog,
             $board->inputTokens,
             $board->outputTokens,
+            $board->evidence(),
         );
     }
 

@@ -168,6 +168,31 @@ final class ResultAssemblerTest extends TestCase
         $this->assertSame('audio', $n2['type']);
     }
 
+    public function testAFolderReadSummaryAndTheStepTraceReachTheCard(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'folder_fetch', 'params' => ['channel' => 'nextcloud', 'folder' => 'Docs']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $summary = ['outcome' => 'read', 'label' => 'Nextcloud', 'folder' => 'Docs', 'read' => 1, 'total' => 1, 'files' => ['a.pdf']];
+        $ctx->setResult('n1', NodeResult::ok('Read 1 files from Nextcloud › Docs: a.pdf.', [], [
+            'folder_read' => $summary,
+            'step_input' => '{"folder":"Docs"}',
+            'duration_ms' => 40,
+        ]));
+        $ctx->setResult('n2', NodeResult::ok('Done.'));
+
+        $cards = $this->assembler->assemble($plan, $ctx)['metadata']['task_plan_render']['cards'];
+
+        $this->assertSame($summary, $cards[0]['folder_read']);
+        $this->assertSame('{"folder":"Docs"}', $cards[0]['step_input']);
+        $this->assertSame(40, $cards[0]['duration_ms']);
+    }
+
     public function testPartialFailureCardStateIsPreserved(): void
     {
         $plan = $this->plan();

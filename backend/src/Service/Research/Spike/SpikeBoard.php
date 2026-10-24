@@ -20,7 +20,7 @@ final class SpikeBoard
     public array $queries = [];
 
     /**
-     * @var list<array{id: string, point: string, fact: string, quote: ?string, url: string}>
+     * @var list<array{id: string, point: string, fact: string, quote: ?string, url: string, passage: string}>
      */
     public array $cards = [];
 
@@ -76,7 +76,7 @@ final class SpikeBoard
     }
 
     /**
-     * @param array{point: string, fact: string, quote: ?string} $card
+     * @param array{point: string, fact: string, quote: ?string, passage?: string} $card
      */
     public function addCard(array $card, string $url): string
     {
@@ -88,9 +88,25 @@ final class SpikeBoard
             'fact' => $card['fact'],
             'quote' => $card['quote'],
             'url' => $url,
+            'passage' => $card['passage'] ?? '',
         ];
 
         return $id;
+    }
+
+    /**
+     * The passages each evidence id rests on, for the citation judge.
+     *
+     * @return array<string, array{url: string, passage: string}>
+     */
+    public function evidence(): array
+    {
+        $out = [];
+        foreach ($this->cards as $card) {
+            $out[$card['id']] = ['url' => $card['url'], 'passage' => $card['passage']];
+        }
+
+        return $out;
     }
 
     public function foundSummary(): string

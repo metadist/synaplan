@@ -704,7 +704,8 @@
       "calendar_event": "Calendar invite",
       "email_me": "Email result",
       "save_to_folder": "Save to folder",
-      "code_run": "Working with your file"
+      "code_run": "Working with your file",
+      "folder_fetch": "Reading files"
     },
     "copyText": "Copy content",
     "copied": "Copied to clipboard",
@@ -717,7 +718,42 @@
     "askSkip": "Skip",
     "askNeedAnswer": "Choose an option or type an answer.",
     "askFailed": "The run could not continue. Send a new message.",
-    "askReadOnly": "Only the owner can answer this. You can still read the question."
+    "askReadOnly": "Only the owner can answer this. You can still read the question.",
+    "folderRead": {
+      "reading": "Reading files from {app}…",
+      "progress": "{read} of {total}",
+      "read": "Read {count} file from {app} › {folder} | Read {count} files from {app} › {folder}",
+      "readAnywhere": "Read {count} file from {app} | Read {count} files from {app}",
+      "listed": "Found {count} file in {app} › {folder} | Found {count} files in {app} › {folder}",
+      "listedAnywhere": "Found {count} file in {app} | Found {count} files in {app}",
+      "tooLarge": "{count} file was larger than 100 MB and was left out. | {count} files were larger than 100 MB and were left out.",
+      "overLimit": "{count} file was past the limit for one run (50 files, 200 MB) and was left out. | {count} files were past the limit for one run (50 files, 200 MB) and were left out.",
+      "unreadable": "{count} file could not be read. | {count} files could not be read.",
+      "moreNotListed": "{count} more file is not listed. | {count} more files are not listed.",
+      "refused": "Synaplan may not read {folder} in your {app}. Nothing was read.",
+      "refusedAnywhere": "Synaplan may not read this in your {app}. Nothing was read.",
+      "refusedHint": "Open the folder in {app} and choose Let Synaplan read this folder.",
+      "notFound": "{app} has no folder {folder} that you can open. Nothing was read.",
+      "notFoundHint": "Check the folder name.",
+      "unreachable": "Synaplan could not reach {host}. Nothing was read.",
+      "unreachableHint": "Attach the files in the chat, or ask your administrator to let Synaplan reach {app}.",
+      "nothing": "No file in {folder} matched. The next steps did not run.",
+      "nothingAnywhere": "No file matched. The next steps did not run.",
+      "nothingRead": "Nothing was read from {app} › {folder}.",
+      "nothingReadAnywhere": "Nothing was read from {app}.",
+      "busy": "Synaplan has read from {app} too often this hour. Nothing was read. Try again later.",
+      "notConnected": "Synaplan has no connected folder with that name. Nothing was read.",
+      "notConnectedHint": "Connect a folder under Apps, or link your cloud there.",
+      "openIn": "Open in {app}",
+      "filesLabel": "Files read",
+      "showAll": "Show all {count}",
+      "showFewer": "Show fewer",
+      "skippedReason": {
+        "too_large": "{name} — larger than 100 MB",
+        "over_limit": "{name} — past the limit for one run",
+        "other": "{name} — could not be read"
+      }
+    }
   },
   "processing": {
     "timeline": {

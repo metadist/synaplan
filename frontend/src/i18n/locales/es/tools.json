@@ -968,6 +968,12 @@
       "copy": "Copiar dirección",
       "copied": "Dirección copiada",
       "copyFailed": "No se pudo copiar la dirección. Selecciónala y cópiala a mano."
+    },
+    "readScope": {
+      "line": "Synaplan puede leer: {what}.",
+      "watched": "las carpetas que vigilas",
+      "allowed": "las carpetas que vigilas, {folders}",
+      "all": "todos tus archivos"
     }
   }
 }

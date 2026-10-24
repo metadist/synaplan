@@ -6,6 +6,9 @@ namespace App\Service\Research\Spike;
 
 final readonly class SpikeAnswer
 {
+    /**
+     * @param array<string, array{url: string, passage: string}> $evidence
+     */
     public function __construct(
         public string $report,
         public int $searches,
@@ -16,6 +19,7 @@ final readonly class SpikeAnswer
         public string $readLog,
         public int $inputTokens,
         public int $outputTokens,
+        public array $evidence = [],
     ) {
     }
 }

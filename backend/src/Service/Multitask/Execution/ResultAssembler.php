@@ -301,21 +301,7 @@ final class ResultAssembler
                 if (true === ($nodeResult->metadata['used_workspace'] ?? false)) {
                     $card['used_workspace'] = true;
                 }
-                $stepInput = $nodeResult->metadata['step_input'] ?? null;
-                if (is_string($stepInput) && '' !== $stepInput) {
-                    $card['step_input'] = $stepInput;
-                }
-                $stepOutput = $nodeResult->metadata['step_output'] ?? null;
-                if (is_string($stepOutput) && '' !== $stepOutput) {
-                    $card['step_output'] = $stepOutput;
-                }
-                if (true === ($nodeResult->metadata['step_output_truncated'] ?? false)) {
-                    $card['step_output_truncated'] = true;
-                }
-                $durationMs = $nodeResult->metadata['duration_ms'] ?? null;
-                if (is_int($durationMs)) {
-                    $card['duration_ms'] = $durationMs;
-                }
+                $card = array_merge($card, CardTrace::fromResult($nodeResult));
                 $query = $nodeResult->metadata['query'] ?? null;
                 if (is_string($query) && '' !== $query && !isset($card['query'])) {
                     $card['query'] = $query;
