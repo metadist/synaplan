@@ -108,6 +108,7 @@ export function fakeMemberTurn(
     outcome: {
       recordVersion: vi.fn(),
       restoreUnpersistedEdit: vi.fn(),
+      busyRefused: vi.fn(),
       scheduleMemoryPoll: vi.fn(),
       showError: vi.fn(),
       showLimit: vi.fn(),

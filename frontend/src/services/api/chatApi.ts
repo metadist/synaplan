@@ -23,6 +23,7 @@ import {
 
 export { ConversationFileRowSchema, GetConversationFilesResponseSchema, type ConversationFileRow }
 import type { StreamUpdatePayload } from '@/types/chatStream'
+import { fetchWithBusyRetry, isBusyRefusal } from './busyRetry'
 
 /**
  * Map a recorder MIME type to an audio file extension the backend accepts and
@@ -524,16 +525,21 @@ function openStreamPost(
       signal: controller.signal,
     })
 
+  const onBusy = () => {
+    if (!isStopped) onUpdate({ status: 'busy' })
+  }
   ;(async () => {
     try {
-      let response = await doFetch()
+      // A full stream pool refuses before PHP starts (503 + server_busy):
+      // retried here; the turn only sees `busy`, then a plain error.
+      let response = await fetchWithBusyRetry(doFetch, { onBusy })
 
       // Expired access cookie: refresh once, then retry. Mirrors the 401
       // handling the old EventSource path did via /auth/token.
       if (response.status === 401) {
         const refreshed = await refreshAccessToken()
         if (refreshed && !isStopped) {
-          response = await doFetch()
+          response = await fetchWithBusyRetry(doFetch, { onBusy })
         }
       }
 
@@ -541,14 +547,19 @@ function openStreamPost(
 
       if (!response.ok) {
         console.error(`🚫 Stream connection failed (HTTP ${response.status})`)
+        if (await isBusyRefusal(response)) {
+          onUpdate({ status: 'error', code: 'server_busy' })
+          return
+        }
         onUpdate(
           response.status === 401 && !hasSessionHint()
             ? {
                 status: 'error',
+                code: 'auth_required',
                 error: 'Authentication required. Please log in again to continue.',
                 message: 'Your session has expired. Please refresh the page and log in again.',
               }
-            : { status: 'error', error: `Connection failed (HTTP ${response.status})` }
+            : { status: 'error', code: response.status === 429 ? 'rate_limited' : 'server_error' }
         )
         return
       }

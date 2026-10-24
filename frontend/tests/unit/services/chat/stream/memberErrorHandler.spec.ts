@@ -56,6 +56,40 @@ describe('member error handler', () => {
     )
   })
 
+  it('gives a busy refusal its text back and offers one retry', () => {
+    const prompt = {
+      id: 'user-1',
+      role: 'user',
+      parts: [{ type: 'text', content: 'Summarise the attached report' }],
+      timestamp: new Date(),
+    } as unknown as Message
+    const turn = fakeMemberTurn()
+    turn.history.messages.unshift(prompt)
+
+    memberErrorHandler({ status: 'error', code: 'server_busy' }, turn)
+
+    expect(turn.history.removeMessage).toHaveBeenCalledWith('assistant-1')
+    expect(turn.history.removeMessage).toHaveBeenCalledWith('user-1')
+    expect(turn.outcome.busyRefused).toHaveBeenCalledWith('Summarise the attached report')
+    expect(turn.history.updateStreamingMessage).not.toHaveBeenCalled()
+  })
+
+  it('shows one localized sentence per refusal class, never a status code', () => {
+    const server = fakeMemberTurn()
+    memberErrorHandler({ status: 'error', code: 'server_error' }, server)
+    expect(server.history.updateStreamingMessage).toHaveBeenCalledWith(
+      'assistant-1',
+      'chatError.busyServer'
+    )
+
+    const limit = fakeMemberTurn()
+    memberErrorHandler({ status: 'error', code: 'rate_limited' }, limit)
+    expect(limit.history.updateStreamingMessage).toHaveBeenCalledWith(
+      'assistant-1',
+      'chatError.busyLimit'
+    )
+  })
+
   it('offers a top-up when the monthly budget is spent', () => {
     const turn = fakeMemberTurn()
 

@@ -16,6 +16,8 @@
     "fileUploadFailed": "Dosya yükleme başarısız. Lütfen tekrar deneyin.",
     "fileUploadDefaultMessage": "Lütfen ekli dosyayı inceleyin.",
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
+    "busy": "Synaplan meşgul — yanıtınız birazdan başlayacak.",
+    "busyNotSent": "Synaplan şu anda meşgul. Mesajınız gönderilmedi — metin giriş kutusuna geri kondu. Birazdan tekrar gönderin.",
     "continueFailed": "Yanıt sürdürülemedi. Lütfen tekrar deneyin.",
     "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim.",
     "openChat": "Sohbeti aç",

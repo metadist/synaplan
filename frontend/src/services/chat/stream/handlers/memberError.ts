@@ -130,6 +130,25 @@ function endAsBudgetExceeded(data: StreamUpdatePayload, turn: MemberTurn): void 
   endTurn(turn)
 }
 
+/**
+ * The server never took the message (503 + server_busy after the retries):
+ * both bubbles go, the text returns to the composer, and Try again sends it
+ * once more. Nothing was stored, and the copy says so.
+ */
+function endAsBusy(turn: MemberTurn): void {
+  const prompts = turn.history.messages.filter((message) => message.role === 'user')
+  const prompt = prompts[prompts.length - 1]
+  const text = prompt?.parts.find((part) => part.type === 'text')?.content ?? ''
+  turn.history.removeMessage(turn.messageId)
+  if (prompt) {
+    turn.history.removeMessage(prompt.id)
+  }
+  if (text) {
+    turn.outcome.busyRefused(text)
+  }
+  endTurn(turn)
+}
+
 /** The same translated notice as the Stop button, never the backend's English string. */
 function endAsCancelled(turn: MemberTurn): void {
   if (!hasAnswerText(turn.message())) {
@@ -179,6 +198,12 @@ export const memberErrorHandler: StreamStatusHandler<MemberTurn> = (data, turn) 
     classified && rawError.trim() !== '' ? rawError : turn.t('chatError.reason.unknown')
   console.error('Error:', errorText, data)
   turn.status.clear()
+
+  // Refusals before the turn started carry a transport code, not a sentence.
+  if (data.code === 'server_busy') return endAsBusy(turn)
+  if (data.code === 'auth_required') return endAsFailure(data, turn.t('chatError.busyAuth'), turn)
+  if (data.code === 'rate_limited') return endAsFailure(data, turn.t('chatError.busyLimit'), turn)
+  if (data.code === 'server_error') return endAsFailure(data, turn.t('chatError.busyServer'), turn)
 
   if (isRecoverableStreamError(data) && finishedOnTransportDrop(turn)) return
   applyFailureDetails(data, turn)

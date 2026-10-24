@@ -12,7 +12,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
 | 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
 | 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
-| 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | in review | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast |
+| 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
+| 2026-10-24 | AU4 | in progress | the chat and the widget say busy, retry three times, then give the text back with a Try again |
 
 ## Baselines
 
@@ -25,6 +26,57 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-24 — AU4: a busy server says so and retries
+
+Copy (all five locales, `chatError.busy*`, `processing.busy`, `widget.busy*`):
+"Synaplan is busy — your answer starts in a moment." while the transport
+retries; then "Synaplan is busy right now. Your message was not sent — it is
+back in the input box." with **Try again**. The widget shows the same two
+sentences in its bubble and composer.
+
+**Walked (J-AU-1)** on the busy test stack (1 stream worker, 1 s wait,
+`docker-compose.busy.yml`): `busy-server.spec.ts` holds the worker with
+chained API streams, sends in the chat UI, sees the busy line in the answer
+area, the not-sent sentence, the prompt back in the composer, and Try again
+resending it (composer clears, prompt bubble back, no duplicate stored).
+2 of 2 busy tests pass locally; the same job runs in CI.
+
+**How it works.** `busyRetry.ts` is the one retry place: only 503 +
+`server_busy` (all three body shapes), `Retry-After` else 5 s, plus jitter,
+max 3 retries. The chat transport reports `busy` while waiting and a
+`server_busy` code at the end; `memberError` then removes both bubbles,
+restores the composer (ChatInput keeps it as the chat draft, not in
+incognito) and offers Try again. Other refusals carry one code per class
+(auth, limit, server) and the handler shows one localized sentence — no
+status code anywhere. The widget retries through `postJsonWithBusyRetry`,
+paints the busy sentence in the placeholder bubble, and on a final refusal
+drops both bubbles and restores its composer.
+
+**Tests.** `busyRetry.spec.ts` (schedule: `Retry-After`, then 5 s, max 3;
+no retry on 500 or a non-busy 503), `memberErrorHandler.spec.ts` (busy
+ending, one sentence per class), locale parity, size ratchet (the busy code
+lives in `busyRetry.ts`, `widgetBusy.ts` and `useBusyRetryOffer.ts` because
+`chatApi.ts`, `widgetsApi.ts`, `ChatView.vue` and `ChatWidget.vue` are
+frozen), 3,154 Vitest tests, vue-tsc, ESLint, Prettier.
+
+**Gate.** Frontend lint, vue-tsc, 3,154 Vitest tests, busy job 2 of 2 on
+the busy stack, layout 16 of 17 (the login overflow is the documented
+local-only demo-card failure). `make test-e2e` on the dev stack: the
+remaining failures are the known-local set (guest 429 limit, subscription,
+Telegram, WhatsApp, workspace tab, the two local-only chat/voice specs).
+The widget/memory/task-prompt failures in the first run were a stale
+`dist-widget` bind mount after a failed stack build on this machine; after
+a backend restart all 15 pass.
+
+**As delivered, different from the brief.** The guest stream also retries
+and shows the busy line, but a final guest refusal keeps today's ending
+(finish the empty bubble); the composer restore and Try again are the
+signed-in turn's, as in J-AU-1. The 401 sentence the brief mentions never
+reached the bubble — the handler already replaced transport strings with a
+localized sentence; AU4 gives each refusal class its own sentence instead.
 
 ---
 

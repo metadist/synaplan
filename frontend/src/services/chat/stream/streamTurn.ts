@@ -142,6 +142,8 @@ export interface ChatActivity {
 export interface TurnOutcome {
   recordVersion(backendMessageId: number): void
   restoreUnpersistedEdit(): void
+  /** A busy refusal: text back into the composer, with a Try again that resends it. */
+  busyRefused(text: string): void
   scheduleMemoryPoll(backendMessageId: number): void
   showError(message: string, durationMs?: number): void
   showLimit(notice: LimitCheckResult): void

@@ -21,6 +21,7 @@ export type TimelineStepState = 'active' | 'done'
  * timeline shows one "Searched the web · 8 sources" row, not two.
  */
 export type TimelineStepKey =
+  | 'busy'
   | 'preprocessing'
   | 'understand'
   | 'links'
@@ -77,6 +78,7 @@ export interface TimelineState {
 }
 
 const STEP_BY_STATUS: Record<string, TimelineStepKey> = {
+  busy: 'busy',
   preprocessing: 'preprocessing',
   classifying: 'understand',
   classified: 'understand',

@@ -811,6 +811,8 @@
     "fileUploadDefaultMessage": "Bitte prüfen Sie die angehängte Datei.",
     "sendFailed": "Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     "chatUnavailable": "Der Chat ist derzeit nicht verfügbar.",
+    "busy": "Synaplan ist ausgelastet — die Antwort beginnt gleich.",
+    "busyNotSent": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet — sie steht wieder im Eingabefeld. Gleich erneut senden.",
     "chatUnavailablePlaceholder": "Chat nicht verfügbar",
     "defaultAssistantReply": "Vielen Dank für Ihre Nachricht! Ich melde mich gleich bei Ihnen zurück.",
     "openChat": "Chat öffnen",

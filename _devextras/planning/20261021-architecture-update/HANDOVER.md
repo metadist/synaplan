@@ -2,7 +2,8 @@
 
 > **Update 2026-10-24:** AU2 ([#2626](https://github.com/metadist/synaplan/pull/2626))
 > merged on 2026-10-22. AU5 ([#2661](https://github.com/metadist/synaplan/pull/2661))
-> merged on 2026-10-23. AU3 is the step in progress. The step log in
+> merged on 2026-10-23. AU3 ([#2687](https://github.com/metadist/synaplan/pull/2687))
+> merged on 2026-10-24; AU4 is the step in progress. The step log in
 > [`STATUS.md`](./STATUS.md) is current; the sections below are the
 > 2026-10-22 snapshot.
 
@@ -80,7 +81,7 @@ are kept.
   `synaplan-charts`. AU6 waits on AU3.
 - **M1–M6** on production and `vultr-cluster` are still open. The numbers
   above are from the dev stack.
-- At most two unmerged step branches. AU3 is the next step. AU4 waits on it.
+- At most two unmerged step branches. AU4 is the step in progress. AU6 waits on AU3, which has landed.
 
 ## Second opinion
 
