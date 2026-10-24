@@ -10,8 +10,8 @@ here, not a chat message.
 | 02 | [#2679](https://github.com/metadist/synaplan/issues/2679) | PR [#2704](https://github.com/metadist/synaplan/pull/2704) |
 | 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | PR [#2706](https://github.com/metadist/synaplan/pull/2706); J-OI-3 walked 2026-10-24 |
 | 04 | [#2667](https://github.com/metadist/synaplan/issues/2667) | PR [#2707](https://github.com/metadist/synaplan/pull/2707); J-OI-4 walked 2026-10-24 |
-| 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | not started |
-| 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | not started |
+| 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | PR [#2709](https://github.com/metadist/synaplan/pull/2709) |
+| 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | in progress |
 
 #2635, #2636 and #2638 stay on row 24. They are not rows here.
 

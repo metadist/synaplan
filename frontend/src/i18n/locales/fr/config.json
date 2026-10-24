@@ -95,6 +95,7 @@
       "descriptionHeader": "DESCRIPTION",
       "admin": {
         "catalogSubtitle": "Recherchez et modifiez le catalogue de modèles du système.",
+        "withdrawn": "N'est plus proposé par {provider}. Il reste ici jusqu'à ce que vous le supprimiez.",
         "bulkImportSubtitle": "Générer et appliquer du SQL à partir de la documentation des fournisseurs (avancé).",
         "addModels": "Import groupé (SQL)",
         "urlsLabel": "URL (une par ligne)",

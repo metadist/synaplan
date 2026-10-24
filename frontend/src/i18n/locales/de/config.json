@@ -82,6 +82,7 @@
       "saveReplacedNone": "{model} ist gespeichert, kann aber gerade nicht genutzt werden, und kein anderes Modell kann einspringen. Prüfe den Anbieter unter Admin → KI-Anbieter.",
       "admin": {
         "catalogSubtitle": "System-Modellkatalog durchsuchen und bearbeiten.",
+        "withdrawn": "Wird von {provider} nicht mehr angeboten. Es bleibt hier, bis du es entfernst.",
         "bulkImportSubtitle": "SQL aus Anbieter-Dokumentation erzeugen und anwenden (erweitert).",
         "addModels": "Massenimport (SQL)",
         "urlsLabel": "URLs (eine pro Zeile)",

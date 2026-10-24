@@ -369,6 +369,7 @@
       },
       "admin": {
         "catalogSubtitle": "Busca y edita el catálogo de modelos del sistema.",
+        "withdrawn": "Ya no lo ofrece {provider}. Sigue aquí hasta que lo quites.",
         "deletedMoved": "Eliminado. {job} ahora usa {model}.",
         "deletedMovedMany": "Eliminado. Lo que usaba este modelo ahora usa otro disponible.",
         "deletedCleared": "Eliminado. {job} no tiene modelo hasta que elijas uno en esta página. No se ha cambiado nada más.",

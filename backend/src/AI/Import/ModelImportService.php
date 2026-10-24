@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Import;
 
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
+use App\AI\Health\ImportedModelListingCheck;
 
 /**
  * Orchestrates the model-import flow behind the admin API: discover an
@@ -22,6 +23,7 @@ final readonly class ModelImportService
         private CapabilityProbe $probe,
         private ModelImportApplier $applier,
         private OpenAiCompatibleEndpointRegistry $endpoints,
+        private ImportedModelListingCheck $listingCheck,
     ) {
     }
 
@@ -31,6 +33,9 @@ final readonly class ModelImportService
     public function preview(string $source, bool $probe): array
     {
         $result = $this->discovery->discover($source);
+        if ($result->ok) {
+            $this->listingCheck->applySuccessfulListing($source, $result);
+        }
         if (!$result->ok) {
             return ['source' => $source, 'rows' => [], 'endpointOk' => false, 'error' => $result->error, 'probeCostNote' => null];
         }
