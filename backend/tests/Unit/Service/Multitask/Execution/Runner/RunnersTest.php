@@ -567,6 +567,9 @@ final class RunnersTest extends TestCase
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
             $this->createMock(PromptService::class),
             $this->createMock(LoggerInterface::class),
+            selfAwarePromptDecorator: null,
+            platformDocsRetriever: null,
+            slashCommandCopy: null,
             knowledge: $knowledge,
         );
 

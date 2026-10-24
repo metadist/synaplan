@@ -145,6 +145,17 @@ export default defineConfig({
       grep: /@layout/,
     },
     {
+      // Real providers, linked clouds, or other maintainer-workstation-only walks.
+      name: 'chromium-noci',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@noci/,
+    },
+    {
       // Visual snapshots (hard-capped, see layout guard docs). CI-only:
       // baselines are generated on the ubuntu runner via workflow dispatch —
       // local font rendering differs and would be permanently red.

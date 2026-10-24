@@ -8,7 +8,12 @@ here, not a chat message.
 | Plan | — | written 2026-10-24 |
 | 01 | [#2678](https://github.com/metadist/synaplan/issues/2678) | PR [#2703](https://github.com/metadist/synaplan/pull/2703) |
 | 02 | [#2679](https://github.com/metadist/synaplan/issues/2679) | PR [#2704](https://github.com/metadist/synaplan/pull/2704) |
-| 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | in progress |
+| 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | PR [#2706](https://github.com/metadist/synaplan/pull/2706); J-OI-3 walked 2026-10-24 |
+| 04 | [#2667](https://github.com/metadist/synaplan/issues/2667) | PR [#2707](https://github.com/metadist/synaplan/pull/2707); J-OI-4 walked 2026-10-24 |
+| 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | not started |
+| 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | not started |
+
+#2635, #2636 and #2638 stay on row 24. They are not rows here.
 
 ## Walks
 
@@ -25,8 +30,33 @@ window (bottom 1197). 320×640, light and dark: Cancel and Import 40
 were both inside the window (bottom 603). The capability column stays
 in the table's sideways scroll, which was already there.
 
-| 04 | [#2667](https://github.com/metadist/synaplan/issues/2667) | not started |
-| 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | not started |
-| 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | not started |
+### 2026-10-24 — J-OI-3
 
-#2635, #2636 and #2638 stay on row 24. They are not rows here.
+Account `demo@synaplan.com`. Stack: Synaplan dev, **cloud-fixture**
+(`client=owncloud`, `localhost:8099`, ada linked), Nextcloud dev on
+`:8081`. Library → Generated → Copy to cloud.
+
+- Menu: **ownCloud · localhost:8099** and **Nextcloud · localhost:8081**.
+- Copy to ownCloud: toast **Open in ownCloud**; Sent to **ownCloud ·
+  localhost:8099 — Copied** (not Nextcloud, not raw `owncloud`).
+- Fixture note: if `curl localhost:8099/control/state` returns a PHP fatal
+  about `/app/index.php`, recreate the container:
+  `docker compose -f _devextras/testing/cloud-apps/fixture-app/compose.yml up -d --force-recreate`.
+
+Automated: `@ci` `copy-to-cloud.spec.ts` (mocked link); `@noci`
+`open-issues-walks.spec.ts` (live links).
+
+### 2026-10-24 — J-OI-4
+
+Account `demo@synaplan.com`. Linked Nextcloud `localhost:8081`, folder
+`Invoices` (three `inv-*.txt` for ada). Branch
+`fix/20261024-folder-read-honesty`. Prompt asks for a linked-cloud read
+of Invoices (no WebDAV).
+
+- **Ideal:** `folder-read-card` **Read … from Nextcloud › Invoices** and a
+  table with Nordwind / Ostsee fixture amounts.
+- **Also acceptable (#2667):** no read step, but the answer refuses honestly
+  (e.g. “wasn't able to read … Invoices”) and does **not** invent Acme/Beta/Gamma
+  vendors.
+- Local run:
+  `cd frontend/tests/e2e && npx playwright test open-issues-walks.spec.ts --project=chromium-noci`.

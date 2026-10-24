@@ -8,6 +8,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Service\File\ConnectedFolderReadHonestyPrompt;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentImageCatalog;
@@ -34,6 +35,7 @@ final readonly class ChatSystemPromptBuilder
         private TimeContextBuilder $timeContextBuilder,
         private DocumentImageCatalog $documentImageCatalog,
         private ConversationFileCatalog $conversationFileCatalog,
+        private ConnectedFolderReadHonestyPrompt $connectedFolderReadHonesty,
         private LoggerInterface $logger,
         #[AutowireIterator('app.plugin.context_provider')] private iterable $pluginContextProviders = [],
         #[Autowire(lazy: true)] private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
@@ -254,6 +256,14 @@ final readonly class ChatSystemPromptBuilder
         }
 
         return $block;
+    }
+
+    /**
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     */
+    public function connectedFolderReadHonesty(Message $message, array $thread): string
+    {
+        return $this->connectedFolderReadHonesty->forChatHandler($message, $thread);
     }
 
     /**

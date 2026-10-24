@@ -8,9 +8,11 @@ use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\ToolCalling\ToolCallingTranslator;
 use App\AI\ToolCalling\ToolCallParser;
+use App\Repository\ConnectionRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\Chat\ProviderTranscriptCapture;
+use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Context\ContextCondenser;
 use App\Service\Context\ModelContextWindow;
 use App\Service\Digest\DigestSearchService;
@@ -18,6 +20,9 @@ use App\Service\Digest\MessageDigestConfig;
 use App\Service\Document\ChatDocumentOutput;
 use App\Service\Document\DocumentEditCoordinator;
 use App\Service\Feedback\FeedbackConfigService;
+use App\Service\File\ConnectedFolderContentGuard;
+use App\Service\File\ConnectedFolderGuardCatalog;
+use App\Service\File\ConnectedFolderReadHonestyPrompt;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
@@ -48,6 +53,8 @@ use App\Service\Message\Routing\RoutingHandoffResolver;
 use App\Service\Message\Routing\RoutingToolset;
 use App\Service\Message\SlashCommandCopy;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Execution\InputFileText;
+use App\Service\PlatformLink\PickupService;
 use App\Service\Plugin\PluginContextProviderInterface;
 use App\Service\Prompt\ChatSystemPromptBuilder;
 use App\Service\Prompt\PromptService;
@@ -74,6 +81,48 @@ use Psr\Log\LoggerInterface;
  */
 final class ChatHandlerFactory
 {
+    private static function connectionRepositoryStub(): ConnectionRepository
+    {
+        $case = new class('connectionRepositoryStub') extends \PHPUnit\Framework\TestCase {
+            public function repo(): ConnectionRepository
+            {
+                return $this->createMock(ConnectionRepository::class);
+            }
+        };
+
+        return $case->repo();
+    }
+
+    private static function pickupServiceStub(): PickupService
+    {
+        $case = new class('pickupServiceStub') extends \PHPUnit\Framework\TestCase {
+            public function service(): PickupService
+            {
+                $pickups = $this->createMock(PickupService::class);
+                $pickups->method('readableLinks')->willReturn([]);
+
+                return $pickups;
+            }
+        };
+
+        return $case->service();
+    }
+
+    private static function inputFileTextStub(): InputFileText
+    {
+        $case = new class('inputFileTextStub') extends \PHPUnit\Framework\TestCase {
+            public function service(): InputFileText
+            {
+                $input = $this->createMock(InputFileText::class);
+                $input->method('of')->willReturn('');
+
+                return $input;
+            }
+        };
+
+        return $case->service();
+    }
+
     /**
      * @param iterable<PluginContextProviderInterface> $pluginContextProviders
      */
@@ -123,7 +172,24 @@ final class ChatHandlerFactory
         $fileWriter = new GeneratedFileWriter($documentGenerator, $documentImageReferenceResolver, $userUploadPathBuilder, $uploadDir, $em, $logger, $documentThumbnailDispatcher);
         $messages = new ChatMessageAssembler($vision, $history, $logger, $contextCondenser, $modelContextWindow);
         $documents = new ChatDocumentOutput($modelRepository, $em, $fileWriter, $logger, $generatedDocumentStore, $documentEditCoordinator, $unreadSourceGuard);
-        $sections = new ChatSystemPromptBuilder($timeContextBuilder, $documentImageCatalog, $conversationFileCatalog, $logger, $pluginContextProviders, $selfAwarePromptDecorator, $platformDocsRetriever);
+        $folderHonesty = new ConnectedFolderReadHonestyPrompt(
+            new ConnectedFolderContentGuard(),
+            new ConnectedFolderGuardCatalog(
+                new PlannerChannelCatalog(self::connectionRepositoryStub()),
+                self::pickupServiceStub(),
+            ),
+            self::inputFileTextStub(),
+        );
+        $sections = new ChatSystemPromptBuilder(
+            $timeContextBuilder,
+            $documentImageCatalog,
+            $conversationFileCatalog,
+            $folderHonesty,
+            $logger,
+            $pluginContextProviders,
+            $selfAwarePromptDecorator,
+            $platformDocsRetriever,
+        );
 
         return new ChatHandler(
             new ChatTurnContextLoader(
