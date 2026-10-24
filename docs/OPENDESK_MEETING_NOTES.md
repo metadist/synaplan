@@ -36,6 +36,8 @@ SYNAPLAN_API_KEY=sk_... TRANSCRIBER_AUTH_TOKEN=... docker compose --profile tran
 
 The same variables are listed in `sidecars/synaplan-transcriber/env.example` and, for Helm, in `sidecars/synaplan-transcriber/helm/opendesk-values.example.yaml`.
 
+The published image tags are `latest` on the default branch, and `<version>`, `<major>.<minor>` and `<major>` on a release tag. Both `linux/amd64` and `linux/arm64` are in that manifest. Pin a version tag, not a short commit.
+
 Signed-in operators can read the snippet Synaplan would hand to Jitsi:
 
 `GET /api/v1/opendesk/meeting-notes/connect`
