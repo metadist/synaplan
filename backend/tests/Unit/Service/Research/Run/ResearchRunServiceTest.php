@@ -39,6 +39,7 @@ final class ResearchRunServiceTest extends ResearchUnitCase
             new ResearchConfig($this->createStub(ConfigRepository::class), '1'),
             $chats,
             $this->clock,
+            new SilentResearchReport(),
         );
     }
 
@@ -114,7 +115,7 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         $repo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => ResearchConfig::MAX_ACTIVE_RUNS === $setting ? '1' : null,
         );
-        $runs = new ResearchRunService($this->store, $this->bus, new ResearchEventLog($this->keys), new ResearchConfig($repo, '1'), $this->chats(), $this->clock);
+        $runs = new ResearchRunService($this->store, $this->bus, new ResearchEventLog($this->keys), new ResearchConfig($repo, '1'), $this->chats(), $this->clock, new SilentResearchReport());
         $runs->start($this->user, $this->body(), true, null);
 
         $this->expectException(ResearchRejected::class);

@@ -24,6 +24,7 @@ final readonly class ResearchRunService
         private ResearchConfig $config,
         private ChatRepository $chats,
         private ClockInterface $clock,
+        private ResearchReportPoster $reports,
     ) {
     }
 
@@ -99,6 +100,9 @@ final readonly class ResearchRunService
         $state->finish(ResearchStatus::Stopped, $outcome);
         $this->store->save($state);
         $this->events->append($state->ref->id, 'stopped', ['outcome' => $outcome->toArray()]);
+        if (null !== $state->ref->chatId) {
+            $this->reports->deliver($state);
+        }
 
         return $state;
     }

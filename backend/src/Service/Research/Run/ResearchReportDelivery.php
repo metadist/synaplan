@@ -43,7 +43,7 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         }
 
         try {
-            $fileId = $this->storeReport($state);
+            $file = $this->storeReport($state);
             $message = (new Message())
                 ->setUserId($state->ref->userId)
                 ->setChat($chat)
@@ -52,15 +52,22 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
                 ->setUnixTimestamp(time())
                 ->setDateTime(date('YmdHis'))
                 ->setMessageType('API')
-                ->setFile(null !== $fileId ? 1 : 0)
+                ->setFile(null !== $file ? 1 : 0)
                 ->setTopic('CHAT')
                 ->setLanguage('en')
                 ->setText($this->text($state))
                 ->setDirection('OUT')
                 ->setStatus('complete');
+            if (null !== $file) {
+                $message->addFile($file);
+            }
             $this->em->persist($message);
             $chat->updateTimestamp();
             $this->em->flush();
+            if (null !== $file) {
+                $file->setMessageId($message->getId());
+                $this->em->flush();
+            }
             $this->store->markDelivered($state->ref->id);
         } catch (\Throwable $e) {
             $this->logger->warning('Research report was not posted to the chat', [
@@ -81,7 +88,7 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         return $state->outcome?->text() ?? 'The research finished without a report.';
     }
 
-    private function storeReport(ResearchRunState $state): ?int
+    private function storeReport(ResearchRunState $state): ?File
     {
         $report = $state->ledger->report();
         if (null === $report || '' === $report) {
@@ -111,6 +118,6 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         $this->em->persist($file);
         $this->em->flush();
 
-        return (int) $file->getId();
+        return $file;
     }
 }
