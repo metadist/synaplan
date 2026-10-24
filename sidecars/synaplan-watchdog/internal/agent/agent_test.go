@@ -116,6 +116,17 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	if agg.Samples != 2 || agg.StreamsBusyMax != 3 {
 		t.Fatalf("aggregate = %+v", agg)
 	}
+	peakRaw, err := memory.Get(context.Background(), capacity.PeakKey("synaplan:test:", "web1", "20261024"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var peak capacity.Peak
+	if err := json.Unmarshal(peakRaw, &peak); err != nil {
+		t.Fatal(err)
+	}
+	if peak.StreamsBusyMax != 3 || peak.StreamsTotal != 4 || peak.At != "2026-10-24T18:00:00Z" {
+		t.Fatalf("peak = %+v", peak)
+	}
 	if memory.TTL(capacity.AggregateKey("synaplan:test:", "web1", "202610241800")) != capacity.AggregateTTL {
 		t.Fatalf("aggregate ttl = %s", memory.TTL(capacity.AggregateKey("synaplan:test:", "web1", "202610241800")))
 	}

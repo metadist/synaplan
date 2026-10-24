@@ -25,6 +25,23 @@ func TestFoldPeakKeepsTheHighWaterMark(t *testing.T) {
 	}
 }
 
+func TestRaisePeakKeepsTheFirstTimeOfTheHighWaterMark(t *testing.T) {
+	first := RaisePeak(Peak{}, "20261024", Snapshot{UpdatedAt: "2026-10-24T11:40:00Z", Streams: Pool{Total: 24, Busy: 22}})
+	same := RaisePeak(first, "20261024", Snapshot{UpdatedAt: "2026-10-24T11:41:00Z", Streams: Pool{Total: 24, Busy: 22}})
+	lower := RaisePeak(same, "20261024", Snapshot{UpdatedAt: "2026-10-24T12:00:00Z", Streams: Pool{Total: 24, Busy: 3}})
+	if lower.StreamsBusyMax != 22 || lower.At != "2026-10-24T11:40:00Z" || lower.StreamsTotal != 24 {
+		t.Fatalf("peak = %+v", lower)
+	}
+	zero := RaisePeak(Peak{}, "20261025", Snapshot{UpdatedAt: "2026-10-25T00:00:05Z"})
+	if zero.StreamsBusyMax != 0 || zero.At != "2026-10-25T00:00:05Z" {
+		t.Fatalf("a new day starts at the first sample: %+v", zero)
+	}
+	nextDay := RaisePeak(lower, "20261025", Snapshot{UpdatedAt: "2026-10-25T00:00:05Z", Streams: Pool{Total: 24, Busy: 1}})
+	if nextDay.StreamsBusyMax != 1 || nextDay.Day != "20261025" {
+		t.Fatalf("a new day does not inherit yesterday: %+v", nextDay)
+	}
+}
+
 func TestKeysCarryTheApplicationPrefix(t *testing.T) {
 	prefix := KeyPrefix("prod")
 	if prefix != "synaplan:prod:" || KeyPrefix("") != "synaplan:prod:" || KeyPrefix("dev") != "synaplan:dev:" {

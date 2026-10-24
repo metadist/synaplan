@@ -120,6 +120,41 @@ func SeenHashKey(prefix string) string {
 	return prefix + SeenKey
 }
 
+// PeakTTL keeps a day's peak long enough to be read as "yesterday".
+const PeakTTL = 48 * time.Hour
+
+// Peak is capacity:peak:{id}:{day}: the most AI answers held at once that day.
+type Peak struct {
+	Day            string `json:"day"`
+	StreamsBusyMax int    `json:"streams_busy_max"`
+	StreamsTotal   int    `json:"streams_total"`
+	At             string `json:"at"`
+}
+
+// PeakKey is one UTC day's peak for one server.
+func PeakKey(prefix, serverID, day string) string {
+	return prefix + "capacity:peak:" + serverID + ":" + day
+}
+
+// Day is the UTC day used in the peak key.
+func Day(now time.Time) string {
+	return now.UTC().Format("20060102")
+}
+
+// RaisePeak records a new high-water mark; an equal or lower sample leaves
+// the earlier time in place.
+func RaisePeak(current Peak, day string, snap Snapshot) Peak {
+	if current.Day != day {
+		current = Peak{Day: day, StreamsBusyMax: -1}
+	}
+	if snap.Streams.Busy > current.StreamsBusyMax {
+		current.StreamsBusyMax = snap.Streams.Busy
+		current.At = snap.UpdatedAt
+	}
+	current.StreamsTotal = snap.Streams.Total
+	return current
+}
+
 // Minute is the UTC minute used in the aggregate key.
 func Minute(now time.Time) string {
 	return now.UTC().Format("200601021504")

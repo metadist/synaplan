@@ -226,6 +226,33 @@ func (a *Agent) publish(ctx context.Context, now time.Time, snap capacity.Snapsh
 	if err := a.Store.Put(ctx, aggKey, encoded, capacity.AggregateTTL); err != nil {
 		log.Printf("watchdog: aggregate store: %v", err)
 	}
+	a.publishPeak(ctx, now, snap)
+}
+
+// publishPeak keeps the day's high-water mark of held AI answers, which the
+// capacity page shows as "peak today" and reads for its sizing hint.
+func (a *Agent) publishPeak(ctx context.Context, now time.Time, snap capacity.Snapshot) {
+	day := capacity.Day(now)
+	key := capacity.PeakKey(a.Prefix, a.ID, day)
+	peak := capacity.Peak{}
+	raw, err := a.Store.Get(ctx, key)
+	if err != nil {
+		log.Printf("watchdog: peak read: %v", err)
+		return
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &peak); err != nil {
+			peak = capacity.Peak{}
+		}
+	}
+	peak = capacity.RaisePeak(peak, day, snap)
+	encoded, err := json.Marshal(peak)
+	if err != nil {
+		return
+	}
+	if err := a.Store.Put(ctx, key, encoded, capacity.PeakTTL); err != nil {
+		log.Printf("watchdog: peak store: %v", err)
+	}
 }
 
 // Current returns the latest sample for /metrics and /ready.
