@@ -1,3 +1,5 @@
+**Archived 2026-10-24.** F4a–F4d are on `main`: the status, start and leave API ([#2568](https://github.com/metadist/synaplan/pull/2568)), the welcome screen and setup ([#2569](https://github.com/metadist/synaplan/pull/2569)), the chat banner, pill and card ([#2576](https://github.com/metadist/synaplan/pull/2576)), and the Demo mix row with auto-leave and undo ([#2577](https://github.com/metadist/synaplan/pull/2577)). Later follow-ups [#2612](https://github.com/metadist/synaplan/pull/2612), [#2621](https://github.com/metadist/synaplan/pull/2621) and [#2624](https://github.com/metadist/synaplan/pull/2624) are on `main` too. The folder was never a roadmap row. It leaves the live directory because the step it describes has landed. The three journeys were not entered as dated walks.
+
 # Synaplan Demo — client surfaces (step F4)
 
 **Goal.** A fresh install can chat with one click on the Synaplan Demo

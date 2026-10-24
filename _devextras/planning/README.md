@@ -72,4 +72,4 @@ feature modules, navigation consolidation, smart search, early intake,
 desktop Phase A, code cleanup V1–V4, the six-issue sprint, UX overhaul, …),
 and the April/May topical dump (`2026-archive/2026-04-05-topic-docs/`) —
 lives under `2026-archive/` with its dated name. The 2026-10-14, 2026-10-15,
-2026-10-16 and 2026-10-18 housekeeping is listed in `ROADMAP.md` §4.
+2026-10-16, 2026-10-18 and 2026-10-24 housekeeping is listed in `ROADMAP.md` §4.
