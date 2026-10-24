@@ -1,4 +1,21 @@
+import { useChatsStore } from '@/stores/chats'
+import { useIncognitoStore } from '@/stores/incognito'
 import { useNotification } from './useNotification'
+
+/**
+ * The resend guard for one turn: same chat, same mode, and — incognito —
+ * the same session. Captured when the turn starts; the toast outlives a
+ * switch to another conversation or a later incognito session.
+ */
+export function busyGuard(chatId: number | undefined, incognito: boolean): () => boolean {
+  const chats = useChatsStore()
+  const incognitoStore = useIncognitoStore()
+  const session = incognitoStore.sessionId
+  return () =>
+    incognito
+      ? incognitoStore.active && incognitoStore.sessionId === session
+      : chats.activeChatId === chatId && !incognitoStore.active
+}
 
 interface BusyInput {
   setInputText: (text: string) => void
@@ -47,7 +64,14 @@ export function busyRefused(
       label: t('chatError.busyTryAgain'),
       onClick: () => {
         if (!isCurrent()) return
-        void input?.submitText(text)
+        // submitText replaces the composer: a draft typed meanwhile goes
+        // back in afterwards, so the resend never eats it.
+        const draft = composerText(input)
+        void input?.submitText(text).then(() => {
+          if (draft.trim() !== '' && draft !== text) {
+            input?.setInputText(draft)
+          }
+        })
       },
     },
   })

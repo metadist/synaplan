@@ -1,6 +1,9 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { describe, expect, it, vi } from 'vitest'
-import { busyRefused, composerText } from '@/composables/useBusyRetryOffer'
+import { busyGuard, busyRefused, composerText } from '@/composables/useBusyRetryOffer'
 import { useNotification } from '@/composables/useNotification'
+import { useChatsStore } from '@/stores/chats'
+import { useIncognitoStore } from '@/stores/incognito'
 
 const t = (key: string) => key
 
@@ -44,5 +47,41 @@ describe('busy refused offer', () => {
     note.action?.onClick()
     expect(input.submitText).not.toHaveBeenCalled()
     remove(note.id)
+  })
+
+  it('puts a draft typed during the toast back after the resend', async () => {
+    const input = fakeInput('next draft')
+    const { notifications, remove } = useNotification()
+
+    busyRefused('Hello', t, input, () => true)
+    const note = notifications.value[notifications.value.length - 1]
+    note.action?.onClick()
+    expect(input.submitText).toHaveBeenCalledWith('Hello')
+    await vi.waitFor(() => {
+      expect(input.setInputText).toHaveBeenCalledWith('next draft')
+    })
+    remove(note.id)
+  })
+
+  it('binds a resend to its chat and to its incognito session', async () => {
+    setActivePinia(createPinia())
+    const chats = useChatsStore()
+    const incognito = useIncognitoStore()
+
+    chats.activeChatId = 42
+    const chatGuard = busyGuard(42, false)
+    expect(chatGuard()).toBe(true)
+    chats.activeChatId = 7
+    expect(chatGuard()).toBe(false)
+    chats.activeChatId = 42
+
+    incognito.startSession()
+    const incognitoGuard = busyGuard(undefined, true)
+    expect(incognitoGuard()).toBe(true)
+    await incognito.endSession()
+    expect(incognitoGuard()).toBe(false)
+    incognito.startSession()
+    expect(incognitoGuard()).toBe(false)
+    await incognito.endSession()
   })
 })

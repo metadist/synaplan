@@ -83,6 +83,12 @@ composer with the Send button — the widget has no toast system, and
 `ChatWidget.vue` is frozen in the size ratchet; the sentence sits in the
 bubble directly above the composer.
 
+**Review round 2 (Copilot, 2 findings).** Fixed: the resend guard now
+binds to the incognito session itself (new `sessionId` in the incognito
+store; a later session rejects), and a draft typed during the toast's
+lifetime goes back into the composer after the resend, so Try again never
+eats it.
+
 **As delivered, different from the brief.** The guest stream also retries
 and shows the busy line, but a final guest refusal keeps today's ending
 (finish the empty bubble); the composer restore and Try again are the

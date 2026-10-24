@@ -740,7 +740,7 @@ import {
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
-import { busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
+import { busyGuard, busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
 import { useDialog } from '@/composables/useDialog'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
@@ -3137,8 +3137,7 @@ function memberTurnFor(
   }
 ): MemberTurn {
   const { chatId, linkVersion } = turn
-  const busyCurrent = () =>
-    chatsStore.activeChatId === chatId && incognitoStore.active === turn.incognito
+  const busyCurrent = busyGuard(chatId, turn.incognito)
   return {
     ...streamTurnFor(canvas),
     chatId,
