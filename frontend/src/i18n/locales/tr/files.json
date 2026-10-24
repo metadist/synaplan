@@ -267,7 +267,8 @@
       },
       "kind": {
         "nextcloud": "Nextcloud",
-        "opencloud": "OpenCloud"
+        "opencloud": "OpenCloud",
+        "owncloud": "ownCloud"
       },
       "done": "{name} üzerinde {folder} konumuna kopyalandı. Dosya burada kalır.",
       "failed": "Dosya kopyalanmadı.",

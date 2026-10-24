@@ -6,7 +6,9 @@ here, not a chat message.
 | Sprint | Issue | State |
 | ------ | ----- | ----- |
 | Plan | — | written 2026-10-24 |
-| 01 | [#2678](https://github.com/metadist/synaplan/issues/2678) | walked 2026-10-24, pull request opening |
+| 01 | [#2678](https://github.com/metadist/synaplan/issues/2678) | PR [#2703](https://github.com/metadist/synaplan/pull/2703) |
+| 02 | [#2679](https://github.com/metadist/synaplan/issues/2679) | PR [#2704](https://github.com/metadist/synaplan/pull/2704) |
+| 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | in progress |
 
 ## Walks
 
@@ -22,8 +24,7 @@ Desktop, light, 1068×1234: the panel was 1202 px tall, the list scrolled
 window (bottom 1197). 320×640, light and dark: Cancel and Import 40
 were both inside the window (bottom 603). The capability column stays
 in the table's sideways scroll, which was already there.
-| 02 | [#2679](https://github.com/metadist/synaplan/issues/2679) | not started |
-| 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | not started |
+
 | 04 | [#2667](https://github.com/metadist/synaplan/issues/2667) | not started |
 | 05 | [#2617](https://github.com/metadist/synaplan/issues/2617) | not started |
 | 06 | [#2680](https://github.com/metadist/synaplan/issues/2680) | not started |

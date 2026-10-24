@@ -213,7 +213,8 @@
       },
       "kind": {
         "nextcloud": "Nextcloud",
-        "opencloud": "OpenCloud"
+        "opencloud": "OpenCloud",
+        "owncloud": "ownCloud"
       },
       "done": "Copié dans {folder} sur {name}. Le fichier est toujours ici.",
       "failed": "Le fichier n’a pas été copié.",

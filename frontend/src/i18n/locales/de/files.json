@@ -254,7 +254,8 @@
       },
       "kind": {
         "nextcloud": "Nextcloud",
-        "opencloud": "OpenCloud"
+        "opencloud": "OpenCloud",
+        "owncloud": "ownCloud"
       },
       "done": "Nach {folder} auf {name} kopiert. Die Datei bleibt hier.",
       "failed": "Die Datei wurde nicht kopiert.",
