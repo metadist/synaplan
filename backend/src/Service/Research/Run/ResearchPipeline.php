@@ -9,6 +9,7 @@ use App\Service\Research\Run\Stage\DeliverStage;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
 use App\Service\Research\Run\Stage\ReadStage;
+use App\Service\Research\Run\Stage\ReflectStage;
 use App\Service\Research\Run\Stage\ResearchSearch;
 use App\Service\Research\Run\Stage\StageContext;
 use App\Service\Research\Run\Stage\StageEnds;
@@ -16,9 +17,9 @@ use App\Service\Research\Run\Stage\StageResult;
 use App\Service\Research\Run\Stage\WriteStage;
 
 /**
- * Runs one research step. Brief and plan share a step, and so do search and
- * reading, so the queue carries four messages and not one per model call.
- * A run with nothing it could search ends before the first paid call.
+ * Runs one research step. Brief and plan share a step, and so do search,
+ * reading and the decision to search again, so the queue stays on four
+ * messages. A run with nothing it could search ends before the first paid call.
  */
 final readonly class ResearchPipeline implements ResearchUnitRunner
 {
@@ -27,6 +28,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
         private PlanStage $plan,
         private GatherStage $gather,
         private ReadStage $read,
+        private ReflectStage $reflect,
         private WriteStage $write,
         private DeliverStage $deliver,
         private ResearchSearch $search,
@@ -64,11 +66,23 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
 
     private function round(StageContext $ctx): StageResult
     {
+        $ctx->state->evidenceBeforeRound = $this->cards($ctx);
         $gathered = $this->gather->run($ctx);
         if ('read' !== $gathered->next || $ctx->state->status->isTerminal()) {
             return $gathered;
         }
+        $read = $this->read->run($ctx);
+        if ('write' !== $read->next) {
+            return $read;
+        }
 
-        return $this->read->run($ctx);
+        return $this->reflect->run($ctx);
+    }
+
+    private function cards(StageContext $ctx): int
+    {
+        $evidence = $ctx->state->ledger->toArray()['evidence'] ?? [];
+
+        return is_array($evidence) ? count($evidence) : 0;
     }
 }

@@ -21,6 +21,12 @@ final class ResearchRunState
     /** The start key, so deleting the run also forgets the retry. */
     public ?string $idempotencyKey = null;
 
+    /** The last round found nothing new, so the next decision must change strategy. */
+    public bool $strategyHint = false;
+
+    /** Evidence cards at the start of the current round. Not stored. */
+    public int $evidenceBeforeRound = 0;
+
     public function __construct(
         public readonly ResearchRunRef $ref,
         public ResearchStatus $status,
@@ -73,6 +79,7 @@ final class ResearchRunState
             'budget' => $this->budget->export(),
             'parent' => $this->parent,
             'idempotency_key' => $this->idempotencyKey,
+            'strategy_hint' => $this->strategyHint,
         ];
     }
 
@@ -147,6 +154,7 @@ final class ResearchRunState
         $state->parent = is_string($parent) && ResearchIds::isValid($parent) ? $parent : null;
         $idempotency = $data['idempotency_key'] ?? null;
         $state->idempotencyKey = is_string($idempotency) && '' !== $idempotency ? $idempotency : null;
+        $state->strategyHint = true === ($data['strategy_hint'] ?? false);
 
         return $state;
     }

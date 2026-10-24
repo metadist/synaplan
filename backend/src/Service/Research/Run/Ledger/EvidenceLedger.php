@@ -122,7 +122,7 @@ final class EvidenceLedger
         $this->report = '' === $text ? null : $text;
     }
 
-    public function markPoint(string $id, string $status): void
+    public function markPoint(string $id, string $status, string $note = ''): void
     {
         $point = $this->points[$id] ?? null;
         if (null === $point) {
@@ -131,7 +131,31 @@ final class EvidenceLedger
         if (!in_array($status, PlanPoint::STATUSES, true)) {
             throw new \InvalidArgumentException('A plan point status is not recognised.');
         }
-        $this->points[$id] = new PlanPoint($id, $point->title, $status, $point->why, $point->queries);
+        $why = '' !== trim($note) ? PlainText::line($note, 300) : $point->why;
+        $this->points[$id] = new PlanPoint($id, $point->title, $status, $why, $point->queries);
+    }
+
+    /**
+     * A search the lead asked for after the plan. The next round runs it
+     * unless that exact search was already run.
+     */
+    public function planSearch(string $pointId, string $query, string $language, string $scope): void
+    {
+        $point = $this->points[$pointId] ?? null;
+        if (null === $point || count($point->queries) >= 12) {
+            return;
+        }
+        $text = PlainText::line($query, 200);
+        if ('' === $text || !in_array($scope, ['web', 'both'], true)) {
+            return;
+        }
+        $queries = $point->queries;
+        $queries[] = [
+            'q' => $text,
+            'language' => '' === $language ? 'en' : $language,
+            'scope' => $scope,
+        ];
+        $this->points[$pointId] = new PlanPoint($point->id, $point->title, $point->status, $point->why, $queries);
     }
 
     public function describeSource(string $id, ?string $sourceClass, ?string $published): void

@@ -25,6 +25,7 @@ use App\Service\Research\Run\Stage\GatherChoice;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
 use App\Service\Research\Run\Stage\ReadStage;
+use App\Service\Research\Run\Stage\ReflectStage;
 use App\Service\Research\Run\Stage\ResearchModelReply;
 use App\Service\Research\Run\Stage\ResearchStop;
 use App\Service\Research\Run\Stage\StageCall;
@@ -87,19 +88,114 @@ final class ResearchPipelineTest extends TestCase
         self::assertSame(ResearchOutcome::FAILED_NO_SOURCES, $context->state->outcome?->code);
     }
 
+    public function testARoundThatStillHasAnOpenPointSearchesAgain(): void
+    {
+        $caller = new ReplayCaller();
+        $caller->script[] = $this->json([
+            'points' => [['id' => 'p1', 'status' => 'thin', 'note' => 'One catalogue only.']],
+            'actions' => [[
+                'type' => 'search',
+                'point' => 'p1',
+                'query' => 'warranty terms 2026',
+                'language' => 'en',
+                'scope' => 'web',
+            ]],
+            'finish' => null,
+        ]);
+        [$pipeline, $context] = $this->open($caller, new ReplaySearch(), ResearchDepth::Standard);
+        $this->ready($context);
+
+        $again = $pipeline->run($context, ResearchUnitPlan::ROUND);
+
+        self::assertSame('round', $again->next);
+        self::assertSame('thin', $context->state->ledger->points()[0]->status);
+        self::assertSame('warranty terms 2026', $context->state->ledger->points()[0]->queries[1]['q'] ?? null);
+        self::assertSame(1, $context->state->budget->toArray()['rounds'][0]);
+        self::assertTrue($context->state->strategyHint);
+        self::assertSame(ResearchStatus::Gathering, $context->state->status);
+
+        $restored = ResearchRunState::decode($context->state->encode());
+        self::assertTrue($restored?->strategyHint);
+    }
+
+    public function testNoProgressStopsAfterTheHintRound(): void
+    {
+        $caller = new ReplayCaller();
+        $caller->script[] = $this->json([
+            'points' => [['id' => 'p1', 'status' => 'open', 'note' => 'Nothing new.']],
+            'actions' => [[
+                'type' => 'search',
+                'point' => 'p1',
+                'query' => 'broader warranty',
+                'language' => 'en',
+                'scope' => 'web',
+            ]],
+            'finish' => null,
+        ]);
+        [$pipeline, $context] = $this->open($caller, new ReplaySearch(), ResearchDepth::Standard);
+        $this->ready($context);
+
+        self::assertSame('round', $pipeline->run($context, ResearchUnitPlan::ROUND)->next);
+        self::assertCount(1, $caller->seen);
+        self::assertStringContainsString('Change strategy', $caller->seen[0]['system']);
+
+        $stop = $pipeline->run($context, ResearchUnitPlan::ROUND);
+
+        self::assertSame('write', $stop->next);
+        self::assertCount(1, $caller->seen);
+        self::assertSame(ResearchUnitPlan::WRITE, ResearchUnitPlan::nextUnit(ResearchUnitPlan::ROUND, $stop->next));
+    }
+
+    public function testAQuickRunDoesNotReflect(): void
+    {
+        $caller = new ReplayCaller();
+        [$pipeline, $context] = $this->open($caller, new ReplaySearch());
+        $this->ready($context);
+
+        $result = $pipeline->run($context, ResearchUnitPlan::ROUND);
+
+        self::assertSame('write', $result->next);
+        self::assertSame([], $caller->seen);
+    }
+
+    public function testFinishDropsTheSearchAndGoesToTheReport(): void
+    {
+        $caller = new ReplayCaller();
+        $caller->script[] = $this->json([
+            'points' => [['id' => 'p1', 'status' => 'answered', 'note' => 'Two catalogues agree.']],
+            'actions' => [[
+                'type' => 'search',
+                'point' => 'p1',
+                'query' => 'should be ignored',
+                'language' => 'en',
+                'scope' => 'web',
+            ]],
+            'finish' => 'covered',
+        ]);
+        [$pipeline, $context] = $this->open($caller, new ReplaySearch(), ResearchDepth::Standard);
+        $this->ready($context);
+
+        $result = $pipeline->run($context, ResearchUnitPlan::ROUND);
+
+        self::assertSame('write', $result->next);
+        self::assertCount(1, $context->state->ledger->points()[0]->queries);
+        self::assertSame(ResearchUnitPlan::WRITE, ResearchUnitPlan::nextUnit(ResearchUnitPlan::ROUND, 'write'));
+        self::assertSame(ResearchUnitPlan::ROUND, ResearchUnitPlan::nextUnit(ResearchUnitPlan::ROUND, 'round'));
+    }
+
     /**
      * @return array{0: ResearchPipeline, 1: StageContext}
      */
-    private function open(ReplayCaller $caller, ReplaySearch $search): array
+    private function open(ReplayCaller $caller, ReplaySearch $search, ResearchDepth $depth = ResearchDepth::Quick): array
     {
         $created = new \DateTimeImmutable('2026-10-24T09:00:00+00:00');
         $clock = new MockClock($created);
         $keys = new MemoryResearchRunKeys($clock);
         $store = new ResearchStateStore($keys, $clock);
-        $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $created);
+        $budget = ResearchBudget::for($depth, ResearchBudgetConfig::defaults($depth), $created);
         $budget->at($created);
         $state = ResearchRunState::open(
-            ResearchRunRef::start(7, ResearchDepth::Quick, 'What does one unit cost?', null, $created),
+            ResearchRunRef::start(7, $depth, 'What does one unit cost?', null, $created),
             $budget,
         );
         $store->save($state);
@@ -109,6 +205,7 @@ final class ResearchPipelineTest extends TestCase
             new PlanStage($calls),
             new GatherStage($calls, $search, new GatherChoice()),
             new ReadStage($calls, new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store),
+            new ReflectStage($calls),
             new WriteStage($calls),
             new DeliverStage(),
             $search,
@@ -122,6 +219,16 @@ final class ResearchPipelineTest extends TestCase
         );
 
         return [$pipeline, $context];
+    }
+
+    private function ready(StageContext $context): void
+    {
+        $context->state->ledger->addPoint('Price', 'Needed.', [[
+            'q' => 'unit price',
+            'language' => 'en',
+            'scope' => 'web',
+        ]]);
+        $context->state->ledger->addQuery('p1', 'unit price', 'web', 1);
     }
 
     /**

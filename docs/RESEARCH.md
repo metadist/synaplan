@@ -50,6 +50,10 @@ A start accepts model hints, a world and starting pages and does not apply
 them yet. The run uses the models configured on the installation. Reading
 whole documents stays off.
 
+After a round of searching and reading, the run judges the open points and
+can search again, up to the round limit of that depth. A quick run does not
+search again. The switch stays off until an administrator turns it on.
+
 At most `RESEARCH.MAX_ACTIVE_RUNS` runs (default 5) can be going at once for
 one person, and at most `RESEARCH.MAX_ACTIVE_THOROUGH_PER_USER` thorough runs
 (default 1).
