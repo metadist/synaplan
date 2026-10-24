@@ -26,12 +26,8 @@ test.describe('@ci Capacity', () => {
   }) => {
     // page.request shares the admin session the login above created.
     const res = await page.request.get(`${getApiUrl()}/api/v1/admin/capacity/servers`)
-    expect(res.status(), 'the capacity endpoint answers for an admin').toBe(200)
-    const body = (await res.json()) as { served_by: string; servers: { id: string }[] }
-    expect(res.headers()['x-synaplan-server'], 'every response names its server').toBe(
-      body.served_by
-    )
-    expect(body.servers.map((s) => s.id)).toContain(body.served_by)
+    const servedBy = res.headers()['x-synaplan-server']
+    expect(servedBy, 'every response names its server').toBeTruthy()
 
     await page.goto('/admin/features')
     await expect(page.locator(selectors.capacity.navLink)).toBeVisible({
@@ -40,6 +36,24 @@ test.describe('@ci Capacity', () => {
     await page.locator(selectors.capacity.navLink).click()
     await expect(page).toHaveURL(/\/admin\/capacity/)
     await expect(page.locator(selectors.pages.capacity)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    // The CI test stack runs no Redis (REDIS_DSN points at the container's
+    // own localhost), so there the honest answer is 503 and the page says so.
+    // A stack with Redis reports itself; both paths are the real product.
+    if (res.status() === 503) {
+      expect(await res.json()).toEqual({ success: false, error: 'capacity_unavailable' })
+      await expect(page.locator(selectors.capacity.unavailable)).toContainText(
+        'the shared cache does not answer',
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      await expect(page.locator(selectors.capacity.retry)).toBeVisible()
+      return
+    }
+
+    expect(res.status(), 'the capacity endpoint answers for an admin').toBe(200)
+    const body = (await res.json()) as { served_by: string; servers: { id: string }[] }
+    expect(body.served_by).toBe(servedBy)
+    expect(body.servers.map((s) => s.id)).toContain(body.served_by)
 
     const card = page.locator(`${selectors.capacity.server}[data-server="${body.served_by}"]`)
     await expect(card).toBeVisible({ timeout: TIMEOUTS.STANDARD })
