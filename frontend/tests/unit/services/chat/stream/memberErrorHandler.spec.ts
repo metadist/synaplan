@@ -114,6 +114,27 @@ describe('member error handler', () => {
     expect(turn.outcome.showError).toHaveBeenCalledWith('chatError.busyWithFiles', 15000)
   })
 
+  it('restores a paste-only send whole instead of dropping it', () => {
+    const prompt = {
+      id: 'user-3',
+      role: 'user',
+      parts: [
+        { type: 'pastedText', content: 'Quarterly report, page one' },
+        { type: 'text', content: 'Summarise this' },
+      ],
+      timestamp: new Date(),
+    } as unknown as Message
+    const turn = fakeMemberTurn()
+    turn.history.messages.unshift(prompt)
+
+    memberErrorHandler({ status: 'error', code: 'server_busy' }, turn)
+
+    expect(turn.outcome.busyRefused).toHaveBeenCalledWith(
+      'Quarterly report, page one\n\nSummarise this'
+    )
+    expect(turn.history.removeMessage).toHaveBeenCalledWith('user-3')
+  })
+
   it('shows one localized sentence per refusal class, never a status code', () => {
     const server = fakeMemberTurn()
     memberErrorHandler({ status: 'error', code: 'server_error' }, server)

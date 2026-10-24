@@ -143,7 +143,16 @@ function endAsBusy(turn: MemberTurn): void {
   if (!prompt || prompt.backendMessageId != null) {
     return endAsFailure({ status: 'error' }, turn.t('chatError.busyAnswer'), turn)
   }
-  const text = prompt.parts.find((part) => part.type === 'text')?.content ?? ''
+  // Typed and pasted parts both carry their content; a paste-only send
+  // must come back whole, not vanish with its bubble.
+  const text = prompt.parts
+    .filter(
+      (part) =>
+        (part.type === 'text' || part.type === 'pastedText') && typeof part.content === 'string'
+    )
+    .map((part) => part.content as string)
+    .join('\n\n')
+    .trim()
   turn.history.removeMessage(turn.messageId)
   // A send with files or a tool cannot be resent as plain text: its row
   // stays visible, with its files, and no one-click resend is offered.
