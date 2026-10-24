@@ -12,7 +12,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
 | 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
 | 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
-| 2026-10-24 | AU3 | in progress | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast |
+| 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | in review | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast |
 
 ## Baselines
 
