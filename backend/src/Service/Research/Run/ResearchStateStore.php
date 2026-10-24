@@ -67,16 +67,16 @@ final readonly class ResearchStateStore
         }
 
         $token = bin2hex(random_bytes(16));
-        if (!$this->keys->setIfAbsent(ResearchKey::claim($runId, $seq), $token, $leaseMs)) {
-            return null;
-        }
-        $this->keys->zAdd(
+        $claimed = $this->keys->claim(
+            ResearchKey::claim($runId, $seq),
+            $token,
+            $leaseMs,
             ResearchKey::CLAIMS,
             $this->clock->nowMs() + $leaseMs,
             ResearchKey::claimMember($runId, $seq, $token),
         );
 
-        return $token;
+        return $claimed ? $token : null;
     }
 
     /**
@@ -241,7 +241,8 @@ final readonly class ResearchStateStore
         $live = [];
         foreach ($this->keys->members($key) as $member) {
             $runId = $userSet ? $this->runIdFromMember($member) : $member;
-            if (1 !== preg_match('/^rr_[0-9a-f]{16}$/', $runId) || null === $this->keys->get(ResearchKey::run($runId))) {
+            $state = 1 === preg_match('/^rr_[0-9a-f]{16}$/', $runId) ? $this->load($runId) : null;
+            if (null === $state || $state->status->isTerminal()) {
                 $this->keys->removeMember($key, $member);
                 if ($userSet && 1 === preg_match('/^rr_[0-9a-f]{16}$/', $runId)) {
                     $this->keys->removeMember(ResearchKey::ACTIVE, $runId);

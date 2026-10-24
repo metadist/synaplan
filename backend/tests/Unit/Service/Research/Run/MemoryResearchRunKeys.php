@@ -50,15 +50,16 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return true;
     }
 
-    public function setIfAbsent(string $key, string $value, int $ttlMillis): bool
+    public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
     {
-        if (null !== $this->get($key)) {
+        if (null !== $this->get($claimKey)) {
             return false;
         }
-        $this->strings[$key] = [
-            'value' => $value,
+        $this->strings[$claimKey] = [
+            'value' => $token,
             'expiresAt' => $this->clock->nowMs() + $ttlMillis,
         ];
+        $this->zAdd($indexKey, $score, $member);
 
         return true;
     }

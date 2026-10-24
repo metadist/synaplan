@@ -33,6 +33,26 @@ end
 return 0
 LUA;
 
+    private const CLAIM = <<<'LUA'
+if redis.call('SET', KEYS[1], ARGV[1], 'PX', tonumber(ARGV[2]), 'NX') then
+  redis.call('ZADD', KEYS[2], tonumber(ARGV[3]), ARGV[4])
+  return 1
+end
+return 0
+LUA;
+
+    private const GET = <<<'LUA'
+local value = redis.call('GET', KEYS[1])
+if value then
+  return {1, value}
+end
+return {0}
+LUA;
+
+    private const MEMBERS = <<<'LUA'
+return redis.call('SMEMBERS', KEYS[1])
+LUA;
+
     private const DELETE_IF_EQUALS = <<<'LUA'
 if redis.call('GET', KEYS[1]) == ARGV[1] then
   return redis.call('DEL', KEYS[1])
@@ -46,7 +66,18 @@ LUA;
 
     public function get(string $key): ?string
     {
-        return $this->redis->get($key);
+        $result = $this->redis->eval(self::GET, [$key], []);
+        if (!is_array($result) || [] === $result) {
+            throw new ResearchStoreUnavailable();
+        }
+        if (1 !== $this->integer($result[0])) {
+            return null;
+        }
+        if (!isset($result[1])) {
+            throw new ResearchStoreUnavailable();
+        }
+
+        return (string) $result[1];
     }
 
     public function set(string $key, string $value, int $ttlSeconds): bool
@@ -58,14 +89,15 @@ LUA;
         return true;
     }
 
-    public function setIfAbsent(string $key, string $value, int $ttlMillis): bool
+    public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
     {
-        $stored = $this->redis->setIfAbsentMillis($key, $value, $ttlMillis);
-        if (null === $stored) {
-            throw new ResearchStoreUnavailable();
-        }
+        $result = $this->redis->eval(
+            self::CLAIM,
+            [$claimKey, $indexKey],
+            [$token, (string) max(1, $ttlMillis), (string) $score, $member],
+        );
 
-        return $stored;
+        return 1 === $this->requiredInteger($result);
     }
 
     public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool
@@ -121,7 +153,12 @@ LUA;
 
     public function members(string $key): array
     {
-        return $this->redis->sMembers($key);
+        $result = $this->redis->eval(self::MEMBERS, [$key], []);
+        if (!is_array($result)) {
+            throw new ResearchStoreUnavailable();
+        }
+
+        return array_values(array_map(static fn (mixed $m): string => (string) $m, $result));
     }
 
     public function zAdd(string $key, int $score, string $member): void

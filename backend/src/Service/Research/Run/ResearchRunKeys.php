@@ -15,9 +15,10 @@ interface ResearchRunKeys
     public function set(string $key, string $value, int $ttlSeconds): bool;
 
     /**
-     * True when this caller stored the value. False when the key is already held.
+     * Take the lease and index it in one write. True when this caller took it.
+     * False when the lease is already held.
      */
-    public function setIfAbsent(string $key, string $value, int $ttlMillis): bool;
+    public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool;
 
     public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool;
 

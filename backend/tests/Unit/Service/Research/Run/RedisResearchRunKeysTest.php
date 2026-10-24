@@ -22,10 +22,28 @@ final class RedisResearchRunKeysTest extends TestCase
     public function testRedisSilenceIsNotAHeldClaim(): void
     {
         $redis = $this->createStub(RedisService::class);
-        $redis->method('setIfAbsentMillis')->willReturn(null);
+        $redis->method('eval')->willReturn(null);
 
         $this->expectException(ResearchStoreUnavailable::class);
         $this->expectExceptionMessage('Start it again in a moment');
-        (new RedisResearchRunKeys($redis))->setIfAbsent('claim', 'token', 1000);
+        (new RedisResearchRunKeys($redis))->claim('claim', 'token', 1000, 'claims', 1000, 'member');
+    }
+
+    public function testRedisSilenceIsNotAMissingRun(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('eval')->willReturn(null);
+
+        $this->expectException(ResearchStoreUnavailable::class);
+        (new RedisResearchRunKeys($redis))->get('research:run:rr_0123456789abcdef');
+    }
+
+    public function testRedisSilenceIsNotAnEmptySet(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('eval')->willReturn(null);
+
+        $this->expectException(ResearchStoreUnavailable::class);
+        (new RedisResearchRunKeys($redis))->members('research:owner:1');
     }
 }
