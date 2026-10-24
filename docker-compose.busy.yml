@@ -17,4 +17,6 @@ services:
       FRANKENPHP_STREAM_WORKER_NUM: "1"
       FRANKENPHP_NUM_THREADS: "4"
       FRANKENPHP_MAX_WAIT_TIME: "1s"
-      SYNAPLAN_TEST_PROVIDER_CHUNK_MS: "400"
+      # One slow stream (~32 s) must outlast a full busy-retry window
+      # (~21 s), or a retry lands in the seam between two held streams.
+      SYNAPLAN_TEST_PROVIDER_CHUNK_MS: "1200"

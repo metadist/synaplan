@@ -494,6 +494,14 @@
     "fileNotSearchable": "Aún no se puede buscar"
   },
   "chatError": {
+    "busyNotSent": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió: está de nuevo en el campo de texto.",
+    "busyKeptDraft": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió. El texto nuevo del campo está intacto.",
+    "busyWithFiles": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió: se queda arriba, con sus archivos. Envíalo de nuevo cuando el servidor esté libre.",
+    "busyAnswer": "Synaplan está ocupado ahora mismo. No se generó una respuesta nueva. Inténtalo de nuevo en un momento.",
+    "busyTryAgain": "Intentar de nuevo",
+    "busyAuth": "Tu sesión ha caducado. Inicia sesión de nuevo y envía tu mensaje.",
+    "busyLimit": "Hay demasiados mensajes ahora mismo. No se envió nada. Espera un momento e inténtalo de nuevo.",
+    "busyServer": "El servidor no pudo aceptar tu mensaje ahora mismo. No se envió nada. Inténtalo de nuevo en un momento.",
     "title": "La respuesta no se completó",
     "retry": "Intentarlo de nuevo con otro modelo",
     "retryWith": "Intentarlo de nuevo con {model}",
@@ -803,6 +811,7 @@
       "intentWebSearch": "Necesita información actual — buscando en la web",
       "intentMultiStep": "Varios pasos — los planifico primero"
     },
+    "busy": "Synaplan está ocupado: tu respuesta empezará en un momento.",
     "started": "Iniciando procesamiento...",
     "startedTitle": "Procesando tu mensaje",
     "startedDesc": "Preparando para analizar tu solicitud",

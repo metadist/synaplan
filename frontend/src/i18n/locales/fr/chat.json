@@ -507,6 +507,14 @@
     "fileNotSearchable": "Pas encore consultable"
   },
   "chatError": {
+    "busyNotSent": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé — il est de retour dans le champ de saisie.",
+    "busyKeptDraft": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé. Le nouveau texte du champ est intact.",
+    "busyWithFiles": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé — il reste ci-dessus, avec ses fichiers. Renvoyez-le quand le serveur sera libre.",
+    "busyAnswer": "Synaplan est occupé pour le moment. Aucune nouvelle réponse n’a été générée. Réessayez dans un instant.",
+    "busyTryAgain": "Réessayer",
+    "busyAuth": "Votre session a expiré. Reconnectez-vous, puis envoyez votre message.",
+    "busyLimit": "Trop de messages pour le moment. Rien n’a été envoyé. Patientez un moment, puis réessayez.",
+    "busyServer": "Le serveur n’a pas pu accepter votre message pour le moment. Rien n’a été envoyé. Réessayez dans un instant.",
     "title": "La réponse n’est pas allée jusqu’au bout",
     "retry": "Réessayer avec un autre modèle",
     "retryWith": "Réessayer avec {model}",
@@ -795,6 +803,7 @@
       "intentWebSearch": "Nécessite des informations actuelles — recherche sur le web",
       "intentMultiStep": "Plusieurs étapes — je les planifie d’abord"
     },
+    "busy": "Synaplan est occupé — votre réponse commence dans un instant.",
     "started": "Démarrage du traitement…",
     "startedTitle": "Traitement de votre message",
     "startedDesc": "Préparation de l’analyse de votre demande",

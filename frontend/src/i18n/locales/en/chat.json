@@ -507,6 +507,14 @@
     "fileNotSearchable": "Not searchable yet"
   },
   "chatError": {
+    "busyNotSent": "Synaplan is busy right now. Your message was not sent — it is back in the input box.",
+    "busyKeptDraft": "Synaplan is busy right now. Your message was not sent. The new text in the input box is untouched.",
+    "busyWithFiles": "Synaplan is busy right now. Your message was not sent — it stays above, with its files. Send it again when the server is free.",
+    "busyAnswer": "Synaplan is busy right now. No new answer was generated. Try again in a moment.",
+    "busyTryAgain": "Try again",
+    "busyAuth": "Your session has expired. Sign in again, then send your message.",
+    "busyLimit": "Too many messages right now. Nothing was sent. Wait a moment, then try again.",
+    "busyServer": "The server could not take your message right now. Nothing was sent. Try again in a moment.",
     "title": "The answer did not finish",
     "retry": "Try again with another model",
     "retryWith": "Try again with {model}",
@@ -795,6 +803,7 @@
       "intentWebSearch": "Needs current information — searching the web",
       "intentMultiStep": "Several steps — planning them first"
     },
+    "busy": "Synaplan is busy — your answer starts in a moment.",
     "started": "Starting processing...",
     "startedTitle": "Processing your message",
     "startedDesc": "Preparing to analyze your request",

@@ -502,6 +502,14 @@
     "fileNotSearchable": "Noch nicht durchsuchbar"
   },
   "chatError": {
+    "busyNotSent": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet — sie steht wieder im Eingabefeld.",
+    "busyKeptDraft": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet. Der neue Text im Eingabefeld ist unverändert.",
+    "busyWithFiles": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet — sie bleibt mit ihren Dateien oben stehen. Sende sie erneut, wenn der Server frei ist.",
+    "busyAnswer": "Synaplan ist gerade ausgelastet. Es wurde keine neue Antwort erstellt. Gleich erneut versuchen.",
+    "busyTryAgain": "Erneut versuchen",
+    "busyAuth": "Die Sitzung ist abgelaufen. Bitte neu anmelden und die Nachricht dann senden.",
+    "busyLimit": "Gerade kommen zu viele Nachrichten an. Es wurde nichts gesendet. Kurz warten und dann erneut versuchen.",
+    "busyServer": "Der Server konnte die Nachricht gerade nicht annehmen. Es wurde nichts gesendet. Gleich erneut versuchen.",
     "title": "Die Antwort ist nicht fertig geworden",
     "retry": "Mit einem anderen Modell erneut versuchen",
     "retryWith": "Mit {model} erneut versuchen",
@@ -793,6 +801,7 @@
       "intentWebSearch": "Braucht aktuelle Informationen — ich suche im Web",
       "intentMultiStep": "Mehrere Schritte — ich plane sie zuerst"
     },
+    "busy": "Synaplan ist ausgelastet — die Antwort beginnt gleich.",
     "started": "Starte Verarbeitung...",
     "startedTitle": "Verarbeite deine Nachricht",
     "startedDesc": "Bereite Analyse deiner Anfrage vor",

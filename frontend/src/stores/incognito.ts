@@ -19,6 +19,8 @@ import { httpClient, getApiBaseUrl } from '@/services/api/httpClient'
  */
 export const useIncognitoStore = defineStore('incognito', () => {
   const active = ref(false)
+  /** Bumped at every startSession, so a stale offer cannot resend into a later session. */
+  const sessionId = ref(0)
   const ephemeralFileIds = ref<number[]>([])
   /** Saved memories and knowledge stay available unless the person turns them off before the first message. */
   const useSavedContext = ref(true)
@@ -43,6 +45,7 @@ export const useIncognitoStore = defineStore('incognito', () => {
   function startSession(): void {
     if (active.value) return
     active.value = true
+    sessionId.value += 1
     useSavedContext.value = true
     ephemeralFileIds.value = []
     window.addEventListener('pagehide', handlePageHide)
@@ -81,6 +84,7 @@ export const useIncognitoStore = defineStore('incognito', () => {
 
   return {
     active,
+    sessionId,
     useSavedContext,
     ephemeralFileIds,
     hasEphemeralFiles,
