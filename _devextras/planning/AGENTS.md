@@ -42,6 +42,26 @@ In practice:
    fixed on the same branch and waited out again.
 6. Only then start the next topic. Do not merge; the owner merges.
 
+## Fast fixes on a gated topic
+
+Once a topic's full local gate is green, a review or CI fix does not start
+over. Be as fast as the proof allows:
+
+1. Reproduce with the smallest failing test, or with the trace timeline
+   (`_devextras/e2e/playwright-trace-timeline.py`). Name the cause before
+   editing; never retry a timing failure blind — make the seam impossible
+   (one hold that outlasts the window), not shorter-lived.
+2. Re-run only what covers the diff: a frontend-only fix gets
+   `make -C frontend lint`, `vue-tsc` and the full Vitest; a backend-only
+   fix gets the backend targets. The affected area's unfiltered suite is
+   the proof; a filtered run is diagnosis only.
+3. Do not rebuild the local test stack or re-run the whole local E2E for a
+   fix a CI job already exercises. Push and let that job run. Re-run
+   locally only when the fix changes what the stack proves (Caddyfile,
+   compose files, a test overlay) — and then only that job's spec.
+4. Poll Copilot and CI in one wait. Reply to a thread as soon as its
+   fixing commit exists, and say which check proved it.
+
 ## Finished plans leave the live directory
 
 When a plan's last step has landed, move its folder into the year archive,
