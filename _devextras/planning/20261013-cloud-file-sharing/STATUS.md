@@ -58,12 +58,12 @@ not a chat message.
 | CF2.11 OpenCloud Apps card | `synaplan` | P2 | planned |  |
 | CF3.1 Copy protocol, ledger, notify key, `identity_revoked` | `synaplan` | P1 | **merged** 2026-10-20 [#2609](https://github.com/metadist/synaplan/pull/2609) | released in 5.5.3; delivery origin narrowed to the registered host or a dev host until CF2.1 |
 | CF3.2 Copy-to-cloud menu, toast, Sent to | `synaplan` | P1 | **merged** 2026-10-20 [#2613](https://github.com/metadist/synaplan/pull/2613) | released in 5.5.3; lists only clouds whose app reports `deliveries` (C21) |
-| CF3.3 Nextcloud inbound, From Synaplan | `synaplan-nextcloud` | P1 | planned |  |
+| CF3.3 Nextcloud inbound, From Synaplan | `synaplan-nextcloud` | P1 | **merged** 2026-10-24 [synaplan-nextcloud#67](https://github.com/metadist/synaplan-nextcloud/pull/67) |  |
 | CF3.4 ownCloud.online inbound, From Synaplan | `synaplan-owncloud-online` | P3 | planned |  |
 | CF3.5 OpenCloud inbound, binary save, From Synaplan | `synaplan-opencloud` | P2 | planned |  |
 | CF3.6 Pickup protocol, `folder_fetch`, read-scope mirror, WebDAV list/get | `synaplan` | P1 | **merged** 2026-10-23 [#2650](https://github.com/metadist/synaplan/pull/2650) | released in 5.5.4; `BREADSCOPE` added here, since CF2.2 has not landed |
 | CF3.7 "Read N files" run card, refusal sentence, read scope on Apps card | `synaplan` | P1 | **in review** · [#2666](https://github.com/metadist/synaplan/pull/2666) · issue [#2662](https://github.com/metadist/synaplan/issues/2662) | the WebDAV path walked with a real planner; the linked-cloud path waits for the reference client (E-9) |
-| CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | P1 | planned | After CF-S5 |
+| CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | P1 | **in review** · [synaplan-nextcloud#75](https://github.com/metadist/synaplan-nextcloud/pull/75) | Walk 2026-10-24 below |
 | CF3.9 ownCloud.online pickup handler, read setting | `synaplan-owncloud-online` | P3 | planned | After CF-S4 |
 | CF3.10 OpenCloud pickup handler, read setting | `synaplan-opencloud` | P2 | planned | After CF-S1, CF-S3 |
 | CF4.1 Status, file detail, source events, re-upload | `synaplan` | P1 | planned | `BKEEPSYNCED`, `reupload` answer |
@@ -658,6 +658,35 @@ Found, not fixed here: in five of nine runs the planner sent a single chat
 step and the chat model claimed to read the folder, twice with an invented
 table "exactly as they appear in the invoice files" —
 [#2667](https://github.com/metadist/synaplan/issues/2667).
+
+**2026-10-24 (CF3.8, Nextcloud pickup handler and read setting).** Built in
+[synaplan-nextcloud#75](https://github.com/metadist/synaplan-nextcloud/pull/75)
+on the merged CF3.6 / CF3.7. Ada (Nextcloud, linked to `demo@synaplan.com`)
+chose *Also folders I allow* in her personal settings and named `Invoices`;
+the setting and Synaplan's copy of it both read
+`{"mode":"allowed","folders":[{"id":"","path":"Invoices"}]}`. An admin save
+announced `["deliveries","pickups","read_scope"]` for the instance. Planner
+and answers Claude Sonnet 5 for the walk (the chat model is back to
+`gpt-oss-120b` after).
+
+- "Please take the invoice files from the linked cloud nextcloud at
+  localhost:8081, folder Invoices, … Do not use a WebDAV folder for this." —
+  the card says "Read 3 files from Nextcloud › Invoices" with **Open in
+  Nextcloud**; Synaplan's pickup 6 is `done`, 3 listed, 3 sent. The follow-up
+  file-work step failed on this machine (`docker_unavailable`, as in the
+  2026-10-23 walk), which is the local Compute sidecar, not the read.
+- Folder HR, same wording: "Synaplan may not read HR in your Nextcloud.
+  Nothing was read." plus "Open the folder in Nextcloud and choose **Let
+  Synaplan read this folder**." No pickup was opened; the refusal used the
+  reported setting.
+- That menu entry exists on folders: choosing it on HR added
+  `{"id":"110","path":"HR"}` on both sides; Ada removed it again in her
+  settings, so her setting ends as `Invoices` only.
+
+Found and fixed in the same PR: the settings folder picker had no Choose
+button and could never finish, and the preferences save read the request
+body only when `copy_folder` was missing — the framework hands that one
+over as a parameter, so the read setting silently never saved.
 
 **2026-10-24 (CF2.1, instance columns, capabilities both ways, delivery
 origin).** In review. `BPLATFORMINSTANCES` gains `BREACHABLE`,
