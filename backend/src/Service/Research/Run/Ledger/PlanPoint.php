@@ -14,15 +14,20 @@ final readonly class PlanPoint
     /** @var list<string> */
     public const STATUSES = [self::OPEN, self::ANSWERED, self::SKIPPED, self::UNCONFIRMED];
 
+    /**
+     * @param list<array{q: string, language: string, scope: string}> $queries
+     */
     public function __construct(
         public string $id,
         public string $title,
         public string $status,
+        public string $why = '',
+        public array $queries = [],
     ) {
     }
 
     /**
-     * @return array{id: string, title: string, status: string}
+     * @return array{id: string, title: string, status: string, why: string, queries: list<array{q: string, language: string, scope: string}>}
      */
     public function toArray(): array
     {
@@ -30,6 +35,8 @@ final readonly class PlanPoint
             'id' => $this->id,
             'title' => $this->title,
             'status' => $this->status,
+            'why' => $this->why,
+            'queries' => $this->queries,
         ];
     }
 }

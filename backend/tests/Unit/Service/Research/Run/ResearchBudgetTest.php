@@ -73,6 +73,7 @@ final class ResearchBudgetTest extends TestCase
         $budget->addCost(0.1);
 
         $restored = ResearchBudget::fromExport(ResearchDepth::Standard, $budget->export());
+        $restored->at($start);
 
         self::assertSame(3, $restored->toArray()['sources_read'][0]);
         self::assertEqualsWithDelta(0.3, $restored->toArray()['cost']['spent'], 0.000001);
