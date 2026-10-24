@@ -508,6 +508,9 @@
   },
   "chatError": {
     "busyNotSent": "Synaplan is busy right now. Your message was not sent — it is back in the input box.",
+    "busyKeptDraft": "Synaplan is busy right now. Your message was not sent. The new text in the input box is untouched.",
+    "busyWithFiles": "Synaplan is busy right now. Your message was not sent — it stays above, with its files. Send it again when the server is free.",
+    "busyAnswer": "Synaplan is busy right now. No new answer was generated. Try again in a moment.",
     "busyTryAgain": "Try again",
     "busyAuth": "Your session has expired. Sign in again, then send your message.",
     "busyLimit": "Too many messages right now. Nothing was sent. Wait a moment, then try again.",

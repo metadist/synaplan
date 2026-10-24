@@ -74,6 +74,46 @@ describe('member error handler', () => {
     expect(turn.history.updateStreamingMessage).not.toHaveBeenCalled()
   })
 
+  it('keeps a stored prompt and offers no resend for it', () => {
+    const prompt = {
+      id: 'user-9',
+      role: 'user',
+      parts: [{ type: 'text', content: 'Answer again' }],
+      backendMessageId: 9,
+      timestamp: new Date(),
+    } as unknown as Message
+    const turn = fakeMemberTurn()
+    turn.history.messages.unshift(prompt)
+
+    memberErrorHandler({ status: 'error', code: 'server_busy' }, turn)
+
+    expect(turn.history.removeMessage).not.toHaveBeenCalledWith('user-9')
+    expect(turn.outcome.busyRefused).not.toHaveBeenCalled()
+    expect(turn.history.updateStreamingMessage).toHaveBeenCalledWith(
+      'assistant-1',
+      'chatError.busyAnswer'
+    )
+  })
+
+  it('keeps a send with files visible and offers no plain-text resend', () => {
+    const prompt = {
+      id: 'user-2',
+      role: 'user',
+      parts: [{ type: 'text', content: 'Summarise the attached report' }],
+      files: [{ fileId: 5 }],
+      timestamp: new Date(),
+    } as unknown as Message
+    const turn = fakeMemberTurn()
+    turn.history.messages.unshift(prompt)
+
+    memberErrorHandler({ status: 'error', code: 'server_busy' }, turn)
+
+    expect(turn.history.removeMessage).toHaveBeenCalledWith('assistant-1')
+    expect(turn.history.removeMessage).not.toHaveBeenCalledWith('user-2')
+    expect(turn.outcome.busyRefused).not.toHaveBeenCalled()
+    expect(turn.outcome.showError).toHaveBeenCalledWith('chatError.busyWithFiles', 15000)
+  })
+
   it('shows one localized sentence per refusal class, never a status code', () => {
     const server = fakeMemberTurn()
     memberErrorHandler({ status: 'error', code: 'server_error' }, server)

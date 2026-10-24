@@ -71,6 +71,18 @@ The widget/memory/task-prompt failures in the first run were a stale
 `dist-widget` bind mount after a failed stack build on this machine; after
 a backend restart all 15 pass.
 
+**Review round 1 (Copilot, 9 findings).** Fixed: the Try again resend is
+bound to its own chat and mode (the toast outlives a chat switch); a newer
+draft typed during the retries is never overwritten (kept-draft sentence);
+a stored prompt (Again) keeps its row and gets no resend; a send with
+files or a tool keeps its row and files and is never resent as plain text;
+widget history recovery re-reads the refreshed transcript and never counts
+the busy sentence as an answer; a widget send with files or a newer draft
+keeps its bubble. Not changed: the widget's Try again is its restored
+composer with the Send button — the widget has no toast system, and
+`ChatWidget.vue` is frozen in the size ratchet; the sentence sits in the
+bubble directly above the composer.
+
 **As delivered, different from the brief.** The guest stream also retries
 and shows the busy line, but a final guest refusal keeps today's ending
 (finish the empty bubble); the composer restore and Try again are the

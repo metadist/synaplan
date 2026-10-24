@@ -503,6 +503,9 @@
   },
   "chatError": {
     "busyNotSent": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet — sie steht wieder im Eingabefeld.",
+    "busyKeptDraft": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet. Der neue Text im Eingabefeld ist unverändert.",
+    "busyWithFiles": "Synaplan ist gerade ausgelastet. Die Nachricht wurde nicht gesendet — sie bleibt mit ihren Dateien oben stehen. Sende sie erneut, wenn der Server frei ist.",
+    "busyAnswer": "Synaplan ist gerade ausgelastet. Es wurde keine neue Antwort erstellt. Gleich erneut versuchen.",
     "busyTryAgain": "Erneut versuchen",
     "busyAuth": "Die Sitzung ist abgelaufen. Bitte neu anmelden und die Nachricht dann senden.",
     "busyLimit": "Gerade kommen zu viele Nachrichten an. Es wurde nichts gesendet. Kurz warten und dann erneut versuchen.",

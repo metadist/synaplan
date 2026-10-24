@@ -1710,8 +1710,9 @@ const sendMessage = async () => {
         messages.value,
         assistantMessageId,
         userMessage,
+        inputMessage.value,
         (text) => (inputMessage.value = text),
-        t('widget.busyNotSent'),
+        { restored: t('widget.busyNotSent'), kept: t('widget.busyKeptDraft') },
         addBotMessage
       )
     } else if (error instanceof WidgetUnavailableError) {
@@ -1723,8 +1724,9 @@ const sendMessage = async () => {
     } else {
       console.error('Failed to send message:', error)
       await recoverWidgetSend(
-        messages.value,
+        () => messages.value,
         assistantMessageId,
+        t('widget.busy'),
         props.isPreview,
         () => loadConversationHistory(true),
         t('widget.sendFailed'),

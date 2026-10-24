@@ -3137,6 +3137,8 @@ function memberTurnFor(
   }
 ): MemberTurn {
   const { chatId, linkVersion } = turn
+  const busyCurrent = () =>
+    chatsStore.activeChatId === chatId && incognitoStore.active === turn.incognito
   return {
     ...streamTurnFor(canvas),
     chatId,
@@ -3162,7 +3164,7 @@ function memberTurnFor(
       restoreUnpersistedEdit: () => {
         if (linkVersion?.kind === 'edit') void reloadEditedTranscript(chatId)
       },
-      busyRefused: (text) => refuseBusyTurn(text, translate, chatInputRef.value),
+      busyRefused: (text) => refuseBusyTurn(text, translate, chatInputRef.value, busyCurrent),
       scheduleMemoryPoll,
       showError: (message, durationMs) => showErrorToast(message, durationMs),
       showLimit: (notice) => showLimitOrPaywall(notice),

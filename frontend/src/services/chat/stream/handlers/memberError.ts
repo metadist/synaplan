@@ -131,18 +131,27 @@ function endAsBudgetExceeded(data: StreamUpdatePayload, turn: MemberTurn): void 
 }
 
 /**
- * The server never took the message (503 + server_busy after the retries):
- * both bubbles go, the text returns to the composer, and Try again sends it
- * once more. Nothing was stored, and the copy says so.
+ * The server never took the message (503 + server_busy after the retries).
+ * A fresh send loses both bubbles and gets its text back, with a Try again.
+ * A stored prompt, or a send with files or a tool, keeps its row instead.
  */
 function endAsBusy(turn: MemberTurn): void {
   const prompts = turn.history.messages.filter((message) => message.role === 'user')
   const prompt = prompts[prompts.length - 1]
-  const text = prompt?.parts.find((part) => part.type === 'text')?.content ?? ''
-  turn.history.removeMessage(turn.messageId)
-  if (prompt) {
-    turn.history.removeMessage(prompt.id)
+  // A stored prompt (Again, a task retry) was already taken once: its row
+  // stays, and resending it is never offered.
+  if (!prompt || prompt.backendMessageId != null) {
+    return endAsFailure({ status: 'error' }, turn.t('chatError.busyAnswer'), turn)
   }
+  const text = prompt.parts.find((part) => part.type === 'text')?.content ?? ''
+  turn.history.removeMessage(turn.messageId)
+  // A send with files or a tool cannot be resent as plain text: its row
+  // stays visible, with its files, and no one-click resend is offered.
+  if ((prompt.files && prompt.files.length > 0) || prompt.tool) {
+    turn.outcome.showError(turn.t('chatError.busyWithFiles'), 15000)
+    return endTurn(turn)
+  }
+  turn.history.removeMessage(prompt.id)
   if (text) {
     turn.outcome.busyRefused(text)
   }

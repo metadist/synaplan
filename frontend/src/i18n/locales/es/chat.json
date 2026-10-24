@@ -495,6 +495,9 @@
   },
   "chatError": {
     "busyNotSent": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió: está de nuevo en el campo de texto.",
+    "busyKeptDraft": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió. El texto nuevo del campo está intacto.",
+    "busyWithFiles": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió: se queda arriba, con sus archivos. Envíalo de nuevo cuando el servidor esté libre.",
+    "busyAnswer": "Synaplan está ocupado ahora mismo. No se generó una respuesta nueva. Inténtalo de nuevo en un momento.",
     "busyTryAgain": "Intentar de nuevo",
     "busyAuth": "Tu sesión ha caducado. Inicia sesión de nuevo y envía tu mensaje.",
     "busyLimit": "Hay demasiados mensajes ahora mismo. No se envió nada. Espera un momento e inténtalo de nuevo.",

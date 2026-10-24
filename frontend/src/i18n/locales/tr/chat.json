@@ -495,6 +495,9 @@
   },
   "chatError": {
     "busyNotSent": "Synaplan şu anda meşgul. Mesajınız gönderilmedi — metin giriş kutusuna geri kondu.",
+    "busyKeptDraft": "Synaplan şu anda meşgul. Mesajınız gönderilmedi. Giriş kutusundaki yeni metin aynen duruyor.",
+    "busyWithFiles": "Synaplan şu anda meşgul. Mesajınız gönderilmedi — dosyalarıyla birlikte yukarıda duruyor. Sunucu boşaldığında tekrar gönderin.",
+    "busyAnswer": "Synaplan şu anda meşgul. Yeni bir yanıt oluşturulmadı. Birazdan tekrar deneyin.",
     "busyTryAgain": "Tekrar dene",
     "busyAuth": "Oturumunuzun süresi doldu. Tekrar giriş yapın ve mesajınızı gönderin.",
     "busyLimit": "Şu anda çok fazla mesaj geliyor. Hiçbir şey gönderilmedi. Bir an bekleyip tekrar deneyin.",

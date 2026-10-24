@@ -508,6 +508,9 @@
   },
   "chatError": {
     "busyNotSent": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé — il est de retour dans le champ de saisie.",
+    "busyKeptDraft": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé. Le nouveau texte du champ est intact.",
+    "busyWithFiles": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé — il reste ci-dessus, avec ses fichiers. Renvoyez-le quand le serveur sera libre.",
+    "busyAnswer": "Synaplan est occupé pour le moment. Aucune nouvelle réponse n’a été générée. Réessayez dans un instant.",
     "busyTryAgain": "Réessayer",
     "busyAuth": "Votre session a expiré. Reconnectez-vous, puis envoyez votre message.",
     "busyLimit": "Trop de messages pour le moment. Rien n’a été envoyé. Patientez un moment, puis réessayez.",

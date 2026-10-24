@@ -18,6 +18,7 @@
     "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
     "busy": "Synaplan está ocupado: tu respuesta empezará en un momento.",
     "busyNotSent": "Synaplan está ocupado ahora mismo. Tu mensaje no se envió: está de nuevo en el campo de texto. Envíalo de nuevo en un momento.",
+    "busyKeptDraft": "Synaplan está ocupado ahora mismo. Ese mensaje no se envió: se queda arriba. Envíalo de nuevo cuando el servidor esté libre.",
     "continueFailed": "No se pudo continuar la respuesta. Por favor intenta de nuevo.",
     "defaultAssistantReply": "¡Gracias por tu mensaje! Te responderé de inmediato.",
     "openChat": "Abrir chat",

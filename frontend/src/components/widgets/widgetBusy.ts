@@ -12,6 +12,8 @@ export interface WidgetBubble {
   id: string
   role: string
   content: string
+  files?: Array<{ id?: number }>
+  fileId?: number
 }
 
 /** Show the busy sentence in the empty answer bubble while the transport retries. */
@@ -48,70 +50,89 @@ export function settleWidgetBubble(
   return true
 }
 
-/** After a failed send, history may still hold the answer; if not, say it failed. */
+/**
+ * After a failed send, history may still hold the answer; if not, say it
+ * failed. `loadHistory` replaces the message list, so the transcript is
+ * re-read through the getter after it. The busy sentence is a status, not
+ * an answer, and never counts as one.
+ */
 export async function recoverWidgetSend(
-  messages: WidgetBubble[],
+  getMessages: () => WidgetBubble[],
   assistantMessageId: string | null,
+  busyText: string,
   isPreview: boolean,
   loadHistory: () => Promise<void>,
   sendFailedText: string,
   addBotMessage: (text: string) => void,
   scrollToBottom: () => Promise<void>
 ): Promise<void> {
-  const lastMessage = messages.find((m) => m.id === assistantMessageId)
-  let recovered = false
-
   if (!isPreview) {
     try {
       await loadHistory()
-      const latestMessage = messages[messages.length - 1]
-      if (
-        latestMessage &&
-        latestMessage.role === 'assistant' &&
-        latestMessage.content.trim().length > 0
-      ) {
-        recovered = true
-      }
     } catch (historyError) {
       if (!(historyError instanceof WidgetUnavailableError)) {
         console.error('Failed to recover conversation history:', historyError)
       }
     }
-  }
-
-  if (!recovered) {
-    if (lastMessage && lastMessage.content.trim().length > 0) {
+    const current = getMessages()
+    const latest = current[current.length - 1]
+    if (
+      latest &&
+      latest.role === 'assistant' &&
+      latest.content.trim().length > 0 &&
+      latest.content !== busyText
+    ) {
+      await scrollToBottom()
       return
     }
-    const idx = messages.findIndex((m) => m.id === assistantMessageId)
-    if (idx !== -1) {
-      messages.splice(idx, 1)
-    }
-    addBotMessage(sendFailedText)
+  }
+
+  const messages = getMessages()
+  const lastMessage = messages.find((m) => m.id === assistantMessageId)
+  if (lastMessage && lastMessage.content.trim().length > 0 && lastMessage.content !== busyText) {
     return
   }
-  await scrollToBottom()
+  const idx = messages.findIndex((m) => m.id === assistantMessageId)
+  if (idx !== -1) {
+    messages.splice(idx, 1)
+  }
+  addBotMessage(sendFailedText)
 }
 
-/** A turn the server never took: drop both bubbles, put the text back in the box. */
+/**
+ * A turn the server never took: the text goes back in the box, unless the
+ * visitor already typed a newer draft or the send carried files — then the
+ * bubble stays visible, with its files, and nothing is resent silently.
+ */
 export function endBusy(
   messages: WidgetBubble[],
   assistantMessageId: string | null,
   userMessage: string,
+  currentInput: string,
   setInput: (text: string) => void,
-  sentence: string,
+  sentences: { restored: string; kept: string },
   addBotMessage: (text: string) => void
 ): void {
   const idx = messages.findIndex((m) => m.id === assistantMessageId)
   if (idx !== -1) {
     messages.splice(idx, 1)
   }
+  let userIndex = -1
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === 'user' && messages[i].content === userMessage) {
-      messages.splice(i, 1)
+      userIndex = i
       break
     }
   }
-  setInput(userMessage)
-  addBotMessage(sentence)
+  const userBubble = userIndex >= 0 ? messages[userIndex] : undefined
+  const hasFiles = !!userBubble && ((userBubble.files?.length ?? 0) > 0 || !!userBubble.fileId)
+  if (currentInput.trim() === '' && !hasFiles) {
+    if (userIndex >= 0) {
+      messages.splice(userIndex, 1)
+    }
+    setInput(userMessage)
+    addBotMessage(sentences.restored)
+    return
+  }
+  addBotMessage(sentences.kept)
 }

@@ -120,6 +120,7 @@
     "chatUnavailable": "Le chat est actuellement indisponible.",
     "busy": "Synaplan est occupé — votre réponse commence dans un instant.",
     "busyNotSent": "Synaplan est occupé pour le moment. Votre message n’a pas été envoyé — il est de retour dans le champ de saisie. Renvoyez-le dans un instant.",
+    "busyKeptDraft": "Synaplan est occupé pour le moment. Ce message n’a pas été envoyé — il reste ci-dessus. Renvoyez-le quand le serveur sera libre.",
     "chatUnavailablePlaceholder": "Chat indisponible",
     "defaultAssistantReply": "Merci pour votre message ! Je vous réponds tout de suite.",
     "openChat": "Ouvrir le chat",
