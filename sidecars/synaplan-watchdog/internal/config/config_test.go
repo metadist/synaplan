@@ -49,6 +49,35 @@ func TestOnlyTheWebRoleServesPHP(t *testing.T) {
 	}
 }
 
+func TestAnExplicitIdOnAHelperRoleCarriesItsRole(t *testing.T) {
+	cases := []struct{ id, role, want string }{
+		{"web1", "web", "web1"},
+		{"web1", "worker", "web1-worker"},
+		{"web1", "scheduler", "web1-scheduler"},
+		{"web1-worker", "worker", "web1-worker"},
+		{"web1-bulk", "worker", "web1-bulk"},
+		{"web1-scheduler", "scheduler", "web1-scheduler"},
+		{"", "worker", "synaplan-backend-1"},
+	}
+	for _, c := range cases {
+		cfg := From(func(key string) string {
+			switch key {
+			case "SYNAPLAN_SERVER_ID":
+				return c.id
+			case "SYNAPLAN_ROLE":
+				return c.role
+			case "HOSTNAME":
+				return "synaplan-backend-1"
+			default:
+				return ""
+			}
+		})
+		if cfg.ServerID != c.want {
+			t.Errorf("id=%q role=%q: got %q, want %q", c.id, c.role, cfg.ServerID, c.want)
+		}
+	}
+}
+
 func TestServerIDDropsUnsafeCharacters(t *testing.T) {
 	cfg := From(func(key string) string {
 		if key == "SYNAPLAN_SERVER_ID" {
