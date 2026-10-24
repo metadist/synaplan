@@ -17,7 +17,7 @@ chat message.
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
-| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walk not run |
+| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
@@ -69,9 +69,46 @@ run, file 54: 23 ms. During thorough run `rr_f0307ef95d034790` (then
 cancelled, `stopped_by_user`), file 56: 69 ms. All three came back
 vectorized.
 
-P-MIN (`09` §4) was not run. `docker-compose.minimal.yml` overrides
-`app_test` on the test stack, not this dev stack, and that stack was not
-started.
+P-MIN (`09` §4) was walked later the same day, see the next entry.
+
+## 2026-10-24 — triage prompt re-smoke and P-MIN walk
+
+Same local stack, flag pin and `CHAT`/`SORT` = 379 as above, all put back
+afterwards (`RESEARCH_ENABLED` removed, `CHAT`/`SORT` = `-1`, backend and
+worker recreated). The corrected `tools:research_triage` prompt was seeded
+with `app:seed`.
+
+Triage with the corrected prompt: a temporary log in gather (removed
+afterwards) showed the sorter reply as `{"results": [...]}`, a list with
+16 rows for 16 hits, so the map fallback was not needed. Standard run
+`rr_f299b0890ee318cb` (chat 391, same Eiffel Tower question) finished
+`complete` in 64 seconds: 8 sources, 19 evidence cards, spent 0.125782 USD.
+
+Quick run `rr_28f8aaeec5ac496b` ("What is the boiling point of water at
+the summit of Mount Everest?") ended `failed_nothing_found` after reading
+two pages. Both pages start with navigation (menus, product lists); the
+reader gets the first 12 000 characters, the answer on the Everest page
+starts after character 8 000, and the reader rightly answered
+`useful: false`. Open finding for the read stage: send the passages that
+match the points, not the first ones.
+
+P-MIN. `docker-compose.minimal.yml` overlays `app_test` on the test stack
+with the `TestProvider` only, so it cannot run a real model. The walk used
+a temporary overlay outside the repository that puts the same blank
+variables on the dev `backend` and `worker`, plus an empty Brave key
+(P-MIN has no web search). The Anthropic key stayed.
+
+| Step | Result |
+| ---- | ------ |
+| Minimal as shipped (`RESEARCH_ENABLED` empty, gate on) | capabilities and start answer 404 `feature_not_configured`; no research surface |
+| Research pinned on, before the fix | capabilities said `web_search_available: true` (`brave` is the default provider name, no key). Run `rr_103b1a0f7d0a482f` paid for brief and plan (0.010098 USD), sent 4 searches to no provider and ended "The sources that were searched held nothing…" — wrong, nothing could be searched |
+| Research pinned on, after the fix | capabilities `web_search_available: false`, `web_search_provider: null`, `knowledge_available: false`. Run `rr_070d4819880ca7c6` ended in 5 seconds with `failed_no_sources`, "There was nothing to research: turn on the web or add files to this project.", 0 USD, posted into chat 396 |
+| Web PDF without Tika | `ResearchSourceReader` on `w3.org/…/dummy.pdf`: blocked, reason `unreadable`. Same URL with Tika on the full stack: read, "Dummy PDF file" |
+| Files-only run with a cloud embedding | Not possible in engine v1: gather skips `files` queries and capabilities reports `knowledge_available: false` by design. Comes with the knowledge source (RS9) |
+
+The fix: `ResearchSearch::available()` answers from the web search
+gateway's health. Capabilities use it, and the pipeline ends a run with
+`failed_no_sources` before the brief when nothing can be searched.
 
 ## 2026-10-23 — run storage and run kernel shared with agent handling (row 25)
 

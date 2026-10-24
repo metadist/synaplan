@@ -9,13 +9,16 @@ use App\Service\Research\Run\Stage\DeliverStage;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
 use App\Service\Research\Run\Stage\ReadStage;
+use App\Service\Research\Run\Stage\ResearchSearch;
 use App\Service\Research\Run\Stage\StageContext;
+use App\Service\Research\Run\Stage\StageEnds;
 use App\Service\Research\Run\Stage\StageResult;
 use App\Service\Research\Run\Stage\WriteStage;
 
 /**
  * Runs one research step. Brief and plan share a step, and so do search and
  * reading, so the queue carries four messages and not one per model call.
+ * A run with nothing it could search ends before the first paid call.
  */
 final readonly class ResearchPipeline implements ResearchUnitRunner
 {
@@ -26,6 +29,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
         private ReadStage $read,
         private WriteStage $write,
         private DeliverStage $deliver,
+        private ResearchSearch $search,
     ) {
     }
 
@@ -43,6 +47,9 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
     private function briefPlan(StageContext $ctx): StageResult
     {
         if (null === $ctx->state->ledger->brief()) {
+            if (!$this->search->available($ctx->state->ref->userId)) {
+                return StageEnds::noSources($ctx);
+            }
             $opened = $this->brief->run($ctx);
             if ('plan' !== $opened->next || $ctx->state->status->isTerminal()) {
                 return $opened;

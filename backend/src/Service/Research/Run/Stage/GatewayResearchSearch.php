@@ -13,6 +13,15 @@ final readonly class GatewayResearchSearch implements ResearchSearch
     {
     }
 
+    public function available(int $userId): bool
+    {
+        try {
+            return $this->gateway->isEnabled($userId);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function search(string $query, string $language, int $limit, int $userId): array
     {
         try {
