@@ -428,6 +428,64 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->assertSame(383, $meteredModelId);
     }
 
+    public function testIncognitoCompletionDoesNotEnqueueSessionSummary(): void
+    {
+        $user = $this->createMockUser();
+        $this->allowChat();
+        $this->messagesGatewayConfig->method('isSessionSummaryEnabled')->willReturn(true);
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $response = $this->controller->chatCompletions($this->completionRequest([
+            'model' => 'echo',
+            'incognito' => true,
+            'messages' => [['role' => 'user', 'content' => 'third party record']],
+        ]), $user);
+
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    public function testCompletionWithoutIncognitoStillEnqueuesSessionSummary(): void
+    {
+        $user = $this->createMockUser();
+        $this->allowChat();
+        $this->messagesGatewayConfig->method('isSessionSummaryEnabled')->willReturn(true);
+        $this->messageBus->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isInstanceOf(\App\Message\SummarizeApiSessionCommand::class));
+
+        $response = $this->controller->chatCompletions($this->completionRequest([
+            'model' => 'echo',
+            'messages' => [['role' => 'user', 'content' => 'remember this session']],
+        ]), $user);
+
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function completionRequest(array $body): Request
+    {
+        $request = Request::create('/v1/chat/completions', 'POST', [], [], [], [], (string) json_encode($body));
+        $request->headers->set('Content-Type', 'application/json');
+
+        return $request;
+    }
+
+    private function allowChat(): void
+    {
+        $model = $this->modelStub(9, 'echo', 'chat', 'Test');
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
+        $this->modelRepository->method('findActiveByTagAndIdentity')->willReturn($model);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'ok',
+            'provider' => 'test',
+            'model' => 'echo',
+            'usage' => [],
+        ]);
+    }
+
     private function modelStub(int $id, string $providerId, string $tag, string $service): Model&MockObject
     {
         $model = $this->createMock(Model::class);

@@ -29,6 +29,7 @@ final readonly class OpenAiChatCompletionRequest
         public ?bool $parallelToolCalls,
         public bool $includeUsage,
         public ?string $reasoningEffort = null,
+        public bool $incognito = false,
     ) {
     }
 
@@ -102,6 +103,7 @@ final readonly class OpenAiChatCompletionRequest
             parallelToolCalls: $parallelToolCalls,
             includeUsage: $includeUsage,
             reasoningEffort: $reasoningEffort,
+            incognito: true === ($body['incognito'] ?? false),
         );
     }
 
