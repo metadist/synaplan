@@ -83,6 +83,10 @@ final class ModuleOwnershipTest extends TestCase
             'GUEST_MAX_SESSIONS_PER_IP',
             'DEFAULT_USER_PLUGINS',
             'MCP_ALLOWED_HOSTS',
+            // Operator inbox and sender for incident mail (SignupAnomalyAlert);
+            // the mail transport itself is infrastructure (MAILER_DSN).
+            'APP_ADMIN_EMAIL',
+            'APP_SENDER_EMAIL',
         ],
         // Product-defining AI providers. Keys are also entered at runtime via
         // ProviderKeyStore; the provider set is the product, not an add-on.
@@ -151,6 +155,15 @@ final class ModuleOwnershipTest extends TestCase
             'RECAPTCHA_ENABLED',
             'RECAPTCHA_SECRET_KEY',
             'RECAPTCHA_MIN_SCORE',
+            // Human check and account-creation limits (2026-10-24 fake-signup
+            // burst). Anti-abuse is core: an install without keys keeps
+            // working, the limits are always on.
+            'TURNSTILE_SITE_KEY',
+            'TURNSTILE_SECRET_KEY',
+            'SIGNUP_IP_LIMIT',
+            'SIGNUP_GLOBAL_LIMIT',
+            'CHECKOUT_IP_LIMIT',
+            'PAID_SIGNUP_ALERT_LIMIT',
         ],
         // Native app shell identity (deep links, Sign in with Apple audience).
         'mobile_shell' => [

@@ -64,9 +64,19 @@ final class RuntimeConfigResponse extends OA\Response
             new OA\Property(
                 property: 'recaptcha',
                 type: 'object',
+                description: 'reCAPTCHA v3 human check. `enabled` is false whenever Turnstile is configured, so at most one provider is active.',
                 properties: [
                     new OA\Property(property: 'enabled', type: 'boolean', example: true),
                     new OA\Property(property: 'siteKey', type: 'string', example: '6LcXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'),
+                ]
+            ),
+            new OA\Property(
+                property: 'turnstile',
+                type: 'object',
+                description: 'Cloudflare Turnstile human check (TURNSTILE_SITE_KEY + TURNSTILE_SECRET_KEY). Takes precedence over reCAPTCHA. The browser obtains a token before sign-up, sign-in and every OAuth start.',
+                properties: [
+                    new OA\Property(property: 'enabled', type: 'boolean', example: false),
+                    new OA\Property(property: 'siteKey', type: 'string', example: '0x4AAAAAAAxxxxxxxxxxxxxxxx'),
                 ]
             ),
             new OA\Property(

@@ -46,6 +46,10 @@ services:
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
       RECAPTCHA_ENABLED: "false"
+      # The E2E suites register many users from one address.
+      SIGNUP_IP_LIMIT: "100000"
+      SIGNUP_GLOBAL_LIMIT: "100000"
+      CHECKOUT_IP_LIMIT: "100000"
       TOKEN_SECRET: "test_token_secret"
       # OIDC defaults match the Keycloak setup script (_docker/keycloak/setup.sh)
       # These work with --profile oidc; without it, Keycloak is not running but the provider shows as enabled (harmless)

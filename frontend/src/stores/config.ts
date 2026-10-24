@@ -110,6 +110,19 @@ const config = {
   },
 
   /**
+   * Cloudflare Turnstile human check. When enabled it replaces reCAPTCHA in
+   * front of sign-up, sign-in and every OAuth start (see useSignupChallenge).
+   */
+  turnstile: {
+    get enabled(): boolean {
+      return getConfigSync().turnstile?.enabled ?? false
+    },
+    get siteKey(): string {
+      return getConfigSync().turnstile?.siteKey ?? ''
+    },
+  },
+
+  /**
    * Feature flags
    * Loaded from backend at runtime
    */

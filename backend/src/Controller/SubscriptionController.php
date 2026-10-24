@@ -7,6 +7,7 @@ use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
+use App\Service\Billing\StripeEntitlement;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Iap\IapPricingService;
 use App\Service\RateLimitService;
@@ -18,6 +19,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -26,8 +28,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Handles subscription plans and Stripe checkout.
  *
  * Security:
- * - Rate limiting on checkout (prevents abuse)
+ * - Rate limiting on checkout: per user and per client IP (`checkout_ip`
+ *   limiter), so a flood of fresh accounts from one address is throttled too
  * - Authentication required for checkout/portal
+ * - A paid tier is granted only for a settled payment ({@see StripeEntitlement})
  */
 #[Route('/api/v1/subscription')]
 #[OA\Tag(name: 'Subscription')]
@@ -99,9 +103,8 @@ class SubscriptionController extends AbstractController
         private LoggerInterface $logger,
         private CacheItemPoolInterface $cache,
         private string $stripeSecretKey,
-        private string $stripePricePro,
-        private string $stripePriceTeam,
-        private string $stripePriceBusiness,
+        private StripeEntitlement $entitlement,
+        private RateLimiterFactoryInterface $checkoutIpLimiter,
         private string $frontendUrl,
         private string $stripePaymentMethods,
         private BillingService $billingService,
@@ -208,11 +211,7 @@ class SubscriptionController extends AbstractController
     )]
     public function getPlans(): JsonResponse
     {
-        $stripePriceIds = [
-            'PRO' => $this->stripePricePro,
-            'TEAM' => $this->stripePriceTeam,
-            'BUSINESS' => $this->stripePriceBusiness,
-        ];
+        $stripePriceIds = $this->entitlement->prices();
 
         $plans = [];
         foreach (self::PLAN_CATALOGUE as $tier => $defaults) {
@@ -300,7 +299,7 @@ class SubscriptionController extends AbstractController
         }
 
         // Rate limiting check
-        if (!$this->checkCheckoutRateLimit($user)) {
+        if (!$this->checkCheckoutRateLimit($user, $request)) {
             $this->logger->warning('Checkout rate limit exceeded', [
                 'user_id' => $user->getId(),
             ]);
@@ -341,12 +340,7 @@ class SubscriptionController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $planId = $data['planId'] ?? null;
 
-        $priceId = match ($planId) {
-            'PRO' => $this->stripePricePro,
-            'TEAM' => $this->stripePriceTeam,
-            'BUSINESS' => $this->stripePriceBusiness,
-            default => null,
-        };
+        $priceId = is_string($planId) ? ($this->entitlement->prices()[$planId] ?? null) : null;
 
         if (!$priceId) {
             return $this->json(['error' => 'Invalid plan'], Response::HTTP_BAD_REQUEST);
@@ -553,7 +547,7 @@ class SubscriptionController extends AbstractController
             return $blocked;
         }
 
-        if (!$this->checkCheckoutRateLimit($user)) {
+        if (!$this->checkCheckoutRateLimit($user, $request)) {
             return $this->json([
                 'error' => 'Too many checkout attempts. Please wait a minute and try again.',
                 'code' => 'RATE_LIMIT_EXCEEDED',
@@ -831,39 +825,31 @@ class SubscriptionController extends AbstractController
                 ]);
             }
 
-            // Find the highest tier subscription
-            $highestLevel = 'NEW';
-            $activeSubscription = null;
-            $levelPriority = ['NEW' => 0, 'PRO' => 1, 'TEAM' => 2, 'BUSINESS' => 3];
+            // Only a settled payment counts. `active` alone is not enough: a
+            // SEPA mandate is active while its first debit is still processing
+            // (and may bounce), and this endpoint is callable by the account
+            // holder — it must not hand out a tier the webhook withheld.
+            $settled = $this->entitlement->highestSettled($subscriptions->data);
+            if (null === $settled) {
+                $pending = $subscriptions->data[0];
+                $this->entitlement->apply($user, $pending, null);
+                $this->em->flush();
 
-            foreach ($subscriptions->data as $sub) {
-                $priceId = $sub->items->data[0]->price->id ?? null;
-                $level = $this->mapPriceIdToLevel($priceId);
-
-                if (($levelPriority[$level] ?? 0) > ($levelPriority[$highestLevel] ?? 0)) {
-                    $highestLevel = $level;
-                    $activeSubscription = $sub;
-                }
+                return $this->json([
+                    'success' => true,
+                    'level' => $user->getUserLevel(),
+                    'status' => 'payment_pending',
+                    'subscriptionId' => $pending->id,
+                    'message' => 'The subscription exists but its payment has not settled yet',
+                ]);
             }
 
-            // Update user with the highest tier
-            $user->setUserLevel($highestLevel);
-
+            [$activeSubscription, $activeInvoice] = $settled;
+            $this->entitlement->apply($user, $activeSubscription, $activeInvoice);
+            $highestLevel = $user->getPaymentDetails()['subscription']['plan'] ?? 'NEW';
             $paymentDetails = $user->getPaymentDetails();
-            $firstItem = $activeSubscription->items->data[0] ?? null;
-            // Stripe SDK v20 dropped the typed `current_period_start/end` properties from
-            // SubscriptionItem; the values still ship in the API response and are reachable
-            // via StripeObject's ArrayAccess, which PHPStan accepts.
-            $paymentDetails['subscription'] = [
-                'source' => BillingService::SOURCE_STRIPE,
-                'stripe_subscription_id' => $activeSubscription->id,
-                'status' => $activeSubscription->status,
-                'subscription_start' => $firstItem['current_period_start'] ?? null,
-                'subscription_end' => $firstItem['current_period_end'] ?? null,
-                'plan' => $highestLevel,
-                'cancel_at_period_end' => $activeSubscription->cancel_at_period_end ?? false,
-            ];
-            if ($activeSubscription->cancel_at) {
+            $paymentDetails['subscription']['cancel_at_period_end'] = $activeSubscription->cancel_at_period_end ?? false;
+            if (null !== ($activeSubscription->cancel_at ?? null)) {
                 $paymentDetails['subscription']['cancel_at'] = $activeSubscription->cancel_at;
             }
             $user->setPaymentDetails($paymentDetails);
@@ -879,7 +865,7 @@ class SubscriptionController extends AbstractController
             return $this->json([
                 'success' => true,
                 'level' => $highestLevel,
-                'status' => $activeSubscription->status,
+                'status' => $activeSubscription->status ?? null,
                 'subscriptionId' => $activeSubscription->id,
                 'message' => 'Subscription synced successfully',
             ]);
@@ -893,23 +879,6 @@ class SubscriptionController extends AbstractController
                 'error' => 'Failed to sync from Stripe: '.$e->getMessage(),
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
-    }
-
-    /**
-     * Map Stripe price ID to user level.
-     */
-    private function mapPriceIdToLevel(?string $priceId): string
-    {
-        if (!$priceId) {
-            return 'NEW';
-        }
-
-        return match ($priceId) {
-            $this->stripePricePro => 'PRO',
-            $this->stripePriceTeam => 'TEAM',
-            $this->stripePriceBusiness => 'BUSINESS',
-            default => 'NEW',
-        };
     }
 
     /**
@@ -1062,10 +1031,19 @@ class SubscriptionController extends AbstractController
     }
 
     /**
-     * Rate limiting for checkout endpoint.
+     * Rate limiting for checkout endpoint: per user (below) and per client IP
+     * (`checkout_ip` limiter), because one address opening checkouts for many
+     * fresh accounts is exactly the 2026-10-24 shape.
      */
-    private function checkCheckoutRateLimit(User $user): bool
+    private function checkCheckoutRateLimit(User $user, Request $request): bool
     {
+        $ip = $request->getClientIp() ?? 'unknown';
+        if (!$this->checkoutIpLimiter->create($ip)->consume()->isAccepted()) {
+            $this->logger->warning('Checkout per-IP limit reached', ['ip' => $ip, 'user_id' => $user->getId()]);
+
+            return false;
+        }
+
         $cacheKey = 'checkout_rate_'.$user->getId();
 
         $item = $this->cache->getItem($cacheKey);

@@ -84,3 +84,35 @@ framework:
             limit: 60
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+        # Account creation (SignupGuard): the email form and every OAuth
+        # callback that would create an account. Keyed per client IP; sized
+        # for a household or small office behind one address (SIGNUP_IP_LIMIT,
+        # default 5 per hour). Counts attempts, so a failing script is slowed too.
+        signup_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:SIGNUP_IP_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        # Installation-wide ceiling on new accounts (SIGNUP_GLOBAL_LIMIT, default
+        # 20 per 10 minutes). Normal days see a handful; the 2026-10-24 burst did
+        # 15–30 per minute. Tripping it also mails the operator.
+        signup_global:
+            policy: 'sliding_window'
+            limit: '%env(int:SIGNUP_GLOBAL_LIMIT)%'
+            interval: '10 minutes'
+            cache_pool: 'cache.rate_limiter'
+        # Stripe checkout sessions per client IP (CHECKOUT_IP_LIMIT, default 10
+        # per hour), on top of the per-user window in SubscriptionController.
+        checkout_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:CHECKOUT_IP_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        # Not a limit on anything a person does: counts paid tiers granted to
+        # accounts younger than a day; when more than PAID_SIGNUP_ALERT_LIMIT
+        # (default 10) land in an hour, SignupAnomalyAlert mails the operator.
+        paid_signup_alert:
+            policy: 'sliding_window'
+            limit: '%env(int:PAID_SIGNUP_ALERT_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'

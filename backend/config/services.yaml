@@ -130,6 +130,16 @@ parameters:
     env(OIDC_BEARER_AUDIENCE): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
+    env(TURNSTILE_SECRET_KEY): ''
+    env(TURNSTILE_SITE_KEY): ''
+    # Account-creation limits (SignupGuard, SubscriptionController, SignupAnomalyAlert).
+    # New accounts per client IP per hour, installation-wide per 10 minutes,
+    # checkouts per client IP per hour, paid grants to fresh accounts per hour
+    # before the operator is alerted.
+    env(SIGNUP_IP_LIMIT): '5'
+    env(SIGNUP_GLOBAL_LIMIT): '20'
+    env(CHECKOUT_IP_LIMIT): '10'
+    env(PAID_SIGNUP_ALERT_LIMIT): '10'
     env(GOOGLE_CLIENT_SECRET): ''
     env(GITHUB_CLIENT_SECRET): ''
     env(OIDC_CLIENT_SECRET): ''
@@ -1081,9 +1091,6 @@ services:
     App\Controller\SubscriptionController:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
-            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
-            $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
-            $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
             $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
             $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
@@ -1093,10 +1100,32 @@ services:
         arguments:
             $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $cache: '@cache.app'
+
+    # Price → tier mapping and the "paid only when settled" rule shared by the
+    # webhook, the sync endpoint and the plan catalogue.
+    App\Service\Billing\StripeEntitlement:
+        arguments:
             $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
             $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
+
+    # Operator alert for unusual account creation (mail once per hour per signal).
+    App\Service\Auth\SignupAnomalyAlert:
+        arguments:
+            $adminEmail: '%env(string:default::APP_ADMIN_EMAIL)%'
+            $senderEmail: '%env(string:default::APP_SENDER_EMAIL)%'
             $cache: '@cache.app'
+
+    # Cloudflare Turnstile — the human check in front of sign-up and sign-in.
+    # Takes precedence over reCAPTCHA v3 when TURNSTILE_SECRET_KEY is set.
+    App\Service\Auth\TurnstileVerifier:
+        arguments:
+            $secretKey: '%env(TURNSTILE_SECRET_KEY)%'
+
+    App\Service\Auth\AuthRuntimeConfig:
+        arguments:
+            $turnstileSiteKey: '%env(TURNSTILE_SITE_KEY)%'
 
     # Shared Chat Page Controller (serves Open Graph meta tags for social media)
     App\Controller\SharedChatPageController:

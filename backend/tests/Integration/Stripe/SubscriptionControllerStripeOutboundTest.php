@@ -357,17 +357,19 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         $proSubId = 'sub_pro_'.bin2hex(random_bytes(4));
         $now = time();
 
-        // Subscription::all returns two active subs (PRO + BUSINESS); the
-        // controller must pick BUSINESS as the highest tier.
+        // Subscription::all returns two active subs (PRO + BUSINESS), both
+        // with a paid first invoice; the controller must pick BUSINESS.
         $this->stripeMock->expect('GET', 'subscriptions', [
             'object' => 'list',
             'has_more' => false,
             'url' => '/v1/subscriptions',
             'data' => [
-                $this->stripeSubscriptionPayload($proSubId, $customerId, self::PRICE_PRO, $now),
-                $this->stripeSubscriptionPayload($businessSubId, $customerId, self::PRICE_BUSINESS, $now),
+                $this->stripeSubscriptionPayload($proSubId, $customerId, self::PRICE_PRO, $now, 'in_pro_1'),
+                $this->stripeSubscriptionPayload($businessSubId, $customerId, self::PRICE_BUSINESS, $now, 'in_biz_1'),
             ],
         ]);
+        $this->stripeMock->expect('GET', 'invoices/in_pro_1', $this->stripeInvoicePayload('in_pro_1', $customerId, $proSubId, 'paid'));
+        $this->stripeMock->expect('GET', 'invoices/in_biz_1', $this->stripeInvoicePayload('in_biz_1', $customerId, $businessSubId, 'paid'));
 
         $this->postJson('/api/v1/subscription/sync');
 
@@ -380,6 +382,42 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         $this->em->refresh($this->user);
         $this->assertSame('BUSINESS', $this->user->getUserLevel());
         $this->assertSame($businessSubId, $this->user->getPaymentDetails()['subscription']['stripe_subscription_id']);
+    }
+
+    /**
+     * The account holder can call /sync at will, so it must apply the same
+     * rule as the webhook: an `active` subscription whose first debit is still
+     * processing (SEPA) stays on the free tier. On 2026-10-24 this endpoint
+     * was the third way to get a Business tier out of a fake mandate.
+     */
+    public function testSyncFromStripeWithholdsTheTierWhilePaymentIsPending(): void
+    {
+        $customerId = 'cus_'.bin2hex(random_bytes(8));
+        $this->seedStripeCustomerId($customerId);
+        $subId = 'sub_sepa_'.bin2hex(random_bytes(4));
+
+        $this->stripeMock->expect('GET', 'subscriptions', [
+            'object' => 'list',
+            'has_more' => false,
+            'url' => '/v1/subscriptions',
+            'data' => [$this->stripeSubscriptionPayload($subId, $customerId, self::PRICE_BUSINESS, time(), 'in_open_1')],
+        ]);
+        $this->stripeMock->expect('GET', 'invoices/in_open_1', $this->stripeInvoicePayload('in_open_1', $customerId, $subId, 'open'));
+
+        $this->postJson('/api/v1/subscription/sync');
+
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertTrue($body['success']);
+        $this->assertSame('NEW', $body['level']);
+        $this->assertSame('payment_pending', $body['status']);
+        $this->assertSame($subId, $body['subscriptionId']);
+
+        $this->em->refresh($this->user);
+        $this->assertSame('NEW', $this->user->getUserLevel());
+        $recorded = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame($subId, $recorded['stripe_subscription_id']);
+        $this->assertFalse($recorded['settled']);
     }
 
     public function testSyncFromStripeDowngradesToNewWhenNoActiveSubscriptions(): void
@@ -446,13 +484,29 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
     /**
      * @return array<string, mixed>
      */
-    private function stripeSubscriptionPayload(string $id, string $customerId, string $priceId, int $now): array
+    /**
+     * @return array<string, mixed>
+     */
+    private function stripeInvoicePayload(string $id, string $customerId, string $subscriptionId, string $status): array
+    {
+        return [
+            'id' => $id,
+            'object' => 'invoice',
+            'customer' => $customerId,
+            'subscription' => $subscriptionId,
+            'status' => $status,
+            'paid' => 'paid' === $status,
+        ];
+    }
+
+    private function stripeSubscriptionPayload(string $id, string $customerId, string $priceId, int $now, ?string $latestInvoice = null): array
     {
         return [
             'id' => $id,
             'object' => 'subscription',
             'customer' => $customerId,
             'status' => 'active',
+            'latest_invoice' => $latestInvoice,
             'cancel_at_period_end' => false,
             'cancel_at' => null,
             'items' => [
