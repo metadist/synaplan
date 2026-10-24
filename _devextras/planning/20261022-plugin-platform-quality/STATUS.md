@@ -10,7 +10,7 @@ and a CI run are entries here, not chat messages.
 | 2026-10-22 | PQ0 | [#2644](https://github.com/metadist/synaplan/pull/2644) | merged | plan |
 | 2026-10-24 | PQ5 | [#2648](https://github.com/metadist/synaplan/pull/2648) | merged | `thinking_seconds` is the server measurement; the length formula is gone |
 | 2026-10-24 | PQ6 | [#2649](https://github.com/metadist/synaplan/pull/2649) | merged | one `FilesTable.vue`, `table-fixed` |
-| 2026-10-24 | PQ1 | [#2719](https://github.com/metadist/synaplan/pull/2719) | in review | static checks; synaform is gitignored and its level-5 noise waits for a split |
+| 2026-10-24 | PQ1 | [#2719](https://github.com/metadist/synaplan/pull/2719) | green, waiting on the owner | All Checks Passed on run [40119393572](https://github.com/metadist/synaplan/actions/runs/40119393572). Copilot round 1: `plugins-format` entrypoints, fixed in the follow-up commit. synaform stays gitignored. |
 | 2026-10-24 | PQ2 | [#2720](https://github.com/metadist/synaplan/pull/2720) | in review | tested tar, native arm64, no short-commit tag |
 | 2026-10-24 | PQ3 | [#2722](https://github.com/metadist/synaplan/pull/2722) | in review | locale files and t(); J-PQ-1 not walked yet |
 
