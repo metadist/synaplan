@@ -54,7 +54,7 @@ assert_not_contains() {
 }
 
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+trap 'if [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ]; then kill "$(cat "$TMP_DIR/runtime/watchdog.supervisor.pid")" 2>/dev/null || true; fi; rm -rf "$TMP_DIR"' EXIT
 mkdir -p "$TMP_DIR/bin" "$TMP_DIR/app/bin" "$TMP_DIR/runtime"
 touch "$TMP_DIR/app/bin/console"
 COMMAND_LOG="$TMP_DIR/commands.log"
@@ -857,6 +857,87 @@ assert_not_contains "chown -R www-data:www-data /var/www/backend/var /var/www/ba
     "the entrypoint no longer chowns the whole var tree on every start"
 assert_not_contains "chmod -R 775 /var/www/backend/var /var/www/backend/public/up" "$ENTRYPOINT" \
     "the entrypoint no longer chmods the whole var tree on every start"
+
+echo "Case 13: the web role restarts the watchdog, and off means no process"
+assert_contains "start_watchdog" "$ENTRYPOINT" "the web role starts the watchdog before FrankenPHP"
+
+WATCHDOG_LOG="$TMP_DIR/watchdog.log"
+cat > "$TMP_DIR/bin/synaplan-watchdog" <<'EOF'
+#!/bin/sh
+printf '%s\n' "started" >> "$WATCHDOG_LOG"
+exit 0
+EOF
+chmod +x "$TMP_DIR/bin/synaplan-watchdog"
+
+(
+    export SYNAPLAN_ROLE=web
+    export SYNAPLAN_WATCHDOG=0
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/synaplan-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    export WATCHDOG_LOG
+    start_watchdog
+)
+assert_eq "" "$( [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ] && echo started || true )" \
+    "SYNAPLAN_WATCHDOG=0 does not start a supervisor"
+
+(
+    export SYNAPLAN_ROLE=worker
+    export SYNAPLAN_WATCHDOG=1
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/synaplan-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    export WATCHDOG_LOG
+    start_watchdog
+)
+if [ -f "$WATCHDOG_LOG" ]; then
+    FAIL=$((FAIL + 1))
+    echo "FAIL: a worker role started the watchdog" >&2
+else
+    PASS=$((PASS + 1))
+    echo "PASS: a worker role does not start the watchdog"
+fi
+
+(
+    export SYNAPLAN_ROLE=web
+    export SYNAPLAN_WATCHDOG=1
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/missing-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    start_watchdog
+)
+status=$?
+assert_eq 0 "$status" "a missing watchdog binary does not fail the web role"
+
+: > "$WATCHDOG_LOG"
+(
+    export SYNAPLAN_ROLE=web
+    export SYNAPLAN_WATCHDOG=1
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/synaplan-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    export WATCHDOG_LOG
+    export WATCHDOG_RESTART_DELAY=0
+    start_watchdog
+)
+started=0
+i=0
+while [ "$i" -lt 50 ]; do
+    if [ -f "$WATCHDOG_LOG" ]; then
+        started="$(wc -l < "$WATCHDOG_LOG" | tr -d ' ')"
+    fi
+    if [ "$started" -ge 2 ]; then
+        break
+    fi
+    i=$((i + 1))
+    sleep 0.1
+done
+if [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ]; then
+    kill "$(cat "$TMP_DIR/runtime/watchdog.supervisor.pid")" 2>/dev/null || true
+fi
+if [ "$started" -ge 2 ]; then
+    PASS=$((PASS + 1))
+    echo "PASS: the watchdog is started again after it exits"
+else
+    FAIL=$((FAIL + 1))
+    echo "FAIL: the watchdog was not restarted (starts=${started})" >&2
+fi
 
 TOTAL=$((PASS + FAIL))
 echo "${PASS}/${TOTAL} assertions passed"

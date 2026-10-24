@@ -1,3 +1,12 @@
+# The capacity watchdog is a static binary. The web role starts it beside
+# FrankenPHP. Dev and prod both inherit this stage.
+FROM golang:1.27-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 AS watchdog
+WORKDIR /src
+COPY sidecars/synaplan-watchdog/go.mod sidecars/synaplan-watchdog/go.sum ./
+RUN go mod download
+COPY sidecars/synaplan-watchdog/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /synaplan-watchdog ./cmd/synaplan-watchdog
+
 # synaplan-base-php 1.2.0 ships fully-tuned PHP ini files under
 # /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
 # 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
@@ -84,6 +93,7 @@ COPY _docker/backend/container-healthcheck.sh /usr/local/bin/container-healthche
 COPY _docker/backend/lib/ /usr/local/bin/lib/
 COPY _docker/backend/synaplan /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/container-healthcheck /usr/local/bin/synaplan
+COPY --from=watchdog /synaplan-watchdog /usr/local/bin/synaplan-watchdog
 
 EXPOSE 80
 

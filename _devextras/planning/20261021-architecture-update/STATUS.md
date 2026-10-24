@@ -13,7 +13,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
 | 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
 | 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
-| 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | in review | the chat and the widget say busy, retry three times, then give the text back with a Try again |
+| 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
+| 2026-10-24 | AU6 | this pull request | in review | watchdog on `:8098`; `capacity:server:{id}` every 5 s. No relay. Not rolled out |
 
 ## Baselines
 
@@ -26,6 +27,45 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-24 — AU6: a watchdog on every server reports its capacity
+
+`sidecars/synaplan-watchdog` is one static binary in the backend image. The
+web role starts it beside FrankenPHP and starts it again when it exits.
+`SYNAPLAN_WATCHDOG=0` does not start it. `:8098` is not published.
+
+Every 5 s it reads `http://127.0.0.1:2019/metrics` and `/frankenphp/threads`,
+the cgroup (`memory.max`, `memory.current`, `cpu.max`, `cpu.stat`) and
+`/proc` when the cgroup has no usage. Thread request paths are counted and
+not stored. It writes `capacity:server:{id}` (TTL 20 s) and
+`capacity:agg:{id}:{minute}` (TTL 24 h). Redis is `REDIS_URL`, or `REDIS_DSN`
+when that is unset.
+
+`GET :8098/live` is 200 while the process runs. `GET :8098/ready` is 200
+when PHP's `/api/health/ready` answered within 2 s in the last 10 s and
+Redis answers. `GET :8098/metrics` passes FrankenPHP's metrics through and
+adds `synaplan_server_info`, `synaplan_stream_slots_total`,
+`synaplan_stream_slots_busy` and `synaplan_stream_slots_busy_ratio`.
+
+There is no relay and no drain endpoint. Kubernetes pod facts are read when
+`KUBERNETES_SERVICE_HOST` is set; they are not acted on until AU8.
+
+**Dev stack, 2026-10-24.** Rebuilt `backend` (classic mode, no worker pools).
+`:8098` is not published. `/live` 200. `/ready` 200 once
+`/api/health/ready` answered. `/metrics` served `synaplan_server_info` with
+`runtime="compose"`. Redis `capacity:server:{hostname}` held the snapshot:
+`admin_ok` true, 20 threads, memory about 491 MB, 10 cores, CPU ratio about
+0.006. Stream and API slot gauges stayed 0 because classic mode does not
+publish `frankenphp_total_workers{worker="streams"|"api"}`; the pool parser
+is covered by the spike fixture. Killing the process brought a new one back
+within 2 s and `/live` stayed 200.
+
+**Gate.** `make -C sidecars/synaplan-watchdog test` (vet, gofmt, 1,138 lines
+against the 2,000-line budget, `go test -race`). The container-runtime bash
+test covers off, a missing binary, and a restart after exit. The scheduler
+assertions that fail in that script on this Mac also fail on `main`.
 
 ---
 

@@ -692,4 +692,5 @@ echo ""
 
 write_boot_status "web-starting" "Starting the web server"
 install_split_worker_pools
+start_watchdog
 exec frankenphp run --config /etc/caddy/Caddyfile

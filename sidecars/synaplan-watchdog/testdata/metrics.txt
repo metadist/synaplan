@@ -1,0 +1,7 @@
+# HELP frankenphp_total_workers Number of PHP workers.
+# TYPE frankenphp_total_workers gauge
+frankenphp_total_workers{worker="m#streams"} 4
+frankenphp_total_workers{worker="m#api"} 4
+frankenphp_busy_workers{worker="m#streams"} 3
+frankenphp_busy_workers{worker="m#api"} 1
+frankenphp_worker_request_count{worker="m#streams"} 10
