@@ -89,8 +89,28 @@ the summit of Mount Everest?") ended `failed_nothing_found` after reading
 two pages. Both pages start with navigation (menus, product lists); the
 reader gets the first 12 000 characters, the answer on the Everest page
 starts after character 8 000, and the reader rightly answered
-`useful: false`. Open finding for the read stage: send the passages that
-match the points, not the first ones.
+`useful: false`. Fixed below.
+
+Read stage fix, same day. A source longer than the passage budget now
+sends the passages that share words with the goal, the points and their
+queries (short menu items need two shared words), each with the passage
+before and after it, in page order; ids stay those of the full text, so
+the passage check is unchanged. Gather also keeps twice as many picks as
+the read budget, because blocked and empty pages do not use it. Before,
+quick run `rr_38b67d48ae217908` ended `failed_nothing_found` with all four
+picks blocked (bot block, 404, no text).
+
+| Run | Depth | Outcome | Cards | Sources read / blocked | Spent USD |
+| --- | ----- | ------- | ----- | ---------------------- | --------- |
+| `rr_a972d5bf40b3f852` | quick | `complete` | 10 | 2 / 2 | 0.066772 |
+| `rr_fbea2902da45484d` | quick | `complete_partial` (1 of 4 points) | 5 | 2 / 1 | 0.046024 |
+| `rr_6e814c0797a336e9` | quick | `complete_partial` (1 of 4 points) | 7 | 2 / 2 | 0.050036 |
+| `rr_b3b2767cd2dfa527` | standard, Eiffel Tower | `complete` | 39 | 6 / 4 | 0.170230 |
+
+The Everest page (766 passages) now sends 38 passages and gives 3–7
+cards per run, quoting "at the top of Everest the boiling temperature of
+the water is 70°C" from §736. Before the fix the quick question failed in
+three of four runs; after it, none of three failed.
 
 P-MIN. `docker-compose.minimal.yml` overlays `app_test` on the test stack
 with the `TestProvider` only, so it cannot run a real model. The walk used

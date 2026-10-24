@@ -244,6 +244,61 @@ final class ResearchStagesTest extends TestCase
         self::assertStringContainsString('{results: [{id:', $prompt);
     }
 
+    public function testASpareIsReadWhenTheBestPicksAreBlocked(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'Needed.', [['q' => 'unit price', 'language' => 'en', 'scope' => 'web']]);
+        $search = new ReplaySearch();
+        $verdicts = [];
+        for ($i = 1; $i <= 6; ++$i) {
+            $search->hits['unit price'][] = ResearchHit::from('https://shop'.$i.'.example/price', 'Price list '.$i, '12.40 EUR', null);
+            $verdicts[] = ['id' => 'r'.$i, 'point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'Price list'];
+        }
+        $caller->script[] = $this->json(['results' => $verdicts]);
+        $caller->script[] = $this->json([
+            'source_id' => 's5',
+            'useful' => false,
+            'published' => null,
+            'kind' => 'vendor',
+            'findings' => [],
+            'leads' => [],
+            'flags' => [],
+        ]);
+        $pages = new ReplayPages();
+        $pages->pages['https://shop5.example/price'] = new ResearchPage(false, 'The unit price at shop five is 12.40 EUR.', '', []);
+
+        (new GatherStage(new StageCall($caller), $search, new GatherChoice()))->run($ctx);
+        (new ReadStage(new StageCall($caller), $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx);
+
+        self::assertCount(6, $ctx->state->ledger->sources());
+        self::assertCount(2, $caller->seen);
+        self::assertStringContainsString('shop five', $caller->seen[1]['system']);
+    }
+
+    public function testTheReaderSeesTheAnswerBehindALongMenu(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $this->readyToRead($ctx);
+        $menu = str_repeat("Products\n\nApplications\n\nLogin\n\nContact us\n\n", 400);
+        $pages = new ReplayPages();
+        $pages->pages['https://maker.example/price'] = new ResearchPage(false, $menu."The unit price is 12.40 EUR.\n\nFooter", '', []);
+        $caller->script[] = $this->json([
+            'source_id' => 's1',
+            'useful' => true,
+            'published' => null,
+            'kind' => 'vendor',
+            'findings' => [],
+            'leads' => [],
+            'flags' => [],
+        ]);
+
+        (new ReadStage(new StageCall($caller), $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx);
+
+        self::assertStringContainsString('The unit price is 12.40 EUR.', $caller->seen[0]['system']);
+        self::assertStringContainsString('Only the passages closest to the points were sent', $caller->seen[0]['system']);
+    }
+
     public function testAnInventedPassageAndAForeignLeadNeverEnterTheReport(): void
     {
         [$ctx, $caller] = $this->open();

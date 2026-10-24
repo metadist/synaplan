@@ -12,6 +12,12 @@ use App\Service\Research\Run\ResearchStatus;
 /** Searches the planned queries, then keeps the hits the sorter marked to read. */
 final readonly class GatherStage implements ResearchStage
 {
+    /**
+     * Pages that turn out blocked or empty do not use the read budget, so
+     * spares behind the best picks keep a run from ending with nothing read.
+     */
+    private const SPARE_FACTOR = 2;
+
     public function __construct(
         private StageCall $calls,
         private ResearchSearch $search,
@@ -113,7 +119,7 @@ final readonly class GatherStage implements ResearchStage
             GatherChoice::verdicts(is_array($called->reply->data) ? $called->reply->data : []),
             null !== $brief ? $brief->mustUse : [],
             null !== $brief ? $brief->mustAvoid : [],
-            $ctx->state->budget->sourcesLeft(),
+            $ctx->state->budget->sourcesLeft() * self::SPARE_FACTOR,
         );
     }
 
