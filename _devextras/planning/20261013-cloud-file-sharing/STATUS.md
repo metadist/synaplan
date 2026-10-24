@@ -45,8 +45,8 @@ not a chat message.
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF1.4-oco Five locales, core words — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.5 OpenCloud chat, media, binary save | `synaplan-opencloud` | P2 | planned | needs CF2.2 (D18); may run during P1 (row 34) |
-| CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | **in review** | Walk 2026-10-24 below |
-| CF2.2 Canonical identity rows, SSO bind, attribution, bearer on chat | `synaplan` | P1 | planned | D8, D15, D18; adoption of provisioned rows (row 39) |
+| CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | **merged** 2026-10-24 [#2694](https://github.com/metadist/synaplan/pull/2694) | Walk 2026-10-24 below |
+| CF2.2 Canonical identity rows, SSO bind, attribution, bearer on chat | `synaplan` | P1 | **in review** | D8, D15, D18; adoption of provisioned rows (row 39). Controller tests cover bind, adoption and bearer-on-chat; the Keycloak block of `cf2-identity.sh` waits on the live exchange |
 | CF2.3 Background key, `cloud:watch`, scope map | `synaplan` | P1 | planned |  |
 | CF2.4 Lifecycle endpoint | `synaplan` | P1 | planned | D16; never deletes an account still in use (row 38, C18) |
 | CF2.5 Apps cards: status, turn off, disconnect that keeps the row | `synaplan` | P1 | planned | D9, D19; no OpenCloud card (CF2.11) |

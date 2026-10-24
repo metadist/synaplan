@@ -52,9 +52,12 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             return true;
         }
 
-        // Accept any Bearer on /v1/ routes (OpenAI-compatible format)
+        // Accept any Bearer on /v1/ routes (OpenAI-compatible format).
+        // A JWT is not an API key. Claiming it lets a successful organisation
+        // login fall through to this check, which then answers 401.
         if (str_starts_with($request->getPathInfo(), '/v1/')
-            && str_starts_with($authHeader, 'Bearer ')) {
+            && str_starts_with($authHeader, 'Bearer ')
+            && 3 !== count(explode('.', substr($authHeader, 7)))) {
             return true;
         }
 

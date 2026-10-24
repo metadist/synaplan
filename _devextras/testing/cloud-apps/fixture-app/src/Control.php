@@ -33,6 +33,9 @@ final class Control
             'POST' === $method && 'register' === $route => $this->register($body),
             'POST' === $method && 'credential' === $route => $this->credential($body),
             'POST' === $method && 'scope' === $route => $this->scope($body),
+            'POST' === $method && 'sso-status' === $route => $this->ssoStatus($body),
+            'POST' === $method && 'bind' === $route => $this->bind($body),
+            'POST' === $method && 'adopt' === $route => $this->adopt($body),
             'GET' === $method && 'written' === $route => Response::json(200, ['written' => $this->store->written()]),
             'GET' === $method && 'log' === $route => Response::json(200, ['log' => $this->store->logEntries()]),
             'files' === $segments[0] && count($segments) >= 2 => $this->files($method, $segments[1], implode('/', array_slice($segments, 2)), $raw),
@@ -225,6 +228,62 @@ final class Control
         ]);
 
         return Response::json(200, ['scope' => $state['scopes'][$person], 'reported' => 200 === $reported['status'] ? true : $reported]);
+    }
+
+    /**
+     * Organisation login: is this platform user bound? The bearer is the
+     * exchanged token; the instance credential is the one this fixture holds.
+     *
+     * @param array<mixed> $body
+     */
+    private function ssoStatus(array $body): Response
+    {
+        $externalId = $body['external_id'] ?? null;
+        $bearer = $body['bearer'] ?? null;
+        if (!is_string($externalId) || '' === $externalId || !is_string($bearer) || '' === $bearer) {
+            throw new FixtureException(422, 'bad_bind', 'external_id and bearer are required.');
+        }
+
+        return $this->forward('GET', '/api/v1/platform-links/sso/status?external_id='.rawurlencode($externalId), null, $bearer, false);
+    }
+
+    /**
+     * @param array<mixed> $body
+     */
+    private function bind(array $body): Response
+    {
+        $externalId = $body['external_id'] ?? null;
+        $bearer = $body['bearer'] ?? null;
+        if (!is_string($externalId) || '' === $externalId || !is_string($bearer) || '' === $bearer) {
+            throw new FixtureException(422, 'bad_bind', 'external_id and bearer are required.');
+        }
+
+        return $this->forward('POST', '/api/v1/platform-links/sso/bind', ['external_id' => $externalId], $bearer, false);
+    }
+
+    /**
+     * @param array<mixed> $body
+     */
+    private function adopt(array $body): Response
+    {
+        $externalId = $body['external_id'] ?? null;
+        $apiKey = $body['api_key'] ?? null;
+        if (!is_string($externalId) || '' === $externalId || !is_string($apiKey) || '' === $apiKey) {
+            throw new FixtureException(422, 'bad_adopt', 'external_id and api_key are required.');
+        }
+
+        return $this->forward('POST', '/api/v1/platform-links/identities/adopt', ['external_id' => $externalId], $apiKey, true);
+    }
+
+    /**
+     * @param array<string, mixed>|null $payload
+     */
+    private function forward(string $method, string $path, ?array $payload, string $credential, bool $asKey): Response
+    {
+        $header = $asKey ? ['X-API-Key' => $credential] : ['Authorization' => 'Bearer '.$credential];
+        $answer = Synaplan::from($this->store->state())->json($method, $path, $payload, $header);
+
+        return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
     }
 
     private function files(string $method, string $person, string $path, string $raw): Response
