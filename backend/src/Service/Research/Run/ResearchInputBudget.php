@@ -11,7 +11,7 @@ namespace App\Service\Research\Run;
  * A model with no window keeps the role cap. A window that cannot hold the
  * output cap leaves no input.
  */
-final class ResearchInputBudget
+final readonly class ResearchInputBudget
 {
     /** @var array<string, int> */
     private const INPUT_CAP = [

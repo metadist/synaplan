@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
-use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
@@ -17,16 +16,21 @@ use App\Service\ModelConfigService;
  * Slot bindings from BCONFIG, with the group allow-list and a provider that
  * can actually be called. An unbound READ or VERIFY slot stays empty so the
  * resolver can walk the fallback chain. ModelConfigService is left unchanged.
+ *
+ * Every research role is a chat call, so a row with any other tag is never
+ * offered — a Desktop hint naming a speech or embedding model resolves to
+ * nothing instead of routing a chat request at it.
  */
 final readonly class ConfigResearchModelLookup implements ResearchModelLookup
 {
+    private const CHAT_TAG = 'chat';
+
     public function __construct(
         private ModelConfigService $models,
         private ModelRepository $repository,
         private ModelHealthRepository $health,
         private ConfigRepository $config,
         private GroupPolicyService $groups,
-        private ProviderRegistry $providers,
     ) {
     }
 
@@ -37,7 +41,10 @@ final readonly class ConfigResearchModelLookup implements ResearchModelLookup
             return null;
         }
 
-        return $this->choice($userId, $id);
+        // getDefaultModel() already applied the allow-list, and a locked
+        // instance default is the one model the member may use even when the
+        // allow-list does not name it (#2103). Checking again would drop it.
+        return $this->choice($userId, $id, allowListChecked: true);
     }
 
     public function byKey(int $userId, string $catalogKey): ?ResearchModelChoice
@@ -56,7 +63,7 @@ final readonly class ConfigResearchModelLookup implements ResearchModelLookup
             return null;
         }
 
-        return $this->choice($userId, $id);
+        return $this->choice($userId, $id, allowListChecked: false);
     }
 
     public function verifyCandidates(int $userId): array
@@ -84,10 +91,10 @@ final readonly class ConfigResearchModelLookup implements ResearchModelLookup
         return $choices;
     }
 
-    private function choice(int $userId, int $id): ?ResearchModelChoice
+    private function choice(int $userId, int $id, bool $allowListChecked): ?ResearchModelChoice
     {
         $model = $this->repository->find($id);
-        if (!$model instanceof Model) {
+        if (!$model instanceof Model || self::CHAT_TAG !== strtolower($model->getTag())) {
             return null;
         }
 
@@ -98,32 +105,30 @@ final readonly class ConfigResearchModelLookup implements ResearchModelLookup
             id: $id,
             provider: strtolower($model->getService()),
             family: $family,
-            allowed: $this->groups->isModelAllowed($userId, $id),
-            healthy: $this->healthy($model),
+            allowed: $allowListChecked || $this->groups->isModelAllowed($userId, $id),
+            healthy: $this->healthy($model, $id),
             retired: $model->isRetired(),
             successorId: $model->getSuccessorId(),
             contextWindow: $model->getContextWindowTokens(),
         );
     }
 
-    private function healthy(Model $model): bool
+    /**
+     * Same answer generation uses: active row, a provider with credentials and,
+     * for Ollama, a model that is actually pulled. A model the health monitor
+     * reports permanently offline is skipped on top.
+     */
+    private function healthy(Model $model, int $id): bool
     {
-        if (1 !== $model->getActive() || $model->isRetired()) {
+        if ($model->isRetired() || !$this->models->isConfiguredModelUsable($id)) {
             return false;
         }
+
         try {
-            if (in_array((int) $model->getId(), $this->health->findOfflineModelIds(), true)) {
-                return false;
-            }
+            return !in_array($id, $this->health->findOfflineModelIds(), true);
         } catch (\Throwable) {
             // A missing health table means nothing is known to be offline.
-        }
-
-        $available = array_map(strtolower(...), $this->providers->getAvailableProviders('chat'));
-        if ([] === $available) {
             return true;
         }
-
-        return in_array(strtolower($model->getService()), $available, true);
     }
 }

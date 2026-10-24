@@ -11,19 +11,35 @@ namespace App\Plug\WebSearch;
  */
 final class WebSearchHosting
 {
-    /** @var array<string, bool> provider name => self-hosted */
+    /**
+     * Provider name => hosting country (ISO 3166-1 alpha-2), or null when the
+     * provider runs on the operator's own server.
+     *
+     * @var array<string, string|null>
+     */
     public const PROVIDERS = [
-        'searxng' => true,
-        'brave' => false,
-        'tavily' => false,
-        'exa' => false,
-        'firecrawl' => false,
-        'perplexity' => false,
+        'searxng' => null,
+        'brave' => 'US',
+        'tavily' => 'US',
+        'exa' => 'US',
+        'firecrawl' => 'US',
+        'perplexity' => 'US',
     ];
 
     public static function selfHosted(string $provider): bool
     {
-        return self::PROVIDERS[strtolower($provider)] ?? false;
+        $key = strtolower($provider);
+
+        return array_key_exists($key, self::PROVIDERS) && null === self::PROVIDERS[$key];
+    }
+
+    /**
+     * Hosting country of a third-party provider. Null for a self-hosted or an
+     * unknown provider; an unknown one is never treated as self-hosted.
+     */
+    public static function country(string $provider): ?string
+    {
+        return self::PROVIDERS[strtolower($provider)] ?? null;
     }
 
     private function __construct()
