@@ -1,0 +1,10 @@
+{
+  "title": "Hallo-Welt-Plugin!",
+  "body": "Dieses Plugin läuft direkt in der Synaplan-Oberfläche, ohne iframe.",
+  "context": "Kontextdaten",
+  "userId": "Benutzer-ID",
+  "apiBase": "API-Basis",
+  "pluginBase": "Plugin-Basis",
+  "button": "Klick mich",
+  "clicked": "Die Schaltfläche wurde geklickt. Sonst ist nichts passiert."
+}

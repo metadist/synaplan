@@ -1,0 +1,10 @@
+{
+  "title": "Hello World Plugin!",
+  "body": "This plugin is running natively in the Synaplan UI without an iframe.",
+  "context": "Context data",
+  "userId": "User ID",
+  "apiBase": "API base",
+  "pluginBase": "Plugin base",
+  "button": "Click me",
+  "clicked": "The button was clicked. Nothing else happened."
+}

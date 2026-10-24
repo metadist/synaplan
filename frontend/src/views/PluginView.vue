@@ -41,9 +41,10 @@ import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { pluginTranslator, readPluginLocale } from '@/services/pluginLocale'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const pluginContainer = ref<HTMLElement | null>(null)
@@ -93,13 +94,21 @@ async function loadPlugin() {
     const module = await import(/* @vite-ignore */ entryUrl)
 
     if (module.default && typeof module.default.mount === 'function') {
-      // 3. Mount the plugin
+      const active = String(locale.value).slice(0, 2)
+      const english = await readPluginLocale(pluginBaseUrl, 'en')
+      const local = active === 'en' ? english : await readPluginLocale(pluginBaseUrl, active)
+      if (!english && !local) {
+        console.warn(
+          `Plugin ${pluginName.value} has no locale file; labels stay as the plugin wrote them.`
+        )
+      }
       module.default.mount(pluginContainer.value, {
         userId: authStore.user.id,
         apiBaseUrl: configStore.apiBaseUrl,
         pluginBaseUrl: pluginBaseUrl,
         config: activePlugin,
-        // Pass shared services if needed
+        locale: active,
+        t: pluginTranslator(local, english),
       })
     } else {
       throw new Error('Plugin does not export a default object with a mount() function')
@@ -141,6 +150,11 @@ onUnmounted(() => {
 
 // Watch for plugin name changes to switch plugins
 watch(pluginName, () => {
+  loadPlugin()
+})
+
+watch(locale, () => {
+  unloadPlugin()
   loadPlugin()
 })
 </script>

@@ -76,8 +76,11 @@ Steps:
 6. **Ship a contract test** under `backend/tests/Plugin/<PluginId>/`.
    `plugins/<id>/backend/tests/` keeps fixtures only — PHPUnit, PHPStan and
    php-cs-fixer already reach the test tree next to the app.
-7. **Locales:** descriptor labels are plain strings; plugins have no i18n hook
-   in v1 (documented limitation).
+7. **Locales:** a plugin page ships `frontend/locales/{de,en,es,fr,tr}.json`.
+   Synaplan loads the active locale (English as fallback) and passes `t(key)`
+   and `locale` into `mount`. Keys are the plugin's own. A script outside the
+   app, such as the Jitsi loader, fetches
+   `/api/v1/plugins/<id>/assets/locales/<lang>.json`.
 8. **Checks.** Plugin PHP is in `make -C backend lint` and `make -C backend phpstan`
    (level 5, findings fixed in the plugin). Plugin JavaScript is in
    `make -C frontend lint` (ESLint + Prettier). `make plugins-format` writes
