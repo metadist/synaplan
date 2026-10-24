@@ -263,6 +263,26 @@ final class PickupServiceTest extends TestCase
         self::assertStringContainsString('Nothing was read.', $result['sentence']);
     }
 
+    public function testTheFilesAPickupProducedCarryTheirIdsForLaterSteps(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->rememberFile(42);
+        $file = (new File())->setFilePath('07/inv-0101.pdf');
+        $file->setFileName('inv-0101.pdf');
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('find')->willReturn($file);
+
+        $files = $this->service(em: $em)->producedFiles($pickup);
+
+        self::assertSame([[
+            'path' => '/api/v1/files/uploads/07/inv-0101.pdf',
+            'type' => 'document',
+            'local_path' => '07/inv-0101.pdf',
+            'name' => 'inv-0101.pdf',
+            'file_id' => 42,
+        ]], $files);
+    }
+
     public function testARunThatStopsWaitingFailsThePickupAndDropsItsTicket(): void
     {
         $pickup = $this->pickup(9);

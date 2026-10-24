@@ -66,7 +66,7 @@ final readonly class FolderFetchRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::FolderFetch,
-                'Read files from one of the user\'s connected folders (Nextcloud, ownCloud.online, OpenCloud, or a WebDAV folder) and attach them to this run. params.channel is a folder name from the list below, params.folder is a folder inside it, params.pattern limits names (for example *.pdf), params.mode is list (names only) or fetch (the files). Read only. Never a path on this computer.',
+                'Read files from one of the user\'s connected folders (Nextcloud, ownCloud.online, OpenCloud, or a WebDAV folder) and attach them to this run. params.channel is a folder name from the list below, params.folder is a folder inside it, params.pattern limits names (for example *.pdf), params.mode is list (names only) or fetch (the files). The steps after it receive every file read here ($nX.files). Read only. Never a path on this computer.',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->renderAvailabilityNote($userId),
                 requiresDynamicNote: true,
             ),
@@ -342,6 +342,7 @@ final readonly class FolderFetchRunner implements TaskRunner
             'type' => 'document',
             'local_path' => $stored['path'],
             'name' => $name,
+            'file_id' => (int) $file->getId(),
         ];
     }
 

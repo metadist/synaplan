@@ -10,8 +10,10 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\UnreadSourceGuard;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Multitask\Execution\InputFileText;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepFiles;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -42,6 +44,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         private ChatHandler $handler,
         private LoggerInterface $logger,
         private UnreadSourceGuard $unreadSourceGuard,
+        private ?InputFileText $fileText = null,
     ) {
     }
 
@@ -97,6 +100,10 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         $synthetic = $this->syntheticMessage($context, $prompt, $language);
+        $unread = $this->attachStepFiles($synthetic, $node, $context, $inputs);
+        if ([] !== $unread && '' === trim($synthetic->getAllFilesText())) {
+            return NodeResult::failed('Synaplan found no text in '.InputFileText::listNames($unread).'. No document was made.');
+        }
 
         // Force the officemaker topic so ChatHandler loads the file-generation
         // prompt (the one that emits {"BFILEPATH":...,"BFILETEXT":...}) and the
@@ -152,7 +159,31 @@ final readonly class DocumentGenerationRunner implements TaskRunner
 
         $filename = is_string($metadata['generated_file']['filename'] ?? null) ? $metadata['generated_file']['filename'] : 'document';
 
-        return NodeResult::ok('Document created: '.$filename, [$descriptor], $metadata);
+        return NodeResult::ok($this->createdText($filename, $unread), [$descriptor], $metadata);
+    }
+
+    /**
+     * Files an earlier step read from a folder reach the document like
+     * uploads: attached, with their text. Returns the ones whose text could
+     * not be read.
+     *
+     * @param array<string, mixed> $inputs already-resolved node inputs
+     *
+     * @return list<string>
+     */
+    private function attachStepFiles(Message $message, TaskNode $node, NodeContext $context, array $inputs): array
+    {
+        return $this->fileText?->attachTo($message, StepFiles::of($node, $context, $inputs), imagesAsText: true) ?? [];
+    }
+
+    /**
+     * @param list<string> $unread files left out because no text was found
+     */
+    private function createdText(string $filename, array $unread): string
+    {
+        $text = 'Document created: '.$filename;
+
+        return [] === $unread ? $text : $text.'. No text was found in '.InputFileText::listNames($unread).', so it is not in the document.';
     }
 
     /**

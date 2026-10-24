@@ -45,6 +45,25 @@ final class ResultAssembler
     ];
 
     /**
+     * Appended by {@see bestEffort()} when the only text left is material a
+     * later step was to work with (a folder read, extracted text): the answer
+     * itself was not made, and the reply must say so.
+     */
+    private const NOT_FINISHED_TEXT = [
+        'en' => 'I could not finish the answer.',
+        'de' => 'Ich konnte die Antwort nicht fertigstellen.',
+        'es' => 'No pude terminar la respuesta.',
+        'fr' => 'Je n’ai pas pu terminer la réponse.',
+        'tr' => 'Yanıtı tamamlayamadım.',
+    ];
+
+    /** Steps whose text is input for a later step, never an answer on its own. */
+    private const INPUT_CAPABILITIES = [
+        Capability::FolderFetch,
+        Capability::ExtractText,
+    ];
+
+    /**
      * Appended by {@see bestEffort()} for each failed visible step when the
      * reply node produced nothing. `{label}` and `{error}` stay in this order
      * in every language so the sentence does not depend on grammar around them.
@@ -352,6 +371,7 @@ final class ResultAssembler
     private function bestEffort(TaskPlan $plan, NodeContext $context): array
     {
         $text = '';
+        $textFrom = null;
         $files = [];
         $metadata = [];
 
@@ -362,6 +382,7 @@ final class ResultAssembler
             }
             if (null !== $result->text && '' !== $result->text) {
                 $text = $result->text;
+                $textFrom = $node->capability;
             }
             foreach ($result->files as $file) {
                 $files[] = $file;
@@ -386,9 +407,42 @@ final class ResultAssembler
             if ([] !== $notes) {
                 $text = rtrim($text)."\n".implode("\n", $notes);
             }
+        } elseif (in_array($textFrom, self::INPUT_CAPABILITIES, true)) {
+            $note = $this->notFinished($plan, $context, $language);
+            $text = null !== $note ? rtrim($text)."\n\n".$note : $text;
         }
 
         return [$text, $files, $metadata];
+    }
+
+    /**
+     * "I could not finish the answer." with the first failed step's own
+     * sentence, so the reply says what did not happen and why. Only for a run
+     * that ended with a failure: a step still running or waiting for approval,
+     * or a condition that stopped the run on purpose, leaves the text as it is.
+     */
+    private function notFinished(TaskPlan $plan, NodeContext $context, string $language): ?string
+    {
+        $failure = null;
+        foreach ($plan->topologicalOrder() as $node) {
+            $result = $context->getResult($node->id);
+            if (null === $result || $result->isRunning() || $result->isWaitingApproval() || NodeStatus::Pending === $result->status) {
+                return null;
+            }
+            if (NodeStatus::Failed !== $result->status) {
+                continue;
+            }
+            $error = 'hidden' !== $node->capability->uiKind() ? trim((string) $result->error) : '';
+            if (null === $failure || ('' === $failure && '' !== $error)) {
+                $failure = $error;
+            }
+        }
+        if (null === $failure) {
+            return null;
+        }
+        $sentence = self::NOT_FINISHED_TEXT[$language] ?? self::NOT_FINISHED_TEXT['en'];
+
+        return '' !== $failure ? $sentence.' '.$failure : $sentence;
     }
 
     /**

@@ -124,7 +124,7 @@ final readonly class DagExecutor
 
             $failedDep = $this->failedDependency($context, $node);
             if (null !== $failedDep) {
-                $result = NodeResult::skipped("dependency '{$failedDep}' did not complete");
+                $result = NodeResult::afterDependency($context->getResult($failedDep), $context->classification['language'] ?? null);
                 $context->setResult($node->id, $result);
                 $this->emitState($progressCallback, $node, 'skipped', $this->failureMetadata($node, $result, $context));
                 continue;
@@ -169,7 +169,7 @@ final readonly class DagExecutor
                     }
                     $blocked = $this->settledFailedDependency($context, $node);
                     if (null !== $blocked) {
-                        $result = NodeResult::skipped("dependency '{$blocked}' did not complete");
+                        $result = NodeResult::afterDependency($context->getResult($blocked), $context->classification['language'] ?? null);
                         $context->setResult($node->id, $result);
                         $this->emitState($progressCallback, $node, 'skipped', $this->failureMetadata($node, $result, $context));
                         $progressed = true;

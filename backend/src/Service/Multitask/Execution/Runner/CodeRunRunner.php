@@ -99,7 +99,7 @@ final readonly class CodeRunRunner implements TaskRunner
             return null;
         }
         $lines = [
-            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". This turn\'s attached files are mounted automatically. To use a file this chat already saved, set params.inputFileNames to its display name from "Files available in this conversation". Never invent a numeric id. Do not set useWorkspace only because this chat already saved a file — that folder is shared across chats.',
+            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". This turn\'s attached files, and the files an earlier step read from a folder, are mounted automatically. To use a file this chat already saved, set params.inputFileNames to its display name from "Files available in this conversation". Never invent a numeric id. Do not set useWorkspace only because this chat already saved a file — that folder is shared across chats.',
             '  Use this step when the user wants to modify, edit, or replace text in an attached file, including a PDF. The sandbox can read a PDF. It cannot change text inside a PDF in place. If the script cannot, it must print "cannot change text inside a PDF in place". Do not answer that the tools in this chat cannot edit files.',
             '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write any result files to /out/ (e.g. open("/out/result.csv","w")) — only files under /out are saved and offered for download; the working directory is discarded.',
         ];
@@ -124,7 +124,8 @@ final readonly class CodeRunRunner implements TaskRunner
             return NodeResult::failed('File work is not available on this installation.');
         }
 
-        $script = $this->script($node, $context->resolveInputs($node));
+        $inputs = $context->resolveInputs($node);
+        $script = $this->script($node, $inputs);
         if (null === $script) {
             return NodeResult::failed('The file-work step had no script to run. Nothing new was saved.');
         }
@@ -138,38 +139,7 @@ final readonly class CodeRunRunner implements TaskRunner
         $timeout = is_array($node->params['limits'] ?? null)
             ? (int) ($node->params['limits']['timeoutSec'] ?? 0)
             : 0;
-        $inputIds = [];
-        foreach ($node->params['inputFileIds'] ?? [] as $id) {
-            if (is_numeric($id)) {
-                $inputIds[] = (int) $id;
-            }
-        }
-
-        // The planner references attachments as `$message.files` and cannot know
-        // their numeric ids, so an interactive "run code on the attached file"
-        // turn arrives with no inputFileIds — the script then can't find the
-        // file (FileNotFoundError). Fall back to the message's own attachments
-        // so the user-selected files are mounted into the sandbox by name. Uses
-        // findFilesByMessageIds so BOTH the ManyToMany attachments (web chat)
-        // and the legacy single-file column (channel messages, File.messageId)
-        // are covered.
-        if ([] === $inputIds) {
-            foreach ($context->message->getFiles() as $file) {
-                $fileId = $file->getId();
-                if (null !== $fileId) {
-                    $inputIds[] = (int) $fileId;
-                }
-            }
-            $messageId = $context->message->getId();
-            if ([] === $inputIds && $context->message->getFile() > 0 && null !== $messageId) {
-                foreach ($this->files->findFilesByMessageIds($userId, [$messageId], 20) as $file) {
-                    $fileId = $file->getId();
-                    if (null !== $fileId) {
-                        $inputIds[] = (int) $fileId;
-                    }
-                }
-            }
-        }
+        $inputIds = (new CodeRunInputFiles($this->files))->ids($node, $context, $inputs, $userId);
 
         $requestedNames = [];
         foreach ($node->params['inputFileNames'] ?? [] as $name) {

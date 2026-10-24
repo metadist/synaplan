@@ -15,6 +15,22 @@ namespace App\Service\Multitask\Execution;
  */
 final readonly class NodeResult
 {
+    private const SKIPPED_AFTER_FAILURE = [
+        'en' => 'Skipped because an earlier step did not finish.',
+        'de' => 'Übersprungen, weil ein vorheriger Schritt nicht fertig wurde.',
+        'es' => 'Se omitió porque un paso anterior no terminó.',
+        'fr' => 'Ignorée, car une étape précédente ne s’est pas terminée.',
+        'tr' => 'Önceki bir adım tamamlanmadığı için atlandı.',
+    ];
+
+    private const SKIPPED_BY_CONDITION = [
+        'en' => 'Skipped because the condition was not met.',
+        'de' => 'Übersprungen, weil die Bedingung nicht erfüllt war.',
+        'es' => 'Se omitió porque no se cumplió la condición.',
+        'fr' => 'Ignorée, car la condition n’était pas remplie.',
+        'tr' => 'Koşul sağlanmadığı için atlandı.',
+    ];
+
     /** In-memory flag: answer steps may still run and explain this failure. */
     public const META_REPORTABLE = 'reportable_failure';
 
@@ -65,6 +81,24 @@ final readonly class NodeResult
     public static function skipped(string $reason): self
     {
         return new self(NodeStatus::Skipped, error: $reason);
+    }
+
+    /**
+     * A step that did not run because a step it needs did not finish, or was
+     * stopped by a condition. That step's card says what happened; this one
+     * says why it did not run, in the run's language. A step skipped in turn
+     * keeps the first reason.
+     */
+    public static function afterDependency(?self $dependency, mixed $language): self
+    {
+        if (null !== $dependency && NodeStatus::Skipped === $dependency->status && null !== $dependency->error) {
+            return self::skipped($dependency->error);
+        }
+        $texts = null !== $dependency && NodeStatus::Stopped === $dependency->status
+            ? self::SKIPPED_BY_CONDITION
+            : self::SKIPPED_AFTER_FAILURE;
+
+        return self::skipped($texts[is_string($language) ? $language : 'en'] ?? $texts['en']);
     }
 
     /**
