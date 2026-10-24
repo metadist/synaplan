@@ -62,9 +62,16 @@ identity rule shared with PHP, the Downward API variables for the chart,
 and the "You are connected to" header for AU7 are written in `03` §6.1 and
 `04` §4.1, §5.2, §6. On the dev stack the snapshot read
 `"hostname":"<container id>","role":"web","place":{},"logs":{"collector":"docker","event_ring_host":"<container id>"}`.
-The platform cluster still needs `SYNAPLAN_SERVER_ID` and
-`SYNAPLAN_HOST_NAME` in its compose file (private repo, after this release);
-without them its three cards are container ids.
+**Every role (same day).** The worker and scheduler roles start the same
+watchdog. Without FrankenPHP it skips the admin API and the PHP probe: its
+report is place, memory and processor, `/ready` is Redis alone, `/metrics`
+answers 200 with `synaplan_server_info{role="worker"}` and no slot gauges.
+On compose, roles on one machine need distinct ids; the platform compose
+derives `web1-worker`, `web1-bulk` and `web1-scheduler` from the exported
+`SYNAPLAN_SERVER_ID`, and `updatewebN.sh` exports it with
+`SYNAPLAN_HOST_NAME` next to `SYNDBHOST` (`synaplan-platform`, pull request
+recorded below). Kubernetes pod names are distinct on their own. The
+Downward API variables are AU8's, in `synaplan-charts`.
 
 **Dev stack, 2026-10-24.** Rebuilt `backend` (classic mode, no worker pools).
 `:8098` is not published. `/live` 200. `/ready` 200 once

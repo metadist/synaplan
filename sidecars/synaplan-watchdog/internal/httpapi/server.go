@@ -87,12 +87,12 @@ func (s *Server) readyNow(ctx context.Context, now time.Time) (int, string) {
 	return http.StatusOK, "ok\n"
 }
 
-// metrics answers 503 until a sample exists and while the last FrankenPHP
-// scrape failed, so a collector records the scrape as down instead of
-// taking zeroed pools for a measurement.
+// metrics answers 503 until a sample exists and, on the web role, while the
+// last FrankenPHP scrape failed, so a collector records the scrape as down
+// instead of taking zeroed pools for a measurement.
 func (s *Server) metrics(w http.ResponseWriter, _ *http.Request) {
 	view := s.agent.Current()
-	if !view.HasSample || !view.Snapshot.AdminOK {
+	if !view.HasSample || (s.agent.ServesPHP() && !view.Snapshot.AdminOK) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte("no sample from FrankenPHP\n"))
 		return

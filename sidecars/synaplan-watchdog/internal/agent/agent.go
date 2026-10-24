@@ -149,10 +149,19 @@ func phpFresh(readyAt time.Time, latency time.Duration, at time.Time) bool {
 }
 
 // PHPFresh reports whether the last good probe still counts at the given time.
+// A role without a probe has no PHP to wait for and is always fresh.
 func (a *Agent) PHPFresh(at time.Time) bool {
+	if a.Probe == nil {
+		return true
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return phpFresh(a.phpReady, a.phpLate, at)
+}
+
+// ServesPHP is true when this agent watches a FrankenPHP process.
+func (a *Agent) ServesPHP() bool {
+	return a.Admin != nil
 }
 
 func (a *Agent) cpuRatio(now time.Time, facts host.Facts) *float64 {

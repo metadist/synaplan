@@ -31,14 +31,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("watchdog: redis: %v", err)
 	}
-	client := &http.Client{Timeout: 2 * time.Second}
 	ag := &agent.Agent{
 		ID:      cfg.ServerID,
 		Version: cfg.Version,
-		Admin:   scrape.Admin{BaseURL: cfg.AdminURL, Client: client},
-		Probe:   scrape.PHP{URL: cfg.PHPReadyURL, Client: client},
 		Read:    func() host.Facts { return host.Read(cfg.HostRoot, os.Getenv) },
 		Store:   st,
+	}
+	// A worker or the scheduler has no FrankenPHP to ask. Its report is its
+	// place, memory and processor, and its readiness is Redis alone.
+	if cfg.ServesPHP() {
+		client := &http.Client{Timeout: 2 * time.Second}
+		ag.Admin = scrape.Admin{BaseURL: cfg.AdminURL, Client: client}
+		ag.Probe = scrape.PHP{URL: cfg.PHPReadyURL, Client: client}
 	}
 	srv := httpapi.New(addr, ag, st)
 

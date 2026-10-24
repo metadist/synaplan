@@ -348,9 +348,11 @@ require_valid_bootstrap_admin_config
 # database initialization before starting their long-running process.
 case "$SYNAPLAN_ROLE" in
     worker)
+        start_watchdog
         run_worker_role
         ;;
     scheduler)
+        start_watchdog
         run_scheduler_role
         exit $?
         ;;

@@ -621,7 +621,7 @@ log line and a response header all point at one thing:
 | ----- | ---- | ------------- |
 | `server_id` | `SYNAPLAN_SERVER_ID`, else the hostname. On Kubernetes the hostname is the pod name, so nothing has to be set. On compose the hostname is a container id (`79e4f90bc8c6`) unless the compose file sets `SYNAPLAN_SERVER_ID`; the platform cluster sets `web1` … `web3` from `updatewebN.sh`, a single-server install leaves it unset and sees its hostname | watchdog (snapshot); PHP (`X-Synaplan-Server` response header and the capacity API's `served_by`, AU7) |
 | `hostname` | the container hostname, unchanged | watchdog (snapshot); PHP's event ring (`host`) already writes this |
-| `role` | `SYNAPLAN_ROLE`, else `web` | watchdog. Workers and the scheduler do not run a watchdog in S0; their heartbeats already carry the hostname (`ScheduledJobStatusStore`) and join the page in AU33 |
+| `role` | `SYNAPLAN_ROLE`, else `web` | watchdog. Every role runs it: the web role reports its pools and PHP readiness; a worker or the scheduler reports its place, memory and processor, is ready when Redis answers, and publishes no slot gauges. On compose, several roles on one machine need distinct ids (`web1`, `web1-worker`, `web1-bulk`, `web1-scheduler`), which the platform compose derives from one exported `SYNAPLAN_SERVER_ID`; on Kubernetes every pod name is distinct by itself |
 
 The snapshot `capacity:server:{id}` (AU6) carries, next to the pools and the
 limits:

@@ -21,6 +21,22 @@ func TestFromEnvFallsBackToRedisDSN(t *testing.T) {
 	}
 }
 
+func TestOnlyTheWebRoleServesPHP(t *testing.T) {
+	web := From(func(string) string { return "" })
+	if web.Role != "web" || !web.ServesPHP() {
+		t.Fatalf("default role = %q serves=%v", web.Role, web.ServesPHP())
+	}
+	worker := From(func(key string) string {
+		if key == "SYNAPLAN_ROLE" {
+			return "worker"
+		}
+		return ""
+	})
+	if worker.Role != "worker" || worker.ServesPHP() {
+		t.Fatalf("worker role = %q serves=%v", worker.Role, worker.ServesPHP())
+	}
+}
+
 func TestServerIDDropsUnsafeCharacters(t *testing.T) {
 	cfg := From(func(key string) string {
 		if key == "SYNAPLAN_SERVER_ID" {

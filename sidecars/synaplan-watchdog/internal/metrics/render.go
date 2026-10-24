@@ -18,6 +18,10 @@ func Render(frankenPHP string, snap capacity.Snapshot) string {
 	}
 	fmt.Fprintf(&b, "synaplan_server_info{server=%q,role=%q,runtime=%q,version=%q} 1\n",
 		snap.ServerID, snap.Role, snap.Runtime, snap.Version)
+	if snap.Role != "web" {
+		// A worker or the scheduler holds no stream slots.
+		return b.String()
+	}
 	writePool(&b, "streams", snap.Streams)
 	writePool(&b, "api", snap.API)
 	ratio := 0.0

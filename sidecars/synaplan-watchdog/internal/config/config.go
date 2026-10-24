@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Listen      string
 	ServerID    string
+	Role        string
 	Version     string
 	RedisURL    string
 	AdminURL    string
@@ -29,6 +30,7 @@ func From(env func(string) string) Config {
 	cfg := Config{
 		Listen:      ":8098",
 		ServerID:    serverID(env),
+		Role:        first(env("SYNAPLAN_ROLE"), "web"),
 		Version:     first(env("APP_VERSION"), "dev"),
 		RedisURL:    first(env("REDIS_URL"), env("REDIS_DSN")),
 		AdminURL:    first(env("WATCHDOG_ADMIN_URL"), "http://127.0.0.1:2019"),
@@ -42,6 +44,12 @@ func From(env func(string) string) Config {
 		}
 	}
 	return cfg
+}
+
+// ServesPHP is true for the role that runs FrankenPHP. The other roles have
+// no admin API and no readiness URL to probe.
+func (c Config) ServesPHP() bool {
+	return c.Role == "web"
 }
 
 func serverID(env func(string) string) string {
