@@ -57,8 +57,7 @@ final readonly class DeliveryOriginPolicy
         if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
             return self::ipIsLoopbackOrLinkLocal($host);
         }
-        $ips = gethostbynamel($host);
-        foreach (is_array($ips) ? $ips : [] as $ip) {
+        foreach ($this->ssrfGuard->resolvedIps($host) as $ip) {
             if (self::ipIsLoopbackOrLinkLocal($ip)) {
                 return true;
             }
@@ -67,7 +66,7 @@ final readonly class DeliveryOriginPolicy
         return false;
     }
 
-    private static function ipIsLoopbackOrLinkLocal(string $ip): bool
+    public static function ipIsLoopbackOrLinkLocal(string $ip): bool
     {
         if (false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
             $long = ip2long($ip);
@@ -81,6 +80,13 @@ final readonly class DeliveryOriginPolicy
         $packed = inet_pton($ip);
         if (false === $packed) {
             return true;
+        }
+        // An IPv4-mapped IPv6 address (::ffff:a.b.c.d) is its embedded IPv4
+        // address for this check.
+        if (str_repeat("\0", 10) === substr($packed, 0, 10) && "\xFF\xFF" === substr($packed, 10, 2)) {
+            $bytes = unpack('C4', substr($packed, 12));
+
+            return false === $bytes || self::ipIsLoopbackOrLinkLocal(implode('.', $bytes));
         }
         if ($packed === inet_pton('::1')) {
             return true;

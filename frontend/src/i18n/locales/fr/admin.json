@@ -1049,6 +1049,7 @@
       "actions": "Actions",
       "approve": "Approuver",
       "approveHost": "Approuver l’hôte",
+      "hostPlaceholder": "Nom d’hôte de livraison, par ex. files.example.lan",
       "approveHostSentence": "{host} se trouve sur un réseau privé ({address}). Synaplan appellera cette adresse pour livrer des copies et des demandes. N’approuvez que des clouds que vous gérez.",
       "approveHostTitle": "Approuver cette adresse ?",
       "canReach": "Synaplan peut atteindre ce cloud.",

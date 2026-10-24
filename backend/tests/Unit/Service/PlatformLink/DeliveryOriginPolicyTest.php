@@ -45,12 +45,23 @@ final class DeliveryOriginPolicyTest extends TestCase
     {
         $policy = new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard());
         $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
-        $instance->setApprovedHosts(['localhost', '127.0.0.1', '169.254.169.254', '[::1]']);
+        $instance->setApprovedHosts(['localhost', '127.0.0.1', '169.254.169.254', '::1']);
 
         self::assertFalse($policy->accepts($instance, 'http://localhost:8081/inbound'));
         self::assertFalse($policy->accepts($instance, 'http://127.0.0.1/inbound'));
         self::assertFalse($policy->accepts($instance, 'http://169.254.169.254/latest/meta-data'));
         self::assertFalse($policy->accepts($instance, 'http://[::1]/inbound'));
+    }
+
+    public function testMappedIpv6LoopbackIsRefusedForAnApprovedHostname(): void
+    {
+        $policy = new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard());
+        $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
+        $instance->setApprovedHosts(['::ffff:127.0.0.1', '::ffff:169.254.169.254', 'files.example.lan']);
+
+        self::assertFalse($policy->accepts($instance, 'http://[::ffff:127.0.0.1]/inbound'));
+        self::assertFalse($policy->accepts($instance, 'http://[::ffff:169.254.169.254]/latest/meta-data'));
+        self::assertTrue($policy->accepts($instance, 'http://files.example.lan/inbound'));
     }
 
     public function testTheDevListCountsOnlyWhileDeveloping(): void

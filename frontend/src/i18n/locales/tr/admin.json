@@ -1045,6 +1045,7 @@
       "actions": "İşlemler",
       "approve": "Onayla",
       "approveHost": "Ana bilgisayarı onayla",
+      "hostPlaceholder": "Teslim ana bilgisayar adı, örn. files.example.lan",
       "approveHostSentence": "{host} özel bir ağda ({address}). Synaplan kopyaları ve istekleri iletmek için bu adresi çağıracak. Yalnızca kendi işlettiğiniz bulutları onaylayın.",
       "approveHostTitle": "Bu adres onaylansın mı?",
       "canReach": "Synaplan bu buluta ulaşabilir.",

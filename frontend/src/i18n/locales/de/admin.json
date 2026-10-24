@@ -1049,6 +1049,7 @@
       "actions": "Aktionen",
       "approve": "Freigeben",
       "approveHost": "Host freigeben",
+      "hostPlaceholder": "Zustell-Hostname, z. B. files.example.lan",
       "approveHostSentence": "{host} liegt in einem privaten Netz ({address}). Synaplan ruft diese Adresse auf, um Kopien und Anfragen zuzustellen. Gib nur Clouds frei, die du selbst betreibst.",
       "approveHostTitle": "Diese Adresse freigeben?",
       "canReach": "Synaplan kann diese Cloud erreichen.",

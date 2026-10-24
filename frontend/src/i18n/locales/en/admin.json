@@ -1049,6 +1049,7 @@
       "actions": "Actions",
       "approve": "Approve",
       "approveHost": "Approve host",
+      "hostPlaceholder": "Delivery hostname, e.g. files.example.lan",
       "approveHostSentence": "{host} is on a private network ({address}). Synaplan will call it to deliver copies and requests. Approve only clouds you run.",
       "approveHostTitle": "Approve this address?",
       "canReach": "Synaplan can reach this cloud.",

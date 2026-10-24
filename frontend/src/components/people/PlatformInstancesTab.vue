@@ -90,6 +90,24 @@
                     <XMarkIcon class="w-3.5 h-3.5" />
                   </button>
                 </span>
+                <span v-if="instance.status !== 'revoked'" class="mt-2 flex items-center gap-2">
+                  <input
+                    v-model="hostInputs[instance.id]"
+                    type="text"
+                    class="w-44 px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('people.linkedPlatforms.hostPlaceholder')"
+                    data-testid="input-approve-host"
+                    @keydown.enter="approveHost(instance)"
+                  />
+                  <button
+                    type="button"
+                    class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium"
+                    data-testid="btn-approve-host"
+                    @click="approveHost(instance)"
+                  >
+                    {{ $t('people.linkedPlatforms.approveHost') }}
+                  </button>
+                </span>
               </td>
               <td class="px-6 py-4 text-sm txt-secondary">
                 {{ statusLabel(instance.status) }}
@@ -104,15 +122,6 @@
                     @click="approve(instance.id)"
                   >
                     {{ $t('people.linkedPlatforms.approve') }}
-                  </button>
-                  <button
-                    v-if="canApproveHost(instance)"
-                    type="button"
-                    class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-                    data-testid="btn-approve-host"
-                    @click="approveHost(instance)"
-                  >
-                    {{ $t('people.linkedPlatforms.approveHost') }}
                   </button>
                   <button
                     v-if="instance.id !== 'outlook-builtin' && instance.status !== 'revoked'"
@@ -196,28 +205,27 @@ function reachClass(instance: AdminPlatformInstance): string {
   return 'txt-secondary'
 }
 
-function canApproveHost(instance: AdminPlatformInstance): boolean {
-  return (
-    instance.status !== 'revoked' &&
-    !!instance.deliveryHost &&
-    !(instance.approvedHosts ?? []).includes(instance.deliveryHost)
-  )
-}
+const hostInputs = ref<Record<string, string>>({})
 
 async function approveHost(instance: AdminPlatformInstance): Promise<void> {
-  const hostName = instance.deliveryHost
+  // A hostname can be approved before any address on it was saved: saving
+  // an unapproved private address is refused, so typing the name here is
+  // the first step, not a shortcut around it. Without a typed name the
+  // button approves the hostname of the saved delivery address.
+  const hostName = hostInputs.value[instance.id]?.trim() || instance.deliveryHost || ''
   if (!hostName) return
   const confirmed = await dialog.confirm({
     title: t('people.linkedPlatforms.approveHostTitle'),
     message: t('people.linkedPlatforms.approveHostSentence', {
       host: hostName,
-      address: instance.deliveryIp ?? hostName,
+      address: hostName === instance.deliveryHost ? (instance.deliveryIp ?? hostName) : hostName,
     }),
   })
   if (!confirmed) return
   try {
     await platformLinksApi.approveHost(instance.id, hostName)
     success(t('people.linkedPlatforms.hostApproved', { host: hostName }))
+    hostInputs.value[instance.id] = ''
     await load()
   } catch {
     showError(t('people.linkedPlatforms.hostError'))

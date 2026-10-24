@@ -1045,6 +1045,7 @@
       "actions": "Acciones",
       "approve": "Aprobar",
       "approveHost": "Aprobar host",
+      "hostPlaceholder": "Nombre de host de entrega, p. ej. files.example.lan",
       "approveHostSentence": "{host} está en una red privada ({address}). Synaplan llamará a esta dirección para entregar copias y solicitudes. Aprueba solo las nubes que gestionas tú.",
       "approveHostTitle": "¿Aprobar esta dirección?",
       "canReach": "Synaplan puede alcanzar esta nube.",
