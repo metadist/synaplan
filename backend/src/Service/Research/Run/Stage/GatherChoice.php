@@ -23,10 +23,11 @@ final class GatherChoice
     public static function verdicts(array $data): array
     {
         $rows = [];
-        if (is_array($data['results'] ?? null) && array_is_list($data['results'])) {
-            $rows = $data['results'];
+        $source = is_array($data['results'] ?? null) ? $data['results'] : $data;
+        if (array_is_list($source)) {
+            $rows = $source;
         } else {
-            foreach ($data as $id => $row) {
+            foreach ($source as $id => $row) {
                 if (!is_string($id) || !is_array($row) || !array_key_exists('read', $row)) {
                     continue;
                 }
