@@ -16,8 +16,8 @@ func Render(frankenPHP string, snap capacity.Snapshot) string {
 		b.WriteString(pass)
 		b.WriteByte('\n')
 	}
-	fmt.Fprintf(&b, "synaplan_server_info{server=%q,runtime=%q,version=%q} 1\n",
-		snap.ServerID, snap.Runtime, snap.Version)
+	fmt.Fprintf(&b, "synaplan_server_info{server=%q,role=%q,runtime=%q,version=%q} 1\n",
+		snap.ServerID, snap.Role, snap.Runtime, snap.Version)
 	writePool(&b, "streams", snap.Streams)
 	writePool(&b, "api", snap.API)
 	ratio := 0.0

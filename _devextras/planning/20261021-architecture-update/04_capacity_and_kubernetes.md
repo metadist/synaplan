@@ -96,7 +96,7 @@ finds both the timing and the warnings.
 ```text
 Admin › System › Capacity              [ Servers ]  Requests   AI calls   Tools   Outbound
 
-  3 servers · updated 4 s ago                                    [ Open the sizing guide ]
+  3 servers · updated 4 s ago · You are connected to web2         [ Open the sizing guide ]
 
   ┌ web1 ───────────────────────────────────────────────────────────────────────┐
   │ AI answers      ██████████████░░░░░░  14 of 24 at once   peak today 22 (11:40) │
@@ -105,17 +105,28 @@ Admin › System › Capacity              [ Servers ]  Requests   AI calls   To
   │ Processor       ███░░░░░░░░░░░░░░░░░  14 % of 8 cores                         │
   │ "Busy" answers today: 0          Answer time p95, last hour: 9.8 s             │
   │ ▸ Technical details                                                          │
-  │     Docker · FrankenPHP 1.12.6 · 24 stream + 24 API workers · wait limit 15 s  │
-  │     Database connections held: 31 · Reported by the watchdog 0.1.0          │
+  │     Docker on synweb100 · FrankenPHP 1.12.6 · 24 stream + 24 API workers      │
+  │     wait limit 15 s · Database connections held: 31 · watchdog 0.1.0          │
+  │     Logs: docker logs 79e4f90bc8c6 (on synweb100)   [ Open recent events ]    │
   └──────────────────────────────────────────────────────────────────────────────┘
-  ┌ web2 … ┐  ┌ web3 … ┐
+  ┌ web2 · You are connected to this server … ┐  ┌ web3 … ┐
 
   Last 24 hours   AI answers at once (all servers)   ▁▂▂▃▅▇█▇▅▃▂▁   peak 61 at 11:40
 ```
 
 On Kubernetes the technical row reads: *Kubernetes pod synaplan-web-7d9f-x2
-in namespace synaplan · memory limit 3 GiB, request 1 GiB · processor request
-1 core, no limit*.
+of synaplan-web on node node-a in namespace synaplan · memory limit 3 GiB,
+request 1 GiB · processor request 1 core, no limit*, and the log row reads
+*Logs: kubectl logs -n synaplan synaplan-web-7d9f-x2 -c synaplan*. On a
+single server the header drops "You are connected to", because there is only
+one card, and the log row reads *Logs: docker logs <hostname>*.
+
+Every word in those rows is a fact from the snapshot (`03` §6.1): the page
+composes the command from `logs.collector`, `place.*` and `hostname`; it
+does not guess. **[ Open recent events ]** opens the event ring
+(`GET /api/v1/admin/logs`) filtered to this server's `logs.event_ring_host`
+(the API gains a `host` filter in AU7). "You are connected to" comes from the
+`X-Synaplan-Server` header of the page's own request.
 
 **Sizing hint**, one sentence under a server whose peak reached 80 % of its
 slots in the last 24 h: *"At its peak today web1 answered 22 of the 24 AI
@@ -128,9 +139,9 @@ sizing guide shows how."* Nothing else on the page is advice.
 | -------- | ------------------ |
 | Who owns this? | "Every server of this installation reports here." (header line) |
 | Who else? | "Only administrators see this page." (footer) |
-| What can they do? | Read; open the sizing guide; open one request's detail (AU33). Nothing on the page changes a server |
+| What can they do? | Read; open the sizing guide; open this server's recent events; open one request's detail (AU33). Nothing on the page changes a server |
 | How do I stop it? | "A server stops reporting when its watchdog is turned off (SYNAPLAN_WATCHDOG=0)." (technical row) |
-| Where does it come from? | "Each server measures itself every 5 seconds and keeps 24 hours." (header tooltip) |
+| Where does it come from? | "Each server measures itself every 5 seconds and keeps 24 hours." (header tooltip); the log row names where that server's lines are collected, and the header names the server that answered this page |
 
 **States:**
 
@@ -183,6 +194,18 @@ resources) and AU34 (autoscaling, drain). Each follows that repository's
 cgroup files (authoritative) and requests from the Downward API env (only
 source). `/.dockerenv` ⇒ `compose`; else `host`.
 
+The chart (AU8) passes the pod's place through the Downward API, and the
+watchdog reads only these names (`03` §6.1):
+
+| Variable | `fieldRef` / `resourceFieldRef` |
+| -------- | ------------------------------- |
+| `SYNAPLAN_K8S_NAMESPACE` | `metadata.namespace` (fallback; the service-account file wins) |
+| `SYNAPLAN_K8S_NODE` | `spec.nodeName` |
+| `SYNAPLAN_K8S_DEPLOYMENT` | `metadata.labels['app.kubernetes.io/name']` plus the component, or left unset — the watchdog then strips the ReplicaSet and pod suffixes from the pod name |
+| `SYNAPLAN_K8S_CONTAINER` | the container name the template uses (`{{ .Chart.Name }}`) |
+| `SYNAPLAN_CPU_REQUEST` | `requests.cpu` |
+| `SYNAPLAN_MEMORY_LIMIT` | `limits.memory` |
+
 ### 5.3 Verification
 
 `vultr-cluster/load-testing` already installs kube-prometheus and Grafana and
@@ -199,6 +222,18 @@ platform compose pass `SYNAPLAN_SERVER_ID` (default: the container hostname)
 and keep `:8098` unpublished; an operator who wants Prometheus publishes it
 on an internal interface. The platform's `scripts/php-runtime-check.sh`
 remains the shell view and gains the watchdog's numbers (ops, private repo).
+
+Three shapes, one snapshot (`03` §6.1):
+
+| Shape | `server_id` | `place.host` | Log row on the page |
+| ----- | ----------- | ------------ | ------------------- |
+| Single server (`deploy/compose.yaml`, Umbrel, CasaOS) | the container hostname, unless the operator sets `SYNAPLAN_SERVER_ID` | unset | `docker logs <hostname>` |
+| Several servers on compose (the platform's web1–web3) | `web1` … `web3`, exported by `updatewebN.sh` next to `SYNDBHOST` and passed through the compose file | `SYNAPLAN_HOST_NAME` (`synweb100` …), same source | `docker logs <hostname>` on `<host>` |
+| Kubernetes (`synaplan-charts`) | the pod name, no setting needed | the node (Downward API) | `kubectl logs -n <namespace> <pod> -c <container>` |
+
+The platform compose change is a follow-up in `synaplan-platform` once AU6
+is released: two variables in the compose file, two exports in each
+`updatewebN.sh`. Until then the three cards carry container ids as names.
 
 ---
 

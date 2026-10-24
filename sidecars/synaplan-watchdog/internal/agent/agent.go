@@ -70,16 +70,26 @@ func (a *Agent) Tick(ctx context.Context, now time.Time) capacity.Snapshot {
 	if a.Read != nil {
 		facts := a.Read()
 		snap.Runtime = facts.Runtime
+		snap.Hostname = facts.Hostname
+		snap.Role = facts.Role
 		snap.MemoryRSSBytes = facts.MemoryRSS
 		snap.MemoryLimitBytes = facts.MemoryLimit
 		snap.MemoryLimited = facts.MemoryLimited
 		snap.CPUCores = facts.CPUCores
 		snap.CPULimited = facts.CPULimited
-		snap.Namespace = facts.Namespace
-		snap.Node = facts.Node
-		snap.Pod = facts.Pod
-		snap.CPURequest = facts.CPURequest
-		snap.MemoryLimit = facts.MemoryRequest
+		snap.Place = capacity.Place{
+			Host:        facts.Host,
+			Pod:         facts.Pod,
+			Namespace:   facts.Namespace,
+			Deployment:  facts.Deployment,
+			Container:   facts.Container,
+			CPURequest:  facts.CPURequest,
+			MemoryLimit: facts.MemoryRequest,
+		}
+		snap.Logs = capacity.Logs{
+			Collector:     facts.LogCollector,
+			EventRingHost: facts.Hostname,
+		}
 		if facts.CPUUsageKnown {
 			snap.CPUUsageRatio = a.cpuRatio(now, facts)
 		}

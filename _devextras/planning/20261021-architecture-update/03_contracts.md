@@ -612,6 +612,43 @@ size × 20 when the pump is on), `REDIS_URL`.
 `serverId` in copy is the display name; Kubernetes pod name or the compose
 hostname.
 
+### 6.1 One server identity, in PHP and in the watchdog (AU6, AU7)
+
+Every record that names a server uses the same rule, so a capacity card, a
+log line and a response header all point at one thing:
+
+| Value | Rule | Who writes it |
+| ----- | ---- | ------------- |
+| `server_id` | `SYNAPLAN_SERVER_ID`, else the hostname. On Kubernetes the hostname is the pod name, so nothing has to be set. On compose the hostname is a container id (`79e4f90bc8c6`) unless the compose file sets `SYNAPLAN_SERVER_ID`; the platform cluster sets `web1` … `web3` from `updatewebN.sh`, a single-server install leaves it unset and sees its hostname | watchdog (snapshot); PHP (`X-Synaplan-Server` response header and the capacity API's `served_by`, AU7) |
+| `hostname` | the container hostname, unchanged | watchdog (snapshot); PHP's event ring (`host`) already writes this |
+| `role` | `SYNAPLAN_ROLE`, else `web` | watchdog. Workers and the scheduler do not run a watchdog in S0; their heartbeats already carry the hostname (`ScheduledJobStatusStore`) and join the page in AU33 |
+
+The snapshot `capacity:server:{id}` (AU6) carries, next to the pools and the
+limits:
+
+| Field | Compose | Kubernetes | Source |
+| ----- | ------- | ---------- | ------ |
+| `place.host` | `SYNAPLAN_HOST_NAME` (the machine; optional) | the node, `SYNAPLAN_K8S_NODE` | env, Downward API `spec.nodeName` (AU8) |
+| `place.pod` | — | the pod name | hostname |
+| `place.namespace` | — | the namespace | the service-account file, else `SYNAPLAN_K8S_NAMESPACE` |
+| `place.deployment` | — | `SYNAPLAN_K8S_DEPLOYMENT`, else the pod name without its ReplicaSet and pod suffixes | env (AU8), derived |
+| `place.container` | — | `SYNAPLAN_K8S_CONTAINER` | env (AU8) |
+| `place.cpu_request`, `place.memory_limit` | — | the declared resources | Downward API `resourceFieldRef` (AU8) |
+| `logs.collector` | `docker` | `kubernetes` | runtime (`process` on a bare host) |
+| `logs.event_ring_host` | the hostname | the pod name | what PHP stamps on `GET /api/v1/admin/logs` records |
+
+PHP and the watchdog write to stderr; the collector is what gathers it. The
+page (AU7) turns these facts into the one command an operator needs —
+`docker logs <hostname>` on `<host>`, or `kubectl logs -n <namespace>
+<pod> -c <container>` — and a link to the event ring filtered by
+`event_ring_host`. The watchdog stores facts, never commands.
+
+**Served by.** The browser learns which server answered from the
+`X-Synaplan-Server` response header (AU7, next to today's `X-Request-Id`).
+The capacity page marks that card "You are connected to this server"; a
+support case can then quote both headers. The header is the `server_id`,
+nothing else — no pod IP, no node address.
+
 ---
 
 ## 7. The stream pump (S5)
@@ -835,7 +872,7 @@ the catalog).
 | Metric | Type | Labels | Source |
 | ------ | ---- | ------ | ------ |
 | `frankenphp_*` | as FrankenPHP | as FrankenPHP | passed through (AU6) |
-| `synaplan_server_info` | gauge | `server`, `runtime` (`compose` \| `kubernetes`), `version` | watchdog |
+| `synaplan_server_info` | gauge | `server`, `role`, `runtime` (`compose` \| `kubernetes` \| `host`), `version` | watchdog |
 | `synaplan_stream_slots_total` / `_busy` | gauge | `pool` | watchdog (from `frankenphp_total_workers` / `busy_workers` of `streams`; after AU31 its own slots) |
 | `synaplan_stream_slots_busy_ratio` | gauge | — | watchdog; the HPA metric (AU34) |
 | `synaplan_requests_total` | counter | `route_class`, `status_class` | PHP request timeline (AU13), aggregated by the watchdog |

@@ -52,6 +52,20 @@ adds `synaplan_server_info`, `synaplan_stream_slots_total`,
 There is no relay and no drain endpoint. Kubernetes pod facts are read when
 `KUBERNETES_SERVICE_HOST` is set; they are not acted on until AU8.
 
+**Place and logs (added after the owner's check on 2026-10-24).** The first
+cut named a server only by `server_id` and `runtime`; a card could not say
+which machine or pod it was, or where its log lines go. The snapshot now
+carries `hostname`, `role`, `place` (`host`, `pod`, `namespace`,
+`deployment`, `container`, declared resources) and `logs` (`collector`,
+`event_ring_host`), and `synaplan_server_info` gains a `role` label. The
+identity rule shared with PHP, the Downward API variables for the chart,
+and the "You are connected to" header for AU7 are written in `03` §6.1 and
+`04` §4.1, §5.2, §6. On the dev stack the snapshot read
+`"hostname":"<container id>","role":"web","place":{},"logs":{"collector":"docker","event_ring_host":"<container id>"}`.
+The platform cluster still needs `SYNAPLAN_SERVER_ID` and
+`SYNAPLAN_HOST_NAME` in its compose file (private repo, after this release);
+without them its three cards are container ids.
+
 **Dev stack, 2026-10-24.** Rebuilt `backend` (classic mode, no worker pools).
 `:8098` is not published. `/live` 200. `/ready` 200 once
 `/api/health/ready` answered. `/metrics` served `synaplan_server_info` with

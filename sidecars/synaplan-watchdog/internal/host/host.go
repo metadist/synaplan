@@ -1,16 +1,27 @@
-// Package host reads the limits of this server from the cgroup and /proc.
+// Package host reads where this server runs and what limits it has.
 package host
 
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
-// Facts is one reading of this server's limits. No request data.
+// Facts is one reading of this server's place and limits. No request data.
 type Facts struct {
 	Runtime       string
+	Hostname      string
+	Role          string
+	Host          string
+	Pod           string
+	Namespace     string
+	Deployment    string
+	Container     string
+	CPURequest    string
+	MemoryRequest string
+	LogCollector  string
 	MemoryRSS     uint64
 	MemoryLimit   uint64
 	MemoryLimited bool
@@ -18,12 +29,10 @@ type Facts struct {
 	CPULimited    bool
 	CPUUsageUsec  uint64
 	CPUUsageKnown bool
-	Namespace     string
-	Node          string
-	Pod           string
-	CPURequest    string
-	MemoryRequest string
 }
+
+// A Deployment pod is <deployment>-<pod-template-hash>-<pod suffix>.
+var deploymentPodSuffix = regexp.MustCompile(`-[a-z0-9]{5,10}-[a-z0-9]{5}$`)
 
 // Read collects facts. root is empty on the real server and a temp directory
 // in tests. env resolves environment variables.
@@ -31,16 +40,34 @@ func Read(root string, env func(string) string) Facts {
 	if env == nil {
 		env = os.Getenv
 	}
-	facts := Facts{Runtime: runtimeOf(root, env)}
+	facts := Facts{
+		Runtime:  runtimeOf(root, env),
+		Hostname: hostname(env),
+		Role:     firstNonEmpty(env("SYNAPLAN_ROLE"), "web"),
+		Host:     env("SYNAPLAN_HOST_NAME"),
+	}
+	facts.LogCollector = collectorOf(facts.Runtime)
+	readMemory(root, &facts)
+	readCPU(root, &facts)
+	if facts.Runtime == "kubernetes" {
+		readKubernetes(root, env, &facts)
+	}
+	return facts
+}
+
+func readMemory(root string, facts *Facts) {
 	if current, ok := readUint(path(root, "/sys/fs/cgroup/memory.current")); ok {
 		facts.MemoryRSS = current
 	} else if rss, ok := readProcRSS(path(root, "/proc/1/status")); ok {
 		facts.MemoryRSS = rss
 	}
-	if limit, limited := readMemoryMax(path(root, "/sys/fs/cgroup/memory.max")); limited {
+	if limit, limited := readUint(path(root, "/sys/fs/cgroup/memory.max")); limited {
 		facts.MemoryLimit = limit
 		facts.MemoryLimited = true
 	}
+}
+
+func readCPU(root string, facts *Facts) {
 	if cores, limited := readCPUMax(path(root, "/sys/fs/cgroup/cpu.max")); limited {
 		facts.CPUCores = cores
 		facts.CPULimited = true
@@ -51,20 +78,27 @@ func Read(root string, env func(string) string) Facts {
 		facts.CPUUsageUsec = usage
 		facts.CPUUsageKnown = true
 	}
-	if facts.Runtime == "kubernetes" {
-		facts.Namespace = readTrim(path(root, "/var/run/secrets/kubernetes.io/serviceaccount/namespace"))
-		if facts.Namespace == "" {
-			facts.Namespace = env("SYNAPLAN_K8S_NAMESPACE")
-		}
-		facts.Node = env("SYNAPLAN_K8S_NODE")
-		facts.Pod = env("SYNAPLAN_SERVER_ID")
-		if facts.Pod == "" {
-			facts.Pod = env("HOSTNAME")
-		}
-		facts.CPURequest = env("SYNAPLAN_CPU_REQUEST")
-		facts.MemoryRequest = env("SYNAPLAN_MEMORY_LIMIT")
-	}
-	return facts
+}
+
+// readKubernetes takes the pod's place from the Downward API variables the
+// chart sets (AU8) and from what the pod can see on its own.
+func readKubernetes(root string, env func(string) string, facts *Facts) {
+	facts.Namespace = firstNonEmpty(
+		readTrim(path(root, "/var/run/secrets/kubernetes.io/serviceaccount/namespace")),
+		env("SYNAPLAN_K8S_NAMESPACE"),
+	)
+	facts.Pod = firstNonEmpty(env("SYNAPLAN_SERVER_ID"), facts.Hostname)
+	facts.Host = firstNonEmpty(env("SYNAPLAN_K8S_NODE"), facts.Host)
+	facts.Container = env("SYNAPLAN_K8S_CONTAINER")
+	facts.Deployment = firstNonEmpty(env("SYNAPLAN_K8S_DEPLOYMENT"), DeploymentOf(facts.Pod))
+	facts.CPURequest = env("SYNAPLAN_CPU_REQUEST")
+	facts.MemoryRequest = env("SYNAPLAN_MEMORY_LIMIT")
+}
+
+// DeploymentOf strips the ReplicaSet and pod suffixes from a Deployment pod
+// name. A name without them is returned unchanged.
+func DeploymentOf(pod string) string {
+	return deploymentPodSuffix.ReplaceAllString(pod, "")
 }
 
 func runtimeOf(root string, env func(string) string) string {
@@ -75,6 +109,26 @@ func runtimeOf(root string, env func(string) string) string {
 		return "compose"
 	}
 	return "host"
+}
+
+// collectorOf names what gathers this process's stderr: the container
+// runtime, or the service manager on a bare host.
+func collectorOf(runtime string) string {
+	switch runtime {
+	case "kubernetes":
+		return "kubernetes"
+	case "compose":
+		return "docker"
+	default:
+		return "process"
+	}
+}
+
+func hostname(env func(string) string) string {
+	if name, err := os.Hostname(); err == nil && name != "" {
+		return name
+	}
+	return env("HOSTNAME")
 }
 
 func path(root, name string) string {
@@ -104,20 +158,8 @@ func readUint(name string) (uint64, bool) {
 	return value, true
 }
 
-func readMemoryMax(name string) (uint64, bool) {
-	text := readTrim(name)
-	if text == "" || text == "max" {
-		return 0, false
-	}
-	return readUint(name)
-}
-
 func readCPUMax(name string) (float64, bool) {
-	text := readTrim(name)
-	if text == "" {
-		return 0, false
-	}
-	fields := strings.Fields(text)
+	fields := strings.Fields(readTrim(name))
 	if len(fields) != 2 || fields[0] == "max" {
 		return 0, false
 	}
@@ -193,4 +235,13 @@ func readProcRSS(name string) (uint64, bool) {
 		return kb * 1024, true
 	}
 	return 0, false
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

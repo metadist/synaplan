@@ -10,6 +10,7 @@ import (
 func TestRenderPassesFrankenPHPThrough(t *testing.T) {
 	body := Render("frankenphp_total_workers{worker=\"streams\"} 16\n", capacity.Snapshot{
 		ServerID: "web1",
+		Role:     "web",
 		Runtime:  "compose",
 		Version:  "dev",
 		Streams:  capacity.Pool{Total: 16, Busy: 4},
@@ -18,7 +19,7 @@ func TestRenderPassesFrankenPHPThrough(t *testing.T) {
 	if !strings.Contains(body, "frankenphp_total_workers{worker=\"streams\"} 16\n") {
 		t.Fatalf("missing passthrough:\n%s", body)
 	}
-	if !strings.Contains(body, "synaplan_server_info{server=\"web1\",runtime=\"compose\",version=\"dev\"} 1\n") {
+	if !strings.Contains(body, "synaplan_server_info{server=\"web1\",role=\"web\",runtime=\"compose\",version=\"dev\"} 1\n") {
 		t.Fatalf("missing server info:\n%s", body)
 	}
 	if !strings.Contains(body, "synaplan_stream_slots_total{pool=\"streams\"} 16\n") {

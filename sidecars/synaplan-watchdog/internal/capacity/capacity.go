@@ -18,9 +18,38 @@ type Pool struct {
 	Busy  int `json:"busy"`
 }
 
+// Place says where this server runs. Empty fields do not apply to the runtime:
+// a compose container has no pod, a bare host has no container.
+type Place struct {
+	// Host is the machine: the Kubernetes node, or SYNAPLAN_HOST_NAME on compose.
+	Host string `json:"host,omitempty"`
+	// Pod is the Kubernetes pod name.
+	Pod string `json:"pod,omitempty"`
+	// Namespace is the Kubernetes namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// Deployment is the Kubernetes Deployment the pod belongs to.
+	Deployment string `json:"deployment,omitempty"`
+	// Container is the container name inside the pod.
+	Container string `json:"container,omitempty"`
+	// CPURequest and MemoryLimit are the pod's declared resources, as strings.
+	CPURequest  string `json:"cpu_request,omitempty"`
+	MemoryLimit string `json:"memory_limit,omitempty"`
+}
+
+// Logs says where this server's log lines go, so the page can name the
+// source without guessing. PHP and the watchdog both write to stderr.
+type Logs struct {
+	// Collector gathers stderr: docker, kubernetes, or process.
+	Collector string `json:"collector"`
+	// EventRingHost is the host value PHP stamps on event-ring records.
+	EventRingHost string `json:"event_ring_host"`
+}
+
 // Snapshot is capacity:server:{id}.
 type Snapshot struct {
 	ServerID         string        `json:"server_id"`
+	Hostname         string        `json:"hostname"`
+	Role             string        `json:"role"`
 	Runtime          string        `json:"runtime"`
 	Version          string        `json:"version"`
 	WatchdogVersion  string        `json:"watchdog_version"`
@@ -36,11 +65,8 @@ type Snapshot struct {
 	CPUCores         float64       `json:"cpu_cores"`
 	CPULimited       bool          `json:"cpu_limited"`
 	CPUUsageRatio    *float64      `json:"cpu_usage_ratio,omitempty"`
-	Namespace        string        `json:"namespace,omitempty"`
-	Node             string        `json:"node,omitempty"`
-	Pod              string        `json:"pod,omitempty"`
-	CPURequest       string        `json:"cpu_request,omitempty"`
-	MemoryLimit      string        `json:"memory_limit,omitempty"`
+	Place            Place         `json:"place"`
+	Logs             Logs          `json:"logs"`
 	Threads          ThreadSummary `json:"threads"`
 }
 
