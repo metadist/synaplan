@@ -116,6 +116,16 @@ final class ResearchBudget
         return max(0, $this->limits->sources - $this->sourcesRead);
     }
 
+    public function searchesLeft(): int
+    {
+        return max(0, $this->limits->searches - $this->searches);
+    }
+
+    public function extras(): ResearchBudgetExtras
+    {
+        return $this->limits->extras;
+    }
+
     /**
      * The snapshot a screen can show: used, then the cap.
      *
