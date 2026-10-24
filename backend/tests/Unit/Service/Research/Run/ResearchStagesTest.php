@@ -170,6 +170,135 @@ final class ResearchStagesTest extends TestCase
         self::assertStringNotContainsString('secret-payload', $caller->seen[0]['user']);
     }
 
+    public function testAVerdictMapKeyedByHitIdIsReadTheSameWay(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'Needed.', [[
+            'q' => 'unit price',
+            'language' => 'en',
+            'scope' => 'web',
+        ]]);
+        $search = new ReplaySearch();
+        $search->hits['unit price'] = [
+            ResearchHit::from('https://forum.example/secret', 'A forum thread', 'talk', null),
+            ResearchHit::from('https://maker.example/price', 'Price list', '12.40 EUR', '2026-03-01'),
+        ];
+        $caller->script[] = $this->json([
+            'r1' => ['point' => 'p1', 'kind' => 'forum', 'fresh' => false, 'read' => false, 'reason' => 'A forum thread'],
+            'r2' => ['point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'The price list'],
+        ]);
+
+        $result = (new GatherStage(new StageCall($caller), $search, new GatherChoice()))->run($ctx);
+        $urls = array_map(static fn ($source) => $source->url, $ctx->state->ledger->sources());
+
+        self::assertSame('read', $result->next);
+        self::assertSame(['https://maker.example/price'], $urls);
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     * @param list<string>            $readable
+     */
+    #[DataProvider('verdictShapes')]
+    public function testEveryVerdictShapeYieldsTheSameReadableIds(array $data, array $readable): void
+    {
+        $verdicts = GatherChoice::verdicts($data);
+        $read = array_keys(array_filter($verdicts, static fn (array $row): bool => true === ($row['read'] ?? null)));
+
+        self::assertSame($readable, $read);
+        foreach ($verdicts as $id => $row) {
+            self::assertSame($id, $row['id']);
+        }
+    }
+
+    /**
+     * @return array<string, array{0: array<array-key, mixed>, 1: list<string>}>
+     */
+    public static function verdictShapes(): array
+    {
+        $no = ['kind' => 'forum', 'read' => false];
+        $yes = ['kind' => 'vendor', 'read' => true];
+
+        return [
+            'list under results' => [['results' => [['id' => 'r1'] + $no, ['id' => 'r2'] + $yes]], ['r2']],
+            'map at the root' => [['r1' => $no, 'r2' => $yes], ['r2']],
+            'map under results' => [['results' => ['r1' => $no, 'r2' => $yes]], ['r2']],
+            'map key wins over a stray id' => [['r2' => ['id' => 'r9'] + $yes], ['r2']],
+            'rows without a verdict are ignored' => [['results' => [['id' => 'r1'], 'r2', ['read' => true]], 'note' => 'x'], []],
+            'empty reply' => [[], []],
+        ];
+    }
+
+    public function testTheTriagePromptAsksForTheSchemaShape(): void
+    {
+        $prompt = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:research_triage' === $entry['topic']) {
+                $prompt = $entry['prompt'];
+            }
+        }
+
+        self::assertIsString($prompt);
+        self::assertSame(['results'], ResearchTriageSchema::schema()['required']);
+        self::assertStringContainsString('{results: [{id:', $prompt);
+    }
+
+    public function testASpareIsReadWhenTheBestPicksAreBlocked(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'Needed.', [['q' => 'unit price', 'language' => 'en', 'scope' => 'web']]);
+        $search = new ReplaySearch();
+        $verdicts = [];
+        for ($i = 1; $i <= 6; ++$i) {
+            $search->hits['unit price'][] = ResearchHit::from('https://shop'.$i.'.example/price', 'Price list '.$i, '12.40 EUR', null);
+            $verdicts[] = ['id' => 'r'.$i, 'point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'Price list'];
+        }
+        $caller->script[] = $this->json(['results' => $verdicts]);
+        $caller->script[] = $this->json([
+            'source_id' => 's5',
+            'useful' => false,
+            'published' => null,
+            'kind' => 'vendor',
+            'findings' => [],
+            'leads' => [],
+            'flags' => [],
+        ]);
+        $pages = new ReplayPages();
+        $pages->pages['https://shop5.example/price'] = new ResearchPage(false, 'The unit price at shop five is 12.40 EUR.', '', []);
+
+        (new GatherStage(new StageCall($caller), $search, new GatherChoice()))->run($ctx);
+        (new ReadStage(new StageCall($caller), $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx);
+
+        self::assertCount(6, $ctx->state->ledger->sources());
+        self::assertCount(2, $caller->seen);
+        self::assertStringContainsString('shop five', $caller->seen[1]['system']);
+    }
+
+    public function testTheReaderSeesTheAnswerBehindALongMenu(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $this->readyToRead($ctx);
+        $menu = str_repeat("Products\n\nApplications\n\nLogin\n\nContact us\n\n", 400);
+        $pages = new ReplayPages();
+        $pages->pages['https://maker.example/price'] = new ResearchPage(false, $menu."The unit price is 12.40 EUR.\n\nFooter", '', []);
+        $caller->script[] = $this->json([
+            'source_id' => 's1',
+            'useful' => true,
+            'published' => null,
+            'kind' => 'vendor',
+            'findings' => [],
+            'leads' => [],
+            'flags' => [],
+        ]);
+
+        (new ReadStage(new StageCall($caller), $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx);
+
+        self::assertStringContainsString('The unit price is 12.40 EUR.', $caller->seen[0]['system']);
+        self::assertStringContainsString('Only the passages closest to the points were sent', $caller->seen[0]['system']);
+    }
+
     public function testAnInventedPassageAndAForeignLeadNeverEnterTheReport(): void
     {
         [$ctx, $caller] = $this->open();

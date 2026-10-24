@@ -17,7 +17,7 @@ chat message.
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
-| RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
+| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
@@ -39,6 +39,96 @@ chat message.
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
 
 ---
+
+## 2026-10-24 — RS6 engine v1 smoke and fairness
+
+Local dev stack. Research was pinned on with
+`RESEARCH_ENABLED=1` in `backend/.env` for the measurement and removed
+afterwards. The database row stays `0`. `CHAT` and `SORT` were set to
+`BMODELS` 379 (Claude Sonnet 5.5, `anthropic:claude-sonnet-5-5`) and put
+back to `-1` afterwards. Web search was the keyed Brave provider.
+`GET /api/v1/research/capabilities` then reported `enabled: true`,
+`web_search_available: true`, `knowledge_available: false`,
+`read_documents: false`.
+
+A standard run before the sorter fix (`rr_5ddfe637190fb426`) searched and
+finished `failed_nothing_found`. The `tools:research_triage` prompt asked
+for "one entry per result id" without naming the `results` list or the
+`id` field, so the sorter returned one verdict per hit id, the code only
+read a `results` list, and nothing was opened. The prompt now spells out
+the schema shape, and gather also reads a verdict map keyed by hit id.
+With that shape accepted, standard run `rr_124552ec9cecc1a8` in chat 389
+finished `complete` in about 72 seconds: 26 statements, 26 backed by a
+source, spent 0.135306 USD (estimate 1 USD). The report is the assistant
+message in that chat. Question: "In which year was the Eiffel Tower
+completed, and who designed it?"
+
+Fairness, same stack. A `.md` upload is vectorized inside the request
+(`Ready` is status `vectorized`). Idle file 53: 67 ms. During the standard
+run, file 54: 23 ms. During thorough run `rr_f0307ef95d034790` (then
+cancelled, `stopped_by_user`), file 56: 69 ms. All three came back
+vectorized.
+
+P-MIN (`09` §4) was walked later the same day, see the next entry.
+
+## 2026-10-24 — triage prompt re-smoke and P-MIN walk
+
+Same local stack, flag pin and `CHAT`/`SORT` = 379 as above, all put back
+afterwards (`RESEARCH_ENABLED` removed, `CHAT`/`SORT` = `-1`, backend and
+worker recreated). The corrected `tools:research_triage` prompt was seeded
+with `app:seed`.
+
+Triage with the corrected prompt: a temporary log in gather (removed
+afterwards) showed the sorter reply as `{"results": [...]}`, a list with
+16 rows for 16 hits, so the map fallback was not needed. Standard run
+`rr_f299b0890ee318cb` (chat 391, same Eiffel Tower question) finished
+`complete` in 64 seconds: 8 sources, 19 evidence cards, spent 0.125782 USD.
+
+Quick run `rr_28f8aaeec5ac496b` ("What is the boiling point of water at
+the summit of Mount Everest?") ended `failed_nothing_found` after reading
+two pages. Both pages start with navigation (menus, product lists); the
+reader gets the first 12 000 characters, the answer on the Everest page
+starts after character 8 000, and the reader rightly answered
+`useful: false`. Fixed below.
+
+Read stage fix, same day. A source longer than the passage budget now
+sends the passages that share words with the goal, the points and their
+queries (short menu items need two shared words), each with the passage
+before and after it, in page order; ids stay those of the full text, so
+the passage check is unchanged. Gather also keeps twice as many picks as
+the read budget, because blocked and empty pages do not use it. Before,
+quick run `rr_38b67d48ae217908` ended `failed_nothing_found` with all four
+picks blocked (bot block, 404, no text).
+
+| Run | Depth | Outcome | Cards | Sources read / blocked | Spent USD |
+| --- | ----- | ------- | ----- | ---------------------- | --------- |
+| `rr_a972d5bf40b3f852` | quick | `complete` | 10 | 2 / 2 | 0.066772 |
+| `rr_fbea2902da45484d` | quick | `complete_partial` (1 of 4 points) | 5 | 2 / 1 | 0.046024 |
+| `rr_6e814c0797a336e9` | quick | `complete_partial` (1 of 4 points) | 7 | 2 / 2 | 0.050036 |
+| `rr_b3b2767cd2dfa527` | standard, Eiffel Tower | `complete` | 39 | 6 / 4 | 0.170230 |
+
+The Everest page (766 passages) now sends 38 passages and gives 3–7
+cards per run, quoting "at the top of Everest the boiling temperature of
+the water is 70°C" from §736. Before the fix the quick question failed in
+three of four runs; after it, none of three failed.
+
+P-MIN. `docker-compose.minimal.yml` overlays `app_test` on the test stack
+with the `TestProvider` only, so it cannot run a real model. The walk used
+a temporary overlay outside the repository that puts the same blank
+variables on the dev `backend` and `worker`, plus an empty Brave key
+(P-MIN has no web search). The Anthropic key stayed.
+
+| Step | Result |
+| ---- | ------ |
+| Minimal as shipped (`RESEARCH_ENABLED` empty, gate on) | capabilities and start answer 404 `feature_not_configured`; no research surface |
+| Research pinned on, before the fix | capabilities said `web_search_available: true` (`brave` is the default provider name, no key). Run `rr_103b1a0f7d0a482f` paid for brief and plan (0.010098 USD), sent 4 searches to no provider and ended "The sources that were searched held nothing…" — wrong, nothing could be searched |
+| Research pinned on, after the fix | capabilities `web_search_available: false`, `web_search_provider: null`, `knowledge_available: false`. Run `rr_070d4819880ca7c6` ended in 5 seconds with `failed_no_sources`, "There was nothing to research: turn on the web or add files to this project.", 0 USD, posted into chat 396 |
+| Web PDF without Tika | `ResearchSourceReader` on `w3.org/…/dummy.pdf`: blocked, reason `unreadable`. Same URL with Tika on the full stack: read, "Dummy PDF file" |
+| Files-only run with a cloud embedding | Not possible in engine v1: gather skips `files` queries and capabilities reports `knowledge_available: false` by design. Comes with the knowledge source (RS9) |
+
+The fix: `ResearchSearch::available()` answers from the web search
+gateway's health. Capabilities use it, and the pipeline ends a run with
+`failed_no_sources` before the brief when nothing can be searched.
 
 ## 2026-10-23 — run storage and run kernel shared with agent handling (row 25)
 

@@ -6,6 +6,7 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchEvidenceSchema;
 use App\Service\Research\Run\Ledger\CanonicalUrl;
+use App\Service\Research\Run\Ledger\Passage;
 use App\Service\Research\Run\Ledger\PassageMap;
 use App\Service\Research\Run\Ledger\PassageSplitter;
 use App\Service\Research\Run\Ledger\PlanPoint;
@@ -148,16 +149,10 @@ final readonly class ReadStage implements ResearchStage
     {
         $brief = $ctx->state->ledger->brief();
         $points = array_map(static fn (PlanPoint $point): string => $point->id.' '.$point->title, $ctx->state->ledger->points());
-        $lines = [];
-        $used = 0;
-        foreach ($map->passages as $passage) {
-            $line = '['.$passage->id.'] '.$passage->text;
-            if ($used + mb_strlen($line) > self::PASSAGE_BUDGET) {
-                $lines[] = '[note] The rest of this source was not sent.';
-                break;
-            }
-            $lines[] = $line;
-            $used += mb_strlen($line);
+        $sent = PassageFocus::pick($map->passages, $this->topics($ctx), self::PASSAGE_BUDGET);
+        $lines = array_map(static fn (Passage $passage): string => '['.$passage->id.'] '.$passage->text, $sent);
+        if (count($sent) < count($map->passages)) {
+            $lines[] = '[note] Only the passages closest to the points were sent; the rest of this source was left out.';
         }
         $linkLines = [];
         foreach ($links as $index => $link) {
@@ -178,6 +173,23 @@ final readonly class ReadStage implements ResearchStage
             'POINTS' => [] === $points ? 'p1 the question' : implode("\n", $points),
             'UNTRUSTED_SOURCE_WRAPPER' => $wrapper,
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function topics(StageContext $ctx): array
+    {
+        $brief = $ctx->state->ledger->brief();
+        $topics = null !== $brief ? [$brief->goal] : [$ctx->state->ref->question];
+        foreach ($ctx->state->ledger->points() as $point) {
+            $topics[] = $point->title;
+            foreach ($point->queries as $query) {
+                $topics[] = $query['q'];
+            }
+        }
+
+        return $topics;
     }
 
     private static function attr(string $value): string

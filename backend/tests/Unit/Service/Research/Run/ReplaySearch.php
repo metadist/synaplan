@@ -15,6 +15,13 @@ final class ReplaySearch implements ResearchSearch
     /** @var list<string> */
     public array $queries = [];
 
+    public bool $available = true;
+
+    public function available(int $userId): bool
+    {
+        return $this->available;
+    }
+
     public function search(string $query, string $language, int $limit, int $userId): array
     {
         $this->queries[] = $query;

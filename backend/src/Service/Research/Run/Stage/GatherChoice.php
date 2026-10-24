@@ -13,6 +13,34 @@ use App\Service\Research\Run\Ledger\CanonicalUrl;
 final class GatherChoice
 {
     /**
+     * The agreed shape is a list under `results`. A model that ignores the
+     * schema and returns one verdict per hit id, at the root or under
+     * `results`, made the same decision and is kept. Ids that name no hit
+     * are dropped later by choose().
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function verdicts(array $data): array
+    {
+        $source = is_array($data['results'] ?? null) ? $data['results'] : $data;
+
+        $verdicts = [];
+        foreach ($source as $key => $row) {
+            if (!is_array($row) || !array_key_exists('read', $row)) {
+                continue;
+            }
+            $id = is_string($key) ? $key : ($row['id'] ?? null);
+            if (is_string($id) && '' !== $id) {
+                $verdicts[$id] = ['id' => $id] + $row;
+            }
+        }
+
+        return $verdicts;
+    }
+
+    /**
      * @param list<array{id: string, url: string, host: string, title: string}> $hits
      * @param array<string, array<string, mixed>>                               $verdicts
      * @param list<string>                                                      $mustUse

@@ -10,11 +10,13 @@ use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
+use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchPipeline;
 use App\Service\Research\Run\ResearchRoles;
 use App\Service\Research\Run\ResearchRunRef;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStateStore;
+use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchUnitPlan;
 use App\Service\Research\Run\Stage\AcceptedEvidence;
 use App\Service\Research\Run\Stage\BriefStage;
@@ -35,17 +37,6 @@ final class ResearchPipelineTest extends TestCase
 {
     public function testBriefAndPlanAreOneStepAndASecondPassSkipsThem(): void
     {
-        $created = new \DateTimeImmutable('2026-10-24T09:00:00+00:00');
-        $clock = new MockClock($created);
-        $keys = new MemoryResearchRunKeys($clock);
-        $store = new ResearchStateStore($keys, $clock);
-        $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $created);
-        $budget->at($created);
-        $state = ResearchRunState::open(
-            ResearchRunRef::start(7, ResearchDepth::Quick, 'What does one unit cost?', null, $created),
-            $budget,
-        );
-        $store->save($state);
         $caller = new ReplayCaller();
         $caller->script[] = $this->json([
             'goal' => 'What does one unit cost?',
@@ -69,22 +60,7 @@ final class ResearchPipelineTest extends TestCase
             'outline' => ['Summary', 'Not confirmed'],
             'estimate' => ['minutes' => 99, 'cost' => 9.99],
         ]);
-        $calls = new StageCall($caller);
-        $pipeline = new ResearchPipeline(
-            new BriefStage($calls),
-            new PlanStage($calls),
-            new GatherStage($calls, new ReplaySearch(), new GatherChoice()),
-            new ReadStage($calls, new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store),
-            new WriteStage($calls),
-            new DeliverStage(),
-        );
-        $context = new StageContext(
-            $state,
-            new ResearchRoles(1, 2, 3, 4, 5, false, []),
-            new ResearchEventLog($keys),
-            $created,
-            new ResearchStop(),
-        );
+        [$pipeline, $context] = $this->open($caller, new ReplaySearch());
 
         $result = $pipeline->run($context, ResearchUnitPlan::BRIEF_PLAN);
         $again = $pipeline->run($context, ResearchUnitPlan::BRIEF_PLAN);
@@ -94,6 +70,58 @@ final class ResearchPipelineTest extends TestCase
         self::assertCount(2, $caller->seen);
         self::assertSame('en', $context->state->ledger->brief()?->language);
         self::assertSame('unit price 2026', $context->state->ledger->points()[0]->queries[0]['q'] ?? null);
+    }
+
+    public function testARunWithNothingToSearchEndsBeforeAnyPaidCall(): void
+    {
+        $caller = new ReplayCaller();
+        $search = new ReplaySearch();
+        $search->available = false;
+        [$pipeline, $context] = $this->open($caller, $search);
+
+        $result = $pipeline->run($context, ResearchUnitPlan::BRIEF_PLAN);
+
+        self::assertSame('done', $result->next);
+        self::assertSame([], $caller->seen);
+        self::assertSame(ResearchStatus::Failed, $context->state->status);
+        self::assertSame(ResearchOutcome::FAILED_NO_SOURCES, $context->state->outcome?->code);
+    }
+
+    /**
+     * @return array{0: ResearchPipeline, 1: StageContext}
+     */
+    private function open(ReplayCaller $caller, ReplaySearch $search): array
+    {
+        $created = new \DateTimeImmutable('2026-10-24T09:00:00+00:00');
+        $clock = new MockClock($created);
+        $keys = new MemoryResearchRunKeys($clock);
+        $store = new ResearchStateStore($keys, $clock);
+        $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $created);
+        $budget->at($created);
+        $state = ResearchRunState::open(
+            ResearchRunRef::start(7, ResearchDepth::Quick, 'What does one unit cost?', null, $created),
+            $budget,
+        );
+        $store->save($state);
+        $calls = new StageCall($caller);
+        $pipeline = new ResearchPipeline(
+            new BriefStage($calls),
+            new PlanStage($calls),
+            new GatherStage($calls, $search, new GatherChoice()),
+            new ReadStage($calls, new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store),
+            new WriteStage($calls),
+            new DeliverStage(),
+            $search,
+        );
+        $context = new StageContext(
+            $state,
+            new ResearchRoles(1, 2, 3, 4, 5, false, []),
+            new ResearchEventLog($keys),
+            $created,
+            new ResearchStop(),
+        );
+
+        return [$pipeline, $context];
     }
 
     /**

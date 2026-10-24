@@ -7,6 +7,7 @@ namespace App\Service\Research\Run;
 use App\Entity\User;
 use App\Plug\PlugConfigService;
 use App\Plug\WebSearch\WebSearchHosting;
+use App\Service\Research\Run\Stage\ResearchSearch;
 
 /**
  * What this installation can do for a research run.
@@ -21,6 +22,7 @@ final readonly class ResearchCapabilities
     public function __construct(
         private PlugConfigService $plugs,
         private ResearchConfig $config,
+        private ResearchSearch $search,
     ) {
     }
 
@@ -30,14 +32,14 @@ final readonly class ResearchCapabilities
     public function describe(User $user): array
     {
         $provider = strtolower($this->plugs->webSearchProvider($user->getId()));
-        $known = array_key_exists($provider, WebSearchHosting::PROVIDERS);
+        $web = array_key_exists($provider, WebSearchHosting::PROVIDERS) && $this->search->available($user->getId() ?? 0);
 
         return [
             'enabled' => true,
             'research_protocol' => self::PROTOCOL,
             'depths' => ['quick', 'standard', 'thorough'],
-            'web_search_available' => $known,
-            'web_search_provider' => $known ? [
+            'web_search_available' => $web,
+            'web_search_provider' => $web ? [
                 'id' => $provider,
                 'self_hosted' => WebSearchHosting::selfHosted($provider),
                 'country' => WebSearchHosting::country($provider),
