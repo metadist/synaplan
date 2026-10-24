@@ -219,10 +219,44 @@ final class AdminModelsController extends AbstractController
         tags: ['Admin Models']
     )]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
-    #[OA\Response(response: 200, description: 'Model deleted')]
+    #[OA\Response(
+        response: 200,
+        description: 'Model deleted. Defaults that pointed at it were moved to another model, or cleared when none could take the job. Search (VECTORIZE) is always cleared, never switched.',
+        content: new OA\JsonContent(
+            required: ['success', 'moved', 'cleared'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'moved',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['setting', 'ownerId', 'modelId', 'modelName'],
+                        properties: [
+                            new OA\Property(property: 'setting', type: 'string', example: 'CHAT'),
+                            new OA\Property(property: 'ownerId', type: 'integer', example: 0),
+                            new OA\Property(property: 'modelId', type: 'integer', example: 12),
+                            new OA\Property(property: 'modelName', type: 'string', example: 'GPT OSS 120B'),
+                        ],
+                        type: 'object'
+                    )
+                ),
+                new OA\Property(
+                    property: 'cleared',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['setting', 'ownerId'],
+                        properties: [
+                            new OA\Property(property: 'setting', type: 'string', example: 'VECTORIZE'),
+                            new OA\Property(property: 'ownerId', type: 'integer', example: 0),
+                        ],
+                        type: 'object'
+                    )
+                ),
+            ]
+        )
+    )]
     #[OA\Response(response: 403, description: 'Admin access required')]
     #[OA\Response(response: 404, description: 'Model not found')]
-    #[OA\Response(response: 409, description: 'Model is still in use')]
     public function delete(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
@@ -230,10 +264,14 @@ final class AdminModelsController extends AbstractController
         }
 
         try {
-            $this->modelsService->deleteModel($id);
+            $released = $this->modelsService->deleteModel($id);
             $this->refreshModelPicker();
 
-            return $this->json(['success' => true]);
+            return $this->json([
+                'success' => true,
+                'moved' => $released['moved'],
+                'cleared' => $released['cleared'],
+            ]);
         } catch (ModelNotFoundException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         } catch (ModelConflictException $e) {
