@@ -31,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
   const impersonator = ref<ImpersonatorInfo | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const errorCode = ref<string | null>(null)
   const initialized = ref(false)
 
   let applyingRemotePrincipal = false
@@ -257,20 +258,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Actions
-  async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
+  async function login(email: string, password: string, challengeToken?: string): Promise<boolean> {
     loading.value = true
-    error.value = null
+    clearError()
 
     const { beginAuthMutation, endAuthMutation } = await import('@/services/api/httpClient')
-    // Same cookie-swap lock as impersonation: a refresh that started on the
-    // expired-session login page still carries the dead cookie. If it lands
-    // after this POST, it 401s and logout() clears the hint — the new session
-    // looks logged out even though the cookies were just set.
+    // Same cookie-swap lock as impersonation: a stale refresh landing after this
+    // POST would 401, and logout() would clear the hint of the new session.
     beginAuthMutation()
     try {
       await settleInFlightRefreshes()
 
-      const result = await authService.login(email, password, recaptchaToken)
+      const result = await authService.login(email, password, challengeToken)
 
       if (result.success) {
         await resetUserScopedClientState()
@@ -284,6 +283,7 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       } else {
         error.value = result.error || 'Login failed'
+        errorCode.value = result.code ?? null
         return false
       }
     } catch (err) {
@@ -299,19 +299,20 @@ export const useAuthStore = defineStore('auth', () => {
   async function register(
     email: string,
     password: string,
-    recaptchaToken?: string,
+    challengeToken?: string,
     language?: string
   ): Promise<{ success: boolean; mailDelivered: boolean }> {
     loading.value = true
-    error.value = null
+    clearError()
 
     try {
-      const result = await authService.register(email, password, recaptchaToken, language)
+      const result = await authService.register(email, password, challengeToken, language)
 
       if (result.success) {
         return { success: true, mailDelivered: result.mailDelivered !== false }
       }
       error.value = result.error || 'Registration failed'
+      errorCode.value = result.code ?? null
       return { success: false, mailDelivered: true }
     } catch {
       error.value = 'Network error'
@@ -332,12 +333,10 @@ export const useAuthStore = defineStore('auth', () => {
     impersonator.value = null
     publishPrincipal(null)
     loading.value = true
-    // Drop any in-flight deep-link intent so the next login isn't hijacked
-    // by a stale entry from this session.
+    // Drop any in-flight deep-link intent so a stale entry can't hijack the next login.
     clearPendingRedirect()
 
-    // Wipe all user-scoped client state (SSE token, chats, memories, etc.)
-    // Non-fatal: session teardown must proceed even if cleanup fails.
+    // Wipe all user-scoped client state; non-fatal, teardown proceeds regardless.
     try {
       await resetUserScopedClientState()
     } catch (cleanupErr) {
@@ -441,7 +440,6 @@ export const useAuthStore = defineStore('auth', () => {
         }
         await syncFromAuthService()
         initialized.value = true
-        // Also resolve authReady if not already done
         if (authReadyResolve) {
           authReadyResolve()
           authReadyResolve = null
@@ -487,6 +485,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function clearError(): void {
     error.value = null
+    errorCode.value = null
   }
 
   /**
@@ -650,6 +649,7 @@ export const useAuthStore = defineStore('auth', () => {
     impersonator,
     loading,
     error,
+    errorCode,
     initialized,
     // Computed
     isAuthenticated,

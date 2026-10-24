@@ -18,6 +18,7 @@ import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { useSignupChallenge } from './useSignupChallenge'
 
 export interface SocialProvider {
   id: string
@@ -33,6 +34,7 @@ export function useSocialAuth() {
   const config = useConfigStore()
   const authStore = useAuthStore()
   const { locale } = useI18n()
+  const { getToken: getChallengeToken } = useSignupChallenge()
 
   const providers = ref<SocialProvider[]>([])
   /** Provider-flow error, cleared on the next attempt. Empty = no error. */
@@ -95,7 +97,11 @@ export function useSocialAuth() {
       }
     }
 
+    // The human check runs before the redirect; the server records it in the
+    // signed OAuth state and refuses a NEW account on the callback without it.
     const params = new URLSearchParams({ language: String(locale.value) })
+    const challenge = await getChallengeToken('signup')
+    if (challenge) params.set('challenge', challenge)
     window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
     return false
   }

@@ -6,6 +6,7 @@ use App\Entity\Topup;
 use App\Entity\User;
 use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\StripeEntitlement;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -26,6 +27,8 @@ use Symfony\Component\Routing\Attribute\Route;
  * - Webhook signature verification (HMAC)
  * - Idempotency check (prevents duplicate processing)
  * - Rate limiting (prevents DoS)
+ * - A paid tier is granted only once the payment has settled
+ *   ({@see StripeEntitlement}); `active` alone is not enough.
  */
 #[Route('/api/v1/stripe')]
 #[OA\Tag(name: 'Stripe')]
@@ -42,9 +45,7 @@ class StripeWebhookController extends AbstractController
         private CacheItemPoolInterface $cache,
         private string $stripeWebhookSecret,
         private string $stripeSecretKey,
-        private string $stripePricePro,
-        private string $stripePriceTeam,
-        private string $stripePriceBusiness,
+        private StripeEntitlement $entitlement,
         private TopupRepository $topupRepository,
     ) {
     }
@@ -367,33 +368,16 @@ class StripeWebhookController extends AbstractController
         // Cancel any other active subscriptions for this customer (upgrade logic)
         $this->cancelOtherSubscriptions($subscription->customer, $subscription->id);
 
-        // Map Stripe price to user level
-        $priceId = $subscription->items->data[0]->price->id ?? null;
-        $userLevel = $this->mapPriceIdToLevel($priceId);
-
-        // Update user
-        $user->setUserLevel($userLevel);
-
-        $paymentDetails = $user->getPaymentDetails();
-        $firstItem = $subscription->items->data[0] ?? null;
-        // MOBILE-APP SEAM (Epic 5.1): stamp the owning channel so the unified
-        // status/source model never has to guess. Literal (not the BillingService
-        // constant) to keep this webhook controller free of service coupling.
-        $paymentDetails['subscription'] = [
-            'source' => 'stripe',
-            'stripe_subscription_id' => $subscription->id,
-            'status' => $subscription->status,
-            'subscription_start' => $firstItem?->current_period_start,
-            'subscription_end' => $firstItem?->current_period_end,
-            'plan' => $userLevel,
-        ];
-        $user->setPaymentDetails($paymentDetails);
+        // Record the subscription; the tier follows only once the first
+        // invoice is paid. A card settles within this same event, a SEPA
+        // mandate does not — its grant arrives with invoice.payment_succeeded.
+        $settled = $this->entitlement->apply($user, $subscription, $this->entitlement->latestInvoice($subscription));
 
         $this->em->flush();
 
-        $this->logger->info('User subscription activated', [
+        $this->logger->info($settled ? 'User subscription activated' : 'User subscription recorded, payment pending', [
             'user_id' => $user->getId(),
-            'level' => $userLevel,
+            'level' => $user->getUserLevel(),
         ]);
 
         return true;
@@ -457,25 +441,11 @@ class StripeWebhookController extends AbstractController
             return true;
         }
 
-        // Check if plan changed
-        $priceId = $subscription->items->data[0]->price->id ?? null;
-        $newLevel = $this->mapPriceIdToLevel($priceId);
-
-        // Update user level if changed
-        if ($newLevel !== $user->getUserLevel() && 'NEW' !== $newLevel) {
-            $user->setUserLevel($newLevel);
-            $this->logger->info('User subscription plan changed', [
-                'user_id' => $user->getId(),
-                'old_level' => $user->getUserLevel(),
-                'new_level' => $newLevel,
-            ]);
-        }
-
-        // Update subscription details
-        $paymentDetails['subscription']['status'] = $subscription->status;
-        $firstItem = $subscription->items->data[0] ?? null;
-        $paymentDetails['subscription']['subscription_end'] = $firstItem?->current_period_end;
-        $paymentDetails['subscription']['plan'] = $newLevel;
+        // Plan, period and tier. The tier only moves when the invoice behind
+        // this update is paid — a plan change on a mandate that never settled
+        // stays at the current level.
+        $this->entitlement->apply($user, $subscription, $this->entitlement->latestInvoice($subscription));
+        $paymentDetails = $user->getPaymentDetails();
 
         // Clear payment_failed when Stripe's smart-retry resolves the
         // past_due invoice via subscription.updated rather than via the
@@ -594,32 +564,38 @@ class StripeWebhookController extends AbstractController
             'customer' => $invoice->customer,
         ]);
 
-        // Clear the payment-failed flag so the SubscriptionView warning
-        // disappears on the next reload (issue #856 recovery criterion).
-        // We do this even when no flag was set — the unset() is a no-op
-        // in that case and keeps the code path simple.
         $user = $this->getUserByStripeCustomer($invoice->customer);
         if (!$user) {
             return true;
         }
 
-        $paymentDetails = $user->getPaymentDetails();
-        if (
-            isset($paymentDetails['subscription']['payment_failed'])
-            || isset($paymentDetails['subscription']['payment_failed_at'])
-        ) {
-            unset(
-                $paymentDetails['subscription']['payment_failed'],
-                $paymentDetails['subscription']['payment_failed_at']
-            );
-            $user->setPaymentDetails($paymentDetails);
-            $this->em->flush();
+        // Money has settled: this is the event that grants the tier for
+        // delayed-notification methods (SEPA, Bacs, ACH) and re-affirms it on
+        // every renewal. Only subscriptions this account currently holds (or
+        // has none of yet) are applied; a stale subscription's invoice must
+        // not revive an old plan.
+        $invoiceSubscriptionId = $this->entitlement->subscriptionIdOfInvoice($invoice);
+        $currentId = $user->getPaymentDetails()['subscription']['stripe_subscription_id'] ?? null;
+        if (null !== $invoiceSubscriptionId && (null === $currentId || $currentId === $invoiceSubscriptionId)) {
+            $subscription = $this->entitlement->subscriptionOfInvoice($invoice);
+            if (null !== $subscription) {
+                $this->entitlement->apply($user, $subscription, $invoice);
+            }
+        }
 
+        // Clear the payment-failed flag so the SubscriptionView warning
+        // disappears on the next reload (issue #856 recovery criterion).
+        $paymentDetails = $user->getPaymentDetails();
+        if (isset($paymentDetails['subscription']['payment_failed']) || isset($paymentDetails['subscription']['payment_failed_at'])) {
+            unset($paymentDetails['subscription']['payment_failed'], $paymentDetails['subscription']['payment_failed_at']);
+            $user->setPaymentDetails($paymentDetails);
             $this->logger->info('Cleared payment_failed flag after invoice.payment_succeeded', [
                 'user_id' => $user->getId(),
                 'invoice_id' => $invoice->id,
             ]);
         }
+
+        $this->em->flush();
 
         return true;
     }
@@ -653,21 +629,5 @@ class StripeWebhookController extends AbstractController
     private function getUserByStripeCustomer(string $customerId): ?User
     {
         return $this->userRepository->findByStripeCustomerId($customerId);
-    }
-
-    private function mapPriceIdToLevel(?string $priceId): string
-    {
-        if (!$priceId) {
-            return 'NEW';
-        }
-
-        // Map Stripe price IDs to user levels
-        $priceMapping = [
-            $this->stripePricePro => 'PRO',
-            $this->stripePriceTeam => 'TEAM',
-            $this->stripePriceBusiness => 'BUSINESS',
-        ];
-
-        return $priceMapping[$priceId] ?? 'NEW';
     }
 }

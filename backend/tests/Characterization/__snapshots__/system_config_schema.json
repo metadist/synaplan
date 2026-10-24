@@ -1799,6 +1799,17 @@
                 "tab": "routing",
                 "type": "boolean"
             },
+            "SIGNUP_PAUSED": {
+                "dbGroup": "SIGNUP",
+                "dbKey": "PAUSED",
+                "default": "false",
+                "description": "Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. Existing accounts sign in as usual. Takes effect immediately, no restart.",
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "boolean"
+            },
             "SYNAPLAN_TTS_URL": {
                 "default": "http://localhost:10200",
                 "description": "Synaplan TTS service URL (self-hosted, Piper-based)",
@@ -1965,6 +1976,22 @@
                 "source": "database",
                 "tab": "ai",
                 "type": "password"
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile secret key",
+                "section": "recaptcha",
+                "sensitive": true,
+                "tab": "auth",
+                "type": "password"
+            },
+            "TURNSTILE_SITE_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile site key. With both Turnstile keys set, Turnstile runs in front of sign-up, sign-in and every Google/GitHub/Apple start, and reCAPTCHA is ignored. Fails closed.",
+                "section": "recaptcha",
+                "sensitive": false,
+                "tab": "auth",
+                "type": "text"
             },
             "USAGE_TAXIMETER_ENABLED": {
                 "dbGroup": "USAGE_TAXIMETER",
@@ -2225,20 +2252,23 @@
                     {
                         "fields": [
                             "REGISTRATION_ENABLED",
-                            "GUEST_CHAT_ENABLED"
+                            "GUEST_CHAT_ENABLED",
+                            "SIGNUP_PAUSED"
                         ],
                         "id": "access",
                         "label": "Who can use this instance"
                     },
                     {
                         "fields": [
+                            "TURNSTILE_SITE_KEY",
+                            "TURNSTILE_SECRET_KEY",
                             "RECAPTCHA_ENABLED",
                             "RECAPTCHA_SITE_KEY",
                             "RECAPTCHA_SECRET_KEY",
                             "RECAPTCHA_MIN_SCORE"
                         ],
                         "id": "recaptcha",
-                        "label": "reCAPTCHA v3"
+                        "label": "Human check (Turnstile, reCAPTCHA v3)"
                     },
                     {
                         "fields": [
@@ -3668,6 +3698,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -3757,6 +3793,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -4940,6 +4986,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -5029,6 +5081,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -7090,6 +7152,17 @@
                 "tab": "routing",
                 "type": "boolean"
             },
+            "SIGNUP_PAUSED": {
+                "dbGroup": "SIGNUP",
+                "dbKey": "PAUSED",
+                "default": "false",
+                "description": "Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. Existing accounts sign in as usual. Takes effect immediately, no restart.",
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "boolean"
+            },
             "SYNAPLAN_TTS_URL": {
                 "default": "http://localhost:10200",
                 "description": "Synaplan TTS service URL (self-hosted, Piper-based)",
@@ -7256,6 +7329,22 @@
                 "source": "database",
                 "tab": "ai",
                 "type": "password"
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile secret key",
+                "section": "recaptcha",
+                "sensitive": true,
+                "tab": "auth",
+                "type": "password"
+            },
+            "TURNSTILE_SITE_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile site key. With both Turnstile keys set, Turnstile runs in front of sign-up, sign-in and every Google/GitHub/Apple start, and reCAPTCHA is ignored. Fails closed.",
+                "section": "recaptcha",
+                "sensitive": false,
+                "tab": "auth",
+                "type": "text"
             },
             "USAGE_TAXIMETER_ENABLED": {
                 "dbGroup": "USAGE_TAXIMETER",
@@ -7516,20 +7605,23 @@
                     {
                         "fields": [
                             "REGISTRATION_ENABLED",
-                            "GUEST_CHAT_ENABLED"
+                            "GUEST_CHAT_ENABLED",
+                            "SIGNUP_PAUSED"
                         ],
                         "id": "access",
                         "label": "Who can use this instance"
                     },
                     {
                         "fields": [
+                            "TURNSTILE_SITE_KEY",
+                            "TURNSTILE_SECRET_KEY",
                             "RECAPTCHA_ENABLED",
                             "RECAPTCHA_SITE_KEY",
                             "RECAPTCHA_SECRET_KEY",
                             "RECAPTCHA_MIN_SCORE"
                         ],
                         "id": "recaptcha",
-                        "label": "reCAPTCHA v3"
+                        "label": "Human check (Turnstile, reCAPTCHA v3)"
                     },
                     {
                         "fields": [
@@ -9105,6 +9197,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -9194,6 +9292,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -10247,6 +10355,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -10336,6 +10450,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -11407,6 +11531,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -11496,6 +11626,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -12669,6 +12809,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -12758,6 +12904,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -13931,6 +14087,12 @@
                 "locked": true,
                 "value": "false"
             },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -14020,6 +14182,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {

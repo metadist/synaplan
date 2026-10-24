@@ -418,6 +418,13 @@ services:
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
+      # Account-creation limits: wide open on the dev stack because the E2E
+      # suites register dozens of users from localhost in one run. Production
+      # keeps the backend/.env.example defaults (5 per IP per hour, 20 per
+      # 10 minutes installation-wide).
+      SIGNUP_IP_LIMIT: ${SIGNUP_IP_LIMIT:-100000}
+      SIGNUP_GLOBAL_LIMIT: ${SIGNUP_GLOBAL_LIMIT:-100000}
+      CHECKOUT_IP_LIMIT: ${CHECKOUT_IP_LIMIT:-100000}
       # Stripe Payment Integration - loaded from backend/.env via env_file
       # (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_*)
       # OAuth Social Login Providers (loaded from backend/.env via env_file)

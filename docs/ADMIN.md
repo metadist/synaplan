@@ -402,6 +402,46 @@ does **not** do that — the refresh tokens are plain database rows.
 
 Always run behind a reverse proxy (nginx, Caddy, Traefik) with TLS termination. Synaplan does not handle TLS directly.
 
+### Account creation: limits, human check, kill switch
+
+Every path that creates an account — the email form and the Google, GitHub
+and Apple callbacks — goes through the same protection. Existing accounts are
+never throttled; only *new* accounts are.
+
+| Control | Where | Default |
+| ------- | ----- | ------- |
+| New accounts per client IP per hour | `SIGNUP_IP_LIMIT` | 5 |
+| New accounts installation-wide per 10 minutes | `SIGNUP_GLOBAL_LIMIT` | 20 (tripping it mails the operator) |
+| Stripe checkouts per client IP per hour | `CHECKOUT_IP_LIMIT` | 10 |
+| Paid tiers for day-old accounts per hour before an alert | `PAID_SIGNUP_ALERT_LIMIT` | 10 |
+| **Pause sign-up** | Admin → Configuration → Authentication (or `SIGNUP_PAUSED=true`) | off |
+| Human check | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (Cloudflare Turnstile), else `RECAPTCHA_*` | none |
+| Alert inbox | `APP_ADMIN_EMAIL` (fallback `APP_SENDER_EMAIL`) | — |
+
+The per-IP windows need the real client address. Behind Cloudflare or a load
+balancer set `SYMFONY_TRUSTED_PROXIES` (and `SYMFONY_TRUSTED_HEADERS=x-forwarded-for`);
+without them every request looks like the proxy and the per-IP limit turns
+into a second installation-wide one.
+
+The pause switch is the emergency brake during a flood of fake accounts: it
+takes effect at once on all nodes (shared Redis + BCONFIG), refuses every new
+account with a sentence that says so, and leaves sign-in untouched. The refused
+person sees one of three sentences — too many sign-ups from this connection,
+sign-up is paused, or "please start the sign-up from the website" when an
+OAuth flow was started without the human check. The limits share one
+rate-limiter cache, so they hold across a multi-node deployment.
+
+Turnstile wins over reCAPTCHA when both are configured and fails closed:
+Cloudflare unreachable means the sign-up is refused, not waved through. The
+browser also obtains a token before the redirect to Google/GitHub/Apple; the
+callback refuses a new account whose flow did not pass it. Native apps cannot
+run the browser challenge and keep only the limits.
+
+The alert mail (`[INCIDENT][Synaplan] Unusual account creation`) is sent once
+per hour per signal and always logged at `critical`, so a log-based pager works
+on an install without mail. Why this exists: `docs/PAYMENTS_CHANNELS.md`,
+section "Stripe payment methods".
+
 ---
 
 ## User Management

@@ -6,7 +6,8 @@ use App\Entity\User;
 use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
 use App\Service\Auth\OAuthLoginResponder;
-use App\Service\ModelConfigService;
+use App\Service\Auth\OAuthSignupGate;
+use App\Service\Auth\SignupBlockedException;
 use App\Service\OAuth\OAuthStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -31,7 +32,7 @@ class GitHubAuthController extends AbstractController
         private EntityManagerInterface $em,
         private OAuthStateService $oauthStateService,
         private OAuthLoginResponder $oauthLoginResponder,
-        private ModelConfigService $modelConfigService,
+        private OAuthSignupGate $signupGate,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
@@ -57,9 +58,10 @@ class GitHubAuthController extends AbstractController
         // result via a deep link — remember that intent in the signed state.
         $native = $request->query->getBoolean('native');
 
-        // Generate signed state token (no session required)
+        // Signed state (no session required); also records the passed human
+        // check the callback requires before creating a NEW account.
         $state = $this->oauthStateService->generateState('github', AccountLanguage::withSignupLanguage(
-            $native ? ['native' => true] : [],
+            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'github'),
             $request->query->get('language'),
         ));
 
@@ -166,13 +168,9 @@ class GitHubAuthController extends AbstractController
                 }
             }
 
-            $this->logger->info('GitHub user info retrieved', [
-                'login' => $userInfo['login'] ?? 'unknown',
-                'email' => $email ?? 'no_email',
-                'id' => $userInfo['id'] ?? 'unknown',
-            ]);
-
-            // Find or create user
+            // A new account needs the human check from the start of the flow
+            // and a free signup slot; an existing account signs in as before.
+            $this->signupGate->assertNewAccountAllowed($email, $statePayload, $request->getClientIp(), $native);
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $email,
@@ -188,11 +186,10 @@ class GitHubAuthController extends AbstractController
 
             // Web → cookies + SPA redirect; native → deep-link handoff token.
             return $this->oauthLoginResponder->success($user, $request, 'github', $native);
+        } catch (SignupBlockedException $e) {
+            return $this->oauthLoginResponder->error('github', $e->getMessage(), $native, ['error_code' => $e->getErrorCodeParam()]);
         } catch (\Exception $e) {
-            $this->logger->error('GitHub OAuth callback error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            $this->logger->error('GitHub OAuth callback error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 
             return $this->oauthLoginResponder->error('github', 'Failed to authenticate with GitHub', $native);
         }
@@ -302,7 +299,7 @@ class GitHubAuthController extends AbstractController
         $this->em->flush();
 
         if ($isNewUser) {
-            $this->modelConfigService->initializeNewUserDefaults($user->getId());
+            $this->signupGate->completeNewUser($user);
         }
 
         return $user;

@@ -69,12 +69,13 @@ final readonly class RecaptchaService
 
             return false;
         } catch (\Exception $e) {
-            $this->logger->error('reCAPTCHA verification error', [
+            $this->logger->error('reCAPTCHA verification error, refusing', [
                 'error' => $e->getMessage(),
             ]);
 
-            // In case of API error, allow request (fail-open for better UX)
-            return true;
+            // Fail closed. The person sees "please try again"; a verification
+            // that passes whenever Google is unreachable protects nothing.
+            return false;
         }
     }
 

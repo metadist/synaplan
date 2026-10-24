@@ -91,9 +91,31 @@ export async function sendCheckoutCompletedWebhook(
   })
 }
 
+/**
+ * The first invoice, expanded on the subscription the way a card payment inside
+ * Checkout leaves it: `paid`. The backend grants a tier only for a settled
+ * invoice (StripeEntitlement), and an expanded object spares it the Stripe
+ * API call it could not make against the mock anyway. `invoiceStatus: 'open'`
+ * models a SEPA mandate whose debit is still processing.
+ */
+function latestInvoice(
+  subscriptionId: string,
+  customerId: string,
+  status: 'paid' | 'open' = 'paid'
+): Record<string, unknown> {
+  return {
+    id: `in_${subscriptionId}`,
+    object: 'invoice',
+    customer: customerId,
+    subscription: subscriptionId,
+    status,
+    paid: status === 'paid',
+  }
+}
+
 export async function sendSubscriptionCreatedWebhook(
   request: APIRequestContext,
-  opts: SubscriptionWebhookData & { eventId?: string }
+  opts: SubscriptionWebhookData & { eventId?: string; invoiceStatus?: 'paid' | 'open' }
 ): Promise<WebhookResult> {
   const now = Math.floor(Date.now() / 1000)
   return sendStripeWebhook({
@@ -105,6 +127,11 @@ export async function sendSubscriptionCreatedWebhook(
       object: 'subscription',
       customer: opts.customerId,
       status: opts.status ?? 'active',
+      latest_invoice: latestInvoice(
+        opts.subscriptionId,
+        opts.customerId,
+        opts.invoiceStatus ?? 'paid'
+      ),
       items: {
         data: [
           {
@@ -151,6 +178,7 @@ export async function sendSubscriptionUpdatedWebhook(
       object: 'subscription',
       customer: opts.customerId,
       status: opts.status ?? 'active',
+      latest_invoice: latestInvoice(opts.subscriptionId, opts.customerId),
       items: {
         data: [
           {

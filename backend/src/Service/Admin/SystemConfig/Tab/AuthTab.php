@@ -9,6 +9,7 @@ use App\Service\Admin\SystemConfig\DatabaseRow;
 use App\Service\Admin\SystemConfig\FieldDefinition;
 use App\Service\Admin\SystemConfig\SystemConfigTab;
 use App\Service\Auth\RegistrationConfig;
+use App\Service\Auth\SignupPauseSwitch;
 use App\Service\Chat\GuestChatConfig;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
@@ -65,12 +66,27 @@ final readonly class AuthTab implements SystemConfigTab
                 default: 'true',
                 row: new DatabaseRow(GuestChatConfig::CONFIG_GROUP, GuestChatConfig::KEY_ENABLED),
             ),
+            'SIGNUP_PAUSED' => new FieldDefinition(
+                type: 'boolean',
+                description: 'Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. Existing accounts sign in as usual. Takes effect immediately, no restart.',
+                default: 'false',
+                row: new DatabaseRow(SignupPauseSwitch::CONFIG_GROUP, SignupPauseSwitch::KEY_PAUSED),
+            ),
         ]);
     }
 
     private function recaptcha(): ConfigSection
     {
-        return new ConfigSection('reCAPTCHA v3', [
+        return new ConfigSection('Human check (Turnstile, reCAPTCHA v3)', [
+            'TURNSTILE_SITE_KEY' => new FieldDefinition(
+                type: 'text',
+                description: 'Cloudflare Turnstile site key. With both Turnstile keys set, Turnstile runs in front of sign-up, sign-in and every Google/GitHub/Apple start, and reCAPTCHA is ignored. Fails closed.',
+            ),
+            'TURNSTILE_SECRET_KEY' => new FieldDefinition(
+                type: 'password',
+                description: 'Cloudflare Turnstile secret key',
+                sensitive: true,
+            ),
             'RECAPTCHA_ENABLED' => new FieldDefinition(
                 type: 'boolean',
                 description: 'Enable reCAPTCHA',

@@ -437,7 +437,8 @@ import {
 } from '@/services/api/nativeServer'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
-import { useRecaptcha } from '../composables/useRecaptcha'
+import { useSignupChallenge } from '../composables/useSignupChallenge'
+import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -449,7 +450,7 @@ const router = useRouter()
 const route = useRoute()
 const { locale, t } = useI18n()
 const themeStore = useTheme()
-const { getToken: getReCaptchaToken } = useRecaptcha()
+const { getToken: getChallengeToken } = useSignupChallenge()
 const config = useConfigStore()
 
 const isDark = themeStore.isDark
@@ -482,7 +483,7 @@ const goBack = () => {
   }
 }
 
-const { register, error: authError, loading, clearError } = useAuth()
+const { register, error: authError, errorCode: authErrorCode, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
@@ -495,7 +496,9 @@ const {
   signInWith,
   error: socialError,
 } = useSocialAuth()
-const error = computed(() => socialError.value || authError.value)
+const error = computed(
+  () => socialError.value || signupBlockedText(t, authErrorCode.value, authError.value)
+)
 
 const onEmailBlur = () => {
   focusedField.value = null
@@ -524,8 +527,8 @@ const handleRegister = async () => {
 
   if (password.value !== confirmPassword.value) return
 
-  const recaptchaToken = await getReCaptchaToken('register')
-  const result = await register(email.value, password.value, recaptchaToken, String(locale.value))
+  const challengeToken = await getChallengeToken('register')
+  const result = await register(email.value, password.value, challengeToken, String(locale.value))
   if (result.success) {
     registrationNeedsAdmin.value = !result.mailDelivered
     registrationSuccess.value = true

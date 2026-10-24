@@ -204,6 +204,10 @@
                 "webSpeechEnabled": "bool",
                 "whisperEnabled": "bool"
             },
+            "turnstile": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
             "usageTaximeter": {
                 "enabled": "bool"
             },
@@ -424,6 +428,10 @@
                 "webSpeechEnabled": "bool",
                 "whisperEnabled": "bool"
             },
+            "turnstile": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
             "usageTaximeter": {
                 "enabled": "bool"
             },
@@ -641,6 +649,10 @@
                 "speechToTextAvailable": "bool",
                 "webSpeechEnabled": "bool",
                 "whisperEnabled": "bool"
+            },
+            "turnstile": {
+                "enabled": "bool",
+                "siteKey": "string"
             },
             "usageTaximeter": {
                 "enabled": "bool"

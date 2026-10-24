@@ -55,6 +55,14 @@
         <env name="STRIPE_PRICE_BUSINESS" value="price_1TestSuiteBusiness" force="true" />
         <!-- Force the shipped allowlist (no sepa_debit) so a developer's local .env can't widen it. -->
         <env name="STRIPE_PAYMENT_METHODS" value="card,link,klarna" force="true" />
+        <!-- Account-creation limits wide open: the suites register many users from one IP. -->
+        <env name="SIGNUP_IP_LIMIT" value="100000" force="true" />
+        <env name="SIGNUP_GLOBAL_LIMIT" value="100000" force="true" />
+        <env name="CHECKOUT_IP_LIMIT" value="100000" force="true" />
+        <env name="PAID_SIGNUP_ALERT_LIMIT" value="100000" force="true" />
+        <env name="TURNSTILE_SECRET_KEY" value="" force="true" />
+        <env name="TURNSTILE_SITE_KEY" value="" force="true" />
+        <env name="SIGNUP_PAUSED" value="" force="true" />
         <!-- Whisper / TTS (defaults for testing) -->
         <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
         <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />

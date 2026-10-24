@@ -297,6 +297,9 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->user->setPaymentDetails($details);
         $this->em->flush();
 
+        // The settled invoice re-affirms the tier, which needs the subscription.
+        $this->stripeMock->expect('GET', 'subscriptions/'.$subscriptionId, $this->subscriptionObject(['id' => $subscriptionId, 'status' => 'active']));
+
         $payload = $this->buildEventPayload('invoice.payment_succeeded', [
             'id' => 'in_'.bin2hex(random_bytes(4)),
             'object' => 'invoice',
@@ -660,21 +663,114 @@ class StripeWebhookControllerTest extends WebTestCase
             'status' => 'canceled',
         ]);
 
+        // The first invoice is fetched to prove the money settled (a card pays
+        // synchronously inside Checkout, so it is already `paid` here).
+        $invoiceId = 'in_'.bin2hex(random_bytes(4));
+        $this->stripeMock->expect('GET', 'invoices/'.$invoiceId, $this->invoiceObject($invoiceId, 'paid', $newSubId));
+
         $payload = $this->buildEventPayload(
             'customer.subscription.created',
-            $this->subscriptionObject(['id' => $newSubId, 'status' => 'active']),
+            $this->subscriptionObject(['id' => $newSubId, 'status' => 'active', 'latest_invoice' => $invoiceId]),
         );
         $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
         $this->assertResponseIsSuccessful();
 
         $this->em->refresh($this->user);
         $this->assertSame('PRO', $this->user->getUserLevel());
-        $this->assertSame($newSubId, $this->user->getPaymentDetails()['subscription']['stripe_subscription_id']);
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame($newSubId, $sub['stripe_subscription_id']);
+        $this->assertTrue($sub['settled']);
 
         // The SDK can issue both list + retrieve + delete depending on the
         // exact code path; we only require that a list and a delete happened.
         $this->assertGreaterThanOrEqual(1, $this->stripeMock->countCalls('GET', 'subscriptions'));
         $this->assertGreaterThanOrEqual(1, $this->stripeMock->countCalls('DELETE', 'subscriptions/'.$oldSubId));
+    }
+
+    /**
+     * The 2026-10-24 shape: a SEPA mandate makes the subscription `active`
+     * while the first debit is still `processing` (invoice `open`). The
+     * account must stay on the free tier until the money arrives.
+     */
+    public function testSubscriptionCreatedWithUnsettledInvoiceRecordsButDoesNotGrantTheTier(): void
+    {
+        $subId = 'sub_sepa_'.bin2hex(random_bytes(4));
+        $invoiceId = 'in_'.bin2hex(random_bytes(4));
+        $this->stripeMock->expect('GET', 'subscriptions', ['object' => 'list', 'data' => [], 'has_more' => false, 'url' => '/v1/subscriptions']);
+        $this->stripeMock->expect('GET', 'invoices/'.$invoiceId, $this->invoiceObject($invoiceId, 'open', $subId));
+
+        $payload = $this->buildEventPayload(
+            'customer.subscription.created',
+            $this->subscriptionObject(['id' => $subId, 'status' => 'active', 'latest_invoice' => $invoiceId]),
+        );
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertSame('NEW', $this->user->getUserLevel(), 'No tier before the payment settled');
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame($subId, $sub['stripe_subscription_id']);
+        $this->assertSame('PRO', $sub['plan'], 'The plan is recorded so the account can say what is pending');
+        $this->assertFalse($sub['settled']);
+
+        // A retry of the same shape (Stripe redelivers after an outage) must not
+        // change the outcome either.
+        $this->stripeMock->expect('GET', 'subscriptions', ['object' => 'list', 'data' => [], 'has_more' => false, 'url' => '/v1/subscriptions']);
+        $this->stripeMock->expect('GET', 'invoices/'.$invoiceId, $this->invoiceObject($invoiceId, 'open', $subId));
+        $retry = $this->buildEventPayload('customer.subscription.created', $this->subscriptionObject(['id' => $subId, 'status' => 'active', 'latest_invoice' => $invoiceId]));
+        $this->postWebhook($retry, StripeSignatureHelper::header($retry, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+        // The browser rebooted the kernel for the second request, so read the
+        // row through the current container's entity manager.
+        $reloaded = $this->client->getContainer()->get('doctrine')->getManager()->find(User::class, $this->user->getId());
+        $this->assertNotNull($reloaded);
+        $this->assertSame('NEW', $reloaded->getUserLevel());
+    }
+
+    /**
+     * Days later the debit settles: invoice.payment_succeeded is the event
+     * that grants the tier for delayed-notification payment methods.
+     */
+    public function testInvoicePaymentSucceededGrantsTheRecordedPendingTier(): void
+    {
+        $subId = 'sub_settle_'.bin2hex(random_bytes(4));
+        $details = $this->user->getPaymentDetails();
+        $details['subscription'] = ['source' => 'stripe', 'stripe_subscription_id' => $subId, 'status' => 'active', 'plan' => 'PRO', 'settled' => false];
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        // The handler fetches the subscription the invoice belongs to.
+        $this->stripeMock->expect('GET', 'subscriptions/'.$subId, $this->subscriptionObject(['id' => $subId, 'status' => 'active']));
+
+        $invoiceId = 'in_'.bin2hex(random_bytes(4));
+        $payload = $this->buildEventPayload('invoice.payment_succeeded', $this->invoiceObject($invoiceId, 'paid', $subId));
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertSame('PRO', $this->user->getUserLevel());
+        $this->assertTrue($this->user->getPaymentDetails()['subscription']['settled']);
+    }
+
+    /**
+     * A paid invoice of a subscription this account no longer holds must not
+     * revive an old plan.
+     */
+    public function testInvoicePaymentSucceededForAnotherSubscriptionIsIgnored(): void
+    {
+        $currentId = 'sub_current_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($currentId);
+        $this->user->setUserLevel('NEW');
+        $this->em->flush();
+
+        $staleId = 'sub_stale_'.bin2hex(random_bytes(4));
+        $payload = $this->buildEventPayload('invoice.payment_succeeded', $this->invoiceObject('in_'.bin2hex(random_bytes(4)), 'paid', $staleId));
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertSame('NEW', $this->user->getUserLevel());
+        $this->assertSame(0, $this->stripeMock->countCalls('GET', 'subscriptions/'.$staleId), 'Not even fetched: the id mismatch is decided locally');
     }
 
     /**
@@ -754,6 +850,26 @@ class StripeWebhookControllerTest extends WebTestCase
         ];
 
         return array_merge($base, $overrides);
+    }
+
+    /**
+     * A minimal Stripe Invoice: `status` is what StripeEntitlement reads to
+     * decide whether the money settled.
+     *
+     * @return array<string, mixed>
+     */
+    private function invoiceObject(string $invoiceId, string $status, string $subscriptionId): array
+    {
+        return [
+            'id' => $invoiceId,
+            'object' => 'invoice',
+            'customer' => $this->stripeCustomerId,
+            'subscription' => $subscriptionId,
+            'status' => $status,
+            'paid' => 'paid' === $status,
+            'amount_paid' => 'paid' === $status ? 1995 : 0,
+            'amount_due' => 1995,
+        ];
     }
 
     private function postWebhook(string $payload, string $signature): void
