@@ -151,6 +151,75 @@ final readonly class ResearchStateStore
         return $due;
     }
 
+    /**
+     * Count one more lost or stalled attempt of this unit and remember when.
+     * The reaper redispatches once, then stops the run.
+     */
+    public function noteLostClaim(string $runId, int $seq): int
+    {
+        $next = $this->lostClaims($runId, $seq) + 1;
+        $this->keys->set(
+            ResearchKey::reap($runId, $seq),
+            $next.'|'.$this->clock->now()->getTimestamp(),
+            $this->ttlSeconds(),
+        );
+
+        return $next;
+    }
+
+    public function lostClaims(string $runId, int $seq): int
+    {
+        return $this->reapMark($runId, $seq)['count'];
+    }
+
+    /** Unix time of the last redispatch of this unit, null when it never needed one. */
+    public function lastRedispatchAt(string $runId, int $seq): ?int
+    {
+        return $this->reapMark($runId, $seq)['at'];
+    }
+
+    /**
+     * Ask the run to stop. It lives in its own key, so a unit that is running
+     * cannot overwrite it with its checkpoint, and its next paid call sees it.
+     */
+    public function requestStop(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        $this->keys->set(ResearchKey::stop($runId), '1', $this->ttlSeconds());
+    }
+
+    public function stopRequested(string $runId): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::stop($runId));
+    }
+
+    public function isClaimed(string $runId, int $seq): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::claim($runId, $seq));
+    }
+
+    /**
+     * Runs that still have work left. A finished run is dropped from the index.
+     *
+     * @return list<ResearchRunState>
+     */
+    public function activeRuns(): array
+    {
+        $runs = [];
+        foreach ($this->liveMembers(ResearchKey::ACTIVE, false) as $runId) {
+            $state = $this->load($runId);
+            if (null !== $state && !$state->status->isTerminal()) {
+                $runs[] = $state;
+            }
+        }
+
+        return $runs;
+    }
+
     public function activeCount(int $userId, ?ResearchDepth $depth = null): int
     {
         $count = 0;
@@ -205,19 +274,33 @@ final readonly class ResearchStateStore
         return count($runIds);
     }
 
+    /**
+     * Drop the raw page texts and keep the report. Called only after the
+     * closing unit is checkpointed, so a crash before that still has the pages.
+     */
+    public function dropSourceTexts(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        foreach ($this->keys->members(ResearchKey::textIndex($runId)) as $sourceId) {
+            $this->keys->delete(ResearchKey::text($runId, $sourceId));
+        }
+        $this->keys->delete(ResearchKey::textIndex($runId));
+    }
+
     public function delete(string $runId): void
     {
         ResearchIds::assert($runId);
         $state = $this->load($runId);
         $this->keys->delete(ResearchKey::run($runId));
         $this->dropClaims($runId);
-        foreach ($this->keys->members(ResearchKey::textIndex($runId)) as $sourceId) {
-            $this->keys->delete(ResearchKey::text($runId, $sourceId));
-        }
-        $this->keys->delete(ResearchKey::textIndex($runId));
+        $this->dropSourceTexts($runId);
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
+        $this->keys->delete(ResearchKey::stop($runId));
         if (null !== $state) {
+            for ($seq = 1; $seq <= $state->expectedSeq; ++$seq) {
+                $this->keys->delete(ResearchKey::reap($runId, $seq));
+            }
             $this->keys->removeMember(ResearchKey::owner($state->ref->userId), $runId);
             $this->keys->removeMember(ResearchKey::activeUser($state->ref->userId), $state->ref->depth->value.':'.$runId);
         }
@@ -292,6 +375,23 @@ final readonly class ResearchStateStore
                 $this->keys->delete(ResearchKey::claim($runId, $parsed['seq']));
             }
         }
+    }
+
+    /**
+     * @return array{count: int, at: ?int}
+     */
+    private function reapMark(string $runId, int $seq): array
+    {
+        ResearchIds::assert($runId);
+        if ($seq < 1) {
+            throw new \InvalidArgumentException('A research unit needs a sequence number.');
+        }
+        $raw = $this->keys->get(ResearchKey::reap($runId, $seq));
+        if (!is_string($raw) || 1 !== preg_match('/^([0-9]+)\|([0-9]+)$/', $raw, $match)) {
+            return ['count' => 0, 'at' => null];
+        }
+
+        return ['count' => (int) $match[1], 'at' => (int) $match[2]];
     }
 
     /**

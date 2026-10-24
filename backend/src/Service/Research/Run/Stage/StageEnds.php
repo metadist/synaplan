@@ -12,7 +12,7 @@ final class StageEnds
 {
     public static function beforeCall(StageContext $ctx): ?StageResult
     {
-        if ($ctx->stop->stopped) {
+        if ($ctx->stop->requested()) {
             return self::finish($ctx, ResearchStatus::Stopped, new ResearchOutcome(ResearchOutcome::STOPPED_BY_USER), 'stopped');
         }
         if ($ctx->state->budget->canCall()) {

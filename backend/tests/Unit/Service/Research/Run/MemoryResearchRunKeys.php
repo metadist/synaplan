@@ -29,6 +29,9 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
     /** @var array<string, array<string, int>> */
     private array $zsets = [];
 
+    /** Runs once, right before the next claim, to interleave a second worker. */
+    public ?\Closure $beforeClaim = null;
+
     public function __construct(private readonly ClockInterface $clock)
     {
     }
@@ -52,6 +55,11 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
 
     public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
     {
+        $interleave = $this->beforeClaim;
+        $this->beforeClaim = null;
+        if (null !== $interleave) {
+            $interleave();
+        }
         if (null !== $this->get($claimKey)) {
             return false;
         }
