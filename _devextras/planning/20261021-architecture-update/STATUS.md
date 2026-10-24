@@ -69,8 +69,7 @@ answers 200 with `synaplan_server_info{role="worker"}` and no slot gauges.
 On compose, roles on one machine need distinct ids; the platform compose
 derives `web1-worker`, `web1-bulk` and `web1-scheduler` from the exported
 `SYNAPLAN_SERVER_ID`, and `updatewebN.sh` exports it with
-`SYNAPLAN_HOST_NAME` next to `SYNDBHOST` (`synaplan-platform`, pull request
-recorded below). Kubernetes pod names are distinct on their own. The
+`SYNAPLAN_HOST_NAME` next to `SYNDBHOST` ([synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33)). Kubernetes pod names are distinct on their own. The
 Downward API variables are AU8's, in `synaplan-charts`.
 
 **Dev stack, 2026-10-24.** Rebuilt `backend` (classic mode, no worker pools).
