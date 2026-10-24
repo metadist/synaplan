@@ -126,17 +126,22 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
 
     /**
      * Locks in the env-configured payment methods on the outbound Checkout
-     * Session. STRIPE_PAYMENT_METHODS in .env.test must contain `sepa_debit`
-     * (IBAN) so EU customers can mandate Direct Debit alongside card / Link /
-     * Klarna. Apple Pay and Google Pay are NOT separate types — Stripe shows
-     * them automatically when `card` is present and the device supports it,
-     * so we only assert the explicitly-configured methods here.
+     * Session: card, Link and Klarna. Apple Pay and Google Pay are NOT
+     * separate types — Stripe shows them automatically when `card` is present
+     * and the device supports it, so we only assert the explicitly-configured
+     * methods here.
      *
-     * If this test fails after dropping a method from STRIPE_PAYMENT_METHODS,
-     * it's deliberate; update both `.env.test` and `.env.example` and adjust
-     * the assertion below.
+     * `sepa_debit` is deliberately absent. Stripe accepts a SEPA mandate before
+     * any money moves and the subscription turns `active` on an unverified
+     * IBAN, which was abused on 2026-10-24 to open hundreds of paid accounts
+     * with fake mandates. Re-adding it needs a delayed unlock first — see the
+     * note in `.env.example`.
+     *
+     * If this test fails after changing STRIPE_PAYMENT_METHODS, it's
+     * deliberate; update `.env.test`, `.env.example`, `phpunit.xml.dist` and
+     * the assertions below together.
      */
-    public function testCheckoutForwardsConfiguredPaymentMethodsIncludingSepaDebit(): void
+    public function testCheckoutForwardsConfiguredPaymentMethodsWithoutSepaDebit(): void
     {
         $customerId = 'cus_'.bin2hex(random_bytes(8));
         $this->seedStripeCustomerId($customerId);
@@ -173,17 +178,21 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         $paymentMethods = $checkoutCall['params']['allowed_payment_method_types'] ?? null;
         $this->assertNotNull($paymentMethods, 'Checkout session must include allowed_payment_method_types');
 
-        $needles = ['card', 'link', 'sepa_debit', 'klarna'];
+        $needles = ['card', 'link', 'klarna'];
         if (is_array($paymentMethods)) {
             foreach ($needles as $method) {
                 $this->assertContains($method, $paymentMethods,
                     sprintf('STRIPE_PAYMENT_METHODS must forward %s to Stripe Checkout', $method));
             }
+            $this->assertNotContains('sepa_debit', $paymentMethods,
+                'sepa_debit must stay off until a delayed unlock exists (fake-mandate abuse, 2026-10-24)');
         } else {
             foreach ($needles as $method) {
                 $this->assertStringContainsString($method, (string) $paymentMethods,
                     sprintf('STRIPE_PAYMENT_METHODS must forward %s to Stripe Checkout', $method));
             }
+            $this->assertStringNotContainsString('sepa_debit', (string) $paymentMethods,
+                'sepa_debit must stay off until a delayed unlock exists (fake-mandate abuse, 2026-10-24)');
         }
     }
 
@@ -223,7 +232,10 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         }
         $this->assertNotNull($checkoutCall, 'Top-up checkout session POST must be captured');
         $this->assertSame('payment', $checkoutCall['params']['mode']);
-        $this->assertContains('sepa_debit', (array) ($checkoutCall['params']['allowed_payment_method_types'] ?? []));
+        $topupMethods = (array) ($checkoutCall['params']['allowed_payment_method_types'] ?? []);
+        $this->assertContains('card', $topupMethods);
+        $this->assertNotContains('sepa_debit', $topupMethods,
+            'top-ups must not accept an unverified IBAN either');
     }
 
     public function testCheckoutReusesExistingStripeCustomer(): void
