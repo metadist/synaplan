@@ -11,6 +11,8 @@ namespace App\Service\Research\Run\Ledger;
  */
 final class EvidenceLedger
 {
+    private const MAX_POINT_QUERIES = 12;
+
     /** @var array<string, Source> */
     private array $sources = [];
 
@@ -122,7 +124,7 @@ final class EvidenceLedger
         $this->report = '' === $text ? null : $text;
     }
 
-    public function markPoint(string $id, string $status): void
+    public function markPoint(string $id, string $status, string $note = ''): void
     {
         $point = $this->points[$id] ?? null;
         if (null === $point) {
@@ -131,7 +133,67 @@ final class EvidenceLedger
         if (!in_array($status, PlanPoint::STATUSES, true)) {
             throw new \InvalidArgumentException('A plan point status is not recognised.');
         }
-        $this->points[$id] = new PlanPoint($id, $point->title, $status, $point->why, $point->queries);
+        $why = '' !== trim($note) ? PlainText::line($note, 300) : $point->why;
+        $this->points[$id] = new PlanPoint($id, $point->title, $status, $why, $point->queries);
+    }
+
+    /**
+     * A search the lead asked for after the plan. The next round runs it
+     * unless that exact search was already run.
+     */
+    public function planSearch(string $pointId, string $query, string $language, string $scope): bool
+    {
+        $point = $this->points[$pointId] ?? null;
+        if (null === $point || count($point->queries) >= self::MAX_POINT_QUERIES) {
+            return false;
+        }
+        $text = PlainText::line($query, 200);
+        if ('' === $text || !in_array($scope, ['web', 'both'], true)) {
+            return false;
+        }
+        $queries = $point->queries;
+        $queries[] = [
+            'q' => $text,
+            'language' => '' === $language ? 'en' : $language,
+            'scope' => $scope,
+        ];
+        $this->points[$pointId] = new PlanPoint($point->id, $point->title, $point->status, $point->why, $queries);
+
+        return true;
+    }
+
+    /** A planned web search that has not run yet, keyed like the gather step. */
+    public function hasPlannedSearch(): bool
+    {
+        $ran = [];
+        foreach ($this->queries as $query) {
+            $ran[$query->pointId.'|'.$query->query] = true;
+        }
+        foreach ($this->points as $point) {
+            foreach ($point->queries as $query) {
+                if ('files' !== $query['scope'] && !isset($ran[$point->id.'|'.$query['q']])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function hasEvidenceFor(string $pointId): bool
+    {
+        foreach ($this->evidence as $card) {
+            if ($card->pointId === $pointId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function evidenceCount(): int
+    {
+        return count($this->evidence);
     }
 
     public function describeSource(string $id, ?string $sourceClass, ?string $published): void
@@ -455,7 +517,7 @@ final class EvidenceLedger
                     PlainText::line((string) ($point['title'] ?? ''), 300),
                     $status,
                     PlainText::line((string) ($point['why'] ?? ''), 300),
-                    $this->queriesOf(is_array($queries) ? $queries : []),
+                    $this->queriesOf(is_array($queries) ? $queries : [], self::MAX_POINT_QUERIES),
                 );
             }
         }
@@ -635,7 +697,7 @@ final class EvidenceLedger
      *
      * @return list<array{q: string, language: string, scope: string}>
      */
-    private function queriesOf(array $queries): array
+    private function queriesOf(array $queries, int $max = 4): array
     {
         $clean = [];
         foreach ($queries as $query) {
@@ -656,7 +718,7 @@ final class EvidenceLedger
                 'language' => '' === $language ? 'en' : $language,
                 'scope' => $scope,
             ];
-            if (4 === count($clean)) {
+            if ($max === count($clean)) {
                 break;
             }
         }

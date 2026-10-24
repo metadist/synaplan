@@ -97,7 +97,7 @@ final readonly class GatherStage implements ResearchStage
         $brief = $ctx->state->ledger->brief();
         $lines = [];
         foreach ($hits as $hit) {
-            $lines[] = $hit['id']."\n".'title: '.self::data($hit['title'])."\n".'url: '.$hit['url']."\n".'snippet: '.self::data($hit['snippet'])."\n".'date: '.self::data($hit['date']);
+            $lines[] = $hit['id']."\n".'title: '.ResearchPrompts::data($hit['title'])."\n".'url: '.$hit['url']."\n".'snippet: '.ResearchPrompts::data($hit['snippet'])."\n".'date: '.ResearchPrompts::data($hit['date']);
         }
         $points = array_map(static fn (PlanPoint $point): string => $point->id.' '.$point->title, $ctx->state->ledger->points());
         $frame = null !== $brief ? $brief->timeFrame : null;
@@ -121,12 +121,6 @@ final readonly class GatherStage implements ResearchStage
             null !== $brief ? $brief->mustAvoid : [],
             $ctx->state->budget->sourcesLeft() * self::SPARE_FACTOR,
         );
-    }
-
-    /** A page title cannot close the <results> block it is listed in. */
-    private static function data(string $text): string
-    {
-        return str_replace(['<', '>'], ['‹', '›'], $text);
     }
 
     /**

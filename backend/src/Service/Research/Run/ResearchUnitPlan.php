@@ -7,8 +7,8 @@ namespace App\Service\Research\Run;
 /**
  * The four steps a research run takes in order.
  *
- * A reflection and a fact-check are later steps, so a round goes from
- * searching and reading straight to the report.
+ * A round that still has open points queues another round. A fact-check
+ * is a later step, so the report still follows the last round.
  */
 final class ResearchUnitPlan
 {
@@ -34,7 +34,11 @@ final class ResearchUnitPlan
 
         return match ($finished) {
             self::BRIEF_PLAN => 'gather' === $stageNext ? self::ROUND : null,
-            self::ROUND => 'write' === $stageNext ? self::WRITE : null,
+            self::ROUND => match ($stageNext) {
+                'write' => self::WRITE,
+                'round' => self::ROUND,
+                default => null,
+            },
             self::WRITE => 'deliver' === $stageNext ? self::DELIVER : null,
             default => null,
         };

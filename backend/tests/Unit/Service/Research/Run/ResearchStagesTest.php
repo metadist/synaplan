@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\AI\StructuredOutput\Schema\ResearchBriefSchema;
+use App\AI\StructuredOutput\Schema\ResearchDecisionSchema;
 use App\AI\StructuredOutput\Schema\ResearchEvidenceSchema;
 use App\AI\StructuredOutput\Schema\ResearchPlanSchema;
 use App\AI\StructuredOutput\Schema\ResearchTriageSchema;
@@ -550,7 +551,7 @@ final class ResearchStagesTest extends TestCase
     public function testResearchPromptsStayInternal(): void
     {
         $topics = array_column(PromptCatalog::all(), 'topic');
-        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_write'] as $topic) {
+        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_write'] as $topic) {
             self::assertContains($topic, $topics);
         }
         $read = null;
@@ -573,6 +574,7 @@ final class ResearchStagesTest extends TestCase
             ['class' => ResearchPlanSchema::class],
             ['class' => ResearchTriageSchema::class],
             ['class' => ResearchEvidenceSchema::class],
+            ['class' => ResearchDecisionSchema::class],
         ];
     }
 
