@@ -19,7 +19,7 @@ use Psr\Clock\ClockInterface;
 final readonly class ResearchStateStore
 {
     /** A reader never sees more than its context window, so more text is only memory. */
-    private const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
+    public const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 
     public function __construct(
         private ResearchRunKeys $keys,

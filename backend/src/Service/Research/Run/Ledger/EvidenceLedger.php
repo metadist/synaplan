@@ -37,6 +37,8 @@ final class EvidenceLedger
 
     private ?ResearchBrief $brief = null;
 
+    private ?string $report = null;
+
     private int $nextSource = 1;
 
     private int $nextEvidence = 1;
@@ -68,13 +70,56 @@ final class EvidenceLedger
         $this->outline = $outline;
     }
 
-    public function addPoint(string $title): string
+    /**
+     * @param list<array{q?: string, language?: string, scope?: string}> $queries
+     */
+    public function addPoint(string $title, string $why = '', array $queries = []): string
     {
         $id = 'p'.$this->nextPoint;
         ++$this->nextPoint;
-        $this->points[$id] = new PlanPoint($id, PlainText::line($title, 300), PlanPoint::OPEN);
+        $this->points[$id] = new PlanPoint($id, PlainText::line($title, 300), PlanPoint::OPEN, PlainText::line($why, 300), $this->queriesOf($queries));
 
         return $id;
+    }
+
+    /**
+     * @return list<PlanPoint>
+     */
+    public function points(): array
+    {
+        return array_values($this->points);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function outline(): array
+    {
+        return $this->outline;
+    }
+
+    public function source(string $id): ?Source
+    {
+        return $this->sources[$id] ?? null;
+    }
+
+    /**
+     * @return list<Source>
+     */
+    public function sources(): array
+    {
+        return array_values($this->sources);
+    }
+
+    public function report(): ?string
+    {
+        return $this->report;
+    }
+
+    public function setReport(string $markdown): void
+    {
+        $text = trim($markdown);
+        $this->report = '' === $text ? null : $text;
     }
 
     public function markPoint(string $id, string $status): void
@@ -86,7 +131,16 @@ final class EvidenceLedger
         if (!in_array($status, PlanPoint::STATUSES, true)) {
             throw new \InvalidArgumentException('A plan point status is not recognised.');
         }
-        $this->points[$id] = new PlanPoint($id, $point->title, $status);
+        $this->points[$id] = new PlanPoint($id, $point->title, $status, $point->why, $point->queries);
+    }
+
+    public function describeSource(string $id, ?string $sourceClass, ?string $published): void
+    {
+        $source = $this->sources[$id] ?? null;
+        if (null === $source) {
+            throw new \InvalidArgumentException('That source is not in this research.');
+        }
+        $this->sources[$id] = $source->described($sourceClass, $published);
     }
 
     public function addSource(Source $source): string
@@ -278,6 +332,7 @@ final class EvidenceLedger
             'leads' => array_map(static fn (SourceLead $lead): array => $lead->toArray(), $this->leads),
             'queries' => array_map(static fn (SearchQuery $query): array => $query->toArray(), $this->queries),
             'models' => $this->models,
+            'report' => $this->report,
             'next' => [
                 'source' => $this->nextSource,
                 'evidence' => $this->nextEvidence,
@@ -302,6 +357,9 @@ final class EvidenceLedger
         $ledger->restoreQueries($data['queries'] ?? []);
         $ledger->restoreModels($data['models'] ?? []);
         $ledger->restoreCounters($data['next'] ?? []);
+        if (is_string($data['report'] ?? null) && '' !== trim($data['report'])) {
+            $ledger->report = trim($data['report']);
+        }
 
         return $ledger;
     }
@@ -391,7 +449,14 @@ final class EvidenceLedger
                 if (!in_array($status, PlanPoint::STATUSES, true)) {
                     $status = PlanPoint::OPEN;
                 }
-                $this->points[$id] = new PlanPoint($id, PlainText::line((string) ($point['title'] ?? ''), 300), $status);
+                $queries = $point['queries'] ?? [];
+                $this->points[$id] = new PlanPoint(
+                    $id,
+                    PlainText::line((string) ($point['title'] ?? ''), 300),
+                    $status,
+                    PlainText::line((string) ($point['why'] ?? ''), 300),
+                    $this->queriesOf(is_array($queries) ? $queries : []),
+                );
             }
         }
         $outline = $plan['outline'] ?? [];
@@ -563,5 +628,39 @@ final class EvidenceLedger
         }
 
         return $highest;
+    }
+
+    /**
+     * @param array<mixed> $queries
+     *
+     * @return list<array{q: string, language: string, scope: string}>
+     */
+    private function queriesOf(array $queries): array
+    {
+        $clean = [];
+        foreach ($queries as $query) {
+            if (!is_array($query)) {
+                continue;
+            }
+            $text = PlainText::line((string) ($query['q'] ?? ''), 200);
+            if ('' === $text) {
+                continue;
+            }
+            $language = strtolower(PlainText::line((string) ($query['language'] ?? ''), 8));
+            $scope = (string) ($query['scope'] ?? 'web');
+            if (!in_array($scope, ['web', 'files', 'both'], true)) {
+                $scope = 'web';
+            }
+            $clean[] = [
+                'q' => $text,
+                'language' => '' === $language ? 'en' : $language,
+                'scope' => $scope,
+            ];
+            if (4 === count($clean)) {
+                break;
+            }
+        }
+
+        return $clean;
     }
 }

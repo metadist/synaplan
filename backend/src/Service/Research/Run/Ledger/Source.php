@@ -88,6 +88,51 @@ final readonly class Source
         );
     }
 
+    public function described(?string $sourceClass, ?string $published): self
+    {
+        $class = self::optional($sourceClass, 40);
+        $date = self::optional($published, 40);
+
+        return new self(
+            $this->id,
+            $this->kind,
+            $this->title,
+            $this->status,
+            $this->url,
+            $this->fileId,
+            $this->host,
+            new SourceDetails(
+                $date ?? $this->details->published,
+                $class ?? $this->details->sourceClass,
+                $this->details->reason,
+                $this->details->readBy,
+                $this->details->origin,
+                $this->details->fromId,
+            ),
+        );
+    }
+
+    public function fromLink(string $fromId): self
+    {
+        return new self(
+            $this->id,
+            $this->kind,
+            $this->title,
+            $this->status,
+            $this->url,
+            $this->fileId,
+            $this->host,
+            new SourceDetails(
+                $this->details->published,
+                $this->details->sourceClass,
+                $this->details->reason,
+                $this->details->readBy,
+                'link',
+                PlainText::line($fromId, 20),
+            ),
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */

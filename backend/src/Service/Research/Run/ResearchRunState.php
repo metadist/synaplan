@@ -139,6 +139,25 @@ final class ResearchRunState
         return $state;
     }
 
+    public function advance(ResearchStatus $status): void
+    {
+        if ($status->isTerminal()) {
+            throw new \InvalidArgumentException('A running research step cannot finish the run.');
+        }
+        $this->status = $status;
+        $this->assertShape();
+    }
+
+    public function finish(ResearchStatus $status, ResearchOutcome $outcome): void
+    {
+        if (!$status->isTerminal()) {
+            throw new \InvalidArgumentException('A finished research run needs an outcome, and a running one does not.');
+        }
+        $this->status = $status;
+        $this->outcome = $outcome;
+        $this->assertShape();
+    }
+
     public function assertShape(): void
     {
         $finished = $this->status->isTerminal();
