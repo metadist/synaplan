@@ -125,7 +125,7 @@ final class FixedResearchContext implements ResearchStageContextFactory
             new ResearchRoles(1, 2, 3, 4, 5, false, []),
             $this->events,
             $this->today,
-            new ResearchStop($state->stopRequested),
+            new ResearchStop(),
         );
     }
 }

@@ -152,26 +152,47 @@ final readonly class ResearchStateStore
     }
 
     /**
-     * How many times this unit's lease was already lost. The reaper
-     * redispatches once, then stops the run.
+     * Count one more lost or stalled attempt of this unit and remember when.
+     * The reaper redispatches once, then stops the run.
      */
     public function noteLostClaim(string $runId, int $seq): int
     {
         $next = $this->lostClaims($runId, $seq) + 1;
-        $this->keys->set(ResearchKey::reap($runId, $seq), (string) $next, $this->ttlSeconds());
+        $this->keys->set(
+            ResearchKey::reap($runId, $seq),
+            $next.'|'.$this->clock->now()->getTimestamp(),
+            $this->ttlSeconds(),
+        );
 
         return $next;
     }
 
     public function lostClaims(string $runId, int $seq): int
     {
-        ResearchIds::assert($runId);
-        if ($seq < 1) {
-            throw new \InvalidArgumentException('A research unit needs a sequence number.');
-        }
-        $raw = $this->keys->get(ResearchKey::reap($runId, $seq));
+        return $this->reapMark($runId, $seq)['count'];
+    }
 
-        return is_string($raw) && 1 === preg_match('/^[0-9]+$/', $raw) ? (int) $raw : 0;
+    /** Unix time of the last redispatch of this unit, null when it never needed one. */
+    public function lastRedispatchAt(string $runId, int $seq): ?int
+    {
+        return $this->reapMark($runId, $seq)['at'];
+    }
+
+    /**
+     * Ask the run to stop. It lives in its own key, so a unit that is running
+     * cannot overwrite it with its checkpoint, and its next paid call sees it.
+     */
+    public function requestStop(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        $this->keys->set(ResearchKey::stop($runId), '1', $this->ttlSeconds());
+    }
+
+    public function stopRequested(string $runId): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::stop($runId));
     }
 
     public function isClaimed(string $runId, int $seq): bool
@@ -275,7 +296,11 @@ final readonly class ResearchStateStore
         $this->dropSourceTexts($runId);
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
+        $this->keys->delete(ResearchKey::stop($runId));
         if (null !== $state) {
+            for ($seq = 1; $seq <= $state->expectedSeq; ++$seq) {
+                $this->keys->delete(ResearchKey::reap($runId, $seq));
+            }
             $this->keys->removeMember(ResearchKey::owner($state->ref->userId), $runId);
             $this->keys->removeMember(ResearchKey::activeUser($state->ref->userId), $state->ref->depth->value.':'.$runId);
         }
@@ -350,6 +375,23 @@ final readonly class ResearchStateStore
                 $this->keys->delete(ResearchKey::claim($runId, $parsed['seq']));
             }
         }
+    }
+
+    /**
+     * @return array{count: int, at: ?int}
+     */
+    private function reapMark(string $runId, int $seq): array
+    {
+        ResearchIds::assert($runId);
+        if ($seq < 1) {
+            throw new \InvalidArgumentException('A research unit needs a sequence number.');
+        }
+        $raw = $this->keys->get(ResearchKey::reap($runId, $seq));
+        if (!is_string($raw) || 1 !== preg_match('/^([0-9]+)\|([0-9]+)$/', $raw, $match)) {
+            return ['count' => 0, 'at' => null];
+        }
+
+        return ['count' => (int) $match[1], 'at' => (int) $match[2]];
     }
 
     /**

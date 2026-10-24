@@ -61,4 +61,9 @@ final class ResearchKey
     {
         return 'research:reap:'.$id.':'.$seq;
     }
+
+    public static function stop(string $id): string
+    {
+        return 'research:stop:'.$id;
+    }
 }

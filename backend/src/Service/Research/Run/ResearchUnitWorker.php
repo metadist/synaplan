@@ -32,15 +32,23 @@ final readonly class ResearchUnitWorker
 
     public function handle(string $runId, string $unit, int $seq): void
     {
-        if (!ResearchUnitPlan::known($unit)) {
+        if (!ResearchUnitPlan::known($unit) || !ResearchIds::isValid($runId) || $seq < 1) {
             return;
         }
         $state = $this->store->load($runId);
-        if (null === $state || $state->status->isTerminal() || $state->expectedSeq !== $seq) {
+        if (!self::due($state, $seq)) {
             return;
         }
         $token = $this->store->claim($runId, $seq, self::leaseMs($state, $unit));
         if (null === $token) {
+            return;
+        }
+        // A duplicate delivery can load before the first one checkpoints and
+        // claim right after it. Only the state read under the claim counts.
+        $state = $this->store->load($runId);
+        if (!self::due($state, $seq)) {
+            $this->store->release($runId, $seq, $token);
+
             return;
         }
         $result = $this->runClaimed($state, $unit, $token);
@@ -48,6 +56,12 @@ final readonly class ResearchUnitWorker
             return;
         }
         $this->after($state, $unit, $result);
+    }
+
+    /** @phpstan-assert-if-true ResearchRunState $state */
+    private static function due(?ResearchRunState $state, int $seq): bool
+    {
+        return null !== $state && !$state->status->isTerminal() && $state->expectedSeq === $seq;
     }
 
     /**
@@ -76,7 +90,7 @@ final readonly class ResearchUnitWorker
 
     private function step(ResearchRunState $state, string $unit): StageResult
     {
-        if ($state->stopRequested) {
+        if ($this->store->stopRequested($state->ref->id)) {
             return $this->stop($state);
         }
         try {

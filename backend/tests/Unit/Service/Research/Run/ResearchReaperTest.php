@@ -9,7 +9,9 @@ use App\Service\Research\Run\ResearchReaper;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchUnitPlan;
+use App\Service\Research\Run\Stage\StageContext;
 use App\Service\Research\Run\Stage\StageResult;
+use Psr\Log\NullLogger;
 
 final class ResearchReaperTest extends ResearchUnitCase
 {
@@ -44,6 +46,80 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertSame(ResearchOutcome::FAILED_INTERRUPTED, $loaded->outcome->code);
         self::assertStringContainsString('interrupted', $loaded->outcome->text());
         self::assertCount(1, $this->bus->sent);
+        self::assertSame([], $this->store->expiredClaims());
+    }
+
+    public function testAReportThatIsAlreadyWrittenIsNotPaidForAgain(): void
+    {
+        $state = $this->openRun();
+        $state->ledger->setReport('Kept.');
+        $this->store->save($state);
+        $units = new ScriptedResearchUnits(new StageResult('deliver'));
+        $reaper = $this->reaper($units);
+
+        foreach ([1, 2] as $_) {
+            self::assertNotNull($this->store->claim($state->ref->id, 1, 1000));
+            $this->clock->sleep(5);
+            $reaper->reap();
+        }
+
+        $loaded = $this->store->load($state->ref->id);
+        self::assertSame(0, $units->calls);
+        self::assertSame('Kept.', $loaded?->ledger->report());
+        self::assertSame(ResearchOutcome::FAILED_INTERRUPTED, $loaded->outcome?->code);
+    }
+
+    public function testAFailingWriterStillClosesTheRunAndTheOtherRunsAreReaped(): void
+    {
+        $broken = $this->openRun();
+        $waiting = $this->waiting(ResearchStatus::WaitingPlan);
+        $this->age($waiting, ResearchReaper::PLAN_WAIT_SECONDS);
+        $units = new ScriptedResearchUnits(new StageResult('deliver'), static function (StageContext $ctx): void {
+            throw new \RuntimeException('The provider closed the connection.');
+        });
+        $reaper = $this->reaper($units);
+        $this->store->noteLostClaim($broken->ref->id, 1);
+        self::assertNotNull($this->store->claim($broken->ref->id, 1, 1000));
+        $this->clock->sleep(5);
+
+        $counts = $reaper->reap();
+
+        self::assertSame(1, $units->calls);
+        self::assertSame(ResearchOutcome::FAILED_INTERRUPTED, $this->store->load($broken->ref->id)?->outcome?->code);
+        self::assertSame(ResearchOutcome::STOPPED_WAITING, $this->store->load($waiting->ref->id)?->outcome?->code);
+        self::assertSame(1, $counts['interrupted']);
+        self::assertSame(1, $counts['stopped']);
+    }
+
+    public function testAStalledRunIsQueuedAgainOnceThenClosed(): void
+    {
+        $state = $this->openRun();
+        $units = new ScriptedResearchUnits(new StageResult('deliver'));
+        $reaper = $this->reaper($units);
+
+        $this->clock->sleep(ResearchReaper::STALL_SECONDS - 1);
+        $reaper->reap();
+        self::assertSame([], $this->bus->sent);
+
+        $this->clock->sleep(1);
+        $reaper->reap();
+        self::assertCount(1, $this->bus->sent);
+        self::assertSame(ResearchStatus::Briefing, $this->store->load($state->ref->id)?->status);
+
+        $this->clock->sleep(ResearchReaper::STALL_SECONDS - 1);
+        $reaper->reap();
+        self::assertCount(1, $this->bus->sent);
+        self::assertSame(ResearchStatus::Briefing, $this->store->load($state->ref->id)?->status);
+
+        $this->clock->sleep(1);
+        $reaper->reap();
+
+        $loaded = $this->store->load($state->ref->id);
+        self::assertCount(1, $this->bus->sent);
+        self::assertSame(['write'], $units->units);
+        self::assertInstanceOf(ResearchRunState::class, $loaded);
+        self::assertSame(ResearchStatus::Failed, $loaded->status);
+        self::assertSame(ResearchOutcome::FAILED_INTERRUPTED, $loaded->outcome?->code);
     }
 
     public function testAnOpenQuestionContinuesAfterTenMinutes(): void
@@ -62,12 +138,26 @@ final class ResearchReaperTest extends ResearchUnitCase
 
         $loaded = $this->store->load($waiting->ref->id);
         self::assertSame(ResearchStatus::Planning, $loaded?->status);
+        self::assertSame(3, $loaded->expectedSeq);
         self::assertSame(ResearchUnitPlan::BRIEF_PLAN, $this->bus->sent[0]['unit'] ?? null);
-        self::assertSame(2, $this->bus->sent[0]['seq'] ?? null);
+        self::assertSame(3, $this->bus->sent[0]['seq'] ?? null);
         self::assertSame(0, $units->calls);
         $events = $this->events->replay($waiting->ref->id, 0);
         self::assertSame('question', $events[0]['event'] ?? null);
         self::assertTrue($events[0]['data']['skipped'] ?? false);
+    }
+
+    public function testAnAnswerThatHoldsTheClaimIsNotOverwritten(): void
+    {
+        $waiting = $this->waiting(ResearchStatus::WaitingAnswer);
+        $this->age($waiting, 601);
+        self::assertNotNull($this->store->claim($waiting->ref->id, 2, 60_000));
+
+        $this->reaper(new ScriptedResearchUnits(new StageResult('gather')))->reap();
+
+        self::assertSame(ResearchStatus::WaitingAnswer, $this->store->load($waiting->ref->id)?->status);
+        self::assertSame([], $this->bus->sent);
+        self::assertSame([], $this->events->replay($waiting->ref->id, 0));
     }
 
     public function testAnUnconfirmedPlanStopsAfterADay(): void
@@ -107,6 +197,7 @@ final class ResearchReaperTest extends ResearchUnitCase
             $this->bus,
             $this->events,
             $this->clock,
+            new NullLogger(),
         );
     }
 }

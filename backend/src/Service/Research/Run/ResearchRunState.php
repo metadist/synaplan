@@ -15,9 +15,6 @@ final class ResearchRunState
 {
     public ?\DateTimeImmutable $expiresAt = null;
 
-    /** Set when the person stops the run. The next unit sees it before any paid call. */
-    public bool $stopRequested = false;
-
     public function __construct(
         public readonly ResearchRunRef $ref,
         public ResearchStatus $status,
@@ -63,7 +60,6 @@ final class ResearchRunState
             'updated_at' => self::stamp($updated),
             'expires_at' => null === $expires ? null : self::stamp($expires),
             'status' => $this->status->value,
-            'stop' => $this->stopRequested,
             'expected_seq' => $expectedSeq ?? $this->expectedSeq,
             'checkpoint_seq' => $checkpointSeq ?? $this->checkpointSeq,
             'outcome' => $this->outcome?->toArray(),
@@ -139,7 +135,6 @@ final class ResearchRunState
         if (is_string($expiresAt) && '' !== $expiresAt) {
             $state->expiresAt = new \DateTimeImmutable($expiresAt);
         }
-        $state->stopRequested = true === ($data['stop'] ?? false);
 
         return $state;
     }

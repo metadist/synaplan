@@ -20,6 +20,7 @@ final readonly class ResolvingResearchStageContext implements ResearchStageConte
         private UserRepository $users,
         private ResearchRoleResolver $roles,
         private ResearchEventLog $events,
+        private ResearchStateStore $store,
         private ClockInterface $clock,
     ) {
     }
@@ -30,13 +31,14 @@ final readonly class ResolvingResearchStageContext implements ResearchStageConte
         if (!$user instanceof User) {
             throw new RoleUnavailable('lead');
         }
+        $runId = $state->ref->id;
 
         return new StageContext(
             $state,
             $this->roles->resolve($user, $state->ref->depth, new ResearchWorld(false), new ResearchModelHints(), null),
             $this->events,
             $this->clock->now(),
-            new ResearchStop($state->stopRequested),
+            new ResearchStop(false, fn (): bool => $this->store->stopRequested($runId)),
         );
     }
 }
