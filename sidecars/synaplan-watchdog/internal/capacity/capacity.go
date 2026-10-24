@@ -120,6 +120,14 @@ func SeenHashKey(prefix string) string {
 	return prefix + SeenKey
 }
 
+// LastKey is the last report of a server, kept as long as the seen-list
+// (SeenTTL). The live snapshot expires after 20 seconds; this copy lets the
+// page show a silent server with its role, machine and log source instead
+// of a bare id.
+func LastKey(prefix, serverID string) string {
+	return prefix + "capacity:last:" + serverID
+}
+
 // PeakTTL keeps a day's peak long enough to be read as "yesterday".
 const PeakTTL = 48 * time.Hour
 

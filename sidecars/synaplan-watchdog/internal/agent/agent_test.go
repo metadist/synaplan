@@ -99,6 +99,13 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	if memory.TTL(capacity.SnapshotKey("synaplan:test:", "web1")) != capacity.SnapshotTTL {
 		t.Fatalf("snapshot ttl = %s", memory.TTL(capacity.SnapshotKey("synaplan:test:", "web1")))
 	}
+	last, err := memory.Get(context.Background(), capacity.LastKey("synaplan:test:", "web1"))
+	if err != nil || string(last) != string(raw) {
+		t.Fatalf("last report differs from the snapshot: %v", err)
+	}
+	if memory.TTL(capacity.LastKey("synaplan:test:", "web1")) != capacity.SeenTTL {
+		t.Fatalf("last report ttl = %s", memory.TTL(capacity.LastKey("synaplan:test:", "web1")))
+	}
 	if seen := memory.Field(capacity.SeenHashKey("synaplan:test:"), "web1"); seen != "2026-10-24T18:00:05Z" {
 		t.Fatalf("seen = %q", seen)
 	}
