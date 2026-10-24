@@ -14,9 +14,14 @@ use Psr\Clock\ClockInterface;
  * Model hints, a world and starting pages are accepted on the request and
  * not applied yet: the run uses the installation's models. Reading whole
  * documents stays off.
+ *
+ * Every change to a run that already exists goes through the unit's claim,
+ * so a worker or the reaper that acts at the same moment is never overwritten.
  */
 final readonly class ResearchRunService
 {
+    private const LIST_HOURS = 48;
+
     public function __construct(
         private ResearchStateStore $store,
         private ResearchUnitBus $bus,
@@ -44,26 +49,27 @@ final readonly class ResearchRunService
     }
 
     /**
+     * The caller's runs of the last 48 hours, newest first.
+     *
      * @return list<array{id: string, status: string, depth: string, question: string, created_at: string}>
      */
-    public function listRecent(User $user): array
+    public function listRecent(User $user, bool $activeOnly = false): array
     {
-        $cutoff = $this->clock->now()->modify('-48 hours');
-        $rows = [];
-        foreach ($this->store->runsFor($user->getId() ?? 0) as $run) {
-            if ($run->ref->createdAt < $cutoff) {
-                continue;
-            }
-            $rows[] = [
-                'id' => $run->ref->id,
-                'status' => $run->status->value,
-                'depth' => $run->ref->depth->value,
-                'question' => $run->ref->question,
-                'created_at' => $run->ref->createdAt->format(\DateTimeInterface::ATOM),
-            ];
-        }
+        $cutoff = $this->clock->now()->modify('-'.self::LIST_HOURS.' hours');
+        $runs = array_filter(
+            $this->store->runsFor($user->getId() ?? 0),
+            static fn (ResearchRunState $run): bool => $run->ref->createdAt >= $cutoff
+                && (!$activeOnly || !$run->status->isTerminal()),
+        );
+        usort($runs, static fn (ResearchRunState $a, ResearchRunState $b): int => $b->ref->createdAt <=> $a->ref->createdAt);
 
-        return $rows;
+        return array_map(static fn (ResearchRunState $run): array => [
+            'id' => $run->ref->id,
+            'status' => $run->status->value,
+            'depth' => $run->ref->depth->value,
+            'question' => $run->ref->question,
+            'created_at' => $run->ref->createdAt->format(\DateTimeInterface::ATOM),
+        ], $runs);
     }
 
     /**
@@ -77,10 +83,10 @@ final readonly class ResearchRunService
         }
         $type = is_string($body['type'] ?? null) ? $body['type'] : '';
         if (ResearchStatus::WaitingAnswer === $state->status && in_array($type, ['answer', 'skip_question'], true)) {
-            return $this->continueWaiting($state, ResearchStatus::Planning, ResearchUnitPlan::BRIEF_PLAN);
+            return $this->continueWaiting($state, ResearchStatus::WaitingAnswer, ResearchStatus::Planning, ResearchUnitPlan::BRIEF_PLAN);
         }
         if (ResearchStatus::WaitingPlan === $state->status && 'approve_plan' === $type) {
-            return $this->continueWaiting($state, ResearchStatus::Gathering, ResearchUnitPlan::ROUND);
+            return $this->continueWaiting($state, ResearchStatus::WaitingPlan, ResearchStatus::Gathering, ResearchUnitPlan::ROUND);
         }
         if (ResearchStatus::WaitingAnswer === $state->status || ResearchStatus::WaitingPlan === $state->status) {
             throw new ResearchRejected(400, 'invalid', 'type', 'That reply is not available for this research.');
@@ -89,22 +95,31 @@ final readonly class ResearchRunService
         throw new ResearchRejected(409, 'not_waiting', null, 'This research is not waiting for a reply.');
     }
 
+    /**
+     * Ask the run to stop. A run nobody is working on stops right away and
+     * its chat hears about it; a unit that is underway sees the stop before
+     * its next paid call and closes the run itself.
+     */
     public function cancel(User $user, string $runId): ResearchRunState
     {
         $state = $this->owned($user, $runId);
-        $this->store->requestStop($state->ref->id);
-        if ($state->status->isTerminal() || $this->store->isClaimed($state->ref->id, $state->expectedSeq)) {
+        if ($state->status->isTerminal()) {
             return $state;
         }
+        $this->store->requestStop($state->ref->id);
         $outcome = new ResearchOutcome(ResearchOutcome::STOPPED_BY_USER);
-        $state->finish(ResearchStatus::Stopped, $outcome);
-        $this->store->save($state);
-        $this->events->append($state->ref->id, 'stopped', ['outcome' => $outcome->toArray()]);
-        if (null !== $state->ref->chatId) {
-            $this->reports->deliver($state);
-        }
+        $stopped = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh) use ($outcome): bool {
+            $fresh->finish(ResearchStatus::Stopped, $outcome);
 
-        return $state;
+            return true;
+        });
+        if (null === $stopped) {
+            return $this->store->load($state->ref->id) ?? $state;
+        }
+        $this->events->append($stopped->ref->id, 'stopped', ['outcome' => $outcome->toArray()]);
+        $this->reports->deliver($stopped);
+
+        return $stopped;
     }
 
     /**
@@ -122,7 +137,7 @@ final readonly class ResearchRunService
             throw new ResearchRejected(400, 'invalid', 'text', 'Write what should change.');
         }
         $question = 'refresh' === $type ? $state->ref->question : $text;
-        if (mb_strlen($question) > 4000) {
+        if (mb_strlen($question) > ResearchRequest::MAX_QUESTION) {
             throw new ResearchRejected(400, 'invalid', 'text', 'That follow-up needs 4000 characters or fewer.');
         }
 
@@ -140,25 +155,31 @@ final readonly class ResearchRunService
         $this->store->delete($state->ref->id);
     }
 
-    private function continueWaiting(ResearchRunState $state, ResearchStatus $status, string $unit): ResearchRunState
+    private function continueWaiting(ResearchRunState $state, ResearchStatus $waiting, ResearchStatus $next, string $unit): ResearchRunState
     {
-        $state->advance($status);
-        $this->store->save($state);
-        $this->bus->dispatch($state->ref->id, $unit, $state->expectedSeq, 0);
+        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh) use ($waiting, $next): bool {
+            if ($waiting !== $fresh->status) {
+                return false;
+            }
+            $fresh->advance($next);
 
-        return $state;
+            return true;
+        });
+        if (null === $saved) {
+            throw new ResearchRejected(409, 'not_waiting', null, 'This research already moved on. Reload it to see where it is.');
+        }
+        $this->bus->dispatch($saved->ref->id, $unit, $saved->expectedSeq, 0);
+
+        return $saved;
     }
 
     private function open(User $user, ResearchRequest $request, ?string $idempotencyKey, ?string $parent): ResearchRunState
     {
         $userId = $user->getId() ?? 0;
         if (null !== $idempotencyKey) {
-            $existing = $this->store->findIdempotency($userId, $idempotencyKey);
-            if (null !== $existing) {
-                $again = $this->store->load($existing);
-                if (null !== $again && $again->ref->userId === $userId) {
-                    return $again;
-                }
+            $again = $this->repeated($userId, $idempotencyKey);
+            if (null !== $again) {
+                return $again;
             }
         }
         $this->guardLimits($userId, $request->depth);
@@ -177,7 +198,8 @@ final readonly class ResearchRunService
             if (null !== $winner && $winner !== $state->ref->id) {
                 $this->store->delete($state->ref->id);
 
-                return $this->owned($user, $winner);
+                return $this->repeated($userId, $idempotencyKey)
+                    ?? throw new ResearchRejected(409, 'conflict', 'Idempotency-Key', 'Another start with this key is still being set up. Try again in a moment.');
             }
         }
         $this->events->append($state->ref->id, 'run', [
@@ -191,23 +213,23 @@ final readonly class ResearchRunService
         return $state;
     }
 
+    private function repeated(int $userId, string $idempotencyKey): ?ResearchRunState
+    {
+        $existing = $this->store->findIdempotency($userId, $idempotencyKey);
+        if (null === $existing) {
+            return null;
+        }
+        $again = $this->store->load($existing);
+
+        return null !== $again && $again->ref->userId === $userId ? $again : null;
+    }
+
     private function guardLimits(int $userId, ResearchDepth $depth): void
     {
-        $active = 0;
-        $thorough = 0;
-        foreach ($this->store->runsFor($userId) as $run) {
-            if ($run->status->isTerminal()) {
-                continue;
-            }
-            ++$active;
-            if (ResearchDepth::Thorough === $run->ref->depth) {
-                ++$thorough;
-            }
-        }
-        if ($active >= $this->config->maxActiveRuns()) {
+        if ($this->store->activeCount($userId) >= $this->config->maxActiveRuns()) {
             throw new ResearchRejected(429, 'too_many', null, 'Too many research runs are already going. Wait for one to finish, or stop one.');
         }
-        if (ResearchDepth::Thorough === $depth && $thorough >= $this->config->maxActiveThorough()) {
+        if (ResearchDepth::Thorough === $depth && $this->store->activeCount($userId, ResearchDepth::Thorough) >= $this->config->maxActiveThorough()) {
             throw new ResearchRejected(429, 'too_many', 'depth', 'A thorough research is already going. Wait for it to finish, or pick a shorter one.');
         }
     }

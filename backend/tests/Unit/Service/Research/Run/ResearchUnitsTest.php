@@ -169,7 +169,6 @@ final class ResearchUnitsTest extends ResearchUnitCase
             $this->events,
             $this->researchConfig(),
             new SilentResearchReport(),
-            new \Psr\Log\NullLogger(),
         );
 
         $worker->handle($state->ref->id, 'brief_plan', 1);
@@ -232,7 +231,6 @@ final class ResearchUnitsTest extends ResearchUnitCase
             $this->events,
             $this->researchConfig(false),
             new SilentResearchReport(),
-            new \Psr\Log\NullLogger(),
         );
 
         $worker->handle($state->ref->id, 'brief_plan', 1);
@@ -276,7 +274,6 @@ final class ResearchUnitsTest extends ResearchUnitCase
             $this->events,
             $this->researchConfig(),
             $reports ?? new SilentResearchReport(),
-            new \Psr\Log\NullLogger(),
         );
     }
 }

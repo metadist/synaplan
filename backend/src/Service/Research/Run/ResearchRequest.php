@@ -11,6 +11,8 @@ use App\Repository\ChatRepository;
 /** A start request that has already been checked. */
 final readonly class ResearchRequest
 {
+    public const MAX_QUESTION = 4000;
+
     /** @var list<string> */
     private const FIELDS = [
         'question', 'depth', 'sources', 'language', 'output', 'instructions',
@@ -29,22 +31,27 @@ final readonly class ResearchRequest
      */
     public static function fromBody(array $body, bool $session, User $user, ChatRepository $chats): self
     {
-        self::rejectUnknown($body);
+        self::checkFields($body);
 
         return new self(self::question($body), self::depth($body), self::chat($body, $session, $user, $chats));
     }
 
     /**
+     * Unknown fields are refused; the optional ones only need the right shape.
+     *
      * @param array<string, mixed> $body
      */
-    private static function rejectUnknown(array $body): void
+    private static function checkFields(array $body): void
     {
         foreach (array_keys($body) as $field) {
             if (!in_array($field, self::FIELDS, true)) {
                 throw new ResearchRejected(400, 'invalid', (string) $field, 'That field is not part of a research request.');
             }
         }
-        self::optionalText($body, 'instructions', 4000);
+        if (null !== ($body['assistant_id'] ?? null) && !is_int($body['assistant_id'])) {
+            throw new ResearchRejected(400, 'invalid', 'assistant_id', 'That assistant was not found.');
+        }
+        self::optionalText($body, 'instructions', self::MAX_QUESTION);
         self::optionalText($body, 'language', 32);
         self::optionalText($body, 'output', 32);
         self::parent($body);
@@ -66,7 +73,7 @@ final readonly class ResearchRequest
         }
         $question = trim($question);
         $length = mb_strlen($question);
-        if ($length < 1 || $length > 4000) {
+        if ($length < 1 || $length > self::MAX_QUESTION) {
             throw new ResearchRejected(400, 'invalid', 'question', 'The question needs between 1 and 4000 characters.');
         }
 

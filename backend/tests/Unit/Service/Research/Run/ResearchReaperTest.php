@@ -15,6 +15,14 @@ use Psr\Log\NullLogger;
 
 final class ResearchReaperTest extends ResearchUnitCase
 {
+    private SilentResearchReport $reports;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->reports = new SilentResearchReport();
+    }
+
     public function testALostLeaseIsRedispatchedOnceThenInterrupted(): void
     {
         $state = $this->openRun();
@@ -47,6 +55,7 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertStringContainsString('interrupted', $loaded->outcome->text());
         self::assertCount(1, $this->bus->sent);
         self::assertSame([], $this->store->expiredClaims());
+        self::assertSame(['failed'], $this->reports->statuses);
     }
 
     public function testAReportThatIsAlreadyWrittenIsNotPaidForAgain(): void
@@ -176,6 +185,7 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertStringContainsString('not confirmed', $loaded->outcome->text());
         self::assertSame([], $this->bus->sent);
         self::assertSame(0, $units->calls);
+        self::assertSame(['stopped'], $this->reports->statuses);
     }
 
     private function waiting(ResearchStatus $status): ResearchRunState
@@ -198,6 +208,7 @@ final class ResearchReaperTest extends ResearchUnitCase
             $this->events,
             $this->clock,
             new NullLogger(),
+            $this->reports,
         );
     }
 }

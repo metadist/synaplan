@@ -169,8 +169,12 @@ final class SilentResearchReport implements ResearchReportPoster
 {
     public int $calls = 0;
 
+    /** @var list<string> */
+    public array $statuses = [];
+
     public function deliver(ResearchRunState $state): void
     {
         ++$this->calls;
+        $this->statuses[] = $state->status->value;
     }
 }

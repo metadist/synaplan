@@ -5,26 +5,34 @@ declare(strict_types=1);
 namespace App\Service\Research\Run;
 
 use App\Entity\Chat;
-use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Repository\UserRepository;
 use App\Service\File\FileStorageService;
+use App\Service\Media\GeneratedFileRegistrar;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Puts a finished web research report into its chat.
+ * Puts a finished web research run into its chat: the report as the
+ * assistant's message with the markdown file attached, or the sentence why
+ * the run ended without one. A run that did not complete says so above the
+ * report, so a partial report never reads as a finished one.
  *
- * An API run has no chat, so this does nothing for it. The report file is a
- * markdown attachment. A failure here does not undo the finished run.
+ * An API run has no chat, so this does nothing for it. Posting happens once
+ * per run; a failure is logged and never undoes the finished run.
  */
 final readonly class ResearchReportDelivery implements ResearchReportPoster
 {
     public function __construct(
         private ChatRepository $chats,
+        private UserRepository $users,
         private EntityManagerInterface $em,
         private FileStorageService $storage,
+        private GeneratedFileRegistrar $files,
         private ResearchStateStore $store,
+        private ResearchOutcomeText $outcomes,
         private LoggerInterface $logger,
     ) {
     }
@@ -32,43 +40,23 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
     public function deliver(ResearchRunState $state): void
     {
         $chatId = $state->ref->chatId;
-        if (null === $chatId || $this->store->wasDelivered($state->ref->id)) {
-            return;
-        }
-        $chat = $this->chats->find($chatId);
-        if (!$chat instanceof Chat || $chat->getUserId() !== $state->ref->userId) {
-            $this->store->markDelivered($state->ref->id);
-
+        if (null === $chatId || !$state->status->isTerminal()) {
             return;
         }
 
         try {
-            $file = $this->storeReport($state);
-            $message = (new Message())
-                ->setUserId($state->ref->userId)
-                ->setChat($chat)
-                ->setTrackingId(time())
-                ->setProviderIndex('RESEARCH')
-                ->setUnixTimestamp(time())
-                ->setDateTime(date('YmdHis'))
-                ->setMessageType('API')
-                ->setFile(null !== $file ? 1 : 0)
-                ->setTopic('CHAT')
-                ->setLanguage('en')
-                ->setText($this->text($state))
-                ->setDirection('OUT')
-                ->setStatus('complete');
-            if (null !== $file) {
-                $message->addFile($file);
+            if ($this->store->wasDelivered($state->ref->id)) {
+                return;
             }
-            $this->em->persist($message);
-            $chat->updateTimestamp();
-            $this->em->flush();
-            if (null !== $file) {
-                $file->setMessageId($message->getId());
-                $this->em->flush();
+            $chat = $this->chats->find($chatId);
+            if (!$chat instanceof Chat || $chat->getUserId() !== $state->ref->userId) {
+                $this->store->markDelivered($state->ref->id);
+
+                return;
             }
+            $message = $this->post($state, $chat);
             $this->store->markDelivered($state->ref->id);
+            $this->attachReport($state, $message);
         } catch (\Throwable $e) {
             $this->logger->warning('Research report was not posted to the chat', [
                 'run_id' => $state->ref->id,
@@ -78,46 +66,71 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         }
     }
 
-    private function text(ResearchRunState $state): string
+    private function post(ResearchRunState $state, Chat $chat): Message
     {
-        $report = $state->ledger->report();
-        if (null !== $report && '' !== $report) {
+        $locale = $this->locale($state->ref->userId);
+        $now = time();
+        $message = (new Message())
+            ->setUserId($state->ref->userId)
+            ->setChat($chat)
+            ->setTrackingId($now)
+            ->setProviderIndex('RESEARCH')
+            ->setUnixTimestamp($now)
+            ->setDateTime(date('YmdHis', $now))
+            ->setMessageType('API')
+            ->setFile(0)
+            ->setTopic('CHAT')
+            ->setLanguage($locale)
+            ->setText($this->text($state, $locale))
+            ->setDirection('OUT')
+            ->setStatus('complete');
+        $this->em->persist($message);
+        $chat->updateTimestamp();
+        $this->em->flush();
+
+        return $message;
+    }
+
+    private function text(ResearchRunState $state, string $locale): string
+    {
+        $report = trim($state->ledger->report() ?? '');
+        $outcome = $state->outcome;
+        if ('' === $report) {
+            return $this->outcomes->sentence($outcome, $locale);
+        }
+        if (ResearchOutcome::COMPLETE === $outcome?->code) {
             return $report;
         }
 
-        return $state->outcome?->text() ?? 'The research finished without a report.';
+        return '> '.$this->outcomes->sentence($outcome, $locale)."\n\n".$report;
     }
 
-    private function storeReport(ResearchRunState $state): ?File
+    private function attachReport(ResearchRunState $state, Message $message): void
     {
         $report = $state->ledger->report();
-        if (null === $report || '' === $report) {
-            return null;
+        if (null === $report || '' === trim($report)) {
+            return;
         }
-        $name = 'research-'.$state->ref->id.'.md';
-        $stored = $this->storage->storeRawContent($report, $state->ref->userId, $name, 'text/markdown');
-        if (true !== $stored['success'] || '' === $stored['path']) {
-            $this->logger->warning('Research report file was not saved', [
+        $stored = $this->storage->storeRawContent($report, $state->ref->userId, 'research-'.$state->ref->id.'.md', 'text/markdown');
+        $file = true === $stored['success']
+            ? $this->files->register($state->ref->userId, $stored['path'], '', $message->getId())
+            : null;
+        if (null === $file) {
+            $this->logger->warning('Research report file was not saved; the report stays in the chat message', [
                 'run_id' => $state->ref->id,
-                'error' => $stored['error'] ?? null,
+                'error' => $stored['error'],
             ]);
 
-            return null;
+            return;
         }
-        $file = new File();
-        $file->setUserId($state->ref->userId);
-        $file->setFilePath($stored['path']);
-        $file->setFileName($name);
-        $file->setFileSize($stored['size']);
-        $file->setFileMime('text/markdown');
-        $file->setFileType('md');
-        $file->setStatus('complete');
-        $file->setSource('chat_attachment');
-        $file->setIncoming(false);
-        $file->setEphemeral(false);
-        $this->em->persist($file);
+        $message->addFile($file);
         $this->em->flush();
+    }
 
-        return $file;
+    private function locale(int $userId): string
+    {
+        $user = $this->users->find($userId);
+
+        return $user instanceof User ? $user->getLocale() : 'en';
     }
 }

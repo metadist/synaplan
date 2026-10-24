@@ -1,0 +1,23 @@
+research:
+  outcome:
+    complete: 'Tamamlandı: %statements% ifade, %supported% tanesi bir kaynakla destekleniyor.'
+    complete_partial: 'Eksiklerle tamamlandı: %points% noktadan %open% tanesi doğrulanamadı. Bunlar "Doğrulanmadı" altında listeleniyor.'
+    complete_snippets_only: 'Hiçbir sayfa açılamadı, bu yüzden bu rapor yalnızca arama özetlerine dayanıyor. Önemli olduğu yerlerde bunu belirtiyor.'
+    stopped_by_user: 'Durduruldu. Durdur''a bastıktan sonra yeni bir iş başlatılmadı; zaten süren bir adım yine de sayılabilir. Şimdiye kadar bulunanlar saklanıyor.'
+    stopped_budget: 'Aylık AI bütçen tükendiği için durduruldu. Rapor %points% noktadan %covered% tanesini kapsıyor.'
+    stopped_limit: 'Bu araştırma bu derinlik için sınırına ulaştığı için durduruldu. Bulunanlar %points% noktadan %covered% tanesini kapsıyor.'
+    stopped_waiting: 'Plan bir gün içinde onaylanmadığı için durduruldu. Hazır olduğunda yeniden başlat.'
+    stopped_by_admin: 'Araştırma Synaplan çalışma alanında kapatıldı. Şimdiye kadar bulunanlar saklanıyor.'
+    failed_no_sources: 'Araştırılacak bir şey yoktu: web''i aç ya da bu projeye dosya ekle.'
+    failed_nothing_found: 'Aranan kaynaklarda bu soruyu yanıtlayan bir şey yoktu. Soruyu farklı ifade et ya da bu projeye dosya ekle.'
+    failed_role_unavailable: 'Bu projedeki %role% modeli kullanılamıyor ve projedeki başka bir model onun yerine geçemiyor. Hiçbir ücret alınmadı.'
+    failed_model_error: '%role% modeli yanıt vermeyi bıraktı. Başka bir ücret alınmadı; tekrar dene ya da başka bir model seç.'
+    failed_interrupted: 'Araştırma sunucuda kesildi. Yeniden başlat — şimdiye kadar bulunan kaynaklar burada saklanıyor.'
+    unknown: 'Araştırma durdu. Yanıta hâlâ ihtiyacın varsa yeniden başlat.'
+  role:
+    reading: 'okuma'
+    sorting: 'sıralama'
+    planning: 'planlama'
+    writing: 'yazma'
+    fact-checking: 'doğrulama'
+    selected: 'seçili görev'

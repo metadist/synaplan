@@ -114,6 +114,24 @@ final readonly class ResearchOutcome
     }
 
     /**
+     * The numbers a translated sentence fills in. The role is a key of
+     * `research.role.*`, never the raw stored value.
+     *
+     * @return array{statements: int, supported: int, open: int, points: int, covered: int, role: string}
+     */
+    public function placeholders(): array
+    {
+        return [
+            'statements' => $this->whole('statements'),
+            'supported' => $this->whole('supported'),
+            'open' => $this->whole('open'),
+            'points' => $this->whole('points'),
+            'covered' => $this->whole('covered'),
+            'role' => $this->role(),
+        ];
+    }
+
+    /**
      * @return array{code: string, params: array<string, int|string>, text: string}
      */
     public function toArray(): array

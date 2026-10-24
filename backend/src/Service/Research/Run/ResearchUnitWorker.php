@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service\Research\Run;
 
 use App\Service\Research\Run\Stage\StageResult;
-use Psr\Log\LoggerInterface;
 
 /**
  * Claims one research step, runs it, and queues the next.
@@ -29,7 +28,6 @@ final readonly class ResearchUnitWorker
         private ResearchEventLog $events,
         private ResearchConfig $config,
         private ResearchReportPoster $reports,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -145,16 +143,8 @@ final readonly class ResearchUnitWorker
 
     private function deliverReport(ResearchRunState $state): void
     {
-        if (!$state->status->isTerminal() || null === $state->ref->chatId) {
-            return;
-        }
-        try {
+        if ($state->status->isTerminal()) {
             $this->reports->deliver($state);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Research report was not posted to the chat', [
-                'run_id' => $state->ref->id,
-                'exception' => $e,
-            ]);
         }
     }
 

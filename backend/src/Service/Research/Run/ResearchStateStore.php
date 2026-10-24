@@ -119,6 +119,37 @@ final readonly class ResearchStateStore
         return true;
     }
 
+    /**
+     * Take the claim of the unit the run is waiting on, change the stored
+     * run, and checkpoint it. Null when someone else holds the claim, the
+     * run moved on meanwhile, or the change was refused.
+     *
+     * @param \Closure(ResearchRunState): bool $change false leaves the run as it is
+     */
+    public function underClaim(ResearchRunState $state, int $leaseMs, \Closure $change): ?ResearchRunState
+    {
+        $runId = $state->ref->id;
+        $seq = $state->expectedSeq;
+        $token = $this->claim($runId, $seq, $leaseMs);
+        if (null === $token) {
+            return null;
+        }
+        try {
+            $fresh = $this->load($runId);
+            if (null === $fresh || $fresh->status->isTerminal() || $fresh->expectedSeq !== $seq || !$change($fresh)) {
+                $this->release($runId, $seq, $token);
+
+                return null;
+            }
+        } catch (\Throwable $e) {
+            $this->release($runId, $seq, $token);
+
+            throw $e;
+        }
+
+        return $this->checkpoint($fresh, $token) ? $fresh : null;
+    }
+
     public function release(string $runId, int $seq, string $token): void
     {
         ResearchIds::assert($runId);

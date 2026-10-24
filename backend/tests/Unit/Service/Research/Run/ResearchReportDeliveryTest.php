@@ -1,0 +1,144 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Service\Research\Run;
+
+use App\Entity\Chat;
+use App\Entity\File;
+use App\Entity\Message;
+use App\Entity\User;
+use App\Repository\ChatRepository;
+use App\Repository\UserRepository;
+use App\Service\File\FileStorageService;
+use App\Service\Media\GeneratedFileRegistrar;
+use App\Service\Research\Run\ResearchBudget;
+use App\Service\Research\Run\ResearchBudgetConfig;
+use App\Service\Research\Run\ResearchDepth;
+use App\Service\Research\Run\ResearchOutcome;
+use App\Service\Research\Run\ResearchOutcomeText;
+use App\Service\Research\Run\ResearchReportDelivery;
+use App\Service\Research\Run\ResearchRunRef;
+use App\Service\Research\Run\ResearchRunState;
+use App\Service\Research\Run\ResearchStatus;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Contracts\Translation\TranslatorInterface;
+
+final class ResearchReportDeliveryTest extends ResearchUnitCase
+{
+    /** @var list<Message> */
+    private array $posted = [];
+
+    private int $registered = 0;
+
+    public function testAFinishedRunPostsTheReportWithTheFileAttachedOnce(): void
+    {
+        $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, '# Prices'."\n\nThe price is 12.", 11);
+        $delivery = $this->delivery();
+
+        $delivery->deliver($state);
+        $delivery->deliver($state);
+
+        self::assertCount(1, $this->posted);
+        self::assertSame("# Prices\n\nThe price is 12.", $this->posted[0]->getText());
+        self::assertSame('de', $this->posted[0]->getLanguage());
+        self::assertSame('OUT', $this->posted[0]->getDirection());
+        self::assertCount(1, $this->posted[0]->getFiles());
+        self::assertSame(1, $this->registered);
+    }
+
+    public function testAStoppedRunSaysSoAboveWhatWasFound(): void
+    {
+        $state = $this->finished(ResearchStatus::Stopped, ResearchOutcome::STOPPED_BY_USER, 'Partial findings.', 11);
+
+        $this->delivery()->deliver($state);
+
+        self::assertCount(1, $this->posted);
+        self::assertSame("> de:research.outcome.stopped_by_user\n\nPartial findings.", $this->posted[0]->getText());
+    }
+
+    public function testARunWithoutAReportPostsOnlyTheReasonAndNoFile(): void
+    {
+        $state = $this->finished(ResearchStatus::Failed, ResearchOutcome::FAILED_INTERRUPTED, null, 11);
+
+        $this->delivery()->deliver($state);
+
+        self::assertCount(1, $this->posted);
+        self::assertSame('de:research.outcome.failed_interrupted', $this->posted[0]->getText());
+        self::assertCount(0, $this->posted[0]->getFiles());
+        self::assertSame(0, $this->registered);
+    }
+
+    public function testNothingIsPostedForAnApiRunOrSomeoneElsesChat(): void
+    {
+        $this->delivery()->deliver($this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, 'Report.', null));
+        $this->delivery()->deliver($this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, 'Report.', 99));
+
+        self::assertSame([], $this->posted);
+    }
+
+    private function finished(ResearchStatus $status, string $code, ?string $report, ?int $chatId): ResearchRunState
+    {
+        $created = $this->clock->now();
+        $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $created);
+        $budget->at($created);
+        $state = ResearchRunState::open(ResearchRunRef::start(7, ResearchDepth::Quick, 'What does one unit cost?', $chatId, $created), $budget);
+        if (null !== $report) {
+            $state->ledger->setReport($report);
+        }
+        $state->finish($status, new ResearchOutcome($code));
+        $this->store->save($state);
+
+        return $state;
+    }
+
+    private function delivery(): ResearchReportDelivery
+    {
+        $mine = $this->createStub(Chat::class);
+        $mine->method('getUserId')->willReturn(7);
+        $theirs = $this->createStub(Chat::class);
+        $theirs->method('getUserId')->willReturn(8);
+        $chats = $this->createStub(ChatRepository::class);
+        $chats->method('find')->willReturnCallback(static fn (int $id): Chat => 11 === $id ? $mine : $theirs);
+
+        $user = $this->createStub(User::class);
+        $user->method('getLocale')->willReturn('de');
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn($user);
+
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(function (object $entity): void {
+            if ($entity instanceof Message) {
+                $this->posted[] = $entity;
+            }
+        });
+
+        $storage = $this->createStub(FileStorageService::class);
+        $storage->method('storeRawContent')->willReturn([
+            'success' => true, 'path' => '7/2026/10/research.md', 'size' => 12, 'mime' => 'text/markdown', 'error' => null,
+        ]);
+        $files = $this->createStub(GeneratedFileRegistrar::class);
+        $files->method('register')->willReturnCallback(function (): File {
+            ++$this->registered;
+
+            return new File();
+        });
+
+        $translator = $this->createStub(TranslatorInterface::class);
+        $translator->method('trans')->willReturnCallback(
+            static fn (string $id, array $parameters = [], ?string $domain = null, ?string $locale = null): string => $locale.':'.$id,
+        );
+
+        return new ResearchReportDelivery(
+            $chats,
+            $users,
+            $em,
+            $storage,
+            $files,
+            $this->store,
+            new ResearchOutcomeText($translator),
+            new NullLogger(),
+        );
+    }
+}

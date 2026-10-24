@@ -15,6 +15,8 @@ use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchRejected;
 use App\Service\Research\Run\ResearchRunNotFound;
 use App\Service\Research\Run\ResearchRunService;
+use App\Service\Research\Run\ResearchRunState;
+use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchUnitPlan;
 
 final class ResearchRunServiceTest extends ResearchUnitCase
@@ -23,9 +25,12 @@ final class ResearchRunServiceTest extends ResearchUnitCase
 
     private User $user;
 
+    private SilentResearchReport $reports;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->reports = new SilentResearchReport();
         $this->user = $this->createStub(User::class);
         $this->user->method('getId')->willReturn(7);
         $chat = $this->createStub(Chat::class);
@@ -39,7 +44,7 @@ final class ResearchRunServiceTest extends ResearchUnitCase
             new ResearchConfig($this->createStub(ConfigRepository::class), '1'),
             $chats,
             $this->clock,
-            new SilentResearchReport(),
+            $this->reports,
         );
     }
 
@@ -93,6 +98,47 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         $stopped = $this->runs->cancel($this->user, $started->ref->id);
 
         self::assertSame(ResearchOutcome::STOPPED_BY_USER, $stopped->outcome?->code);
+        self::assertSame(['stopped'], $this->reports->statuses);
+        self::assertSame(2, $this->store->load($started->ref->id)?->expectedSeq);
+    }
+
+    public function testCancelLeavesARunningStepToTheWorker(): void
+    {
+        $started = $this->runs->start($this->user, $this->body(), true, null);
+        self::assertNotNull($this->store->claim($started->ref->id, 1, 1000));
+
+        $state = $this->runs->cancel($this->user, $started->ref->id);
+
+        self::assertSame(ResearchStatus::Briefing, $state->status);
+        self::assertTrue($this->store->stopRequested($started->ref->id));
+        self::assertSame([], $this->reports->statuses);
+    }
+
+    public function testTheListCanShowOnlyRunsThatAreStillGoingNewestFirst(): void
+    {
+        $older = $this->runs->start($this->user, $this->body(), true, null);
+        $this->clock->sleep(60);
+        $newer = $this->runs->start($this->user, $this->body(), true, null);
+        $this->runs->cancel($this->user, $older->ref->id);
+
+        self::assertSame([$newer->ref->id, $older->ref->id], array_column($this->runs->listRecent($this->user), 'id'));
+        self::assertSame([$newer->ref->id], array_column($this->runs->listRecent($this->user, true), 'id'));
+    }
+
+    public function testAnApprovedPlanContinuesUnderTheClaim(): void
+    {
+        $opened = $this->runs->start($this->user, $this->body(), true, null);
+        $waiting = new ResearchRunState($opened->ref, ResearchStatus::WaitingPlan, $opened->ledger, $opened->budget, 2, 1);
+        $this->store->save($waiting);
+
+        $state = $this->runs->input($this->user, $opened->ref->id, ['type' => 'approve_plan']);
+
+        self::assertSame(ResearchStatus::Gathering, $state->status);
+        self::assertSame(3, $state->expectedSeq);
+        self::assertSame(['unit' => ResearchUnitPlan::ROUND, 'seq' => 3], [
+            'unit' => $this->bus->sent[1]['unit'],
+            'seq' => $this->bus->sent[1]['seq'],
+        ]);
     }
 
     public function testAFollowUpKeepsTheParent(): void
@@ -115,7 +161,7 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         $repo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => ResearchConfig::MAX_ACTIVE_RUNS === $setting ? '1' : null,
         );
-        $runs = new ResearchRunService($this->store, $this->bus, new ResearchEventLog($this->keys), new ResearchConfig($repo, '1'), $this->chats(), $this->clock, new SilentResearchReport());
+        $runs = new ResearchRunService($this->store, $this->bus, new ResearchEventLog($this->keys), new ResearchConfig($repo, '1'), $this->chats(), $this->clock, $this->reports);
         $runs->start($this->user, $this->body(), true, null);
 
         $this->expectException(ResearchRejected::class);
