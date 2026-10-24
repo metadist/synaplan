@@ -34,6 +34,13 @@ final class StageEnds
         ]), 'failed');
     }
 
+    public static function roleUnavailable(StageContext $ctx, string $role): StageResult
+    {
+        return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_ROLE_UNAVAILABLE, [
+            'role' => $role,
+        ]), 'failed');
+    }
+
     public static function noSources(StageContext $ctx): StageResult
     {
         return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_NO_SOURCES), 'failed');
@@ -44,13 +51,10 @@ final class StageEnds
         return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_NOTHING_FOUND), 'failed');
     }
 
-    private static function finish(StageContext $ctx, ResearchStatus $status, ResearchOutcome $outcome, string $event): StageResult
+    public static function finish(StageContext $ctx, ResearchStatus $status, ResearchOutcome $outcome, string $event): StageResult
     {
         $ctx->state->finish($status, $outcome);
-        $ctx->events->append($ctx->state->ref->id, $event, [
-            'code' => $outcome->code,
-            'text' => $outcome->text(),
-        ]);
+        $ctx->events->append($ctx->state->ref->id, $event, ['outcome' => $outcome->toArray()]);
 
         return new StageResult('done');
     }

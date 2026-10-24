@@ -66,19 +66,22 @@ final readonly class PlanStage implements ResearchStage
             $scope = (string) ($row['scope'] ?? 'web');
             $queries = [];
             foreach (is_array($row['queries'] ?? null) ? $row['queries'] : [] as $query) {
-                if (!is_array($query)) {
+                if (!is_array($query) || '' === trim((string) ($query['q'] ?? ''))) {
                     continue;
                 }
                 $queries[] = [
-                    'q' => (string) ($query['q'] ?? ''),
+                    'q' => (string) $query['q'],
                     'language' => (string) ($query['language'] ?? $brief->language),
                     'scope' => $scope,
                 ];
             }
+            if ([] === $queries) {
+                $queries[] = ['q' => $title, 'language' => $brief->language, 'scope' => $scope];
+            }
             $ctx->state->ledger->addPoint($title, (string) ($row['why'] ?? ''), $queries);
             ++$kept;
         }
-        if ($kept < $view['pointsMin']) {
+        if (0 === $kept) {
             return StageEnds::model($ctx, 'planning');
         }
 

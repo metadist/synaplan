@@ -43,9 +43,9 @@ final readonly class BriefStage implements ResearchStage
         }
 
         $data = $called->reply->data ?? [];
-        $language = strtolower(trim((string) ($data['language'] ?? '')));
+        $language = self::language((string) ($data['language'] ?? ''));
         $output = (string) ($data['output'] ?? '');
-        if (1 !== preg_match('/^[a-z]{2}$/', $language) || !in_array($output, self::OUTPUTS, true)) {
+        if (null === $language || !in_array($output, self::OUTPUTS, true)) {
             return StageEnds::model($ctx, 'sorting');
         }
 
@@ -70,8 +70,19 @@ final readonly class BriefStage implements ResearchStage
             'goal' => $brief->goal,
             'language' => $brief->language,
             'output' => $brief->output,
+            'time_frame' => $brief->timeFrame,
         ]);
 
         return new StageResult('plan');
+    }
+
+    /** "de", "DE", "de-DE" and "de_AT" all mean German; anything else is not a language code. */
+    private static function language(string $raw): ?string
+    {
+        if (1 !== preg_match('/^([a-z]{2})(?:[-_][a-z0-9]{2,8})?$/', strtolower(trim($raw)), $match)) {
+            return null;
+        }
+
+        return $match[1];
     }
 }

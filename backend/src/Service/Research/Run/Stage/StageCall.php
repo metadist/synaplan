@@ -8,7 +8,8 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
  * One paid call, and a single retry when the answer is not the JSON shape.
- * Stop and an exhausted budget are checked before each attempt.
+ * Stop and an exhausted budget are checked before each attempt. A model that
+ * cannot be resolved is not retried: nothing was called, so nothing is charged.
  */
 final readonly class StageCall
 {
@@ -38,6 +39,9 @@ final readonly class StageCall
         }
         if (self::usable($reply, $schema)) {
             return StageCallResult::reply($reply);
+        }
+        if (!$reply->called) {
+            return StageCallResult::stop(StageEnds::roleUnavailable($ctx, $role));
         }
         if (null === $schema) {
             return StageCallResult::stop(StageEnds::model($ctx, $role));

@@ -156,6 +156,31 @@ final readonly class Source
     }
 
     /**
+     * The `source` event: enough for a live client to show the row without another request.
+     *
+     * @return array<string, mixed>
+     */
+    public function toEvent(): array
+    {
+        $event = ['id' => $this->id, 'kind' => $this->kind, 'title' => $this->title];
+        if (null !== $this->url) {
+            $event['url'] = $this->url;
+        }
+        if (null !== $this->host) {
+            $event['host'] = $this->host;
+        }
+        if (null !== $this->fileId) {
+            $event['file_id'] = $this->fileId;
+        }
+        $event['status'] = $this->status;
+        if (null !== $this->details->reason) {
+            $event['reason'] = $this->details->reason;
+        }
+
+        return $event;
+    }
+
+    /**
      * @param array<string, mixed> $data
      */
     public static function fromArray(array $data): self

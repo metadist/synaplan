@@ -44,20 +44,26 @@ final readonly class WriteStage implements ResearchStage
             'OUTLINE' => implode("\n", $ctx->state->ledger->outline()),
             'EVIDENCE_BY_POINT' => $this->evidence($ctx),
         ]);
+        $sections = $ctx->state->ledger->outline();
+        if ([] === $sections) {
+            $sections = ['Summary'];
+        }
+        $ctx->state->advance(ResearchStatus::Writing);
+        $ctx->events->append($ctx->state->ref->id, 'writing', ['section' => $sections[0]]);
+
         $called = $this->calls->once($ctx, 'writing', $ctx->roles->writer, $system, 'Write the report.', null);
         if ($called->stop instanceof StageResult) {
             return $called->stop;
         }
 
         $ctx->state->ledger->setReport($called->reply->text ?? '');
-        $ctx->state->advance(ResearchStatus::Writing);
-        $sections = $ctx->state->ledger->outline();
-        if ([] === $sections) {
-            $sections = ['Summary'];
-        }
-        foreach ($sections as $section) {
-            $ctx->events->append($ctx->state->ref->id, 'writing', ['section' => $section]);
-            $ctx->events->append($ctx->state->ref->id, 'section', ['title' => $section]);
+        $total = count($sections);
+        foreach ($sections as $index => $section) {
+            $ctx->events->append($ctx->state->ref->id, 'section', [
+                'title' => $section,
+                'index' => $index + 1,
+                'total' => $total,
+            ]);
         }
 
         return new StageResult('deliver');

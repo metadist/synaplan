@@ -10,7 +10,8 @@ use App\Service\Research\Run\ResearchStatus;
 
 /**
  * Closes the run with a sentence. Putting the report into the chat is a
- * later step; the report text stays on the run.
+ * later step; the report text stays on the run. A citation to evidence that
+ * does not exist is removed here, so the closing numbers count real sources.
  */
 final readonly class DeliverStage implements ResearchStage
 {
@@ -18,45 +19,40 @@ final readonly class DeliverStage implements ResearchStage
     {
         $ledger = $ctx->state->ledger;
         $grouped = $ledger->evidenceForWriter();
-        $cards = 0;
-        $open = 0;
-        foreach ($ledger->points() as $point) {
-            $found = $grouped[$point->id] ?? [];
-            $cards += count($found);
-            if ([] === $found) {
-                ++$open;
-            }
-        }
-
-        if (0 === $cards || null === $ledger->report()) {
+        $report = $ledger->report();
+        if ([] === $grouped || null === $report) {
             return StageEnds::nothingFound($ctx);
         }
-        foreach ($ledger->points() as $point) {
-            if ([] !== ($grouped[$point->id] ?? [])) {
-                $ledger->markPoint($point->id, PlanPoint::ANSWERED);
-            } else {
-                $ledger->markPoint($point->id, PlanPoint::UNCONFIRMED);
+
+        $known = [];
+        foreach ($grouped as $cards) {
+            foreach ($cards as $card) {
+                $known[] = (string) $card['id'];
             }
         }
+        $cited = ReportCitations::clean($report, $known);
+        $ledger->setReport($cited['report']);
 
-        $total = count($ledger->points());
-        if ($open > 0) {
-            $outcome = new ResearchOutcome(ResearchOutcome::COMPLETE_PARTIAL, [
-                'open' => $open,
-                'points' => $total,
-            ]);
-        } else {
-            $outcome = new ResearchOutcome(ResearchOutcome::COMPLETE, [
-                'statements' => $cards,
-                'supported' => $cards,
-            ]);
+        $open = 0;
+        foreach ($ledger->points() as $point) {
+            $status = [] !== ($grouped[$point->id] ?? []) ? PlanPoint::ANSWERED : PlanPoint::UNCONFIRMED;
+            if (PlanPoint::UNCONFIRMED === $status) {
+                ++$open;
+            }
+            $ledger->markPoint($point->id, $status);
+            $ctx->events->append($ctx->state->ref->id, 'point', ['id' => $point->id, 'status' => $status]);
         }
-        $ctx->state->finish(ResearchStatus::Complete, $outcome);
-        $ctx->events->append($ctx->state->ref->id, 'complete', [
-            'code' => $outcome->code,
-            'text' => $outcome->text(),
-        ]);
 
-        return new StageResult('done');
+        $outcome = $open > 0
+            ? new ResearchOutcome(ResearchOutcome::COMPLETE_PARTIAL, [
+                'open' => $open,
+                'points' => count($ledger->points()),
+            ])
+            : new ResearchOutcome(ResearchOutcome::COMPLETE, [
+                'statements' => $cited['statements'],
+                'supported' => $cited['supported'],
+            ]);
+
+        return StageEnds::finish($ctx, ResearchStatus::Complete, $outcome, 'complete');
     }
 }

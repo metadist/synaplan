@@ -63,7 +63,7 @@ final readonly class GatherStage implements ResearchStage
                     'point' => $point->id,
                     'query' => $query['q'],
                     'scope' => $query['scope'],
-                    'count' => count($found),
+                    'results' => count($found),
                 ]);
                 foreach ($found as $hit) {
                     $hits[] = [
@@ -91,7 +91,7 @@ final readonly class GatherStage implements ResearchStage
         $brief = $ctx->state->ledger->brief();
         $lines = [];
         foreach ($hits as $hit) {
-            $lines[] = $hit['id']."\n".'title: '.$hit['title']."\n".'url: '.$hit['url']."\n".'snippet: '.$hit['snippet']."\n".'date: '.$hit['date'];
+            $lines[] = $hit['id']."\n".'title: '.self::data($hit['title'])."\n".'url: '.$hit['url']."\n".'snippet: '.self::data($hit['snippet'])."\n".'date: '.self::data($hit['date']);
         }
         $points = array_map(static fn (PlanPoint $point): string => $point->id.' '.$point->title, $ctx->state->ledger->points());
         $frame = null !== $brief ? $brief->timeFrame : null;
@@ -114,15 +114,20 @@ final readonly class GatherStage implements ResearchStage
                 $verdicts[$row['id']] = $row;
             }
         }
-        $room = $ctx->state->budget->toArray()['sources_read'][1] - $ctx->state->budget->toArray()['sources_read'][0];
 
         return $this->choice->choose(
             $hits,
             $verdicts,
             null !== $brief ? $brief->mustUse : [],
             null !== $brief ? $brief->mustAvoid : [],
-            max(0, $room),
+            $ctx->state->budget->sourcesLeft(),
         );
+    }
+
+    /** A page title cannot close the <results> block it is listed in. */
+    private static function data(string $text): string
+    {
+        return str_replace(['<', '>'], ['‹', '›'], $text);
     }
 
     /**
@@ -136,11 +141,10 @@ final readonly class GatherStage implements ResearchStage
             }
             $id = $ctx->state->ledger->addSource(Source::web($row['url'], $row['title']));
             $ctx->state->ledger->describeSource($id, $row['kind'], null);
-            $ctx->events->append($ctx->state->ref->id, 'source', [
-                'id' => $id,
-                'title' => $row['title'],
-                'status' => Source::FOUND,
-            ]);
+            $source = $ctx->state->ledger->source($id);
+            if (null !== $source) {
+                $ctx->events->append($ctx->state->ref->id, 'source', $source->toEvent());
+            }
         }
     }
 }
