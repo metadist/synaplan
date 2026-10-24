@@ -116,3 +116,11 @@ framework:
             limit: '%env(int:PAID_SIGNUP_ALERT_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
+        # One OAuth state nonce may authorise one callback. The signed state
+        # lives for ten minutes; spending the nonce here stops one solved
+        # human check from creating a second account on another node.
+        oauth_signup_nonce:
+            policy: 'sliding_window'
+            limit: 1
+            interval: '10 minutes'
+            cache_pool: 'cache.rate_limiter'

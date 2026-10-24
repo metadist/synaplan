@@ -150,7 +150,7 @@ class GoogleAuthController extends AbstractController
 
             // A new account needs the human check from the start of the flow
             // and a free signup slot; an existing account signs in as before.
-            $this->signupGate->assertNewAccountAllowed($userInfo['email'] ?? null, $statePayload, $request->getClientIp(), $native);
+            $this->signupGate->assertGoogleSignup($userInfo['email'] ?? null, $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $googleRefreshToken,

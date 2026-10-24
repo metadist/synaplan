@@ -9,6 +9,7 @@ use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
  * Account creation through an OAuth provider (Google, GitHub, Apple) gets the
@@ -16,14 +17,21 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * The browser passes the human-check token to the provider's `/login` start
  * endpoint as `?challenge=`; {@see stateExtras()} verifies it and records the
- * result in the signed OAuth state. On the callback,
- * {@see assertNewAccountAllowed()} lets every existing account sign in and
- * refuses a *new* one unless the state carries that proof and the signup
- * limits allow it. 84 % of the fake accounts of 2026-10-24 came through
- * "Sign in with Google", which had no check at all.
+ * result in the signed OAuth state. On the callback, a *new* account is
+ * refused unless that proof is present, its nonce has not been used yet, and
+ * the signup limits allow it. An existing account — matched by email or by
+ * the provider's stable id — always signs in.
  *
- * MOBILE-APP SEAM: the native apps cannot run a browser challenge, so a
- * native start skips the human check and keeps only the rate limits.
+ * `?native=true` on the browser start URL only chooses the deep-link return
+ * path. It does not skip the human check: anyone can add that query flag.
+ * The only exemption is Sign in with Apple from the iOS sheet
+ * ({@see assertAppleSignup()} with `$verifiedNative`), because that request
+ * already carries an Apple-signed identity token. It still counts against
+ * the signup limits.
+ *
+ * One solved check must not mint many accounts. The state's nonce is spent
+ * in the shared rate-limiter cache the first time it authorises a callback,
+ * so a replay fails on every node.
  */
 final readonly class OAuthSignupGate
 {
@@ -33,6 +41,7 @@ final readonly class OAuthSignupGate
         private SignupProtection $protection,
         private UserRepository $users,
         private ModelConfigService $modelConfig,
+        private RateLimiterFactoryInterface $oauthSignupNonceLimiter,
         private LoggerInterface $logger,
     ) {
     }
@@ -61,25 +70,101 @@ final readonly class OAuthSignupGate
     }
 
     /**
-     * Refuse the creation of a new account unless the start of the flow passed
-     * the human check (web only) and the signup limits allow it. An existing
-     * account always passes.
+     * Google's email is stable and always present for a real consent.
      *
      * @param array<string, mixed> $statePayload
      *
      * @throws SignupBlockedException
      */
-    public function assertNewAccountAllowed(?string $email, array $statePayload, ?string $clientIp, bool $native = false): void
+    public function assertGoogleSignup(?string $email, array $statePayload, ?string $clientIp): void
     {
-        if (null !== $email && '' !== $email && null !== $this->users->findOneBy(['mail' => $email])) {
+        $existing = null !== $email && '' !== $email ? $this->users->findOneBy(['mail' => $email]) : null;
+        $this->assertNewAccountAllowed($existing, $statePayload, $clientIp, false);
+    }
+
+    /**
+     * GitHub matches an existing account by email or, when the address is
+     * hidden, by the numeric GitHub id.
+     *
+     * @param array<string, mixed> $statePayload
+     *
+     * @throws SignupBlockedException
+     */
+    public function assertGithubSignup(?string $email, int|string|null $githubId, array $statePayload, ?string $clientIp): void
+    {
+        $existing = null !== $email && '' !== $email ? $this->users->findOneBy(['mail' => $email]) : null;
+        if (null === $existing && null !== $githubId && '' !== (string) $githubId) {
+            $existing = $this->users->findByGithubId($githubId);
+        }
+        $this->assertNewAccountAllowed($existing, $statePayload, $clientIp, false);
+    }
+
+    /**
+     * Apple's durable key is `sub`. The email is absent on later logins and
+     * the private-relay address can change, so an email-only check would
+     * treat a returning person as a new account and refuse them when sign-up
+     * is paused or the limit is spent.
+     *
+     * `$verifiedNative` is true only for the iOS sheet endpoint, which has
+     * already verified an Apple identity token. A `native` flag inside the
+     * browser OAuth state is not that proof.
+     *
+     * @param array<string, mixed> $statePayload
+     *
+     * @throws SignupBlockedException
+     */
+    public function assertAppleSignup(string $appleSub, ?string $email, array $statePayload, ?string $clientIp, bool $verifiedNative = false): void
+    {
+        $existing = $this->users->findByAppleSub($appleSub);
+        if (null === $existing && null !== $email && '' !== $email) {
+            $existing = $this->users->findOneBy(['mail' => $email]);
+        }
+        $this->assertNewAccountAllowed($existing, $statePayload, $clientIp, $verifiedNative);
+    }
+
+    /**
+     * @param array<string, mixed> $statePayload
+     *
+     * @throws SignupBlockedException
+     */
+    private function assertNewAccountAllowed(?User $existing, array $statePayload, ?string $clientIp, bool $verifiedNative): void
+    {
+        if (!$verifiedNative) {
+            $this->consumeNonce($statePayload, null === $existing);
+        }
+        if (null !== $existing) {
             return;
         }
-
-        if (!$native && $this->protection->challengeRequired() && true !== ($statePayload[self::STATE_HUMAN] ?? false)) {
+        if (!$verifiedNative && $this->protection->challengeRequired() && true !== ($statePayload[self::STATE_HUMAN] ?? false)) {
             throw SignupBlockedException::challengeRequired();
         }
 
         $this->protection->assertSignupAllowed($clientIp);
+    }
+
+    /**
+     * Spend the OAuth state nonce once. A missing nonce only blocks account
+     * creation; a returning account can still sign in.
+     *
+     * @param array<string, mixed> $statePayload
+     *
+     * @throws SignupBlockedException
+     */
+    private function consumeNonce(array $statePayload, bool $required): void
+    {
+        $nonce = $statePayload['nonce'] ?? null;
+        if (!is_string($nonce) || '' === $nonce) {
+            if ($required) {
+                throw SignupBlockedException::challengeRequired();
+            }
+
+            return;
+        }
+        if (!$this->oauthSignupNonceLimiter->create($nonce)->consume()->isAccepted()) {
+            $this->logger->warning('OAuth signup state replay refused');
+
+            throw SignupBlockedException::challengeRequired();
+        }
     }
 
     /** Everything a freshly created account needs besides its row. */

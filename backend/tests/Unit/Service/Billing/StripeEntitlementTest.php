@@ -148,6 +148,28 @@ final class StripeEntitlementTest extends TestCase
         $this->assertNull($this->entitlement->highestSettled([$business]));
     }
 
+    public function testProofInvoiceUsesTheLatestInvoiceNotAnOlderPaidOne(): void
+    {
+        $latest = $this->object(['id' => 'in_new', 'status' => 'open', 'paid' => false]);
+        $subscription = $this->subscription(['latest_invoice' => $latest]);
+        $olderPaid = $this->object(['id' => 'in_old', 'status' => 'paid', 'paid' => true]);
+
+        $proof = $this->entitlement->proofInvoice($subscription, $olderPaid);
+
+        $this->assertSame('in_new', $proof->id ?? null);
+        $this->assertSame('open', $proof['status'] ?? null);
+        $this->assertFalse($this->entitlement->isSettled($subscription, $proof));
+    }
+
+    public function testProofInvoiceKeepsTheEventInvoiceWhenItIsTheLatest(): void
+    {
+        $subscription = $this->subscription(['latest_invoice' => 'in_same']);
+        $event = $this->object(['id' => 'in_same', 'status' => 'paid', 'paid' => true]);
+
+        $this->assertSame($event, $this->entitlement->proofInvoice($subscription, $event));
+        $this->assertTrue($this->entitlement->isSettled($subscription, $event));
+    }
+
     public function testLatestInvoiceReturnsTheExpandedObjectWithoutAnApiCall(): void
     {
         $expanded = $this->object(['id' => 'in_1', 'status' => 'paid']);

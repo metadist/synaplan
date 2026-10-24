@@ -219,6 +219,26 @@ class UserRepository extends ServiceEntityRepository
      * Apple flow. Mirrors {@see findByStripeCustomerId()} — a wildcard-escaped
      * LIKE over the JSON column, avoiding a schema migration.
      */
+    /**
+     * Find the user linked to a GitHub account by its numeric id (stored in
+     * BUSERDETAILS.github_id, either as a JSON number or a string).
+     */
+    public function findByGithubId(int|string $githubId): ?User
+    {
+        $escaped = $this->escapeLike((string) $githubId);
+
+        return $this->createQueryBuilder('u')
+            ->where("u.userDetails LIKE :quoted ESCAPE '!'")
+            ->orWhere("u.userDetails LIKE :bareComma ESCAPE '!'")
+            ->orWhere("u.userDetails LIKE :bareBrace ESCAPE '!'")
+            ->setParameter('quoted', '%"github_id":"'.$escaped.'"%')
+            ->setParameter('bareComma', '%"github_id":'.$escaped.',%')
+            ->setParameter('bareBrace', '%"github_id":'.$escaped.'}%')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findByAppleSub(string $appleSub): ?User
     {
         return $this->createQueryBuilder('u')

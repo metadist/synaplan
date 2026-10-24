@@ -143,7 +143,7 @@ class AppleAuthController extends AbstractController
 
             $claims = $this->identityTokenVerifier->verify($identityToken);
             $profile = $this->parseUserField($userField);
-            $this->signupGate->assertNewAccountAllowed($claims['email'] ?? $profile['email'], $statePayload, $request->getClientIp(), $native);
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $claims,
                 $profile,
@@ -213,7 +213,7 @@ class AppleAuthController extends AbstractController
 
         // MOBILE-APP SEAM: no browser challenge on the native sheet — only the signup limits and pause switch apply.
         try {
-            $this->signupGate->assertNewAccountAllowed($claims['email'] ?? $profile['email'], [], $request->getClientIp(), true);
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], [], $request->getClientIp(), true);
         } catch (SignupBlockedException $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
         }

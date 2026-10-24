@@ -578,9 +578,7 @@ class StripeWebhookController extends AbstractController
         $currentId = $user->getPaymentDetails()['subscription']['stripe_subscription_id'] ?? null;
         if (null !== $invoiceSubscriptionId && (null === $currentId || $currentId === $invoiceSubscriptionId)) {
             $subscription = $this->entitlement->subscriptionOfInvoice($invoice);
-            if (null !== $subscription) {
-                $this->entitlement->apply($user, $subscription, $invoice);
-            }
+            $this->entitlement->apply($user, $subscription, $this->entitlement->proofInvoice($subscription, $invoice));
         }
 
         // Clear the payment-failed flag so the SubscriptionView warning

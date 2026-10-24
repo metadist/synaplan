@@ -182,6 +182,10 @@ x-app-environment: &app-environment
   SIGNUP_GLOBAL_LIMIT: "${SIGNUP_GLOBAL_LIMIT:-20}"
   CHECKOUT_IP_LIMIT: "${CHECKOUT_IP_LIMIT:-10}"
   PAID_SIGNUP_ALERT_LIMIT: "${PAID_SIGNUP_ALERT_LIMIT:-10}"
+  # Empty default on purpose: a set value would pin the switch and the admin
+  # toggle (BCONFIG SIGNUP.PAUSED) would no longer take effect.
+  SIGNUP_PAUSED: "${SIGNUP_PAUSED:-}"
+  APP_ADMIN_EMAIL: "${APP_ADMIN_EMAIL:-}"
   # Per-plan spending ceiling for AI usage. Only ever enforced together with
   # Stripe, because the budget is denominated in the plan a user pays for.
   COST_BUDGET_GATE_ENABLED: "${COST_BUDGET_GATE_ENABLED:-false}"

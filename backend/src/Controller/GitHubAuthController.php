@@ -170,7 +170,7 @@ class GitHubAuthController extends AbstractController
 
             // A new account needs the human check from the start of the flow
             // and a free signup slot; an existing account signs in as before.
-            $this->signupGate->assertNewAccountAllowed($email, $statePayload, $request->getClientIp(), $native);
+            $this->signupGate->assertGithubSignup($email, $userInfo['id'] ?? null, $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $email,
