@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Entity\Config;
+use App\Entity\GroupConfig;
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupConfigRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Service\Iam\Policy\GroupPolicyService;
-use App\Service\Model\PickerCapabilities;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -24,7 +27,9 @@ final readonly class DefaultModelMover
     public function __construct(
         private ModelRepository $models,
         private ConfigRepository $configs,
+        private GroupConfigRepository $groupConfigs,
         private ModelHealthRepository $health,
+        private ModelConfigService $usable,
         private EntityManagerInterface $em,
         private ?GroupPolicyService $groupPolicy = null,
     ) {
@@ -32,43 +37,40 @@ final readonly class DefaultModelMover
 
     /**
      * @return array{
-     *     moved: list<array{setting: string, ownerId: int, modelId: int, modelName: string}>,
-     *     cleared: list<array{setting: string, ownerId: int}>
+     *     moved: list<array{setting: string, scope: string, ownerId: int, modelId: int, modelName: string}>,
+     *     cleared: list<array{setting: string, scope: string, ownerId: int}>
      * }
      */
     public function release(Model $model): array
     {
         $id = (int) $model->getId();
-        /** @var list<Config> $rows */
-        $rows = $this->configs->findBy([
-            'group' => 'DEFAULTMODEL',
-            'value' => (string) $id,
-        ]);
-
+        $bindings = $this->bindings($id);
         $moved = [];
         $cleared = [];
-        $candidates = $this->needsReplacement($rows) ? $this->candidates() : [];
+        $candidates = $this->needsReplacement($bindings) ? $this->candidates() : [];
         $offline = [] === $candidates ? [] : array_flip($this->offlineIds());
 
-        foreach ($rows as $row) {
-            $setting = $row->getSetting();
-            $ownerId = $row->getOwnerId();
+        foreach ($bindings as $binding) {
+            $setting = $binding['setting'];
+            $ownerId = $binding['ownerId'];
+            $scope = $binding['scope'];
             if ('VECTORIZE' === $setting) {
-                $this->em->remove($row);
-                $cleared[] = ['setting' => $setting, 'ownerId' => $ownerId];
+                $this->em->remove($binding['row']);
+                $cleared[] = ['setting' => $setting, 'scope' => $scope, 'ownerId' => $ownerId];
                 continue;
             }
 
-            $replacement = $this->replacement($candidates, $model, $setting, $ownerId, $offline, $id);
+            $replacement = $this->replacement($candidates, $model, $setting, $ownerId, $scope, $offline, $id);
             if (null === $replacement) {
-                $this->em->remove($row);
-                $cleared[] = ['setting' => $setting, 'ownerId' => $ownerId];
+                $this->em->remove($binding['row']);
+                $cleared[] = ['setting' => $setting, 'scope' => $scope, 'ownerId' => $ownerId];
                 continue;
             }
 
-            $row->setValue((string) $replacement->getId());
+            $binding['row']->setValue((string) $replacement->getId());
             $moved[] = [
                 'setting' => $setting,
+                'scope' => $scope,
                 'ownerId' => $ownerId,
                 'modelId' => (int) $replacement->getId(),
                 'modelName' => $replacement->getName(),
@@ -79,12 +81,64 @@ final readonly class DefaultModelMover
     }
 
     /**
-     * @param list<Config> $rows
+     * @return list<array{setting: string, scope: string, ownerId: int, row: Config|GroupConfig}>
      */
-    private function needsReplacement(array $rows): bool
+    private function bindings(int $id): array
     {
+        $bindings = [];
+        /** @var list<Config> $rows */
+        $rows = $this->configs->findBy(['group' => 'DEFAULTMODEL']);
         foreach ($rows as $row) {
-            if ('VECTORIZE' !== $row->getSetting()) {
+            if ($this->storedId($row->getValue()) !== $id) {
+                continue;
+            }
+            $bindings[] = [
+                'setting' => $row->getSetting(),
+                'scope' => 'global',
+                'ownerId' => $row->getOwnerId(),
+                'row' => $row,
+            ];
+        }
+
+        /** @var list<GroupConfig> $groupRows */
+        $groupRows = $this->groupConfigs->findBy(['group' => 'DEFAULTMODEL']);
+        foreach ($groupRows as $row) {
+            if ($this->storedId($row->getValue()) !== $id) {
+                continue;
+            }
+            $bindings[] = [
+                'setting' => $row->getSetting(),
+                'scope' => 'group',
+                'ownerId' => $row->getGroupId(),
+                'row' => $row,
+            ];
+        }
+
+        return $bindings;
+    }
+
+    private function storedId(string $raw): ?int
+    {
+        $raw = trim($raw);
+        if ('' === $raw) {
+            return null;
+        }
+        if (is_numeric($raw)) {
+            $parsed = (int) $raw;
+
+            return 0 !== $parsed ? $parsed : null;
+        }
+
+        return $this->groupPolicy?->modelIdFromStored($raw);
+    }
+
+    /**
+     * @param list<array{setting: string, scope: string, ownerId: int, row: Config|GroupConfig}> $bindings
+     */
+    private function needsReplacement(array $bindings): bool
+    {
+        foreach ($bindings as $binding) {
+            if ('VECTORIZE' !== $binding['setting']) {
                 return true;
             }
         }
@@ -107,13 +161,13 @@ final readonly class DefaultModelMover
      * @param list<Model>       $candidates
      * @param array<int, mixed> $offline
      */
-    private function replacement(array $candidates, Model $deleted, string $setting, int $ownerId, array $offline, int $deletedId): ?Model
+    private function replacement(array $candidates, Model $deleted, string $setting, int $ownerId, string $scope, array $offline, int $deletedId): ?Model
     {
         $same = [];
         $other = [];
         foreach ($candidates as $candidate) {
             $candidateId = (int) $candidate->getId();
-            if ($candidateId === $deletedId || $candidateId < 1) {
+            if ($candidateId === $deletedId || $candidateId < 1 || !$this->fits($candidate, $setting)) {
                 continue;
             }
             if (1 !== $candidate->getSelectable() || 1 !== $candidate->getActive()) {
@@ -122,11 +176,10 @@ final readonly class DefaultModelMover
             if ($candidate->isRetired() || $candidate->isHiddenBecauseFree() || isset($offline[$candidateId])) {
                 continue;
             }
-            $accepted = PickerCapabilities::forTag(strtoupper($candidate->getTag()), $candidate->getFeatures());
-            if (!in_array($setting, $accepted, true)) {
+            if (!$this->usable->isConfiguredModelUsable($candidateId)) {
                 continue;
             }
-            if ($ownerId > 0 && null !== $this->groupPolicy && !$this->groupPolicy->isModelAllowed($ownerId, $candidateId, $setting)) {
+            if ('global' === $scope && $ownerId > 0 && null !== $this->groupPolicy && !$this->groupPolicy->isModelAllowed($ownerId, $candidateId, $setting)) {
                 continue;
             }
 
@@ -142,6 +195,27 @@ final readonly class DefaultModelMover
         usort($other, $byId);
 
         return $same[0] ?? $other[0] ?? null;
+    }
+
+    private function fits(Model $candidate, string $setting): bool
+    {
+        $expected = ModelCatalog::CAPABILITY_TAGS[$setting] ?? null;
+        if (null === $expected || strtolower($candidate->getTag()) !== $expected) {
+            return false;
+        }
+
+        $features = $candidate->getFeatures();
+        if ('PIC2PIC' === $setting && !in_array('pic2pic', $features, true)) {
+            return false;
+        }
+        if ('IMG2VID' === $setting && !in_array('image2video', $features, true)) {
+            return false;
+        }
+        if ('TEXT2VID' === $setting && in_array('image2video', $features, true)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

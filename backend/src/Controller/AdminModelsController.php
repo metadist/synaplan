@@ -230,9 +230,10 @@ final class AdminModelsController extends AbstractController
                     property: 'moved',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['setting', 'ownerId', 'modelId', 'modelName'],
+                        required: ['setting', 'scope', 'ownerId', 'modelId', 'modelName'],
                         properties: [
                             new OA\Property(property: 'setting', type: 'string', example: 'CHAT'),
+                            new OA\Property(property: 'scope', type: 'string', enum: ['global', 'group'], example: 'global'),
                             new OA\Property(property: 'ownerId', type: 'integer', example: 0),
                             new OA\Property(property: 'modelId', type: 'integer', example: 12),
                             new OA\Property(property: 'modelName', type: 'string', example: 'GPT OSS 120B'),
@@ -244,9 +245,10 @@ final class AdminModelsController extends AbstractController
                     property: 'cleared',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['setting', 'ownerId'],
+                        required: ['setting', 'scope', 'ownerId'],
                         properties: [
                             new OA\Property(property: 'setting', type: 'string', example: 'VECTORIZE'),
+                            new OA\Property(property: 'scope', type: 'string', enum: ['global', 'group'], example: 'global'),
                             new OA\Property(property: 'ownerId', type: 'integer', example: 0),
                         ],
                         type: 'object'
