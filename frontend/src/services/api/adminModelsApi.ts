@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import {
+  DeleteAdminModelsDeleteResponseSchema,
   PostAdminModelsImportEndpointApplyResponseSchema,
   PostAdminModelsImportEndpointPreviewResponseSchema,
 } from '@/generated/api-schemas'
@@ -109,9 +110,10 @@ export const adminModelsApi = {
       body: JSON.stringify(req),
     })
   },
-  delete: async (id: number): Promise<{ success: boolean }> => {
-    return httpClient<{ success: boolean }>(`/api/v1/admin/models/${id}`, {
+  delete: async (id: number) => {
+    return httpClient(`/api/v1/admin/models/${id}`, {
       method: 'DELETE',
+      schema: DeleteAdminModelsDeleteResponseSchema,
     })
   },
   importPreview: async (req: AdminImportPreviewRequest): Promise<AdminImportPreviewResponse> => {

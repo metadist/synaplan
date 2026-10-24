@@ -369,6 +369,11 @@
       },
       "admin": {
         "catalogSubtitle": "Sistem model kataloğunu arayın ve düzenleyin.",
+        "deletedMoved": "Kaldırıldı. {job} artık {model} kullanıyor.",
+        "deletedMovedMany": "Kaldırıldı. Bu modeli kullanan yerler artık başka bir uygun model kullanıyor.",
+        "deletedCleared": "Kaldırıldı. Bu sayfada bir model seçene kadar {job} için model yok. Başka bir şey değişmedi.",
+        "deletedMovedAndCleared": "Kaldırıldı. Bir kısmı artık başka bir model kullanıyor. Bu sayfada bir model seçene kadar {job} için model yok.",
+        "someJobs": "Bir kısmı",
         "availability": {
           "providerUnavailable": "Sağlayıcı yapılandırılmamış",
           "providerUnavailableTooltip": "Bu yapay zeka sağlayıcısı için bu kurulumda API anahtarı veya sunucu URL'si yok. Sağlayıcı yapılandırılana kadar kullanıcılar bu modeli görmez.",

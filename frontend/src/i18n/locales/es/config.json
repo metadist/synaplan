@@ -369,6 +369,11 @@
       },
       "admin": {
         "catalogSubtitle": "Busca y edita el catálogo de modelos del sistema.",
+        "deletedMoved": "Eliminado. {job} ahora usa {model}.",
+        "deletedMovedMany": "Eliminado. Lo que usaba este modelo ahora usa otro disponible.",
+        "deletedCleared": "Eliminado. {job} no tiene modelo hasta que elijas uno en esta página. No se ha cambiado nada más.",
+        "deletedMovedAndCleared": "Eliminado. Una parte ahora usa otro modelo. {job} no tiene modelo hasta que elijas uno en esta página.",
+        "someJobs": "Una parte",
         "availability": {
           "providerUnavailable": "Proveedor no configurado",
           "providerUnavailableTooltip": "Este proveedor de IA no tiene clave de API ni URL de servidor en esta instalación. Los usuarios no verán este modelo hasta que el proveedor esté configurado.",
