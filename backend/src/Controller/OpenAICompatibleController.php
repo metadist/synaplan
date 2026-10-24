@@ -344,10 +344,10 @@ class OpenAICompatibleController extends AbstractController
         $dbModelId = $resolvedModel['model_id'];
 
         if ($parsed->stream) {
-            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId, $parsed->incognito);
+            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId, $parsed->flags->incognito);
         }
 
-        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId, $parsed->incognito);
+        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId, $parsed->flags->incognito);
     }
 
     /**
