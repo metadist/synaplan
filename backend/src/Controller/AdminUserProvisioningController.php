@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminUserProvisioningService;
 use App\Service\Admin\UserProvisioningConflictException;
+use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
+use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
+use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
+use App\Service\PlatformLink\InstanceCredential;
 use App\Service\Usage\UsageStatsService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,6 +37,7 @@ final class AdminUserProvisioningController extends AbstractController
         private readonly AdminUserProvisioningService $provisioning,
         private readonly UserRepository $userRepository,
         private readonly UsageStatsService $usageStats,
+        private readonly InstanceCredential $instanceCredential,
     ) {
     }
 
@@ -39,7 +45,11 @@ final class AdminUserProvisioningController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/users',
         summary: 'Provision (create or fetch) a user for an external identity',
-        description: 'Idempotent on (source, external_id). Returns the existing user if already provisioned.',
+        description: 'Idempotent on (source, external_id). With the instance credential the identity row is canonical (client, instance, bare uid) and the later key mint binds that key. Without it, behaviour is unchanged.',
+        parameters: [
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
+        ],
         security: [['Bearer' => []]],
         tags: ['Admin User Provisioning']
     )]
@@ -61,6 +71,7 @@ final class AdminUserProvisioningController extends AbstractController
     #[OA\Response(response: 201, description: 'User created')]
     #[OA\Response(response: 400, description: 'Invalid input')]
     #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 401, description: 'Invalid instance credentials')]
     #[OA\Response(response: 409, description: 'Email belongs to a different account')]
     public function provision(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -73,14 +84,28 @@ final class AdminUserProvisioningController extends AbstractController
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
+        $instance = $this->optionalInstance($request);
+        if ($instance instanceof JsonResponse) {
+            return $instance;
+        }
+
+        $source = (string) ($data['source'] ?? '');
+        if ($instance instanceof PlatformInstance) {
+            if ('' !== trim($source) && trim($source) !== $instance->getClient()) {
+                return $this->json(['error' => 'source does not match this cloud.'], Response::HTTP_BAD_REQUEST);
+            }
+            $source = $instance->getClient();
+        }
+
         try {
             $result = $this->provisioning->provision(
-                (string) ($data['source'] ?? ''),
+                $source,
                 (string) ($data['external_id'] ?? ''),
                 (string) ($data['email'] ?? ''),
                 isset($data['display_name']) ? (string) $data['display_name'] : null,
                 (string) ($data['level'] ?? 'NEW'),
                 isset($data['password']) && is_string($data['password']) && '' !== $data['password'] ? $data['password'] : null,
+                $instance,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
@@ -99,11 +124,15 @@ final class AdminUserProvisioningController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/users/{id}/api-keys',
         summary: 'Mint an API key on behalf of a user',
-        description: 'Returns the plaintext key ONCE. Use it as that user\'s X-API-Key.',
+        description: 'Returns the plaintext key ONCE. Use it as that user\'s X-API-Key. With the instance credential the key is bound to that user\'s canonical identity row.',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
+        ],
         security: [['Bearer' => []]],
         tags: ['Admin User Provisioning']
     )]
-    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\RequestBody(
         required: false,
         content: new OA\JsonContent(
@@ -134,14 +163,24 @@ final class AdminUserProvisioningController extends AbstractController
             return $this->json(['error' => 'Refusing to mint a key for an admin account'], Response::HTTP_FORBIDDEN);
         }
 
+        $instance = $this->optionalInstance($request);
+        if ($instance instanceof JsonResponse) {
+            return $instance;
+        }
+
         $data = json_decode($request->getContent(), true);
         $data = is_array($data) ? $data : [];
 
-        $minted = $this->provisioning->mintApiKeyForUser(
-            $target,
-            (string) ($data['name'] ?? 'external-integration'),
-            is_array($data['scopes'] ?? null) ? array_map('strval', $data['scopes']) : [],
-        );
+        try {
+            $minted = $this->provisioning->mintApiKeyForUser(
+                $target,
+                (string) ($data['name'] ?? 'external-integration'),
+                is_array($data['scopes'] ?? null) ? array_map('strval', $data['scopes']) : [],
+                $instance,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
 
         return $this->json([
             'success' => true,
@@ -183,6 +222,26 @@ final class AdminUserProvisioningController extends AbstractController
             'user' => $this->provisioning->serializeUser($target),
             'usage' => $this->usageStats->getUserStats($target),
         ]);
+    }
+
+    /**
+     * Both headers absent: no instance. One of them, or a bad pair: 401.
+     */
+    private function optionalInstance(Request $request): PlatformInstance|JsonResponse|null
+    {
+        $id = trim((string) $request->headers->get('X-Instance-Id', ''));
+        $secret = (string) $request->headers->get('X-Instance-Secret', '');
+        if ('' === $id && '' === $secret) {
+            return null;
+        }
+
+        try {
+            return $this->instanceCredential->require($id, $secret);
+        } catch (PlatformInstanceNotFoundException|PlatformInstanceSecretException) {
+            return $this->json(['error' => 'Invalid instance credentials.'], Response::HTTP_UNAUTHORIZED);
+        } catch (PlatformInstanceNotActiveException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_FORBIDDEN);
+        }
     }
 
     private function requireAdmin(?User $user): ?JsonResponse

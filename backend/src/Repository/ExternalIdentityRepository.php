@@ -83,6 +83,7 @@ class ExternalIdentityRepository extends ServiceEntityRepository
         string $externalId,
         string $instanceId = '',
         ?int $apiKeyId = null,
+        ?string $mode = null,
     ): ExternalIdentity {
         $identity = $this->findOneByTriple($source, $instanceId, $externalId);
         if (null === $identity) {
@@ -99,10 +100,47 @@ class ExternalIdentityRepository extends ServiceEntityRepository
         if (null !== $apiKeyId) {
             $identity->setApiKeyId($apiKeyId);
         }
+        if (null !== $mode) {
+            $identity->setMode($mode);
+        }
 
         $this->getEntityManager()->flush();
 
         return $identity;
+    }
+
+    /**
+     * A canonical row: this person, this cloud, a real instance id.
+     */
+    public function findCanonicalForUserSource(int $userId, string $source): ?ExternalIdentity
+    {
+        $row = $this->createQueryBuilder('e')
+            ->where('e.userId = :userId')
+            ->andWhere('e.source = :source')
+            ->andWhere('e.instanceId <> :empty')
+            ->setParameter('userId', $userId)
+            ->setParameter('source', $source)
+            ->setParameter('empty', '')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $row instanceof ExternalIdentity ? $row : null;
+    }
+
+    /**
+     * @return list<ExternalIdentity>
+     */
+    public function findForUserOnInstance(int $userId, string $source, string $instanceId): array
+    {
+        /** @var list<ExternalIdentity> $rows */
+        $rows = $this->findBy([
+            'userId' => $userId,
+            'source' => $source,
+            'instanceId' => $instanceId,
+        ]);
+
+        return $rows;
     }
 
     public function deleteByUserId(int $userId): void

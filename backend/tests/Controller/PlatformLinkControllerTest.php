@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\ApiKey;
+use App\Entity\ExternalIdentity;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Security\ApiKeyScope;
@@ -100,6 +101,15 @@ final class PlatformLinkControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/admin/platform-links/instances');
         self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $this->client->request('GET', '/api/v1/platform-links/sso/status?external_id=ada');
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $this->postJson('/api/v1/platform-links/sso/bind', ['external_id' => 'ada']);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $this->postJson('/api/v1/platform-links/identities/adopt', ['external_id' => 'ada']);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testAdminRegisterIsActiveAndAnonymousIsPending(): void
@@ -183,6 +193,12 @@ final class PlatformLinkControllerTest extends WebTestCase
         self::assertSame((int) $user->getId(), $exchanged['user']['id']);
 
         $this->em->clear();
+        $linked = $this->em->getRepository(ExternalIdentity::class)->findOneBy([
+            'instanceId' => $instanceA['instance_id'],
+            'externalId' => 'jdoe',
+        ]);
+        self::assertInstanceOf(ExternalIdentity::class, $linked);
+        self::assertSame(ExternalIdentity::MODE_LINK, $linked->getMode());
         $reloaded = $this->em->getRepository(User::class)->find($user->getId());
         self::assertInstanceOf(User::class, $reloaded);
         self::assertSame($countBefore, $this->em->getRepository(User::class)->count([]));

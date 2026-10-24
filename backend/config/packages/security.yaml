@@ -22,6 +22,7 @@ security:
             user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
+                - App\Security\OidcBearerAuthenticator
                 - App\Security\ApiKeyAuthenticator
 
         # Model Context Protocol (MCP) Streamable HTTP endpoint.
@@ -70,7 +71,8 @@ security:
         # first-run setup is unfinished.
         - { path: ^/v1/free/keys$, methods: [POST], roles: PUBLIC_ACCESS }
 
-        # OpenAI-compatible endpoints (require API key auth)
+        # OpenAI-compatible endpoints. API keys, plus an OIDC bearer token
+        # on POST /v1/chat/completions and GET /v1/models only.
         - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
 
         # MCP: public discovery (RFC 9728 metadata) + CORS preflight; the
