@@ -6,16 +6,16 @@ namespace App\Tests\Unit\Service\Prompt;
 
 use App\Entity\File;
 use App\Entity\Message;
-use App\Repository\FileRepository;
 use App\Repository\ConnectionRepository;
+use App\Repository\FileRepository;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\File\ConnectedFolderContentGuard;
 use App\Service\File\ConnectedFolderGuardCatalog;
 use App\Service\File\ConnectedFolderReadHonestyPrompt;
 use App\Service\File\ConversationFileCatalog;
+use App\Service\File\DocumentImageCatalog;
 use App\Service\Multitask\Execution\InputFileText;
 use App\Service\PlatformLink\PickupService;
-use App\Service\File\DocumentImageCatalog;
 use App\Service\Prompt\ChatPromptBlocks;
 use App\Service\Prompt\ChatSystemPromptBuilder;
 use App\Service\Prompt\TimeContextBuilder;

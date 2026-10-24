@@ -6,12 +6,12 @@ namespace App\Tests\Unit\Service\File;
 
 use App\Entity\Message;
 use App\Service\Connection\PlannerChannel;
+use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\File\ConnectedFolderContentGuard;
 use App\Service\File\ConnectedFolderGuardCatalog;
 use App\Service\File\ConnectedFolderReadHonestyPrompt;
 use App\Service\Multitask\Execution\InputFileText;
 use App\Service\PlatformLink\PickupService;
-use App\Service\Connection\PlannerChannelCatalog;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\TestCase;
 

@@ -91,9 +91,6 @@ final readonly class ConnectedFolderReadHonestyPrompt
             }
             if (true === ($result->metadata['folder_fetch'] ?? false)) {
                 foreach ($result->files as $descriptor) {
-                    if (!is_array($descriptor)) {
-                        continue;
-                    }
                     if ('' !== trim($this->inputFileText->of($descriptor, $userId))) {
                         return true;
                     }
