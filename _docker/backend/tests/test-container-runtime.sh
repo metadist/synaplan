@@ -837,6 +837,25 @@ assert_eq 78 "$(BOOTSTRAP_ADMIN_EMAIL=admin@example.com BOOTSTRAP_ADMIN_PASSWORD
     runtime_status_under_set_e "$TMP_DIR/app" require_bootstrap_admin_pair)" \
     "a half-configured bootstrap pair keeps exit code 78 under set -e"
 
+echo "Case 12: the entrypoint repairs permissions recursively only when a tree needs it"
+
+# var/uploads is a shared NFS mount with tens of thousands of files in
+# production, and the recursive chown/chmod this replaces cost one NFS
+# operation per file on every backend and scheduler start of every node,
+# for a tree that is already www-data:775. The per-tree guard and the
+# forced-repair escape hatch are entrypoint wiring, so — like Case 9 —
+# they are asserted on the script text.
+assert_contains "ensure_writable_tree /var/www/backend/var/uploads" "$ENTRYPOINT" \
+    "the entrypoint checks the uploads tree on its own"
+assert_contains "ensure_writable_tree /var/www/backend/public/up" "$ENTRYPOINT" \
+    "the entrypoint checks the public uploads directory on its own"
+assert_contains "SYNAPLAN_REPAIR_PERMISSIONS" "$ENTRYPOINT" \
+    "the entrypoint keeps a forced recursive repair for restores"
+assert_not_contains "chown -R www-data:www-data /var/www/backend/var /var/www/backend/public/up" "$ENTRYPOINT" \
+    "the entrypoint no longer chowns the whole var tree on every start"
+assert_not_contains "chmod -R 775 /var/www/backend/var /var/www/backend/public/up" "$ENTRYPOINT" \
+    "the entrypoint no longer chmods the whole var tree on every start"
+
 TOTAL=$((PASS + FAIL))
 echo "${PASS}/${TOTAL} assertions passed"
 [ "$FAIL" -eq 0 ]
