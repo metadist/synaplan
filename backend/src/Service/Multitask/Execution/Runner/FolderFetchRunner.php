@@ -22,6 +22,7 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\PlatformLink\CloudFolderLink;
 use App\Service\PlatformLink\PickupService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -35,6 +36,9 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final readonly class FolderFetchRunner implements TaskRunner
 {
+    /** Names the step text lists for the answer. */
+    private const NAMES_IN_TEXT = 50;
+
     public function __construct(
         private ConnectionRepository $connections,
         private CredentialVaultInterface $vault,
@@ -43,6 +47,7 @@ final readonly class FolderFetchRunner implements TaskRunner
         private EntityManagerInterface $em,
         private PickupService $pickups,
         private PlannerChannelCatalog $channels,
+        private CloudFolderLink $folderLinks,
         #[Autowire('%env(int:PICKUP_WAIT_SEC)%')]
         private int $waitSeconds = 600,
     ) {
@@ -76,34 +81,55 @@ final readonly class FolderFetchRunner implements TaskRunner
         $mode = 'list' === ($node->params['mode'] ?? null) ? CloudPickup::MODE_LIST : CloudPickup::MODE_FETCH;
         $channel = is_string($node->params['channel'] ?? null) ? trim($node->params['channel']) : '';
 
-        $identityId = '' !== $channel ? $this->pickups->identityForChannel($userId, $channel, $this->usedChannels($userId)) : null;
-        if (null !== $identityId) {
-            return $this->fromCloud($userId, $identityId, $folder, $pattern, $mode, $channel);
+        $link = '' !== $channel ? $this->pickups->linkForChannel($userId, $channel, $this->usedChannels($userId)) : null;
+        if (null !== $link) {
+            $source = new FolderRead(
+                $link['client'],
+                FolderRead::clientLabel($link['client']),
+                $link['host'],
+                $folder,
+                $this->folderLinks->to($link['client'], $link['host'], $folder),
+            );
+
+            return $this->fromCloud($node->id, $context, $userId, $link['identity_id'], $source, $pattern, $mode);
         }
 
         $connection = $this->folderConnection($userId, $channel, $node->params['connection_id'] ?? null);
         if (!$connection instanceof Connection) {
-            return NodeResult::failed('Synaplan has no connected folder to read. Nothing was read.');
+            $nowhere = new FolderRead('', '', '', $folder);
+
+            return NodeResult::failed('Synaplan has no connected folder to read. Nothing was read.', $nowhere->metadata(FolderRead::NOT_CONNECTED));
         }
 
-        return $this->fromWebDav($connection, $folder, $pattern, $mode);
+        return $this->fromWebDav($node->id, $context, $connection, $folder, $pattern, $mode);
     }
 
-    private function fromCloud(int $userId, int $identityId, string $folder, string $pattern, string $mode, string $channel): NodeResult
+    private function fromCloud(string $nodeId, NodeContext $context, int $userId, int $identityId, FolderRead $source, string $pattern, string $mode): NodeResult
     {
         $opened = $this->pickups->open($userId, $identityId, [
-            'folder_path' => $folder,
+            'folder_path' => $source->folder,
             'pattern' => $pattern,
         ], $mode);
         if (!$opened['ok']) {
-            return NodeResult::failed($opened['sentence']);
+            $outcome = match ($opened['error']) {
+                'outside_scope' => FolderRead::REFUSED,
+                'rate_limited' => FolderRead::BUSY,
+                'not_linked', 'unauthorized' => FolderRead::NOT_CONNECTED,
+                default => FolderRead::UNREACHABLE,
+            };
+
+            return NodeResult::failed($opened['sentence'], $source->metadata($outcome));
         }
 
         $deadline = microtime(true) + max(0, $this->waitSeconds);
+        $reported = '';
         do {
             $pickup = $this->pickups->find($opened['pickup_id']);
             if ($pickup instanceof CloudPickup && $this->settled($pickup)) {
-                return $this->fromPickup($pickup, $channel, $folder);
+                return $this->fromPickup($pickup, $source);
+            }
+            if ($pickup instanceof CloudPickup) {
+                $reported = $this->reportProgress($context, $nodeId, $source, count($pickup->fileIds()), $this->matchingSoFar($pickup), $reported);
             }
             if ($this->waitSeconds <= 0) {
                 break;
@@ -111,119 +137,177 @@ final readonly class FolderFetchRunner implements TaskRunner
             usleep(200000);
         } while (microtime(true) < $deadline);
 
-        return NodeResult::failed('Synaplan could not reach this cloud in time. Nothing was read.');
+        if (!$this->pickups->giveUp($opened['pickup_id'])) {
+            // The cloud's result landed between the last look and giving up.
+            $pickup = $this->pickups->find($opened['pickup_id']);
+            if ($pickup instanceof CloudPickup && $this->settled($pickup)) {
+                return $this->fromPickup($pickup, $source);
+            }
+        }
+
+        return NodeResult::failed('Synaplan could not reach '.$this->hostOf($source).' in time. Nothing was read.', $source->metadata(FolderRead::UNREACHABLE));
     }
 
-    private function fromPickup(CloudPickup $pickup, string $channel, string $folder): NodeResult
+    /**
+     * The files of this folder the run asked for: the ones it takes plus the
+     * ones it leaves out for size or the run limit ("12 of 52").
+     */
+    private function matchingSoFar(CloudPickup $pickup): int
     {
-        $where = $this->where($channel, $folder);
-        if (CloudPickup::STATE_FAILED === $pickup->getState()) {
-            return NodeResult::failed($this->failedSentence($pickup, $where));
-        }
-        $files = CloudPickup::MODE_FETCH === $pickup->getMode() ? $this->pickups->producedFiles($pickup) : [];
-        if (CloudPickup::MODE_FETCH === $pickup->getMode() && [] === $files) {
-            return NodeResult::failed('No files in '.$where.' matched. Nothing was read.');
-        }
-        $text = $this->outcomeText($pickup, $where, count($files));
-        if (CloudPickup::STATE_PARTIAL === $pickup->getState()) {
-            return NodeResult::ok($text, $files, ['folder_fetch' => true, 'partial' => true]);
+        $leftOut = 0;
+        foreach ($pickup->skipped() as $row) {
+            if (in_array($row['reason'] ?? null, ['too_large', 'over_limit'], true)) {
+                ++$leftOut;
+            }
         }
 
-        return NodeResult::ok($text, $files, ['folder_fetch' => true]);
+        return $pickup->acceptCount() + $leftOut;
     }
 
-    private function fromWebDav(Connection $connection, string $folder, string $pattern, string $mode): NodeResult
+    private function fromPickup(CloudPickup $pickup, FolderRead $source): NodeResult
+    {
+        $where = $source->where();
+        $skipped = $this->skippedOf($pickup);
+        if (CloudPickup::STATE_FAILED === $pickup->getState()) {
+            return match ($pickup->getErrorCode()) {
+                'outside_scope' => NodeResult::failed('Synaplan may not read '.$where.'. Nothing was read.', $source->metadata(FolderRead::REFUSED)),
+                'not_found' => NodeResult::failed($where.' has no folder you can open. Nothing was read.', $source->metadata(FolderRead::NOT_FOUND)),
+                default => NodeResult::failed('Synaplan could not reach '.$this->hostOf($source).'. Nothing was read.', $source->metadata(FolderRead::UNREACHABLE)),
+            };
+        }
+        if (CloudPickup::MODE_LIST === $pickup->getMode()) {
+            $names = $pickup->names();
+            if ([] === $names) {
+                return NodeResult::failed('No files in '.$where.' matched. Nothing was read.', $source->metadata(FolderRead::NOTHING));
+            }
+
+            return NodeResult::ok(implode("\n", $names), [], $source->metadata(FolderRead::LISTED, count($names), count($names), $names) + ['mode' => 'list']);
+        }
+        $files = $this->pickups->producedFiles($pickup);
+        $names = array_map(static fn (array $file): string => $file['name'], $files);
+        if ([] === $files) {
+            return NodeResult::failed($this->nothingRead($where, $skipped), $source->metadata(FolderRead::NOTHING, 0, count($skipped), [], $skipped));
+        }
+        $total = count($files) + count($skipped);
+        if ([] !== $skipped || CloudPickup::STATE_PARTIAL === $pickup->getState()) {
+            return NodeResult::ok(
+                $this->partialSentence($where, $names, $total, $skipped),
+                $files,
+                $source->metadata(FolderRead::PARTIAL, count($files), $total, $names, $skipped) + ['partial' => true],
+            );
+        }
+
+        return NodeResult::ok($this->readSentence($where, $names), $files, $source->metadata(FolderRead::READ, count($files), $total, $names));
+    }
+
+    private function fromWebDav(string $nodeId, NodeContext $context, Connection $connection, string $folder, string $pattern, string $mode): NodeResult
     {
         $target = DavConnectionResolver::resolve($connection, $this->vault);
         $config = $connection->getConfig() ?? [];
         $root = is_string($config['folder'] ?? null) ? trim($config['folder'], '/') : '';
         $relative = '' !== $folder ? $folder : $root;
         $label = '' !== $connection->getName() ? $connection->getName() : 'the folder';
+        $source = new FolderRead('webdav', $label, null !== $target ? $target->host() : '', $relative);
         if (null === $target) {
-            return NodeResult::failed('Synaplan could not reach '.$label.'. Nothing was read.');
+            return NodeResult::failed('Synaplan could not reach '.$label.'. Nothing was read.', $source->metadata(FolderRead::UNREACHABLE));
         }
 
         try {
             $listed = $this->webDav->list($target, $relative);
         } catch (DavException $e) {
             if (404 === $e->statusCode) {
-                return NodeResult::failed($label.' has no folder '.$relative.' that you can open. Nothing was read.');
+                return NodeResult::failed($label.' has no folder '.$relative.' that you can open. Nothing was read.', $source->metadata(FolderRead::NOT_FOUND));
             }
 
-            return NodeResult::failed('Synaplan could not reach '.$target->host().'. Nothing was read.');
+            return NodeResult::failed('Synaplan could not reach '.$target->host().'. Nothing was read.', $source->metadata(FolderRead::UNREACHABLE));
         }
 
-        $matched = [];
-        foreach ($listed as $row) {
-            if ($this->nameMatches($pattern, $row['name'])) {
-                $matched[] = $row;
-            }
-        }
+        $matched = array_values(array_filter($listed, fn (array $row): bool => $this->nameMatches($pattern, $row['name'])));
         if (CloudPickup::MODE_LIST === $mode) {
             if ([] === $matched) {
-                return NodeResult::failed('No files in '.$relative.' matched. Nothing was read.');
+                return NodeResult::failed('No files in '.$source->where().' matched. Nothing was read.', $source->metadata(FolderRead::NOTHING));
             }
-            $lines = [];
-            foreach ($matched as $row) {
-                $lines[] = $row['name'];
-            }
+            $names = array_map(static fn (array $row): string => $row['name'], $matched);
 
-            return NodeResult::ok(implode("\n", $lines), [], ['folder_fetch' => true, 'mode' => 'list']);
+            return NodeResult::ok(implode("\n", $names), [], $source->metadata(FolderRead::LISTED, count($names), count($names), $names) + ['mode' => 'list']);
         }
 
-        return $this->downloadWebDav($connection, $target, $matched, $relative, $label);
+        return $this->downloadWebDav($nodeId, $context, $connection, $target, $matched, $source);
     }
 
     /**
      * @param list<array{name: string, path: string, size: int}> $matched
      */
-    private function downloadWebDav(Connection $connection, DavTarget $target, array $matched, string $relative, string $label): NodeResult
+    private function downloadWebDav(string $nodeId, NodeContext $context, Connection $connection, DavTarget $target, array $matched, FolderRead $source): NodeResult
     {
         $files = [];
-        $skippedLarge = 0;
-        $skippedLimit = 0;
+        $names = [];
+        $skipped = [];
         $bytes = 0;
-        $stopped = false;
+        $unreachable = false;
+        $reported = '';
         foreach ($matched as $row) {
+            if ($unreachable) {
+                // Once the folder stops answering, the rest is named, not dropped.
+                $skipped[] = ['name' => $row['name'], 'reason' => 'unreadable'];
+                continue;
+            }
             if ($row['size'] > PickupService::MAX_FILE_BYTES) {
-                ++$skippedLarge;
+                $skipped[] = ['name' => $row['name'], 'reason' => 'too_large'];
                 continue;
             }
             if (count($files) >= PickupService::MAX_FILES || $bytes + $row['size'] > PickupService::MAX_BYTES) {
-                ++$skippedLimit;
+                $skipped[] = ['name' => $row['name'], 'reason' => 'over_limit'];
                 continue;
             }
+            $reported = $this->reportProgress($context, $nodeId, $source, count($files), count($matched), $reported);
             try {
                 $body = $this->webDav->get($target, $row['path'], PickupService::MAX_FILE_BYTES);
             } catch (DavException $e) {
-                if (str_contains($e->getMessage(), 'larger than the limit')) {
-                    ++$skippedLarge;
-                    continue;
-                }
-                $stopped = true;
-                break;
+                $tooLarge = str_contains($e->getMessage(), 'larger than the limit');
+                $skipped[] = ['name' => $row['name'], 'reason' => $tooLarge ? 'too_large' : 'unreadable'];
+                $unreachable = !$tooLarge;
+                continue;
             }
             $stored = $this->storeWorkingCopy($connection, $body, $row['name'], $row['path']);
             if (null === $stored) {
-                $stopped = true;
-                break;
+                $skipped[] = ['name' => $row['name'], 'reason' => 'unreadable'];
+                continue;
             }
             $files[] = $stored;
+            $names[] = $row['name'];
             $bytes += strlen($body);
         }
-        $where = $this->where($label, $relative);
+        $where = $source->where();
+        $total = count($matched);
         if ([] === $files) {
-            return NodeResult::failed($this->nothingRead($where, $skippedLarge, $skippedLimit));
+            return NodeResult::failed(
+                $unreachable ? 'Synaplan could not reach '.$target->host().'. Nothing was read.' : $this->nothingRead($where, $skipped),
+                $source->metadata($unreachable ? FolderRead::UNREACHABLE : FolderRead::NOTHING, 0, $total, [], $skipped),
+            );
         }
-        if ($skippedLarge > 0 || $skippedLimit > 0 || $stopped) {
+        if ([] !== $skipped) {
             return NodeResult::ok(
-                $this->partialSentence($where, count($files), count($files) + $skippedLarge + $skippedLimit, $skippedLarge, $skippedLimit, $stopped),
+                $this->partialSentence($where, $names, $total, $skipped),
                 $files,
-                ['folder_fetch' => true, 'partial' => true],
+                $source->metadata(FolderRead::PARTIAL, count($files), $total, $names, $skipped) + ['partial' => true],
             );
         }
 
-        return NodeResult::ok('Read '.count($files).' files from '.$where.'.', $files, ['folder_fetch' => true]);
+        return NodeResult::ok($this->readSentence($where, $names), $files, $source->metadata(FolderRead::READ, count($files), $total, $names));
+    }
+
+    /**
+     * Sends "Reading files from … n of m" to the card when the count moved.
+     */
+    private function reportProgress(NodeContext $context, string $nodeId, FolderRead $source, int $read, int $total, string $reported): string
+    {
+        $now = $read.'/'.$total;
+        if ($now !== $reported) {
+            $context->emitProgress($nodeId, ['folder_read' => $source->metadata(FolderRead::READING, $read, $total)['folder_read']]);
+        }
+
+        return $now;
     }
 
     /**
@@ -277,69 +361,67 @@ final readonly class FolderFetchRunner implements TaskRunner
         return $connection instanceof Connection && 'webdav' === $connection->getType() ? $connection : null;
     }
 
+    /**
+     * @return list<array{name: string, reason: string}>
+     */
+    private function skippedOf(CloudPickup $pickup): array
+    {
+        $out = [];
+        foreach ($pickup->skipped() as $row) {
+            $reason = is_string($row['reason'] ?? null) ? $row['reason'] : '';
+            if ('type_not_read' === $reason) {
+                continue;
+            }
+            $name = is_string($row['name'] ?? null) && '' !== $row['name'] ? $row['name'] : (is_string($row['id'] ?? null) ? $row['id'] : '');
+            $out[] = ['name' => $name, 'reason' => '' !== $reason ? $reason : 'unreadable'];
+        }
+
+        return $out;
+    }
+
     private function settled(CloudPickup $pickup): bool
     {
-        return in_array($pickup->getState(), [
-            CloudPickup::STATE_DONE,
-            CloudPickup::STATE_PARTIAL,
-            CloudPickup::STATE_FAILED,
-        ], true);
+        return in_array($pickup->getState(), [CloudPickup::STATE_DONE, CloudPickup::STATE_PARTIAL, CloudPickup::STATE_FAILED], true);
     }
 
-    private function where(string $channel, string $folder): string
+    private function hostOf(FolderRead $source): string
     {
-        $name = '' !== $channel ? $channel : 'the folder';
-
-        return '' !== $folder ? $name.' › '.$folder : $name;
+        return '' !== $source->host ? $source->host : 'this cloud';
     }
 
-    private function failedSentence(CloudPickup $pickup, string $where): string
+    /**
+     * @param list<string> $names
+     */
+    private function readSentence(string $where, array $names): string
     {
-        return match ($pickup->getErrorCode()) {
-            'outside_scope' => 'Synaplan may not read '.$where.'. Nothing was read.',
-            'not_found' => $where.' has no folder you can open. Nothing was read.',
-            default => 'Synaplan could not reach '.$where.'. Nothing was read.',
-        };
+        return 'Read '.count($names).' files from '.$where.$this->nameList($names).'.';
     }
 
-    private function outcomeText(CloudPickup $pickup, string $where, int $attached): string
+    /**
+     * @param list<array{name: string, reason: string}> $skipped
+     */
+    private function nothingRead(string $where, array $skipped): string
     {
-        if (CloudPickup::MODE_LIST === $pickup->getMode()) {
-            $names = $pickup->names();
-
-            return [] === $names ? 'Read the names from '.$where.'.' : implode("\n", $names);
-        }
-        $large = 0;
-        $over = 0;
-        foreach ($pickup->skipped() as $row) {
-            if ('too_large' === ($row['reason'] ?? null)) {
-                ++$large;
-            }
-            if ('over_limit' === ($row['reason'] ?? null)) {
-                ++$over;
-            }
-        }
-        if ($large > 0 || $over > 0) {
-            return $this->partialSentence($where, $attached, max($pickup->getListed(), $attached + $large + $over), $large, $over, false);
-        }
-
-        return 'Read '.$attached.' files from '.$where.'.';
-    }
-
-    private function nothingRead(string $where, int $large, int $over): string
-    {
-        if ($large > 0 && 0 === $over) {
+        $reasons = array_unique(array_column($skipped, 'reason'));
+        if (['too_large'] === array_values($reasons)) {
             return 'Every file in '.$where.' is larger than 100 MB. Nothing was read.';
         }
-        if ($over > 0) {
+        if (in_array('over_limit', $reasons, true)) {
             return $where.' has more files than one run can take. Nothing was read.';
         }
 
         return 'No files in '.$where.' matched. Nothing was read.';
     }
 
-    private function partialSentence(string $where, int $read, int $total, int $large, int $over, bool $stopped): string
+    /**
+     * @param list<string>                              $names
+     * @param list<array{name: string, reason: string}> $skipped
+     */
+    private function partialSentence(string $where, array $names, int $total, array $skipped): string
     {
+        $large = count(array_filter($skipped, static fn (array $row): bool => 'too_large' === $row['reason']));
+        $over = count(array_filter($skipped, static fn (array $row): bool => 'over_limit' === $row['reason']));
+        $other = count($skipped) - $large - $over;
         $why = [];
         if ($large > 0) {
             $why[] = $large.' '.($large > 1 ? 'were' : 'was').' larger than 100 MB and left out';
@@ -347,11 +429,25 @@ final readonly class FolderFetchRunner implements TaskRunner
         if ($over > 0) {
             $why[] = $over.' '.($over > 1 ? 'were' : 'was').' past the limit for one run and left out';
         }
-        if ($stopped) {
-            $why[] = 'the rest could not be read';
+        if ($other > 0) {
+            $why[] = $other.' could not be read';
         }
 
-        return 'Read '.$read.' of '.$total.' files from '.$where.$this->because($why).'.';
+        return 'Read '.count($names).' of '.max($total, count($names)).' files from '.$where.$this->nameList($names).$this->because($why).'.';
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private function nameList(array $names): string
+    {
+        if ([] === $names) {
+            return '';
+        }
+        $shown = array_slice($names, 0, self::NAMES_IN_TEXT);
+        $rest = count($names) - count($shown);
+
+        return ': '.implode(', ', $shown).($rest > 0 ? ' and '.$rest.' more' : '');
     }
 
     /**
@@ -408,16 +504,14 @@ final readonly class FolderFetchRunner implements TaskRunner
         }
         try {
             $lines = [];
-            $used = [];
             foreach ($this->channels->ofKind($userId, PlannerChannel::KIND_FOLDER) as $channel) {
                 $connection = $this->connections->findByIdAndOwner($channel->connectionId, $userId);
                 if (!$connection instanceof Connection || 'webdav' !== $connection->getType()) {
                     continue;
                 }
-                $used[] = $channel->key;
                 $lines[] = sprintf('  - "%s": connected folder %s. params.channel="%s".', $channel->key, $channel->label, $channel->key);
             }
-            foreach ($this->pickups->readableLinks($userId, $used) as $link) {
+            foreach ($this->pickups->readableLinks($userId, $this->usedChannels($userId)) as $link) {
                 $folders = [] === $link['folders'] ? 'only what they watch' : implode(', ', $link['folders']);
                 $lines[] = sprintf(
                     '  - "%s": linked %s at %s. Synaplan may read: %s. params.channel="%s".',

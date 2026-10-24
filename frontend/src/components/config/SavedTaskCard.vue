@@ -15,6 +15,8 @@ import { isWorkflowsBuilderEnabled } from '@/composables/useWorkflowsFeature'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import SavedTaskStepsEditor from '@/components/config/workflows/SavedTaskStepsEditor.vue'
+import FolderFetchCard from '@/components/multitask/FolderFetchCard.vue'
+import { folderReadsFromSnapshot } from '@/utils/folderRead'
 import {
   savedTasksApi,
   type SavedTask,
@@ -602,6 +604,13 @@ const onRunCopy = async () => {
           <span class="font-medium txt-primary">{{ runLabel('runStatus', run.status) }}</span>
           <span class="txt-secondary"> · {{ runLabel('runTrigger', run.trigger) }}</span>
           <p v-if="run.error" class="txt-secondary mt-1">{{ run.error }}</p>
+          <FolderFetchCard
+            v-for="(read, index) in folderReadsFromSnapshot(run.planSnapshot)"
+            :key="`${run.id}-read-${index}`"
+            :read="read"
+            full
+            class="mt-2"
+          />
         </div>
         <span v-if="run.started" class="text-xs txt-secondary whitespace-nowrap">
           {{ formatWhen(run.started) }}

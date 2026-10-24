@@ -712,7 +712,8 @@
       "calendar_event": "Invitación de calendario",
       "email_me": "Envío por correo",
       "save_to_folder": "Guardar en carpeta",
-      "code_run": "Trabajando con su archivo"
+      "code_run": "Trabajando con su archivo",
+      "folder_fetch": "Lectura de archivos"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",
@@ -725,7 +726,42 @@
     "askSkip": "Omitir",
     "askNeedAnswer": "Elige una opción o escribe una respuesta.",
     "askFailed": "La ejecución no pudo continuar. Envía un mensaje nuevo.",
-    "askReadOnly": "Solo quien lo creó puede responder. Aun así puede leer la pregunta."
+    "askReadOnly": "Solo quien lo creó puede responder. Aun así puede leer la pregunta.",
+    "folderRead": {
+      "reading": "Leyendo archivos de {app}…",
+      "progress": "{read} de {total}",
+      "read": "Se leyó {count} archivo de {app} › {folder} | Se leyeron {count} archivos de {app} › {folder}",
+      "readAnywhere": "Se leyó {count} archivo de {app} | Se leyeron {count} archivos de {app}",
+      "listed": "Se encontró {count} archivo en {app} › {folder} | Se encontraron {count} archivos en {app} › {folder}",
+      "listedAnywhere": "Se encontró {count} archivo en {app} | Se encontraron {count} archivos en {app}",
+      "tooLarge": "{count} archivo superaba los 100 MB y se dejó fuera. | {count} archivos superaban los 100 MB y se dejaron fuera.",
+      "overLimit": "{count} archivo superaba el límite de una ejecución (50 archivos, 200 MB) y se dejó fuera. | {count} archivos superaban el límite de una ejecución (50 archivos, 200 MB) y se dejaron fuera.",
+      "unreadable": "No se pudo leer {count} archivo. | No se pudieron leer {count} archivos.",
+      "moreNotListed": "{count} archivo más no aparece en la lista. | {count} archivos más no aparecen en la lista.",
+      "refused": "Synaplan no puede leer {folder} en tu {app}. No se leyó nada.",
+      "refusedAnywhere": "Synaplan no puede leer esto en tu {app}. No se leyó nada.",
+      "refusedHint": "Abre la carpeta en {app} y elige «Permitir que Synaplan lea esta carpeta».",
+      "notFound": "{app} no tiene ninguna carpeta {folder} que puedas abrir. No se leyó nada.",
+      "notFoundHint": "Comprueba el nombre de la carpeta.",
+      "unreachable": "Synaplan no pudo conectar con {host}. No se leyó nada.",
+      "unreachableHint": "Adjunta los archivos en el chat o pide a tu administrador que permita a Synaplan acceder a {app}.",
+      "nothing": "Ningún archivo de {folder} coincidía. Los pasos siguientes no se ejecutaron.",
+      "nothingAnywhere": "Ningún archivo coincidía. Los pasos siguientes no se ejecutaron.",
+      "nothingRead": "No se leyó nada de {app} › {folder}.",
+      "nothingReadAnywhere": "No se leyó nada de {app}.",
+      "busy": "Synaplan ha leído de {app} demasiadas veces en esta hora. No se leyó nada. Inténtalo más tarde.",
+      "notConnected": "Synaplan no tiene ninguna carpeta conectada con ese nombre. No se leyó nada.",
+      "notConnectedHint": "Conecta una carpeta en Apps o vincula allí tu nube.",
+      "openIn": "Abrir en {app}",
+      "filesLabel": "Archivos leídos",
+      "showAll": "Mostrar los {count}",
+      "showFewer": "Mostrar menos",
+      "skippedReason": {
+        "too_large": "{name}: más de 100 MB",
+        "over_limit": "{name}: por encima del límite de una ejecución",
+        "other": "{name}: no se pudo leer"
+      }
+    }
   },
   "processing": {
     "timeline": {

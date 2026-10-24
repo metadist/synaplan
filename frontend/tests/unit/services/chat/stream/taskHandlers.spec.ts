@@ -133,6 +133,54 @@ describe('task handlers', () => {
     expect(image.url).toContain('/api/v1/files/uploads/a.png')
   })
 
+  it('counts a folder read live and keeps its final summary', () => {
+    const turn = planned()
+
+    taskHandlers.task_progress(
+      {
+        status: 'task_progress',
+        metadata: {
+          node_id: 'n1',
+          folder_read: {
+            outcome: 'reading',
+            label: 'Nextcloud',
+            folder: 'Docs',
+            read: 2,
+            total: 5,
+          },
+        },
+      },
+      turn
+    )
+    expect(turn.message()!.taskPlan!.cards[0].folderRead).toMatchObject({
+      outcome: 'reading',
+      read: 2,
+      total: 5,
+    })
+
+    taskHandlers.task_update(
+      {
+        status: 'task_update',
+        metadata: {
+          node_id: 'n1',
+          state: 'done',
+          folder_read: {
+            outcome: 'read',
+            label: 'Nextcloud',
+            folder: 'Docs',
+            read: 5,
+            files: ['a.pdf'],
+          },
+        },
+      },
+      turn
+    )
+    expect(turn.message()!.taskPlan!.cards[0].folderRead).toMatchObject({
+      outcome: 'read',
+      read: 5,
+    })
+  })
+
   it('leaves a message without a plan alone', () => {
     const message = assistantMessage()
     const turn = fakeTurn(message)

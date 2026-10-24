@@ -6,6 +6,8 @@
 import { isTaskCardKind, isTaskCardState, type TaskCard } from '@/stores/history'
 import type { StreamEventMetadata } from '@/types/chatStream'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { cardTraceFrom } from '@/utils/cardTrace'
+import { parseFolderRead } from '@/utils/folderRead'
 import { findTaskCard, isAskUserPayload } from '../messageUpdates'
 import type { StreamHandlers, StreamStatusHandler, StreamTurn } from '../streamTurn'
 
@@ -47,10 +49,7 @@ function applyStepTrace(card: TaskCard, meta: StreamEventMetadata): void {
   if (typeof meta.query === 'string' && meta.query) card.query = meta.query
   if (typeof meta.results_count === 'number') card.resultsCount = meta.results_count
   if (meta.used_workspace === true) card.usedWorkspace = true
-  if (typeof meta.step_input === 'string') card.stepInput = meta.step_input
-  if (typeof meta.step_output === 'string') card.stepOutput = meta.step_output
-  if (meta.step_output_truncated === true) card.stepOutputTruncated = true
-  if (typeof meta.duration_ms === 'number') card.durationMs = meta.duration_ms
+  Object.assign(card, cardTraceFrom(meta))
   if (isAskUserPayload(meta.ask_user)) card.askUser = meta.ask_user
 }
 
@@ -79,7 +78,7 @@ const taskFile: StreamStatusHandler<StreamTurn> = (data, turn) => {
   }
 }
 
-/** Live render progress feeds the moving bar of the running card. */
+/** Live progress: the moving bar of a render, or "n of m" files of a folder read. */
 const taskProgress: StreamStatusHandler<StreamTurn> = (data, turn) => {
   const card = findTaskCard(turn.message(), data.metadata?.node_id)
   if (!card || card.state === 'cancelled') return
@@ -88,6 +87,8 @@ const taskProgress: StreamStatusHandler<StreamTurn> = (data, turn) => {
   if (typeof meta.percent === 'number') card.progressPercent = meta.percent
   if (typeof meta.provider_status === 'string') card.providerStatus = meta.provider_status
   if (typeof meta.elapsed_seconds === 'number') card.elapsedSeconds = meta.elapsed_seconds
+  const folderRead = parseFolderRead(meta.folder_read)
+  if (folderRead) card.folderRead = folderRead
 }
 
 export const taskHandlers: StreamHandlers<StreamTurn> = {

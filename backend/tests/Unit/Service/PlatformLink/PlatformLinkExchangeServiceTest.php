@@ -141,6 +141,8 @@ final class PlatformLinkExchangeServiceTest extends TestCase
 
         self::assertSame([5], array_column($links, 'id'));
         self::assertFalse($links[0]['can_copy']);
+        self::assertFalse($links[0]['can_read']);
+        self::assertSame(['mode' => 'watched', 'folders' => []], $links[0]['read_scope']);
     }
 
     public function testACloudThatAcceptsCopiesIsOffered(): void
@@ -166,6 +168,32 @@ final class PlatformLinkExchangeServiceTest extends TestCase
         $links = $this->service(keys: $keys, identities: $identities, instances: $instances)->listForUser(7);
 
         self::assertTrue($links[0]['can_copy']);
+    }
+
+    public function testACloudThatHandsOutFilesSaysWhatSynaplanMayRead(): void
+    {
+        $identity = $this->identity(5, 7, 99);
+        $identity->setReadScope(['mode' => 'allowed', 'folders' => [
+            ['id' => '11', 'path' => 'Invoices/2026'],
+            ['id' => '12', 'path' => ''],
+        ]]);
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('findByUserId')->willReturn([$identity]);
+        $instance = new PlatformInstance(PlatformInstance::CLIENT_NEXTCLOUD, 'pi_aabbccddeeff', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE);
+        $instance->setDeliveryUrl('https://files.example.org/index.php/apps/synaplan_integration/api/v1/inbound');
+        $instance->setAppCapabilities(['pickups', 'read_scope']);
+        $instances = $this->createStub(PlatformInstanceRepository::class);
+        $instances->method('findByInstanceId')->willReturn($instance);
+        $key = new ApiKey();
+        $key->setName('Nextcloud');
+        $keys = $this->createStub(ApiKeyRepository::class);
+        $keys->method('find')->willReturn($key);
+
+        $links = $this->service(keys: $keys, identities: $identities, instances: $instances)->listForUser(7);
+
+        self::assertFalse($links[0]['can_copy']);
+        self::assertTrue($links[0]['can_read']);
+        self::assertSame(['mode' => 'allowed', 'folders' => ['Invoices/2026']], $links[0]['read_scope']);
     }
 
     private function identity(int $id, int $userId, ?int $apiKeyId): ExternalIdentity
