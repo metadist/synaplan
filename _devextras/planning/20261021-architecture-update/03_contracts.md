@@ -597,7 +597,7 @@ One Go binary, `sidecars/synaplan-watchdog`, in the backend image.
 
 | Mode / endpoint | Since | Does |
 | --------------- | ----- | ---- |
-| agent loop | AU6 | every 5 s: read `http://localhost:2019/metrics` and `/frankenphp/threads`, cgroup limits (`/sys/fs/cgroup/memory.max`, `cpu.max`), `/proc` RSS, Kubernetes facts; write `capacity:server:{serverId}` (TTL 20 s) and the one-minute aggregate `capacity:agg:{serverId}:{minute}` (TTL 24 h) to Redis |
+| agent loop | AU6 | every 5 s: read `http://localhost:2019/metrics` and `/frankenphp/threads`, cgroup limits (`/sys/fs/cgroup/memory.max`, `cpu.max`), `/proc` RSS, Kubernetes facts; write `capacity:server:{serverId}` (TTL 20 s), the one-minute aggregate `capacity:agg:{serverId}:{minute}` (TTL 24 h), and the field `{serverId}` = last report time in the hash `capacity:seen` (TTL 7 d, refreshed) to Redis. The hash is how the page lists a server whose snapshot has expired ("last report 3 minutes ago") |
 | `GET :8098/live` | AU6 | 200 while the watchdog runs |
 | `GET :8098/ready` | AU6 | 200 when PHP answered its own probe (`GET /api/health/ready`, AU2) within 2 s in the last 10 s, Redis answers, and the server is not draining; else 503 |
 | `GET :8098/metrics` | AU6 | FrankenPHP's metrics passed through plus `synaplan_*` (§9) |

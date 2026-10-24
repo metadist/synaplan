@@ -199,6 +199,9 @@ func (a *Agent) publish(ctx context.Context, now time.Time, snap capacity.Snapsh
 	if err := a.Store.Put(ctx, capacity.SnapshotKey(a.ID), body, capacity.SnapshotTTL); err != nil {
 		log.Printf("watchdog: snapshot store: %v", err)
 	}
+	if err := a.Store.PutField(ctx, capacity.SeenKey, a.ID, snap.UpdatedAt, capacity.SeenTTL); err != nil {
+		log.Printf("watchdog: seen store: %v", err)
+	}
 	minute := capacity.Minute(now)
 	agg := capacity.Aggregate{}
 	raw, err := a.Store.Get(ctx, capacity.AggregateKey(a.ID, minute))

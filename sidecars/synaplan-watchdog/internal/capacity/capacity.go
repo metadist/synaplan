@@ -10,6 +10,12 @@ const (
 	SnapshotTTL = 20 * time.Second
 	// AggregateTTL keeps one minute of peaks for a day.
 	AggregateTTL = 24 * time.Hour
+	// SeenKey is the hash of every server id that reported, with its last
+	// report time. A server that stops reporting stays listed here, so the
+	// page can say "last report 3 minutes ago" after its snapshot expired.
+	SeenKey = "capacity:seen"
+	// SeenTTL drops a server that has not reported for a week.
+	SeenTTL = 7 * 24 * time.Hour
 )
 
 // Pool is one PHP worker pool.

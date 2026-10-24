@@ -98,6 +98,12 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	if memory.TTL(capacity.SnapshotKey("web1")) != capacity.SnapshotTTL {
 		t.Fatalf("snapshot ttl = %s", memory.TTL(capacity.SnapshotKey("web1")))
 	}
+	if seen := memory.Field(capacity.SeenKey, "web1"); seen != "2026-10-24T18:00:05Z" {
+		t.Fatalf("seen = %q", seen)
+	}
+	if memory.HashTTL(capacity.SeenKey) != capacity.SeenTTL {
+		t.Fatalf("seen ttl = %s", memory.HashTTL(capacity.SeenKey))
+	}
 	aggRaw, err := memory.Get(context.Background(), capacity.AggregateKey("web1", "202610241800"))
 	if err != nil {
 		t.Fatal(err)
