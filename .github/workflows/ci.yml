@@ -480,14 +480,20 @@ jobs:
         if: needs.change-scope.outputs.mode != 'promote'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Build and push the arm64 image
+      - name: Build, test, and push the arm64 image
         if: needs.change-scope.outputs.mode != 'promote'
         id: arm64
         env:
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
         run: |
           set -euo pipefail
-          docker build -t synaplan-transcriber:ci sidecars/synaplan-transcriber
+          # Native arm64, named as linux/arm64 so the release manifest cannot
+          # pick up an amd64 image from the default builder.
+          docker buildx build --platform linux/arm64 --load \
+            -t synaplan-transcriber:ci sidecars/synaplan-transcriber
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD/sidecars/synaplan-transcriber/test:/app/test:ro" \
+            synaplan-transcriber:ci node --test
           temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-arm64"
           docker tag synaplan-transcriber:ci "$temporary_tag"
           docker push "$temporary_tag"
