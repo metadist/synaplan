@@ -610,6 +610,35 @@ LUA;
         }
     }
 
+    /**
+     * Every field of a hash. Null when Redis does not answer, so a caller can
+     * tell "no fields" from "no Redis".
+     *
+     * @return array<string, string>|null
+     */
+    public function hGetAll(string $key): ?array
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return null;
+        }
+
+        try {
+            /** @var array<string, mixed> $fields */
+            $fields = $client->hgetall($this->prefix($key));
+            $result = [];
+            foreach ($fields as $field => $value) {
+                $result[(string) $field] = (string) $value;
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('HGETALL', $key, $e);
+
+            return null;
+        }
+    }
+
     public function getLastConnectionError(): ?\Throwable
     {
         return $this->connectionFailure;

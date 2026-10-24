@@ -46,6 +46,7 @@ final class MinimalModuleEnvTest extends TestCase
         'chat_artifacts' => ['CHAT_ARTIFACTS_ENABLED'],
         'research' => ['RESEARCH_ENABLED'],
         'freeapi' => ['FREEAPI_BASE_URL'],
+        'capacity' => ['SYNAPLAN_WATCHDOG'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

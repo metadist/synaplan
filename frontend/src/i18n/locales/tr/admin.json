@@ -1377,6 +1377,9 @@
     },
     "freeapi": {
       "label": "Synaplan Demo"
+    },
+    "capacity": {
+      "label": "Sunucu kapasitesi"
     }
   },
   "partners": {
@@ -1441,6 +1444,72 @@
       "not_partner": "Bu bağlantı bulunamadı.",
       "bad_url": "Bu adres genel bir https sunucusu değil.",
       "replay": "Bu istek zaten kullanıldı."
+    }
+  },
+  "capacity": {
+    "title": "Kapasite",
+    "subtitle": "Bu kurulumdaki her sunucunun ne kadar yüklü olduğu ve birinin yardıma ihtiyacı olup olmadığı.",
+    "loading": "Sunucular okunuyor…",
+    "unavailable": "Paylaşılan önbellek yanıt vermediği için kapasite şu anda okunamıyor. Sunucular çalışmaya devam ediyor.",
+    "failed": "Sunucular okunamadı. Birazdan tekrar deneyin.",
+    "empty": "Henüz hiçbir sunucu rapor vermedi — sunucular başladıktan sonraki bir dakika içinde rapor verir.",
+    "checkAgain": "Tekrar kontrol et",
+    "footer": "Bu sayfayı yalnızca yöneticiler görür. Buradaki hiçbir şey bir sunucuyu değiştirmez.",
+    "servers": {
+      "title": "Sunucular",
+      "summary": "{count} sunucu · {seconds} sn önce güncellendi",
+      "connectedTo": "{server} sunucusuna bağlısınız",
+      "owner": "Bu kurulumdaki her sunucu burada rapor verir.",
+      "source": "Her sunucu kendini 5 saniyede bir ölçer ve 24 saat saklar."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Arka plan işi",
+      "scheduler": "Zamanlanmış görevler"
+    },
+    "card": {
+      "connectedHere": "Bu sunucuya bağlısınız.",
+      "reporting": "Rapor veriyor",
+      "silentSeconds": "Son rapor {count} sn önce",
+      "silentMinutes": "Son rapor {count} dk önce — sunucu kapalı veya yeniden başlıyor olabilir",
+      "silentUnknown": "Rapor vermeyi bıraktı",
+      "aiAnswers": "AI yanıtları",
+      "otherRequests": "Diğer istekler",
+      "memory": "Bellek",
+      "processor": "İşlemci",
+      "ofAtOnce": "aynı anda {total} / {used}",
+      "noPools": "ayrı havuz yok",
+      "peakToday": "bugünkü zirve {count} ({time})",
+      "memoryOf": "{total} / {used}",
+      "memoryUnlimited": "{used} · sınır yok",
+      "processorOf": "{cores} çekirdeğin % {percent}",
+      "processorMeasuring": "ölçülüyor · {cores} çekirdek",
+      "processorShort": "% {percent}",
+      "sizingHint": "{server} bugünkü zirvesinde aynı anda tutabileceği {total} AI isteğinin {peak} tanesini yanıtladı. Bir sunucu ekleyin veya AI yanıt yuvalarını artırın — boyutlandırma kılavuzu nasıl yapılacağını gösterir.",
+      "technical": "Teknik ayrıntılar",
+      "runsOn": "Çalıştığı yer",
+      "workers": "PHP",
+      "logs": "Günlükler",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} AI yanıt yuvası + {api} istek yuvası",
+      "poolsSingle": "{count} iş parçacıklı tek havuz",
+      "logsStderr": "sürecin hata çıktısı",
+      "openEvents": "Son olayları aç",
+      "howToStop": "Watchdog kapatıldığında (SYNAPLAN_WATCHDOG=0) sunucu rapor vermeyi bırakır.",
+      "helperSilent": "rapor vermeyi bıraktı",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Doğrudan makinede"
+      },
+      "place": {
+        "machine": "makine {name}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "bellek sınırı {value}",
+        "cpuRequest": "istenen işlemci {value}"
+      }
     }
   }
 }

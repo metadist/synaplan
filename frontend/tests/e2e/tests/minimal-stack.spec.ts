@@ -79,7 +79,8 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(expectedIds).toContain('live_voice')
     expect(expectedIds).toContain('freeapi')
     expect(expectedIds).toContain('research')
-    expect(expectedIds).toHaveLength(20)
+    expect(expectedIds).toContain('capacity')
+    expect(expectedIds).toHaveLength(21)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -126,6 +127,30 @@ test.describe('@minimal @ci Minimal stack', () => {
     await expect(page.locator(selectors.apps.card('telegram'))).toHaveCount(0)
     await page.goto('/apps/telegram')
     await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
+  })
+
+  test('Capacity is absent when the watchdog is off: no nav entry, 404 on the route', async ({
+    page,
+    request,
+  }) => {
+    await login(page, CREDENTIALS.getAdminCredentials())
+    const res = await request.get(`${getApiUrl()}/api/v1/admin/capacity/servers`)
+    expect(res.status()).toBe(404)
+    expect(await res.json()).toEqual({
+      error: 'feature_not_configured',
+      module: 'capacity',
+      docs: 'modules/capacity',
+    })
+
+    await page.goto('/admin/features')
+    await page.locator(selectors.pages.featureStatus).waitFor({
+      state: 'visible',
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.capacity.navLink)).toHaveCount(0)
+    await page.goto('/admin/capacity')
+    await expect(page.locator(selectors.pages.capacity)).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Capacity')
   })
 
   test('WhatsApp webhook answers the uniform 404', async ({ request }) => {

@@ -113,6 +113,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'admin',
     'adminModelStatus',
     'aiInfra',
+    'capacity',
     'iam',
     'modules',
     'partners',

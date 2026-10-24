@@ -127,9 +127,10 @@ final readonly class EventRingStore
         ?string $query = null,
         ?string $requestId = null,
         int $limit = 50,
+        ?string $host = null,
     ): array {
         $limit = max(1, min(self::MAX_ENTRIES, $limit));
-        $hasFilter = null !== $level || null !== $query || null !== $requestId;
+        $hasFilter = null !== $level || null !== $query || null !== $requestId || null !== $host;
 
         // With filters we over-fetch and narrow in PHP; without, the limit is exact.
         $fetch = $hasFilter ? self::MAX_ENTRIES : $limit;
@@ -147,6 +148,9 @@ final readonly class EventRingStore
                 continue;
             }
             if (null !== $requestId && $event['request_id'] !== $requestId) {
+                continue;
+            }
+            if (null !== $host && $event['host'] !== $host) {
                 continue;
             }
             if (null !== $query && !$this->matchesQuery($event, $query)) {

@@ -35,6 +35,7 @@ import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
 import { assistantsRouteGuard } from '@/router/assistantGuards'
+import { capacityRoute } from '@/router/capacityRoute'
 import { aiModelsTabRedirect, routingRedirect, topicsRedirect } from '@/router/aiSettingsRedirects'
 import {
   approvalsRouteGuard,
@@ -681,6 +682,7 @@ const router = createRouter({
         i18n: ['admin', 'config'],
       },
     },
+    capacityRoute,
     {
       path: '/setup/status',
       name: 'setup-status',

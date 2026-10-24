@@ -4409,6 +4409,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
                 "isSet": false,
@@ -6155,6 +6161,17 @@
                 "tab": "features",
                 "type": "boolean"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "dbGroup": "MODULES",
+                "dbKey": "GATE_CAPACITY",
+                "default": "true",
+                "description": "Hide the \"capacity\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. On is the shipped default for new installs. Configure the module first — see Operate → System status.",
+                "section": "modules",
+                "sensitive": false,
+                "source": "database",
+                "tab": "features",
+                "type": "boolean"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "dbGroup": "MODULES",
                 "dbKey": "GATE_CHAT_ARTIFACTS",
@@ -7885,6 +7902,7 @@
                     },
                     {
                         "fields": [
+                            "FEATURE_MODULES_GATE_CAPACITY",
                             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS",
                             "FEATURE_MODULES_GATE_COMPUTE",
                             "FEATURE_MODULES_GATE_DOCLING",
@@ -8625,6 +8643,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "false"
+            },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
             },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
@@ -12238,6 +12262,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
                 "isSet": false,
@@ -13515,6 +13545,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "false"
+            },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
             },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,

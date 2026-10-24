@@ -99,6 +99,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "capacity": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "chat_artifacts": {
                     "configured": "bool",
                     "gated": "bool"
@@ -322,6 +326,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "capacity": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "chat_artifacts": {
                     "configured": "bool",
                     "gated": "bool"
@@ -545,6 +553,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "capacity": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "chat_artifacts": {
                     "configured": "bool",
                     "gated": "bool"

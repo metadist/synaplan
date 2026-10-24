@@ -40,6 +40,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'chat_artifacts',
         'research',
         'freeapi',
+        'capacity',
     ];
 
     public function testTheDescriptorSetIsExactlyThePlan(): void

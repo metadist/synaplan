@@ -81,6 +81,18 @@ final class EventRingStoreTest extends KernelTestCase
         self::assertSame('c', $both[0]['event']);
     }
 
+    public function testFilterByHostNamesOneServer(): void
+    {
+        $this->store->record(['event' => 'a', 'level' => 'error', 'host' => 'web1', 'ts' => 10]);
+        $this->store->record(['event' => 'b', 'level' => 'error', 'host' => 'web2', 'ts' => 20]);
+        $this->store->record(['event' => 'c', 'level' => 'warning', 'host' => 'web2', 'ts' => 30]);
+
+        $web2 = $this->store->recent(host: 'web2');
+        self::assertSame(['c', 'b'], array_column($web2, 'event'));
+        self::assertCount(1, $this->store->recent(level: 'error', host: 'web2'));
+        self::assertCount(0, $this->store->recent(host: 'web3'));
+    }
+
     public function testQueryMatchesAcrossFields(): void
     {
         $this->store->record(['event' => 'ai_fallback', 'level' => 'warning', 'provider' => 'anthropic', 'ts' => 5]);
