@@ -14,7 +14,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
 | 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
 | 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
-| 2026-10-24 | AU6 | this pull request | in review | watchdog on `:8098`; `capacity:server:{id}` every 5 s. No relay. Not rolled out |
+| 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | in review | watchdog on `:8098`; `capacity:server:{id}` every 5 s. No relay. Not rolled out |
 
 ## Baselines
 
