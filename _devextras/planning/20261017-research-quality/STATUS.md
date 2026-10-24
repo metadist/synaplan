@@ -16,7 +16,7 @@ chat message.
 | RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (web search reads locally, no vision). Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23), but no run opened a document: the only PDF was outside the 3-page cap. Done needs one smoke item whose top 3 results include a PDF, measured flag off and on. The flag stays off. |
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
-| RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
+| RS5 | in progress | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting are on `feat/research-model-slots`. No production binding (RQ3). Not merged |
 | RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
 | RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
 | RS8 | planned | Fact-check — §0 #11 |

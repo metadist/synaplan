@@ -45,6 +45,11 @@ class ModelCatalog
         'PLAN' => 'chat',
         'SUMMARIZE' => 'chat',
         'ANALYZE' => 'chat',
+        // Reading sources and fact-checking. No production binding until the
+        // research bake-off (RQ3). Until then the resolver walks the fallback
+        // chain; these slots stay off the AI Models page.
+        'READ' => 'chat',
+        'VERIFY' => 'chat',
         'TEXT2PIC' => 'text2pic',
         'PIC2PIC' => 'text2pic',
         'TEXT2VID' => 'text2vid',
@@ -1111,7 +1116,7 @@ class ModelCatalog
                 'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (120B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
                 'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:120b'],
-                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+                'meta' => ['family' => 'openai', 'jurisdiction' => 'local', 'context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -1141,7 +1146,7 @@ class ModelCatalog
                 'description' => 'OpenAI\'s open-weight GPT-OSS (20B) on the operator\'s own Ollama server — the model the Synaplan compose stack downloads for local AI. 128K context, Apache-2.0, MXFP4 quantization; runs on a single GPU or a well-equipped CPU box (~14 GB).',
                 'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:20b'],
-                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+                'meta' => ['family' => 'openai', 'jurisdiction' => 'local', 'context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -1162,7 +1167,7 @@ class ModelCatalog
                 'description' => 'Local model on GPU server. Alibaba Qwen 3.5 35B - strong reasoning and coding.',
                 'max_tokens' => 32768,
                 'params' => ['model' => 'qwen3.5:35b'],
-                'meta' => ['context_window' => '32768', 'max_output' => '32768'],
+                'meta' => ['family' => 'alibaba', 'jurisdiction' => 'local', 'context_window' => '32768', 'max_output' => '32768'],
             ],
         ],
         // ==================== WHISPER (local whisper.cpp) ====================
@@ -1348,7 +1353,7 @@ class ModelCatalog
                 'description' => 'Groq GPT-OSS 120B - 120B-Parameter MoE-Modell. Für anspruchsvolle agentische Anwendungen. Schnelle Inferenz dank Groq Hardware.',
                 'max_tokens' => 16384,
                 'params' => ['model' => 'openai/gpt-oss-120b'],
-                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
+                'meta' => ['family' => 'openai', 'jurisdiction' => 'US', 'context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
                 'features' => ['tool_use'],
             ],
         ],
@@ -2185,6 +2190,8 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.10,
                 'cache_write_multiplier' => 1.25,
                 'meta' => [
+                    'family' => 'openai',
+                    'jurisdiction' => 'US',
                     'api' => 'responses',
                     'context_window' => '1050000',
                     'max_output' => '128000',
@@ -2257,6 +2264,8 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.01,
                 'cache_write_multiplier' => 1.25,
                 'meta' => [
+                    'family' => 'openai',
+                    'jurisdiction' => 'US',
                     'api' => 'responses',
                     'context_window' => '1050000',
                     'max_output' => '128000',
@@ -2654,7 +2663,7 @@ class ModelCatalog
                 'max_tokens' => 64000,
                 'params' => ['model' => 'claude-sonnet-5'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
-                'meta' => ['context_window' => '1000000', 'max_output' => '64000'],
+                'meta' => ['family' => 'anthropic', 'jurisdiction' => 'US', 'context_window' => '1000000', 'max_output' => '64000'],
             ],
         ],
         [
@@ -2756,7 +2765,7 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'claude-opus-5-5'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
-                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30'],
+                'meta' => ['family' => 'anthropic', 'jurisdiction' => 'US', 'context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30'],
                 'cache_read_price_per_1M' => 0.20,
             ],
         ],
@@ -2814,7 +2823,7 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'claude-sonnet-5-5'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
-                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
+                'meta' => ['family' => 'anthropic', 'jurisdiction' => 'US', 'context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
                 'cache_read_price_per_1M' => 0.10,
             ],
         ],
@@ -3230,7 +3239,7 @@ class ModelCatalog
                 'params' => ['model' => 'gemini-3.1-pro-preview'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
                 'cache_read_price_per_1M' => 0.20,
-                'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
         [
@@ -3613,7 +3622,7 @@ class ModelCatalog
                 'params' => ['model' => 'gemini-3.8-flash'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
                 'cache_read_price_per_1M' => 0.075,
-                'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
         [
@@ -4397,6 +4406,7 @@ class ModelCatalog
                 'description' => 'Triton Inference Server with vLLM backend',
                 'max_tokens' => 32768,
                 'features' => ['streaming', 'gpu'],
+                'meta' => ['family' => 'mistral', 'jurisdiction' => 'local'],
                 'supportsStreaming' => true,
             ],
         ],
@@ -4418,6 +4428,7 @@ class ModelCatalog
                 'description' => 'Triton Inference Server with vLLM backend',
                 'max_tokens' => 16384,
                 'features' => ['streaming', 'gpu'],
+                'meta' => ['family' => 'openai', 'jurisdiction' => 'local'],
                 'supportsStreaming' => true,
             ],
         ],
@@ -4565,7 +4576,7 @@ class ModelCatalog
                 'max_tokens' => 131072,
                 'params' => ['model' => 'mistral-large-4'],
                 'cache_read_price_per_1M' => 0.068,
-                'meta' => ['context_window' => '524288', 'max_output' => '131072'],
+                'meta' => ['family' => 'mistral', 'jurisdiction' => 'EU', 'context_window' => '524288', 'max_output' => '131072'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
             ],
         ],
@@ -4725,6 +4736,7 @@ class ModelCatalog
                 'features' => ['reasoning', 'tool_use', 'vision', 'multilingual'],
                 'cache_read_price_per_1M' => 0.05,
                 'meta' => [
+                    'family' => 'alibaba',
                     'context_window' => '262144',
                     'max_output' => '32768',
                     'host' => 'trustedtokens.eu',
@@ -4780,6 +4792,7 @@ class ModelCatalog
                 'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.05,
                 'meta' => [
+                    'family' => 'openai',
                     'context_window' => '131072',
                     'max_output' => '16384',
                     'host' => 'trustedtokens.eu',
@@ -4808,6 +4821,7 @@ class ModelCatalog
                 'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.30,
                 'meta' => [
+                    'family' => 'zhipu',
                     'context_window' => '1048576',
                     'max_output' => '32768',
                     'host' => 'trustedtokens.eu',
@@ -4836,6 +4850,7 @@ class ModelCatalog
                 'features' => ['reasoning', 'tool_use', 'vision', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.03,
                 'meta' => [
+                    'family' => 'zhipu',
                     'context_window' => '1048576',
                     'max_output' => '32768',
                     'host' => 'trustedtokens.eu',
@@ -5199,6 +5214,8 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.50,
                 'reasoning_effort_default' => 'high',
                 'meta' => [
+                    'family' => 'xai',
+                    'jurisdiction' => 'US',
                     'context_window' => '500000',
                     'max_output' => '32768',
                     'regions' => 'us-east-1, us-west-2',
@@ -5579,6 +5596,7 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.15,
                 'reasoning_effort_default' => 'high',
                 'meta' => [
+                    'family' => 'meta',
                     'context_window' => '1000000',
                     'max_output' => '32768',
                     'host' => 'api.meta.ai',
@@ -5635,6 +5653,7 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.20,
                 'reasoning_effort_default' => 'high',
                 'meta' => [
+                    'family' => 'meta',
                     'context_window' => '1048576',
                     'max_output' => '32768',
                     'host' => 'api.meta.ai',
@@ -5816,6 +5835,7 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.35,
                 'reasoning_effort_default' => 'high',
                 'meta' => [
+                    'family' => 'openai',
                     'context_window' => '131072',
                     'max_output' => '40960',
                     'license' => 'Apache-2.0',

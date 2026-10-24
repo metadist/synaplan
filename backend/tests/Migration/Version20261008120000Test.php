@@ -52,10 +52,10 @@ final class Version20261008120000Test extends KernelTestCase
             $json = $this->fetchJson($bid);
             self::assertEqualsWithDelta(0.10, (float) $json['cache_read_price_per_1M'], 1e-9);
 
-            $catalogRow = $this->catalogRow($bid);
+            $catalogRow = $this->migrationEraCatalogRow($bid);
             self::assertSame(ModelCatalog::fingerprint($catalogRow), $json['__catalog_fingerprint'] ?? null);
             unset($json['__catalog_fingerprint']);
-            self::assertSame($catalogRow['json'], $json, 'The snapshot must equal the catalog row.');
+            self::assertSame($catalogRow['json'], $json, 'The snapshot must equal the catalog row as of this migration.');
         }
     }
 
@@ -124,7 +124,7 @@ final class Version20261008120000Test extends KernelTestCase
      */
     private function givenPreviousCatalogRow(int $bid): void
     {
-        $previous = $this->catalogRow($bid);
+        $previous = $this->migrationEraCatalogRow($bid);
         unset($previous['json']['cache_read_price_per_1M']);
         ModelCatalog::upsert($this->connection, $previous);
     }
@@ -139,6 +139,22 @@ final class Version20261008120000Test extends KernelTestCase
         self::assertIsArray($decoded);
 
         return $decoded;
+    }
+
+    /**
+     * This migration froze BIDs 379/380 on 2026-10-08. Later catalog fields
+     * (meta.family, meta.jurisdiction) are rolled in by ModelSeeder, not here.
+     *
+     * @return array<string, mixed>
+     */
+    private function migrationEraCatalogRow(int $bid): array
+    {
+        $row = $this->catalogRow($bid);
+        if (isset($row['json']['meta']) && is_array($row['json']['meta'])) {
+            unset($row['json']['meta']['family'], $row['json']['meta']['jurisdiction']);
+        }
+
+        return $row;
     }
 
     /**

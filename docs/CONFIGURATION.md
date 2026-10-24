@@ -782,6 +782,19 @@ See [Users and groups](ADMIN.md#users-and-groups) in the admin guide.
 
 ---
 
+## Research model slots
+
+`DEFAULTMODEL.READ` (reading sources) and `DEFAULTMODEL.VERIFY` (fact-checking)
+are chat slots. **They are bound by the research bake-off.** Until that
+bake-off writes a default, neither slot has a model: reading sources uses the
+sorting model, then the analysis model, then the chat model. Fact-checking
+uses the analysis model, then the chat model, and prefers a model from a
+different lab than the one that writes the report. If no allowed model can
+fill a role, the run stops and names the job. The slots do not appear on the
+AI Models page yet.
+
+---
+
 ## Linked platforms (`PLATFORM_LINKS`)
 
 Lets users of a registered Nextcloud / ownCloud / OpenCloud instance link the
