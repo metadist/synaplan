@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Research\Run;
 
-use App\Service\Research\Run\ResearchClock;
 use App\Service\Research\Run\ResearchKey;
 use App\Service\Research\Run\ResearchRunKeys;
+use Psr\Clock\ClockInterface;
 
 /**
  * In-memory Redis for research runs. A key disappears when its lease is over,
@@ -29,7 +29,7 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
     /** @var array<string, array<string, int>> */
     private array $zsets = [];
 
-    public function __construct(private readonly ResearchClock $clock)
+    public function __construct(private readonly ClockInterface $clock)
     {
     }
 
@@ -44,7 +44,7 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
     {
         $this->strings[$key] = [
             'value' => $value,
-            'expiresAt' => $this->clock->nowMs() + $ttlSeconds * 1000,
+            'expiresAt' => $this->nowMs() + $ttlSeconds * 1000,
         ];
 
         return true;
@@ -57,7 +57,7 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         }
         $this->strings[$claimKey] = [
             'value' => $token,
-            'expiresAt' => $this->clock->nowMs() + $ttlMillis,
+            'expiresAt' => $this->nowMs() + $ttlMillis,
         ];
         $this->zAdd($indexKey, $score, $member);
 
@@ -66,10 +66,11 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
 
     public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool
     {
-        if ($this->get($claimKey) !== $token) {
+        if ($this->get($claimKey) !== $token || null === $this->get($stateKey)) {
             return false;
         }
         $this->set($stateKey, $state, $ttlSeconds);
+        unset($this->strings[$claimKey]);
 
         return true;
     }
@@ -91,17 +92,18 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
 
     public function expire(string $key, int $ttlSeconds): void
     {
-        $expiresAt = $this->clock->nowMs() + $ttlSeconds * 1000;
-        if (isset($this->strings[$key]) && $this->strings[$key]['expiresAt'] > $this->clock->nowMs()) {
+        $now = $this->nowMs();
+        $expiresAt = $now + $ttlSeconds * 1000;
+        if (isset($this->strings[$key]) && $this->strings[$key]['expiresAt'] > $now) {
             $this->strings[$key]['expiresAt'] = $expiresAt;
         }
-        if (isset($this->lists[$key]) && $this->lists[$key]['expiresAt'] > $this->clock->nowMs()) {
+        if (isset($this->lists[$key]) && $this->lists[$key]['expiresAt'] > $now) {
             $this->lists[$key]['expiresAt'] = $expiresAt;
         }
-        if (isset($this->sets[$key]) && $this->sets[$key]['expiresAt'] > $this->clock->nowMs()) {
+        if (isset($this->sets[$key]) && $this->sets[$key]['expiresAt'] > $now) {
             $this->sets[$key]['expiresAt'] = $expiresAt;
         }
-        if (isset($this->counters[$key]) && $this->counters[$key]['expiresAt'] > $this->clock->nowMs()) {
+        if (isset($this->counters[$key]) && $this->counters[$key]['expiresAt'] > $now) {
             $this->counters[$key]['expiresAt'] = $expiresAt;
         }
     }
@@ -126,7 +128,7 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
     public function addMember(string $key, string $member): void
     {
         $this->sweepSet($key);
-        $expiresAt = $this->sets[$key]['expiresAt'] ?? ($this->clock->nowMs() + 48 * 3600 * 1000);
+        $expiresAt = $this->sets[$key]['expiresAt'] ?? ($this->nowMs() + 48 * 3600 * 1000);
         $members = $this->sets[$key]['members'] ?? [];
         $members[$member] = true;
         $this->sets[$key] = ['members' => $members, 'expiresAt' => $expiresAt];
@@ -167,9 +169,12 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return $due;
     }
 
-    public function appendEvent(string $runId, string $body, int $ttlSeconds): int
+    public function appendEvent(string $runId, string $body): ?int
     {
-        $expiresAt = $this->clock->nowMs() + $ttlSeconds * 1000;
+        $expiresAt = $this->runExpiresAt($runId);
+        if (null === $expiresAt) {
+            return null;
+        }
         $seqKey = ResearchKey::eventSeq($runId);
         $this->sweepCounter($seqKey);
         $seq = ($this->counters[$seqKey]['value'] ?? 0) + 1;
@@ -181,38 +186,62 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         $items[] = $seq."\n".$body;
         $this->lists[$listKey] = ['items' => $items, 'expiresAt' => $expiresAt];
 
-        $runKey = ResearchKey::run($runId);
-        if (isset($this->strings[$runKey]) && $this->strings[$runKey]['expiresAt'] > $this->clock->nowMs()) {
-            $this->strings[$runKey]['expiresAt'] = $expiresAt;
-        }
-
         return $seq;
+    }
+
+    public function putSourceText(string $runId, string $sourceId, string $text): bool
+    {
+        $expiresAt = $this->runExpiresAt($runId);
+        if (null === $expiresAt) {
+            return false;
+        }
+        $this->strings[ResearchKey::text($runId, $sourceId)] = ['value' => $text, 'expiresAt' => $expiresAt];
+        $indexKey = ResearchKey::textIndex($runId);
+        $this->sweepSet($indexKey);
+        $members = $this->sets[$indexKey]['members'] ?? [];
+        $members[$sourceId] = true;
+        $this->sets[$indexKey] = ['members' => $members, 'expiresAt' => $expiresAt];
+
+        return true;
+    }
+
+    private function runExpiresAt(string $runId): ?int
+    {
+        $runKey = ResearchKey::run($runId);
+        $this->sweepString($runKey);
+
+        return $this->strings[$runKey]['expiresAt'] ?? null;
+    }
+
+    private function nowMs(): int
+    {
+        return (int) $this->clock->now()->format('Uv');
     }
 
     private function sweepString(string $key): void
     {
-        if (isset($this->strings[$key]) && $this->strings[$key]['expiresAt'] <= $this->clock->nowMs()) {
+        if (isset($this->strings[$key]) && $this->strings[$key]['expiresAt'] <= $this->nowMs()) {
             unset($this->strings[$key]);
         }
     }
 
     private function sweepList(string $key): void
     {
-        if (isset($this->lists[$key]) && $this->lists[$key]['expiresAt'] <= $this->clock->nowMs()) {
+        if (isset($this->lists[$key]) && $this->lists[$key]['expiresAt'] <= $this->nowMs()) {
             unset($this->lists[$key]);
         }
     }
 
     private function sweepSet(string $key): void
     {
-        if (isset($this->sets[$key]) && $this->sets[$key]['expiresAt'] <= $this->clock->nowMs()) {
+        if (isset($this->sets[$key]) && $this->sets[$key]['expiresAt'] <= $this->nowMs()) {
             unset($this->sets[$key]);
         }
     }
 
     private function sweepCounter(string $key): void
     {
-        if (isset($this->counters[$key]) && $this->counters[$key]['expiresAt'] <= $this->clock->nowMs()) {
+        if (isset($this->counters[$key]) && $this->counters[$key]['expiresAt'] <= $this->nowMs()) {
             unset($this->counters[$key]);
         }
     }

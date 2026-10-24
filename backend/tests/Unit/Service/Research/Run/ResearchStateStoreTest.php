@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Service\Research\Run;
 use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
+use App\Service\Research\Run\ResearchEventLog;
+use App\Service\Research\Run\ResearchKey;
 use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchRunNotFound;
 use App\Service\Research\Run\ResearchRunRef;
@@ -14,16 +16,17 @@ use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Research\Run\ResearchStatus;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Clock\MockClock;
 
 final class ResearchStateStoreTest extends TestCase
 {
-    private AdjustableClock $clock;
+    private MockClock $clock;
     private MemoryResearchRunKeys $keys;
     private ResearchStateStore $store;
 
     protected function setUp(): void
     {
-        $this->clock = new AdjustableClock();
+        $this->clock = new MockClock('2026-10-24 10:00:00');
         $this->keys = new MemoryResearchRunKeys($this->clock);
         $this->store = new ResearchStateStore($this->keys, $this->clock);
     }
@@ -37,7 +40,7 @@ final class ResearchStateStoreTest extends TestCase
         self::assertNotNull($token);
         self::assertNull($this->store->claim($state->ref->id, 1, 1000));
 
-        $this->clock->advanceMs(1001);
+        $this->clock->sleep(1.001);
         self::assertFalse($this->store->checkpoint($state, (string) $token));
         self::assertSame(1, $this->store->expectedSeq($state->ref->id));
         self::assertSame($state->ref->id, $this->store->expiredClaims()[0]['runId']);
@@ -49,6 +52,38 @@ final class ResearchStateStoreTest extends TestCase
         self::assertSame(2, $state->expectedSeq);
         self::assertSame(2, $this->store->load($state->ref->id)?->expectedSeq);
         self::assertSame([], $this->store->expiredClaims());
+    }
+
+    public function testACheckpointReleasesItsClaim(): void
+    {
+        $state = $this->open();
+        $this->store->save($state);
+        $token = (string) $this->store->claim($state->ref->id, 1, 5000);
+
+        self::assertTrue($this->store->checkpoint($state, $token));
+        self::assertNull($this->keys->get(ResearchKey::claim($state->ref->id, 1)));
+    }
+
+    public function testAWorkerCannotBringBackADeletedRun(): void
+    {
+        $state = $this->open();
+        $this->store->save($state);
+        $token = (string) $this->store->claim($state->ref->id, 1, 5000);
+        $events = new ResearchEventLog($this->keys);
+        $events->append($state->ref->id, 'run', ['status' => 'briefing']);
+
+        $this->store->delete($state->ref->id);
+
+        self::assertFalse($this->store->checkpoint($state, $token));
+        self::assertNull($this->store->load($state->ref->id));
+        try {
+            $this->store->putSourceText($state->ref->id, 's1', 'The price is 12.40 EUR.');
+            self::fail('A deleted run should not keep new source text.');
+        } catch (ResearchRunNotFound) {
+        }
+        self::assertNull($this->store->sourceText($state->ref->id, 's1'));
+        $this->expectException(ResearchRunNotFound::class);
+        $events->append($state->ref->id, 'source', ['id' => 's1']);
     }
 
     public function testReleasingTheClaimLetsTheNextWorkerTakeIt(): void
@@ -102,7 +137,7 @@ final class ResearchStateStoreTest extends TestCase
     {
         $state = $this->open();
         $this->store->save($state);
-        $this->clock->advanceMs(48 * 3600 * 1000 + 1);
+        $this->clock->sleep(48 * 3600 + 1);
 
         self::assertNull($this->store->load($state->ref->id));
         self::assertSame(0, $this->store->activeCount($state->ref->userId));
@@ -130,7 +165,7 @@ final class ResearchStateStoreTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('That source is too large to keep for this research.');
-        $this->store->putSourceText($state->ref->id, 's1', str_repeat('a', 20 * 1024 * 1024 + 1));
+        $this->store->putSourceText($state->ref->id, 's1', str_repeat('a', 4 * 1024 * 1024 + 1));
     }
 
     private function open(ResearchDepth $depth = ResearchDepth::Standard, int $userId = 5): ResearchRunState

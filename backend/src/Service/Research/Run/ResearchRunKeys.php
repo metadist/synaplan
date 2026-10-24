@@ -20,10 +20,18 @@ interface ResearchRunKeys
      */
     public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool;
 
+    /**
+     * Write the state and release the claim, only while the claim still holds
+     * the token and the run still exists. False when the lease was lost or the
+     * run was deleted meanwhile.
+     */
     public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool;
 
     public function deleteIfEquals(string $key, string $expected): bool;
 
+    /**
+     * @throws ResearchStoreUnavailable when Redis did not answer, so a deletion is never skipped silently
+     */
     public function delete(string $key): void;
 
     public function expire(string $key, int $ttlSeconds): void;
@@ -54,6 +62,14 @@ interface ResearchRunKeys
     /**
      * Append one event body and return its sequence number. The body is the
      * JSON object `{"event","data"}`; the stored line is `{seq}\n{body}`.
+     * The events expire with the run. Null when the run is gone, so a worker
+     * cannot bring back a deleted run's history.
      */
-    public function appendEvent(string $runId, string $body, int $ttlSeconds): int;
+    public function appendEvent(string $runId, string $body): ?int;
+
+    /**
+     * Keep a source's extracted text until the run expires. False when the
+     * run is gone, so a worker cannot bring back a deleted run's text.
+     */
+    public function putSourceText(string $runId, string $sourceId, string $text): bool;
 }

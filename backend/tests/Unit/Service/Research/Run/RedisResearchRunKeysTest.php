@@ -46,4 +46,21 @@ final class RedisResearchRunKeysTest extends TestCase
         $this->expectException(ResearchStoreUnavailable::class);
         (new RedisResearchRunKeys($redis))->members('research:owner:1');
     }
+
+    public function testADeletionRedisDidNotConfirmIsNotReportedAsDone(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('delete')->willReturn(false);
+
+        $this->expectException(ResearchStoreUnavailable::class);
+        (new RedisResearchRunKeys($redis))->delete('research:run:rr_0123456789abcdef');
+    }
+
+    public function testAnEventForAGoneRunIsNotStored(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('eval')->willReturn(0);
+
+        self::assertNull((new RedisResearchRunKeys($redis))->appendEvent('rr_0123456789abcdef', '{}'));
+    }
 }

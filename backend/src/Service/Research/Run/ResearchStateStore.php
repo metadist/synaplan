@@ -4,20 +4,26 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
+use Psr\Clock\ClockInterface;
+
 /**
  * Redis state for one research run: the ledger, the checkpoint, and the claim
  * that fences it. A unit writes through `checkpoint` while it holds the claim.
  * `save` is for opening a run, before any worker has claimed it.
  *
+ * Every key of a run expires with the run, so deleting a person through the
+ * owner index reaches all of them.
+ *
  * Nothing here is reachable until a later step turns the research module on.
  */
 final readonly class ResearchStateStore
 {
-    private const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+    /** A reader never sees more than its context window, so more text is only memory. */
+    private const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 
     public function __construct(
         private ResearchRunKeys $keys,
-        private ResearchClock $clock,
+        private ClockInterface $clock,
         private int $ttlHours = 48,
     ) {
         if ($ttlHours < 1 || $ttlHours > 168) {
@@ -72,7 +78,7 @@ final readonly class ResearchStateStore
             $token,
             $leaseMs,
             ResearchKey::CLAIMS,
-            $this->clock->nowMs() + $leaseMs,
+            $this->nowMs() + $leaseMs,
             ResearchKey::claimMember($runId, $seq, $token),
         );
 
@@ -80,8 +86,9 @@ final readonly class ResearchStateStore
     }
 
     /**
-     * Write the run only while $token still holds the claim for the unit that
-     * is in progress. A lost lease leaves the stored run untouched.
+     * Write the run and release the claim, only while $token still holds the
+     * claim for the unit that is in progress. A lost lease leaves the stored
+     * run untouched.
      */
     public function checkpoint(ResearchRunState $state, string $token): bool
     {
@@ -127,7 +134,7 @@ final readonly class ResearchStateStore
     public function expiredClaims(): array
     {
         $due = [];
-        foreach ($this->keys->zRangeByScore(ResearchKey::CLAIMS, $this->clock->nowMs()) as $member) {
+        foreach ($this->keys->zRangeByScore(ResearchKey::CLAIMS, $this->nowMs()) as $member) {
             $parsed = $this->parseClaim($member);
             if (null === $parsed) {
                 $this->keys->zRem(ResearchKey::CLAIMS, $member);
@@ -169,6 +176,9 @@ final readonly class ResearchStateStore
         return $this->keys->get(ResearchKey::text($runId, $sourceId));
     }
 
+    /**
+     * @throws ResearchRunNotFound when the run expired or was deleted meanwhile
+     */
     public function putSourceText(string $runId, string $sourceId, string $text): void
     {
         ResearchIds::assert($runId);
@@ -176,16 +186,16 @@ final readonly class ResearchStateStore
         if (strlen($text) > self::MAX_SOURCE_BYTES) {
             throw new \InvalidArgumentException('That source is too large to keep for this research.');
         }
-        $this->keys->set(ResearchKey::text($runId, $sourceId), $text, $this->ttlSeconds());
-        $this->keys->addMember(ResearchKey::textIndex($runId), $sourceId);
-        $this->keys->expire(ResearchKey::textIndex($runId), $this->ttlSeconds());
+        if (!$this->keys->putSourceText($runId, $sourceId, $text)) {
+            throw new ResearchRunNotFound($runId);
+        }
     }
 
     public function deleteUser(int $userId): int
     {
         $runIds = $this->keys->members(ResearchKey::owner($userId));
         foreach ($runIds as $runId) {
-            if (1 === preg_match('/^rr_[0-9a-f]{16}$/', $runId)) {
+            if (ResearchIds::isValid($runId)) {
                 $this->delete($runId);
             }
         }
@@ -199,19 +209,19 @@ final readonly class ResearchStateStore
     {
         ResearchIds::assert($runId);
         $state = $this->load($runId);
+        $this->keys->delete(ResearchKey::run($runId));
+        $this->dropClaims($runId);
         foreach ($this->keys->members(ResearchKey::textIndex($runId)) as $sourceId) {
             $this->keys->delete(ResearchKey::text($runId, $sourceId));
         }
         $this->keys->delete(ResearchKey::textIndex($runId));
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
-        $this->keys->delete(ResearchKey::run($runId));
         if (null !== $state) {
             $this->keys->removeMember(ResearchKey::owner($state->ref->userId), $runId);
             $this->keys->removeMember(ResearchKey::activeUser($state->ref->userId), $state->ref->depth->value.':'.$runId);
         }
         $this->keys->removeMember(ResearchKey::ACTIVE, $runId);
-        $this->dropClaims($runId);
     }
 
     private function syncMembership(ResearchRunState $state): void
@@ -219,8 +229,12 @@ final readonly class ResearchStateStore
         $runId = $state->ref->id;
         $userId = $state->ref->userId;
         $member = $state->ref->depth->value.':'.$runId;
+        $ttl = $this->ttlSeconds();
         $this->keys->addMember(ResearchKey::owner($userId), $runId);
-        $this->keys->expire(ResearchKey::owner($userId), $this->ttlSeconds());
+        $this->keys->expire(ResearchKey::owner($userId), $ttl);
+        $this->keys->expire(ResearchKey::events($runId), $ttl);
+        $this->keys->expire(ResearchKey::eventSeq($runId), $ttl);
+        $this->keys->expire(ResearchKey::textIndex($runId), $ttl);
         if ($state->status->isTerminal()) {
             $this->keys->removeMember(ResearchKey::activeUser($userId), $member);
             $this->keys->removeMember(ResearchKey::ACTIVE, $runId);
@@ -228,9 +242,9 @@ final readonly class ResearchStateStore
             return;
         }
         $this->keys->addMember(ResearchKey::activeUser($userId), $member);
-        $this->keys->expire(ResearchKey::activeUser($userId), $this->ttlSeconds());
+        $this->keys->expire(ResearchKey::activeUser($userId), $ttl);
         $this->keys->addMember(ResearchKey::ACTIVE, $runId);
-        $this->keys->expire(ResearchKey::ACTIVE, $this->ttlSeconds());
+        $this->keys->expire(ResearchKey::ACTIVE, $ttl);
     }
 
     /**
@@ -241,10 +255,11 @@ final readonly class ResearchStateStore
         $live = [];
         foreach ($this->keys->members($key) as $member) {
             $runId = $userSet ? $this->runIdFromMember($member) : $member;
-            $state = 1 === preg_match('/^rr_[0-9a-f]{16}$/', $runId) ? $this->load($runId) : null;
+            $valid = ResearchIds::isValid($runId);
+            $state = $valid ? $this->load($runId) : null;
             if (null === $state || $state->status->isTerminal()) {
                 $this->keys->removeMember($key, $member);
-                if ($userSet && 1 === preg_match('/^rr_[0-9a-f]{16}$/', $runId)) {
+                if ($userSet && $valid) {
                     $this->keys->removeMember(ResearchKey::ACTIVE, $runId);
                 }
                 continue;
@@ -289,7 +304,7 @@ final readonly class ResearchStateStore
             return null;
         }
         [$runId, $seq, $token] = $parts;
-        if (1 !== preg_match('/^rr_[0-9a-f]{16}$/', $runId)) {
+        if (!ResearchIds::isValid($runId)) {
             return null;
         }
         if (1 !== preg_match('/^[1-9][0-9]*$/', $seq) || 1 !== preg_match('/^[0-9a-f]{32}$/', $token)) {
@@ -306,9 +321,14 @@ final readonly class ResearchStateStore
         }
     }
 
+    private function nowMs(): int
+    {
+        return (int) $this->clock->now()->format('Uv');
+    }
+
     private function now(): \DateTimeImmutable
     {
-        return (new \DateTimeImmutable('@'.intdiv($this->clock->nowMs(), 1000)))->setTimezone(new \DateTimeZone('UTC'));
+        return (new \DateTimeImmutable('@'.$this->clock->now()->getTimestamp()))->setTimezone(new \DateTimeZone('UTC'));
     }
 
     private function ttlSeconds(): int

@@ -7,7 +7,7 @@ namespace App\Service\Research\Run;
 /**
  * Sequenced events for one run. A client asks for everything after the last
  * id it saw and continues from there. Unknown names are refused here; a
- * client still ignores names it does not know.
+ * client still ignores names it does not know. Events expire with the run.
  */
 final readonly class ResearchEventLog
 {
@@ -33,17 +33,14 @@ final readonly class ResearchEventLog
         'ping',
     ];
 
-    public function __construct(
-        private ResearchRunKeys $keys,
-        private int $ttlHours = 48,
-    ) {
-        if ($ttlHours < 1 || $ttlHours > 168) {
-            throw new \InvalidArgumentException('Research events are kept between 1 and 168 hours.');
-        }
+    public function __construct(private ResearchRunKeys $keys)
+    {
     }
 
     /**
      * @param array<string, mixed> $data
+     *
+     * @throws ResearchRunNotFound when the run expired or was deleted meanwhile
      */
     public function append(string $runId, string $event, array $data): int
     {
@@ -61,7 +58,7 @@ final readonly class ResearchEventLog
             throw new \InvalidArgumentException('A research update could not be stored.');
         }
 
-        return $this->keys->appendEvent($runId, $body, $this->ttlHours * 3600);
+        return $this->keys->appendEvent($runId, $body) ?? throw new ResearchRunNotFound($runId);
     }
 
     /**

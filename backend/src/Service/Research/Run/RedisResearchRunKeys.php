@@ -9,25 +9,38 @@ use App\Service\Infrastructure\RedisService;
 /**
  * Research keys on the shared Redis. A checkpoint is written only while the
  * claim token still holds the lease, in one Lua script, so a worker whose
- * lease expired cannot overwrite a newer run.
+ * lease expired cannot overwrite a newer run. Events and source texts are
+ * written only while the run exists and expire with it.
  */
 final readonly class RedisResearchRunKeys implements ResearchRunKeys
 {
     private const APPEND_EVENT = <<<'LUA'
-local seq = redis.call('INCR', KEYS[1])
-local ttl = tonumber(ARGV[1])
-redis.call('EXPIRE', KEYS[1], ttl)
-redis.call('RPUSH', KEYS[2], seq .. '\n' .. ARGV[2])
-redis.call('EXPIRE', KEYS[2], ttl)
-if redis.call('EXISTS', KEYS[3]) == 1 then
-  redis.call('EXPIRE', KEYS[3], ttl)
+local ttl = redis.call('PTTL', KEYS[3])
+if ttl < 1 then
+  return 0
 end
+local seq = redis.call('INCR', KEYS[1])
+redis.call('PEXPIRE', KEYS[1], ttl)
+redis.call('RPUSH', KEYS[2], seq .. '\n' .. ARGV[1])
+redis.call('PEXPIRE', KEYS[2], ttl)
 return seq
 LUA;
 
+    private const PUT_SOURCE_TEXT = <<<'LUA'
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl < 1 then
+  return 0
+end
+redis.call('SET', KEYS[2], ARGV[1], 'PX', ttl)
+redis.call('SADD', KEYS[3], ARGV[2])
+redis.call('PEXPIRE', KEYS[3], ttl)
+return 1
+LUA;
+
     private const COMPARE_AND_SET = <<<'LUA'
-if redis.call('GET', KEYS[1]) == ARGV[1] then
+if redis.call('GET', KEYS[1]) == ARGV[1] and redis.call('EXISTS', KEYS[2]) == 1 then
   redis.call('SET', KEYS[2], ARGV[2], 'EX', tonumber(ARGV[3]))
+  redis.call('DEL', KEYS[1])
   return 1
 end
 return 0
@@ -107,9 +120,8 @@ LUA;
             [$claimKey, $stateKey],
             [$token, $state, (string) $ttlSeconds],
         );
-        $number = $this->requiredInteger($result);
 
-        return 1 === $number;
+        return 1 === $this->requiredInteger($result);
     }
 
     public function deleteIfEquals(string $key, string $expected): bool
@@ -121,7 +133,9 @@ LUA;
 
     public function delete(string $key): void
     {
-        $this->redis->delete($key);
+        if (!$this->redis->delete($key)) {
+            throw new ResearchStoreUnavailable();
+        }
     }
 
     public function expire(string $key, int $ttlSeconds): void
@@ -178,19 +192,27 @@ LUA;
         return $this->redis->zRangeByScore($key, '-inf', (string) $maxScore);
     }
 
-    public function appendEvent(string $runId, string $body, int $ttlSeconds): int
+    public function appendEvent(string $runId, string $body): ?int
     {
         $result = $this->redis->eval(
             self::APPEND_EVENT,
             [ResearchKey::eventSeq($runId), ResearchKey::events($runId), ResearchKey::run($runId)],
-            [(string) $ttlSeconds, $body],
+            [$body],
         );
         $seq = $this->requiredInteger($result);
-        if ($seq < 1) {
-            throw new ResearchStoreUnavailable();
-        }
 
-        return $seq;
+        return $seq < 1 ? null : $seq;
+    }
+
+    public function putSourceText(string $runId, string $sourceId, string $text): bool
+    {
+        $result = $this->redis->eval(
+            self::PUT_SOURCE_TEXT,
+            [ResearchKey::run($runId), ResearchKey::text($runId, $sourceId), ResearchKey::textIndex($runId)],
+            [$text, $sourceId],
+        );
+
+        return 1 === $this->requiredInteger($result);
     }
 
     private function requiredInteger(mixed $result): int

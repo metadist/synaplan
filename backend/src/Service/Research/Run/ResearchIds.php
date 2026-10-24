@@ -11,9 +11,14 @@ final class ResearchIds
         return 'rr_'.bin2hex(random_bytes(8));
     }
 
+    public static function isValid(string $id): bool
+    {
+        return 1 === preg_match('/^rr_[0-9a-f]{16}$/', $id);
+    }
+
     public static function assert(string $id): void
     {
-        if (1 !== preg_match('/^rr_[0-9a-f]{16}$/', $id)) {
+        if (!self::isValid($id)) {
             throw new \InvalidArgumentException('This research could not be found.');
         }
     }

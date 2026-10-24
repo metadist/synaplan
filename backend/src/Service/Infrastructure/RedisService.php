@@ -178,34 +178,6 @@ final class RedisService
     }
 
     /**
-     * Store the value only when the key is absent, and drop it after $ttlMillis.
-     *
-     * True when this caller stored it. False when the key is already held.
-     * Null when Redis did not answer, so a dead store is not mistaken for
-     * "someone else is working".
-     */
-    public function setIfAbsentMillis(string $key, string $value, int $ttlMillis): ?bool
-    {
-        $client = $this->client();
-        if (null === $client) {
-            return null;
-        }
-
-        try {
-            $result = $client->set($this->prefix($key), $value, 'PX', max(1, $ttlMillis), 'NX');
-            if (null === $result) {
-                return false;
-            }
-
-            return 'OK' === (string) $result ? true : null;
-        } catch (\Throwable $e) {
-            $this->logCommandFailure('SET NX PX', $key, $e);
-
-            return null;
-        }
-    }
-
-    /**
      * Run a Lua script. Keys are prefixed; arguments are not, so a script must
      * read keys only from KEYS.
      *
@@ -232,25 +204,6 @@ final class RedisService
             return $client->eval($script, count($prefixed), ...$prefixed, ...$args);
         } catch (\Throwable $e) {
             $this->logCommandFailure('EVAL', $keys[0] ?? 'eval', $e);
-
-            return null;
-        }
-    }
-
-    /**
-     * Append one value to a list. Null when Redis did not answer.
-     */
-    public function appendList(string $key, string $value): ?int
-    {
-        $client = $this->client();
-        if (null === $client) {
-            return null;
-        }
-
-        try {
-            return (int) $client->rpush($this->prefix($key), [$value]);
-        } catch (\Throwable $e) {
-            $this->logCommandFailure('RPUSH', $key, $e);
 
             return null;
         }
