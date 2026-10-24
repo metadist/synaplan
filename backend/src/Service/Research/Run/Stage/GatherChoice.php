@@ -13,6 +13,39 @@ use App\Service\Research\Run\Ledger\CanonicalUrl;
 final class GatherChoice
 {
     /**
+     * The agreed shape is a list under `results`. A model that instead
+     * returns one verdict per hit id is the same decision and is kept.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function verdicts(array $data): array
+    {
+        $rows = [];
+        if (is_array($data['results'] ?? null) && array_is_list($data['results'])) {
+            $rows = $data['results'];
+        } else {
+            foreach ($data as $id => $row) {
+                if (!is_string($id) || !is_array($row) || !array_key_exists('read', $row)) {
+                    continue;
+                }
+                $row['id'] = $id;
+                $rows[] = $row;
+            }
+        }
+
+        $verdicts = [];
+        foreach ($rows as $row) {
+            if (is_array($row) && is_string($row['id'] ?? null)) {
+                $verdicts[$row['id']] = $row;
+            }
+        }
+
+        return $verdicts;
+    }
+
+    /**
      * @param list<array{id: string, url: string, host: string, title: string}> $hits
      * @param array<string, array<string, mixed>>                               $verdicts
      * @param list<string>                                                      $mustUse

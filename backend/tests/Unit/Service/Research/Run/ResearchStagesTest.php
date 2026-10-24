@@ -170,6 +170,32 @@ final class ResearchStagesTest extends TestCase
         self::assertStringNotContainsString('secret-payload', $caller->seen[0]['user']);
     }
 
+    public function testAVerdictMapKeyedByHitIdIsReadTheSameWay(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'Needed.', [[
+            'q' => 'unit price',
+            'language' => 'en',
+            'scope' => 'web',
+        ]]);
+        $search = new ReplaySearch();
+        $search->hits['unit price'] = [
+            ResearchHit::from('https://forum.example/secret', 'A forum thread', 'talk', null),
+            ResearchHit::from('https://maker.example/price', 'Price list', '12.40 EUR', '2026-03-01'),
+        ];
+        $caller->script[] = $this->json([
+            'r1' => ['point' => 'p1', 'kind' => 'forum', 'fresh' => false, 'read' => false, 'reason' => 'A forum thread'],
+            'r2' => ['point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'The price list'],
+        ]);
+
+        $result = (new GatherStage(new StageCall($caller), $search, new GatherChoice()))->run($ctx);
+        $urls = array_map(static fn ($source) => $source->url, $ctx->state->ledger->sources());
+
+        self::assertSame('read', $result->next);
+        self::assertSame(['https://maker.example/price'], $urls);
+    }
+
     public function testAnInventedPassageAndAForeignLeadNeverEnterTheReport(): void
     {
         [$ctx, $caller] = $this->open();

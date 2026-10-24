@@ -108,16 +108,9 @@ final readonly class GatherStage implements ResearchStage
             return $called->stop;
         }
 
-        $verdicts = [];
-        foreach (is_array($called->reply->data['results'] ?? null) ? $called->reply->data['results'] : [] as $row) {
-            if (is_array($row) && is_string($row['id'] ?? null)) {
-                $verdicts[$row['id']] = $row;
-            }
-        }
-
         return $this->choice->choose(
             $hits,
-            $verdicts,
+            GatherChoice::verdicts(is_array($called->reply->data) ? $called->reply->data : []),
             null !== $brief ? $brief->mustUse : [],
             null !== $brief ? $brief->mustAvoid : [],
             $ctx->state->budget->sourcesLeft(),

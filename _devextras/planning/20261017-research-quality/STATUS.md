@@ -17,7 +17,7 @@ chat message.
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
-| RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
+| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walk not run |
 | RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
@@ -39,6 +39,36 @@ chat message.
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
 
 ---
+
+## 2026-10-24 — RS6 engine v1 smoke and fairness
+
+Local dev stack, Docker context `m4`. Research was pinned on with
+`RESEARCH_ENABLED=1` in `backend/.env` for the measurement and removed
+afterwards. The database row stays `0`. `CHAT` and `SORT` were set to
+`BMODELS` 379 (Claude Sonnet 5.5, `anthropic:claude-sonnet-5-5`) and put
+back to `-1` afterwards. Web search was the keyed Brave provider.
+`GET /api/v1/research/capabilities` then reported `enabled: true`,
+`web_search_available: true`, `knowledge_available: false`,
+`read_documents: false`.
+
+A standard run before the sorter fix (`rr_5ddfe637190fb426`) searched and
+finished `failed_nothing_found`. The sorter had returned one verdict per
+hit id, and the code only read a `results` list, so nothing was opened.
+With that shape accepted, standard run `rr_124552ec9cecc1a8` in chat 389
+finished `complete` in about 72 seconds: 26 statements, 26 backed by a
+source, spent 0.135306 USD (estimate 1 USD). The report is the assistant
+message in that chat. Question: "In which year was the Eiffel Tower
+completed, and who designed it?"
+
+Fairness, same stack. A `.md` upload is vectorized inside the request
+(`Ready` is status `vectorized`). Idle file 53: 67 ms. During the standard
+run, file 54: 23 ms. During thorough run `rr_f0307ef95d034790` (then
+cancelled, `stopped_by_user`), file 56: 69 ms. All three came back
+vectorized.
+
+P-MIN (`09` §4) was not run. `docker-compose.minimal.yml` overrides
+`app_test` on the test stack, not this dev stack, and that stack was not
+started.
 
 ## 2026-10-23 — run storage and run kernel shared with agent handling (row 25)
 
