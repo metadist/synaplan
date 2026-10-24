@@ -108,14 +108,37 @@ final readonly class StripeEntitlement
         try {
             return Invoice::retrieve($latest);
         } catch (\Throwable $e) {
-            $this->logger->warning('Stripe entitlement: latest invoice could not be fetched, treating as unsettled', [
-                'subscription_id' => $subscription->id ?? null,
-                'invoice_id' => $latest,
-                'error' => $e->getMessage(),
-            ]);
+            throw new StripeLookupFailed('Stripe entitlement: latest invoice could not be fetched', 0, $e);
+        }
+    }
 
+    /**
+     * The invoice that proves whether the subscription's current price is paid.
+     *
+     * Always the subscription's latest invoice, never an older paid invoice
+     * that happens to share the subscription id. A plan upgrade leaves the
+     * latest invoice `open` while a previous period's invoice is `paid`;
+     * treating that older invoice as proof would unlock the unpaid upgrade.
+     * Fetching the latest invoice throws {@see StripeLookupFailed} so the
+     * webhook is retried instead of acknowledged.
+     */
+    public function proofInvoice(StripeObject $subscription, StripeObject $eventInvoice): ?StripeObject
+    {
+        $latest = $subscription->latest_invoice ?? null;
+        $latestId = $latest instanceof StripeObject ? ($latest->id ?? null) : $latest;
+        if (!is_string($latestId) || '' === $latestId) {
             return null;
         }
+
+        $eventId = $eventInvoice->id ?? null;
+        if ($latestId === $eventId) {
+            return $eventInvoice;
+        }
+        if ($latest instanceof StripeObject) {
+            return $latest;
+        }
+
+        return $this->latestInvoice($subscription);
     }
 
     /**
@@ -187,13 +210,7 @@ final readonly class StripeEntitlement
         try {
             return Subscription::retrieve($ref);
         } catch (\Throwable $e) {
-            $this->logger->warning('Stripe entitlement: subscription of invoice could not be fetched', [
-                'invoice_id' => $invoice->id ?? null,
-                'subscription_id' => $ref,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
+            throw new StripeLookupFailed('Stripe entitlement: subscription of invoice could not be fetched', 0, $e);
         }
     }
 

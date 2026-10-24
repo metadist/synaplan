@@ -14,6 +14,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class OAuthSignupGateTest extends TestCase
 {
@@ -47,13 +49,35 @@ final class OAuthSignupGateTest extends TestCase
         $this->assertSame([], $this->gate()->stateExtras(Request::create('/login', 'GET', ['challenge' => 'anything']), 'github'));
     }
 
-    public function testExistingAccountsSignInWithoutAnyCheck(): void
+    public function testExistingGoogleAccountSignsInWithoutTheHumanCheck(): void
     {
         $this->users->expects($this->once())->method('findOneBy')->with(['mail' => 'known@example.com'])->willReturn(new User());
         $this->protection->method('challengeRequired')->willReturn(true);
         $this->protection->expects($this->never())->method('assertSignupAllowed');
 
-        $this->gate()->assertNewAccountAllowed('known@example.com', [], '203.0.113.1');
+        $this->gate()->assertGoogleSignup('known@example.com', ['nonce' => 'n1'], '203.0.113.1');
+        $this->addToAssertionCount(1);
+    }
+
+    public function testReturningAppleUserIsFoundBySubjectWhenTheEmailIsMissing(): void
+    {
+        $this->users->expects($this->once())->method('findByAppleSub')->with('apple-sub-1')->willReturn(new User());
+        $this->users->expects($this->never())->method('findOneBy');
+        $this->protection->method('challengeRequired')->willReturn(true);
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        $this->gate()->assertAppleSignup('apple-sub-1', null, ['nonce' => 'n-apple'], '203.0.113.1');
+        $this->addToAssertionCount(1);
+    }
+
+    public function testReturningGitHubUserIsFoundByIdWhenTheEmailIsHidden(): void
+    {
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->users->expects($this->once())->method('findByGithubId')->with(99)->willReturn(new User());
+        $this->protection->method('challengeRequired')->willReturn(true);
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        $this->gate()->assertGithubSignup(null, 99, ['nonce' => 'n-gh'], '203.0.113.1');
         $this->addToAssertionCount(1);
     }
 
@@ -64,7 +88,7 @@ final class OAuthSignupGateTest extends TestCase
         $this->protection->expects($this->never())->method('assertSignupAllowed');
 
         try {
-            $this->gate()->assertNewAccountAllowed('new@example.com', ['nonce' => 'x'], '203.0.113.1');
+            $this->gate()->assertGoogleSignup('new@example.com', ['nonce' => 'x'], '203.0.113.1');
             $this->fail('A new OAuth account without the human flag must be refused');
         } catch (SignupBlockedException $e) {
             $this->assertSame(SignupBlockedException::CODE_CHALLENGE_REQUIRED, $e->getReasonCode());
@@ -78,16 +102,42 @@ final class OAuthSignupGateTest extends TestCase
         $this->protection->method('challengeRequired')->willReturn(true);
         $this->protection->expects($this->once())->method('assertSignupAllowed')->with('203.0.113.1');
 
-        $this->gate()->assertNewAccountAllowed('new@example.com', [OAuthSignupGate::STATE_HUMAN => true], '203.0.113.1');
+        $this->gate()->assertGoogleSignup('new@example.com', ['nonce' => 'n2', OAuthSignupGate::STATE_HUMAN => true], '203.0.113.1');
     }
 
-    public function testNativeStartSkipsTheHumanCheckButKeepsTheLimits(): void
+    public function testTheSameNonceCannotCreateASecondAccount(): void
     {
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->protection->method('challengeRequired')->willReturn(true);
+        $this->protection->expects($this->once())->method('assertSignupAllowed');
+        $gate = $this->gate();
+        $state = ['nonce' => 'once', OAuthSignupGate::STATE_HUMAN => true];
+
+        $gate->assertGoogleSignup('first@example.com', $state, '203.0.113.1');
+
+        $this->expectException(SignupBlockedException::class);
+        $gate->assertGoogleSignup('second@example.com', $state, '203.0.113.2');
+    }
+
+    public function testABrowserNativeFlagDoesNotSkipTheHumanCheck(): void
+    {
+        $this->users->method('findByAppleSub')->willReturn(null);
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->protection->method('challengeRequired')->willReturn(true);
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        $this->expectException(SignupBlockedException::class);
+        $this->gate()->assertAppleSignup('new-sub', 'new@example.com', ['nonce' => 'n3', 'native' => true], '203.0.113.1');
+    }
+
+    public function testVerifiedAppleNativeSheetSkipsTheHumanCheckButKeepsTheLimits(): void
+    {
+        $this->users->method('findByAppleSub')->willReturn(null);
         $this->users->method('findOneBy')->willReturn(null);
         $this->protection->method('challengeRequired')->willReturn(true);
         $this->protection->expects($this->once())->method('assertSignupAllowed')->with('203.0.113.1');
 
-        $this->gate()->assertNewAccountAllowed('new@example.com', [], '203.0.113.1', native: true);
+        $this->gate()->assertAppleSignup('new-sub', 'new@example.com', [], '203.0.113.1', true);
     }
 
     public function testCompleteNewUserInitialisesTheModelDefaults(): void
@@ -101,6 +151,13 @@ final class OAuthSignupGateTest extends TestCase
 
     private function gate(): OAuthSignupGate
     {
-        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, new NullLogger());
+        $nonces = new RateLimiterFactory([
+            'id' => 'oauth_signup_nonce',
+            'policy' => 'sliding_window',
+            'limit' => 1,
+            'interval' => '10 minutes',
+        ], new InMemoryStorage());
+
+        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger());
     }
 }

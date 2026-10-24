@@ -54,14 +54,28 @@ function loadTurnstile(): Promise<TurnstileApi> {
     script.src = TURNSTILE_SCRIPT
     script.async = true
     script.defer = true
-    script.onload = () => {
-      if (window.turnstile) resolve(window.turnstile)
-      else reject(new Error('Turnstile script loaded without an API'))
-    }
-    script.onerror = () => {
+    let settled = false
+    let timer = 0
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      script.remove()
       scriptPromise = null
-      reject(new Error('Turnstile script failed to load'))
+      reject(error)
     }
+    timer = window.setTimeout(() => fail(new Error('Turnstile script timed out')), TOKEN_TIMEOUT_MS)
+    script.onload = () => {
+      if (window.turnstile) {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(window.turnstile)
+        return
+      }
+      fail(new Error('Turnstile script loaded without an API'))
+    }
+    script.onerror = () => fail(new Error('Turnstile script failed to load'))
     document.head.appendChild(script)
   })
 

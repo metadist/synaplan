@@ -170,7 +170,7 @@ class GitHubAuthController extends AbstractController
 
             // A new account needs the human check from the start of the flow
             // and a free signup slot; an existing account signs in as before.
-            $this->signupGate->assertNewAccountAllowed($email, $statePayload, $request->getClientIp(), $native);
+            $this->signupGate->assertGithubSignup($email, $userInfo['id'] ?? null, $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $email,
@@ -210,16 +210,8 @@ class GitHubAuthController extends AbstractController
             $user = $this->userRepository->findOneBy(['mail' => $email]);
         }
 
-        if (!$user) {
-            // Try to find by GitHub ID in userDetails
-            $users = $this->userRepository->findAll();
-            foreach ($users as $existingUser) {
-                $details = $existingUser->getUserDetails() ?? [];
-                if (isset($details['github_id']) && $details['github_id'] == $githubId) {
-                    $user = $existingUser;
-                    break;
-                }
-            }
+        if (!$user && (is_int($githubId) || is_string($githubId))) {
+            $user = $this->userRepository->findByGithubId($githubId);
         }
 
         $isNewUser = false;

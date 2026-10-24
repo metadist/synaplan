@@ -739,10 +739,13 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->user->setPaymentDetails($details);
         $this->em->flush();
 
-        // The handler fetches the subscription the invoice belongs to.
-        $this->stripeMock->expect('GET', 'subscriptions/'.$subId, $this->subscriptionObject(['id' => $subId, 'status' => 'active']));
-
         $invoiceId = 'in_'.bin2hex(random_bytes(4));
+        $this->stripeMock->expect('GET', 'subscriptions/'.$subId, $this->subscriptionObject([
+            'id' => $subId,
+            'status' => 'active',
+            'latest_invoice' => $invoiceId,
+        ]));
+
         $payload = $this->buildEventPayload('invoice.payment_succeeded', $this->invoiceObject($invoiceId, 'paid', $subId));
         $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
         $this->assertResponseIsSuccessful();
@@ -771,6 +774,49 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->em->refresh($this->user);
         $this->assertSame('NEW', $this->user->getUserLevel());
         $this->assertSame(0, $this->stripeMock->countCalls('GET', 'subscriptions/'.$staleId), 'Not even fetched: the id mismatch is decided locally');
+    }
+
+    /**
+     * An older paid invoice must not unlock the subscription's current price.
+     * After an upgrade the latest invoice is still open while the previous
+     * period's invoice is paid.
+     */
+    public function testInvoicePaymentSucceededIgnoresAnOlderPaidInvoice(): void
+    {
+        $subId = 'sub_upgrade_'.bin2hex(random_bytes(4));
+        $details = $this->user->getPaymentDetails();
+        $details['subscription'] = ['source' => 'stripe', 'stripe_subscription_id' => $subId, 'status' => 'active', 'plan' => 'PRO', 'settled' => true];
+        $this->user->setPaymentDetails($details);
+        $this->user->setUserLevel('PRO');
+        $this->em->flush();
+
+        $open = $this->invoiceObject('in_open', 'open', $subId);
+        $subscription = $this->subscriptionObject(['id' => $subId, 'status' => 'active', 'latest_invoice' => $open]);
+        $this->stripeMock->expect('GET', 'subscriptions/'.$subId, $subscription);
+
+        $payload = $this->buildEventPayload('invoice.payment_succeeded', $this->invoiceObject('in_old', 'paid', $subId));
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertSame('PRO', $this->user->getUserLevel(), 'The unpaid upgrade must not be granted');
+        $this->assertFalse($this->user->getPaymentDetails()['subscription']['settled']);
+    }
+
+    public function testInvoicePaymentSucceededIsRetriedWhenStripeCannotBeReached(): void
+    {
+        $subId = 'sub_retry_'.bin2hex(random_bytes(4));
+        $details = $this->user->getPaymentDetails();
+        $details['subscription'] = ['source' => 'stripe', 'stripe_subscription_id' => $subId, 'status' => 'active', 'plan' => 'PRO', 'settled' => false];
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        $payload = $this->buildEventPayload('invoice.payment_succeeded', $this->invoiceObject('in_paid', 'paid', $subId));
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_INTERNAL_SERVER_ERROR);
+        $this->em->refresh($this->user);
+        $this->assertSame('NEW', $this->user->getUserLevel());
     }
 
     /**
