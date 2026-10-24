@@ -84,6 +84,7 @@ final class ChatRunnerHandoverTest extends TestCase
             null,
             null,
             null,
+            null,
             new \App\Service\File\ConnectedFolderContentGuard(),
             new \App\Service\Connection\PlannerChannelCatalog($this->createMock(\App\Repository\ConnectionRepository::class)),
         );

@@ -155,7 +155,7 @@ final class RunnersTest extends TestCase
             return ['provider' => 'groq', 'model' => 'gpt-oss-120b'];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'long input text']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -188,7 +188,7 @@ final class RunnersTest extends TestCase
         $modelConfig->method('getProviderForModel')->with(55)->willReturn('anthropic');
         $modelConfig->method('getModelName')->with(55)->willReturn('claude-sonnet-5');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'excel contents']);
 
         $result = $runner->run($node, $this->context($this->message('summarize these spreadsheets')));
@@ -216,7 +216,7 @@ final class RunnersTest extends TestCase
             return [];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n2', Capability::Chat, [], ['text' => 'wie wird das Wetter heute?']);
 
         $context = $this->context($this->message('wie wird das Wetter heute?'));
@@ -256,7 +256,7 @@ final class RunnersTest extends TestCase
         $modelConfig->expects(self::once())->method('getProviderForModel')->with(999)->willReturn('ollama');
         $modelConfig->expects(self::once())->method('getModelName')->with(999)->willReturn('nemotron-3-nano');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'Was ist die Hauptstadt von Frankreich']);
 
         $context = new NodeContext(
@@ -286,7 +286,7 @@ final class RunnersTest extends TestCase
         $modelConfig->method('getProviderForModel')->with(76)->willReturn('groq');
         $modelConfig->method('getModelName')->with(76)->willReturn('openai/gpt-oss-120b');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'alpha']);
         $context = new NodeContext(
             $this->message('alpha'),
@@ -333,7 +333,7 @@ final class RunnersTest extends TestCase
         $modelConfig->method('getProviderForModel')->willReturn('groq');
         $modelConfig->method('getModelName')->willReturn('gpt-oss-120b');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n2', Capability::Chat, ['n1'], ['text' => 'inbox dump'], ['topic_id' => 'meeting-requests']);
 
         $result = $runner->run($node, $this->context($this->message('inbox dump')));
@@ -391,7 +391,7 @@ final class RunnersTest extends TestCase
             $modelConfig,
         );
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), $decorator, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), $decorator, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'Which model are you?'], ['topic_id' => 'synaplan']);
         $context = new NodeContext($this->message('Which model are you?'), [], 1, ['language' => 'en', 'model_id' => 20]);
 
@@ -422,7 +422,7 @@ final class RunnersTest extends TestCase
         $modelConfig->method('getProviderForModel')->willReturn('groq');
         $modelConfig->method('getModelName')->willReturn('gpt-oss-120b');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'hello'], ['topic_id' => 'does-not-exist']);
 
         $result = $runner->run($node, $this->context($this->message('hello')));
@@ -457,7 +457,7 @@ final class RunnersTest extends TestCase
         $modelConfig->expects(self::once())->method('getProviderForModel')->with(42)->willReturn('ollama');
         $modelConfig->expects(self::once())->method('getModelName')->with(42)->willReturn('pinned-model');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'hello'], ['topic_id' => 'brief']);
 
         $result = $runner->run($node, $this->context($this->message('hello')));
@@ -468,7 +468,7 @@ final class RunnersTest extends TestCase
 
     public function testChatRunnerFailsOnEmptyInput(): void
     {
-        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => '']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -498,7 +498,7 @@ final class RunnersTest extends TestCase
             return [];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'what does our contract say about notice periods?']);
 
         $context = new NodeContext(
@@ -527,7 +527,7 @@ final class RunnersTest extends TestCase
         $vectorSearch = $this->createMock(VectorSearchService::class);
         $vectorSearch->method('semanticSearch')->willThrowException(new \RuntimeException('qdrant down'));
 
-        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'question']);
 
         $result = $runner->run($node, $this->context($this->message('question')));
@@ -617,6 +617,7 @@ final class RunnersTest extends TestCase
             null,
             null,
             null,
+            null,
             new ConnectedFolderContentGuard(),
             new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)),
         );
@@ -640,7 +641,7 @@ final class RunnersTest extends TestCase
         $aiFacade->method('chatStream')->willThrowException(new \RuntimeException('groq 500'));
         $modelConfig = $this->createMock(ModelConfigService::class);
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class), null, null, null, null, new ConnectedFolderContentGuard(), new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)));
         $node = new TaskNode('n2', Capability::Summarize, [], ['text' => 'input']);
 
         $result = $runner->run($node, $this->context($this->message()));
