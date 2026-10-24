@@ -8,7 +8,8 @@ here, not a chat message.
 | Plan | — | written 2026-10-24 |
 | 01 | [#2678](https://github.com/metadist/synaplan/issues/2678) | PR [#2703](https://github.com/metadist/synaplan/pull/2703) |
 | 02 | [#2679](https://github.com/metadist/synaplan/issues/2679) | PR [#2704](https://github.com/metadist/synaplan/pull/2704) |
-| 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | in progress |
+| 03 | [#2671](https://github.com/metadist/synaplan/issues/2671) | PR [#2706](https://github.com/metadist/synaplan/pull/2706); J-OI-3 browser walk pending |
+| 04 | [#2667](https://github.com/metadist/synaplan/issues/2667) | in progress |
 
 ## Walks
 

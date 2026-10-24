@@ -7,6 +7,9 @@ namespace App\Tests\Unit\Service\Prompt;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\FileRepository;
+use App\Repository\ConnectionRepository;
+use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\File\ConnectedFolderContentGuard;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\Prompt\ChatPromptBlocks;
@@ -122,6 +125,8 @@ final class ChatPromptImageContextTest extends TestCase
             new TimeContextBuilder(),
             $catalog,
             $this->createStub(ConversationFileCatalog::class),
+            new ConnectedFolderContentGuard(),
+            new PlannerChannelCatalog($this->createStub(ConnectionRepository::class)),
             new NullLogger(),
         );
     }

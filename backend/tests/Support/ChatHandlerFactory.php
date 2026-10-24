@@ -26,7 +26,10 @@ use App\Service\File\GeneratedDocumentStore;
 use App\Service\File\GeneratedFileWriter;
 use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
+use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\File\ConnectedFolderContentGuard;
 use App\Service\File\UnreadSourceGuard;
+use App\Repository\ConnectionRepository;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Infrastructure\DatabaseConnectionRelease;
 use App\Service\Knowledge\KnowledgeContextFormatter;
@@ -74,6 +77,18 @@ use Psr\Log\LoggerInterface;
  */
 final class ChatHandlerFactory
 {
+    private static function connectionRepositoryStub(): ConnectionRepository
+    {
+        $case = new class extends \PHPUnit\Framework\TestCase {
+            public function repo(): ConnectionRepository
+            {
+                return $this->createMock(ConnectionRepository::class);
+            }
+        };
+
+        return $case->repo();
+    }
+
     /**
      * @param iterable<PluginContextProviderInterface> $pluginContextProviders
      */
@@ -123,7 +138,17 @@ final class ChatHandlerFactory
         $fileWriter = new GeneratedFileWriter($documentGenerator, $documentImageReferenceResolver, $userUploadPathBuilder, $uploadDir, $em, $logger, $documentThumbnailDispatcher);
         $messages = new ChatMessageAssembler($vision, $history, $logger, $contextCondenser, $modelContextWindow);
         $documents = new ChatDocumentOutput($modelRepository, $em, $fileWriter, $logger, $generatedDocumentStore, $documentEditCoordinator, $unreadSourceGuard);
-        $sections = new ChatSystemPromptBuilder($timeContextBuilder, $documentImageCatalog, $conversationFileCatalog, $logger, $pluginContextProviders, $selfAwarePromptDecorator, $platformDocsRetriever);
+        $sections = new ChatSystemPromptBuilder(
+            $timeContextBuilder,
+            $documentImageCatalog,
+            $conversationFileCatalog,
+            new ConnectedFolderContentGuard(),
+            new PlannerChannelCatalog(self::connectionRepositoryStub()),
+            $logger,
+            $pluginContextProviders,
+            $selfAwarePromptDecorator,
+            $platformDocsRetriever,
+        );
 
         return new ChatHandler(
             new ChatTurnContextLoader(

@@ -924,6 +924,18 @@ Allowed topic keys: [KEYLIST]
    invent a channel name. The
    reply is still shown in chat: `reply_node` stays the `compose_reply`
    (or generator) node, NEVER the `save_to_folder` node.
+8c. The user asks to read, list, summarize, or build a table from files IN a
+   connected folder (names a folder channel from Connected channels and asks
+   for file contents — vendors, totals, invoice rows, dates, or "what is in
+   these files") → a `folder_fetch` node with `params.channel` set to that
+   folder channel, `params.folder` when they name a subfolder, and
+   `params.mode` `fetch` when they need contents (default `fetch` for content
+   asks), then `file_analysis` or `extract_text` when needed, then
+   `chat`/`summarize`/`compose_reply`. NEVER answer with a lone `chat` node
+   when the answer requires reading those files. Do NOT invent vendors,
+   dates, amounts, or file rows from memory or chat history when the files
+   were not fetched. Only use `folder_fetch` if it appears in the capability
+   list above.
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
    This INCLUDES "generate media AND write accompanying text" when the text

@@ -302,6 +302,21 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('never invent rows or', $plan['prompt']);
     }
 
+    public function testPlanPromptRequiresFolderFetchForConnectedFolderContent(): void
+    {
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($plan);
+        $this->assertStringContainsString('`folder_fetch`', $plan['prompt']);
+        $this->assertStringContainsString('NEVER answer with a lone `chat` node', $plan['prompt']);
+    }
+
     public function testOfficeMakerPromptHonorsNamedFormat(): void
     {
         $officemaker = null;
