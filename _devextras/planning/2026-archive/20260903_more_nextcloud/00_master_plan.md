@@ -1,7 +1,7 @@
 # More Nextcloud — link a platform user to an existing Synaplan account — master plan
 
 **Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
-Track 6 of [`../20260903_roadmap.md`](../2026-archive/20260903_roadmap/20260903_roadmap.md).
+Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md).
 Needs `BEXTERNALIDENTITIES` from track 1 S1; otherwise independent and
 small. Can be pulled forward when a hoster asks.
 Sprint files: [`01_sprint_1_core_handshake.md`](./01_sprint_1_core_handshake.md) ·
@@ -15,18 +15,18 @@ Sprint files: [`01_sprint_1_core_handshake.md`](./01_sprint_1_core_handshake.md)
 `synaplan-owncloud-online/` (parity), `synaplan-docs/` (docs).
 **Related:**
 
-- [`../2026-archive/20260709-hosting-partner-core-requirements/README.md`](../2026-archive/20260709-hosting-partner-core-requirements/README.md)
+- [`../20260709-hosting-partner-core-requirements/README.md`](../20260709-hosting-partner-core-requirements/README.md)
   §CORE-2 — admin key → provision + mint (shipped; stays as one mode)
 - `frontend/src/views/AddinConnectView.vue` + `/wwwroot/Synamail/docs/AUTH_FLOW.md`
   — the Outlook add-in connects an *existing* account (pattern reused)
 - `backend/src/Controller/DesktopController.php` — pairing codes (fallback
   pattern)
-- [`../20260902-collabora-integration/05_epic_4_partner_platforms.md`](../20260902-collabora-integration/05_epic_4_partner_platforms.md)
+- [`../../20260902-collabora-integration/05_epic_4_partner_platforms.md`](../../20260902-collabora-integration/05_epic_4_partner_platforms.md)
   — assumes the platform app already holds a Synaplan key; this track
   produces that key per user
-- [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) — binding
+- [`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md) — binding
   user-flow contract (J-NC-1…3). Wireframe:
-  [`../2026-archive/20260907_ux_user_flows/connect-platform.md`](../2026-archive/20260907_ux_user_flows/connect-platform.md).
+  [`../20260907_ux_user_flows/connect-platform.md`](../20260907_ux_user_flows/connect-platform.md).
   Synamail `docs/AUTH_FLOW.md` remains the Outlook acceptance list.
 
 ---
@@ -167,7 +167,7 @@ redirect policy; `/addin/connect` becomes a redirect to the generic route
 
 This handshake is already closer to a real flow than sharing was — keep
 it that way. Journeys J-NC-1…3:
-[`../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md`](../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md) §5.6.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.6.
 The user never types or sees a key. Empty Linked-platforms explains
 *where to start* (Nextcloud settings), not Synaplan jargon.
 

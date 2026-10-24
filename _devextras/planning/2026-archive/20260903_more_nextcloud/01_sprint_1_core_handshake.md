@@ -15,9 +15,9 @@ master plan decisions 2, 3, 4, 6, 8, 10, 13 and §11 rows 1, 2, 7.
 default off in code and seeder). Every `/api/v1/platform-links/*` and
 `/api/v1/me/platform-links*` route 404s when off. The `client=outlook` path of
 `PlatformConnectView` is **not** flag-gated: it is today's shipped behaviour.
-**User-flow:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
+**User-flow:** [`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md)
 J-NC-1 (confirm card) and J-NC-3 (disconnect either side). Wireframe:
-[`../2026-archive/20260907_ux_user_flows/connect-platform.md`](../2026-archive/20260907_ux_user_flows/connect-platform.md).
+[`../20260907_ux_user_flows/connect-platform.md`](../20260907_ux_user_flows/connect-platform.md).
 `NC4` / `NC5` walk those journeys; empty Linked platforms explains
 to start in Nextcloud. Outlook still follows `docs/AUTH_FLOW.md`.
 

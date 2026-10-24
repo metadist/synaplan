@@ -11,7 +11,7 @@ recorded as a dated STATUS entry. Journeys are walked on the cloud of the
 current phase (`00` row 42): Nextcloud in P1, OpenCloud in P2,
 ownCloud.online in P3. A journey is done for the plan when it is walked on all
 three clouds — at the latest at the P3 exit. J-NC-1…3 are defined in
-[`../20260903_more_nextcloud/00_master_plan.md`](../20260903_more_nextcloud/00_master_plan.md)
+[`../2026-archive/20260903_more_nextcloud/00_master_plan.md`](../2026-archive/20260903_more_nextcloud/00_master_plan.md)
 §5.
 
 ---
