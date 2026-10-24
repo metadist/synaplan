@@ -169,6 +169,7 @@ make lint                          # the house lint (backend format, frontend li
 # (grep_filter in ci.yml), and without it the run also picks up specs that
 # need an external installation (e.g. the castingdata plugin spec).
 (cd frontend && npm run test:e2e:ollama)       # when the chat-model / Ollama path changed
+(cd frontend && npm run test:e2e:busy)         # the two-pool busy profile (AU3)
 # Each in a subshell, so several can run in sequence from the repository root.
 # A new file or path also updates .github/mobile-impact-policy.json and
 # tests/mobile-impact.test.mjs in the same pull request (AGENTS.md, mobile seam).

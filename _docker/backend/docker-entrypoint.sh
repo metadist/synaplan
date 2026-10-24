@@ -47,6 +47,68 @@ esac
 # worker/scheduler share the same var/ directory and must not fight over it.
 # Every write is best-effort: a failure here must never break the boot.
 BOOT_STATUS_FILE="${BOOT_STATUS_FILE:-/var/www/backend/var/boot-status.json}"
+# Two worker pools exist only in the production snippet. Dev, and test
+# without FRANKENPHP_BUSY_PROFILE, keep the classic stub the base-image shim
+# already wrote. Nested Caddy defaults do not parse, so an unset stream pool
+# is exported from the api pool here, before Caddy reads the file. num_threads
+# and max_threads are inserted only when set: an empty value is a parse error.
+install_split_worker_pools() {
+    local global_target="/etc/caddy/synaplan-worker-mode.Caddyfile"
+    local global_template="/usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile"
+    local workers_target="/etc/caddy/synaplan-php-workers.caddy"
+    local workers_template="/usr/local/etc/php/templates/synaplan-php-workers.Caddyfile"
+    local busy="${FRANKENPHP_BUSY_PROFILE:-0}"
+
+    # The site always imports the workers file. Dev and ordinary test get an
+    # empty one, which leaves them in classic mode.
+    if [ "${APP_ENV:-prod}" != "prod" ] && [ "$busy" != "1" ]; then
+        : > "$workers_target"
+        return 0
+    fi
+
+    export FRANKENPHP_WORKER_NUM="${FRANKENPHP_WORKER_NUM:-16}"
+    if [ -z "${FRANKENPHP_STREAM_WORKER_NUM:-}" ]; then
+        export FRANKENPHP_STREAM_WORKER_NUM="$FRANKENPHP_WORKER_NUM"
+    fi
+    export FRANKENPHP_MAX_WAIT_TIME="${FRANKENPHP_MAX_WAIT_TIME:-15s}"
+
+    if [ -f "$global_template" ]; then
+        cp "$global_template" "$global_target"
+    fi
+    if [ -n "${FRANKENPHP_NUM_THREADS:-}" ]; then
+        insert_frankenphp_line "num_threads ${FRANKENPHP_NUM_THREADS}" "$global_target"
+    fi
+    if [ -n "${FRANKENPHP_MAX_THREADS:-}" ]; then
+        insert_frankenphp_line "max_threads ${FRANKENPHP_MAX_THREADS}" "$global_target"
+    fi
+    if [ ! -f "$workers_template" ]; then
+        echo "⚠️  PHP worker template missing (${workers_template}); the streams pool is not installed."
+        : > "$workers_target"
+        return 0
+    fi
+    cp "$workers_template" "$workers_target"
+    # The public listener proxies PHP to 127.0.0.1:9080 in this mode. Trust
+    # that hop so the client address stays the one Caddy accepted. A direct
+    # connection is not from 127.0.0.1, so a spoofed forwarding header is ignored.
+    case ",${SYMFONY_TRUSTED_PROXIES:-}," in
+        *,127.0.0.1,*) ;;
+        *) export SYMFONY_TRUSTED_PROXIES="${SYMFONY_TRUSTED_PROXIES:+${SYMFONY_TRUSTED_PROXIES},}127.0.0.1" ;;
+    esac
+    echo "🧵 Worker pools: streams=${FRANKENPHP_STREAM_WORKER_NUM} api=${FRANKENPHP_WORKER_NUM} max_wait=${FRANKENPHP_MAX_WAIT_TIME}"
+}
+
+insert_frankenphp_line() {
+    local line="$1"
+    local file="$2"
+    local tmp
+    tmp=$(mktemp)
+    awk -v line="$line" '
+        !done && $0 ~ /^frankenphp \{/ { print; print "\t" line; done = 1; next }
+        { print }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
 write_boot_status() {
     # $1 phase  $2 human-readable message (optional)
     [ "$SYNAPLAN_ROLE" = "web" ] || return 0
@@ -603,4 +665,5 @@ echo "   📚 Swagger: ${APP_URL}/api/doc"
 echo ""
 
 write_boot_status "web-starting" "Starting the web server"
+install_split_worker_pools
 exec frankenphp run --config /etc/caddy/Caddyfile

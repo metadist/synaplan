@@ -1,0 +1,18 @@
+# Imported inside the site php_server. Present only in production worker mode
+# and in the busy-server profile; dev and ordinary test import an empty file.
+# Both pools use the front controller. `match` sends the long routes to
+# `streams` (03 §5). Everything else stays on `api`.
+
+worker {
+	name streams
+	file "/var/www/backend/public/index.php"
+	num {$FRANKENPHP_STREAM_WORKER_NUM:16}
+	match /api/v1/messages/stream* /api/v1/widget/*/message /v1/chat/completions /v1/messages /v1/audio/transcriptions/sessions/*/stream /api/v1/tts/stream /mcp
+	env APP_RUNTIME App\Runtime\FrankenPhpRuntime
+}
+worker {
+	name api
+	file "/var/www/backend/public/index.php"
+	num {$FRANKENPHP_WORKER_NUM:16}
+	env APP_RUNTIME App\Runtime\FrankenPhpRuntime
+}

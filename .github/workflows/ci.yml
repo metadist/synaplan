@@ -1235,6 +1235,18 @@ jobs:
             npm_script: "test:e2e:ollama"
             grep_filter: "@ci"
             shard: ""
+          # AU3: the test image with the production worker snippet, one stream
+          # worker and a one-second wait. Own overlay so the other jobs stay
+          # in classic mode.
+          - browser: chromium
+            variant: "Busy"
+            auth_method: password
+            compose_profiles: ""
+            compose_overlay: "-f docker-compose.busy.yml"
+            playwright_project: "chromium-busy"
+            npm_script: ""
+            grep_filter: "@busy"
+            shard: ""
           # Intermezzo S4 — core stack, every optional module emptied.
           # Own overlay + project so the sharded chromium jobs keep today's
           # Tika / WhatsApp / Stripe configuration.

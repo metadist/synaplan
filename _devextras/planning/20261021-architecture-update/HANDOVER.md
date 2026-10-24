@@ -1,8 +1,10 @@
 # Handover — 2026-10-22
 
-> **Update 2026-10-23:** AU2 ([#2626](https://github.com/metadist/synaplan/pull/2626))
-> merged on 2026-10-22; AU5 is the next step in progress. The step log in
-> [`STATUS.md`](./STATUS.md) is current; this file is the 2026-10-22 snapshot.
+> **Update 2026-10-24:** AU2 ([#2626](https://github.com/metadist/synaplan/pull/2626))
+> merged on 2026-10-22. AU5 ([#2661](https://github.com/metadist/synaplan/pull/2661))
+> merged on 2026-10-23. AU3 is the step in progress. The step log in
+> [`STATUS.md`](./STATUS.md) is current; the sections below are the
+> 2026-10-22 snapshot.
 
 For the owner, so the track can continue from here. Step log:
 [`STATUS.md`](./STATUS.md). Plan: [`00_master_plan.md`](./00_master_plan.md).
@@ -71,14 +73,14 @@ are kept.
   one node.
 - **AU4.** Chat and the widget say the server is busy, retry, and put the
   text back in the composer. UX, all five locales.
-- **AU5.** A waiting stream gives its database connection back. Depends only
-  on AU1, so it is free.
+- **AU5.** Merged on 2026-10-23 ([#2661](https://github.com/metadist/synaplan/pull/2661)).
+  A waiting web-chat or widget stream gives its database connection back.
+  The gateways still release only when the response ends (AU10, AU12).
 - **AU6–AU8.** Watchdog, the capacity page, Kubernetes probes in
-  `synaplan-charts`.
+  `synaplan-charts`. AU6 waits on AU3.
 - **M1–M6** on production and `vultr-cluster` are still open. The numbers
   above are from the dev stack.
-- At most two unmerged step branches. After #2626 merges, AU3 or AU5 is the
-  next step.
+- At most two unmerged step branches. AU3 is the next step. AU4 waits on it.
 
 ## Second opinion
 
