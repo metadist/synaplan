@@ -28,7 +28,11 @@ use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\File\ConnectedFolderContentGuard;
+use App\Service\File\ConnectedFolderGuardCatalog;
+use App\Service\File\ConnectedFolderReadHonestyPrompt;
 use App\Service\File\UnreadSourceGuard;
+use App\Service\Multitask\Execution\InputFileText;
+use App\Service\PlatformLink\PickupService;
 use App\Repository\ConnectionRepository;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Infrastructure\DatabaseConnectionRelease;
@@ -79,7 +83,7 @@ final class ChatHandlerFactory
 {
     private static function connectionRepositoryStub(): ConnectionRepository
     {
-        $case = new class extends \PHPUnit\Framework\TestCase {
+        $case = new class('connectionRepositoryStub') extends \PHPUnit\Framework\TestCase {
             public function repo(): ConnectionRepository
             {
                 return $this->createMock(ConnectionRepository::class);
@@ -87,6 +91,36 @@ final class ChatHandlerFactory
         };
 
         return $case->repo();
+    }
+
+    private static function pickupServiceStub(): PickupService
+    {
+        $case = new class('pickupServiceStub') extends \PHPUnit\Framework\TestCase {
+            public function service(): PickupService
+            {
+                $pickups = $this->createMock(PickupService::class);
+                $pickups->method('readableLinks')->willReturn([]);
+
+                return $pickups;
+            }
+        };
+
+        return $case->service();
+    }
+
+    private static function inputFileTextStub(): InputFileText
+    {
+        $case = new class('inputFileTextStub') extends \PHPUnit\Framework\TestCase {
+            public function service(): InputFileText
+            {
+                $input = $this->createMock(InputFileText::class);
+                $input->method('of')->willReturn('');
+
+                return $input;
+            }
+        };
+
+        return $case->service();
     }
 
     /**
@@ -138,12 +172,19 @@ final class ChatHandlerFactory
         $fileWriter = new GeneratedFileWriter($documentGenerator, $documentImageReferenceResolver, $userUploadPathBuilder, $uploadDir, $em, $logger, $documentThumbnailDispatcher);
         $messages = new ChatMessageAssembler($vision, $history, $logger, $contextCondenser, $modelContextWindow);
         $documents = new ChatDocumentOutput($modelRepository, $em, $fileWriter, $logger, $generatedDocumentStore, $documentEditCoordinator, $unreadSourceGuard);
+        $folderHonesty = new ConnectedFolderReadHonestyPrompt(
+            new ConnectedFolderContentGuard(),
+            new ConnectedFolderGuardCatalog(
+                new PlannerChannelCatalog(self::connectionRepositoryStub()),
+                self::pickupServiceStub(),
+            ),
+            self::inputFileTextStub(),
+        );
         $sections = new ChatSystemPromptBuilder(
             $timeContextBuilder,
             $documentImageCatalog,
             $conversationFileCatalog,
-            new ConnectedFolderContentGuard(),
-            new PlannerChannelCatalog(self::connectionRepositoryStub()),
+            $folderHonesty,
             $logger,
             $pluginContextProviders,
             $selfAwarePromptDecorator,

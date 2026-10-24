@@ -10,7 +10,11 @@ use App\Repository\FileRepository;
 use App\Repository\ConnectionRepository;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\File\ConnectedFolderContentGuard;
+use App\Service\File\ConnectedFolderGuardCatalog;
+use App\Service\File\ConnectedFolderReadHonestyPrompt;
 use App\Service\File\ConversationFileCatalog;
+use App\Service\Multitask\Execution\InputFileText;
+use App\Service\PlatformLink\PickupService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\Prompt\ChatPromptBlocks;
 use App\Service\Prompt\ChatSystemPromptBuilder;
@@ -121,12 +125,22 @@ final class ChatPromptImageContextTest extends TestCase
 
     private function promptBuilder(DocumentImageCatalog $catalog): ChatSystemPromptBuilder
     {
+        $pickups = $this->createStub(PickupService::class);
+        $inputFileText = $this->createStub(InputFileText::class);
+        $honesty = new ConnectedFolderReadHonestyPrompt(
+            new ConnectedFolderContentGuard(),
+            new ConnectedFolderGuardCatalog(
+                new PlannerChannelCatalog($this->createStub(ConnectionRepository::class)),
+                $pickups,
+            ),
+            $inputFileText,
+        );
+
         return new ChatSystemPromptBuilder(
             new TimeContextBuilder(),
             $catalog,
             $this->createStub(ConversationFileCatalog::class),
-            new ConnectedFolderContentGuard(),
-            new PlannerChannelCatalog($this->createStub(ConnectionRepository::class)),
+            $honesty,
             new NullLogger(),
         );
     }
