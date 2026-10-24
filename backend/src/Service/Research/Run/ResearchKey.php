@@ -56,4 +56,9 @@ final class ResearchKey
     {
         return $id.'|'.$seq.'|'.$token;
     }
+
+    public static function reap(string $id, int $seq): string
+    {
+        return 'research:reap:'.$id.':'.$seq;
+    }
 }

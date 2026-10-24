@@ -151,6 +151,42 @@ final readonly class ResearchStateStore
         return $due;
     }
 
+    /**
+     * How many times this unit's lease was already lost. The reaper
+     * redispatches once, then stops the run.
+     */
+    public function noteLostClaim(string $runId, int $seq): int
+    {
+        ResearchIds::assert($runId);
+        if ($seq < 1) {
+            throw new \InvalidArgumentException('A research unit needs a sequence number.');
+        }
+        $raw = $this->keys->get(ResearchKey::reap($runId, $seq));
+        $seen = is_string($raw) && 1 === preg_match('/^[0-9]+$/', $raw) ? (int) $raw : 0;
+        $next = $seen + 1;
+        $this->keys->set(ResearchKey::reap($runId, $seq), (string) $next, $this->ttlSeconds());
+
+        return $next;
+    }
+
+    /**
+     * Runs that still have work left. A finished run is dropped from the index.
+     *
+     * @return list<ResearchRunState>
+     */
+    public function activeRuns(): array
+    {
+        $runs = [];
+        foreach ($this->liveMembers(ResearchKey::ACTIVE, false) as $runId) {
+            $state = $this->load($runId);
+            if (null !== $state && !$state->status->isTerminal()) {
+                $runs[] = $state;
+            }
+        }
+
+        return $runs;
+    }
+
     public function activeCount(int $userId, ?ResearchDepth $depth = null): int
     {
         $count = 0;
@@ -205,16 +241,26 @@ final readonly class ResearchStateStore
         return count($runIds);
     }
 
+    /**
+     * Drop the raw page texts and keep the report. Called only after the
+     * closing unit is checkpointed, so a crash before that still has the pages.
+     */
+    public function dropSourceTexts(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        foreach ($this->keys->members(ResearchKey::textIndex($runId)) as $sourceId) {
+            $this->keys->delete(ResearchKey::text($runId, $sourceId));
+        }
+        $this->keys->delete(ResearchKey::textIndex($runId));
+    }
+
     public function delete(string $runId): void
     {
         ResearchIds::assert($runId);
         $state = $this->load($runId);
         $this->keys->delete(ResearchKey::run($runId));
         $this->dropClaims($runId);
-        foreach ($this->keys->members(ResearchKey::textIndex($runId)) as $sourceId) {
-            $this->keys->delete(ResearchKey::text($runId, $sourceId));
-        }
-        $this->keys->delete(ResearchKey::textIndex($runId));
+        $this->dropSourceTexts($runId);
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
         if (null !== $state) {
