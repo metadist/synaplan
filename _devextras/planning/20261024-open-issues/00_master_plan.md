@@ -36,7 +36,7 @@ and are not re-planned here:
 | 1 | **Bugs before the feature.** [#2678](https://github.com/metadist/synaplan/issues/2678) and [#2679](https://github.com/metadist/synaplan/issues/2679) (bilogic) go first, then the other bugs, then [#2680](https://github.com/metadist/synaplan/issues/2680). | The request was to start with bilogic and fix the bugs first. |
 | 2 | **One sprint, one pull request, one concern.** A sprint that finds a second bug records it and stops. | Reviewable diffs. `feat` vs `fix` stays honest for the release bump. |
 | 3 | **The test fails on today's code, then the fix makes it pass.** A longer timeout is not a fix. | The issue comes back the week the wait is no longer long enough. |
-| 4 | **Branches are cut from current `main`, not stacked.** Each pull request targets `main`. The next sprint starts only after **All Checks Passed** is green and every Copilot thread has a reply. | [`AGENTS.md`](../AGENTS.md). Do not merge; the owner merges. |
+| 4 | **Code branches are cut from this plan branch, one parent at a time.** The pull request targets that parent. The parent merges first; then the child is retargeted onto `main`. The next sprint starts only after **All Checks Passed** is green on the current head and every Copilot thread has a reply. | The owner asked for the fixes on this branch. One topic per pull request still holds. Do not merge; the owner merges. |
 | 5 | **#2635, #2636 and #2638 stay on row 24.** This folder points at them. It does not open a second plan. | That track already has the decisions, the file list and the image-job shape. |
 | 6 | **Copy is written in the sprint file before the Vue file.** New strings ship in `en`, `de`, `es`, `fr`, `tr` in the same pull request. | A missing key falls back to English and fails locale parity. |
 | 7 | **#2680 does not delete rows by itself.** It marks a model the provider no longer offers, and it labels duplicates. Removal stays the admin's click, and that click is what sprint 02 makes possible. | Automatic deletion of a default embedding model rebuilds the search index. The issue asks to stop the one-by-one chore, not to drop models with no sentence. |
@@ -47,13 +47,13 @@ and are not re-planned here:
 
 ```
 main
- ├── docs/20261024-open-issues          this plan
- ├── fix/20261024-import-button         #2678
- ├── fix/20261024-delete-default-model  #2679
- ├── fix/20261024-owncloud-copy-label   #2671
- ├── fix/20261024-folder-read-honesty   #2667
- ├── fix/20261024-completion-incognito  #2617
- └── feat/20261024-model-housekeeping   #2680
+ └── docs/20261024-open-issues
+      └── fix/20261024-import-button              #2678
+           └── fix/20261024-delete-default-model  #2679
+                └── fix/20261024-owncloud-copy-label    #2671
+                     └── fix/20261024-folder-read-honesty    #2667
+                          └── fix/20261024-completion-incognito  #2617
+                               └── feat/20261024-model-housekeeping  #2680
 ```
 
 Sprint 06 is the only `feat`. Everything else that changes product code
@@ -76,7 +76,7 @@ request. Follow [`AGENTS.md`](../AGENTS.md).
    It is not the gate.
 5. Walk the journey when the sprint names one. Record it in `STATUS.md`.
 6. Commit. No AI attribution. No secrets.
-7. Push and open the pull request against `main`. The body contains
+7. Push and open the pull request against the parent branch. The body contains
    `Fixes #NNNN`, the test, and the journey.
 8. Request Copilot:
 
