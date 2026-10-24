@@ -25,6 +25,32 @@ and the product mapping that powers it. It is the human-readable companion to
   endpoint (HTTP 409 `IAP_OWNERSHIP_CONFLICT`). The UI explains where to manage the existing
   subscription.
 
+## Stripe payment methods — SEPA is off
+
+`STRIPE_PAYMENT_METHODS` (default `card,link,klarna`) is the allow-list forwarded to
+Stripe Checkout for subscriptions and top-ups. `sepa_debit` is **not** in it.
+
+A SEPA Direct Debit mandate is accepted by Stripe before any money moves. The first
+debit settles in 1–14 working days and can still be returned afterwards, yet
+`customer.subscription.created` fires immediately and `StripeWebhookController` sets the
+tier on that event — so the account is unlocked on an unverified IBAN. On 2026-10-24 that
+window was used to open several hundred BUSINESS/TEAM accounts within minutes with fake
+mandates. The response on the live cluster was: `sepa_debit` removed from the NFS `.env`,
+backend recreated node by node, the burst cohort's passwords replaced with random values,
+their login tokens deleted and their API keys removed.
+
+Before `sepa_debit` is re-added, the deployment needs:
+
+1. **Delayed unlock for asynchronous methods** — grant the tier on `invoice.paid`
+   (money actually settled), not on `customer.subscription.created`; until then treat
+   the subscription as `incomplete` with no paid entitlement.
+2. **Signup and checkout rate limits** per IP / ASN / mail domain, and an admin kill
+   switch per payment method that does not need a container roll.
+3. An alert when paid signups per minute leave the normal band.
+
+The test `SubscriptionControllerStripeOutboundTest` fails if `sepa_debit` reappears in
+the outbound Checkout call, so re-enabling it is an explicit, reviewed change.
+
 ## `source` field (migration-free)
 
 The owning channel lives in `BPAYMENTDETAILS.subscription.source` (`stripe` | `apple` | `google`).
