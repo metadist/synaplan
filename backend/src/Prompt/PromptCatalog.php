@@ -2405,10 +2405,11 @@ Today is [TODAY]. Time frame: [TIME_FRAME]. Must use: [MUST_USE]. Must avoid: [M
 <points>[POINTS]</points>
 <results>[RESULTS]</results>
 
-Return JSON only, one entry per result id:
-{point: id or null, kind: official | primary | academic | documentation | news
- | vendor | forum | other, fresh: true | false | null, read: true | false,
- reason: at most 12 words}
+Return JSON only, with one entry in results for every result above:
+{results: [{id: the result id (r1, r2, …), point: id or null,
+ kind: official | primary | academic | documentation | news | vendor | forum
+ | other, fresh: true | false | null, read: true | false,
+ reason: at most 12 words}]}
 
 Prefer official and primary sources, then academic and documentation, then
 reputable news. A vendor page is fine for that vendor's own prices and terms.

@@ -13,8 +13,10 @@ use App\Service\Research\Run\Ledger\CanonicalUrl;
 final class GatherChoice
 {
     /**
-     * The agreed shape is a list under `results`. A model that instead
-     * returns one verdict per hit id is the same decision and is kept.
+     * The agreed shape is a list under `results`. A model that ignores the
+     * schema and returns one verdict per hit id, at the root or under
+     * `results`, made the same decision and is kept. Ids that name no hit
+     * are dropped later by choose().
      *
      * @param array<array-key, mixed> $data
      *
@@ -22,24 +24,16 @@ final class GatherChoice
      */
     public static function verdicts(array $data): array
     {
-        $rows = [];
         $source = is_array($data['results'] ?? null) ? $data['results'] : $data;
-        if (array_is_list($source)) {
-            $rows = $source;
-        } else {
-            foreach ($source as $id => $row) {
-                if (!is_string($id) || !is_array($row) || !array_key_exists('read', $row)) {
-                    continue;
-                }
-                $row['id'] = $id;
-                $rows[] = $row;
-            }
-        }
 
         $verdicts = [];
-        foreach ($rows as $row) {
-            if (is_array($row) && is_string($row['id'] ?? null)) {
-                $verdicts[$row['id']] = $row;
+        foreach ($source as $key => $row) {
+            if (!is_array($row) || !array_key_exists('read', $row)) {
+                continue;
+            }
+            $id = is_string($key) ? $key : ($row['id'] ?? null);
+            if (is_string($id) && '' !== $id) {
+                $verdicts[$id] = ['id' => $id] + $row;
             }
         }
 

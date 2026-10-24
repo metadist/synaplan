@@ -42,7 +42,7 @@ chat message.
 
 ## 2026-10-24 — RS6 engine v1 smoke and fairness
 
-Local dev stack, Docker context `m4`. Research was pinned on with
+Local dev stack. Research was pinned on with
 `RESEARCH_ENABLED=1` in `backend/.env` for the measurement and removed
 afterwards. The database row stays `0`. `CHAT` and `SORT` were set to
 `BMODELS` 379 (Claude Sonnet 5.5, `anthropic:claude-sonnet-5-5`) and put
@@ -52,8 +52,11 @@ back to `-1` afterwards. Web search was the keyed Brave provider.
 `read_documents: false`.
 
 A standard run before the sorter fix (`rr_5ddfe637190fb426`) searched and
-finished `failed_nothing_found`. The sorter had returned one verdict per
-hit id, and the code only read a `results` list, so nothing was opened.
+finished `failed_nothing_found`. The `tools:research_triage` prompt asked
+for "one entry per result id" without naming the `results` list or the
+`id` field, so the sorter returned one verdict per hit id, the code only
+read a `results` list, and nothing was opened. The prompt now spells out
+the schema shape, and gather also reads a verdict map keyed by hit id.
 With that shape accepted, standard run `rr_124552ec9cecc1a8` in chat 389
 finished `complete` in about 72 seconds: 26 statements, 26 backed by a
 source, spent 0.135306 USD (estimate 1 USD). The report is the assistant

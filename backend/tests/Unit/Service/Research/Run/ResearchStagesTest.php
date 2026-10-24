@@ -196,6 +196,54 @@ final class ResearchStagesTest extends TestCase
         self::assertSame(['https://maker.example/price'], $urls);
     }
 
+    /**
+     * @param array<array-key, mixed> $data
+     * @param list<string>            $readable
+     */
+    #[DataProvider('verdictShapes')]
+    public function testEveryVerdictShapeYieldsTheSameReadableIds(array $data, array $readable): void
+    {
+        $verdicts = GatherChoice::verdicts($data);
+        $read = array_keys(array_filter($verdicts, static fn (array $row): bool => true === ($row['read'] ?? null)));
+
+        self::assertSame($readable, $read);
+        foreach ($verdicts as $id => $row) {
+            self::assertSame($id, $row['id']);
+        }
+    }
+
+    /**
+     * @return array<string, array{0: array<array-key, mixed>, 1: list<string>}>
+     */
+    public static function verdictShapes(): array
+    {
+        $no = ['kind' => 'forum', 'read' => false];
+        $yes = ['kind' => 'vendor', 'read' => true];
+
+        return [
+            'list under results' => [['results' => [['id' => 'r1'] + $no, ['id' => 'r2'] + $yes]], ['r2']],
+            'map at the root' => [['r1' => $no, 'r2' => $yes], ['r2']],
+            'map under results' => [['results' => ['r1' => $no, 'r2' => $yes]], ['r2']],
+            'map key wins over a stray id' => [['r2' => ['id' => 'r9'] + $yes], ['r2']],
+            'rows without a verdict are ignored' => [['results' => [['id' => 'r1'], 'r2', ['read' => true]], 'note' => 'x'], []],
+            'empty reply' => [[], []],
+        ];
+    }
+
+    public function testTheTriagePromptAsksForTheSchemaShape(): void
+    {
+        $prompt = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:research_triage' === $entry['topic']) {
+                $prompt = $entry['prompt'];
+            }
+        }
+
+        self::assertIsString($prompt);
+        self::assertSame(['results'], ResearchTriageSchema::schema()['required']);
+        self::assertStringContainsString('{results: [{id:', $prompt);
+    }
+
     public function testAnInventedPassageAndAForeignLeadNeverEnterTheReport(): void
     {
         [$ctx, $caller] = $this->open();
