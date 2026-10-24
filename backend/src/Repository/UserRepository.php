@@ -213,40 +213,53 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find the user linked to a Sign-in-with-Apple identity by its stable `sub`
-     * (stored in BUSERDETAILS.apple_sub). Apple's `sub` is the durable key even
-     * when the private-relay email changes, so it is the primary match for the
-     * Apple flow. Mirrors {@see findByStripeCustomerId()} — a wildcard-escaped
-     * LIKE over the JSON column, avoiding a schema migration.
-     */
-    /**
-     * Find the user linked to a GitHub account by its numeric id (stored in
-     * BUSERDETAILS.github_id, either as a JSON number or a string).
+     * Find the user linked to a GitHub account by its numeric id (stored as the
+     * top-level BUSERDETAILS.github_id, either a JSON number or a string).
      */
     public function findByGithubId(int|string $githubId): ?User
     {
-        $escaped = $this->escapeLike((string) $githubId);
-
-        return $this->createQueryBuilder('u')
-            ->where("u.userDetails LIKE :quoted ESCAPE '!'")
-            ->orWhere("u.userDetails LIKE :bareComma ESCAPE '!'")
-            ->orWhere("u.userDetails LIKE :bareBrace ESCAPE '!'")
-            ->setParameter('quoted', '%"github_id":"'.$escaped.'"%')
-            ->setParameter('bareComma', '%"github_id":'.$escaped.',%')
-            ->setParameter('bareBrace', '%"github_id":'.$escaped.'}%')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        return $this->findByTopLevelDetail('github_id', (string) $githubId);
     }
 
+    /**
+     * Find the user linked to a Sign-in-with-Apple identity by its stable `sub`
+     * (stored as the top-level BUSERDETAILS.apple_sub). Apple's `sub` is the
+     * durable key even when the private-relay email changes.
+     */
     public function findByAppleSub(string $appleSub): ?User
     {
-        return $this->createQueryBuilder('u')
-            ->where("u.userDetails LIKE :appleSub ESCAPE '!'")
-            ->setParameter('appleSub', '%"apple_sub":"'.$this->escapeLike($appleSub).'"%')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        return $this->findByTopLevelDetail('apple_sub', $appleSub);
+    }
+
+    /**
+     * Match a provider identity stored as one top-level BUSERDETAILS key.
+     *
+     * A text search over the JSON also matches the same text nested inside a
+     * profile field such as the company name. The signup gate would then treat
+     * a stranger as an existing account and skip the human check, while account
+     * creation — which reads only the top-level key — would still create a user.
+     */
+    private function findByTopLevelDetail(string $key, string $value): ?User
+    {
+        if ('' === $value) {
+            return null;
+        }
+
+        $sql = match ($key) {
+            'github_id' => "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.github_id')) = :value LIMIT 1",
+            'apple_sub' => "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.apple_sub')) = :value LIMIT 1",
+            default => null,
+        };
+        if (null === $sql) {
+            return null;
+        }
+
+        $id = $this->getEntityManager()->getConnection()->fetchOne($sql, ['value' => $value]);
+        if (!is_numeric($id)) {
+            return null;
+        }
+
+        return $this->find((int) $id);
     }
 
     /**

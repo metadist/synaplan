@@ -33,8 +33,8 @@ export interface SocialProvider {
 export function useSocialAuth() {
   const config = useConfigStore()
   const authStore = useAuthStore()
-  const { locale } = useI18n()
-  const { getToken: getChallengeToken } = useSignupChallenge()
+  const { locale, t } = useI18n()
+  const { getToken: getChallengeToken, isEnabled: challengeEnabled } = useSignupChallenge()
 
   const providers = ref<SocialProvider[]>([])
   /** Provider-flow error, cleared on the next attempt. Empty = no error. */
@@ -70,13 +70,23 @@ export function useSocialAuth() {
       error.value = ''
       busy.value = true
       try {
-        // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8);
-        // every other provider (and Apple on Android) uses the system-browser
-        // OAuth flow.
-        const result =
-          'apple' === provider && 'ios' === getNativePlatform()
-            ? await startNativeAppleSignIn()
-            : await startNativeOAuth(provider)
+        // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8).
+        // That request already carries an Apple-signed identity token, so it
+        // is the one path without a human-check token. Every other provider,
+        // including Apple on Android, solves the check here and passes the
+        // token on the system-browser start URL.
+        const appleSheet = 'apple' === provider && 'ios' === getNativePlatform()
+        let challenge = ''
+        if (!appleSheet) {
+          challenge = await getChallengeToken('signup')
+          if (challengeEnabled && '' === challenge) {
+            error.value = t('auth.signupBlocked.challengeFailed')
+            return false
+          }
+        }
+        const result = appleSheet
+          ? await startNativeAppleSignIn()
+          : await startNativeOAuth(provider, challenge)
         if (!result.success) {
           // A user-dismissed browser is a silent cancellation, not an error.
           if (!result.cancelled) {

@@ -433,13 +433,17 @@ rate-limiter cache, so they hold across a multi-node deployment.
 
 Turnstile wins over reCAPTCHA when both are configured and fails closed:
 Cloudflare unreachable means the sign-up is refused, not waved through. The
-browser also obtains a token before the redirect to Google/GitHub/Apple; the
-callback refuses a new account whose flow did not pass it. Adding
-`?native=true` to the browser start URL does not skip that check — the flag
-only chooses where the answer is sent. The iOS Sign in with Apple sheet is
-the one path without a browser challenge, because Apple has already signed
-the identity token; it still counts against the limits. One solved check
-authorises one OAuth state: the state's nonce is spent on first use.
+browser obtains a token before the redirect to Google, GitHub or Apple, and
+the native app does the same inside the app before it opens the system
+browser, then sends that token on the start URL. The callback refuses a new
+account whose flow did not pass it. Adding `?native=true` to the start URL
+does not skip that check — the flag only chooses where the answer is sent.
+An installed app that does not yet send the token cannot create a new social
+account while a human check is configured; signing in to an existing account
+still works. The iOS Sign in with Apple sheet is the one path without a
+browser challenge, because Apple has already signed the identity token; it
+still counts against the limits. One solved check authorises one OAuth
+state: the state's nonce is spent on first use.
 
 The alert mail (`[INCIDENT][Synaplan] Unusual account creation`) is sent once
 per hour per signal and always logged at `critical`, so a log-based pager works

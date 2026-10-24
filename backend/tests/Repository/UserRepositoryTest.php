@@ -133,4 +133,82 @@ class UserRepositoryTest extends KernelTestCase
         $this->assertIsArray($users);
         $this->assertLessThanOrEqual($limit, count($users));
     }
+
+    public function testFindByGithubIdReadsOnlyTheTopLevelKey(): void
+    {
+        $githubId = random_int(1_000_000_000, 1_900_000_000);
+        $nested = $this->persistUser('gh-nested-'.$githubId.'@example.com', [
+            'companyName' => ['github_id' => $githubId],
+        ]);
+        $quoted = $this->persistUser('gh-quoted-'.$githubId.'@example.com', [
+            'companyName' => '{"github_id":'.$githubId.'}',
+        ]);
+
+        $this->assertNull($this->repository->findByGithubId($githubId));
+
+        $linked = $this->persistUser('gh-linked-'.$githubId.'@example.com', [
+            'github_id' => $githubId,
+        ]);
+        $found = $this->repository->findByGithubId((string) $githubId);
+
+        $this->assertNotNull($found);
+        $this->assertSame($linked->getId(), $found->getId());
+        $this->assertNotSame($nested->getId(), $found->getId());
+        $this->assertNotSame($quoted->getId(), $found->getId());
+    }
+
+    public function testFindByGithubIdMatchesAnIdStoredAsAString(): void
+    {
+        $githubId = (string) random_int(1_000_000_000, 1_900_000_000);
+        $linked = $this->persistUser('gh-string-'.$githubId.'@example.com', [
+            'github_id' => $githubId,
+        ]);
+
+        $found = $this->repository->findByGithubId($githubId);
+
+        $this->assertNotNull($found);
+        $this->assertSame($linked->getId(), $found->getId());
+    }
+
+    public function testFindByAppleSubIgnoresANestedProfileValue(): void
+    {
+        $appleSub = 'apple-sub-'.bin2hex(random_bytes(8));
+        $this->persistUser('apple-nested-'.$appleSub.'@example.com', [
+            'companyName' => ['apple_sub' => $appleSub],
+        ]);
+
+        $this->assertNull($this->repository->findByAppleSub($appleSub));
+    }
+
+    public function testFindByAppleSubFindsTheTopLevelKey(): void
+    {
+        $appleSub = 'apple-sub-'.bin2hex(random_bytes(8));
+        $linked = $this->persistUser('apple-linked-'.$appleSub.'@example.com', [
+            'apple_sub' => $appleSub,
+        ]);
+
+        $found = $this->repository->findByAppleSub($appleSub);
+
+        $this->assertNotNull($found);
+        $this->assertSame($linked->getId(), $found->getId());
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     */
+    private function persistUser(string $mail, array $details): User
+    {
+        $user = (new User())
+            ->setMail($mail)
+            ->setType('WEB')
+            ->setProviderId('github')
+            ->setUserLevel('NEW');
+        $user->setCreated(date('Y-m-d H:i:s'));
+        $user->setEmailVerified(true);
+        $user->setUserDetails($details);
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $user;
+    }
 }
