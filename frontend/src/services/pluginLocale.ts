@@ -28,6 +28,23 @@ export function lookupPluginString(copy: PluginCopy, key: string): string | null
   return typeof current === 'string' ? current : null
 }
 
+/** Drops a plugin load that finished after a newer language or page took over. */
+export function createLoadGate() {
+  let generation = 0
+  return {
+    begin(): number {
+      generation += 1
+      return generation
+    },
+    cancel(): void {
+      generation += 1
+    },
+    isCurrent(token: number): boolean {
+      return token === generation
+    },
+  }
+}
+
 export function pluginTranslator(local: PluginCopy | null, english: PluginCopy | null) {
   return (key: string, params: Record<string, string | number> = {}) => {
     const template =
