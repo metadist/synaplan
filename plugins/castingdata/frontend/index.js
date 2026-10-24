@@ -171,7 +171,10 @@ export default {
       setLoading(testBtn, true)
       try {
         const result = await apiFetch('/test-connection', { method: 'POST' })
-        showStatus(result.message || (result.success ? 'Connection OK' : 'Connection failed'), result.success)
+        showStatus(
+          result.message || (result.success ? 'Connection OK' : 'Connection failed'),
+          result.success
+        )
       } catch (e) {
         showStatus('Connection test failed: ' + e.message, false)
       } finally {
@@ -180,5 +183,5 @@ export default {
     }
 
     loadConfig()
-  }
+  },
 }

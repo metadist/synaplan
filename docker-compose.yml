@@ -218,6 +218,7 @@ services:
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
+      - ./plugins:/plugins:ro
     # NO depends_on -- on purpose. The frontend must start IMMEDIATELY so the
     # boot-status onboarding page binds :5173 within seconds of `up -d`, even
     # while the backend image is still building on a fresh checkout. The only
