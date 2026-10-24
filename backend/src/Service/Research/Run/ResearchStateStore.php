@@ -287,6 +287,66 @@ final readonly class ResearchStateStore
         $this->keys->delete(ResearchKey::textIndex($runId));
     }
 
+    /**
+     * Remember a start key for 24 hours. Null when this caller stored it.
+     * The existing run id when a retry of the same key arrived first.
+     */
+    public function findIdempotency(int $userId, string $key): ?string
+    {
+        $existing = $this->keys->get(ResearchKey::idempotency($userId, $key));
+
+        return is_string($existing) && ResearchIds::isValid($existing) ? $existing : null;
+    }
+
+    public function claimIdempotency(int $userId, string $key, string $runId): ?string
+    {
+        $redisKey = ResearchKey::idempotency($userId, $key);
+        if ($this->keys->setIfAbsent($redisKey, $runId, 86_400)) {
+            return null;
+        }
+        $existing = $this->keys->get($redisKey);
+        if (!is_string($existing) || !ResearchIds::isValid($existing)) {
+            throw new ResearchStoreUnavailable();
+        }
+
+        return $existing;
+    }
+
+    public function wasDelivered(string $runId): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::delivered($runId));
+    }
+
+    public function markDelivered(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        $this->keys->set(ResearchKey::delivered($runId), '1', $this->ttlSeconds());
+    }
+
+    /**
+     * Every run this person still has. A finished run stays until its time
+     * runs out, so a later visit can still open it.
+     *
+     * @return list<ResearchRunState>
+     */
+    public function runsFor(int $userId): array
+    {
+        $runs = [];
+        foreach ($this->keys->members(ResearchKey::owner($userId)) as $runId) {
+            if (!ResearchIds::isValid($runId)) {
+                continue;
+            }
+            $state = $this->load($runId);
+            if (null !== $state && $state->ref->userId === $userId) {
+                $runs[] = $state;
+            }
+        }
+
+        return $runs;
+    }
+
     public function delete(string $runId): void
     {
         ResearchIds::assert($runId);
@@ -297,6 +357,10 @@ final readonly class ResearchStateStore
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
         $this->keys->delete(ResearchKey::stop($runId));
+        $this->keys->delete(ResearchKey::delivered($runId));
+        if (null !== $state && null !== $state->idempotencyKey) {
+            $this->keys->delete(ResearchKey::idempotency($state->ref->userId, $state->idempotencyKey));
+        }
         if (null !== $state) {
             for ($seq = 1; $seq <= $state->expectedSeq; ++$seq) {
                 $this->keys->delete(ResearchKey::reap($runId, $seq));

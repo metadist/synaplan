@@ -9,6 +9,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\Module\Channel\TelegramModule;
 use App\Module\Channel\WhatsappModule;
 use App\Module\Chat\ChatArtifactsModule;
+use App\Module\Chat\ResearchModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
@@ -37,6 +38,8 @@ use App\Service\FreeApi\FreeApiState;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
+use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Security\EncryptionService;
 
 /**
@@ -85,6 +88,7 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
+            new ResearchModule($this->disabledResearch(), $this->createStub(ResearchStateStore::class)),
             $this->disabledFreeApi(),
         ];
 
@@ -104,6 +108,11 @@ trait BuildsAllModules
             new FreeApiConfig($config, new FeatureFlagEnv([]), '', 'test', false, '', ''),
             new FreeApiState($config, $this->createStub(EncryptionService::class)),
         );
+    }
+
+    private function disabledResearch(): ResearchConfig
+    {
+        return new ResearchConfig($this->createStub(ConfigRepository::class), '');
     }
 
     private function disabledArtifacts(): ChatArtifactsConfig

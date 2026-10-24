@@ -53,6 +53,15 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return true;
     }
 
+    public function setIfAbsent(string $key, string $value, int $ttlSeconds): bool
+    {
+        if (null !== $this->get($key)) {
+            return false;
+        }
+
+        return $this->set($key, $value, $ttlSeconds);
+    }
+
     public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
     {
         $interleave = $this->beforeClaim;

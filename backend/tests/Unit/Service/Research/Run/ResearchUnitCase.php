@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Research\Run;
 
+use App\Repository\ConfigRepository;
 use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
+use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
 use App\Service\Research\Run\ResearchKey;
+use App\Service\Research\Run\ResearchReportPoster;
 use App\Service\Research\Run\ResearchRoles;
 use App\Service\Research\Run\ResearchRunRef;
 use App\Service\Research\Run\ResearchRunState;
@@ -37,6 +40,11 @@ abstract class ResearchUnitCase extends TestCase
     protected ResearchEventLog $events;
 
     protected RecordingResearchBus $bus;
+
+    protected function researchConfig(bool $on = true): ResearchConfig
+    {
+        return new ResearchConfig($this->createStub(ConfigRepository::class), $on ? '1' : '0');
+    }
 
     protected function setUp(): void
     {
@@ -154,5 +162,15 @@ final class RecordingMessageBus implements MessageBusInterface
         $this->stamp = $stamp instanceof DelayStamp ? $stamp : null;
 
         return new Envelope($message, $stamps);
+    }
+}
+
+final class SilentResearchReport implements ResearchReportPoster
+{
+    public int $calls = 0;
+
+    public function deliver(ResearchRunState $state): void
+    {
+        ++$this->calls;
     }
 }

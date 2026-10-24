@@ -6,8 +6,12 @@ namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Message\RunResearchUnit;
 use App\Service\Research\Run\MessengerResearchUnitBus;
+use App\Service\Research\Run\ResearchBudget;
+use App\Service\Research\Run\ResearchBudgetConfig;
+use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchKey;
 use App\Service\Research\Run\ResearchOutcome;
+use App\Service\Research\Run\ResearchRunRef;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchUnitWorker;
@@ -157,7 +161,16 @@ final class ResearchUnitsTest extends ResearchUnitCase
     {
         $state = $this->openRun();
         $units = new ScriptedResearchUnits(new StageResult('gather'));
-        $worker = new ResearchUnitWorker($this->store, $units, new UnavailableResearchContext(), $this->bus, $this->events);
+        $worker = new ResearchUnitWorker(
+            $this->store,
+            $units,
+            new UnavailableResearchContext(),
+            $this->bus,
+            $this->events,
+            $this->researchConfig(),
+            new SilentResearchReport(),
+            new \Psr\Log\NullLogger(),
+        );
 
         $worker->handle($state->ref->id, 'brief_plan', 1);
 
@@ -207,7 +220,53 @@ final class ResearchUnitsTest extends ResearchUnitCase
         self::assertGreaterThan($when, $sync);
     }
 
-    private function worker(ScriptedResearchUnits $units): ResearchUnitWorker
+    public function testARunStopsWhenResearchIsTurnedOff(): void
+    {
+        $state = $this->openRun();
+        $units = new ScriptedResearchUnits(new StageResult('deliver'));
+        $worker = new ResearchUnitWorker(
+            $this->store,
+            $units,
+            new FixedResearchContext($this->events, $this->clock->now()),
+            $this->bus,
+            $this->events,
+            $this->researchConfig(false),
+            new SilentResearchReport(),
+            new \Psr\Log\NullLogger(),
+        );
+
+        $worker->handle($state->ref->id, 'brief_plan', 1);
+
+        $loaded = $this->store->load($state->ref->id);
+        self::assertInstanceOf(ResearchRunState::class, $loaded);
+        self::assertSame(['write'], $units->units);
+        self::assertInstanceOf(ResearchOutcome::class, $loaded->outcome);
+        self::assertSame(ResearchOutcome::STOPPED_BY_ADMIN, $loaded->outcome->code);
+        self::assertSame([], $this->bus->sent);
+    }
+
+    public function testAFinishedWebRunPostsItsReport(): void
+    {
+        $created = $this->clock->now();
+        $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $created);
+        $budget->at($created);
+        $state = ResearchRunState::open(
+            ResearchRunRef::start(7, ResearchDepth::Quick, 'What does one unit cost?', 11, $created),
+            $budget,
+        );
+        $this->store->save($state);
+        $reports = new SilentResearchReport();
+        $units = new ScriptedResearchUnits(new StageResult('done'), static function (StageContext $ctx): void {
+            $ctx->state->ledger->setReport('The price is 12.');
+            $ctx->state->finish(ResearchStatus::Complete, new ResearchOutcome(ResearchOutcome::COMPLETE));
+        });
+
+        $this->worker($units, $reports)->handle($state->ref->id, 'deliver', 1);
+
+        self::assertSame(1, $reports->calls);
+    }
+
+    private function worker(ScriptedResearchUnits $units, ?SilentResearchReport $reports = null): ResearchUnitWorker
     {
         return new ResearchUnitWorker(
             $this->store,
@@ -215,6 +274,9 @@ final class ResearchUnitsTest extends ResearchUnitCase
             new FixedResearchContext($this->events, $this->clock->now()),
             $this->bus,
             $this->events,
+            $this->researchConfig(),
+            $reports ?? new SilentResearchReport(),
+            new \Psr\Log\NullLogger(),
         );
     }
 }

@@ -512,6 +512,28 @@
             "mobile_class": "backend-only"
         },
         {
+            "id": "research",
+            "label_key": "modules.research.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Research is turned off",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "RESEARCH_ENABLED"
+                ],
+                "bconfig": [
+                    "RESEARCH.ENABLED"
+                ],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/research",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "searxng",
             "label_key": "modules.searxng.label",
             "state": "absent",

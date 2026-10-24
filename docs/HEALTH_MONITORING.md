@@ -87,6 +87,13 @@ One-time per environment. Galera replication propagates across the cluster.
 - **Interval:** 5 min
 - **Alert threshold:** 2 consecutive failures
 
+## Research
+
+Research does not add a row to this probe. The system status page shows how
+many research runs are in progress when the switch is on. A run that stops
+answering is recovered by `app:research:reap` on the scheduler tick. See
+`docs/RESEARCH.md`.
+
 ## Smoke test
 
 ```bash

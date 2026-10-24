@@ -473,6 +473,13 @@ Search call. `SystemConfigSchemaCharacterizationTest` pins the schema and
 the values, `SystemConfigTabOrderTest` the tab order and that every field
 sits in exactly one section.
 
+## Research runs
+
+A research run is stored in Redis, not in a table. `ResearchModule` is off
+until `RESEARCH_ENABLED` or `RESEARCH.ENABLED` is on. The start route queues
+one step; `ResearchUnitWorker` runs that step and queues the next. A web
+run's last step writes the report into the chat. See `docs/RESEARCH.md`.
+
 ## Where new code goes
 
 - A controller method validates and delegates. Business logic lives in a

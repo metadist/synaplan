@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Service\Research\Run;
 
 use App\Service\Research\Run\Stage\StageResult;
+use Psr\Log\LoggerInterface;
 
 /**
  * Claims one research step, runs it, and queues the next.
  *
  * A second delivery of the same step finds the claim taken and returns
- * before any paid call. The first step is queued by the start endpoint,
- * which is a later piece; this worker only continues a run that exists.
+ * before any paid call. The start endpoint queues the first step.
  */
 final readonly class ResearchUnitWorker
 {
@@ -27,6 +27,9 @@ final readonly class ResearchUnitWorker
         private ResearchStageContextFactory $contexts,
         private ResearchUnitBus $bus,
         private ResearchEventLog $events,
+        private ResearchConfig $config,
+        private ResearchReportPoster $reports,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -93,6 +96,9 @@ final readonly class ResearchUnitWorker
         if ($this->store->stopRequested($state->ref->id)) {
             return $this->stop($state);
         }
+        if (!$this->config->isEnabled()) {
+            return $this->stoppedByAdmin($state);
+        }
         try {
             $context = $this->contexts->open($state);
         } catch (RoleUnavailable $missing) {
@@ -107,6 +113,7 @@ final readonly class ResearchUnitWorker
         if (ResearchUnitPlan::DELIVER === $unit && null !== $state->ledger->report()) {
             $this->store->dropSourceTexts($state->ref->id);
         }
+        $this->deliverReport($state);
         if ($state->status->isTerminal()) {
             return;
         }
@@ -115,6 +122,40 @@ final readonly class ResearchUnitWorker
             return;
         }
         $this->bus->dispatch($state->ref->id, $next, $state->expectedSeq, self::GAP_MS);
+    }
+
+    private function stoppedByAdmin(ResearchRunState $state): StageResult
+    {
+        if (null === $state->ledger->report()) {
+            try {
+                $this->units->run($this->contexts->open($state), ResearchUnitPlan::WRITE);
+            } catch (RoleUnavailable) {
+                // What was already found is the report. The missing model is not a second failure.
+            }
+        }
+        if ($state->status->isTerminal()) {
+            return new StageResult('done');
+        }
+        $outcome = new ResearchOutcome(ResearchOutcome::STOPPED_BY_ADMIN);
+        $state->finish(ResearchStatus::Stopped, $outcome);
+        $this->record($state, 'stopped', $outcome);
+
+        return new StageResult('done');
+    }
+
+    private function deliverReport(ResearchRunState $state): void
+    {
+        if (!$state->status->isTerminal() || null === $state->ref->chatId) {
+            return;
+        }
+        try {
+            $this->reports->deliver($state);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Research report was not posted to the chat', [
+                'run_id' => $state->ref->id,
+                'exception' => $e,
+            ]);
+        }
     }
 
     private function stop(ResearchRunState $state): StageResult

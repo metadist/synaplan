@@ -1,0 +1,66 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\Research\Run;
+
+/** The run as a client reads it. The retry key stays on the server. */
+final class ResearchRunView
+{
+    /**
+     * @param list<array{seq: int, event: string, data: array<string, mixed>}> $events
+     *
+     * @return array{id: string, status: string, events: list<array{seq: int, event: string, data: array<string, mixed>}>, research_protocol: int}
+     */
+    public static function accepted(ResearchRunState $state, array $events): array
+    {
+        return [
+            'id' => $state->ref->id,
+            'status' => $state->status->value,
+            'events' => $events,
+            'research_protocol' => ResearchCapabilities::PROTOCOL,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function one(ResearchRunState $state, bool $stopRequested): array
+    {
+        $ledger = $state->ledger->toArray();
+        $budget = $state->budget->toArray();
+        $report = $state->ledger->report();
+
+        return [
+            'id' => $state->ref->id,
+            'research_protocol' => ResearchCapabilities::PROTOCOL,
+            'status' => $state->status->value,
+            'depth' => $state->ref->depth->value,
+            'question' => $state->ref->question,
+            'parent' => $state->parent,
+            'stop_requested' => $stopRequested,
+            'brief' => $ledger['brief'],
+            'plan' => $ledger['plan'],
+            'sources' => $ledger['sources'],
+            'evidence' => $ledger['evidence'],
+            'report' => null === $report ? null : ['markdown' => $report, 'version' => 1],
+            'check' => null,
+            'outcome' => $state->outcome?->toArray(),
+            'models' => $ledger['models'],
+            'budget' => [
+                'searches' => $budget['searches'],
+                'sources_read' => $budget['sources_read'],
+                'rounds' => $budget['rounds'],
+                'seconds' => $budget['seconds'],
+            ],
+            'cost' => [
+                'estimate' => $budget['cost']['estimate'],
+                'spent' => $budget['cost']['spent'],
+                'currency' => 'USD',
+            ],
+            'created_at' => $state->ref->createdAt->format(\DateTimeInterface::ATOM),
+            'updated_at' => ($state->updatedAt ?? $state->ref->createdAt)->format(\DateTimeInterface::ATOM),
+            'expires_at' => $state->expiresAt?->format(\DateTimeInterface::ATOM),
+        ];
+    }
+}
