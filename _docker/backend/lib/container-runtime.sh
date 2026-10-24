@@ -838,13 +838,12 @@ run_scheduler_role() {
     runtime_log "Scheduler stopped."
 }
 
-# The web role starts the capacity watchdog beside FrankenPHP and restarts it
-# when it exits. SYNAPLAN_WATCHDOG=0 leaves it off. A missing binary (an image
-# from before this process was built) does not stop the web server.
+# Every role starts the capacity watchdog beside its main process and restarts
+# it when it exits: the web role reports its PHP pools, a worker or the
+# scheduler reports its place, memory and processor. SYNAPLAN_WATCHDOG=0
+# leaves it off. A missing binary (an image from before this process was
+# built) does not stop the role.
 start_watchdog() {
-    if [ "${SYNAPLAN_ROLE:-web}" != "web" ]; then
-        return 0
-    fi
     case "${SYNAPLAN_WATCHDOG:-1}" in
         0|false|no|off)
             runtime_log "Watchdog is off."
@@ -854,7 +853,7 @@ start_watchdog() {
 
     local bin="${SYNAPLAN_WATCHDOG_BIN:-/usr/local/bin/synaplan-watchdog}"
     if [ ! -x "$bin" ]; then
-        runtime_log "Watchdog binary is not in this image; the web server starts without it."
+        runtime_log "Watchdog binary is not in this image; this role starts without it."
         return 0
     fi
 

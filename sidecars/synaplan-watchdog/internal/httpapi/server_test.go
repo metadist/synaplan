@@ -95,6 +95,33 @@ func TestLiveAndMetrics(t *testing.T) {
 	_ = capacity.Version
 }
 
+func TestWorkerRoleIsReadyOnRedisAloneAndServesMetrics(t *testing.T) {
+	memory := store.NewMemory()
+	ag := &agent.Agent{
+		ID:    "web1-worker",
+		Read:  func() host.Facts { return host.Facts{Runtime: "compose", Role: "worker"} },
+		Store: memory,
+	}
+	now := time.Now()
+	ag.Tick(context.Background(), now)
+	server := New(":8098", ag, memory)
+
+	code, body := server.readyNow(context.Background(), now)
+	if code != http.StatusOK || body != "ok\n" {
+		t.Fatalf("worker ready = %d %s", code, body)
+	}
+	memory.SetPing(errors.New("down"))
+	if code, _ := server.readyNow(context.Background(), now); code != http.StatusServiceUnavailable {
+		t.Fatalf("worker without redis = %d", code)
+	}
+
+	rec := httptest.NewRecorder()
+	server.metrics(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `role="worker"`) {
+		t.Fatalf("worker metrics = %d\n%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestMetricsIs503WithoutAFrankenPHPSample(t *testing.T) {
 	memory := store.NewMemory()
 	ag := &agent.Agent{

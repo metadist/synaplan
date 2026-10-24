@@ -121,6 +121,11 @@ request 1 GiB · processor request 1 core, no limit*, and the log row reads
 single server the header drops "You are connected to", because there is only
 one card, and the log row reads *Logs: docker logs <hostname>*.
 
+Workers and the scheduler report the same snapshot with their `role`. The
+Servers tab lists them under the server they share (`place.host`, or the
+same `server_id` prefix) as one compact row each: role, memory, processor,
+last report, logs. They have no AI answer bars.
+
 Every word in those rows is a fact from the snapshot (`03` §6.1): the page
 composes the command from `logs.collector`, `place.*` and `hostname`; it
 does not guess. **[ Open recent events ]** opens the event ring
@@ -228,12 +233,13 @@ Three shapes, one snapshot (`03` §6.1):
 | Shape | `server_id` | `place.host` | Log row on the page |
 | ----- | ----------- | ------------ | ------------------- |
 | Single server (`deploy/compose.yaml`, Umbrel, CasaOS) | the container hostname, unless the operator sets `SYNAPLAN_SERVER_ID` | unset | `docker logs <hostname>` |
-| Several servers on compose (the platform's web1–web3) | `web1` … `web3`, exported by `updatewebN.sh` next to `SYNDBHOST` and passed through the compose file | `SYNAPLAN_HOST_NAME` (`synweb100` …), same source | `docker logs <hostname>` on `<host>` |
+| Several servers on compose (the platform's web1–web3) | `web1` … `web3`, exported by `updatewebN.sh` next to `SYNDBHOST` and passed through the compose file; the worker, bulk worker and scheduler on that node get `-worker`, `-bulk`, `-scheduler` | `SYNAPLAN_HOST_NAME` (`synweb100` …), same source | `docker logs <hostname>` on `<host>` |
 | Kubernetes (`synaplan-charts`) | the pod name, no setting needed | the node (Downward API) | `kubectl logs -n <namespace> <pod> -c <container>` |
 
-The platform compose change is a follow-up in `synaplan-platform` once AU6
-is released: two variables in the compose file, two exports in each
-`updatewebN.sh`. Until then the three cards carry container ids as names.
+The platform compose carries the two variables and the role suffixes
+(`synaplan-platform`, same day as AU6). The scripts export them next to
+`SYNDBHOST`, the per-node value that already tells a node which one it is;
+a `docker compose up` without the script falls back to container ids.
 
 ---
 

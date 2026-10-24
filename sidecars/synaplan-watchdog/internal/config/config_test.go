@@ -19,6 +19,34 @@ func TestFromEnvFallsBackToRedisDSN(t *testing.T) {
 	if cfg.ServerID != "synaplan-backend-1" || cfg.Listen != ":8098" || cfg.PHPReadyURL != "http://127.0.0.1/api/health/ready" {
 		t.Fatalf("%+v", cfg)
 	}
+	if cfg.KeyPrefix != "synaplan:prod:" {
+		t.Fatalf("prefix without APP_ENV = %q", cfg.KeyPrefix)
+	}
+	dev := From(func(key string) string {
+		if key == "APP_ENV" {
+			return "dev"
+		}
+		return ""
+	})
+	if dev.KeyPrefix != "synaplan:dev:" {
+		t.Fatalf("prefix with APP_ENV=dev = %q", dev.KeyPrefix)
+	}
+}
+
+func TestOnlyTheWebRoleServesPHP(t *testing.T) {
+	web := From(func(string) string { return "" })
+	if web.Role != "web" || !web.ServesPHP() {
+		t.Fatalf("default role = %q serves=%v", web.Role, web.ServesPHP())
+	}
+	worker := From(func(key string) string {
+		if key == "SYNAPLAN_ROLE" {
+			return "worker"
+		}
+		return ""
+	})
+	if worker.Role != "worker" || worker.ServesPHP() {
+		t.Fatalf("worker role = %q serves=%v", worker.Role, worker.ServesPHP())
+	}
 }
 
 func TestServerIDDropsUnsafeCharacters(t *testing.T) {
