@@ -177,6 +177,8 @@ final class Control
         $announced = Synaplan::from($state)->json('PATCH', '/api/v1/platform-links/instances/self', [
             'delivery_url' => $state['inbound_url'],
             'app_capabilities' => self::CAPABILITIES,
+            'app_version' => 'fixture-1',
+            'server_id' => 'cloud-fixture',
         ]);
         $keys = self::refreshKeys($this->store);
 

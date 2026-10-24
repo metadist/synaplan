@@ -22,6 +22,14 @@ final readonly class PlatformInstanceService
     public const REGISTER_IP_LIMIT = 10;
     public const REGISTER_IP_WINDOW = 3600;
 
+    /**
+     * What this core offers the apps (02 §8.1). A name appears only once the
+     * step that builds it has landed.
+     *
+     * @var list<string>
+     */
+    public const CORE_CAPABILITIES = ['deliveries', 'pickups', 'read_scope'];
+
     /** Matches BEXTERNALIDENTITIES.BEXTERNALID (VARCHAR(191)). */
     public const EXTERNAL_ID_MAX_LENGTH = 191;
     /** Generous cap for the partner's CSRF nonce, which only round-trips. */
@@ -108,6 +116,8 @@ final readonly class PlatformInstanceService
      *     client: string,
      *     delivery_url: string,
      *     capabilities: list<string>,
+     *     app_capabilities: list<string>,
+     *     reachable: ?bool,
      *     notify_keys: list<array{publicKey: string, kid: string}>
      * }
      */
@@ -123,7 +133,9 @@ final readonly class PlatformInstanceService
             'host' => $instance->getHost(),
             'client' => $instance->getClient(),
             'delivery_url' => $instance->getDeliveryUrl() ?? '',
-            'capabilities' => ['deliveries', 'pickups', 'read_scope'],
+            'capabilities' => self::CORE_CAPABILITIES,
+            'app_capabilities' => $instance->getAppCapabilities(),
+            'reachable' => $instance->isReachable(),
             'notify_keys' => $this->notifyKeys->publicKeys(),
         ];
     }
@@ -145,12 +157,19 @@ final readonly class PlatformInstanceService
     }
 
     /**
-     * @return list<array{id: string, client: string, host: string, status: string, registeredBy: int, created: int, lastSeen: int}>
+     * @return list<array{id: string, client: string, host: string, status: string, registeredBy: int, created: int, lastSeen: int, deliveryUrl: string, deliveryHost: string, deliveryIp: ?string, reachable: ?bool, appVersion: string, appCapabilities: list<string>, approvedHosts: list<string>}>
      */
     public function listForAdmin(): array
     {
         $out = [];
         foreach ($this->instanceRepository->findAllOrdered() as $instance) {
+            $deliveryUrl = $instance->getDeliveryUrl() ?? '';
+            $deliveryHost = '' !== $deliveryUrl ? strtolower((string) parse_url($deliveryUrl, PHP_URL_HOST)) : '';
+            $deliveryIp = null;
+            if ('' !== $deliveryHost && false === filter_var($deliveryHost, \FILTER_VALIDATE_IP)) {
+                $resolved = gethostbyname($deliveryHost);
+                $deliveryIp = $resolved !== $deliveryHost ? $resolved : null;
+            }
             $out[] = [
                 'id' => $instance->getInstanceId(),
                 'client' => $instance->getClient(),
@@ -159,10 +178,78 @@ final readonly class PlatformInstanceService
                 'registeredBy' => $instance->getRegisteredBy(),
                 'created' => $instance->getCreated(),
                 'lastSeen' => $instance->getLastSeen(),
+                'deliveryUrl' => $deliveryUrl,
+                'deliveryHost' => $deliveryHost,
+                'deliveryIp' => $deliveryIp,
+                'reachable' => $instance->isReachable(),
+                'appVersion' => $instance->getAppVersion() ?? '',
+                'appCapabilities' => $instance->getAppCapabilities(),
+                'approvedHosts' => $instance->getApprovedHosts(),
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * Approve one private hostname for delivery (02 §6.2). The hostname is
+     * stored, not the address it resolves to today.
+     */
+    public function approveHost(string $instanceId, string $hostname, User $admin, string $ip): void
+    {
+        $instance = $this->requireInstance($instanceId);
+        $host = self::normalizeHostname($hostname);
+        $hosts = $instance->getApprovedHosts();
+        if (!in_array($host, $hosts, true)) {
+            $hosts[] = $host;
+            $instance->setApprovedHosts($hosts);
+            $this->instanceRepository->save($instance);
+        }
+        $this->auditLogWriter->record(
+            (int) $admin->getId(),
+            'platform_instance.host_approved',
+            'platform_instance',
+            $instanceId,
+            ['hostname' => $host],
+            $ip,
+        );
+    }
+
+    public function removeApprovedHost(string $instanceId, string $hostname, User $admin, string $ip): void
+    {
+        $instance = $this->requireInstance($instanceId);
+        $host = self::normalizeHostname($hostname);
+        $instance->setApprovedHosts(array_values(array_filter(
+            $instance->getApprovedHosts(),
+            static fn (string $approved): bool => $approved !== $host,
+        )));
+        $this->instanceRepository->save($instance);
+        $this->auditLogWriter->record(
+            (int) $admin->getId(),
+            'platform_instance.host_removed',
+            'platform_instance',
+            $instanceId,
+            ['hostname' => $host],
+            $ip,
+        );
+    }
+
+    private static function normalizeHostname(string $hostname): string
+    {
+        $host = strtolower(trim($hostname));
+        if (str_contains($host, '://')) {
+            $host = strtolower((string) parse_url($host, PHP_URL_HOST));
+        }
+        $host = trim($host, '[]');
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $host;
+        }
+        $host = (string) preg_replace('/:\d+$/', '', $host);
+        if (1 !== preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/', $host)) {
+            throw new PlatformLinkValidationException('That hostname cannot be approved.');
+        }
+
+        return $host;
     }
 
     public function approve(string $instanceId, User $admin, string $ip): void

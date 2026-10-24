@@ -60,8 +60,37 @@
             >
               <td class="px-6 py-4 text-sm font-medium txt-primary">
                 {{ clientLabel(instance.client) }}
+                <span v-if="instance.appVersion" class="block text-xs txt-secondary">
+                  {{ instance.appVersion }}
+                </span>
               </td>
-              <td class="px-6 py-4 text-sm txt-secondary">{{ instance.host }}</td>
+              <td class="px-6 py-4 text-sm txt-secondary">
+                {{ instance.host }}
+                <span
+                  v-if="instance.deliveryUrl"
+                  class="block text-xs"
+                  :class="reachClass(instance)"
+                >
+                  {{ reachLabel(instance) }}
+                </span>
+                <span
+                  v-for="hostName in instance.approvedHosts"
+                  :key="hostName"
+                  class="mt-1 mr-1 inline-flex items-center gap-1 rounded-full surface-card px-2 py-0.5 text-xs txt-primary"
+                >
+                  {{ hostName }}
+                  <button
+                    type="button"
+                    class="txt-secondary hover:txt-primary"
+                    :aria-label="$t('people.linkedPlatforms.removeHost', { host: hostName })"
+                    :title="$t('people.linkedPlatforms.removeHost', { host: hostName })"
+                    data-testid="btn-remove-host"
+                    @click="removeHost(instance.id, hostName)"
+                  >
+                    <XMarkIcon class="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              </td>
               <td class="px-6 py-4 text-sm txt-secondary">
                 {{ statusLabel(instance.status) }}
               </td>
@@ -75,6 +104,15 @@
                     @click="approve(instance.id)"
                   >
                     {{ $t('people.linkedPlatforms.approve') }}
+                  </button>
+                  <button
+                    v-if="canApproveHost(instance)"
+                    type="button"
+                    class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+                    data-testid="btn-approve-host"
+                    @click="approveHost(instance)"
+                  >
+                    {{ $t('people.linkedPlatforms.approveHost') }}
                   </button>
                   <button
                     v-if="instance.id !== 'outlook-builtin' && instance.status !== 'revoked'"
@@ -97,6 +135,7 @@
 
 <script setup lang="ts">
 import EmptyState from '@/components/common/EmptyState.vue'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
@@ -142,6 +181,56 @@ async function approve(id: string): Promise<void> {
     await load()
   } catch {
     showError(t('people.linkedPlatforms.approveError'))
+  }
+}
+
+function reachLabel(instance: AdminPlatformInstance): string {
+  if (instance.reachable === true) return t('people.linkedPlatforms.canReach')
+  if (instance.reachable === false) return t('people.linkedPlatforms.cannotReach')
+  return t('people.linkedPlatforms.reachNotChecked')
+}
+
+function reachClass(instance: AdminPlatformInstance): string {
+  if (instance.reachable === true) return 'text-green-600 dark:text-green-400'
+  if (instance.reachable === false) return 'text-red-600 dark:text-red-400'
+  return 'txt-secondary'
+}
+
+function canApproveHost(instance: AdminPlatformInstance): boolean {
+  return (
+    instance.status !== 'revoked' &&
+    !!instance.deliveryHost &&
+    !(instance.approvedHosts ?? []).includes(instance.deliveryHost)
+  )
+}
+
+async function approveHost(instance: AdminPlatformInstance): Promise<void> {
+  const hostName = instance.deliveryHost
+  if (!hostName) return
+  const confirmed = await dialog.confirm({
+    title: t('people.linkedPlatforms.approveHostTitle'),
+    message: t('people.linkedPlatforms.approveHostSentence', {
+      host: hostName,
+      address: instance.deliveryIp ?? hostName,
+    }),
+  })
+  if (!confirmed) return
+  try {
+    await platformLinksApi.approveHost(instance.id, hostName)
+    success(t('people.linkedPlatforms.hostApproved', { host: hostName }))
+    await load()
+  } catch {
+    showError(t('people.linkedPlatforms.hostError'))
+  }
+}
+
+async function removeHost(id: string, hostName: string): Promise<void> {
+  try {
+    await platformLinksApi.removeApprovedHost(id, hostName)
+    success(t('people.linkedPlatforms.hostRemoved', { host: hostName }))
+    await load()
+  } catch {
+    showError(t('people.linkedPlatforms.hostError'))
   }
 }
 
