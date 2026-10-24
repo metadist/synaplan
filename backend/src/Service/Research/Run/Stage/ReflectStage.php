@@ -60,6 +60,9 @@ final readonly class ReflectStage implements ResearchStage
         $this->applyPoints($ctx, $data);
         $ctx->state->budget->spend('rounds');
         $finish = $this->actions->finish($data);
+        if ('no_progress' === $finish && !$ctx->state->strategyHint) {
+            $finish = null;
+        }
         $decision = $this->rules->judge(
             $ctx->state->ledger,
             $ctx->state->budget,
@@ -69,12 +72,15 @@ final readonly class ReflectStage implements ResearchStage
             $progress,
             $ctx->state->strategyHint,
         );
+        if (LoopStop::CONTINUE === $decision->next
+            && !$this->queue($ctx, $this->actions->keep($data, $ctx->state->ledger, $ctx->state->budget, 0))) {
+            $decision = new LoopStop(LoopStop::WRITE, 'no_search', null, false);
+        }
         $this->roundEvent($ctx, $decision->next);
         if (LoopStop::CONTINUE !== $decision->next) {
             return $this->close($ctx, $decision);
         }
 
-        $this->queue($ctx, $this->actions->keep($data, $ctx->state->ledger, $ctx->state->budget, 0));
         $ctx->state->strategyHint = $early->hint && !$progress;
         if ($progress) {
             $ctx->state->strategyHint = false;
@@ -125,19 +131,22 @@ final readonly class ReflectStage implements ResearchStage
     /**
      * @param list<LoopAction> $actions
      */
-    private function queue(StageContext $ctx, array $actions): void
+    private function queue(StageContext $ctx, array $actions): bool
     {
+        $queued = false;
         foreach ($actions as $action) {
             if (LoopAction::SEARCH !== $action->type || null === $action->point || null === $action->query) {
                 continue;
             }
-            $ctx->state->ledger->planSearch(
+            $queued = $ctx->state->ledger->planSearch(
                 $action->point,
                 $action->query,
                 $action->language ?? 'en',
                 $action->scope ?? 'web',
-            );
+            ) || $queued;
         }
+
+        return $queued;
     }
 
     private function prompt(StageContext $ctx, bool $hint): string
@@ -173,7 +182,7 @@ final readonly class ReflectStage implements ResearchStage
             'LEDGER_SUMMARY' => $ledger->summaryForLead(4000),
             'QUERIES_RUN' => [] === $queries ? 'none' : implode("\n", $queries),
             'UNREAD_SOURCES' => [] === $unread ? 'none' : implode("\n", $unread),
-            'HINT' => $hint ? 'The last round found nothing new. Change strategy: other languages, other source kinds, broader or narrower queries.' : '',
+            'HINT' => $hint ? 'The last round found nothing new. Change strategy: other languages, other source kinds, broader or narrower queries. Set finish to null and queue at least one new search.' : '',
         ]);
     }
 

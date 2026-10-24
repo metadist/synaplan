@@ -11,6 +11,8 @@ namespace App\Service\Research\Run\Ledger;
  */
 final class EvidenceLedger
 {
+    private const MAX_POINT_QUERIES = 12;
+
     /** @var array<string, Source> */
     private array $sources = [];
 
@@ -139,15 +141,15 @@ final class EvidenceLedger
      * A search the lead asked for after the plan. The next round runs it
      * unless that exact search was already run.
      */
-    public function planSearch(string $pointId, string $query, string $language, string $scope): void
+    public function planSearch(string $pointId, string $query, string $language, string $scope): bool
     {
         $point = $this->points[$pointId] ?? null;
-        if (null === $point || count($point->queries) >= 12) {
-            return;
+        if (null === $point || count($point->queries) >= self::MAX_POINT_QUERIES) {
+            return false;
         }
         $text = PlainText::line($query, 200);
         if ('' === $text || !in_array($scope, ['web', 'both'], true)) {
-            return;
+            return false;
         }
         $queries = $point->queries;
         $queries[] = [
@@ -156,6 +158,8 @@ final class EvidenceLedger
             'scope' => $scope,
         ];
         $this->points[$pointId] = new PlanPoint($point->id, $point->title, $point->status, $point->why, $queries);
+
+        return true;
     }
 
     public function describeSource(string $id, ?string $sourceClass, ?string $published): void
@@ -479,7 +483,7 @@ final class EvidenceLedger
                     PlainText::line((string) ($point['title'] ?? ''), 300),
                     $status,
                     PlainText::line((string) ($point['why'] ?? ''), 300),
-                    $this->queriesOf(is_array($queries) ? $queries : []),
+                    $this->queriesOf(is_array($queries) ? $queries : [], self::MAX_POINT_QUERIES),
                 );
             }
         }
@@ -659,7 +663,7 @@ final class EvidenceLedger
      *
      * @return list<array{q: string, language: string, scope: string}>
      */
-    private function queriesOf(array $queries): array
+    private function queriesOf(array $queries, int $max = 4): array
     {
         $clean = [];
         foreach ($queries as $query) {
@@ -680,7 +684,7 @@ final class EvidenceLedger
                 'language' => '' === $language ? 'en' : $language,
                 'scope' => $scope,
             ];
-            if (4 === count($clean)) {
+            if ($max === count($clean)) {
                 break;
             }
         }
