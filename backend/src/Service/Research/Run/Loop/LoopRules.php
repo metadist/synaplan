@@ -14,6 +14,10 @@ use App\Service\Research\Run\ResearchOutcome;
  * is spent does not end the loop while sources can still be read, and the
  * other way round. Both spent, the round cap, the clock, the cost cap and
  * the call cap do.
+ *
+ * The cost cap here is this run's limit for its depth, so it ends as
+ * `stopped_limit`. `stopped_budget` says the person's monthly budget is used
+ * up and belongs to the monthly check only.
  */
 final readonly class LoopRules
 {
@@ -55,11 +59,10 @@ final readonly class LoopRules
 
     private function budget(EvidenceLedger $ledger, ResearchBudget $budget): ?LoopStop
     {
-        $used = $budget->toArray();
         if (0 === $budget->callsLeft()) {
             return $this->write('calls', ResearchOutcome::COMPLETE_PARTIAL, $ledger);
         }
-        if ($used['seconds'][0] >= $used['seconds'][1]) {
+        if (0 === $budget->secondsLeft()) {
             return $this->write('wall', ResearchOutcome::STOPPED_LIMIT, $ledger);
         }
         if (!$budget->canCall()) {
@@ -68,7 +71,7 @@ final readonly class LoopRules
         if (!$budget->canRound()) {
             return $this->write('rounds', ResearchOutcome::STOPPED_LIMIT, $ledger);
         }
-        if ($used['searches'][0] >= $used['searches'][1] && $used['sources_read'][0] >= $used['sources_read'][1]) {
+        if (!$budget->canSearch() && !$budget->canRead()) {
             return $this->write('gather', ResearchOutcome::STOPPED_LIMIT, $ledger);
         }
 

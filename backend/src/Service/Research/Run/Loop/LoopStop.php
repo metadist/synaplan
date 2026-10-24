@@ -26,7 +26,7 @@ final readonly class LoopStop
         public bool $hint,
     ) {
         if (!in_array($next, [self::CONTINUE, self::WRITE, self::HALT], true)) {
-            throw new \InvalidArgumentException('Unknown loop step.');
+            throw new \InvalidArgumentException(sprintf('Unknown loop step "%s".', $next));
         }
     }
 }
