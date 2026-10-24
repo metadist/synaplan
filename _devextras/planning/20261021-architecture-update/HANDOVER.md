@@ -3,7 +3,8 @@
 > **Update 2026-10-24:** AU2 ([#2626](https://github.com/metadist/synaplan/pull/2626))
 > merged on 2026-10-22. AU5 ([#2661](https://github.com/metadist/synaplan/pull/2661))
 > merged on 2026-10-23. AU3 ([#2687](https://github.com/metadist/synaplan/pull/2687))
-> merged on 2026-10-24; AU4 is the step in progress. The step log in
+> and AU4 ([#2696](https://github.com/metadist/synaplan/pull/2696)) merged on
+> 2026-10-24. AU6 is the step in progress. The step log in
 > [`STATUS.md`](./STATUS.md) is current; the sections below are the
 > 2026-10-22 snapshot.
 
