@@ -1,222 +1,20 @@
 // synaScriber plugin page in Synaplan: your meeting notes, and for
 // administrators the settings and the connection checks.
 
-const COPY = {
-  en: {
-    title: 'Meeting notes',
-    intro:
-      'Written notes of your Jitsi meetings: the ones you started and the ones from meetings you took part in. Every copy is also in Sources › Generated.',
-    mine: 'Your meeting notes',
-    empty: 'No meeting notes yet. Start them in a Jitsi meeting with the Meeting notes button.',
-    open: 'Open file',
-    state_saved: 'Saved',
-    state_nothing_to_save: 'Nobody spoke',
-    state_failed: 'Stopped with a problem',
-    state_running: 'Running',
-    state_stopping: 'Saving',
-    state_saving: 'Saving',
-    state_starting: 'Starting',
-    admin: 'Settings',
-    enabled: 'Show the Meeting notes button in Jitsi',
-    languages: 'Offered languages',
-    default_language: 'Default language',
-    default_folder: 'Default folder in Sources',
-    jitsi_url: 'Jitsi address (where the button runs)',
-    stt_url: 'Speech-to-text server',
-    prosody_url: 'Jitsi connection (Prosody)',
-    secret: 'Shared secret with Jitsi',
-    secret_set: 'set',
-    secret_missing: 'missing',
-    save: 'Save settings',
-    saved: 'Settings saved.',
-    checks: 'Status',
-    check_jitsi: 'Jitsi answers',
-    check_speech: 'Speech-to-text server answers',
-    transcriber_secret: 'Shared secret with the transcriber',
-    ok: 'OK',
-    not_ok: 'Not reachable',
-    error: 'Could not load the meeting notes. Reload the page.',
-    captions: 'Live captions in the meeting while notes are on',
-    from: 'started by {name}',
-    all_generated: 'Show in Sources › Generated',
-    share:
-      'Give every signed-in participant a copy in their Sources › Generated (off: only the person who started gets it)',
-  },
-  de: {
-    title: 'Mitschrift',
-    intro:
-      'Schriftliche Mitschriften Ihrer Jitsi-Besprechungen: die von Ihnen gestarteten und die aus Besprechungen, an denen Sie teilgenommen haben. Jede Kopie liegt auch in Quellen › Erzeugt.',
-    mine: 'Ihre Mitschriften',
-    empty:
-      'Noch keine Mitschriften. Starten Sie eine in einer Jitsi-Besprechung über die Schaltfläche Mitschrift.',
-    open: 'Datei öffnen',
-    state_saved: 'Gespeichert',
-    state_nothing_to_save: 'Niemand hat gesprochen',
-    state_failed: 'Mit Problem beendet',
-    state_running: 'Läuft',
-    state_stopping: 'Wird gespeichert',
-    state_saving: 'Wird gespeichert',
-    state_starting: 'Startet',
-    admin: 'Einstellungen',
-    enabled: 'Schaltfläche Mitschrift in Jitsi anzeigen',
-    languages: 'Angebotene Sprachen',
-    default_language: 'Standardsprache',
-    default_folder: 'Standardordner in Quellen',
-    jitsi_url: 'Adresse von Jitsi (wo die Schaltfläche läuft)',
-    stt_url: 'Spracherkennungs-Server',
-    prosody_url: 'Verbindung zu Jitsi (Prosody)',
-    secret: 'Gemeinsames Geheimnis mit Jitsi',
-    secret_set: 'gesetzt',
-    secret_missing: 'fehlt',
-    save: 'Einstellungen speichern',
-    saved: 'Einstellungen gespeichert.',
-    checks: 'Status',
-    check_jitsi: 'Jitsi antwortet',
-    check_speech: 'Spracherkennungs-Server antwortet',
-    transcriber_secret: 'Gemeinsames Geheimnis mit dem Transkriptionsdienst',
-    ok: 'OK',
-    not_ok: 'Nicht erreichbar',
-    error: 'Die Mitschriften konnten nicht geladen werden. Laden Sie die Seite neu.',
-    captions: 'Live-Untertitel in der Besprechung, solange die Mitschrift läuft',
-    from: 'gestartet von {name}',
-    all_generated: 'In Quellen › Erzeugt anzeigen',
-    share:
-      'Alle angemeldeten Teilnehmenden erhalten eine Kopie in Quellen › Erzeugt (aus: nur die Person, die gestartet hat)',
-  },
-  es: {
-    title: 'Notas de la reunión',
-    intro:
-      'Notas escritas de tus reuniones de Jitsi: las que iniciaste y las de reuniones en las que participaste. Cada copia también está en Fuentes › Generados.',
-    mine: 'Tus notas',
-    empty: 'Aún no hay notas. Inícialas en una reunión de Jitsi con el botón Notas de la reunión.',
-    open: 'Abrir archivo',
-    state_saved: 'Guardadas',
-    state_nothing_to_save: 'Nadie habló',
-    state_failed: 'Detenidas con un problema',
-    state_running: 'En curso',
-    state_stopping: 'Guardando',
-    state_saving: 'Guardando',
-    state_starting: 'Iniciando',
-    admin: 'Ajustes',
-    enabled: 'Mostrar el botón Notas de la reunión en Jitsi',
-    languages: 'Idiomas ofrecidos',
-    default_language: 'Idioma predeterminado',
-    default_folder: 'Carpeta predeterminada en Fuentes',
-    jitsi_url: 'Dirección de Jitsi (donde está el botón)',
-    stt_url: 'Servidor de voz a texto',
-    prosody_url: 'Conexión con Jitsi (Prosody)',
-    secret: 'Secreto compartido con Jitsi',
-    secret_set: 'definido',
-    secret_missing: 'falta',
-    save: 'Guardar ajustes',
-    saved: 'Ajustes guardados.',
-    checks: 'Estado',
-    check_jitsi: 'Jitsi responde',
-    check_speech: 'El servidor de voz a texto responde',
-    transcriber_secret: 'Secreto compartido con el servicio de transcripción',
-    ok: 'OK',
-    not_ok: 'No accesible',
-    error: 'No se pudieron cargar las notas. Recarga la página.',
-    captions: 'Subtítulos en directo en la reunión mientras se toman notas',
-    from: 'iniciadas por {name}',
-    all_generated: 'Mostrar en Fuentes › Generados',
-    share:
-      'Cada participante con sesión iniciada recibe una copia en Fuentes › Generados (desactivado: solo quien las inició)',
-  },
-  fr: {
-    title: 'Notes de réunion',
-    intro:
-      'Notes écrites de vos réunions Jitsi : celles que vous avez lancées et celles des réunions auxquelles vous avez participé. Chaque copie se trouve aussi dans Sources › Générés.',
-    mine: 'Vos notes de réunion',
-    empty:
-      'Pas encore de notes. Lancez-les dans une réunion Jitsi avec le bouton Notes de réunion.',
-    open: 'Ouvrir le fichier',
-    state_saved: 'Enregistrées',
-    state_nothing_to_save: "Personne n'a parlé",
-    state_failed: 'Arrêtées avec un problème',
-    state_running: 'En cours',
-    state_stopping: 'Enregistrement',
-    state_saving: 'Enregistrement',
-    state_starting: 'Démarrage',
-    admin: 'Réglages',
-    enabled: 'Afficher le bouton Notes de réunion dans Jitsi',
-    languages: 'Langues proposées',
-    default_language: 'Langue par défaut',
-    default_folder: 'Dossier par défaut dans Sources',
-    jitsi_url: 'Adresse de Jitsi (où se trouve le bouton)',
-    stt_url: 'Serveur de reconnaissance vocale',
-    prosody_url: 'Connexion à Jitsi (Prosody)',
-    secret: 'Secret partagé avec Jitsi',
-    secret_set: 'défini',
-    secret_missing: 'manquant',
-    save: 'Enregistrer les réglages',
-    saved: 'Réglages enregistrés.',
-    checks: 'État',
-    check_jitsi: 'Jitsi répond',
-    check_speech: 'Le serveur de reconnaissance vocale répond',
-    transcriber_secret: 'Secret partagé avec le service de transcription',
-    ok: 'OK',
-    not_ok: 'Injoignable',
-    error: 'Impossible de charger les notes. Rechargez la page.',
-    captions: 'Sous-titres en direct dans la réunion pendant la prise de notes',
-    from: 'lancées par {name}',
-    all_generated: 'Afficher dans Sources › Générés',
-    share:
-      'Chaque participant connecté reçoit une copie dans Sources › Générés (désactivé : seule la personne qui a lancé les notes)',
-  },
-  tr: {
-    title: 'Toplantı notları',
-    intro:
-      'Jitsi toplantılarınızın yazılı notları: başlattıklarınız ve katıldığınız toplantılardan gelenler. Her kopya ayrıca Kaynaklar › Üretilen bölümündedir.',
-    mine: 'Toplantı notlarınız',
-    empty: 'Henüz not yok. Bir Jitsi toplantısında Toplantı notları düğmesiyle başlatın.',
-    open: 'Dosyayı aç',
-    state_saved: 'Kaydedildi',
-    state_nothing_to_save: 'Kimse konuşmadı',
-    state_failed: 'Bir sorunla durdu',
-    state_running: 'Sürüyor',
-    state_stopping: 'Kaydediliyor',
-    state_saving: 'Kaydediliyor',
-    state_starting: 'Başlıyor',
-    admin: 'Ayarlar',
-    enabled: "Jitsi'de Toplantı notları düğmesini göster",
-    languages: 'Sunulan diller',
-    default_language: 'Varsayılan dil',
-    default_folder: "Kaynaklar'da varsayılan klasör",
-    jitsi_url: 'Jitsi adresi (düğmenin bulunduğu yer)',
-    stt_url: 'Konuşmadan metne sunucusu',
-    prosody_url: 'Jitsi bağlantısı (Prosody)',
-    secret: 'Jitsi ile ortak gizli anahtar',
-    secret_set: 'ayarlı',
-    secret_missing: 'eksik',
-    save: 'Ayarları kaydet',
-    saved: 'Ayarlar kaydedildi.',
-    checks: 'Durum',
-    check_jitsi: 'Jitsi yanıt veriyor',
-    check_speech: 'Konuşmadan metne sunucusu yanıt veriyor',
-    transcriber_secret: 'Transkripsiyon hizmeti ile ortak gizli anahtar',
-    ok: 'Tamam',
-    not_ok: 'Erişilemiyor',
-    error: 'Notlar yüklenemedi. Sayfayı yenileyin.',
-    captions: 'Notlar açıkken toplantıda canlı altyazı',
-    from: '{name} başlattı',
-    all_generated: 'Kaynaklar › Üretilen bölümünde göster',
-    share:
-      'Oturum açan her katılımcı Kaynaklar › Üretilen bölümünde bir kopya alır (kapalı: yalnızca başlatan kişi)',
-  },
+let translate = (key) => key
+let currentLocale = 'en'
+
+function lang() {
+  return currentLocale
+}
+
+function t(key, params = {}) {
+  return translate(key, params)
 }
 const LANGUAGES = { de: 'Deutsch', en: 'English', es: 'Español', fr: 'Français', tr: 'Türkçe' }
 const FIELD =
   'mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
 
-function lang() {
-  const code = (localStorage.getItem('language') || navigator.language || 'en').slice(0, 2)
-  return COPY[code] ? code : 'en'
-}
-function t(key, params = {}) {
-  const text = COPY[lang()][key] || COPY.en[key] || key
-  return text.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? '')
-}
 function h(tag, attrs = {}, children = []) {
   const node = document.createElement(tag)
   for (const [key, value] of Object.entries(attrs)) {
@@ -434,6 +232,9 @@ function adminCard(base, status, onSaved) {
 
 export default {
   async mount(el, ctx) {
+    currentLocale = String(ctx.locale || 'en').slice(0, 2)
+    translate = (key, params = {}) =>
+      typeof ctx.t === 'function' ? ctx.t('page.' + key, params) : key
     const base = ctx.apiBaseUrl || ''
     const root = h('div', { class: 'max-w-3xl mx-auto p-4 grid gap-4' }, [
       h('h1', { class: 'txt-primary text-xl font-semibold', text: t('title') }),
