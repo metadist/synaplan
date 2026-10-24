@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getToken = vi.fn(async () => 'challenge-token')
 let challengeEnabled = true
-const startNativeOAuth = vi.fn(async () => ({ success: true }))
+const startNativeOAuth = vi.fn()
 const startNativeAppleSignIn = vi.fn(async () => ({ success: true }))
 const handleOAuthCallback = vi.fn(async () => true)
 let native = true
