@@ -34,6 +34,7 @@ func main() {
 	ag := &agent.Agent{
 		ID:      cfg.ServerID,
 		Version: cfg.Version,
+		Prefix:  cfg.KeyPrefix,
 		Read:    func() host.Facts { return host.Read(cfg.HostRoot, os.Getenv) },
 		Store:   st,
 	}

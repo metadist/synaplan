@@ -9,9 +9,11 @@ import (
 
 // Config is everything the process reads at boot.
 type Config struct {
-	Listen      string
-	ServerID    string
-	Role        string
+	Listen   string
+	ServerID string
+	Role     string
+	// KeyPrefix is `synaplan:<APP_ENV>:`, the application's Redis namespace.
+	KeyPrefix   string
 	Version     string
 	RedisURL    string
 	AdminURL    string
@@ -31,6 +33,7 @@ func From(env func(string) string) Config {
 		Listen:      ":8098",
 		ServerID:    serverID(env),
 		Role:        first(env("SYNAPLAN_ROLE"), "web"),
+		KeyPrefix:   keyPrefix(env("APP_ENV")),
 		Version:     first(env("APP_VERSION"), "dev"),
 		RedisURL:    first(env("REDIS_URL"), env("REDIS_DSN")),
 		AdminURL:    first(env("WATCHDOG_ADMIN_URL"), "http://127.0.0.1:2019"),
@@ -50,6 +53,16 @@ func From(env func(string) string) Config {
 // no admin API and no readiness URL to probe.
 func (c Config) ServesPHP() bool {
 	return c.Role == "web"
+}
+
+// keyPrefix mirrors RedisService's `synaplan:<env>:`. An unset APP_ENV is
+// prod, which is what the image runs when nothing says otherwise.
+func keyPrefix(appEnv string) string {
+	appEnv = sanitize(appEnv)
+	if appEnv == "" {
+		appEnv = "prod"
+	}
+	return "synaplan:" + appEnv + ":"
 }
 
 func serverID(env func(string) string) string {

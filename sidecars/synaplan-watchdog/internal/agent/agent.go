@@ -29,10 +29,12 @@ type PHPProbe interface {
 type Agent struct {
 	ID      string
 	Version string
-	Admin   AdminAPI
-	Probe   PHPProbe
-	Read    func() host.Facts
-	Store   store.Store
+	// Prefix is the application's Redis key prefix (capacity.KeyPrefix).
+	Prefix string
+	Admin  AdminAPI
+	Probe  PHPProbe
+	Read   func() host.Facts
+	Store  store.Store
 
 	mu        sync.Mutex
 	prevCPU   cpuPoint
@@ -196,15 +198,16 @@ func (a *Agent) publish(ctx context.Context, now time.Time, snap capacity.Snapsh
 		log.Printf("watchdog: snapshot: %v", err)
 		return
 	}
-	if err := a.Store.Put(ctx, capacity.SnapshotKey(a.ID), body, capacity.SnapshotTTL); err != nil {
+	if err := a.Store.Put(ctx, capacity.SnapshotKey(a.Prefix, a.ID), body, capacity.SnapshotTTL); err != nil {
 		log.Printf("watchdog: snapshot store: %v", err)
 	}
-	if err := a.Store.PutField(ctx, capacity.SeenKey, a.ID, snap.UpdatedAt, capacity.SeenTTL); err != nil {
+	if err := a.Store.PutField(ctx, capacity.SeenHashKey(a.Prefix), a.ID, snap.UpdatedAt, capacity.SeenTTL); err != nil {
 		log.Printf("watchdog: seen store: %v", err)
 	}
 	minute := capacity.Minute(now)
 	agg := capacity.Aggregate{}
-	raw, err := a.Store.Get(ctx, capacity.AggregateKey(a.ID, minute))
+	aggKey := capacity.AggregateKey(a.Prefix, a.ID, minute)
+	raw, err := a.Store.Get(ctx, aggKey)
 	if err != nil {
 		log.Printf("watchdog: aggregate read: %v", err)
 		return
@@ -220,7 +223,7 @@ func (a *Agent) publish(ctx context.Context, now time.Time, snap capacity.Snapsh
 	if err != nil {
 		return
 	}
-	if err := a.Store.Put(ctx, capacity.AggregateKey(a.ID, minute), encoded, capacity.AggregateTTL); err != nil {
+	if err := a.Store.Put(ctx, aggKey, encoded, capacity.AggregateTTL); err != nil {
 		log.Printf("watchdog: aggregate store: %v", err)
 	}
 }

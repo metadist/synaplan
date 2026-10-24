@@ -44,6 +44,7 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	agent := &Agent{
 		ID:      "web1",
 		Version: "dev",
+		Prefix:  "synaplan:test:",
 		Admin:   fakeAdmin{metrics: string(metrics), threads: threads},
 		Probe:   fakeProbe{ok: true, latency: 20 * time.Millisecond},
 		Read: func() host.Facts {
@@ -88,23 +89,23 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 		t.Fatalf("cpu ratio = %v", second.CPUUsageRatio)
 	}
 
-	raw, err := memory.Get(context.Background(), capacity.SnapshotKey("web1"))
+	raw, err := memory.Get(context.Background(), capacity.SnapshotKey("synaplan:test:", "web1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(raw), "/api/v1/chats/42") {
 		t.Fatalf("snapshot kept a request path: %s", raw)
 	}
-	if memory.TTL(capacity.SnapshotKey("web1")) != capacity.SnapshotTTL {
-		t.Fatalf("snapshot ttl = %s", memory.TTL(capacity.SnapshotKey("web1")))
+	if memory.TTL(capacity.SnapshotKey("synaplan:test:", "web1")) != capacity.SnapshotTTL {
+		t.Fatalf("snapshot ttl = %s", memory.TTL(capacity.SnapshotKey("synaplan:test:", "web1")))
 	}
-	if seen := memory.Field(capacity.SeenKey, "web1"); seen != "2026-10-24T18:00:05Z" {
+	if seen := memory.Field(capacity.SeenHashKey("synaplan:test:"), "web1"); seen != "2026-10-24T18:00:05Z" {
 		t.Fatalf("seen = %q", seen)
 	}
-	if memory.HashTTL(capacity.SeenKey) != capacity.SeenTTL {
-		t.Fatalf("seen ttl = %s", memory.HashTTL(capacity.SeenKey))
+	if memory.HashTTL(capacity.SeenHashKey("synaplan:test:")) != capacity.SeenTTL {
+		t.Fatalf("seen ttl = %s", memory.HashTTL(capacity.SeenHashKey("synaplan:test:")))
 	}
-	aggRaw, err := memory.Get(context.Background(), capacity.AggregateKey("web1", "202610241800"))
+	aggRaw, err := memory.Get(context.Background(), capacity.AggregateKey("synaplan:test:", "web1", "202610241800"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,8 +116,8 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	if agg.Samples != 2 || agg.StreamsBusyMax != 3 {
 		t.Fatalf("aggregate = %+v", agg)
 	}
-	if memory.TTL(capacity.AggregateKey("web1", "202610241800")) != capacity.AggregateTTL {
-		t.Fatalf("aggregate ttl = %s", memory.TTL(capacity.AggregateKey("web1", "202610241800")))
+	if memory.TTL(capacity.AggregateKey("synaplan:test:", "web1", "202610241800")) != capacity.AggregateTTL {
+		t.Fatalf("aggregate ttl = %s", memory.TTL(capacity.AggregateKey("synaplan:test:", "web1", "202610241800")))
 	}
 }
 

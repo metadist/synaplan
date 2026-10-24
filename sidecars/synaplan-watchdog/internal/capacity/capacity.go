@@ -95,14 +95,29 @@ type Aggregate struct {
 	CPUUsageMax    float64 `json:"cpu_usage_max"`
 }
 
+// KeyPrefix is what the application's RedisService puts before every key:
+// `synaplan:<APP_ENV>:`. The watchdog writes under the same prefix so PHP
+// reads the snapshots, and so a dev and a test stack on one Redis stay apart.
+func KeyPrefix(appEnv string) string {
+	if appEnv == "" {
+		appEnv = "prod"
+	}
+	return "synaplan:" + appEnv + ":"
+}
+
 // SnapshotKey is the live report for one server.
-func SnapshotKey(serverID string) string {
-	return "capacity:server:" + serverID
+func SnapshotKey(prefix, serverID string) string {
+	return prefix + "capacity:server:" + serverID
 }
 
 // AggregateKey is one minute of peaks for one server.
-func AggregateKey(serverID, minute string) string {
-	return "capacity:agg:" + serverID + ":" + minute
+func AggregateKey(prefix, serverID, minute string) string {
+	return prefix + "capacity:agg:" + serverID + ":" + minute
+}
+
+// SeenHashKey is the seen-list under the prefix.
+func SeenHashKey(prefix string) string {
+	return prefix + SeenKey
 }
 
 // Minute is the UTC minute used in the aggregate key.

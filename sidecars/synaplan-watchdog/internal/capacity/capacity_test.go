@@ -25,11 +25,18 @@ func TestFoldPeakKeepsTheHighWaterMark(t *testing.T) {
 	}
 }
 
-func TestKeys(t *testing.T) {
-	if SnapshotKey("web1") != "capacity:server:web1" {
-		t.Fatal(SnapshotKey("web1"))
+func TestKeysCarryTheApplicationPrefix(t *testing.T) {
+	prefix := KeyPrefix("prod")
+	if prefix != "synaplan:prod:" || KeyPrefix("") != "synaplan:prod:" || KeyPrefix("dev") != "synaplan:dev:" {
+		t.Fatal(prefix)
 	}
-	if AggregateKey("web1", "202610241900") != "capacity:agg:web1:202610241900" {
-		t.Fatal(AggregateKey("web1", "202610241900"))
+	if SnapshotKey(prefix, "web1") != "synaplan:prod:capacity:server:web1" {
+		t.Fatal(SnapshotKey(prefix, "web1"))
+	}
+	if AggregateKey(prefix, "web1", "202610241900") != "synaplan:prod:capacity:agg:web1:202610241900" {
+		t.Fatal(AggregateKey(prefix, "web1", "202610241900"))
+	}
+	if SeenHashKey(prefix) != "synaplan:prod:capacity:seen" {
+		t.Fatal(SeenHashKey(prefix))
 	}
 }
