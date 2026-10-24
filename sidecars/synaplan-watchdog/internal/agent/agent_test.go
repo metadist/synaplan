@@ -114,6 +114,57 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	}
 }
 
+type failingAdmin struct{}
+
+func (failingAdmin) Metrics(context.Context) (string, error) {
+	return "", context.DeadlineExceeded
+}
+
+func (failingAdmin) Threads(context.Context) ([]byte, error) {
+	return nil, context.DeadlineExceeded
+}
+
+func TestFailedAdminScrapeDropsTheStaleBody(t *testing.T) {
+	good := fakeAdmin{metrics: "frankenphp_total_workers{worker=\"streams\"} 4\n", threads: []byte(`[]`)}
+	agent := &Agent{
+		ID:    "web1",
+		Admin: good,
+		Read:  func() host.Facts { return host.Facts{Runtime: "host"} },
+		Store: store.NewMemory(),
+	}
+	now := time.Now()
+	agent.Tick(context.Background(), now)
+	if view := agent.Current(); view.MetricsBody == "" || !view.Snapshot.AdminOK {
+		t.Fatalf("first scrape should be good: %+v", view)
+	}
+
+	agent.Admin = failingAdmin{}
+	snap := agent.Tick(context.Background(), now.Add(5*time.Second))
+	view := agent.Current()
+	if snap.AdminOK || view.MetricsBody != "" {
+		t.Fatalf("a failed scrape kept the old body: ok=%v body=%q", snap.AdminOK, view.MetricsBody)
+	}
+}
+
+func TestProbeIsStampedWhenItAnswers(t *testing.T) {
+	slowAdmin := fakeAdmin{metrics: "", threads: []byte(`[]`)}
+	agent := &Agent{
+		ID:    "web1",
+		Admin: slowAdmin,
+		Probe: fakeProbe{ok: true, latency: 1500 * time.Millisecond},
+		Read:  func() host.Facts { return host.Facts{Runtime: "host"} },
+		Store: store.NewMemory(),
+	}
+	now := time.Date(2026, 10, 24, 18, 0, 0, 0, time.UTC)
+	agent.Tick(context.Background(), now)
+	if !agent.PHPFresh(now.Add(11 * time.Second)) {
+		t.Fatal("an answer stamped at now+1.5s must still be fresh 11s after the tick began")
+	}
+	if agent.PHPFresh(now.Add(12 * time.Second)) {
+		t.Fatal("the window is ten seconds after the answer")
+	}
+}
+
 func TestSlowPHPProbeDoesNotCountAsReady(t *testing.T) {
 	agent := &Agent{
 		ID:    "web1",

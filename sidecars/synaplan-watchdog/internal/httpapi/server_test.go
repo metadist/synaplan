@@ -83,6 +83,9 @@ func TestLiveAndMetrics(t *testing.T) {
 	server.metrics(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	body, _ := io.ReadAll(rec.Body)
 	text := string(body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("metrics = %d", rec.Code)
+	}
 	if !strings.Contains(text, "frankenphp_total_workers") || !strings.Contains(text, "synaplan_server_info") {
 		t.Fatalf("metrics =\n%s", text)
 	}
@@ -91,6 +94,35 @@ func TestLiveAndMetrics(t *testing.T) {
 	}
 	_ = capacity.Version
 }
+
+func TestMetricsIs503WithoutAFrankenPHPSample(t *testing.T) {
+	memory := store.NewMemory()
+	ag := &agent.Agent{
+		ID:    "web1",
+		Read:  func() host.Facts { return host.Facts{Runtime: "host"} },
+		Admin: brokenAdmin{},
+		Store: memory,
+	}
+	server := New(":8098", ag, memory)
+
+	before := httptest.NewRecorder()
+	server.metrics(before, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if before.Code != http.StatusServiceUnavailable {
+		t.Fatalf("no sample yet, got %d", before.Code)
+	}
+
+	ag.Tick(context.Background(), time.Now())
+	after := httptest.NewRecorder()
+	server.metrics(after, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if after.Code != http.StatusServiceUnavailable {
+		t.Fatalf("failed admin scrape, got %d", after.Code)
+	}
+}
+
+type brokenAdmin struct{}
+
+func (brokenAdmin) Metrics(context.Context) (string, error) { return "", errors.New("refused") }
+func (brokenAdmin) Threads(context.Context) ([]byte, error) { return nil, errors.New("refused") }
 
 type readyProbe struct {
 	ok      bool

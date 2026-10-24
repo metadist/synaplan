@@ -73,8 +73,7 @@ func (s *Server) readyNow(ctx context.Context, now time.Time) (int, string) {
 	if view.Snapshot.Draining {
 		return http.StatusServiceUnavailable, "draining\n"
 	}
-	phpOK := !view.PHPReadyAt.IsZero() && now.Sub(view.PHPReadyAt) <= 10*time.Second && view.PHPLatency <= 2*time.Second
-	if !phpOK {
+	if !s.agent.PHPFresh(now) {
 		return http.StatusServiceUnavailable, "php\n"
 	}
 	if s.store == nil {
@@ -88,8 +87,16 @@ func (s *Server) readyNow(ctx context.Context, now time.Time) (int, string) {
 	return http.StatusOK, "ok\n"
 }
 
+// metrics answers 503 until a sample exists and while the last FrankenPHP
+// scrape failed, so a collector records the scrape as down instead of
+// taking zeroed pools for a measurement.
 func (s *Server) metrics(w http.ResponseWriter, _ *http.Request) {
 	view := s.agent.Current()
+	if !view.HasSample || !view.Snapshot.AdminOK {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("no sample from FrankenPHP\n"))
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	_, _ = w.Write([]byte(metrics.Render(view.MetricsBody, view.Snapshot)))
 }

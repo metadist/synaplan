@@ -73,6 +73,31 @@ func TestReadKubernetesAndProcRSS(t *testing.T) {
 	}
 }
 
+func TestCPUSetCapsTheCoreCount(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".dockerenv", "")
+	writeFile(t, root, "sys/devices/system/cpu/online", "0-31\n")
+	writeFile(t, root, "sys/fs/cgroup/cpuset.cpus.effective", "4-5\n")
+	writeFile(t, root, "sys/fs/cgroup/cpu.max", "max 100000\n")
+
+	facts := Read(root, func(string) string { return "" })
+	if facts.CPUCores != 2 || !facts.CPULimited {
+		t.Fatalf("cpu = %v limited %v, want 2 pinned cores", facts.CPUCores, facts.CPULimited)
+	}
+
+	writeFile(t, root, "sys/fs/cgroup/cpu.max", "100000 100000\n")
+	facts = Read(root, func(string) string { return "" })
+	if facts.CPUCores != 1 {
+		t.Fatalf("a quota below the cpuset wins: cpu = %v", facts.CPUCores)
+	}
+
+	writeFile(t, root, "sys/fs/cgroup/cpu.max", "800000 100000\n")
+	facts = Read(root, func(string) string { return "" })
+	if facts.CPUCores != 2 {
+		t.Fatalf("a quota above the cpuset does not raise it: cpu = %v", facts.CPUCores)
+	}
+}
+
 func TestDeploymentOf(t *testing.T) {
 	cases := map[string]string{
 		"synaplan-web-7d9f8b6c4-x2k9q": "synaplan-web",

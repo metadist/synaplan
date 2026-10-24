@@ -67,13 +67,21 @@ func readMemory(root string, facts *Facts) {
 	}
 }
 
+// readCPU takes the smallest of the quota, the cpuset and the online CPUs.
+// A container pinned to two CPUs on a 32-core host has two cores, whatever
+// cpu.max says, and its usage ratio is measured against those two.
 func readCPU(root string, facts *Facts) {
-	if cores, limited := readCPUMax(path(root, "/sys/fs/cgroup/cpu.max")); limited {
-		facts.CPUCores = cores
+	online := countCPUList(readTrim(path(root, "/sys/devices/system/cpu/online")))
+	cores := online
+	if pinned := countCPUList(readTrim(path(root, "/sys/fs/cgroup/cpuset.cpus.effective"))); pinned > 0 && (cores == 0 || pinned < cores) {
+		cores = pinned
 		facts.CPULimited = true
-	} else if online := readCPUOnline(path(root, "/sys/devices/system/cpu/online")); online > 0 {
-		facts.CPUCores = online
 	}
+	if quota, ok := readCPUMax(path(root, "/sys/fs/cgroup/cpu.max")); ok && (cores == 0 || quota < cores) {
+		cores = quota
+		facts.CPULimited = true
+	}
+	facts.CPUCores = cores
 	if usage, ok := readCPUUsage(path(root, "/sys/fs/cgroup/cpu.stat")); ok {
 		facts.CPUUsageUsec = usage
 		facts.CPUUsageKnown = true
@@ -189,8 +197,8 @@ func readCPUUsage(name string) (uint64, bool) {
 	return 0, false
 }
 
-func readCPUOnline(name string) float64 {
-	text := readTrim(name)
+// countCPUList counts a kernel CPU list such as "0-3,8".
+func countCPUList(text string) float64 {
 	if text == "" {
 		return 0
 	}

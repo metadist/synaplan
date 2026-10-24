@@ -59,6 +59,10 @@ type View struct {
 
 // Tick reads, stores, and remembers one sample. Redis errors are logged
 // and do not discard the sample.
+//
+// The PHP probe runs first, so its answer is stamped at now plus its own
+// latency: the admin calls that follow may each wait out a timeout, and a
+// readiness window must not be shortened by them.
 func (a *Agent) Tick(ctx context.Context, now time.Time) capacity.Snapshot {
 	snap := capacity.Snapshot{
 		ServerID:        a.ID,
@@ -66,6 +70,19 @@ func (a *Agent) Tick(ctx context.Context, now time.Time) capacity.Snapshot {
 		WatchdogVersion: capacity.Version,
 		UpdatedAt:       now.UTC().Format(time.RFC3339),
 		Runtime:         "host",
+	}
+	if a.Probe != nil {
+		ok, latency := a.Probe.Probe(ctx)
+		answeredAt := now.Add(latency)
+		a.mu.Lock()
+		if ok && latency <= probeBudget {
+			a.phpReady = answeredAt
+			a.phpLate = latency
+		}
+		readyAt := a.phpReady
+		readyLate := a.phpLate
+		a.mu.Unlock()
+		snap.PHPReady = phpFresh(readyAt, readyLate, answeredAt)
 	}
 	if a.Read != nil {
 		facts := a.Read()
@@ -95,37 +112,47 @@ func (a *Agent) Tick(ctx context.Context, now time.Time) capacity.Snapshot {
 		}
 	}
 	if a.Admin != nil {
-		if body, err := a.Admin.Metrics(ctx); err == nil {
+		body, err := a.Admin.Metrics(ctx)
+		if err == nil {
 			pools := admin.ParsePools(body)
 			snap.Streams = capacity.Pool{Total: pools["streams"].Total, Busy: pools["streams"].Busy}
 			snap.API = capacity.Pool{Total: pools["api"].Total, Busy: pools["api"].Busy}
 			snap.AdminOK = true
-			a.mu.Lock()
-			a.metrics = body
-			a.mu.Unlock()
+		} else {
+			// A stale body must not be served as a fresh scrape.
+			body = ""
 		}
+		a.mu.Lock()
+		a.metrics = body
+		a.mu.Unlock()
 		if raw, err := a.Admin.Threads(ctx); err == nil {
 			if summary, err := admin.SummarizeThreads(raw); err == nil {
 				snap.Threads = capacity.ThreadSummary{Count: summary.Count, Busy: summary.Busy}
 			}
 		}
 	}
-	if a.Probe != nil {
-		ok, latency := a.Probe.Probe(ctx)
-		a.mu.Lock()
-		if ok && latency <= 2*time.Second {
-			a.phpReady = now
-			a.phpLate = latency
-		}
-		readyAt := a.phpReady
-		readyLate := a.phpLate
-		a.mu.Unlock()
-		snap.PHPReady = !readyAt.IsZero() && now.Sub(readyAt) <= 10*time.Second && readyLate <= 2*time.Second
-	}
 
 	a.remember(snap)
 	a.publish(ctx, now, snap)
 	return snap
+}
+
+const (
+	probeBudget = 2 * time.Second
+	readyWindow = 10 * time.Second
+)
+
+// phpFresh is the readiness rule: PHP answered within the budget, and that
+// answer is not older than the window.
+func phpFresh(readyAt time.Time, latency time.Duration, at time.Time) bool {
+	return !readyAt.IsZero() && at.Sub(readyAt) <= readyWindow && latency <= probeBudget
+}
+
+// PHPFresh reports whether the last good probe still counts at the given time.
+func (a *Agent) PHPFresh(at time.Time) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return phpFresh(a.phpReady, a.phpLate, at)
 }
 
 func (a *Agent) cpuRatio(now time.Time, facts host.Facts) *float64 {
