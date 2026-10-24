@@ -157,16 +157,28 @@ final readonly class ResearchStateStore
      */
     public function noteLostClaim(string $runId, int $seq): int
     {
+        $next = $this->lostClaims($runId, $seq) + 1;
+        $this->keys->set(ResearchKey::reap($runId, $seq), (string) $next, $this->ttlSeconds());
+
+        return $next;
+    }
+
+    public function lostClaims(string $runId, int $seq): int
+    {
         ResearchIds::assert($runId);
         if ($seq < 1) {
             throw new \InvalidArgumentException('A research unit needs a sequence number.');
         }
         $raw = $this->keys->get(ResearchKey::reap($runId, $seq));
-        $seen = is_string($raw) && 1 === preg_match('/^[0-9]+$/', $raw) ? (int) $raw : 0;
-        $next = $seen + 1;
-        $this->keys->set(ResearchKey::reap($runId, $seq), (string) $next, $this->ttlSeconds());
 
-        return $next;
+        return is_string($raw) && 1 === preg_match('/^[0-9]+$/', $raw) ? (int) $raw : 0;
+    }
+
+    public function isClaimed(string $runId, int $seq): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::claim($runId, $seq));
     }
 
     /**

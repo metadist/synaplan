@@ -14,6 +14,7 @@ final readonly class ResearchReaper
 {
     public const ANSWER_WAIT_SECONDS = 600;
     public const PLAN_WAIT_SECONDS = 86400;
+    public const STALL_SECONDS = 600;
 
     public function __construct(
         private ResearchStateStore $store,
@@ -54,14 +55,15 @@ final readonly class ResearchReaper
             return;
         }
         $attempt = $this->store->noteLostClaim($claim['runId'], $claim['seq']);
-        $this->store->release($claim['runId'], $claim['seq'], $claim['token']);
         if ($attempt >= 2) {
             $this->interrupt($state);
+            $this->store->release($claim['runId'], $claim['seq'], $claim['token']);
             ++$counts['interrupted'];
 
             return;
         }
         $this->bus->dispatch($claim['runId'], ResearchUnitPlan::resume($state), $claim['seq'], 0);
+        $this->store->release($claim['runId'], $claim['seq'], $claim['token']);
         ++$counts['redispatched'];
     }
 
@@ -81,7 +83,29 @@ final readonly class ResearchReaper
         if (ResearchStatus::WaitingPlan === $state->status && $age >= self::PLAN_WAIT_SECONDS) {
             $this->stopWaiting($state);
             ++$counts['stopped'];
+
+            return;
         }
+        if ($this->isStalled($state, $age)) {
+            $this->bus->dispatch($state->ref->id, ResearchUnitPlan::resume($state), $state->expectedSeq, 0);
+            $this->store->noteLostClaim($state->ref->id, $state->expectedSeq);
+            ++$counts['redispatched'];
+        }
+    }
+
+    /**
+     * A step finished but its successor was never queued: nobody holds the
+     * claim and the run is not waiting. It is queued again once per step.
+     */
+    private function isStalled(ResearchRunState $state, int $age): bool
+    {
+        if (ResearchStatus::WaitingAnswer === $state->status || ResearchStatus::WaitingPlan === $state->status) {
+            return false;
+        }
+
+        return $age >= self::STALL_SECONDS
+            && !$this->store->isClaimed($state->ref->id, $state->expectedSeq)
+            && 0 === $this->store->lostClaims($state->ref->id, $state->expectedSeq);
     }
 
     private function continueAfterQuestion(ResearchRunState $state): void

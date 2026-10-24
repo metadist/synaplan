@@ -39,7 +39,7 @@ final readonly class ResearchUnitWorker
         if (null === $state || $state->status->isTerminal() || $state->expectedSeq !== $seq) {
             return;
         }
-        $token = $this->store->claim($runId, $seq, self::LEASE_MS);
+        $token = $this->store->claim($runId, $seq, self::leaseMs($state, $unit));
         if (null === $token) {
             return;
         }
@@ -48,6 +48,19 @@ final readonly class ResearchUnitWorker
             return;
         }
         $this->after($state, $unit, $result);
+    }
+
+    /**
+     * A round searches and reads until the wall clock is up, so its lease
+     * covers the time the run has left plus one slow call.
+     */
+    private static function leaseMs(ResearchRunState $state, string $unit): int
+    {
+        if (ResearchUnitPlan::ROUND !== $unit) {
+            return self::LEASE_MS;
+        }
+
+        return $state->budget->secondsLeft() * 1000 + self::LEASE_MS;
     }
 
     private function runClaimed(ResearchRunState $state, string $unit, string $token): StageResult
