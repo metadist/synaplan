@@ -589,7 +589,7 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.10.0@sha256:58f9a182705faf353d9bbeb7986b629e5335cc3e821d0a2ca3ebd00a8f3387cc
+    image: centrifugo/centrifugo:v6.10.1@sha256:dc233a5bc45392c3717d9c5254b5c89c67e1871335c3ce55538429b9bf25b88b
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
@@ -683,7 +683,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:5c6707fcf2e1a30cffe2ecb7e315584fc87747c389327e4bc711c4959aa1eecc
+    image: ollama/ollama:latest@sha256:4c5b27871a3239a717048f9b93057680a51b60c8119a7016aebb57f938e25e35
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

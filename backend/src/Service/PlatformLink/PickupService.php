@@ -30,6 +30,9 @@ final readonly class PickupService
     private const UPLOAD_PREFIX = 'pickup:upload:';
     private const TTL = 600;
     private const HOUR_LIMIT = 20;
+    /** Longer than the ticket and the run's wait together. */
+    private const SWEEP_AFTER = 1200;
+    private const UNCONFIRMED = 'unconfirmed';
     public const MAX_FILES = 50;
     public const MAX_BYTES = 209715200;
     public const MAX_FILE_BYTES = 104857600;
@@ -56,7 +59,7 @@ final readonly class PickupService
     public function open(int $ownerId, int $identityId, array $selector, string $mode): array
     {
         if (!$this->platformLinks->isEnabled($ownerId)) {
-            return $this->refused('unreachable', 'Synaplan is not linked to this cloud. Nothing was read.');
+            return $this->refused('not_linked', 'Synaplan is not linked to this cloud. Nothing was read.');
         }
         $identity = $this->identities->find($identityId);
         if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $ownerId || null === $identity->getId()) {
@@ -135,6 +138,7 @@ final readonly class PickupService
         $upload = [];
         $reuse = [];
         $skip = [];
+        $names = [];
         $namesOnly = CloudPickup::MODE_LIST === $pickup->getMode();
         foreach (array_slice($items, 0, 500) as $item) {
             if (!is_array($item) || !is_string($item['id'] ?? null)) {
@@ -147,6 +151,7 @@ final readonly class PickupService
             if (strlen($remoteId) > 255 || strlen($version) > 255) {
                 continue;
             }
+            $names[$remoteId] = $name;
             if (!$this->nameMatches($pickup, $name)) {
                 $skip[] = ['id' => $remoteId, 'reason' => 'type_not_read'];
                 continue;
@@ -176,10 +181,15 @@ final readonly class PickupService
             $pickup->addAccepted(1, $size);
         }
         $pickup->addListed(count($items));
+        $pickup->addSkipped(array_map(
+            static fn (array $row): array => ['id' => $row['id'], 'name' => $names[$row['id']] ?? '', 'reason' => $row['reason']],
+            $skip,
+        ));
         $this->pickups->save($pickup);
         $this->rememberUploads($id, $upload);
 
-        return ['upload' => array_keys($upload), 'reuse' => $reuse, 'skip' => $skip];
+        // Numeric remote ids (Nextcloud file ids) became integer keys above.
+        return ['upload' => array_map('strval', array_keys($upload)), 'reuse' => $reuse, 'skip' => $skip];
     }
 
     public function storeFile(PlatformInstance $instance, int $id, string $remoteId, string $version, string $bytes, string $name, string $mime): int
@@ -220,7 +230,7 @@ final readonly class PickupService
     public function result(PlatformInstance $instance, int $id, array $body): array
     {
         $pickup = $this->requireOwn($instance, $id);
-        if (in_array($pickup->getState(), [CloudPickup::STATE_DONE, CloudPickup::STATE_PARTIAL, CloudPickup::STATE_FAILED], true)) {
+        if ($this->isSettled($pickup)) {
             return ['state' => $pickup->getState()];
         }
         $status = is_string($body['status'] ?? null) ? $body['status'] : '';
@@ -233,17 +243,46 @@ final readonly class PickupService
         if (null === $state) {
             return ['state' => $pickup->getState()];
         }
-        $skipped = is_array($body['skipped'] ?? null) ? $body['skipped'] : [];
-        $pickup->finish(
+        $reported = is_array($body['skipped'] ?? null) ? array_values(array_filter($body['skipped'], 'is_array')) : [];
+        $skipped = self::withReported($pickup->skipped(), $reported);
+        $this->pickups->finishIfOpen(
+            $id,
             $state,
-            is_numeric($body['listed'] ?? null) ? (int) $body['listed'] : $pickup->getListed(),
-            is_numeric($body['sent'] ?? null) ? (int) $body['sent'] : $pickup->getSent(),
-            array_values(array_filter($skipped, 'is_array')),
             is_string($body['error_code'] ?? null) ? $body['error_code'] : null,
+            is_numeric($body['listed'] ?? null) ? (int) $body['listed'] : null,
+            is_numeric($body['sent'] ?? null) ? (int) $body['sent'] : null,
+            [] !== $skipped ? $skipped : null,
         );
-        $this->pickups->save($pickup);
+        $this->em->refresh($pickup);
 
         return ['state' => $pickup->getState()];
+    }
+
+    /**
+     * The rows Synaplan recorded while listing carry the names; the app may add
+     * files it could not send. One row per file id, the recorded one first.
+     *
+     * @param list<array<mixed>> $recorded
+     * @param list<array<mixed>> $reported
+     *
+     * @return list<array<mixed>>
+     */
+    private static function withReported(array $recorded, array $reported): array
+    {
+        $seen = [];
+        foreach ($recorded as $row) {
+            if (is_string($row['id'] ?? null)) {
+                $seen[$row['id']] = true;
+            }
+        }
+        foreach ($reported as $row) {
+            $rowId = is_string($row['id'] ?? null) ? $row['id'] : null;
+            if (null === $rowId || !isset($seen[$rowId])) {
+                $recorded[] = $row;
+            }
+        }
+
+        return $recorded;
     }
 
     /**
@@ -335,8 +374,10 @@ final readonly class PickupService
 
     /**
      * @param list<string> $usedChannels
+     *
+     * @return array{identity_id: int, channel: string, host: string, client: string, folders: list<string>}|null
      */
-    public function identityForChannel(int $ownerId, string $channel, array $usedChannels = []): ?int
+    public function linkForChannel(int $ownerId, string $channel, array $usedChannels = []): ?array
     {
         $needle = PlannerChannelCatalog::sanitize($channel);
         if ('' === $needle) {
@@ -344,11 +385,40 @@ final readonly class PickupService
         }
         foreach ($this->readableLinks($ownerId, $usedChannels) as $link) {
             if ($link['channel'] === $needle) {
-                return $link['identity_id'];
+                return $link;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The run stopped waiting. A pickup still open fails, and its ticket goes,
+     * so a late claim or upload is refused instead of landing in no run. False
+     * when a result landed first; the caller then reads that result.
+     */
+    public function giveUp(int $id): bool
+    {
+        if (!$this->pickups->finishIfOpen($id, CloudPickup::STATE_FAILED, self::UNCONFIRMED)) {
+            return false;
+        }
+        $this->redis->delete(self::TICKET_PREFIX.$id);
+
+        return true;
+    }
+
+    /**
+     * Fails pickups no run is waiting for any more (the runner crashed or the
+     * worker restarted), so every ledger row ends in a terminal state.
+     */
+    public function sweep(): int
+    {
+        return $this->pickups->failOpenOlderThan(time() - self::SWEEP_AFTER, self::UNCONFIRMED);
+    }
+
+    private function isSettled(CloudPickup $pickup): bool
+    {
+        return in_array($pickup->getState(), [CloudPickup::STATE_DONE, CloudPickup::STATE_PARTIAL, CloudPickup::STATE_FAILED], true);
     }
 
     /**
@@ -367,6 +437,7 @@ final readonly class PickupService
                 'type' => 'document',
                 'local_path' => $file->getFilePath(),
                 'name' => $file->getFileName(),
+                'file_id' => $id,
             ];
         }
 

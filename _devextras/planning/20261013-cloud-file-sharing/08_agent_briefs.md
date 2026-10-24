@@ -361,9 +361,9 @@ Wave contract: `00` §2 (D1–D3), `01` §4, `06` §2. Tests: `09` §1.
 | Repo · type | `synaplan` · `docs(planning)` |
 | Branch | `docs/cf0-6-planning-status` |
 | Depends on | — (the track is agreed: `00` §3 rows 1–36) |
-| Reads | `00` §12; `../20260903_more_nextcloud/STATUS.md`; `../20260925_roadmap.md` row 5 |
+| Reads | `00` §12; `../2026-archive/20260903_more_nextcloud/STATUS.md`; `../20260925_roadmap.md` row 5 |
 
-**Build** — More-Nextcloud STATUS: S2 merged, S3 absorbed here except the pairing-code fallback; roadmap row 5 and "Nextcloud S3" point to this folder.
+**Build** — done 2026-10-24 with the archive of More-Nextcloud. S2 is recorded as merged (`synaplan-nextcloud` #34). S3 is absorbed here. The pairing-code fallback (NC18, NC19) is named in that STATUS and is not scheduled. "Nextcloud S3" points at this folder.
 
 ### CF0.7 — First walks
 

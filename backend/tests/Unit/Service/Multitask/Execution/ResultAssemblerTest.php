@@ -168,6 +168,31 @@ final class ResultAssemblerTest extends TestCase
         $this->assertSame('audio', $n2['type']);
     }
 
+    public function testAFolderReadSummaryAndTheStepTraceReachTheCard(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'folder_fetch', 'params' => ['channel' => 'nextcloud', 'folder' => 'Docs']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $summary = ['outcome' => 'read', 'label' => 'Nextcloud', 'folder' => 'Docs', 'read' => 1, 'total' => 1, 'files' => ['a.pdf']];
+        $ctx->setResult('n1', NodeResult::ok('Read 1 files from Nextcloud › Docs: a.pdf.', [], [
+            'folder_read' => $summary,
+            'step_input' => '{"folder":"Docs"}',
+            'duration_ms' => 40,
+        ]));
+        $ctx->setResult('n2', NodeResult::ok('Done.'));
+
+        $cards = $this->assembler->assemble($plan, $ctx)['metadata']['task_plan_render']['cards'];
+
+        $this->assertSame($summary, $cards[0]['folder_read']);
+        $this->assertSame('{"folder":"Docs"}', $cards[0]['step_input']);
+        $this->assertSame(40, $cards[0]['duration_ms']);
+    }
+
     public function testPartialFailureCardStateIsPreserved(): void
     {
         $plan = $this->plan();
@@ -418,6 +443,69 @@ final class ResultAssemblerTest extends TestCase
             'One step could not be completed: Backblaze · s3_head_bucket. the tool does not exist',
             $result['content'],
         );
+    }
+
+    public function testAFolderReadAloneIsNotPassedOffAsTheAnswer(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'folder_fetch'],
+                ['id' => 'n2', 'capability' => 'code_run', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('Read 3 files from Nextcloud › Invoices.', [['path' => '/api/v1/files/uploads/02/a.txt', 'type' => 'document']]));
+        $ctx->setResult('n2', NodeResult::failed('File work could not finish. Nothing new was saved.'));
+        $ctx->setResult('n3', NodeResult::skipped('Skipped because an earlier step did not finish.'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame(
+            "Read 3 files from Nextcloud › Invoices.\n\nI could not finish the answer. File work could not finish. Nothing new was saved.",
+            $result['content'],
+        );
+    }
+
+    public function testARunWaitingForApprovalOrStoppedByAConditionIsNotCalledUnfinished(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'folder_fetch'],
+                ['id' => 'n2', 'capability' => 'email_me', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2']],
+            ],
+        ]);
+        $waiting = $this->context();
+        $waiting->setResult('n1', NodeResult::ok('Read 3 files from Nextcloud › Invoices.'));
+        $waiting->setResult('n2', NodeResult::waitingApproval(41));
+        $stopped = $this->context();
+        $stopped->setResult('n1', NodeResult::ok('Read 3 files from Nextcloud › Invoices.'));
+        $stopped->setResult('n2', NodeResult::stopped());
+        $stopped->setResult('n3', NodeResult::skipped('Skipped because the condition was not met.'));
+
+        self::assertStringNotContainsString('I could not finish the answer.', $this->assembler->assemble($plan, $waiting)['content']);
+        self::assertSame('Read 3 files from Nextcloud › Invoices.', $this->assembler->assemble($plan, $stopped)['content']);
+    }
+
+    public function testExtractedTextAloneSaysTheAnswerWasNotFinishedInTheRunsLanguage(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'de', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'extract_text'],
+                ['id' => 'n2', 'capability' => 'document_generation', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ctx = $this->context('mach eine Tabelle', 'de');
+        $ctx->setResult('n1', NodeResult::ok('ACME, 2026-10-01, 12.00'));
+        $ctx->setResult('n2', NodeResult::failed('The document could not be created.'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertStringEndsWith('Ich konnte die Antwort nicht fertigstellen. The document could not be created.', $result['content']);
     }
 
     public function testBestEffortIgnoresAFailedHiddenStep(): void

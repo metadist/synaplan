@@ -23,7 +23,7 @@ vi.mock('@/composables/useDialog', () => ({
 
 import LinkedPlatformsConfiguration from '@/components/config/LinkedPlatformsConfiguration.vue'
 
-function mountPage(isAdmin: boolean) {
+function mountPage(isAdmin: boolean, client = 'nextcloud') {
   setActivePinia(createPinia())
   const auth = useAuthStore()
   auth.user = {
@@ -40,6 +40,7 @@ function mountPage(isAdmin: boolean) {
     ],
   })
   return mount(LinkedPlatformsConfiguration, {
+    props: { client },
     global: {
       plugins: [router],
       stubs: {
@@ -74,5 +75,57 @@ describe('LinkedPlatformsConfiguration', () => {
     expect(wrapper.find('[data-testid="text-admin-platform-instances-pointer"]').exists()).toBe(
       false
     )
+  })
+
+  function link(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 5,
+      client: 'nextcloud',
+      host: 'files.example.org',
+      external_id: 'ada',
+      key_id: 9,
+      key_label: 'Nextcloud',
+      created: 1,
+      last_seen: 2,
+      can_copy: true,
+      can_read: true,
+      read_scope: { mode: 'allowed', folders: ['Invoices/2026', 'Specs'] },
+      ...overrides,
+    }
+  }
+
+  it('says what Synaplan may read in a cloud that hands out files', async () => {
+    listMine.mockResolvedValue([link()])
+    const wrapper = mountPage(false)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="text-read-scope"]').text()).toBe(
+      'Synaplan may read: the folders you watch, Invoices/2026, Specs.'
+    )
+  })
+
+  it('names all files and only watched folders as the cloud reports them', async () => {
+    listMine.mockResolvedValue([
+      link({ id: 6, read_scope: { mode: 'all', folders: [] } }),
+      link({ id: 7, read_scope: { mode: 'watched', folders: ['Ignored'] } }),
+    ])
+    const wrapper = mountPage(false)
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="text-read-scope"]').map((line) => line.text())).toEqual([
+      'Synaplan may read: all your files.',
+      'Synaplan may read: the folders you watch.',
+    ])
+  })
+
+  it('says nothing about reading for a cloud whose app cannot hand out files', async () => {
+    listMine.mockResolvedValue([
+      link({ can_read: false }),
+      link({ id: 8, can_read: undefined, read_scope: undefined }),
+    ])
+    const wrapper = mountPage(false)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="text-read-scope"]').exists()).toBe(false)
   })
 })

@@ -45,3 +45,9 @@ and moved here; its §7 became code cleanup V4.
 `20261016_6-issues/` is implemented (#2525–#2527, #2529, #2531) and moved
 here; GitHub #2504 is still open, and the #2460 CI-image repeat was never
 run.
+
+2026-10-24 housekeeping: `20261019-synaplan-demo-ui/` moved here. F4a–F4d
+shipped (#2568, #2569, #2576, #2577). It was never a roadmap row. The
+three journeys were not entered as walks. `20260903_more_nextcloud/`
+moved here the same day: S1 and S2 shipped, S3's product work is cloud
+file sharing, and the pairing-code fallback (NC18, NC19) is not scheduled.

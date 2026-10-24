@@ -102,7 +102,7 @@ final class DagExecutorTest extends TestCase
         );
     }
 
-    private function context(): NodeContext
+    private function context(string $language = 'en'): NodeContext
     {
         $m = $this->createMock(Message::class);
         $m->method('getText')->willReturn('Create an image of a dog and summarize the scene as an mp3');
@@ -111,7 +111,7 @@ final class DagExecutorTest extends TestCase
         $m->method('getFilePath')->willReturn('');
         $m->method('getFiles')->willReturn(new ArrayCollection());
 
-        return new NodeContext($m, [], 1, ['language' => 'en']);
+        return new NodeContext($m, [], 1, ['language' => $language]);
     }
 
     public function testCanonicalDocToMp3Chain(): void
@@ -770,8 +770,27 @@ final class DagExecutorTest extends TestCase
 
         self::assertNotNull($skipped);
         self::assertSame('n2', $skipped['node_id']);
-        self::assertSame("dependency 'n1' did not complete", $skipped['error']);
+        self::assertSame('Skipped because an earlier step did not finish.', $skipped['error']);
         self::assertArrayNotHasKey('prompt', $skipped);
+    }
+
+    public function testASkippedStepSaysWhyInTheRunsLanguage(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'de', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'extract_text'],
+                ['id' => 'n2', 'capability' => 'summarize', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'chat', 'depends_on' => ['n2']],
+            ],
+        ]);
+        $runner = $this->runner(static fn (TaskNode $node): NodeResult => NodeResult::failed('Synaplan found no text in scan.png.'));
+        $context = $this->context('de');
+
+        $this->executor($runner)->execute($plan, $context);
+
+        self::assertSame('Übersprungen, weil ein vorheriger Schritt nicht fertig wurde.', $context->getResult('n2')?->error);
+        self::assertSame('Übersprungen, weil ein vorheriger Schritt nicht fertig wurde.', $context->getResult('n3')?->error);
     }
 
     public function testParallelFailedMediaNodeEmitsRetryPayload(): void
@@ -960,5 +979,24 @@ final class DagExecutorTest extends TestCase
 
         self::assertSame(['n1'], $ran);
         self::assertSame('skipped', $result['node_statuses']['n2']);
+    }
+
+    public function testAStepAfterAnUnmetConditionDoesNotBlameAFailure(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'condition'],
+                ['id' => 'n2', 'capability' => 'email_me', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'chat', 'depends_on' => ['n2']],
+            ],
+        ]);
+        $runner = $this->runner(static fn (TaskNode $node): NodeResult => NodeResult::stopped('Condition was not met'));
+        $context = $this->context();
+
+        $this->executor($runner)->execute($plan, $context);
+
+        self::assertSame('Skipped because the condition was not met.', $context->getResult('n2')?->error);
+        self::assertSame('Skipped because the condition was not met.', $context->getResult('n3')?->error);
     }
 }

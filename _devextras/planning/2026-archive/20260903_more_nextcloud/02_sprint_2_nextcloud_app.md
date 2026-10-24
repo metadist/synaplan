@@ -13,7 +13,7 @@ decisions 1, 7, 9, 11; §11 rows 3, 5.
 **Repos:** `synaplan-nextcloud/` only. App version `1.5.0 → 1.6.0`.
 **Flag:** none in the app — the mode is admin configuration (`mode` app value).
 Existing installs never change mode on upgrade.
-**User-flow:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
+**User-flow:** [`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md)
 J-NC-1…3 on the Nextcloud side. Personal settings: not connected →
 **Connect Synaplan** → back as "Connected as {name}". Email conflict
 in `link` mode is "An account with this email exists — connect it"
