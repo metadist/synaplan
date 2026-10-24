@@ -63,7 +63,7 @@ final readonly class LoopRules
             return $this->write('wall', ResearchOutcome::STOPPED_LIMIT, $ledger);
         }
         if (!$budget->canCall()) {
-            return $this->write('cost', ResearchOutcome::STOPPED_BUDGET, $ledger);
+            return $this->write('cost', ResearchOutcome::STOPPED_LIMIT, $ledger);
         }
         if (!$budget->canRound()) {
             return $this->write('rounds', ResearchOutcome::STOPPED_LIMIT, $ledger);

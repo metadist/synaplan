@@ -74,7 +74,7 @@ final class ResearchLoopTest extends TestCase
 
         $cost = $this->budget(ResearchDepth::Standard);
         $cost->addCost(1.0);
-        $this->assertStop($ledger, $cost, 'cost', ResearchOutcome::STOPPED_BUDGET);
+        $this->assertStop($ledger, $cost, 'cost', ResearchOutcome::STOPPED_LIMIT);
 
         $rounds = $this->budget(ResearchDepth::Quick);
         $this->assertStop($ledger, $rounds, 'rounds', ResearchOutcome::STOPPED_LIMIT);

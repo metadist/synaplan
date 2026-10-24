@@ -44,6 +44,12 @@ final readonly class LoopActions
 
         $limits = $this->limits($budget);
         $seen = $this->asked($ledger);
+        $used = $budget->toArray();
+        $left = [
+            LoopAction::SEARCH => $used['searches'][1] - $used['searches'][0],
+            LoopAction::READ => $used['sources_read'][1] - $used['sources_read'][0],
+            LoopAction::ASK_USER => $limits['questions'] - $questionsAsked,
+        ];
         $kept = [];
         $actions = $decision['actions'] ?? [];
         if (!is_array($actions)) {
@@ -60,6 +66,12 @@ final readonly class LoopActions
             $one = $this->one($action, $ledger, $budget, $questionsAsked, $seen);
             if (null === $one) {
                 continue;
+            }
+            if (isset($left[$one->type])) {
+                if ($left[$one->type] <= 0) {
+                    continue;
+                }
+                --$left[$one->type];
             }
             $kept[] = $one;
             if (LoopAction::SEARCH === $one->type && null !== $one->point && null !== $one->query) {
