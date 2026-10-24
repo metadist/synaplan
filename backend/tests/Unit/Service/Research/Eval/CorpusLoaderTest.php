@@ -40,6 +40,19 @@ final class CorpusLoaderTest extends TestCase
         }
     }
 
+    public function testTheHardSetLoadsWithGoldForEveryItemAndTwoTraps(): void
+    {
+        $items = (new CorpusLoader())->load(dirname(__DIR__, 5).'/tests/Eval/research/corpus-hard.json', false);
+        $traps = array_filter($items, static fn ($item): bool => [] !== $item->facts->forbidden);
+
+        $this->assertCount(12, $items);
+        $this->assertCount(2, $traps);
+        foreach ($items as $item) {
+            $this->assertContains($item->language, ['en', 'de', 'es', 'fr', 'tr']);
+            $this->assertNotSame([], $item->facts->entries, $item->id);
+        }
+    }
+
     public function testARowWithoutSourcesIsRejected(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'corpus');

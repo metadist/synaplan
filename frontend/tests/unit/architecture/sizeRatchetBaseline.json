@@ -1,14 +1,14 @@
 {
   "_comment": "Frontend size ratchet ledger (tests/unit/architecture/sizeRatchet.spec.ts). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
   "recorded": "2026-10-16",
-  "updated": "2026-10-19",
+  "updated": "2026-10-23",
   "limits": {
     "fileLines": 800,
     "functionLines": 100
   },
   "counts": {
     "fileLines": 29,
-    "functionLines": 80
+    "functionLines": 79
   },
   "fileLines": {
     "src/components/ChatBrowser.vue": 999,
@@ -31,8 +31,8 @@
     "src/services/api/widgetsApi.ts": 826,
     "src/services/filesService.ts": 1276,
     "src/stores/chats.ts": 1513,
-    "src/stores/history.ts": 1121,
-    "src/utils/messageMapper.ts": 869,
+    "src/stores/history.ts": 1041,
+    "src/utils/messageMapper.ts": 860,
     "src/views/ChatView.vue": 4470,
     "src/views/FilesView.vue": 2989,
     "src/views/LoginView.vue": 812,
@@ -105,7 +105,7 @@
     "src/stores/usageTaximeter.ts::useUsageTaximeterStore": 309,
     "src/stores/userFeedback.ts::useFeedbackStore": 202,
     "src/stores/userMemories.ts::useMemoriesStore": 330,
-    "src/utils/messageMapper.ts::mapApiMessageRow": 219,
+    "src/utils/messageMapper.ts::mapApiMessageRow": 216,
     "src/utils/messageMapper.ts::parseContentWithThinking": 121,
     "src/utils/messageMapper.ts::reconcileLocalMessage": 110,
     "src/utils/processingStepCopy.ts::describeStep": 239,

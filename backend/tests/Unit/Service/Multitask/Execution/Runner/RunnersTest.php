@@ -30,6 +30,7 @@ use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Execution\InputFileText;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
@@ -93,6 +94,17 @@ final class RunnersTest extends TestCase
         return new NodeContext($message, [], 1, ['language' => 'en']);
     }
 
+    /**
+     * Uploads arrive with their text already extracted.
+     */
+    private function uploadText(): InputFileText
+    {
+        $fileText = $this->createStub(InputFileText::class);
+        $fileText->method('of')->willReturnCallback(static fn (array $descriptor): string => is_string($descriptor['text'] ?? null) ? $descriptor['text'] : '');
+
+        return $fileText;
+    }
+
     public function testExtractTextReadsResolvedFileText(): void
     {
         $ctx = $this->context($this->message());
@@ -100,7 +112,7 @@ final class RunnersTest extends TestCase
         // Simulate resolved file with extracted text via a direct input literal.
         $node = new TaskNode('n1', Capability::ExtractText, [], ['files' => [['path' => 'a.pdf', 'type' => 'pdf', 'text' => 'HELLO DOC']]]);
 
-        $result = (new ExtractTextRunner())->run($node, $ctx);
+        $result = (new ExtractTextRunner($this->uploadText()))->run($node, $ctx);
 
         self::assertTrue($result->isSuccessful());
         self::assertSame('HELLO DOC', $result->text);
@@ -111,16 +123,17 @@ final class RunnersTest extends TestCase
         $ctx = $this->context($this->message(fileText: 'LEGACY TEXT'));
         $node = new TaskNode('n1', Capability::ExtractText);
 
-        $result = (new ExtractTextRunner())->run($node, $ctx);
+        $result = (new ExtractTextRunner($this->uploadText()))->run($node, $ctx);
 
         self::assertSame('LEGACY TEXT', $result->text);
     }
 
     public function testExtractTextFailsWhenNoText(): void
     {
-        $result = (new ExtractTextRunner())->run(new TaskNode('n1', Capability::ExtractText), $this->context($this->message()));
+        $result = (new ExtractTextRunner($this->uploadText()))->run(new TaskNode('n1', Capability::ExtractText), $this->context($this->message()));
 
         self::assertFalse($result->isSuccessful());
+        self::assertSame('There was no file to read text from.', $result->error);
     }
 
     public function testSummarizeCallsModelAndReturnsContent(): void

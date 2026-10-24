@@ -92,6 +92,7 @@ final class SavedTaskOutcomeNarrator
             'email_search' => 'The mailbox search',
             'chat', 'summarize' => 'The written answer',
             'calendar_event' => 'The calendar entry',
+            'folder_fetch' => 'Reading the folder',
             default => 'A step',
         };
     }

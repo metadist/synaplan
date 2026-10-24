@@ -968,6 +968,12 @@
       "copy": "Adresi kopyala",
       "copied": "Adres kopyalandı",
       "copyFailed": "Adres kopyalanamadı. Seçip elle kopyalayın."
+    },
+    "readScope": {
+      "line": "Synaplan şunları okuyabilir: {what}.",
+      "watched": "izlediğiniz klasörler",
+      "allowed": "izlediğiniz klasörler, {folders}",
+      "all": "tüm dosyalarınız"
     }
   }
 }

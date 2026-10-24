@@ -8,7 +8,8 @@ use App\AI\Service\AiFacade;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Asks a judge model whether a claim is in a report. The prompt names no arm.
+ * Asks a judge model whether a claim is in a report, or whether a passage
+ * supports a statement. The prompt names no arm.
  */
 final readonly class JudgeClient
 {
@@ -21,13 +22,12 @@ final readonly class JudgeClient
 
     public function factPrompt(string $assertion, string $report): string
     {
-        $path = $this->projectDir.'/tests/Eval/research/judges/fact.md';
-        if (!is_file($path)) {
-            throw new \RuntimeException('The fact judge prompt is missing.');
-        }
-        $template = (string) file_get_contents($path);
+        return $this->fill('fact.md', ['{assertion}' => $assertion, '{report}' => $report]);
+    }
 
-        return strtr($template, ['{assertion}' => $assertion, '{report}' => $report]);
+    public function citationPrompt(string $statement, string $quote): string
+    {
+        return $this->fill('citation.md', ['{statement}' => $statement, '{quote}' => $quote]);
     }
 
     /**
@@ -37,21 +37,54 @@ final readonly class JudgeClient
      */
     public function judgeFact(string $assertion, string $report, array $judgeKeys, int $userId): array
     {
-        $prompt = $this->factPrompt($assertion, $report);
         $out = [];
         foreach ($judgeKeys as $key) {
-            [$provider, $model] = $this->parse($key);
-            $response = $this->ai->chat($prompt, $userId, [
-                'provider' => $provider,
-                'model' => $model,
-            ]);
-            $out[] = [
-                'judge' => $key,
-                'verdict' => $this->verdict((string) ($response['content'] ?? '')),
-            ];
+            $out[] = $this->ask($key, $this->factPrompt($assertion, $report), ['present', 'absent', 'contradicted'], $userId);
         }
 
-        return $out;
+        return array_map(static fn (array $row): array => ['judge' => $row['judge'], 'verdict' => $row['verdict']], $out);
+    }
+
+    /**
+     * @return array{judge: string, verdict: string, tokens: int}
+     */
+    public function judgeCitation(string $statement, string $quote, string $judgeKey, int $userId): array
+    {
+        return $this->ask($judgeKey, $this->citationPrompt($statement, $quote), ['supports', 'does_not_support'], $userId);
+    }
+
+    /**
+     * @param list<string> $words
+     *
+     * @return array{judge: string, verdict: string, tokens: int}
+     */
+    private function ask(string $key, string $prompt, array $words, int $userId): array
+    {
+        [$provider, $model] = $this->parse($key);
+        $response = $this->ai->chat($prompt, $userId, [
+            'provider' => $provider,
+            'model' => $model,
+        ]);
+        $usage = \is_array($response['usage'] ?? null) ? $response['usage'] : [];
+
+        return [
+            'judge' => $key,
+            'verdict' => $this->verdict((string) ($response['content'] ?? ''), $words),
+            'tokens' => (int) ($usage['total_tokens'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param array<string, string> $values
+     */
+    private function fill(string $file, array $values): string
+    {
+        $path = $this->projectDir.'/tests/Eval/research/judges/'.$file;
+        if (!is_file($path)) {
+            throw new \RuntimeException('The judge prompt '.$file.' is missing.');
+        }
+
+        return strtr((string) file_get_contents($path), $values);
     }
 
     /**
@@ -70,10 +103,13 @@ final readonly class JudgeClient
         return [$parts[0], $parts[1]];
     }
 
-    private function verdict(string $content): string
+    /**
+     * @param list<string> $words
+     */
+    private function verdict(string $content, array $words): string
     {
-        $word = strtolower((string) strtok(trim($content), " \n\t"));
+        $word = strtolower(trim((string) strtok(trim($content), " \n\t"), " .,:;*`'\""));
 
-        return \in_array($word, ['present', 'absent', 'contradicted'], true) ? $word : 'uncertain';
+        return \in_array($word, $words, true) ? $word : 'uncertain';
     }
 }

@@ -285,6 +285,40 @@ describe('SavedTaskCard', () => {
     )
   })
 
+  it('names every file a run read from a folder and every file it left out', async () => {
+    mockRuns.mockResolvedValue({
+      runs: [
+        run({
+          planSnapshot: {
+            cards: [
+              {
+                capability: 'folder_fetch',
+                folder_read: {
+                  outcome: 'partial',
+                  label: 'Nextcloud',
+                  folder: 'Invoices',
+                  read: 4,
+                  total: 5,
+                  files: ['a.pdf', 'b.pdf', 'c.pdf', 'd.pdf'],
+                  skipped: [{ name: 'scan.tiff', reason: 'too_large' }],
+                },
+              },
+            ],
+          },
+        }),
+      ],
+      retention: '',
+    })
+    const wrapper = mountCard(task({ lastRunAt: '2026-08-15T12:00:00+00:00' }))
+    await wrapper.get('[data-testid="btn-view-runs"]').trigger('click')
+    await flushPromises()
+
+    const runs = wrapper.get('[data-testid="saved-task-runs"]')
+    expect(runs.text()).toContain('Read 4 files from Nextcloud › Invoices')
+    expect(runs.findAll('[data-testid="folder-read-files"] li')).toHaveLength(4)
+    expect(runs.text()).toContain('scan.tiff — larger than 100 MB')
+  })
+
   it('localizes run status and trigger instead of raw enum codes', async () => {
     mockRuns.mockResolvedValue({
       runs: [run({ status: 'completed', trigger: 'schedule' })],

@@ -9,6 +9,7 @@ import type {
   RagSourceRef,
 } from '@/stores/history'
 import { isTaskCardKind, isTaskCardState } from '@/stores/history'
+import { cardTraceFrom, type CardTraceWire } from '@/utils/cardTrace'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
@@ -319,36 +320,34 @@ export interface ApiLoadedMessageRow {
   /** Per-node render state for DAG turns — present only on OUT messages of DAG turns. */
   taskPlan?: {
     reply_node: string
-    cards: Array<{
-      nodeId: string
-      capability: string
-      kind: string
-      state: string
-      depends_on?: string[]
-      text?: string
-      url?: string
-      type?: string
-      error?: string
-      job_id?: string
-      /** Compact web-search summary fields (search cards only) */
-      query?: string
-      resultsCount?: number
-      used_workspace?: boolean
-      usedWorkspace?: boolean
-      /** #1229 smart collapse: card prose is contained in the answer body. */
-      redundant?: boolean
-      step_input?: string
-      step_output?: string
-      step_output_truncated?: boolean
-      duration_ms?: number
-      ask_user?: {
-        question?: string
-        options?: string[]
-        recommended?: string
-        allowText?: boolean
-        expiresAt?: number
-      }
-    }>
+    cards: Array<
+      {
+        nodeId: string
+        capability: string
+        kind: string
+        state: string
+        depends_on?: string[]
+        text?: string
+        url?: string
+        type?: string
+        error?: string
+        job_id?: string
+        /** Compact web-search summary fields (search cards only) */
+        query?: string
+        resultsCount?: number
+        used_workspace?: boolean
+        usedWorkspace?: boolean
+        /** #1229 smart collapse: card prose is contained in the answer body. */
+        redundant?: boolean
+        ask_user?: {
+          question?: string
+          options?: string[]
+          recommended?: string
+          allowText?: boolean
+          expiresAt?: number
+        }
+      } & CardTraceWire
+    >
   } | null
   ragSources?: RagSourceRef[] | null
   /** Background async media job (Release 4.0). */
@@ -522,10 +521,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         // the canonical answer surface; the duplicated card collapses (the
         // previous #1165 approach of REMOVING the body text is retired).
         redundant: c.redundant === true,
-        stepInput: typeof c.step_input === 'string' ? c.step_input : undefined,
-        stepOutput: typeof c.step_output === 'string' ? c.step_output : undefined,
-        stepOutputTruncated: c.step_output_truncated === true,
-        durationMs: typeof c.duration_ms === 'number' ? c.duration_ms : undefined,
+        ...cardTraceFrom(c),
         askUser: askUserFrom(c.ask_user),
       }
     })
@@ -628,22 +624,20 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
 /** In-progress turn payload from GET /chats/{id}/messages (#1142 / #1343). */
 export interface ApiInProgressTurn {
   reply_node: string
-  cards: Array<{
-    nodeId: string
-    capability: string
-    kind: string
-    state: string
-    text?: string | null
-    url?: string | null
-    error?: string | null
-    query?: string | null
-    resultsCount?: number | null
-    type?: string | null
-    step_input?: string | null
-    step_output?: string | null
-    step_output_truncated?: boolean | null
-    duration_ms?: number | null
-  }>
+  cards: Array<
+    {
+      nodeId: string
+      capability: string
+      kind: string
+      state: string
+      text?: string | null
+      url?: string | null
+      error?: string | null
+      query?: string | null
+      resultsCount?: number | null
+      type?: string | null
+    } & CardTraceWire
+  >
 }
 
 /**
@@ -690,10 +684,7 @@ export function mapInProgressTurn(turn: ApiInProgressTurn): Message {
       ? { resultsCount: c.resultsCount }
       : {}),
     ...(typeof c.type === 'string' && c.type ? { mediaType: c.type } : {}),
-    ...(typeof c.step_input === 'string' && c.step_input ? { stepInput: c.step_input } : {}),
-    ...(typeof c.step_output === 'string' && c.step_output ? { stepOutput: c.step_output } : {}),
-    ...(c.step_output_truncated === true ? { stepOutputTruncated: true } : {}),
-    ...(typeof c.duration_ms === 'number' ? { durationMs: c.duration_ms } : {}),
+    ...cardTraceFrom(c),
   }))
 
   return {

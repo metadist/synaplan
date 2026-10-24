@@ -34,6 +34,43 @@ class CloudPickupRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    /**
+     * Fails only rows that are still open. A result that landed between the
+     * check and the write is left alone.
+     */
+    public function failOpenOlderThan(int $createdBefore, string $errorCode): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BCLOUDPICKUPS SET BSTATE = ?, BERRORCODE = ?, BFINISHED = ? WHERE BSTATE IN (?, ?) AND BCREATED < ?',
+            [CloudPickup::STATE_FAILED, $errorCode, time(), CloudPickup::STATE_QUEUED, CloudPickup::STATE_CLAIMED, $createdBefore],
+        );
+    }
+
+    /**
+     * Ends one pickup only while it is still open, so a result and a run that
+     * gave up cannot overwrite each other: whichever lands first wins. Counts
+     * left null keep what the row already holds.
+     *
+     * @param list<array<mixed>>|null $skipped
+     */
+    public function finishIfOpen(int $id, string $state, ?string $errorCode, ?int $listed = null, ?int $sent = null, ?array $skipped = null): bool
+    {
+        return 1 === (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BCLOUDPICKUPS SET BSTATE = ?, BERRORCODE = ?, BFINISHED = ?, BLISTED = COALESCE(?, BLISTED), BSENT = COALESCE(?, BSENT), BSKIPPED = COALESCE(?, BSKIPPED) WHERE BID = ? AND BSTATE IN (?, ?)',
+            [
+                $state,
+                $errorCode,
+                time(),
+                $listed,
+                $sent,
+                null !== $skipped ? json_encode($skipped, JSON_THROW_ON_ERROR) : null,
+                $id,
+                CloudPickup::STATE_QUEUED,
+                CloudPickup::STATE_CLAIMED,
+            ],
+        );
+    }
+
     public function countSince(int $ownerId, int $createdAfter): int
     {
         return (int) $this->createQueryBuilder('p')

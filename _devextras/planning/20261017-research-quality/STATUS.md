@@ -15,7 +15,7 @@ chat message.
 | RS3 | in progress | `knowledge_search` and `read_document` on `POST /v1/messages` when a folder is pinned. `OpenAiGatewayToolLoop` (`POST /v1/chat/completions`) is a follow-up, same reason as RS2. Manual walk 2026-10-22 below: the simple question answered from the first-turn injection, and one explicit follow-up ran both tools. Run `V42D2`: UC-05 passed (ready in 132 ms, UC-05d hit after Ready). UC-06 facts 0/3. UC-05e is not in the runner. Not done. |
 | RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (web search reads locally, no vision). Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23), but no run opened a document: the only PDF was outside the 3-page cap. Done needs one smoke item whose top 3 results include a PDF, measured flag off and on. The flag stays off. |
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
-| RQ2b | in progress | Starter set scored 2026-10-23. Better spike arm does not beat B1+ by 10 points. Citation precision not judged. B4 not run. Go / no-go sentence below, not yet accepted |
+| RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
 | RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
 | RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
@@ -37,6 +37,20 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-23 — run storage and run kernel shared with agent handling (row 25)
+
+The owner approved, in the agent-handling decision session
+([`../20261023-agent-handling/00_master_plan.md`](../20261023-agent-handling/00_master_plan.md)
+§0 #5 and #9), one table **`BRUNS`** for assistant runs and research runs
+(column `BKIND` = `assistant` · `research`). It replaces the `BRESEARCHRUNS`
+alternative of §0 #7 here; §0 #7's default (Redis only in v1) is not changed
+by this entry — whether RS6 writes `BRUNS` rows is decided when RS6 starts.
+The run machinery (units, claims, checkpoints, event log, reaper, delivery)
+is shared as `App\Service\Run\*`: whichever of RS6 and AH8 is built first
+creates it, and the other adopts it. Nothing in RS1–RS4, RD1 or RQ2b changes.
 
 ---
 
@@ -117,6 +131,179 @@ the root cause of the empty-argument rejection is fixed in
 `AnthropicProvider` (an empty tool input is sent as `{}`). Tool-mode recall
 was not re-measured after that change. It cannot change the fact-recall
 clause, because B1+ plus 10 points is above 1.
+
+## 2026-10-23 — RQ2b citation precision
+
+Branch `feat/research-citation-judge` from `a9f75713b`, code uncommitted. Same
+account, model, corpus hash and stack as above. Both arms ran again with
+`--answers`, so each answer is saved with the passages it cites. The spike
+cites evidence ids; each id keeps the passage text the reader cited. A URL
+citation would be read again and matched to the statement's words and
+numbers. B1+ gave none.
+
+```bash
+docker compose exec -T backend php bin/console app:research:spike \
+  --corpus=full --mode=tools --user=1 --repeat=2 \
+  --report=var/research-eval/rq2b-cite-tools.md \
+  --answers=var/research-eval/rq2b-cite-tools.json
+
+docker compose exec -T backend php bin/console app:research:eval \
+  --corpus=full --arm=b1plus --user=1 --repeat=2 \
+  --gateway-url=http://127.0.0.1:80 --folder=rq2-eval \
+  --report=var/research-eval/rq2b-cite-b1plus.md \
+  --answers=var/research-eval/rq2b-cite-b1plus.json
+
+docker compose exec -T backend php bin/console app:research:citations \
+  --answers=var/research-eval/rq2b-cite-tools.json,var/research-eval/rq2b-cite-b1plus.json \
+  --judges=openai:gpt-6.1-sol,xai:grok-4.7,google:gemini-3.1-pro-preview \
+  --user=1 --out=var/research-eval/rq2b-citations-v2
+```
+
+Judges are GPT-6.1 Sol and Grok 4.7; Gemini 3.1 Pro decides a split. None is
+the Claude writer. Pairs from both arms are shuffled together (seed 1), and
+the prompt is `judges/citation.md` with no arm name. **No human calibration
+exists (`06` §4), so these numbers are a signal and gate nothing.** The 40
+blind pairs for people to label are in
+`backend/var/research-eval/rq2b-citations-v2/sample.json`.
+
+| Date | Step | Arm | Corpus | Depth | Recall | Citation precision | Coverage | Abstention | Cost | Time p50 / p95 | Command |
+| ---- | ---- | --- | ------ | ----- | ------ | ------------------ | -------- | ---------- | ---- | -------------- | ------- |
+| 2026-10-23 | RQ2b | S-T | starter 20 | 10 searches, 15 sources, repeat 2 | 0.78 across 16 | 93.8 % (182 of 194; 2 uncertain), judges agree on 93.4 % | not judged | both traps abstained; trap-02 recall 1.00 | p50 0.046 USD, sum 0.90 USD, from mean tokens. No usage row | 25243 / 46384 ms | `app:research:spike --corpus=full --mode=tools --repeat=2 --answers=…` |
+| 2026-10-23 | RQ2b | B1+ | starter 20 | gateway, repeat 2 | 0.89 across 19 | none: 0 cited statements in 40 answers | not judged | both traps abstained; trap-02 recall 1.00 | 0.39 USD across 60 usage rows (40 messages, 20 sorting), about 0.01 USD per answer | 3335 / 5169 ms | `app:research:eval --corpus=full --arm=b1plus --repeat=2 --folder=rq2-eval --answers=…` |
+| 2026-10-23 | RQ2b | B1+ web | starter 20 | gateway with `web_search` declared, repeat 2 | 0.95 across 19 | not measurable: 5 cited statements, all on `trap-01`, every cited page unreadable | not judged | both traps abstained; trap-02 recall 1.00 | 0.36 USD across 50 usage rows (40 messages, 10 sorting), about 0.009 USD per answer | 2823 / 4737 ms | `app:research:eval --corpus=full --arm=b1plus --repeat=2 --folder=rq2-eval --web-search --answers=…` |
+
+The spike wrote 196 cited statements in 26 answers. I read the 12 the
+judges rejected, which is one reader and not a calibration:
+- 8 are real or partial misses: the sentence cites the wrong evidence id
+  (p3, p177), or the passage lacks a detail the sentence adds (p48, p54,
+  p83, p104, p168, p179).
+- 2 are meta sentences (p4, p129).
+- 1 is a judge error: p119's passage says "Default: 3306".
+- 1 is strict: p17's passage lacks only the date.
+A first pass on the same answers had a sentence-split bug at German
+abbreviations ("Art. 17"). It scored 95.3 %. That shows how much the judge
+result moves between passes.
+
+B1+ did not search the web. None of its 40 answers has a URL. 18 say the
+answer comes from the model's own knowledge. Its `[1][2][3]` markers point to
+knowledge-base passages that are not about the question, and there is no
+sources list to resolve them. The usage log for the run window has
+`knowledge_search` rows and no web search. B1+'s recall and its low cost are
+those of an answer from memory, not of research.
+
+B1+ web is B1+ with web search available. With `--web-search` the adapter
+declares Anthropic's `web_search` tool, as a desktop client does. The gateway
+(`WEB_SEARCH_MODE` `auto`) answers it with Synaplan's own search. The model
+decides whether to search. In 40 answers it searched twice, both on
+`trap-01` (two `tool:web_search` usage rows). Two answers contain a URL.
+18 still say the answer comes from the model's own knowledge. The 5 cited
+statements point to EUR-Lex and syna.de PDF pages. The reader could not
+open any of them (EUR-Lex blocks the fetch; PDFs are not read while
+`WEB_SEARCH.READ_DOCUMENTS` is off), so there is nothing to judge. Run from
+16:33:56 to 16:36:11 UTC; report `rq2b-b1plus-web.md`.
+
+Judge cost: the judges wrote no usage row. The total tokens were 41708 for
+GPT-6.1 Sol, 361444 for Grok 4.7 and 2324 for Gemini. Priced at the
+completion rate, that is at most about 2.6 USD for this pass.
+
+**Go / no-go (§0 #40), updated, for the owner to accept.** Still no-go. The
+fact-recall clause fails as above (0.78 against 0.89). Tool mode reaches
+93.8 % citation precision, and B1+ cites no source at all, so the precision
+part would pass. But the judges are not calibrated, and that clause also
+needs the cost to be at most 2× B1+. The spike's p50 is 0.046 USD per answer
+against about 0.01 USD for B1+, which is 4.7×. With web search available
+(B1+ web) nothing changes. The model almost never searches, recall rises to
+0.95, cost stays about 0.009 USD per answer, and it cites no readable
+source. On this corpus the gateway answers from memory. It does not research.
+The corpus asks facts the model already knows, so it cannot show the value
+of research. That is a corpus question for the owner, not a spike result.
+
+## 2026-10-23 — RQ2b on a harder corpus
+
+Same branch, account, writer model and stack. New corpus
+`backend/tests/Eval/research/corpus-hard.json`, 12 items, sha256
+`fd3325500cb07d9e6166d4371c0916776dae6a533da75685e50f3f5131f88d62` at run
+time. Every item needs a fact from after the writer's training data: the
+2026 Nobel prizes, the Deutscher Buchpreis and Premio Planeta 2026, the
+newest PHP 8.5 and 8.6 releases, the ECB rates since September 2026, one
+multi-hop item (Kagan against Carson), and two traps (an outdated ECB rate,
+a false Murakami premise). Five languages. **The gold was written and
+checked by the agent against nobelprize.org, kva.se, deutscher-buchpreis.de,
+premioplaneta.es, php.net and ecb.europa.eu, not by a person.** One gold
+row was wrong: hard-10 said "20 years older"; the dates give 19.5 years.
+It now matches "19", and every arm below was rescored from its saved
+answers with the fixed gold.
+
+```bash
+docker compose exec -T backend php bin/console app:research:spike \
+  --corpus=tests/Eval/research/corpus-hard.json --mode=tools --user=1 --repeat=2 \
+  --report=var/research-eval/hard-tools.md --answers=var/research-eval/hard-tools.json
+
+docker compose exec -T backend php bin/console app:research:eval \
+  --corpus=tests/Eval/research/corpus-hard.json --arm=b1plus --user=1 --repeat=2 \
+  --gateway-url=http://127.0.0.1:80 --folder=rq2-eval [--web-search] \
+  --report=var/research-eval/hard-b1plus[-web].md \
+  --answers=var/research-eval/hard-b1plus[-web].json
+
+docker compose exec -T backend php bin/console app:research:citations \
+  --answers=var/research-eval/hard-tools.json,var/research-eval/hard-b1plus.json,var/research-eval/hard-b1plus-web.json \
+  --judges=openai:gpt-6.1-sol,xai:grok-4.7,google:gemini-3.1-pro-preview \
+  --user=1 --out=var/research-eval/citations-hard
+```
+
+| Date | Step | Arm | Corpus | Depth | Recall | Citation precision | Coverage | Abstention | Cost | Time p50 / max | Command |
+| ---- | ---- | --- | ------ | ----- | ------ | ------------------ | -------- | ---------- | ---- | -------------- | ------- |
+| 2026-10-23 | RQ2b | S-T | hard 12 | 10 searches, 15 sources, repeat 2 | 0.96 across 12 | 87.3 % (226 of 259; 8 uncertain), judges agree on 85.4 % | not judged | both traps abstained | 1.67 USD for 24 answers, 0.070 USD mean, from tokens. No usage row | 34539 / 53047 ms | as above |
+| 2026-10-23 | RQ2b | B1+ | hard 12 | gateway, repeat 2 | 0.03 across 12 | not measurable: 3 cited statements | not judged | both traps abstained | 0.50 USD across 59 usage rows, about 0.021 USD per answer | 7470 / 9068 ms | as above |
+| 2026-10-23 | RQ2b | B1+ web | hard 12 | gateway with `web_search` declared, repeat 2 | 0.96 across 12 | 64.0 % (32 of 50; 4 unreadable) | not judged | both traps abstained | 1.42 USD across 72 usage rows (35 `tool:web_search`), about 0.059 USD per answer | 10138 / 21955 ms | as above |
+
+Time is over the 12 per-item means; with 12 items the maximum stands in for
+p95. B1+ ran from 16:43:56 to 16:47:02 UTC, B1+ web from 16:47:02 to
+16:51:12; the spike writes no usage row, so the windows hold only B1+.
+`citations-hard/report.md` shows B1+ and B1+ web as one `b1plus` row (63
+statements, 62.7 %), because both arms carry the same arm name. The split
+above matches each statement to the answer file it came from; 6 statements
+appear in both files and are left out.
+
+What the numbers say:
+- Without web search B1+ knows none of it (0.03). It says so and
+  abstains, so it does not invent facts.
+- With web search B1+ now searches (35 searches in 24 answers) and finds
+  the facts as well as the spike (0.96 each). Its only miss is a German
+  answer that writes "2,50 %", which the scorer does not match against
+  "2.5".
+- The spike's sentences are better backed by their sources: 87.3 % against
+  64.0 %. B1+ web mostly lists sources at the end or cites a whole page,
+  so fewer of its sentences can be checked (50 against 259), and those
+  that can be checked are less often supported.
+- 13 of the spike's 33 rejected statements are "not confirmed" or premise
+  sentences, which say what the evidence does not contain. Without them it
+  is 226 of 246, 91.9 %. That is a reading by one agent, not a rule change.
+- The spike costs 1.2× B1+ web and takes about 3.4× as long.
+
+Judge cost: no usage row. Tokens 86479 GPT-6.1 Sol, 678880 Grok 4.7,
+11379 Gemini 3.1 Pro; at most about 5 USD at the completion rate. Gemini
+timed out once; the split was then decided without it.
+
+**Go / no-go (§0 #40), on the hard corpus, for the owner to accept.**
+No-go by the letter of the gate, but close. The fact-recall clause fails:
+0.96 against 0.96, no 10-point lead. The precision clause needs ≥ 92 % for
+the spike and < 92 % for B1+ at ≤ 2× its cost. The cost holds (1.2×) and
+B1+ web misses 92 % (64.0 %), but the spike reaches 87.3 %, or 91.9 %
+without its meta sentences. Both readings stay below 92 %. The judges are
+uncalibrated, so this result can move by a few points either way.
+The plain reading: on new facts the spike is as complete as the gateway
+with search, and its claims are clearly better sourced (+23 points), at
+about the same cost and three times the wait. Whether that is enough for
+RS6 is the owner's decision, best after people label the 40 blind pairs in
+`citations-hard/sample.json`.
+
+**Owner decision, 2026-10-23: go.** The owner accepts the hard-corpus
+result as go although the precision clause is missed narrowly (87.3 %,
+91.9 % without meta sentences, against 92 %). Reason: same recall as B1+
+with web search, clearly better sourced claims, cost within 2×. This is an
+explicit override of the gate, not a pass. RS6 may start when asked;
+human calibration of the judges is still open.
 
 ## 2026-10-23 — RQ1 full desktop use-case run
 

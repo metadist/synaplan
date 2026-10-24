@@ -162,15 +162,35 @@ final class PickupServiceTest extends TestCase
 
         self::assertSame([], $answer['upload']);
         self::assertSame([['id' => 'big', 'reason' => 'too_large']], $answer['skip']);
+        self::assertSame([['id' => 'big', 'name' => 'big.pdf', 'reason' => 'too_large']], $pickup->skipped());
+    }
+
+    public function testTheResultKeepsTheNamesSynaplanRecorded(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $service = $this->service($this->ledger($pickup));
+        $service->listing($this->instance(), 3, [
+            ['id' => 'big', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
+        ]);
+
+        $service->result($this->instance(), 3, ['status' => 'partial', 'skipped' => [
+            ['id' => 'big', 'reason' => 'too_large'],
+            ['id' => 'remote-2', 'reason' => 'unreadable'],
+        ]]);
+
+        self::assertSame(CloudPickup::STATE_PARTIAL, $pickup->getState());
+        self::assertSame([
+            ['id' => 'big', 'name' => 'big.pdf', 'reason' => 'too_large'],
+            ['id' => 'remote-2', 'reason' => 'unreadable'],
+        ], $pickup->skipped());
     }
 
     public function testResultIsIdempotent(): void
     {
         $pickup = $this->pickup(3);
         $pickup->markClaimed();
-        $pickups = $this->createStub(CloudPickupRepository::class);
-        $pickups->method('find')->willReturn($pickup);
-        $service = $this->service($pickups);
+        $service = $this->service($this->ledger($pickup));
 
         $first = $service->result($this->instance(), 3, ['status' => 'done', 'listed' => 1, 'sent' => 1, 'skipped' => []]);
         $second = $service->result($this->instance(), 3, ['status' => 'failed', 'error_code' => 'unreachable']);
@@ -239,6 +259,7 @@ final class PickupServiceTest extends TestCase
         $result = $this->service($pickups, links: $this->links(false))->open(7, 4, ['folder_path' => 'Docs'], 'fetch');
 
         self::assertFalse($result['ok']);
+        self::assertSame('not_linked', $result['error']);
         self::assertStringContainsString('Nothing was read.', $result['sentence']);
     }
 
@@ -254,6 +275,73 @@ final class PickupServiceTest extends TestCase
         ]);
 
         self::assertSame(['1027191588'], $answer['upload']);
+    }
+
+    public function testTheFilesAPickupProducedCarryTheirIdsForLaterSteps(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->rememberFile(42);
+        $file = (new File())->setFilePath('07/inv-0101.pdf');
+        $file->setFileName('inv-0101.pdf');
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('find')->willReturn($file);
+
+        $files = $this->service(em: $em)->producedFiles($pickup);
+
+        self::assertSame([[
+            'path' => '/api/v1/files/uploads/07/inv-0101.pdf',
+            'type' => 'document',
+            'local_path' => '07/inv-0101.pdf',
+            'name' => 'inv-0101.pdf',
+            'file_id' => 42,
+        ]], $files);
+    }
+
+    public function testARunThatStopsWaitingFailsThePickupAndDropsItsTicket(): void
+    {
+        $pickup = $this->pickup(9);
+        $redis = $this->createMock(RedisService::class);
+        $redis->expects(self::once())->method('delete')->with('pickup:ticket:9');
+
+        self::assertTrue($this->service($this->ledger($pickup), redis: $redis)->giveUp(9));
+
+        self::assertSame(CloudPickup::STATE_FAILED, $pickup->getState());
+        self::assertSame('unconfirmed', $pickup->getErrorCode());
+    }
+
+    public function testAResultThatLandedFirstIsNotGivenUp(): void
+    {
+        $pickup = $this->pickup(9);
+        $pickup->finish(CloudPickup::STATE_DONE, 1, 1, [], null);
+        $redis = $this->createMock(RedisService::class);
+        $redis->expects(self::never())->method('delete');
+
+        self::assertFalse($this->service($this->ledger($pickup), redis: $redis)->giveUp(9));
+
+        self::assertSame(CloudPickup::STATE_DONE, $pickup->getState());
+    }
+
+    public function testAResultAfterTheRunGaveUpDoesNotReopenIt(): void
+    {
+        $pickup = $this->pickup(9);
+        $pickup->markClaimed();
+        $service = $this->service($this->ledger($pickup));
+
+        $service->giveUp(9);
+        $answer = $service->result($this->instance(), 9, ['status' => 'done', 'listed' => 1, 'sent' => 1]);
+
+        self::assertSame(CloudPickup::STATE_FAILED, $answer['state']);
+        self::assertSame('unconfirmed', $pickup->getErrorCode());
+    }
+
+    public function testTheSweepFailsPickupsNoRunWaitsFor(): void
+    {
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->expects(self::once())->method('failOpenOlderThan')
+            ->with(self::lessThanOrEqual(time() - 1200), 'unconfirmed')
+            ->willReturn(2);
+
+        self::assertSame(2, $this->service($pickups)->sweep());
     }
 
     public function testANamesOnlyPickupDoesNotAskForUploads(): void
@@ -377,6 +465,29 @@ final class PickupServiceTest extends TestCase
             $this->createStub(AuditLogWriter::class),
             $links ?? $this->links(),
         );
+    }
+
+    /**
+     * A repository that ends a pickup only while it is open, as the database
+     * update does.
+     */
+    private function ledger(CloudPickup $pickup): CloudPickupRepository
+    {
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $pickups->method('finishIfOpen')->willReturnCallback(
+            /** @param list<array<string, mixed>>|null $skipped */
+            static function (int $id, string $state, ?string $errorCode, ?int $listed = null, ?int $sent = null, ?array $skipped = null) use ($pickup): bool {
+                if (!in_array($pickup->getState(), [CloudPickup::STATE_QUEUED, CloudPickup::STATE_CLAIMED], true)) {
+                    return false;
+                }
+                $pickup->finish($state, $listed ?? $pickup->getListed(), $sent ?? $pickup->getSent(), $skipped ?? $pickup->skipped(), $errorCode);
+
+                return true;
+            },
+        );
+
+        return $pickups;
     }
 
     private function links(bool $enabled = true): PlatformLinksConfig

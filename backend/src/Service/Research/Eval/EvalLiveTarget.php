@@ -19,6 +19,7 @@ final readonly class EvalLiveTarget
         public ?string $gatewayModel,
         public ?string $b4Endpoint,
         public array $judges,
+        public bool $webSearch = false,
     ) {
     }
 }
