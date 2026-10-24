@@ -5,6 +5,8 @@ namespace App\Security;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcTokenService;
 use App\Service\OidcUserService;
+use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
+use App\Service\PlatformLink\PlatformBearerAttribution;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,34 +31,30 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  */
 class OidcBearerAuthenticator extends AbstractAuthenticator
 {
+    /** JWT claims, so a later controller can read `azp` without parsing the token again. */
+    public const CLAIMS_ATTRIBUTE = 'oidc.claims';
+
     public function __construct(
         private OidcTokenService $oidcTokenService,
         private OidcUserService $oidcUserService,
         private LoggerInterface $logger,
+        private PlatformBearerAttribution $attribution,
     ) {
     }
 
     public function supports(Request $request): ?bool
     {
-        // Only handle Authorization: Bearer tokens
-        $authHeader = (string) $request->headers->get('Authorization', '');
-        if (!str_starts_with($authHeader, 'Bearer ')) {
+        $token = $this->bearerToken($request);
+        if (null === $token || str_starts_with($token, 'sk_')) {
             return false;
         }
 
-        $token = substr($authHeader, 7);
-
-        // Defer to ApiKeyAuthenticator for Synaplan API keys
-        if (str_starts_with($token, 'sk_')) {
+        // API keys stay on ApiKeyAuthenticator. Bearer tokens are accepted on
+        // the API and on exactly two OpenAI-compatible paths (D18).
+        if (str_starts_with($request->getPathInfo(), '/v1/') && !$this->isChatPath($request)) {
             return false;
         }
 
-        // Defer to ApiKeyAuthenticator for /v1/ routes (OpenAI-compatible)
-        if (str_starts_with($request->getPathInfo(), '/v1/')) {
-            return false;
-        }
-
-        // Defer to other authenticators if API key signals are present
         $apiKeyHeader = $request->headers->get('X-API-Key');
         if (is_string($apiKeyHeader) && '' !== trim($apiKeyHeader)) {
             return false;
@@ -67,12 +65,10 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
             return false;
         }
 
-        // Defer to CookieTokenAuthenticator if cookies are present
         if ($request->cookies->has('access_token') || $request->cookies->has('oidc_access_token')) {
             return false;
         }
 
-        // Only handle tokens that look like JWTs (three dot-separated parts)
         if (3 !== count(explode('.', $token))) {
             return false;
         }
@@ -80,16 +76,34 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         return true;
     }
 
-    public function authenticate(Request $request): Passport
+    private function bearerToken(Request $request): ?string
     {
         $authHeader = (string) $request->headers->get('Authorization', '');
-        $token = substr($authHeader, 7);
+        if (!str_starts_with($authHeader, 'Bearer ')) {
+            return null;
+        }
 
+        return substr($authHeader, 7);
+    }
+
+    private function isChatPath(Request $request): bool
+    {
+        $path = $request->getPathInfo();
+
+        return ('POST' === $request->getMethod() && '/v1/chat/completions' === $path)
+            || ('GET' === $request->getMethod() && '/v1/models' === $path);
+    }
+
+    public function authenticate(Request $request): Passport
+    {
+        $token = $this->bearerToken($request) ?? '';
         $claims = $this->oidcTokenService->validateBearerToken($token);
 
         if (!$claims) {
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
         }
+
+        $request->attributes->set(self::CLAIMS_ATTRIBUTE, $claims);
 
         // Find or create user via shared service (full claims include role data)
         try {
@@ -97,6 +111,8 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         } catch (OidcAccessDeniedException) {
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
         }
+
+        $this->attribution->attribute($user, $claims);
 
         $this->logger->debug('OIDC bearer token authenticated', [
             'user_id' => $user->getId(),
@@ -115,6 +131,14 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
+        if ($exception instanceof PlatformDisconnectedException) {
+            return new JsonResponse([
+                'error' => PlatformDisconnectedException::CODE,
+                'message' => PlatformDisconnectedException::MESSAGE,
+                'code' => PlatformDisconnectedException::CODE,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         return new JsonResponse([
             'error' => 'Authentication failed',
             'message' => $exception->getMessage(),

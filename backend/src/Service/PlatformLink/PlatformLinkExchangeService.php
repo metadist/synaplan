@@ -103,7 +103,7 @@ final readonly class PlatformLinkExchangeService
             $instance->getClient(),
             $payload['externalId'],
             $instance->getInstanceId(),
-            (int) $apiKey->getId(),
+            (int) $apiKey->getId(), ExternalIdentity::MODE_LINK,
         );
 
         $instance->touchLastSeen();

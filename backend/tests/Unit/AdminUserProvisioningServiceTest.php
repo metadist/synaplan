@@ -111,9 +111,10 @@ final class AdminUserProvisioningServiceTest extends TestCase
 
     public function testMintApiKeyGeneratesPrefixedKeyWithScopes(): void
     {
+        $this->em->method('wrapInTransaction')->willReturnCallback(static fn (callable $fn) => $fn());
         $this->apiKeyRepository->expects($this->once())
             ->method('save')
-            ->with($this->isInstanceOf(ApiKey::class));
+            ->with($this->isInstanceOf(ApiKey::class), false);
 
         $user = $this->userWithId(149);
         $result = $this->service->mintApiKeyForUser($user, 'nc-alice', ['chat', 'files']);
@@ -156,6 +157,7 @@ final class AdminUserProvisioningServiceTest extends TestCase
 
     public function testMintApiKeyDefaultsToWildcardScope(): void
     {
+        $this->em->method('wrapInTransaction')->willReturnCallback(static fn (callable $fn) => $fn());
         $this->apiKeyRepository->method('save');
 
         $result = $this->service->mintApiKeyForUser($this->userWithId(150), '', []);

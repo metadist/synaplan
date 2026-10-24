@@ -26,6 +26,7 @@ final class ScheduledJobs
             'app:cloud-deliveries:sweep',
             'app:media:reap-jobs',
             'app:chat:reap-stuck',
+            'app:research:reap',
             'app:desktop:reap-jobs',
             'app:voice:reap-sessions',
             'app:process-mail-handlers',

@@ -104,6 +104,7 @@ final class ApiKeyScope
         'POST /api/v1/media/generate' => [self::PLATFORM_CHAT],
         'POST /v1/chat/completions' => [self::PLATFORM_CHAT],
         'GET /api/v1/config/memory-service/check' => [self::PLATFORM_CHAT, self::PLATFORM_MEMORIES],
+        'POST /api/v1/platform-links/identities/adopt' => [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG],
     ];
 
     /**
@@ -325,6 +326,7 @@ final class ApiKeyScope
      *   /api/v1/agents           → agents:*
      *   POST /api/v1/summary/generate, POST /api/v1/media/generate,
      *   POST /v1/chat/completions → also chat (exact routes, PLATFORM_ROUTES)
+     *   POST /api/v1/platform-links/identities/adopt → chat, files or rag
      *   GET /api/v1/config/memory-service/check → chat OR memories
      *   /api/v1/auth/me          → any key except one naming `freeapi`
      *                              (self-service identity, see SELF_SERVICE_PATHS)
