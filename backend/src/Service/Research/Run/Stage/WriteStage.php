@@ -28,6 +28,9 @@ final readonly class WriteStage implements ResearchStage
 
     public function run(StageContext $ctx): StageResult
     {
+        if ([] === $ctx->state->ledger->evidenceForWriter()) {
+            return new StageResult('deliver');
+        }
         $brief = $ctx->state->ledger->brief();
         $language = null !== $brief ? $brief->language : 'en';
         $view = StageBudget::view($ctx->state->budget);

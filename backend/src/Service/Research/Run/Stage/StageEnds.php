@@ -21,7 +21,7 @@ final class StageEnds
 
         $points = count($ctx->state->ledger->points());
 
-        return self::finish($ctx, ResearchStatus::Stopped, new ResearchOutcome(ResearchOutcome::STOPPED_BUDGET, [
+        return self::finish($ctx, ResearchStatus::Stopped, new ResearchOutcome(ResearchOutcome::STOPPED_LIMIT, [
             'covered' => self::covered($ctx),
             'points' => $points,
         ]), 'stopped');
@@ -37,6 +37,11 @@ final class StageEnds
     public static function noSources(StageContext $ctx): StageResult
     {
         return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_NO_SOURCES), 'failed');
+    }
+
+    public static function nothingFound(StageContext $ctx): StageResult
+    {
+        return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_NOTHING_FOUND), 'failed');
     }
 
     private static function finish(StageContext $ctx, ResearchStatus $status, ResearchOutcome $outcome, string $event): StageResult

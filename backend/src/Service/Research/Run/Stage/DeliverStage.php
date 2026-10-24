@@ -29,11 +29,13 @@ final readonly class DeliverStage implements ResearchStage
         }
 
         if (0 === $cards || null === $ledger->report()) {
-            return StageEnds::noSources($ctx);
+            return StageEnds::nothingFound($ctx);
         }
         foreach ($ledger->points() as $point) {
             if ([] !== ($grouped[$point->id] ?? [])) {
                 $ledger->markPoint($point->id, PlanPoint::ANSWERED);
+            } else {
+                $ledger->markPoint($point->id, PlanPoint::UNCONFIRMED);
             }
         }
 
