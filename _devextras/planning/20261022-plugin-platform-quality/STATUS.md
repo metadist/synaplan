@@ -12,7 +12,7 @@ and a CI run are entries here, not chat messages.
 | 2026-10-24 | PQ6 | [#2649](https://github.com/metadist/synaplan/pull/2649) | merged | one `FilesTable.vue`, `table-fixed` |
 | 2026-10-24 | PQ1 | [#2719](https://github.com/metadist/synaplan/pull/2719) | in review | static checks; synaform is gitignored and its level-5 noise waits for a split |
 | 2026-10-24 | PQ2 | [#2720](https://github.com/metadist/synaplan/pull/2720) | in review | tested tar, native arm64, no short-commit tag |
-| 2026-10-24 | PQ3 | opening | in progress | locale files and t() |
+| 2026-10-24 | PQ3 | [#2722](https://github.com/metadist/synaplan/pull/2722) | in review | locale files and t(); J-PQ-1 not walked yet |
 
 ## Baselines
 
