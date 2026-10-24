@@ -175,8 +175,8 @@ final readonly class AdminModelsService
 
     /**
      * @return array{
-     *     moved: list<array{setting: string, ownerId: int, modelId: int, modelName: string}>,
-     *     cleared: list<array{setting: string, ownerId: int}>
+     *     moved: list<array{setting: string, scope: string, ownerId: int, modelId: int, modelName: string}>,
+     *     cleared: list<array{setting: string, scope: string, ownerId: int}>
      * }
      */
     public function deleteModel(int $id): array
