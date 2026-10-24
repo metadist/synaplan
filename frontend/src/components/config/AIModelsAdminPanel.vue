@@ -501,12 +501,13 @@ import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
+import { modelDeletionMessage } from '@/components/config/modelDeletionCopy'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const emit = defineEmits<{ changed: [] }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const dialog = useDialog()
 
 interface EditForm {
@@ -764,8 +765,8 @@ async function deleteModel(m: AdminModel) {
 
   rowDeletingId.value = m.id
   try {
-    await adminModelsApi.delete(m.id)
-    success(t('config.aiModels.admin.modelDeleted'))
+    const result = await adminModelsApi.delete(m.id)
+    success(modelDeletionMessage(result, t, te))
     await loadModels()
     emit('changed')
   } catch (e: unknown) {
