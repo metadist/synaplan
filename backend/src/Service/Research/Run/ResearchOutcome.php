@@ -18,8 +18,10 @@ final readonly class ResearchOutcome
     public const COMPLETE_SNIPPETS_ONLY = 'complete_snippets_only';
     public const STOPPED_BY_USER = 'stopped_by_user';
     public const STOPPED_BUDGET = 'stopped_budget';
+    public const STOPPED_LIMIT = 'stopped_limit';
     public const STOPPED_WAITING = 'stopped_waiting';
     public const FAILED_NO_SOURCES = 'failed_no_sources';
+    public const FAILED_NOTHING_FOUND = 'failed_nothing_found';
     public const FAILED_ROLE_UNAVAILABLE = 'failed_role_unavailable';
     public const FAILED_MODEL_ERROR = 'failed_model_error';
     public const FAILED_INTERRUPTED = 'failed_interrupted';
@@ -32,8 +34,10 @@ final readonly class ResearchOutcome
         self::COMPLETE_SNIPPETS_ONLY,
         self::STOPPED_BY_USER,
         self::STOPPED_BUDGET,
+        self::STOPPED_LIMIT,
         self::STOPPED_WAITING,
         self::FAILED_NO_SOURCES,
+        self::FAILED_NOTHING_FOUND,
         self::FAILED_ROLE_UNAVAILABLE,
         self::FAILED_MODEL_ERROR,
         self::FAILED_INTERRUPTED,
@@ -87,8 +91,14 @@ final readonly class ResearchOutcome
                 $this->whole('covered'),
                 $this->whole('points'),
             ),
+            self::STOPPED_LIMIT => sprintf(
+                'Stopped because this research reached its limit for this depth. What was found covers %d of %d points.',
+                $this->whole('covered'),
+                $this->whole('points'),
+            ),
             self::STOPPED_WAITING => 'Stopped because the plan was not confirmed within a day. Start it again when you are ready.',
             self::FAILED_NO_SOURCES => 'There was nothing to research: turn on the web or add files to this project.',
+            self::FAILED_NOTHING_FOUND => 'The sources that were searched held nothing that answers this question. Try rewording it or add files to this project.',
             self::FAILED_ROLE_UNAVAILABLE => sprintf(
                 'The %s model of this project is not available, and no other model in this project can stand in. Nothing was charged.',
                 $this->role(),

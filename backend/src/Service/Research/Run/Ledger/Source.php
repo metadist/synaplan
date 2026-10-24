@@ -88,6 +88,51 @@ final readonly class Source
         );
     }
 
+    public function described(?string $sourceClass, ?string $published): self
+    {
+        $class = self::optional($sourceClass, 40);
+        $date = self::optional($published, 40);
+
+        return new self(
+            $this->id,
+            $this->kind,
+            $this->title,
+            $this->status,
+            $this->url,
+            $this->fileId,
+            $this->host,
+            new SourceDetails(
+                $date ?? $this->details->published,
+                $class ?? $this->details->sourceClass,
+                $this->details->reason,
+                $this->details->readBy,
+                $this->details->origin,
+                $this->details->fromId,
+            ),
+        );
+    }
+
+    public function fromLink(string $fromId): self
+    {
+        return new self(
+            $this->id,
+            $this->kind,
+            $this->title,
+            $this->status,
+            $this->url,
+            $this->fileId,
+            $this->host,
+            new SourceDetails(
+                $this->details->published,
+                $this->details->sourceClass,
+                $this->details->reason,
+                $this->details->readBy,
+                'link',
+                PlainText::line($fromId, 20),
+            ),
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -108,6 +153,31 @@ final readonly class Source
             'origin' => $this->details->origin,
             'from' => $this->details->fromId,
         ];
+    }
+
+    /**
+     * The `source` event: enough for a live client to show the row without another request.
+     *
+     * @return array<string, mixed>
+     */
+    public function toEvent(): array
+    {
+        $event = ['id' => $this->id, 'kind' => $this->kind, 'title' => $this->title];
+        if (null !== $this->url) {
+            $event['url'] = $this->url;
+        }
+        if (null !== $this->host) {
+            $event['host'] = $this->host;
+        }
+        if (null !== $this->fileId) {
+            $event['file_id'] = $this->fileId;
+        }
+        $event['status'] = $this->status;
+        if (null !== $this->details->reason) {
+            $event['reason'] = $this->details->reason;
+        }
+
+        return $event;
     }
 
     /**

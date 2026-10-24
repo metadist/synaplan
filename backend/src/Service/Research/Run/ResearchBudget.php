@@ -106,6 +106,16 @@ final class ResearchBudget
         return $this->calls;
     }
 
+    public function callsLeft(): int
+    {
+        return max(0, $this->limits->maxModelCalls - $this->calls);
+    }
+
+    public function sourcesLeft(): int
+    {
+        return max(0, $this->limits->sources - $this->sourcesRead);
+    }
+
     /**
      * The snapshot a screen can show: used, then the cap.
      *

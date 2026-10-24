@@ -75,7 +75,7 @@ final class ResearchBudgetTest extends TestCase
         $restored = ResearchBudget::fromExport(ResearchDepth::Standard, $budget->export());
         // Pin the clock like the tests above: canCall() reads the wall clock,
         // and the fixed start above is in the past for every later run.
-        $restored->at($start->modify('+30 seconds'));
+        $restored->at($start);
 
         self::assertSame(3, $restored->toArray()['sources_read'][0]);
         self::assertEqualsWithDelta(0.3, $restored->toArray()['cost']['spent'], 0.000001);
