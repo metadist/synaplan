@@ -278,14 +278,40 @@ cat <<'EOM'
 EOM
 fi
 
-# Ensure writable directories exist and have correct permissions
-# This runs on every startup to handle volume mounts (Mac/Linux compatibility)
+# Ensure writable directories exist and have correct permissions.
+#
+# Only the top level of each tree is fixed on a normal start. The recursive
+# repair this used to run walked every uploaded file: in production
+# var/uploads is a shared NFS mount with tens of thousands of files, so
+# every backend and scheduler start on every node issued one chown and one
+# chmod NFS operation per file for a tree that was already www-data:775 —
+# the image build chowns it, and the application creates new files as
+# www-data. That held FrankenPHP back for minutes while the load balancer
+# drained the node. The recursive repair still runs for a tree whose top
+# level is not owned by www-data (fresh volume, dev bind mount with
+# host-owned files), and SYNAPLAN_REPAIR_PERMISSIONS=1 forces it, e.g.
+# after a restore copied files in as another user.
 mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backend/var/uploads /var/www/backend/public/up
 
-# Fix ownership and permissions recursively (works on both Mac and Linux)
-# -R flag handles all subdirectories and files, no need for separate find commands
-chown -R www-data:www-data /var/www/backend/var /var/www/backend/public/up 2>/dev/null || true
-chmod -R 775 /var/www/backend/var /var/www/backend/public/up 2>/dev/null || true
+ensure_writable_tree() {
+    # $1: directory that www-data must own and be able to write to.
+    local tree="$1"
+
+    if [ "${SYNAPLAN_REPAIR_PERMISSIONS:-0}" != "1" ] \
+        && [ "$(stat -c '%U:%G' "$tree" 2>/dev/null || true)" = "www-data:www-data" ]; then
+        chmod 775 "$tree" 2>/dev/null || true
+        return 0
+    fi
+
+    chown -R www-data:www-data "$tree" 2>/dev/null || true
+    chmod -R 775 "$tree" 2>/dev/null || true
+}
+
+ensure_writable_tree /var/www/backend/var
+ensure_writable_tree /var/www/backend/var/cache
+ensure_writable_tree /var/www/backend/var/log
+ensure_writable_tree /var/www/backend/var/uploads
+ensure_writable_tree /var/www/backend/public/up
 
 # Regenerate autoloader if plugins directory exists and has content
 # This MUST happen BEFORE any php bin/console commands because Symfony bootstrapping
