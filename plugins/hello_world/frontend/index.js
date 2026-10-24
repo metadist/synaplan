@@ -23,12 +23,11 @@ export default {
           Click Me!
         </button>
       </div>
-    `;
+    `
 
-    const btn = el.querySelector('#plugin-action-btn');
+    const btn = el.querySelector('#plugin-action-btn')
     if (btn) {
-      btn.onclick = () => alert('Plugin action triggered!');
+      btn.onclick = () => alert('Plugin action triggered!')
     }
-  }
-};
-
+  },
+}

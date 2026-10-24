@@ -15,6 +15,10 @@ lint: ## Check code quality (backend PSR-12 + frontend types)
 	$(MAKE) -C backend lint
 	$(MAKE) -C frontend lint
 
+plugins-format: ## Format plugins/ (read-write one-off; service mounts stay read-only)
+	docker compose run --rm --no-deps -v ./plugins:/plugins:rw backend ./vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php /plugins
+	docker compose run --rm --no-deps -v ./plugins:/plugins:rw -v ./frontend:/app -w /app frontend npx prettier --write "/plugins/**/*.js"
+
 format: ## Fix code formatting (backend + frontend)
 	$(MAKE) -C backend format
 	$(MAKE) -C frontend format

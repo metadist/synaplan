@@ -16,8 +16,7 @@ class HelloController extends AbstractController
         return new JsonResponse([
             'message' => 'Hello from plugin!',
             'userId' => $userId,
-            'plugin' => 'hello_world'
+            'plugin' => 'hello_world',
         ]);
     }
 }
-

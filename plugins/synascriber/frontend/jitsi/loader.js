@@ -11,7 +11,7 @@
  * popup when that fails. Keycloak returns to the plugin's /jitsi/silent page
  * on Synaplan, which hands the code back to this window.
  */
-(function () {
+;(function () {
   'use strict'
 
   var script = document.currentScript
@@ -31,7 +31,7 @@
   var SYNAPLAN_ORIGIN
   try {
     SYNAPLAN_ORIGIN = new URL(CONFIG.synaplan).origin
-  } catch (e) {
+  } catch {
     return
   }
   var API = CONFIG.synaplan + '/api/v1/plugins/synascriber/jitsi'
@@ -41,114 +41,254 @@
 
   var COPY = {
     en: {
-      button: 'Meeting notes', start_title: 'Start meeting notes', language: 'Meeting language', folder: 'Folder in Synaplan Sources',
-      consent: 'Everyone in this meeting will see that notes are on, and everyone signed in gets them in Synaplan Sources › Generated. Speech becomes text on your organisation\'s servers; audio is not kept.',
-      consent_own: 'Everyone in this meeting will see that notes are on; only you get them in Synaplan Sources › Generated. Speech becomes text on your organisation\'s servers; audio is not kept.',
-      start: 'Start meeting notes', cancel: 'Cancel', stop: 'Stop notes', on: 'Notes on', by: 'started by {name}', since: 'since {time}',
-      starting: 'Starting meeting notes…', saving: 'Saving the notes…', sign_in: 'Sign in to use meeting notes', signing_in: 'Signing in…',
-      saved: 'Notes saved in Synaplan Sources › Generated ({folder}).', saved_all: 'Notes saved in Synaplan Sources › Generated ({folder}) for everyone who was signed in: {count} people.',
-      saved_partial: '{count} participants did not get a copy. Ask your administrator.', received: 'The meeting notes {name} started are in your Synaplan Sources › Generated ({folder}).',
-      open: 'Open the notes', nothing: 'Notes stopped. Nobody spoke, so no file was written.',
-      failed: 'Meeting notes stopped: {reason} Nothing more is being written down.', close: 'Close',
-      stop_hint: 'Only {name} or an administrator can stop the notes here. A moderator can stop them with Jitsi\'s own control.',
+      button: 'Meeting notes',
+      start_title: 'Start meeting notes',
+      language: 'Meeting language',
+      folder: 'Folder in Synaplan Sources',
+      consent:
+        "Everyone in this meeting will see that notes are on, and everyone signed in gets them in Synaplan Sources › Generated. Speech becomes text on your organisation's servers; audio is not kept.",
+      consent_own:
+        "Everyone in this meeting will see that notes are on; only you get them in Synaplan Sources › Generated. Speech becomes text on your organisation's servers; audio is not kept.",
+      start: 'Start meeting notes',
+      cancel: 'Cancel',
+      stop: 'Stop notes',
+      on: 'Notes on',
+      by: 'started by {name}',
+      since: 'since {time}',
+      starting: 'Starting meeting notes…',
+      saving: 'Saving the notes…',
+      sign_in: 'Sign in to use meeting notes',
+      signing_in: 'Signing in…',
+      saved: 'Notes saved in Synaplan Sources › Generated ({folder}).',
+      saved_all:
+        'Notes saved in Synaplan Sources › Generated ({folder}) for everyone who was signed in: {count} people.',
+      saved_partial: '{count} participants did not get a copy. Ask your administrator.',
+      received:
+        'The meeting notes {name} started are in your Synaplan Sources › Generated ({folder}).',
+      open: 'Open the notes',
+      nothing: 'Notes stopped. Nobody spoke, so no file was written.',
+      failed: 'Meeting notes stopped: {reason} Nothing more is being written down.',
+      close: 'Close',
+      stop_hint:
+        "Only {name} or an administrator can stop the notes here. A moderator can stop them with Jitsi's own control.",
       err_already_running: 'Meeting notes are already on in this meeting.',
       err_not_enabled: 'An administrator has turned meeting notes off.',
       err_not_configured: 'Meeting notes are not fully set up yet. Ask your administrator.',
       err_jitsi_unreachable: 'Jitsi did not answer. Notes were not started. Try again in a minute.',
-      err_room_not_found: 'This meeting is not running on the server yet. Wait a moment and try again.',
+      err_room_not_found:
+        'This meeting is not running on the server yet. Wait a moment and try again.',
       err_transcriber_not_connected: 'the transcription service did not connect.',
       err_start_timeout: 'the start did not finish in time.',
       err_file_not_saved: 'the transcript could not be saved in Synaplan. Ask your administrator.',
       err_generic: 'Something went wrong. Try again in a minute.',
-      captions_on: 'Captions: on', captions_off: 'Captions: off', captions_region: 'Live captions', captions_hide: 'Hide captions', you: 'You', someone: 'Participant',
+      captions_on: 'Captions: on',
+      captions_off: 'Captions: off',
+      captions_region: 'Live captions',
+      captions_hide: 'Hide captions',
+      you: 'You',
+      someone: 'Participant',
     },
     de: {
-      button: 'Mitschrift', start_title: 'Mitschrift starten', language: 'Sprache der Besprechung', folder: 'Ordner in Synaplan Quellen',
-      consent: 'Alle in dieser Besprechung sehen, dass mitgeschrieben wird, und alle Angemeldeten erhalten die Mitschrift in Synaplan Quellen › Erzeugt. Sprache wird auf den Servern Ihrer Organisation zu Text; Audio wird nicht gespeichert.',
-      consent_own: 'Alle in dieser Besprechung sehen, dass mitgeschrieben wird; nur Sie erhalten die Mitschrift in Synaplan Quellen › Erzeugt. Sprache wird auf den Servern Ihrer Organisation zu Text; Audio wird nicht gespeichert.',
-      start: 'Mitschrift starten', cancel: 'Abbrechen', stop: 'Mitschrift beenden', on: 'Mitschrift läuft', by: 'gestartet von {name}', since: 'seit {time}',
-      starting: 'Mitschrift wird gestartet…', saving: 'Mitschrift wird gespeichert…', sign_in: 'Anmelden, um die Mitschrift zu nutzen', signing_in: 'Anmeldung…',
-      saved: 'Mitschrift gespeichert in Synaplan Quellen › Erzeugt ({folder}).', saved_all: 'Mitschrift gespeichert in Synaplan Quellen › Erzeugt ({folder}) für alle Angemeldeten: {count} Personen.',
-      saved_partial: '{count} Teilnehmende haben keine Kopie erhalten. Wenden Sie sich an die Administration.', received: 'Die von {name} gestartete Mitschrift liegt in Ihren Synaplan Quellen › Erzeugt ({folder}).',
-      open: 'Mitschrift öffnen', nothing: 'Mitschrift beendet. Niemand hat gesprochen, daher wurde keine Datei geschrieben.',
-      failed: 'Mitschrift beendet: {reason} Es wird nichts mehr mitgeschrieben.', close: 'Schließen',
-      stop_hint: 'Nur {name} oder eine Administratorin bzw. ein Administrator kann die Mitschrift hier beenden. Moderierende können sie über Jitsi beenden.',
+      button: 'Mitschrift',
+      start_title: 'Mitschrift starten',
+      language: 'Sprache der Besprechung',
+      folder: 'Ordner in Synaplan Quellen',
+      consent:
+        'Alle in dieser Besprechung sehen, dass mitgeschrieben wird, und alle Angemeldeten erhalten die Mitschrift in Synaplan Quellen › Erzeugt. Sprache wird auf den Servern Ihrer Organisation zu Text; Audio wird nicht gespeichert.',
+      consent_own:
+        'Alle in dieser Besprechung sehen, dass mitgeschrieben wird; nur Sie erhalten die Mitschrift in Synaplan Quellen › Erzeugt. Sprache wird auf den Servern Ihrer Organisation zu Text; Audio wird nicht gespeichert.',
+      start: 'Mitschrift starten',
+      cancel: 'Abbrechen',
+      stop: 'Mitschrift beenden',
+      on: 'Mitschrift läuft',
+      by: 'gestartet von {name}',
+      since: 'seit {time}',
+      starting: 'Mitschrift wird gestartet…',
+      saving: 'Mitschrift wird gespeichert…',
+      sign_in: 'Anmelden, um die Mitschrift zu nutzen',
+      signing_in: 'Anmeldung…',
+      saved: 'Mitschrift gespeichert in Synaplan Quellen › Erzeugt ({folder}).',
+      saved_all:
+        'Mitschrift gespeichert in Synaplan Quellen › Erzeugt ({folder}) für alle Angemeldeten: {count} Personen.',
+      saved_partial:
+        '{count} Teilnehmende haben keine Kopie erhalten. Wenden Sie sich an die Administration.',
+      received:
+        'Die von {name} gestartete Mitschrift liegt in Ihren Synaplan Quellen › Erzeugt ({folder}).',
+      open: 'Mitschrift öffnen',
+      nothing: 'Mitschrift beendet. Niemand hat gesprochen, daher wurde keine Datei geschrieben.',
+      failed: 'Mitschrift beendet: {reason} Es wird nichts mehr mitgeschrieben.',
+      close: 'Schließen',
+      stop_hint:
+        'Nur {name} oder eine Administratorin bzw. ein Administrator kann die Mitschrift hier beenden. Moderierende können sie über Jitsi beenden.',
       err_already_running: 'In dieser Besprechung läuft bereits eine Mitschrift.',
       err_not_enabled: 'Die Mitschrift wurde von der Administration ausgeschaltet.',
-      err_not_configured: 'Die Mitschrift ist noch nicht vollständig eingerichtet. Wenden Sie sich an die Administration.',
-      err_jitsi_unreachable: 'Jitsi hat nicht geantwortet. Die Mitschrift wurde nicht gestartet. Versuchen Sie es in einer Minute erneut.',
-      err_room_not_found: 'Diese Besprechung läuft auf dem Server noch nicht. Warten Sie kurz und versuchen Sie es erneut.',
+      err_not_configured:
+        'Die Mitschrift ist noch nicht vollständig eingerichtet. Wenden Sie sich an die Administration.',
+      err_jitsi_unreachable:
+        'Jitsi hat nicht geantwortet. Die Mitschrift wurde nicht gestartet. Versuchen Sie es in einer Minute erneut.',
+      err_room_not_found:
+        'Diese Besprechung läuft auf dem Server noch nicht. Warten Sie kurz und versuchen Sie es erneut.',
       err_transcriber_not_connected: 'der Transkriptionsdienst hat sich nicht verbunden.',
       err_start_timeout: 'der Start wurde nicht rechtzeitig abgeschlossen.',
-      err_file_not_saved: 'die Mitschrift konnte nicht in Synaplan gespeichert werden. Wenden Sie sich an die Administration.',
+      err_file_not_saved:
+        'die Mitschrift konnte nicht in Synaplan gespeichert werden. Wenden Sie sich an die Administration.',
       err_generic: 'Etwas ist schiefgelaufen. Versuchen Sie es in einer Minute erneut.',
-      captions_on: 'Untertitel: an', captions_off: 'Untertitel: aus', captions_region: 'Live-Untertitel', captions_hide: 'Untertitel ausblenden', you: 'Sie', someone: 'Teilnehmende Person',
+      captions_on: 'Untertitel: an',
+      captions_off: 'Untertitel: aus',
+      captions_region: 'Live-Untertitel',
+      captions_hide: 'Untertitel ausblenden',
+      you: 'Sie',
+      someone: 'Teilnehmende Person',
     },
     es: {
-      button: 'Notas de la reunión', start_title: 'Iniciar notas de la reunión', language: 'Idioma de la reunión', folder: 'Carpeta en Fuentes de Synaplan',
-      consent: 'Todos en esta reunión verán que se están tomando notas, y todas las personas con sesión iniciada las recibirán en Fuentes de Synaplan › Generados. La voz se convierte en texto en los servidores de tu organización; el audio no se guarda.',
-      consent_own: 'Todos en esta reunión verán que se están tomando notas; solo tú las recibirás en Fuentes de Synaplan › Generados. La voz se convierte en texto en los servidores de tu organización; el audio no se guarda.',
-      start: 'Iniciar notas', cancel: 'Cancelar', stop: 'Detener notas', on: 'Notas activas', by: 'iniciadas por {name}', since: 'desde las {time}',
-      starting: 'Iniciando las notas…', saving: 'Guardando las notas…', sign_in: 'Inicia sesión para usar las notas', signing_in: 'Iniciando sesión…',
-      saved: 'Notas guardadas en Fuentes de Synaplan › Generados ({folder}).', saved_all: 'Notas guardadas en Fuentes de Synaplan › Generados ({folder}) para todas las personas con sesión iniciada: {count}.',
-      saved_partial: '{count} participantes no recibieron una copia. Consulta a tu administrador.', received: 'Las notas que inició {name} están en tus Fuentes de Synaplan › Generados ({folder}).',
-      open: 'Abrir las notas', nothing: 'Notas detenidas. Nadie habló, así que no se creó ningún archivo.',
-      failed: 'Las notas se detuvieron: {reason} Ya no se anota nada más.', close: 'Cerrar',
-      stop_hint: 'Solo {name} o un administrador puede detener las notas aquí. Un moderador puede detenerlas con el control de Jitsi.',
+      button: 'Notas de la reunión',
+      start_title: 'Iniciar notas de la reunión',
+      language: 'Idioma de la reunión',
+      folder: 'Carpeta en Fuentes de Synaplan',
+      consent:
+        'Todos en esta reunión verán que se están tomando notas, y todas las personas con sesión iniciada las recibirán en Fuentes de Synaplan › Generados. La voz se convierte en texto en los servidores de tu organización; el audio no se guarda.',
+      consent_own:
+        'Todos en esta reunión verán que se están tomando notas; solo tú las recibirás en Fuentes de Synaplan › Generados. La voz se convierte en texto en los servidores de tu organización; el audio no se guarda.',
+      start: 'Iniciar notas',
+      cancel: 'Cancelar',
+      stop: 'Detener notas',
+      on: 'Notas activas',
+      by: 'iniciadas por {name}',
+      since: 'desde las {time}',
+      starting: 'Iniciando las notas…',
+      saving: 'Guardando las notas…',
+      sign_in: 'Inicia sesión para usar las notas',
+      signing_in: 'Iniciando sesión…',
+      saved: 'Notas guardadas en Fuentes de Synaplan › Generados ({folder}).',
+      saved_all:
+        'Notas guardadas en Fuentes de Synaplan › Generados ({folder}) para todas las personas con sesión iniciada: {count}.',
+      saved_partial: '{count} participantes no recibieron una copia. Consulta a tu administrador.',
+      received:
+        'Las notas que inició {name} están en tus Fuentes de Synaplan › Generados ({folder}).',
+      open: 'Abrir las notas',
+      nothing: 'Notas detenidas. Nadie habló, así que no se creó ningún archivo.',
+      failed: 'Las notas se detuvieron: {reason} Ya no se anota nada más.',
+      close: 'Cerrar',
+      stop_hint:
+        'Solo {name} o un administrador puede detener las notas aquí. Un moderador puede detenerlas con el control de Jitsi.',
       err_already_running: 'Ya hay notas activas en esta reunión.',
       err_not_enabled: 'Un administrador ha desactivado las notas de la reunión.',
-      err_not_configured: 'Las notas aún no están configuradas por completo. Consulta a tu administrador.',
-      err_jitsi_unreachable: 'Jitsi no respondió. Las notas no se iniciaron. Inténtalo de nuevo en un minuto.',
-      err_room_not_found: 'Esta reunión aún no está en marcha en el servidor. Espera un momento e inténtalo de nuevo.',
+      err_not_configured:
+        'Las notas aún no están configuradas por completo. Consulta a tu administrador.',
+      err_jitsi_unreachable:
+        'Jitsi no respondió. Las notas no se iniciaron. Inténtalo de nuevo en un minuto.',
+      err_room_not_found:
+        'Esta reunión aún no está en marcha en el servidor. Espera un momento e inténtalo de nuevo.',
       err_transcriber_not_connected: 'el servicio de transcripción no se conectó.',
       err_start_timeout: 'el inicio no terminó a tiempo.',
-      err_file_not_saved: 'la transcripción no se pudo guardar en Synaplan. Consulta a tu administrador.',
+      err_file_not_saved:
+        'la transcripción no se pudo guardar en Synaplan. Consulta a tu administrador.',
       err_generic: 'Algo salió mal. Inténtalo de nuevo en un minuto.',
-      captions_on: 'Subtítulos: activados', captions_off: 'Subtítulos: desactivados', captions_region: 'Subtítulos en directo', captions_hide: 'Ocultar subtítulos', you: 'Tú', someone: 'Participante',
+      captions_on: 'Subtítulos: activados',
+      captions_off: 'Subtítulos: desactivados',
+      captions_region: 'Subtítulos en directo',
+      captions_hide: 'Ocultar subtítulos',
+      you: 'Tú',
+      someone: 'Participante',
     },
     fr: {
-      button: 'Notes de réunion', start_title: 'Lancer les notes de réunion', language: 'Langue de la réunion', folder: 'Dossier dans Sources Synaplan',
-      consent: 'Tous les participants verront que des notes sont prises, et chaque personne connectée les recevra dans Sources Synaplan › Générés. La parole devient du texte sur les serveurs de votre organisation ; l\'audio n\'est pas conservé.',
-      consent_own: 'Tous les participants verront que des notes sont prises ; vous seul(e) les recevrez dans Sources Synaplan › Générés. La parole devient du texte sur les serveurs de votre organisation ; l\'audio n\'est pas conservé.',
-      start: 'Lancer les notes', cancel: 'Annuler', stop: 'Arrêter les notes', on: 'Notes en cours', by: 'lancées par {name}', since: 'depuis {time}',
-      starting: 'Lancement des notes…', saving: 'Enregistrement des notes…', sign_in: 'Connectez-vous pour utiliser les notes', signing_in: 'Connexion…',
-      saved: 'Notes enregistrées dans Sources Synaplan › Générés ({folder}).', saved_all: 'Notes enregistrées dans Sources Synaplan › Générés ({folder}) pour chaque personne connectée : {count}.',
-      saved_partial: '{count} participants n\'ont pas reçu de copie. Adressez-vous à votre administrateur.', received: 'Les notes lancées par {name} sont dans vos Sources Synaplan › Générés ({folder}).',
-      open: 'Ouvrir les notes', nothing: 'Notes arrêtées. Personne n\'a parlé, aucun fichier n\'a été créé.',
-      failed: 'Les notes se sont arrêtées : {reason} Plus rien n\'est noté.', close: 'Fermer',
-      stop_hint: 'Seul(e) {name} ou un administrateur peut arrêter les notes ici. Un modérateur peut les arrêter avec la commande de Jitsi.',
+      button: 'Notes de réunion',
+      start_title: 'Lancer les notes de réunion',
+      language: 'Langue de la réunion',
+      folder: 'Dossier dans Sources Synaplan',
+      consent:
+        "Tous les participants verront que des notes sont prises, et chaque personne connectée les recevra dans Sources Synaplan › Générés. La parole devient du texte sur les serveurs de votre organisation ; l'audio n'est pas conservé.",
+      consent_own:
+        "Tous les participants verront que des notes sont prises ; vous seul(e) les recevrez dans Sources Synaplan › Générés. La parole devient du texte sur les serveurs de votre organisation ; l'audio n'est pas conservé.",
+      start: 'Lancer les notes',
+      cancel: 'Annuler',
+      stop: 'Arrêter les notes',
+      on: 'Notes en cours',
+      by: 'lancées par {name}',
+      since: 'depuis {time}',
+      starting: 'Lancement des notes…',
+      saving: 'Enregistrement des notes…',
+      sign_in: 'Connectez-vous pour utiliser les notes',
+      signing_in: 'Connexion…',
+      saved: 'Notes enregistrées dans Sources Synaplan › Générés ({folder}).',
+      saved_all:
+        'Notes enregistrées dans Sources Synaplan › Générés ({folder}) pour chaque personne connectée : {count}.',
+      saved_partial:
+        "{count} participants n'ont pas reçu de copie. Adressez-vous à votre administrateur.",
+      received: 'Les notes lancées par {name} sont dans vos Sources Synaplan › Générés ({folder}).',
+      open: 'Ouvrir les notes',
+      nothing: "Notes arrêtées. Personne n'a parlé, aucun fichier n'a été créé.",
+      failed: "Les notes se sont arrêtées : {reason} Plus rien n'est noté.",
+      close: 'Fermer',
+      stop_hint:
+        'Seul(e) {name} ou un administrateur peut arrêter les notes ici. Un modérateur peut les arrêter avec la commande de Jitsi.',
       err_already_running: 'Des notes sont déjà en cours dans cette réunion.',
       err_not_enabled: 'Un administrateur a désactivé les notes de réunion.',
-      err_not_configured: 'Les notes ne sont pas encore entièrement configurées. Adressez-vous à votre administrateur.',
-      err_jitsi_unreachable: 'Jitsi n\'a pas répondu. Les notes n\'ont pas été lancées. Réessayez dans une minute.',
-      err_room_not_found: 'Cette réunion n\'a pas encore démarré sur le serveur. Patientez un instant puis réessayez.',
-      err_transcriber_not_connected: 'le service de transcription ne s\'est pas connecté.',
-      err_start_timeout: 'le lancement n\'a pas abouti à temps.',
-      err_file_not_saved: 'la transcription n\'a pas pu être enregistrée dans Synaplan. Adressez-vous à votre administrateur.',
-      err_generic: 'Une erreur s\'est produite. Réessayez dans une minute.',
-      captions_on: 'Sous-titres : activés', captions_off: 'Sous-titres : désactivés', captions_region: 'Sous-titres en direct', captions_hide: 'Masquer les sous-titres', you: 'Vous', someone: 'Participant',
+      err_not_configured:
+        'Les notes ne sont pas encore entièrement configurées. Adressez-vous à votre administrateur.',
+      err_jitsi_unreachable:
+        "Jitsi n'a pas répondu. Les notes n'ont pas été lancées. Réessayez dans une minute.",
+      err_room_not_found:
+        "Cette réunion n'a pas encore démarré sur le serveur. Patientez un instant puis réessayez.",
+      err_transcriber_not_connected: "le service de transcription ne s'est pas connecté.",
+      err_start_timeout: "le lancement n'a pas abouti à temps.",
+      err_file_not_saved:
+        "la transcription n'a pas pu être enregistrée dans Synaplan. Adressez-vous à votre administrateur.",
+      err_generic: "Une erreur s'est produite. Réessayez dans une minute.",
+      captions_on: 'Sous-titres : activés',
+      captions_off: 'Sous-titres : désactivés',
+      captions_region: 'Sous-titres en direct',
+      captions_hide: 'Masquer les sous-titres',
+      you: 'Vous',
+      someone: 'Participant',
     },
     tr: {
-      button: 'Toplantı notları', start_title: 'Toplantı notlarını başlat', language: 'Toplantı dili', folder: 'Synaplan Kaynaklar\'da klasör',
-      consent: 'Bu toplantıdaki herkes not alındığını görür; oturum açan herkes notları Synaplan Kaynaklar › Üretilen bölümünde alır. Konuşma, kuruluşunuzun sunucularında metne dönüşür; ses saklanmaz.',
-      consent_own: 'Bu toplantıdaki herkes not alındığını görür; notları yalnızca siz Synaplan Kaynaklar › Üretilen bölümünde alırsınız. Konuşma, kuruluşunuzun sunucularında metne dönüşür; ses saklanmaz.',
-      start: 'Notları başlat', cancel: 'İptal', stop: 'Notları durdur', on: 'Notlar açık', by: '{name} başlattı', since: '{time} itibarıyla',
-      starting: 'Notlar başlatılıyor…', saving: 'Notlar kaydediliyor…', sign_in: 'Notları kullanmak için oturum açın', signing_in: 'Oturum açılıyor…',
-      saved: 'Notlar Synaplan Kaynaklar › Üretilen ({folder}) bölümüne kaydedildi.', saved_all: 'Notlar, oturum açan herkes için Synaplan Kaynaklar › Üretilen ({folder}) bölümüne kaydedildi: {count} kişi.',
-      saved_partial: '{count} katılımcı kopya alamadı. Yöneticinize başvurun.', received: '{name} tarafından başlatılan notlar Synaplan Kaynaklar › Üretilen ({folder}) bölümünde.',
-      open: 'Notları aç', nothing: 'Notlar durduruldu. Kimse konuşmadığı için dosya oluşturulmadı.',
-      failed: 'Toplantı notları durdu: {reason} Artık hiçbir şey not edilmiyor.', close: 'Kapat',
-      stop_hint: 'Notları burada yalnızca {name} veya bir yönetici durdurabilir. Moderatörler Jitsi\'nin kendi denetimiyle durdurabilir.',
+      button: 'Toplantı notları',
+      start_title: 'Toplantı notlarını başlat',
+      language: 'Toplantı dili',
+      folder: "Synaplan Kaynaklar'da klasör",
+      consent:
+        'Bu toplantıdaki herkes not alındığını görür; oturum açan herkes notları Synaplan Kaynaklar › Üretilen bölümünde alır. Konuşma, kuruluşunuzun sunucularında metne dönüşür; ses saklanmaz.',
+      consent_own:
+        'Bu toplantıdaki herkes not alındığını görür; notları yalnızca siz Synaplan Kaynaklar › Üretilen bölümünde alırsınız. Konuşma, kuruluşunuzun sunucularında metne dönüşür; ses saklanmaz.',
+      start: 'Notları başlat',
+      cancel: 'İptal',
+      stop: 'Notları durdur',
+      on: 'Notlar açık',
+      by: '{name} başlattı',
+      since: '{time} itibarıyla',
+      starting: 'Notlar başlatılıyor…',
+      saving: 'Notlar kaydediliyor…',
+      sign_in: 'Notları kullanmak için oturum açın',
+      signing_in: 'Oturum açılıyor…',
+      saved: 'Notlar Synaplan Kaynaklar › Üretilen ({folder}) bölümüne kaydedildi.',
+      saved_all:
+        'Notlar, oturum açan herkes için Synaplan Kaynaklar › Üretilen ({folder}) bölümüne kaydedildi: {count} kişi.',
+      saved_partial: '{count} katılımcı kopya alamadı. Yöneticinize başvurun.',
+      received:
+        '{name} tarafından başlatılan notlar Synaplan Kaynaklar › Üretilen ({folder}) bölümünde.',
+      open: 'Notları aç',
+      nothing: 'Notlar durduruldu. Kimse konuşmadığı için dosya oluşturulmadı.',
+      failed: 'Toplantı notları durdu: {reason} Artık hiçbir şey not edilmiyor.',
+      close: 'Kapat',
+      stop_hint:
+        "Notları burada yalnızca {name} veya bir yönetici durdurabilir. Moderatörler Jitsi'nin kendi denetimiyle durdurabilir.",
       err_already_running: 'Bu toplantıda notlar zaten açık.',
       err_not_enabled: 'Bir yönetici toplantı notlarını kapattı.',
       err_not_configured: 'Toplantı notları henüz tam kurulmadı. Yöneticinize başvurun.',
-      err_jitsi_unreachable: 'Jitsi yanıt vermedi. Notlar başlatılmadı. Bir dakika sonra tekrar deneyin.',
+      err_jitsi_unreachable:
+        'Jitsi yanıt vermedi. Notlar başlatılmadı. Bir dakika sonra tekrar deneyin.',
       err_room_not_found: 'Bu toplantı sunucuda henüz başlamadı. Biraz bekleyip tekrar deneyin.',
       err_transcriber_not_connected: 'yazıya dökme hizmeti bağlanmadı.',
       err_start_timeout: 'başlatma zamanında tamamlanmadı.',
-      err_file_not_saved: 'not dosyası Synaplan\'a kaydedilemedi. Yöneticinize başvurun.',
+      err_file_not_saved: "not dosyası Synaplan'a kaydedilemedi. Yöneticinize başvurun.",
       err_generic: 'Bir sorun oluştu. Bir dakika sonra tekrar deneyin.',
-      captions_on: 'Altyazı: açık', captions_off: 'Altyazı: kapalı', captions_region: 'Canlı altyazı', captions_hide: 'Altyazıyı gizle', you: 'Siz', someone: 'Katılımcı',
+      captions_on: 'Altyazı: açık',
+      captions_off: 'Altyazı: kapalı',
+      captions_region: 'Canlı altyazı',
+      captions_hide: 'Altyazıyı gizle',
+      you: 'Siz',
+      someone: 'Katılımcı',
     },
   }
   var LANGUAGE_NAMES = { de: 'Deutsch', en: 'English', es: 'Español', fr: 'Français', tr: 'Türkçe' }
@@ -156,11 +296,20 @@
   function locale() {
     var candidates = []
     try {
-      candidates.push(window.APP && APP.translation && APP.translation.getCurrentLanguage && APP.translation.getCurrentLanguage())
-    } catch (e) { /* Jitsi not ready yet */ }
+      candidates.push(
+        window.APP &&
+          APP.translation &&
+          APP.translation.getCurrentLanguage &&
+          APP.translation.getCurrentLanguage()
+      )
+    } catch {
+      /* Jitsi not ready yet */
+    }
     candidates.push(document.documentElement.lang, navigator.language)
     for (var i = 0; i < candidates.length; i++) {
-      var code = String(candidates[i] || '').slice(0, 2).toLowerCase()
+      var code = String(candidates[i] || '')
+        .slice(0, 2)
+        .toLowerCase()
       if (COPY[code]) {
         return code
       }
@@ -183,7 +332,11 @@
   function randomString(bytes) {
     var array = new Uint8Array(bytes)
     crypto.getRandomValues(array)
-    return Array.prototype.map.call(array, function (b) { return ('0' + b.toString(16)).slice(-2) }).join('')
+    return Array.prototype.map
+      .call(array, function (b) {
+        return ('0' + b.toString(16)).slice(-2)
+      })
+      .join('')
   }
 
   function base64url(buffer) {
@@ -214,7 +367,11 @@
         reject(new Error('timeout'))
       }, timeoutMs)
       function onMessage(event) {
-        if (event.origin !== SYNAPLAN_ORIGIN || !event.data || event.data.type !== 'synascriber-auth') {
+        if (
+          event.origin !== SYNAPLAN_ORIGIN ||
+          !event.data ||
+          event.data.type !== 'synascriber-auth'
+        ) {
           return
         }
         var params = new URLSearchParams(event.data.search || '')
@@ -245,42 +402,47 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
-    }).then(function (response) {
-      if (!response.ok) {
-        throw new Error('token_exchange_failed')
-      }
-      return response.json()
-    }).then(function (data) {
-      token = data.access_token
-      tokenExpires = Date.now() + Math.max(30, (data.expires_in || 300) - 30) * 1000
-      return token
     })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('token_exchange_failed')
+        }
+        return response.json()
+      })
+      .then(function (data) {
+        token = data.access_token
+        tokenExpires = Date.now() + Math.max(30, (data.expires_in || 300) - 30) * 1000
+        return token
+      })
   }
 
   function signIn(silent) {
     var state = randomString(16)
     var verifier = randomString(32)
-    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(function (hash) {
-      var url = authUrl(state, base64url(hash), silent)
-      var waiting = waitForRedirect(state, silent ? 8000 : 120000)
-      var frame = null
-      if (silent) {
-        frame = document.createElement('iframe')
-        frame.style.display = 'none'
-        frame.title = 'synascriber-sign-in'
-        frame.src = url
-        document.body.appendChild(frame)
-      } else {
-        window.open(url, 'synascriber-sign-in', 'width=480,height=640')
-      }
-      return waiting.finally(function () {
-        if (frame) {
-          frame.remove()
+    return crypto.subtle
+      .digest('SHA-256', new TextEncoder().encode(verifier))
+      .then(function (hash) {
+        var url = authUrl(state, base64url(hash), silent)
+        var waiting = waitForRedirect(state, silent ? 8000 : 120000)
+        var frame = null
+        if (silent) {
+          frame = document.createElement('iframe')
+          frame.style.display = 'none'
+          frame.title = 'synascriber-sign-in'
+          frame.src = url
+          document.body.appendChild(frame)
+        } else {
+          window.open(url, 'synascriber-sign-in', 'width=480,height=640')
         }
+        return waiting.finally(function () {
+          if (frame) {
+            frame.remove()
+          }
+        })
       })
-    }).then(function (code) {
-      return exchange(code, verifier)
-    })
+      .then(function (code) {
+        return exchange(code, verifier)
+      })
   }
 
   function ensureToken(interactive) {
@@ -296,26 +458,44 @@
   }
 
   function api(method, path, body, interactive) {
-    return ensureToken(interactive).then(function (bearer) {
-      return fetch(API + path, {
-        method: method,
-        headers: { Authorization: 'Bearer ' + bearer, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
+    return ensureToken(interactive)
+      .then(function (bearer) {
+        return fetch(API + path, {
+          method: method,
+          headers: {
+            Authorization: 'Bearer ' + bearer,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        })
       })
-    }).then(function (response) {
-      return response.json().catch(function () { return {} }).then(function (data) {
-        if (response.status === 401) {
-          token = null
-        }
-        return { status: response.status, data: data }
+      .then(function (response) {
+        return response
+          .json()
+          .catch(function () {
+            return {}
+          })
+          .then(function (data) {
+            if (response.status === 401) {
+              token = null
+            }
+            return { status: response.status, data: data }
+          })
       })
-    })
   }
 
   // ---------------------------------------------------------------- state
 
   // view.state: hidden | signin | connecting | launching | idle (session states come from view.info.session)
-  var view = { state: 'hidden', info: null, notice: null, busy: false, signedIn: false, dialog: false }
+  var view = {
+    state: 'hidden',
+    info: null,
+    notice: null,
+    busy: false,
+    signedIn: false,
+    dialog: false,
+  }
   var room = ''
   var pollTimer = null
   var shownOutcomes = {}
@@ -324,64 +504,69 @@
     if (!room) {
       return Promise.resolve()
     }
-    return api('GET', '/state?room=' + encodeURIComponent(room), null, interactive).then(function (res) {
-      if (res.status === 401) {
+    return api('GET', '/state?room=' + encodeURIComponent(room), null, interactive)
+      .then(function (res) {
+        if (res.status === 401) {
+          view.signedIn = false
+          view.state = 'signin'
+          render()
+          return
+        }
+        view.signedIn = true
+        if (res.status !== 200 || !res.data.enabled) {
+          view.state = 'hidden'
+          view.info = null
+          render()
+          return
+        }
+        view.info = res.data
+        if (view.state !== 'launching') {
+          view.state = 'idle'
+        }
+        var recent = res.data.recent
+        if (recent && !shownOutcomes[recent.id]) {
+          shownOutcomes[recent.id] = true
+          showOutcome(recent)
+        }
+        render()
+      })
+      .catch(function () {
         view.signedIn = false
         view.state = 'signin'
         render()
-        return
-      }
-      view.signedIn = true
-      if (res.status !== 200 || !res.data.enabled) {
-        view.state = 'hidden'
-        view.info = null
-        render()
-        return
-      }
-      view.info = res.data
-      if (view.state !== 'launching') {
-        view.state = 'idle'
-      }
-      var recent = res.data.recent
-      if (recent && !shownOutcomes[recent.id]) {
-        shownOutcomes[recent.id] = true
-        showOutcome(recent)
-      }
-      render()
-    }).catch(function () {
-      view.signedIn = false
-      view.state = 'signin'
-      render()
-    })
+      })
   }
 
   function startNotes(language, folder) {
     view.busy = true
     view.state = 'launching'
     render()
-    return api('POST', '/sessions', { room: room, language: language, folder: folder }, true).then(function (res) {
-      view.busy = false
-      view.dialog = false
-      view.state = 'idle'
-      var session = res.data && res.data.session
-      if (res.status === 201 && session) {
-        view.info.session = session
-      } else if (session && session.state === 'failed') {
-        shownOutcomes[session.id] = true
-        showOutcome(session)
-      } else {
-        view.notice = { kind: 'error', text: errorText(res.data) }
-        if (session) {
+    return api('POST', '/sessions', { room: room, language: language, folder: folder }, true).then(
+      function (res) {
+        view.busy = false
+        view.dialog = false
+        view.state = 'idle'
+        var session = res.data && res.data.session
+        if (res.status === 201 && session) {
           view.info.session = session
+        } else if (session && session.state === 'failed') {
+          shownOutcomes[session.id] = true
+          showOutcome(session)
+        } else {
+          view.notice = { kind: 'error', text: errorText(res.data) }
+          if (session) {
+            view.info.session = session
+          }
         }
+        render()
+        return refresh(false)
+      },
+      function () {
+        view.busy = false
+        view.state = 'signin'
+        render()
       }
-      render()
-      return refresh(false)
-    }, function () {
-      view.busy = false
-      view.state = 'signin'
-      render()
-    })
+    )
   }
 
   function stopNotes() {
@@ -411,11 +596,18 @@
     if (session.state === 'saved' && session.fileId) {
       var text = session.received
         ? t('received', { name: session.startedBy, folder: session.folder })
-        : t(session.recipients > 1 ? 'saved_all' : 'saved', { folder: session.folder, count: session.recipients })
+        : t(session.recipients > 1 ? 'saved_all' : 'saved', {
+            folder: session.folder,
+            count: session.recipients,
+          })
       if (session.mine && session.notDelivered > 0) {
         text += ' ' + t('saved_partial', { count: session.notDelivered })
       }
-      view.notice = { kind: 'saved', text: text, link: CONFIG.synaplan + '/files?file=' + session.fileId }
+      view.notice = {
+        kind: 'saved',
+        text: text,
+        link: CONFIG.synaplan + '/files?file=' + session.fileId,
+      }
     } else if (session.state === 'nothing_to_save') {
       view.notice = { kind: 'info', text: t('nothing') }
     } else {
@@ -492,7 +684,7 @@
   function clock(iso) {
     try {
       return new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-    } catch (e) {
+    } catch {
       return ''
     }
   }
@@ -507,25 +699,59 @@
       }
       select.appendChild(option)
     })
-    var folder = el('input', { id: 'syn-folder', type: 'text', maxlength: '64', value: info.defaultFolder || 'Meetings' })
-    var start = el('button', { class: 'act primary', type: 'button', text: t('start'), onclick: function () { startNotes(select.value, folder.value) } })
+    var folder = el('input', {
+      id: 'syn-folder',
+      type: 'text',
+      maxlength: '64',
+      value: info.defaultFolder || 'Meetings',
+    })
+    var start = el('button', {
+      class: 'act primary',
+      type: 'button',
+      text: t('start'),
+      onclick: function () {
+        startNotes(select.value, folder.value)
+      },
+    })
     if (view.busy) {
       start.setAttribute('disabled', 'disabled')
     }
-    var box = el('div', { class: 'dialog', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'syn-title' }, [
-      el('h2', { id: 'syn-title', text: t('start_title') }),
-      el('label', { for: 'syn-language', text: t('language') }), select,
-      el('label', { for: 'syn-folder', text: t('folder') }), folder,
-      el('p', { class: 'hint', text: t(view.info && view.info.shared === false ? 'consent_own' : 'consent') }),
-      el('div', { class: 'row' }, [start, el('button', { class: 'act secondary', type: 'button', text: t('cancel'), onclick: function () { view.dialog = false; render() } })]),
-    ])
+    var box = el(
+      'div',
+      { class: 'dialog', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'syn-title' },
+      [
+        el('h2', { id: 'syn-title', text: t('start_title') }),
+        el('label', { for: 'syn-language', text: t('language') }),
+        select,
+        el('label', { for: 'syn-folder', text: t('folder') }),
+        folder,
+        el('p', {
+          class: 'hint',
+          text: t(view.info && view.info.shared === false ? 'consent_own' : 'consent'),
+        }),
+        el('div', { class: 'row' }, [
+          start,
+          el('button', {
+            class: 'act secondary',
+            type: 'button',
+            text: t('cancel'),
+            onclick: function () {
+              view.dialog = false
+              render()
+            },
+          }),
+        ]),
+      ]
+    )
     box.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         view.dialog = false
         render()
       }
     })
-    setTimeout(function () { select.focus() }, 0)
+    setTimeout(function () {
+      select.focus()
+    }, 0)
     return box
   }
 
@@ -539,38 +765,92 @@
     var session = info.session
     var wrap = el('div', { class: 'wrap' })
     wrap.style.top = topOffset() + 'px'
-    var active = session && ['starting', 'running', 'stopping', 'saving'].indexOf(session.state) >= 0
+    var active =
+      session && ['starting', 'running', 'stopping', 'saving'].indexOf(session.state) >= 0
 
     if (view.state === 'signin') {
-      wrap.appendChild(el('button', { class: 'pill', type: 'button', onclick: function () { view.state = 'connecting'; render(); refresh(true) } }, [
-        el('span', { class: 'dot' }), el('span', { text: t('sign_in') }),
-      ]))
+      wrap.appendChild(
+        el(
+          'button',
+          {
+            class: 'pill',
+            type: 'button',
+            onclick: function () {
+              view.state = 'connecting'
+              render()
+              refresh(true)
+            },
+          },
+          [el('span', { class: 'dot' }), el('span', { text: t('sign_in') })]
+        )
+      )
     } else if (view.state === 'connecting') {
-      wrap.appendChild(el('div', { class: 'pill', role: 'status', 'aria-disabled': 'true' }, [el('span', { class: 'dot' }), el('span', { text: t('signing_in') })]))
+      wrap.appendChild(
+        el('div', { class: 'pill', role: 'status', 'aria-disabled': 'true' }, [
+          el('span', { class: 'dot' }),
+          el('span', { text: t('signing_in') }),
+        ])
+      )
     } else if (view.state === 'launching') {
-      wrap.appendChild(el('div', { class: 'pill on', role: 'status', 'aria-live': 'polite', 'aria-disabled': 'true' }, [el('span', { class: 'dot' }), el('span', { text: t('starting') })]))
+      wrap.appendChild(
+        el(
+          'div',
+          { class: 'pill on', role: 'status', 'aria-live': 'polite', 'aria-disabled': 'true' },
+          [el('span', { class: 'dot' }), el('span', { text: t('starting') })]
+        )
+      )
     } else if (active) {
-      var label = session.state === 'running'
-        ? t('on') + ' · ' + t('by', { name: session.startedBy }) + ' · ' + t('since', { time: clock(session.startedAt) })
-        : (session.state === 'starting' ? t('starting') : t('saving'))
-      wrap.appendChild(el('div', { class: 'pill on', role: 'status', 'aria-live': 'polite', 'aria-disabled': 'true' }, [
-        el('span', { class: 'dot' }), el('span', { text: label }),
-      ]))
+      var label =
+        session.state === 'running'
+          ? t('on') +
+            ' · ' +
+            t('by', { name: session.startedBy }) +
+            ' · ' +
+            t('since', { time: clock(session.startedAt) })
+          : session.state === 'starting'
+            ? t('starting')
+            : t('saving')
+      wrap.appendChild(
+        el(
+          'div',
+          { class: 'pill on', role: 'status', 'aria-live': 'polite', 'aria-disabled': 'true' },
+          [el('span', { class: 'dot' }), el('span', { text: label })]
+        )
+      )
       if (session.state === 'running') {
         if (session.canStop) {
-          var stop = el('button', { class: 'act danger', type: 'button', text: t('stop'), onclick: stopNotes })
+          var stop = el('button', {
+            class: 'act danger',
+            type: 'button',
+            text: t('stop'),
+            onclick: stopNotes,
+          })
           if (view.busy) {
             stop.setAttribute('disabled', 'disabled')
           }
           wrap.appendChild(el('div', { class: 'row' }, [stop]))
         } else {
-          wrap.appendChild(el('div', { class: 'banner', text: t('stop_hint', { name: session.startedBy }) }))
+          wrap.appendChild(
+            el('div', { class: 'banner', text: t('stop_hint', { name: session.startedBy }) })
+          )
         }
       }
     } else {
-      wrap.appendChild(el('button', { class: 'pill', type: 'button', 'aria-expanded': String(view.dialog), onclick: function () { view.dialog = !view.dialog; render() } }, [
-        el('span', { class: 'dot' }), el('span', { text: t('button') }),
-      ]))
+      wrap.appendChild(
+        el(
+          'button',
+          {
+            class: 'pill',
+            type: 'button',
+            'aria-expanded': String(view.dialog),
+            onclick: function () {
+              view.dialog = !view.dialog
+              render()
+            },
+          },
+          [el('span', { class: 'dot' }), el('span', { text: t('button') })]
+        )
+      )
       if (view.dialog) {
         wrap.appendChild(dialog())
       }
@@ -581,11 +861,31 @@
     }
 
     if (view.notice) {
-      var notice = el('div', { class: 'banner ' + view.notice.kind, role: 'status', 'aria-live': 'polite' }, [el('span', { text: view.notice.text })])
+      var notice = el(
+        'div',
+        { class: 'banner ' + view.notice.kind, role: 'status', 'aria-live': 'polite' },
+        [el('span', { text: view.notice.text })]
+      )
       if (view.notice.link) {
-        notice.appendChild(el('div', { class: 'row' }, [el('a', { href: view.notice.link, target: '_blank', rel: 'noopener', text: t('open') })]))
+        notice.appendChild(
+          el('div', { class: 'row' }, [
+            el('a', { href: view.notice.link, target: '_blank', rel: 'noopener', text: t('open') }),
+          ])
+        )
       }
-      notice.appendChild(el('div', { class: 'row' }, [el('button', { class: 'act secondary', type: 'button', text: t('close'), onclick: function () { view.notice = null; render() } })]))
+      notice.appendChild(
+        el('div', { class: 'row' }, [
+          el('button', {
+            class: 'act secondary',
+            type: 'button',
+            text: t('close'),
+            onclick: function () {
+              view.notice = null
+              render()
+            },
+          }),
+        ])
+      )
       wrap.appendChild(notice)
     }
     shadow.appendChild(wrap)
@@ -602,7 +902,14 @@
   var CAPTION_LINES = 2
   var CAPTION_CHARS = 160
   var CAPTION_CHARS_NARROW = 70
-  var captions = { on: captionPref(), lines: [], conference: null, seen: false, timer: null, order: 0 }
+  var captions = {
+    on: captionPref(),
+    lines: [],
+    conference: null,
+    seen: false,
+    timer: null,
+    order: 0,
+  }
   var captionHost = document.createElement('div')
   captionHost.id = 'synascriber-captions'
   var captionShadow = captionHost.attachShadow({ mode: 'open' })
@@ -620,7 +927,7 @@
   function captionPref() {
     try {
       return localStorage.getItem(CAPTION_PREF) !== 'off'
-    } catch (e) {
+    } catch {
       return true
     }
   }
@@ -629,7 +936,9 @@
     captions.on = on
     try {
       localStorage.setItem(CAPTION_PREF, on ? 'on' : 'off')
-    } catch (e) { /* private mode: keep it for this page */ }
+    } catch {
+      /* private mode: keep it for this page */
+    }
     renderCaptions()
     render()
   }
@@ -639,12 +948,16 @@
       if (endpoint && window.APP && APP.conference && endpoint === APP.conference.getMyUserId()) {
         return t('you')
       }
-    } catch (e) { /* not joined */ }
+    } catch {
+      /* not joined */
+    }
     if (participant && participant.name) {
       return participant.name
     }
     try {
-      var name = APP.conference.getParticipantDisplayName && APP.conference.getParticipantDisplayName(endpoint)
+      var name =
+        APP.conference.getParticipantDisplayName &&
+        APP.conference.getParticipantDisplayName(endpoint)
       if (name) {
         return name
       }
@@ -653,15 +966,24 @@
       if (entry && entry.name) {
         return entry.name
       }
-    } catch (e) { /* roster not available */ }
+    } catch {
+      /* roster not available */
+    }
     return t('someone')
   }
 
   function onTranscript(from, message) {
-    if (!message || message.type !== 'transcription-result' || !message.transcript || !message.transcript[0]) {
+    if (
+      !message ||
+      message.type !== 'transcription-result' ||
+      !message.transcript ||
+      !message.transcript[0]
+    ) {
       return
     }
-    var text = String(message.transcript[0].text || '').replace(/\s+/g, ' ').trim()
+    var text = String(message.transcript[0].text || '')
+      .replace(/\s+/g, ' ')
+      .trim()
     var endpoint = String((message.participant && message.participant.id) || '').split('-')[0]
     var id = String(message.message_id || '')
     var line = null
@@ -689,8 +1011,12 @@
     }
     line.at = Date.now()
     line.order = ++captions.order
-    captions.lines = captions.lines.filter(function (l) { return l === line || Date.now() - l.at <= CAPTION_HOLD_MS })
-    captions.lines.sort(function (a, b) { return a.order - b.order })
+    captions.lines = captions.lines.filter(function (l) {
+      return l === line || Date.now() - l.at <= CAPTION_HOLD_MS
+    })
+    captions.lines.sort(function (a, b) {
+      return a.order - b.order
+    })
     captions.lines = captions.lines.slice(-CAPTION_LINES)
     if (!captions.seen) {
       captions.seen = true
@@ -712,7 +1038,12 @@
   // Above Jitsi's toolbar and the speaker name on the stage, whichever is higher.
   function captionBottom() {
     var bottom = 24
-    ;['.toolbox-content-items', '.toolbox-content', '#largeVideoContainer [class*="badgeContainer"]', '.stage-participant-label'].forEach(function (selector) {
+    ;[
+      '.toolbox-content-items',
+      '.toolbox-content',
+      '#largeVideoContainer [class*="badgeContainer"]',
+      '.stage-participant-label',
+    ].forEach(function (selector) {
       var node = document.querySelector(selector)
       var rect = node && node.getBoundingClientRect()
       if (rect && rect.height > 0 && rect.top < window.innerHeight) {
@@ -726,25 +1057,54 @@
     captionShadow.innerHTML = ''
     captionShadow.appendChild(el('style', { text: CAPTION_STYLE }))
     var now = Date.now()
-    var lines = captions.lines.filter(function (l) { return now - l.at <= CAPTION_HOLD_MS && (l.done || l.pending) })
+    var lines = captions.lines.filter(function (l) {
+      return now - l.at <= CAPTION_HOLD_MS && (l.done || l.pending)
+    })
     if (!captions.on || lines.length === 0) {
       clearInterval(captions.timer)
       captions.timer = null
       return
     }
-    var box = el('div', { class: 'cc', role: 'log', 'aria-live': 'polite', 'aria-label': t('captions_region') })
+    var box = el('div', {
+      class: 'cc',
+      role: 'log',
+      'aria-live': 'polite',
+      'aria-label': t('captions_region'),
+    })
     box.style.bottom = captionBottom() + 'px'
     lines.forEach(function (l) {
       var full = (l.done + (l.pending ? ' ' + l.pending.text : '')).trim()
       var shown = tail(full)
-      var doneShown = shown.slice(0, Math.max(0, shown.length - (l.pending ? l.pending.text.length : 0)))
-      box.appendChild(el('div', { class: 'line' }, [
-        el('span', { class: 'who', text: l.name + ':' }),
-        el('span', { text: l.pending ? doneShown : shown }),
-        l.pending ? el('span', { class: 'pending', 'aria-hidden': 'true', text: shown.slice(doneShown.length) }) : null,
-      ]))
+      var doneShown = shown.slice(
+        0,
+        Math.max(0, shown.length - (l.pending ? l.pending.text.length : 0))
+      )
+      box.appendChild(
+        el('div', { class: 'line' }, [
+          el('span', { class: 'who', text: l.name + ':' }),
+          el('span', { text: l.pending ? doneShown : shown }),
+          l.pending
+            ? el('span', {
+                class: 'pending',
+                'aria-hidden': 'true',
+                text: shown.slice(doneShown.length),
+              })
+            : null,
+        ])
+      )
     })
-    box.appendChild(el('button', { class: 'hide', type: 'button', 'aria-label': t('captions_hide'), title: t('captions_hide'), text: '×', onclick: function () { setCaptions(false) } }))
+    box.appendChild(
+      el('button', {
+        class: 'hide',
+        type: 'button',
+        'aria-label': t('captions_hide'),
+        title: t('captions_hide'),
+        text: '×',
+        onclick: function () {
+          setCaptions(false)
+        },
+      })
+    )
     captionShadow.appendChild(box)
     if (!captions.timer) {
       captions.timer = setInterval(renderCaptions, 1000)
@@ -752,23 +1112,39 @@
   }
 
   function captionToggle() {
-    return el('button', { class: 'pill', type: 'button', 'aria-pressed': String(captions.on), onclick: function () { setCaptions(!captions.on) } }, [
-      el('span', { text: t(captions.on ? 'captions_on' : 'captions_off') }),
-    ])
+    return el(
+      'button',
+      {
+        class: 'pill',
+        type: 'button',
+        'aria-pressed': String(captions.on),
+        onclick: function () {
+          setCaptions(!captions.on)
+        },
+      },
+      [el('span', { text: t(captions.on ? 'captions_on' : 'captions_off') })]
+    )
   }
 
   // Jitsi replaces the conference object on reconnects; re-attach when it does.
   function attachCaptions() {
     var conference = null
     try {
-      conference = (APP.store.getState()['features/base/conference'] || {}).conference || APP.conference._room
-    } catch (e) { /* not joined */ }
+      conference =
+        (APP.store.getState()['features/base/conference'] || {}).conference || APP.conference._room
+    } catch {
+      /* not joined */
+    }
     if (!conference || conference === captions.conference || typeof conference.on !== 'function') {
       return
     }
     captions.conference = conference
     var events = window.JitsiMeetJS && JitsiMeetJS.events && JitsiMeetJS.events.conference
-    conference.on((events && events.NON_PARTICIPANT_MESSAGE_RECEIVED) || 'conference.non_participant_message_received', onTranscript)
+    conference.on(
+      (events && events.NON_PARTICIPANT_MESSAGE_RECEIVED) ||
+        'conference.non_participant_message_received',
+      onTranscript
+    )
   }
 
   // ---------------------------------------------------------------- boot
@@ -778,7 +1154,9 @@
       if (window.APP && APP.conference && APP.conference.isJoined && APP.conference.isJoined()) {
         return String(APP.conference.roomName || '').toLowerCase()
       }
-    } catch (e) { /* not ready */ }
+    } catch {
+      /* not ready */
+    }
     return ''
   }
 

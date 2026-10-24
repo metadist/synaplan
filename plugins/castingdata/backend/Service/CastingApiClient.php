@@ -34,7 +34,7 @@ final readonly class CastingApiClient
     /**
      * Search productions by query string.
      *
-     * @return array<int, array<string, mixed>> Production list
+     * @return array<string, mixed> Production payload from the Casting API
      */
     public function searchProductions(int $userId, string $query, int $limit = 5): array
     {
@@ -57,7 +57,7 @@ final readonly class CastingApiClient
     /**
      * Search active auditions.
      *
-     * @return array<int, array<string, mixed>> Audition list
+     * @return array<string, mixed> Audition payload from the Casting API
      */
     public function searchAuditions(int $userId, ?int $productionId = null, ?string $query = null): array
     {
