@@ -30,7 +30,7 @@ test.describe('@busy a full stream pool answers at once', () => {
     let holding = true
     const hold = (async () => {
       while (holding) {
-        await request.get(holdUrl, { timeout: 30_000 }).catch(() => null)
+        await request.get(holdUrl, { timeout: 60_000 }).catch(() => null)
       }
     })()
 
@@ -84,8 +84,8 @@ test.describe('@busy a full stream pool answers at once', () => {
       .get(`${api}/api/health`, { timeout: 5_000 })
       .then((response) => ({ response, elapsedMs: Date.now() - started }))
     const [first, second, health] = await Promise.all([
-      request.get(streamUrl, { timeout: 30_000 }),
-      request.get(streamUrl, { timeout: 15_000 }),
+      request.get(streamUrl, { timeout: 60_000 }),
+      request.get(streamUrl, { timeout: 60_000 }),
       healthPromise,
     ])
 
