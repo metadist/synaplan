@@ -2489,12 +2489,12 @@ First judge each point:
 Then decide whether to stop: set "finish" to "covered" when every point is
 answered, "budget" when the budget is nearly used, "no_progress" when the last
 round found nothing new — and leave "actions" empty in that case. Otherwise set
-"finish" to null and choose at most [MAX_ACTIONS] actions:
+"finish" to null and choose at most [MAX_ACTIONS] search actions:
 - search {point, query, language, scope}: never repeat a query already run;
-  change the words, the language or the source kind instead.
-- read {source}: an unread source likely to settle a thin, conflicting or open point.
-- reread {source, question}: a read source with a sharper question.
-- ask_user {question, options}: only for a choice only the person can make.
+  change the words, the language or the source kind instead. scope is "web"
+  or "both".
+The sources in <unread> are read in the next round anyway; do not spend an
+action on them.
 
 Prefer official and primary sources; prefer recent ones when the question is
 about the current state. Return JSON only, in the shape

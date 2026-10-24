@@ -32,4 +32,10 @@ final class ResearchPrompts
 
         return strtr($template, $replace);
     }
+
+    /** Text from a page or a model cannot close the block it is listed in. */
+    public static function data(string $text): string
+    {
+        return str_replace(['<', '>'], ['‹', '›'], $text);
+    }
 }

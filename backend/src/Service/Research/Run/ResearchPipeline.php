@@ -66,7 +66,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
 
     private function round(StageContext $ctx): StageResult
     {
-        $ctx->state->evidenceBeforeRound = $this->cards($ctx);
+        $ctx->state->evidenceBeforeRound = $ctx->state->ledger->evidenceCount();
         $gathered = $this->gather->run($ctx);
         if ('read' !== $gathered->next || $ctx->state->status->isTerminal()) {
             return $gathered;
@@ -77,12 +77,5 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
         }
 
         return $this->reflect->run($ctx);
-    }
-
-    private function cards(StageContext $ctx): int
-    {
-        $evidence = $ctx->state->ledger->toArray()['evidence'] ?? [];
-
-        return is_array($evidence) ? count($evidence) : 0;
     }
 }

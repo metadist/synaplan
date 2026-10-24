@@ -162,6 +162,40 @@ final class EvidenceLedger
         return true;
     }
 
+    /** A planned web search that has not run yet, keyed like the gather step. */
+    public function hasPlannedSearch(): bool
+    {
+        $ran = [];
+        foreach ($this->queries as $query) {
+            $ran[$query->pointId.'|'.$query->query] = true;
+        }
+        foreach ($this->points as $point) {
+            foreach ($point->queries as $query) {
+                if ('files' !== $query['scope'] && !isset($ran[$point->id.'|'.$query['q']])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function hasEvidenceFor(string $pointId): bool
+    {
+        foreach ($this->evidence as $card) {
+            if ($card->pointId === $pointId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function evidenceCount(): int
+    {
+        return count($this->evidence);
+    }
+
     public function describeSource(string $id, ?string $sourceClass, ?string $published): void
     {
         $source = $this->sources[$id] ?? null;

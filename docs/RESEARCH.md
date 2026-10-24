@@ -52,7 +52,11 @@ whole documents stays off.
 
 After a round of searching and reading, the run judges the open points and
 can search again, up to the round limit of that depth. A quick run does not
-search again. The switch stays off until an administrator turns it on.
+search again. The run goes to the report instead when the next round would
+have nothing new to search or read, or when the model calls left could not
+pay for another round and the report. A point the run calls answered
+without a finding stays open. Research as a whole stays off until
+`RESEARCH.ENABLED` is turned on.
 
 At most `RESEARCH.MAX_ACTIVE_RUNS` runs (default 5) can be going at once for
 one person, and at most `RESEARCH.MAX_ACTIVE_THOROUGH_PER_USER` thorough runs
