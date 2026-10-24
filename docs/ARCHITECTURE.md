@@ -162,6 +162,27 @@ flowchart LR
   apps read them. A new event is a `feat:` with frontend work.
 - **Stop.** `CancelledTurns` flags a turn the caller owns and stores the
   partial answer the client sends.
+## Two worker pools
+
+Production worker mode runs two FrankenPHP pools from
+`_docker/backend/synaplan-worker-mode.Caddyfile`. `streams` takes the long
+routes (chat and its re-attach, the widget message, both gateways, the
+dictation session stream, TTS and `/mcp`). `api` takes every other request,
+including the usage CSV export and a one-shot transcription that only
+streams a result it already has. `FRANKENPHP_STREAM_WORKER_NUM` defaults to
+`FRANKENPHP_WORKER_NUM`, so stream capacity stays what it is today and short
+requests get a pool of their own. A request that waits longer than
+`FRANKENPHP_MAX_WAIT_TIME` (15 seconds) is a 503. FrankenPHP writes that
+503 itself, so the public listener proxies PHP to `127.0.0.1:9080` in
+worker mode and replaces only that status with a `server_busy` body and
+`Retry-After: 5`. The entrypoint trusts that localhost hop, which keeps the
+client address Caddy accepted. Dev and the ordinary test stack stay on
+`php_server` directly and do not proxy.
+
+Adding the stream pool holds one more set of database connections on each
+web node. Check Galera `max_connections` before enabling it, and enable it
+on one node first.
+
 - **Database.** A FrankenPHP worker keeps its Doctrine connections between
   requests, so a held connection follows every worker, streaming or idle.
   `DatabaseConnectionRelease` closes every open connection that is outside a

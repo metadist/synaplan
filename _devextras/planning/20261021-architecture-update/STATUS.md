@@ -11,7 +11,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
 | 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
-| 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | in review | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
+| 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
+| 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | in review | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast |
 
 ## Baselines
 
@@ -24,6 +25,41 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-24 — AU3: AI streams get their own PHP pool
+
+`frankenphp validate` accepts the site Caddyfile and the two-pool snippet.
+`match` is legal only inside `php_server`, and two global workers cannot
+share a filename, so the pools are imported there. FrankenPHP writes its
+own 503 (`maximum request handling time exceeded`) and does not return a
+Caddy error, so `handle_errors` never sees it. Worker mode proxies PHP to
+`127.0.0.1:9080` and replaces only status 503. Dev stays on `php_server`.
+
+Measured with `_devextras/perf/runtime/pool-isolation.sh` on the dev stack:
+2 stream workers, 2 api workers, `max_wait_time` 2s, `test-model` at 400 ms
+per chunk, 8 parallel chat streams.
+
+| | Result |
+| - | --- |
+| Streams admitted / refused | 2 / 6 |
+| Refused body | `{"error":"server_busy","retryAfter":5}`, `Retry-After: 5` |
+| `/v1/chat/completions` while the pool was full | 503, OpenAI-shaped `server_busy` |
+| `/api/health` during the streams, 20 requests | 20 of 20, p95 5.6 ms (budget 50 ms) |
+| Metrics | `frankenphp_total_workers{worker="streams"}` and `{worker="api"}` |
+
+A dictation session create with the demo cookie answered 401, so that route
+was not held. TTS answered 200 in 0.01 s and did not occupy a worker. The
+OpenAI-shaped body, which is the dictation stream's body, was measured on
+`/v1/chat/completions`.
+
+**As delivered, different from the brief.** Nested Caddy defaults do not
+parse, and an empty `num_threads` is a parse error. The entrypoint exports
+the stream pool from the api pool when it is unset, and inserts
+`num_threads` / `max_threads` only when those variables are set. The pools
+sit inside `php_server`, not in the global `frankenphp` block the brief
+drew.
 
 ---
 

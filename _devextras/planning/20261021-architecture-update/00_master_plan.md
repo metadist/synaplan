@@ -1,11 +1,11 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** Pre-flight closed 2026-10-21 (AU0b). §0 was ticked in the
-pre-flight decision session of 2026-10-21; S0 may start. The contract
-hardening tasks in `03_contracts.md` (§1.7, §2.3, §7.1) must merge before
-AU10, AU19 and AU28 respectively.
-**Priority:** Row 22 of [`../ROADMAP.md`](../ROADMAP.md), not started. S0 is
-production relief and can start before the owner orders the rest.
+**Status:** S0 is in progress. AU0, AU0b, AU1, AU2 and AU5 are merged.
+AU3 (two worker pools) is the open step. The contract hardening tasks in
+`03_contracts.md` (§1.7, §2.3, §7.1) must merge before AU10, AU19 and AU28
+respectively.
+**Priority:** Row 22 of [`../ROADMAP.md`](../ROADMAP.md). S0 is production
+relief and continues before the owner orders the rest.
 **Origin:** Four directions from an external system architect (quoted in
 §1.1), plus the owner's remarks of the same day: long waits must not hold
 PHP, a smart but simple watchdog directs the work, and every request is
@@ -36,7 +36,7 @@ approved in the 2026-10-21 pre-flight session (Agree column of §0).
 | [`04_capacity_and_kubernetes.md`](./04_capacity_and_kubernetes.md) | The extra part the owner asked for: the request timeline, the capacity page, the watchdog as server agent, Kubernetes probes, autoscaling and drain |
 | [`S0_protect_and_measure.md`](./S0_protect_and_measure.md) … [`S6_capacity_and_kubernetes.md`](./S6_capacity_and_kubernetes.md) | One file per sprint: one vibe brief per step, sprint test, exit criteria |
 | [`STATUS.md`](./STATUS.md) | Step log, measurements, review log |
-| [`HANDOVER.md`](./HANDOVER.md) | 2026-10-22 handover: AU1 merged, AU2 open, what is left, second opinion on S5 |
+| [`HANDOVER.md`](./HANDOVER.md) | 2026-10-22 handover, updated 2026-10-24: AU2 and AU5 merged, AU3 in progress, second opinion on S5 |
 | [`spike/`](./spike/README.md) | The 2026-10-21 runtime spike: scripts that produced every number in `02` |
 
 ---

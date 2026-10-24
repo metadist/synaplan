@@ -149,6 +149,28 @@ provider becomes unavailable, see
 
 ---
 
+## Worker pools
+
+Production worker mode (`APP_ENV=prod`) runs two PHP pools. `streams` serves
+the long AI routes. `api` serves everything else, so a server full of
+streams still answers a short request. Dev and the test stack do not use
+worker mode.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `FRANKENPHP_WORKER_NUM` | `16` | Workers in the `api` pool |
+| `FRANKENPHP_STREAM_WORKER_NUM` | the api pool's count | Workers in the `streams` pool |
+| `FRANKENPHP_MAX_WAIT_TIME` | `15s` | How long a request waits for a free worker before a 503 |
+| `FRANKENPHP_NUM_THREADS` | unset | Total FrankenPHP threads. Leave unset unless you need to cap them |
+| `FRANKENPHP_MAX_THREADS` | unset | Upper bound for threads. Leave unset unless you set it |
+
+A 503 on a long route carries `Retry-After: 5` and a `server_busy` body. The
+chat page's own sentence for that wait is a later step.
+
+Before raising the stream pool on the web nodes, check that Galera
+`max_connections` can take one more connection per stream worker, and change
+one node first.
+
 ## Access Policy
 
 Self-registration and guest chat are switches in **Admin → System

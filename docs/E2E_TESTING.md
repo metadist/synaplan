@@ -100,6 +100,7 @@ without `@ci` in its title chain does not run in CI, period. Other tags:
 | `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
 | `@ollama` | Own **chromium-ollama** project and CI job, and excluded from the sharded chromium run. The tagged spec repoints the CHAT default model for the whole installation, so it needs a test stack to itself — see below. |
 | `@minimal` | Own **chromium-minimal** project and CI job on the `docker-compose.minimal.yml` overlay. Proves every optional feature module is absent (chat + text upload still work; gated WhatsApp answers the uniform 404). Excluded from the sharded chromium run. |
+| `@busy` | Own **chromium-busy** project and CI job on the `docker-compose.busy.yml` overlay. One stream worker, a one-second wait: the second slow chat stream is `server_busy` and `/api/health` still answers. Excluded from the sharded chromium run, which stays in classic mode. |
 | `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on

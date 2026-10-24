@@ -52,6 +52,15 @@ x-app-command: &app-command
 x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
+  # Two PHP worker pools. The stream pool defaults to the api pool, so an
+  # install that only set FRANKENPHP_WORKER_NUM keeps today's stream capacity
+  # and gains a separate pool for short requests. Empty thread values stay
+  # unset: Caddy rejects an empty num_threads.
+  FRANKENPHP_WORKER_NUM: ${FRANKENPHP_WORKER_NUM:-16}
+  FRANKENPHP_STREAM_WORKER_NUM: ${FRANKENPHP_STREAM_WORKER_NUM:-}
+  FRANKENPHP_NUM_THREADS: ${FRANKENPHP_NUM_THREADS:-}
+  FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
+  FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   # Deployment hint for the release notice: it decides which manual-update guide
   # the admin UI links to. Optional — an unset or unknown value means the
   # self-hosted guide, so nothing breaks when a deployment never sets it.
