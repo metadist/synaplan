@@ -51,10 +51,15 @@ test.describe('@ci Capacity', () => {
     await expect(card.locator(selectors.capacity.logCommand)).toContainText(
       /docker logs|kubectl logs|error output/
     )
-    await expect(card.locator(selectors.capacity.recentEvents)).toHaveAttribute(
-      'href',
-      /\/api\/v1\/admin\/logs\?host=/
-    )
+    // Recent events come through the authenticated client, in the card.
+    await card.locator(selectors.capacity.recentEvents).click()
+    const eventsList = card.locator(selectors.capacity.eventsList)
+    await expect(eventsList).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(
+      eventsList
+        .locator(`${selectors.capacity.eventsEmpty}, ${selectors.capacity.eventItem}`)
+        .first()
+    ).toBeVisible({ timeout: TIMEOUTS.STANDARD })
   })
 
   test('J-AU-2 a cluster: live, silent, a worker row, and the sizing hint', async ({ page }) => {
@@ -91,6 +96,48 @@ test.describe('@ci Capacity', () => {
       'the server may be down or restarting'
     )
     await expect(web2).toHaveAttribute('data-reporting', 'no')
+
+    // The event ring, filtered to one server, rendered from a mocked answer.
+    await page.route('**/api/v1/admin/logs**', async (route) => {
+      const url = new URL(route.request().url())
+      expect(url.searchParams.get('host')).toBe('79e4f90bc8c6')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          mode: 'recent',
+          events: [
+            {
+              id: 'evt1',
+              ts: Math.floor(Date.now() / 1000) - 120,
+              level: 'warning',
+              channel: 'app',
+              event: 'ai_fallback',
+              message: 'Provider answered slowly; the fallback model replied.',
+              exception_class: null,
+              exception_message: null,
+              stack: [],
+              request_id: 'req-1',
+              host: '79e4f90bc8c6',
+              route: 'chat_send',
+              method: 'POST',
+              status_code: 200,
+              user_id: null,
+              provider: 'anthropic',
+              model: null,
+              worker: null,
+              duration_ms: 8120,
+            },
+          ],
+        }),
+      })
+    })
+    await web1.locator(selectors.capacity.recentEvents).click()
+    await expect(web1.locator(selectors.capacity.eventItem)).toHaveCount(1)
+    await expect(web1.locator(selectors.capacity.eventItem)).toContainText(
+      'Provider answered slowly; the fallback model replied.'
+    )
   })
 
   test('the shared cache does not answer: one sentence and Check again', async ({ page }) => {

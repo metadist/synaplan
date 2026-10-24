@@ -1494,7 +1494,6 @@
       "pools": "{streams} plazas de respuesta de IA + {api} plazas de solicitud",
       "poolsSingle": "un grupo de {count} hilos",
       "logsStderr": "la salida de error del proceso",
-      "openEvents": "Abrir eventos recientes",
       "howToStop": "Un servidor deja de informar cuando su watchdog está apagado (SYNAPLAN_WATCHDOG=0).",
       "helperSilent": "dejó de informar",
       "runtime": {
@@ -1510,6 +1509,14 @@
         "memoryLimit": "límite de memoria {value}",
         "cpuRequest": "procesador solicitado {value}"
       }
+    },
+    "events": {
+      "open": "Mostrar eventos recientes",
+      "hide": "Ocultar eventos recientes",
+      "loading": "Leyendo eventos…",
+      "failed": "No se pudieron leer los eventos.",
+      "empty": "Sin avisos de este servidor en la última hora.",
+      "window": "Avisos y errores de la última hora, los más recientes primero, como máximo 20."
     }
   }
 }

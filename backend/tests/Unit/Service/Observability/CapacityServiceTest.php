@@ -105,4 +105,38 @@ final class CapacityServiceTest extends TestCase
         self::assertSame('worker', $report['servers'][0]['role']);
         self::assertNull($report['servers'][0]['cpu']['usage_ratio']);
     }
+
+    public function testASilentServerKeepsItsIdentityFromTheLastReport(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('hGetAll')->willReturn(['web1-worker' => '2026-10-24T18:00:00Z']);
+        $redis->method('get')->willReturnCallback(static fn (string $key): ?string => match ($key) {
+            'capacity:last:web1-worker' => json_encode([
+                'updated_at' => '2026-10-24T18:00:00Z',
+                'role' => 'worker',
+                'hostname' => 'a1b2c3',
+                'place' => ['host' => 'synweb100'],
+                'logs' => ['collector' => 'docker', 'event_ring_host' => 'a1b2c3'],
+            ], JSON_THROW_ON_ERROR),
+            default => null,
+        });
+
+        $server = (new CapacityService($redis, new ServerIdentity('web1')))->report()['servers'][0];
+
+        self::assertFalse($server['reporting']);
+        self::assertSame('worker', $server['role']);
+        self::assertSame('synweb100', $server['place']['host']);
+        self::assertSame('a1b2c3', $server['logs']['event_ring_host']);
+    }
+
+    public function testANumericServerIdStaysAString(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('hGetAll')->willReturn(['42' => '2026-10-24T18:00:00Z']);
+        $redis->method('get')->willReturn(null);
+
+        $report = (new CapacityService($redis, new ServerIdentity('42')))->report();
+
+        self::assertSame('42', $report['servers'][0]['id']);
+    }
 }

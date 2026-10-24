@@ -1498,7 +1498,6 @@
       "pools": "{streams} AI answer slots + {api} request slots",
       "poolsSingle": "one pool of {count} threads",
       "logsStderr": "the process's error output",
-      "openEvents": "Open recent events",
       "howToStop": "A server stops reporting when its watchdog is turned off (SYNAPLAN_WATCHDOG=0).",
       "helperSilent": "stopped reporting",
       "runtime": {
@@ -1514,6 +1513,14 @@
         "memoryLimit": "memory limit {value}",
         "cpuRequest": "processor request {value}"
       }
+    },
+    "events": {
+      "open": "Show recent events",
+      "hide": "Hide recent events",
+      "loading": "Reading events…",
+      "failed": "The events could not be read.",
+      "empty": "No warnings from this server in the last hour.",
+      "window": "Warnings and errors of the last hour, newest first, at most 20."
     }
   }
 }

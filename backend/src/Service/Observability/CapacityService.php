@@ -31,6 +31,7 @@ final readonly class CapacityService
 {
     private const SEEN_KEY = 'capacity:seen';
     private const SNAPSHOT_PREFIX = 'capacity:server:';
+    private const LAST_PREFIX = 'capacity:last:';
     private const PEAK_PREFIX = 'capacity:peak:';
 
     /** A server whose last report is older than this is listed as not reporting. */
@@ -57,7 +58,8 @@ final readonly class CapacityService
         $now = new \DateTimeImmutable();
         $servers = [];
         foreach ($seen as $id => $lastSeenAt) {
-            $servers[] = $this->server($id, $lastSeenAt, $now);
+            // PHP turns a numeric hash field such as "42" into an integer key.
+            $servers[] = $this->server((string) $id, $lastSeenAt, $now);
         }
         usort($servers, static fn (array $a, array $b): int => strcmp($a['id'], $b['id']));
 
@@ -73,10 +75,13 @@ final readonly class CapacityService
      */
     private function server(string $id, string $lastSeenAt, \DateTimeImmutable $now): array
     {
-        $raw = $this->redis->get(self::SNAPSHOT_PREFIX.$id);
+        // The live snapshot expires after 20 seconds; the last report keeps a
+        // silent server's role, machine and log source for a week.
+        $live = $this->redis->get(self::SNAPSHOT_PREFIX.$id);
+        $raw = $live ?? $this->redis->get(self::LAST_PREFIX.$id);
         $snapshot = null === $raw ? [] : $this->decode($raw);
         $updatedAt = $this->str($snapshot['updated_at'] ?? null) ?? $lastSeenAt;
-        $reporting = null !== $raw && $this->isFresh($updatedAt, $now);
+        $reporting = null !== $live && $this->isFresh($updatedAt, $now);
 
         return [
             'id' => $id,

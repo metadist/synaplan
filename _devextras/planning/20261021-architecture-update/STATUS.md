@@ -51,8 +51,7 @@ processor against their limits, a sizing sentence once the peak reached
 the PHP pools, the version, and the log row with the one command built from
 the watchdog's facts (`docker logs <hostname>`, `kubectl logs -n <ns> <pod>
 -c <container>`) plus **Open recent events**, which opens the event ring
-filtered by the server's `event_ring_host` — the ring has no page yet, so
-until AU33 the link opens the filtered API answer in a new tab. Workers and
+filtered by the server's `event_ring_host` and read through the authenticated client, so the native app's Bearer session works like a cookie; the ring's own page stays with AU33. Workers and
 the scheduler attach to the web server of their machine (same `place.host`,
 or the `-worker` / `-bulk` / `-scheduler` id the platform compose gives
 them) as compact rows; one with no web server of its own is a card with a
@@ -82,8 +81,7 @@ the absent state. Five locales (`capacity.*`, `modules.capacity.label`,
 `nav.adminCapacity`, `pageTitles.adminCapacity`).
 
 **Carried.** "Busy answers today" (Caddy's 503 count) and the 24-hour
-sparkline stay with AU33's request timeline; the event ring gets its page
-there too.
+sparkline stay with AU33's request timeline, which also gives the event ring its page.
 
 ---
 

@@ -1477,10 +1477,10 @@
       "otherRequests": "Diğer istekler",
       "memory": "Bellek",
       "processor": "İşlemci",
-      "ofAtOnce": "aynı anda {total} / {used}",
+      "ofAtOnce": "aynı anda {used} / {total}",
       "noPools": "ayrı havuz yok",
       "peakToday": "bugünkü zirve {count} ({time})",
-      "memoryOf": "{total} / {used}",
+      "memoryOf": "{used} / {total}",
       "memoryUnlimited": "{used} · sınır yok",
       "processorOf": "{cores} çekirdeğin % {percent}",
       "processorMeasuring": "ölçülüyor · {cores} çekirdek",
@@ -1494,7 +1494,6 @@
       "pools": "{streams} AI yanıt yuvası + {api} istek yuvası",
       "poolsSingle": "{count} iş parçacıklı tek havuz",
       "logsStderr": "sürecin hata çıktısı",
-      "openEvents": "Son olayları aç",
       "howToStop": "Watchdog kapatıldığında (SYNAPLAN_WATCHDOG=0) sunucu rapor vermeyi bırakır.",
       "helperSilent": "rapor vermeyi bıraktı",
       "runtime": {
@@ -1510,6 +1509,14 @@
         "memoryLimit": "bellek sınırı {value}",
         "cpuRequest": "istenen işlemci {value}"
       }
+    },
+    "events": {
+      "open": "Son olayları göster",
+      "hide": "Son olayları gizle",
+      "loading": "Olaylar okunuyor…",
+      "failed": "Olaylar okunamadı.",
+      "empty": "Son bir saatte bu sunucudan uyarı yok.",
+      "window": "Son bir saatin uyarı ve hataları, en yenisi önce, en fazla 20."
     }
   }
 }

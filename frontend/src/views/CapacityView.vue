@@ -144,6 +144,9 @@ const now = ref(new Date())
 
 const POLL_MS = 10_000
 let timer: ReturnType<typeof setInterval> | null = null
+// One request at a time; a response that is not the latest request is dropped.
+let inFlight = false
+let requestSeq = 0
 
 const groups = computed(() => (report.value ? groupServers(report.value.servers) : []))
 const connectedTo = computed(() => report.value?.served_by ?? null)
@@ -152,19 +155,26 @@ const updatedAgo = computed(() =>
 )
 
 async function load(): Promise<void> {
+  if (inFlight) return
+  inFlight = true
+  const seq = ++requestSeq
   loading.value = true
   try {
-    report.value = await capacityApi.servers()
+    const next = await capacityApi.servers()
+    if (seq !== requestSeq) return
+    report.value = next
     unavailable.value = false
     failed.value = false
     now.value = new Date()
   } catch (error) {
+    if (seq !== requestSeq) return
     if (error instanceof ApiError && error.status === 503) {
       unavailable.value = true
     } else {
       failed.value = true
     }
   } finally {
+    inFlight = false
     loading.value = false
   }
 }

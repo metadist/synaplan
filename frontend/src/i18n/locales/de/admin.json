@@ -1498,7 +1498,6 @@
       "pools": "{streams} KI-Antwortplätze + {api} Anfrageplätze",
       "poolsSingle": "ein Pool mit {count} Threads",
       "logsStderr": "die Fehlerausgabe des Prozesses",
-      "openEvents": "Letzte Ereignisse öffnen",
       "howToStop": "Ein Server berichtet nicht mehr, wenn sein Watchdog abgeschaltet ist (SYNAPLAN_WATCHDOG=0).",
       "helperSilent": "berichtet nicht mehr",
       "runtime": {
@@ -1514,6 +1513,14 @@
         "memoryLimit": "Speicherlimit {value}",
         "cpuRequest": "Prozessoranforderung {value}"
       }
+    },
+    "events": {
+      "open": "Letzte Ereignisse anzeigen",
+      "hide": "Letzte Ereignisse ausblenden",
+      "loading": "Ereignisse werden gelesen…",
+      "failed": "Die Ereignisse konnten nicht gelesen werden.",
+      "empty": "Keine Warnungen von diesem Server in der letzten Stunde.",
+      "window": "Warnungen und Fehler der letzten Stunde, neueste zuerst, höchstens 20."
     }
   }
 }

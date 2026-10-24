@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowTopRightOnSquareIcon } from '@heroicons/vue/24/outline'
 import CapacityBar from './CapacityBar.vue'
+import ServerEventsPanel from './ServerEventsPanel.vue'
 import type { CapacityServer } from '@/services/api/capacityApi'
-import { useConfigStore } from '@/stores/config'
 import { formatBytes, logCommand, needsSizingHint, secondsSince } from '@/utils/capacityFacts'
 
 /**
@@ -22,7 +21,6 @@ const props = defineProps<{
 }>()
 
 const { t, locale } = useI18n()
-const configStore = useConfigStore()
 
 // `updated_at` is the time of the last report that exists, live or expired.
 const silentFor = computed(() =>
@@ -105,13 +103,9 @@ const poolsSentence = computed(() =>
 
 const command = computed(() => logCommand(props.server))
 
-// The event ring has no page of its own yet (AU33 adds the Requests tab);
-// until then the filtered API answer is the one place that shows this
-// server's recent warnings, and the admin's session opens it directly.
-const eventsHref = computed(() => {
-  const host = encodeURIComponent(props.server.logs.event_ring_host || props.server.hostname)
-  return `${configStore.apiBaseUrl}/api/v1/admin/logs?host=${host}&since_minutes=60`
-})
+// The host the event ring stamps on this server's records. Empty when no
+// report ever carried one; then there is nothing to filter by.
+const eventsHost = computed(() => props.server.logs.event_ring_host || props.server.hostname)
 </script>
 
 <template>
@@ -240,18 +234,9 @@ const eventsHref = computed(() => {
             <span v-else class="txt-primary" data-testid="text-log-command">{{
               t('capacity.card.logsStderr')
             }}</span>
-            <a
-              :href="eventsHref"
-              target="_blank"
-              rel="noopener"
-              class="inline-flex items-center gap-1 text-[var(--brand)] hover:underline"
-              data-testid="link-recent-events"
-            >
-              {{ t('capacity.card.openEvents') }}
-              <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
-            </a>
           </dd>
         </div>
+        <ServerEventsPanel v-if="eventsHost" :host="eventsHost" />
         <p class="txt-secondary text-xs">{{ t('capacity.card.howToStop') }}</p>
       </dl>
     </details>
