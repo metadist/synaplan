@@ -29,7 +29,7 @@ not a chat message.
 | CF0.3 Cloud uploads that name a knowledge folder skip Incoming (D3) | `synaplan` | P1 | **merged** 2026-10-19 [#2572](https://github.com/metadist/synaplan/pull/2572) | automatic rule, no new request field (decision 2026-10-14) |
 | CF0.4 `check-stale` returns `vector_state` | `synaplan` | P1 | **merged** 2026-10-19 [#2573](https://github.com/metadist/synaplan/pull/2573) |  |
 | CF0.5 Docs truth (D10, D11) | `synaplan-docs`, `synaplan-nextcloud` | P1 | **in review** · Nextcloud hosting guide [synaplan-nextcloud#63](https://github.com/metadist/synaplan-nextcloud/pull/63), OpenCloud docs [synaplan-docs#32](https://github.com/metadist/synaplan-docs/pull/32) | the guide describes 1.7.0, so it merges after #59, #60 and #65 |
-| CF0.6 STATUS hygiene (D14) | `synaplan` | P1 | planned | rows 1–36 agreed; can start |
+| CF0.6 STATUS hygiene (D14) | `synaplan` | P1 | **done** 2026-10-24 | More-Nextcloud archived; S2 recorded as merged (#34); S3 absorbed here; pairing-code fallback (NC18, NC19) named and not scheduled |
 | CF0.7 First walks + compatibility check | all (walk) | P1 | planned | Nextcloud J-NC-1…3; current OpenCloud and ownCloud.online releases |
 | CF0.8 Translation mode for documents (D25) | `synaplan` | P1 | **merged** 2026-10-19 [#2582](https://github.com/metadist/synaplan/pull/2582) | `summaryType: translation`; a translation the model cut off is refused |
 | CF0.9 The connect page names the signed-in account (D28) | `synaplan` | P1 | **merged** 2026-10-19 [#2581](https://github.com/metadist/synaplan/pull/2581) | follow-up: the card follows the theme ([#2584](https://github.com/metadist/synaplan/pull/2584)) |

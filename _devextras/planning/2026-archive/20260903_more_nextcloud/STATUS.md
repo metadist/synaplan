@@ -1,6 +1,8 @@
+**Archived 2026-10-24.** S1 is on `main` ([#1745](https://github.com/metadist/synaplan/pull/1745)). S2 `link` mode merged in `synaplan-nextcloud` [#34](https://github.com/metadist/synaplan-nextcloud/pull/34); the table below still says "planned" because it was written on 2026-09-07. S3's ownCloud.online parity and the docs correction are in [`../../20261013-cloud-file-sharing/`](../../20261013-cloud-file-sharing/00_master_plan.md) (CF1.1, CF0.5). The pairing-code fallback (NC18, NC19) was not absorbed and is not scheduled. The folder leaves the live directory for that reason.
+
 # Status — More Nextcloud
 
-Track 6 of [`../20260903_roadmap.md`](../2026-archive/20260903_roadmap/20260903_roadmap.md). Plan of record:
+Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md).
 
 ## Steps
@@ -32,7 +34,7 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-07 (UX contract):** keep the handshake as a flow, not a
 settings form. See
-[`../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md`](../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md) §5.6.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.6.
 
 **2026-09-07 (S1 implementation):** Wave 2 S1 landed on
 `feat/more-nextcloud-s1-handshake` — `BPLATFORMINSTANCES`, instance

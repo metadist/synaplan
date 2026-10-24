@@ -104,7 +104,7 @@ the cap) can change the core contract.
 what the code does.
 
 **User-flow:** J-NC-1…3 (first walks, roadmap §3.1; defined in
-[`../20260903_more_nextcloud/00_master_plan.md`](../20260903_more_nextcloud/00_master_plan.md)
+[`../2026-archive/20260903_more_nextcloud/00_master_plan.md`](../2026-archive/20260903_more_nextcloud/00_master_plan.md)
 §5) and the compatibility check of the current OpenCloud and ownCloud.online
 releases. **Briefs:** `08` §3 · **Tests:** `09` §1.
 
@@ -116,7 +116,7 @@ releases. **Briefs:** `08` §3 · **Tests:** `09` §1.
 | CF0.3 | `synaplan` | **D3.** An upload from `nextcloud`, `opencloud` or `owncloud` that names a knowledge folder other than `DEFAULT` skips Incoming; without a folder, or with `DEFAULT`, it still lands in Incoming (C10). The apps already send the folder the person picked, so released app versions benefit without a new release. Outlook is unchanged. | backend-only |
 | CF0.4 | `synaplan` | `check-stale` returns `vector_state` per item (additive). | backend-only |
 | CF0.5 | `synaplan-docs`, `synaplan-nextcloud` | **D10, D11.** OpenCloud section of `docs/plugins.md` and the `docs/intro.md` bullet rewritten to the code (shared identity provider, personal space, manual updates). Nextcloud `docs/HOSTING_GUIDE.md` roadmap refreshed (stale handling shipped, scopes enforced). | docs |
-| CF0.6 | `synaplan` | **D14.** More-Nextcloud STATUS: S2 merged, S3 absorbed here except the pairing-code fallback; roadmap row 5 "Folder watch" and "Nextcloud S3" point here. | docs |
+| CF0.6 | `synaplan` | **D14. Done 2026-10-24.** More-Nextcloud archived. S2 recorded as merged (`synaplan-nextcloud` #34). S3 absorbed here (ownCloud.online parity → CF1.1, docs → CF0.5). Pairing-code fallback (NC18, NC19) not scheduled. "Nextcloud S3" points here. | docs |
 | CF0.7 | all (walk) | First walks on local stacks after CF0.1–CF0.4 are merged: J-NC-1…3 and the provision mode on Nextcloud; the compatibility check of the current releases — ownCloud.online provision mode (summarize, translate, chat, knowledge status) and OpenCloud with organisation login (summarize, knowledge). Dated STATUS entries. | walk |
 
 **Exit:** in provision and link mode a Nextcloud user summarizes, translates,
