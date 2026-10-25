@@ -59,7 +59,10 @@ final readonly class CapacityService
         $servers = [];
         foreach ($seen as $id => $lastSeenAt) {
             // PHP turns a numeric hash field such as "42" into an integer key.
-            $servers[] = $this->server((string) $id, $lastSeenAt, $now);
+            $server = $this->server((string) $id, $lastSeenAt, $now);
+            if (null !== $server) {
+                $servers[] = $server;
+            }
         }
         usort($servers, static fn (array $a, array $b): int => strcmp($a['id'], $b['id']));
 
@@ -71,15 +74,23 @@ final readonly class CapacityService
     }
 
     /**
-     * @return Server
+     * Null when neither the live snapshot nor the last report exists: the
+     * seen-list field outlived its report (the hash is refreshed by every
+     * server, a dead server's report expires after a week), so the id alone
+     * would be a card with nothing on it.
+     *
+     * @return Server|null
      */
-    private function server(string $id, string $lastSeenAt, \DateTimeImmutable $now): array
+    private function server(string $id, string $lastSeenAt, \DateTimeImmutable $now): ?array
     {
         // The live snapshot expires after 20 seconds; the last report keeps a
         // silent server's role, machine and log source for a week.
         $live = $this->redis->get(self::SNAPSHOT_PREFIX.$id);
         $raw = $live ?? $this->redis->get(self::LAST_PREFIX.$id);
-        $snapshot = null === $raw ? [] : $this->decode($raw);
+        if (null === $raw) {
+            return null;
+        }
+        $snapshot = $this->decode($raw);
         $updatedAt = $this->str($snapshot['updated_at'] ?? null) ?? $lastSeenAt;
         $reporting = null !== $live && $this->isFresh($updatedAt, $now);
 

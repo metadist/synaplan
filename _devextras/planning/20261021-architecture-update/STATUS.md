@@ -56,7 +56,10 @@ the scheduler attach to the web server of their machine (same `place.host`,
 or the `-worker` / `-bulk` / `-scheduler` id the platform compose gives
 them) as compact rows; one with no web server of its own is a card with a
 role chip and no AI bars. A silent server keeps its card, greyed, with
-"Last report n min ago — the server may be down or restarting".
+"Last report n min ago — the server may be down or restarting". An id whose
+last report has expired (a week) is not a card: there is nothing to show.
+The owner's first look on 2026-10-25 found two of my seeded walk entries
+drawn as zeroed web cards; the seeds are removed and the rule is the fix.
 
 **Walked (J-AU-2)** on the dev stack as `admin@synaplan.com`, with two
 seeded reports beside the real one (a silent `web2`, a `web1-worker`, a

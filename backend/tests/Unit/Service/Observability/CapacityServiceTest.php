@@ -43,6 +43,7 @@ final class CapacityServiceTest extends TestCase
         $today = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Ymd');
         $redis->method('get')->willReturnCallback(static fn (string $key): ?string => match ($key) {
             'capacity:peak:web2:'.$today => json_encode(['day' => $today, 'streams_busy_max' => 14, 'streams_total' => 16, 'at' => '2026-10-24T11:40:05Z'], JSON_THROW_ON_ERROR),
+            'capacity:last:web1' => json_encode(['server_id' => 'web1', 'role' => 'web', 'updated_at' => '2026-10-24T18:00:00Z'], JSON_THROW_ON_ERROR),
             'capacity:server:web2' => json_encode([
                 'server_id' => 'web2',
                 'hostname' => '79e4f90bc8c6',
@@ -133,10 +134,26 @@ final class CapacityServiceTest extends TestCase
     {
         $redis = $this->createStub(RedisService::class);
         $redis->method('hGetAll')->willReturn(['42' => '2026-10-24T18:00:00Z']);
-        $redis->method('get')->willReturn(null);
+        $redis->method('get')->willReturnCallback(static fn (string $key): ?string => 'capacity:last:42' === $key
+            ? json_encode(['server_id' => '42', 'updated_at' => '2026-10-24T18:00:00Z'], JSON_THROW_ON_ERROR)
+            : null);
 
         $report = (new CapacityService($redis, new ServerIdentity('42')))->report();
 
         self::assertSame('42', $report['servers'][0]['id']);
+    }
+
+    public function testASeenIdWithoutAnyReportIsNotListed(): void
+    {
+        $fresh = (new \DateTimeImmutable())->format('Y-m-d\TH:i:s\Z');
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('hGetAll')->willReturn(['web1' => $fresh, 'ghost' => '2026-10-17T17:00:00Z']);
+        $redis->method('get')->willReturnCallback(static fn (string $key): ?string => 'capacity:server:web1' === $key
+            ? json_encode(['server_id' => 'web1', 'role' => 'web', 'updated_at' => $fresh], JSON_THROW_ON_ERROR)
+            : null);
+
+        $report = (new CapacityService($redis, new ServerIdentity('web1')))->report();
+
+        self::assertSame(['web1'], array_column($report['servers'], 'id'), 'an id whose report expired is not a card');
     }
 }
