@@ -86,6 +86,7 @@ final class PendingPaymentSubscriberTest extends TestCase
         yield 'logout' => ['POST', '/api/v1/auth/logout'];
         yield 'profile' => ['GET', '/api/v1/profile'];
         yield 'runtime config' => ['GET', '/api/v1/config/runtime'];
+        yield 'stop impersonating' => ['POST', '/api/v1/admin/impersonate/exit'];
     }
 
     /**
@@ -97,6 +98,7 @@ final class PendingPaymentSubscriberTest extends TestCase
         yield 'messages' => ['/v1/messages'];
         yield 'a path that only shares a prefix' => ['/api/v1/authentication'];
         yield 'writing runtime config' => ['/api/v1/config/runtime'];
+        yield 'starting impersonation' => ['/api/v1/admin/impersonate'];
     }
 
     private function dispatch(string $method, string $path, ?string $status): RequestEvent
