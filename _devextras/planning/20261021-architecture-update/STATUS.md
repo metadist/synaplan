@@ -15,8 +15,9 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
 | 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
 | 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | merged (`5e7a4ebdd`) | watchdog on `:8098`; `capacity:server:{id}` every 5 s with place and log source. No relay. Not rolled out |
-| 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | in review | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
-| 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | in review | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
+| 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | merged (`3b0c6f627`) | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
+| 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | merged (`33f498065`) | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
+| 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
 
 ## Baselines
 
@@ -29,6 +30,67 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-25 — AU8: probes follow PHP capacity, metrics are scraped
+
+In `synaplan-charts`, [#90](https://github.com/metadist/synaplan-charts/pull/90).
+
+**Off by default, on purpose.** No Synaplan release contains the watchdog
+yet: the chart pins 5.4.1, the latest release is 5.5.4 (2026-10-23), and
+AU6 merged on 2026-10-24. `/api/health/ready` is in 5.5.3 and later. Probes
+on `:8098` by default would restart every pod on today's image, so
+`watchdog.enabled` defaults to off and a complete semver tag below 5.6.0
+fails the render (5.6.0 is the next automatic release: #2724 is a `feat`).
+The `appVersion` bump to 5.6.0 turns it on. Off keeps the `/` probes and
+sets `SYNAPLAN_WATCHDOG=0`, so Admin › Capacity is absent.
+
+**What it does when on.** Liveness `GET /live` and readiness `GET /ready`
+on the `watchdog` port 8098, startup `GET /api/health/ready` on `http`
+(120 × 5 s for the first boot's migrations). Every role gets the port and
+the place: namespace and node from the Downward API, deployment and
+container names, and the declared processor request and memory limit *as
+written* (`500m`, `3Gi`; `resourceFieldRef` gives unitless numbers, or node
+allocatable when nothing is declared). `SYNAPLAN_SERVER_ID` stays unset:
+the pod name is the id, and an explicit id would give a worker a doubled
+`-worker` suffix. `frankenphp.*` sets the pools and `max_wait_time`.
+`metrics.podMonitor`, `metrics.serviceMonitor` (headless `-metrics`
+Service) and `metrics.dashboard` (`dashboards/synaplan-capacity.json` for
+the Grafana sidecar) each refuse to render without the watchdog. Resource
+starting values are documented, not defaulted.
+
+**Observed on a cluster** (local k3d, `e2e/run.sh standalone up`, image
+`ghcr.io/metadist/synaplan:latest` = `main` at `3dae716`, 2 stream + 2 api
+workers, `maxWaitTime: 3s`; workers held by slow form bodies, which PHP
+reads before the script runs):
+
+| Phase | Pod Ready | Restarts | Watchdog `/ready` | Gauges | Probes |
+| ----- | --------- | -------- | ----------------- | ------ | ------ |
+| streams pool full, 35 s | True throughout | 0 | 200 | `streams` 2/2, ratio 1 | third `POST /v1/chat/completions` → 503 `server_busy` after 3.0 s, `Retry-After: 5`; `GET /api/health/ready` 200 in 10 ms |
+| api pool full, 40 s | False after ≈ 16 s | 0 | 503 | `api` 2/2 | PHP's own readiness request → `server_busy` after 3 s |
+| after the api hold | True again ≈ 10 s later | 0 | 200 | 0/2, 0/2 | — |
+
+The Redis snapshot carried `runtime kubernetes`, the k3d node as host, the
+namespace, `deployment synaplan`, `container synaplan`, `cpu_request 500m`,
+`memory_limit 3Gi`, `collector kubernetes`; worker and scheduler reported
+with their own deployment and container. Exit criterion 2 holds on that
+cluster. FrankenPHP 1.13 labels the pools `worker="streams"`/`"api"` (1.12
+used `m#streams`); the dashboard matches both.
+
+**Not done.** M6 on the `vultr-cluster` load-test namespace: that cluster
+also hosts the VS-AP openDesk installation, so the run waits for the
+owner. Exit criterion 3 stays open until then.
+
+**Gate.** `make all` (helm-docs, lint, kubeconform, package) and
+`make check` (helm-unittest 50/50, 25 new; kubeconform on every Helmfile
+environment) green; default render differs from `main` by
+`SYNAPLAN_WATCHDOG=0` only; `ci/synaplan/lint-values-watchdog.yaml` makes
+CI render and validate the on-path. Copilot: round 1 — 503 panel lost
+methods (fixed `27509db`); round 2 — server count stuck when none reports
+(fixed `3a56f2e`); round 3 — `<fullname>-metrics` could pass 63 characters
+(fixed `91ea2dc`, unit test 51/51). The three-round cap is reached; a
+further review is the owner's call.
 
 ---
 

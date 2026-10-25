@@ -1,8 +1,8 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** S0 is in progress. AU0, AU0b, AU1, AU2, AU3, AU4, AU5 and AU6 are
-merged; AU6's every-role follow-up and AU7 (the capacity page) are in review;
-AU8 (the chart) is next. The contract hardening tasks in
+**Status:** S0 is in progress. AU0–AU7 are merged, AU6's every-role
+follow-up included; AU8 (the chart) is in review in `synaplan-charts`. The
+contract hardening tasks in
 `03_contracts.md` (§1.7, §2.3, §7.1) must merge before AU10, AU19 and AU28
 respectively.
 **Priority:** Row 22 of [`../ROADMAP.md`](../ROADMAP.md). S0 is production
