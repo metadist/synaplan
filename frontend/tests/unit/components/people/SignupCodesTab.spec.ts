@@ -6,6 +6,7 @@ const list = vi.fn()
 const revoke = vi.fn()
 const update = vi.fn()
 const confirm = vi.fn()
+const uses = vi.fn()
 const push = vi.fn()
 const success = vi.fn()
 const warning = vi.fn()
@@ -17,7 +18,7 @@ vi.mock('@/services/api/signupCodesApi', () => ({
     revoke: (...args: unknown[]) => revoke(...args),
     update: (...args: unknown[]) => update(...args),
     create: vi.fn(),
-    uses: vi.fn().mockResolvedValue([]),
+    uses: (...args: unknown[]) => uses(...args),
   },
 }))
 
@@ -64,6 +65,8 @@ describe('SignupCodesTab', () => {
     revoke.mockReset()
     update.mockReset()
     confirm.mockReset()
+    uses.mockReset()
+    uses.mockResolvedValue([])
     push.mockReset()
     success.mockReset()
     warning.mockReset()
@@ -174,6 +177,37 @@ describe('SignupCodesTab', () => {
     expect(row.get('[data-testid="text-signup-code-uses-deleted"]').text()).toBe(
       '2 accounts that used this code have since been deleted.'
     )
+  })
+
+  it('reloads the list when a revoke was not confirmed instead of saying it failed', async () => {
+    list.mockResolvedValue([pilots])
+    confirm.mockResolvedValue(true)
+    revoke.mockRejectedValue(new TypeError('Failed to fetch'))
+    const wrapper = mountTab()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-signup-code-revoke"]').trigger('click')
+    await flushPromises()
+
+    expect(warning).toHaveBeenCalledWith(
+      'We could not confirm the change. The list now shows the current state of the code.'
+    )
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
+  it('reloads who used the code when its counter changes', async () => {
+    list.mockResolvedValue([{ ...pilots, uses: 0 }])
+    confirm.mockResolvedValue(true)
+    revoke.mockResolvedValue({ ...pilots, uses: 1, active: false, state: 'revoked' })
+    const wrapper = mountTab()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-signup-code-uses"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="btn-signup-code-revoke"]').trigger('click')
+    await flushPromises()
+
+    expect(uses).toHaveBeenCalledTimes(2)
   })
 
   it('says the list did not load instead of showing an empty page', async () => {

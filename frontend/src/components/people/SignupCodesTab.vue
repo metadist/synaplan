@@ -81,6 +81,7 @@
       @close="formOpen = false"
       @created="(code) => (codes = [code, ...codes])"
       @saved="replace"
+      @refresh="load"
     />
   </section>
 </template>
@@ -96,6 +97,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { signupCodesApi, type SignupCode } from '@/services/api/signupCodesApi'
 import { useConfigStore } from '@/stores/config'
+import { isDefiniteRefusal } from '@/utils/signupCodeOutcome'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -142,8 +144,8 @@ async function revoke(code: SignupCode) {
   try {
     replace(await signupCodesApi.revoke(code.id))
     success(t('admin.signupCodes.revoked'))
-  } catch {
-    notifyError(t('admin.signupCodes.revokeFailed'))
+  } catch (failure) {
+    unconfirmedOr(failure, 'admin.signupCodes.revokeFailed')
   }
 }
 
@@ -154,9 +156,19 @@ async function restore(code: SignupCode) {
     if (restored.state === 'expired') warning(t('admin.signupCodes.restoredExpired'))
     else if (restored.state === 'used_up') warning(t('admin.signupCodes.restoredUsedUp'))
     else success(t('admin.signupCodes.restored'))
-  } catch {
-    notifyError(t('admin.signupCodes.restoreFailed'))
+  } catch (failure) {
+    unconfirmedOr(failure, 'admin.signupCodes.restoreFailed')
   }
+}
+
+/** A refused change left the code as it was; an unanswered one may not have. */
+function unconfirmedOr(failure: unknown, refusedKey: string) {
+  if (isDefiniteRefusal(failure)) {
+    notifyError(t(refusedKey))
+    return
+  }
+  warning(t('admin.signupCodes.changeUnconfirmed'))
+  void load()
 }
 
 onMounted(load)

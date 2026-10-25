@@ -17,6 +17,7 @@ vi.mock('@/composables/useNotification', () => ({
 }))
 
 import SignupCodeFormDialog from '@/components/people/SignupCodeFormDialog.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 const pilots: SignupCode = {
   id: 7,
@@ -100,6 +101,34 @@ describe('SignupCodeFormDialog', () => {
     expect(dialog.get('[data-testid="text-signup-code-plain"]').text()).toBe('R7KQ-M2XH-9TZA')
     expect(document.activeElement).toBe(dialog.get('[data-testid="btn-signup-code-copy"]').element)
     expect(dialog.emitted('created')).toHaveLength(1)
+  })
+
+  it('says nothing was saved only when the server refused', async () => {
+    create.mockRejectedValue(new ApiError(400, 'invalid', 'SIGNUP_CODE_REQUEST_INVALID'))
+    const dialog = await openDialog(null)
+
+    await dialog.get('[data-testid="input-signup-code-label"]').setValue('Pilots')
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(dialog.get('[data-testid="text-signup-code-form-error"]').text()).toBe(
+      'The code was not created. Nothing was saved; try again.'
+    )
+    expect(dialog.emitted('refresh')).toBeUndefined()
+  })
+
+  it('does not claim nothing was saved when the answer was lost, and refreshes the list', async () => {
+    create.mockRejectedValue(new TypeError('Failed to fetch'))
+    const dialog = await openDialog(null)
+
+    await dialog.get('[data-testid="input-signup-code-label"]').setValue('Pilots')
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(dialog.get('[data-testid="text-signup-code-form-error"]').text()).toContain(
+      'We could not confirm whether the code was created.'
+    )
+    expect(dialog.emitted('refresh')).toHaveLength(1)
   })
 
   it('keeps Tab inside the panel', async () => {

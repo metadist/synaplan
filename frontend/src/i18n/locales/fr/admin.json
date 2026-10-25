@@ -654,6 +654,7 @@
       "restoredExpired": "Le code n'est plus révoqué, mais sa date de fin est passée. Choisissez une date plus tardive dans Modifier pour qu'il soit utilisable.",
       "restoredUsedUp": "Le code n'est plus révoqué, mais toutes ses utilisations sont épuisées. Augmentez la limite dans Modifier pour que d'autres personnes puissent l'utiliser.",
       "restoreFailed": "Le code n'a pas été rétabli et reste inutilisable. Réessayez.",
+      "changeUnconfirmed": "Nous n'avons pas pu confirmer la modification. La liste affiche maintenant l'état actuel du code.",
       "form": {
         "titleCreate": "Créer un code d'invitation",
         "titleEdit": "Modifier le code d'invitation",
@@ -671,7 +672,9 @@
         "maxUsesInvalid": "Saisissez un nombre entier d'au moins 1, ou choisissez Sans limite.",
         "dateRequired": "Choisissez une date, ou Sans date de fin.",
         "createFailed": "Le code n'a pas été créé. Rien n'a été enregistré ; réessayez.",
+        "createUnconfirmed": "Nous n'avons pas pu confirmer la création du code. Vérifiez la liste : si un code avec ce libellé apparaît, révoquez-le et créez-en un nouveau, car son code ne peut plus être affiché.",
         "saveFailed": "Les modifications n'ont pas été enregistrées. Le code fonctionne comme avant.",
+        "saveUnconfirmed": "Nous n'avons pas pu confirmer l'enregistrement des modifications. La liste affiche maintenant l'état actuel du code.",
         "saved": "Modifications enregistrées."
       },
       "uses": {

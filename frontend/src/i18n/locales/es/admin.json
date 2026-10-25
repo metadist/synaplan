@@ -650,6 +650,7 @@
       "restoredExpired": "El código ya no está revocado, pero su fecha de fin ya pasó. Pon una fecha posterior en Editar para que se pueda usar.",
       "restoredUsedUp": "El código ya no está revocado, pero todos sus usos están agotados. Sube el límite en Editar para que más personas puedan usarlo.",
       "restoreFailed": "El código no se restauró y sigue sin poder usarse. Inténtalo de nuevo.",
+      "changeUnconfirmed": "No pudimos confirmar el cambio. La lista muestra ahora el estado actual del código.",
       "form": {
         "titleCreate": "Crear un código de invitación",
         "titleEdit": "Editar código de invitación",
@@ -667,7 +668,9 @@
         "maxUsesInvalid": "Escribe un número entero de 1 o más, o elige Sin límite.",
         "dateRequired": "Elige una fecha o Sin fecha de fin.",
         "createFailed": "El código no se creó. No se guardó nada; inténtalo de nuevo.",
+        "createUnconfirmed": "No pudimos confirmar si se creó el código. Revisa la lista: si aparece un código con esta etiqueta, revócalo y crea uno nuevo, porque su código no se puede volver a mostrar.",
         "saveFailed": "Los cambios no se guardaron. El código funciona como antes.",
+        "saveUnconfirmed": "No pudimos confirmar si se guardaron los cambios. La lista muestra ahora el estado actual del código.",
         "saved": "Cambios guardados."
       },
       "uses": {

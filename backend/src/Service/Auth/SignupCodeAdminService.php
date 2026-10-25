@@ -10,12 +10,14 @@ use App\Entity\User;
 use App\Repository\SignupCodeRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\AuditLogWriter;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * What an administrator does with sign-up codes: issue one (the plain code
  * leaves the server exactly once, in the create response), change its label,
  * limit or expiry, revoke or restore it, and see who used it. Revoking keeps
  * the row and its uses; the people who signed up keep their accounts.
+ * Every write and its audit row commit together or not at all.
  */
 final readonly class SignupCodeAdminService
 {
@@ -39,6 +41,7 @@ final readonly class SignupCodeAdminService
         private SignupCodeRepository $codes,
         private UserRepository $users,
         private AuditLogWriter $audit,
+        private EntityManagerInterface $em,
     ) {
     }
 
@@ -71,14 +74,15 @@ final readonly class SignupCodeAdminService
         $plain = $this->uniqueCode();
         $code->setCodeHash(SignupCodeRepository::hash($plain));
         $code->setPrefix(substr($plain, 0, SignupCode::PREFIX_LENGTH));
-        $this->codes->save($code);
-
-        $this->audit->record((int) $actor->getId(), 'signup_code.created', self::RESOURCE_KIND, (string) $code->getId(), [
-            'prefix' => $code->getPrefix(),
-            'level' => $code->getLevel(),
-            'maxUses' => $code->getMaxUses(),
-            'expiresAt' => $code->getExpires(),
-        ], $ip);
+        $this->em->wrapInTransaction(function () use ($code, $actor, $ip): void {
+            $this->codes->save($code);
+            $this->audit->record((int) $actor->getId(), 'signup_code.created', self::RESOURCE_KIND, (string) $code->getId(), [
+                'prefix' => $code->getPrefix(),
+                'level' => $code->getLevel(),
+                'maxUses' => $code->getMaxUses(),
+                'expiresAt' => $code->getExpires(),
+            ], $ip);
+        });
 
         return [
             'code' => self::display($plain),
@@ -112,12 +116,13 @@ final readonly class SignupCodeAdminService
             }
             $code->setActive($changes['active']);
         }
-        $this->codes->save($code);
-
-        $this->audit->record((int) $actor->getId(), 'signup_code.updated', self::RESOURCE_KIND, (string) $id, [
-            'prefix' => $code->getPrefix(),
-            'changed' => array_values(array_intersect(['label', 'maxUses', 'expiresAt', 'active'], array_keys($changes))),
-        ], $ip);
+        $this->em->wrapInTransaction(function () use ($code, $actor, $id, $changes, $ip): void {
+            $this->codes->save($code);
+            $this->audit->record((int) $actor->getId(), 'signup_code.updated', self::RESOURCE_KIND, (string) $id, [
+                'prefix' => $code->getPrefix(),
+                'changed' => array_values(array_intersect(['label', 'maxUses', 'expiresAt', 'active'], array_keys($changes))),
+            ], $ip);
+        });
 
         return $this->present($code, $this->emailsOf([$code->getCreatedBy()]), $now);
     }
@@ -131,12 +136,13 @@ final readonly class SignupCodeAdminService
     {
         $code = $this->find($id);
         $code->setActive(false);
-        $this->codes->save($code);
-
-        $this->audit->record((int) $actor->getId(), 'signup_code.revoked', self::RESOURCE_KIND, (string) $id, [
-            'prefix' => $code->getPrefix(),
-            'uses' => $code->getUses(),
-        ], $ip);
+        $this->em->wrapInTransaction(function () use ($code, $actor, $id, $ip): void {
+            $this->codes->save($code);
+            $this->audit->record((int) $actor->getId(), 'signup_code.revoked', self::RESOURCE_KIND, (string) $id, [
+                'prefix' => $code->getPrefix(),
+                'uses' => $code->getUses(),
+            ], $ip);
+        });
 
         return $this->present($code, $this->emailsOf([$code->getCreatedBy()]), $now);
     }

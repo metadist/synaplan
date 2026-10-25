@@ -157,12 +157,18 @@ import {
   type SignupCodeLevel,
 } from '@/services/api/signupCodesApi'
 import { dateInputToUnixEndOfDay, unixToDateInput } from '@/utils/signupCodeDates'
+import { isDefiniteRefusal } from '@/utils/signupCodeOutcome'
 
 const LEVELS: SignupCodeLevel[] = ['NEW', 'PRO', 'TEAM', 'BUSINESS']
 const VALIDITIES: SignupCodeCreate['validity'][] = ['forever', 'week', 'fiveMonths']
 
 const props = defineProps<{ open: boolean; code: SignupCode | null }>()
-const emit = defineEmits<{ close: []; created: [code: SignupCode]; saved: [code: SignupCode] }>()
+const emit = defineEmits<{
+  close: []
+  created: [code: SignupCode]
+  saved: [code: SignupCode]
+  refresh: []
+}>()
 
 const { t } = useI18n()
 const { success } = useNotification()
@@ -256,10 +262,17 @@ async function submit() {
       createdCode.value = created.code
       emit('created', created.signupCode)
     }
-  } catch {
-    error.value = props.code
-      ? t('admin.signupCodes.form.saveFailed')
-      : t('admin.signupCodes.form.createFailed')
+  } catch (failure) {
+    if (isDefiniteRefusal(failure)) {
+      error.value = props.code
+        ? t('admin.signupCodes.form.saveFailed')
+        : t('admin.signupCodes.form.createFailed')
+    } else {
+      error.value = props.code
+        ? t('admin.signupCodes.form.saveUnconfirmed')
+        : t('admin.signupCodes.form.createUnconfirmed')
+      emit('refresh')
+    }
   } finally {
     saving.value = false
   }

@@ -654,6 +654,7 @@
       "restoredExpired": "The code is no longer revoked, but its end date has passed. Set a later date under Edit so people can use it.",
       "restoredUsedUp": "The code is no longer revoked, but all its uses are taken. Raise the limit under Edit so more people can use it.",
       "restoreFailed": "The code was not restored and still cannot be used. Try again.",
+      "changeUnconfirmed": "We could not confirm the change. The list now shows the current state of the code.",
       "form": {
         "titleCreate": "Create an invitation code",
         "titleEdit": "Edit invitation code",
@@ -671,7 +672,9 @@
         "maxUsesInvalid": "Enter a whole number of 1 or more, or choose No limit.",
         "dateRequired": "Pick a date, or choose No end date.",
         "createFailed": "The code was not created. Nothing was saved; try again.",
+        "createUnconfirmed": "We could not confirm whether the code was created. Check the list: if a code with this label appears, revoke it and create a new one, because its code cannot be shown again.",
         "saveFailed": "The changes were not saved. The code works as before.",
+        "saveUnconfirmed": "We could not confirm whether the changes were saved. The list now shows the current state of the code.",
         "saved": "Changes saved."
       },
       "uses": {

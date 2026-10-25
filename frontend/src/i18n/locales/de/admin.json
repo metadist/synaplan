@@ -654,6 +654,7 @@
       "restoredExpired": "Der Code ist nicht mehr widerrufen, aber sein Enddatum ist vorbei. Lege unter Bearbeiten ein späteres Datum fest, damit er wieder genutzt werden kann.",
       "restoredUsedUp": "Der Code ist nicht mehr widerrufen, aber alle Nutzungen sind verbraucht. Erhöhe unter Bearbeiten die Grenze, damit weitere Personen ihn nutzen können.",
       "restoreFailed": "Der Code wurde nicht wiederhergestellt und bleibt gesperrt. Versuche es erneut.",
+      "changeUnconfirmed": "Wir konnten die Änderung nicht bestätigen. Die Liste zeigt jetzt den aktuellen Stand des Codes.",
       "form": {
         "titleCreate": "Einladungscode erstellen",
         "titleEdit": "Einladungscode bearbeiten",
@@ -671,7 +672,9 @@
         "maxUsesInvalid": "Gib eine ganze Zahl ab 1 ein oder wähle Ohne Grenze.",
         "dateRequired": "Wähle ein Datum oder Ohne Enddatum.",
         "createFailed": "Der Code wurde nicht erstellt. Es wurde nichts gespeichert; versuche es erneut.",
+        "createUnconfirmed": "Wir konnten nicht bestätigen, ob der Code erstellt wurde. Sieh in der Liste nach: Taucht ein Code mit dieser Bezeichnung auf, widerrufe ihn und erstelle einen neuen, denn sein Code kann nicht noch einmal angezeigt werden.",
         "saveFailed": "Die Änderungen wurden nicht gespeichert. Der Code funktioniert wie vorher.",
+        "saveUnconfirmed": "Wir konnten nicht bestätigen, ob die Änderungen gespeichert wurden. Die Liste zeigt jetzt den aktuellen Stand des Codes.",
         "saved": "Änderungen gespeichert."
       },
       "uses": {

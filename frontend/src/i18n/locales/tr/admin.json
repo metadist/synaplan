@@ -650,6 +650,7 @@
       "restoredExpired": "Kod artık iptal edilmiş değil, ancak bitiş tarihi geçti. Kullanılabilmesi için Düzenle'de daha ileri bir tarih belirleyin.",
       "restoredUsedUp": "Kod artık iptal edilmiş değil, ancak tüm kullanımları doldu. Daha fazla kişinin kullanabilmesi için Düzenle'de sınırı artırın.",
       "restoreFailed": "Kod geri getirilmedi ve kullanılamıyor. Tekrar deneyin.",
+      "changeUnconfirmed": "Değişikliği doğrulayamadık. Liste artık kodun güncel durumunu gösteriyor.",
       "form": {
         "titleCreate": "Davet kodu oluştur",
         "titleEdit": "Davet kodunu düzenle",
@@ -667,7 +668,9 @@
         "maxUsesInvalid": "1 veya daha büyük bir tam sayı girin ya da Sınır yok seçin.",
         "dateRequired": "Bir tarih seçin ya da Bitiş tarihi yok seçin.",
         "createFailed": "Kod oluşturulmadı. Hiçbir şey kaydedilmedi; tekrar deneyin.",
+        "createUnconfirmed": "Kodun oluşturulup oluşturulmadığını doğrulayamadık. Listeye bakın: bu etiketle bir kod görünürse iptal edin ve yenisini oluşturun, çünkü kodu tekrar gösterilemez.",
         "saveFailed": "Değişiklikler kaydedilmedi. Kod eskisi gibi çalışıyor.",
+        "saveUnconfirmed": "Değişikliklerin kaydedilip kaydedilmediğini doğrulayamadık. Liste artık kodun güncel durumunu gösteriyor.",
         "saved": "Değişiklikler kaydedildi."
       },
       "uses": {

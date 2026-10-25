@@ -77,7 +77,7 @@
         </button>
       </div>
     </div>
-    <SignupCodeUses v-if="showUses" :code-id="code.id" :used="code.uses" />
+    <SignupCodeUses v-if="showUses" :key="code.uses" :code-id="code.id" :used="code.uses" />
   </li>
 </template>
 
