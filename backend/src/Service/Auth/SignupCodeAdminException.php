@@ -12,6 +12,7 @@ final class SignupCodeAdminException extends \RuntimeException
 {
     public const NOT_FOUND = 'SIGNUP_CODE_NOT_FOUND';
     public const INVALID = 'SIGNUP_CODE_REQUEST_INVALID';
+    public const NOT_STORED = 'SIGNUP_CODE_NOT_STORED';
 
     private function __construct(string $message, private readonly string $errorCode)
     {
@@ -21,6 +22,11 @@ final class SignupCodeAdminException extends \RuntimeException
     public static function notFound(int $id): self
     {
         return new self(sprintf('Sign-up code %d does not exist.', $id), self::NOT_FOUND);
+    }
+
+    public static function notStored(int $id): self
+    {
+        return new self(sprintf('Sign-up code %d was created before codes were kept and cannot be shown again.', $id), self::NOT_STORED);
     }
 
     public static function invalid(string $message): self

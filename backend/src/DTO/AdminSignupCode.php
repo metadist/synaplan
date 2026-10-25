@@ -7,12 +7,12 @@ namespace App\DTO;
 use OpenApi\Attributes as OA;
 
 /**
- * One sign-up code as the administrator sees it. Never the code itself: that
- * leaves the server once, in the create response.
+ * One sign-up code as the administrator sees it. The code itself comes from
+ * GET /api/v1/admin/signup-codes/{id}/code when `codeStored` is true.
  */
 #[OA\Schema(
     schema: 'AdminSignupCode',
-    required: ['id', 'prefix', 'label', 'level', 'maxUses', 'uses', 'expiresAt', 'active', 'state', 'createdAt', 'createdById', 'createdByEmail'],
+    required: ['id', 'prefix', 'label', 'level', 'maxUses', 'uses', 'expiresAt', 'active', 'codeStored', 'state', 'createdAt', 'createdById', 'createdByEmail'],
     properties: [
         new OA\Property(property: 'id', type: 'integer', example: 7),
         new OA\Property(property: 'prefix', type: 'string', description: 'The first four characters, to recognise the code', example: 'R7KQ'),
@@ -22,6 +22,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'uses', type: 'integer', example: 2),
         new OA\Property(property: 'expiresAt', type: 'integer', nullable: true, description: 'Unix time the code stops working; null: never', example: 1789000000),
         new OA\Property(property: 'active', type: 'boolean', description: 'False once revoked', example: true),
+        new OA\Property(property: 'codeStored', type: 'boolean', description: 'False for codes created before codes were kept; those cannot be shown again', example: true),
         new OA\Property(property: 'state', type: 'string', enum: ['active', 'expired', 'used_up', 'revoked'], example: 'active'),
         new OA\Property(property: 'createdAt', type: 'integer', example: 1761400000),
         new OA\Property(property: 'createdById', type: 'integer', example: 1),

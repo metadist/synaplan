@@ -11,12 +11,7 @@
     <div class="flex flex-col sm:flex-row sm:items-start gap-3">
       <div class="flex-1 min-w-0 space-y-1">
         <div class="flex flex-wrap items-center gap-2">
-          <span
-            class="font-mono text-sm txt-primary surface-chip rounded-lg px-2 py-0.5"
-            :aria-label="$t('admin.signupCodes.prefixAria', { prefix: code.prefix })"
-            data-testid="text-signup-code-prefix"
-            >{{ code.prefix }}…</span
-          >
+          <SignupCodeReveal :code="code" />
           <span class="font-medium txt-primary break-words" data-testid="text-signup-code-label">{{
             code.label
           }}</span>
@@ -85,6 +80,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import SignupCodeReveal from '@/components/people/SignupCodeReveal.vue'
 import SignupCodeUses from '@/components/people/SignupCodeUses.vue'
 import { useDateFormat } from '@/composables/useDateFormat'
 import type { SignupCode } from '@/services/api/signupCodesApi'

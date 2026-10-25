@@ -7,6 +7,7 @@ const revoke = vi.fn()
 const update = vi.fn()
 const confirm = vi.fn()
 const uses = vi.fn()
+const show = vi.fn()
 const push = vi.fn()
 const success = vi.fn()
 const warning = vi.fn()
@@ -19,6 +20,7 @@ vi.mock('@/services/api/signupCodesApi', () => ({
     update: (...args: unknown[]) => update(...args),
     create: vi.fn(),
     uses: (...args: unknown[]) => uses(...args),
+    show: (...args: unknown[]) => show(...args),
   },
 }))
 
@@ -49,6 +51,7 @@ const pilots: SignupCode = {
   uses: 2,
   expiresAt: null,
   active: true,
+  codeStored: true,
   state: 'active',
   createdAt: 1761400000,
   createdById: 1,
@@ -66,6 +69,7 @@ describe('SignupCodesTab', () => {
     update.mockReset()
     confirm.mockReset()
     uses.mockReset()
+    show.mockReset()
     uses.mockResolvedValue([])
     push.mockReset()
     success.mockReset()
@@ -208,6 +212,36 @@ describe('SignupCodesTab', () => {
     await flushPromises()
 
     expect(uses).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the full code on click so it can be copied again', async () => {
+    list.mockResolvedValue([pilots])
+    show.mockResolvedValue('R7KQ-M2XH-9TZA')
+    const wrapper = mountTab()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="text-signup-code-prefix"]').trigger('click')
+    await flushPromises()
+
+    expect(show).toHaveBeenCalledWith(7)
+    expect(wrapper.get('[data-testid="text-signup-code-full"]').text()).toBe('R7KQ-M2XH-9TZA')
+    expect(wrapper.find('[data-testid="btn-signup-code-row-copy"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="btn-signup-code-hide"]').trigger('click')
+    expect(wrapper.find('[data-testid="text-signup-code-full"]').exists()).toBe(false)
+  })
+
+  it('explains why a code from before codes were kept cannot be shown', async () => {
+    list.mockResolvedValue([{ ...pilots, codeStored: false }])
+    const wrapper = mountTab()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="text-signup-code-prefix"]').trigger('click')
+    await flushPromises()
+
+    expect(show).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="text-signup-code-show-message"]').text()).toContain(
+      'created before codes were kept'
+    )
   })
 
   it('says the list did not load instead of showing an empty page', async () => {

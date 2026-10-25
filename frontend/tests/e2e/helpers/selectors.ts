@@ -694,6 +694,7 @@ export const selectors = {
     rowLabel: '[data-testid="text-signup-code-label"]',
     rowState: '[data-testid="text-signup-code-state"]',
     rowPrefix: '[data-testid="text-signup-code-prefix"]',
+    rowFullCode: '[data-testid="text-signup-code-full"]',
     rowFacts: '[data-testid="text-signup-code-facts"]',
     revoke: '[data-testid="btn-signup-code-revoke"]',
     restore: '[data-testid="btn-signup-code-restore"]',
