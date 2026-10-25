@@ -88,6 +88,21 @@ final class ReapPendingSignupsCommandTest extends KernelTestCase
         self::assertCount(ReapPendingSignupsCommand::PAGE_SIZE, $this->remaining($kept));
     }
 
+    public function testOlderDateFormatsCountAndAnUnreadableDateIsKept(): void
+    {
+        $eightDaysAgo = time() - 8 * 86400;
+        $compact = $this->user('compact', User::ACCOUNT_STATUS_PENDING_PAYMENT, 8, created: date('YmdHis', $eightDaysAgo));
+        $isoT = $this->user('iso-t', User::ACCOUNT_STATUS_PENDING_PAYMENT, 8, created: date('Y-m-d\\TH:i:s', $eightDaysAgo));
+        $zero = $this->user('zero', User::ACCOUNT_STATUS_PENDING_PAYMENT, 8, created: '0000-00-00 00:00:00');
+        $overflow = $this->user('overflow', User::ACCOUNT_STATUS_PENDING_PAYMENT, 8, created: '2026-13-45 99:99:99');
+
+        $tester = $this->tester();
+        $tester->execute([]);
+
+        self::assertStringContainsString('Deleted 2 pending sign-up(s)', $tester->getDisplay());
+        self::assertSame([$zero, $overflow], $this->remaining([$compact, $isoT, $zero, $overflow]));
+    }
+
     public function testDryRunDeletesNothing(): void
     {
         $old = $this->user('dry', User::ACCOUNT_STATUS_PENDING_PAYMENT, 9);
@@ -116,7 +131,7 @@ final class ReapPendingSignupsCommandTest extends KernelTestCase
      *
      * @return ($flush is true ? int : User)
      */
-    private function user(string $name, string $status, int $ageDays, array $subscription = [], bool $flush = true): int|User
+    private function user(string $name, string $status, int $ageDays, array $subscription = [], bool $flush = true, ?string $created = null): int|User
     {
         $user = (new User())
             ->setMail(self::MAIL_PREFIX.$name.'-'.uniqid().'@synaplan.internal')
@@ -124,7 +139,7 @@ final class ReapPendingSignupsCommandTest extends KernelTestCase
             ->setProviderId(self::MAIL_PREFIX.uniqid())
             ->setUserLevel('NEW')
             ->setAccountStatus($status);
-        $user->setCreated(date('Y-m-d H:i:s', time() - $ageDays * 86400));
+        $user->setCreated($created ?? date('Y-m-d H:i:s', time() - $ageDays * 86400));
         if ([] !== $subscription) {
             $user->setSubscriptionData($subscription);
         }
