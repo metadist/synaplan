@@ -7,7 +7,7 @@ run are entries here, not chat messages.
 
 | Id | State |
 | -- | ----- |
-| D1–D9 | open — owner |
+| D1–D10 | open — owner |
 
 ## Steps
 
@@ -20,7 +20,8 @@ run are entries here, not chat messages.
 | IC2 | | waits for D1, D2, #2744 |
 | IC3 | | waits for IC2 |
 | IC4 | | not started |
-| IC5 | | waits for D6 |
+| IC5 | | waits for D6, D10 |
+| IC5b | | waits for IC5 |
 | IC6 | | waits for IC2, IC5 |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
 | IC7 | | waits for D7 |
@@ -32,6 +33,12 @@ run are entries here, not chat messages.
 Read-only. `origin/main` at `7f7134620`, open #2744 at `2e1d86aa0`.
 Findings F1–F15 in the plan; the security details of IC0 and PC1–PC3 are
 in `synaplan-platform/planning/20261025-iam-security-note/`.
+
+## Reviews
+
+| Date | Round | Result |
+| ---- | ----- | ------ |
+| 2026-10-25 | Copilot round 1 on [#2745](https://github.com/metadist/synaplan/pull/2745) | five findings, all accepted; plan revised (change log) |
 
 ## Walks
 
