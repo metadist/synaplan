@@ -90,7 +90,7 @@
     "subtitle": "Débloquez plus de fonctionnalités et des limites plus élevées",
     "chooseYourPlan": "Choisissez votre formule",
     "pendingTitle": "Paiement encore dû",
-    "pendingBody": "Choisissez une formule ci-dessous pour terminer. Le compte reste limité tant que le paiement n’est pas fait.",
+    "pendingBody": "Choisissez une formule ci-dessous pour terminer. Le compte reste limité tant que le paiement n’est pas fait. Sans paiement, il est supprimé 7 jours après l’inscription.",
     "currentPlan": "Formule actuelle",
     "yourPlan": "Votre formule",
     "noActiveSubscription": "Aucun abonnement actif",

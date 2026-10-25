@@ -30,6 +30,7 @@ final class ScheduledJobsTest extends TestCase
                 'app:approvals:expire',
                 'app:models:discover',
                 'app:freeapi:maintain',
+                'app:signup:reap-pending',
             ],
             'daily' => [
                 'app:updates:check',

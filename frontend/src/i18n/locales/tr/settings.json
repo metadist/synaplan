@@ -188,7 +188,7 @@
     "subtitle": "Daha fazla özellik ve daha yüksek limitler açın",
     "chooseYourPlan": "Planınızı Seçin",
     "pendingTitle": "Ödeme bekleniyor",
-    "pendingBody": "Bitirmek için aşağıdan bir plan seçin. Ödeme tamamlanana kadar hesap sınırlı kalır.",
+    "pendingBody": "Bitirmek için aşağıdan bir plan seçin. Ödeme tamamlanana kadar hesap sınırlı kalır. Ödeme yapılmazsa hesap, kayıttan 7 gün sonra silinir.",
     "currentPlan": "Mevcut Plan",
     "yourPlan": "Planınız",
     "noActiveSubscription": "Aktif abonelik yok",
