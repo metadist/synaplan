@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
+use App\Service\Research\Run\Lead\LeadStage;
 use App\Service\Research\Run\Stage\BriefStage;
 use App\Service\Research\Run\Stage\DeliverStage;
 use App\Service\Research\Run\Stage\GatherStage;
@@ -17,9 +18,10 @@ use App\Service\Research\Run\Stage\StageResult;
 use App\Service\Research\Run\Stage\WriteStage;
 
 /**
- * Runs one research step. Brief and plan share a step, and so do search,
- * reading and the decision to search again, so the queue stays on four
- * messages. A run with nothing it could search ends before the first paid call.
+ * Runs one research step. Brief and plan share a step. A round is search,
+ * reading and the decision to search again, or one turn where the lead
+ * calls the tools itself. The queue stays on four messages. A run with
+ * nothing it could search ends before the first paid call.
  */
 final readonly class ResearchPipeline implements ResearchUnitRunner
 {
@@ -29,6 +31,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
         private GatherStage $gather,
         private ReadStage $read,
         private ReflectStage $reflect,
+        private LeadStage $lead,
         private WriteStage $write,
         private DeliverStage $deliver,
         private ResearchSearch $search,
@@ -66,6 +69,9 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
 
     private function round(StageContext $ctx): StageResult
     {
+        if ($this->lead->active($ctx)) {
+            return $this->lead->run($ctx);
+        }
         $ctx->state->evidenceBeforeRound = $ctx->state->ledger->evidenceCount();
         $gathered = $this->gather->run($ctx);
         if ('read' !== $gathered->next || $ctx->state->status->isTerminal()) {

@@ -55,8 +55,14 @@ can search again, up to the round limit of that depth. A quick run does not
 search again. The run goes to the report instead when the next round would
 have nothing new to search or read, or when the model calls left could not
 pay for another round and the report. A point the run calls answered
-without a finding stays open. Research as a whole stays off until
-`RESEARCH.ENABLED` is turned on.
+without a finding stays open.
+
+When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
+uses that same round to call search, read or finish itself. The list is
+empty until a model passes the conformance suite, so a run keeps judging
+the round. Each tool stops at the budget and returns a short result, never
+the page. Asking the person is refused until a run can wait for the answer.
+Research as a whole stays off until `RESEARCH.ENABLED` is turned on.
 
 At most `RESEARCH.MAX_ACTIVE_RUNS` runs (default 5) can be going at once for
 one person, and at most `RESEARCH.MAX_ACTIVE_THOROUGH_PER_USER` thorough runs
