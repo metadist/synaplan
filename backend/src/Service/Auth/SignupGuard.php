@@ -32,14 +32,20 @@ final readonly class SignupGuard
     }
 
     /**
+     * `$invited`: the person brings a valid invitation code an administrator
+     * issued. The pause stops strangers, not them; the limits still count.
+     *
      * @throws SignupBlockedException
      */
-    public function assertAllowed(?string $clientIp): void
+    public function assertAllowed(?string $clientIp, bool $invited = false): void
     {
         if ($this->pauseSwitch->isPaused()) {
-            $this->logger->notice('Signup refused: paused by operator', ['ip' => $clientIp]);
+            if (!$invited) {
+                $this->logger->notice('Signup refused: paused by operator', ['ip' => $clientIp]);
 
-            throw SignupBlockedException::paused();
+                throw SignupBlockedException::paused();
+            }
+            $this->logger->notice('Signup admitted while paused: invitation code', ['ip' => $clientIp]);
         }
 
         $ip = null !== $clientIp && '' !== $clientIp ? $clientIp : 'unknown';

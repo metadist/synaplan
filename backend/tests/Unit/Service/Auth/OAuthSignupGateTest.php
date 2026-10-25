@@ -107,6 +107,15 @@ final class OAuthSignupGateTest extends TestCase
         $this->gate()->assertGoogleSignup('new@example.com', ['nonce' => 'n2', OAuthSignupGate::STATE_HUMAN => true], '203.0.113.1');
     }
 
+    public function testTheInvitationCodeInTheSignedStateReachesTheLimitsCheck(): void
+    {
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->protection->method('challengeRequired')->willReturn(false);
+        $this->protection->expects($this->once())->method('assertSignupAllowed')->with('203.0.113.1', 'BHTB2345CQA7');
+
+        $this->gate()->assertGoogleSignup('invited@example.com', ['nonce' => 'n9', 'code' => 'BHTB2345CQA7'], '203.0.113.1');
+    }
+
     public function testTheSameNonceCannotCreateASecondAccount(): void
     {
         $this->users->method('findOneBy')->willReturn(null);

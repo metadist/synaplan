@@ -1,6 +1,7 @@
 import { expect, test } from '../test-setup'
 import { getApiUrl } from '../config/config'
-import { openApp } from '../helpers/auth'
+import { getAuthHeaders, openApp } from '../helpers/auth'
+import { CREDENTIALS } from '../config/credentials'
 import { ChatHelper } from '../helpers/chat'
 
 /**
@@ -100,5 +101,33 @@ test.describe('@busy a full stream pool answers at once', () => {
     expect(body).toEqual({ error: 'server_busy', retryAfter: 5 })
 
     await request.delete(`${api}/api/v1/chats/${chatId}`)
+  })
+})
+
+/**
+ * Only FrankenPHP's own busy answer (text/plain) is replaced. A 503 the
+ * application sends keeps its code and sentence; a paused sign-up once
+ * reached the register page as "server_busy".
+ */
+test.describe('@busy an application 503 keeps its own answer', () => {
+  test('a paused sign-up says it is paused, not busy', async ({ request }) => {
+    const api = getApiUrl()
+    const admin = await getAuthHeaders(request, CREDENTIALS.getAdminCredentials())
+    const setPaused = (value: string) =>
+      request.put(`${api}/api/v1/admin/config/values`, {
+        headers: admin,
+        data: { key: 'SIGNUP_PAUSED', value },
+      })
+
+    expect((await setPaused('true')).ok(), 'pause sign-up').toBeTruthy()
+    try {
+      const refused = await request.post(`${api}/api/v1/auth/register`, {
+        data: { email: `paused-${Date.now()}@test.synaplan.com`, password: 'PausedPass123!' },
+      })
+      expect(refused.status()).toBe(503)
+      expect(await refused.json()).toMatchObject({ code: 'SIGNUP_PAUSED' })
+    } finally {
+      await setPaused('false')
+    }
   })
 })

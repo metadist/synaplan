@@ -16,17 +16,28 @@ const KEYS: Record<string, string> = {
   SIGNUP_PLAN_INVALID: 'auth.signupBlocked.planInvalid',
 }
 
+/**
+ * Answers that arrive without a code: the busy body of a full server, and the
+ * texts authService reports for a lost connection or an unreadable answer.
+ * Shown raw they read as "server_busy" or "Network error".
+ */
+const TEXT_KEYS: Record<string, string> = {
+  server_busy: 'auth.signupBlocked.busy',
+  'Network error': 'auth.signupBlocked.network',
+  'Registration failed': 'auth.signupBlocked.failed',
+}
+
 export function signupBlockedI18nKey(code: string | null | undefined): string | null {
   if (!code) return null
   return KEYS[code.toUpperCase()] ?? null
 }
 
-/** The translated sentence for a known code, otherwise the server's own text. */
+/** The translated sentence for a known code or text, otherwise the server's own text. */
 export function signupBlockedText(
   t: (key: string) => string,
   code: string | null | undefined,
   fallback: string | null
 ): string | null {
-  const key = signupBlockedI18nKey(code)
+  const key = signupBlockedI18nKey(code) ?? (fallback ? TEXT_KEYS[fallback] : undefined)
   return key ? t(key) : fallback
 }

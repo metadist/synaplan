@@ -221,7 +221,7 @@ class AuthController extends AbstractController
     #[OA\Response(response: 400, description: 'Validation error')]
     #[OA\Response(response: 403, description: 'Registration is disabled on this instance (e.g. OIDC-only)')]
     #[OA\Response(response: 429, description: 'Too many sign-ups from this connection (SIGNUP_RATE_LIMITED); Retry-After is set')]
-    #[OA\Response(response: 503, description: 'Sign-up is paused by the operator (SIGNUP_PAUSED)')]
+    #[OA\Response(response: 503, description: 'Sign-up is paused by the operator and the request has no valid invitation code (SIGNUP_PAUSED)')]
     public function register(
         #[MapRequestPayload] RegisterRequest $dto,
         Request $request,
@@ -240,7 +240,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
         }
         try {
-            $this->signupProtection->assertSignupAllowed($request->getClientIp());
+            $this->signupProtection->assertSignupAllowed($request->getClientIp(), $dto->code);
         } catch (SignupBlockedException $e) {
             return $this->signupBlocked($e);
         }

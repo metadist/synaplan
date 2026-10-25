@@ -32,6 +32,20 @@ final readonly class SignupAdmission
     }
 
     /**
+     * True when this sign-up will redeem a valid invitation code: admission
+     * mode and a code that may still be used. Such a person was let in by an
+     * administrator, so the operator's pause does not apply to them.
+     */
+    public function holdsInvitation(?string $code): bool
+    {
+        if (!$this->registration->isAdmissionMode() || null === $code || '' === trim($code)) {
+            return false;
+        }
+
+        return $this->codes->findRedeemable($code) instanceof SignupCode;
+    }
+
+    /**
      * @return Admission|null null while registration is open
      *
      * @throws SignupBlockedException

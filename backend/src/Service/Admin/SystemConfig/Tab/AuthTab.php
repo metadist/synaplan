@@ -75,7 +75,7 @@ final readonly class AuthTab implements SystemConfigTab
             ),
             'SIGNUP_PAUSED' => new FieldDefinition(
                 type: 'boolean',
-                description: 'Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. Existing accounts sign in as usual. Takes effect immediately, no restart.',
+                description: 'Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. In admission mode a valid invitation code still opens an account; the sign-up limits apply to it. Existing accounts sign in as usual. Takes effect immediately, no restart.',
                 default: 'false',
                 row: new DatabaseRow(SignupPauseSwitch::CONFIG_GROUP, SignupPauseSwitch::KEY_PAUSED),
             ),
