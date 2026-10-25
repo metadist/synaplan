@@ -82,7 +82,7 @@ final readonly class LeadToolbox
             [$question],
             ResearchUnitPlan::ROUND,
             ResearchStatus::Gathering->value,
-            '' !== $call->id ? $call->id : 'call_0',
+            $call->id,
         );
         ++$ctx->state->questionsAsked;
         $ctx->state->advance(ResearchStatus::WaitingAnswer);

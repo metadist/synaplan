@@ -114,7 +114,7 @@ final readonly class LeadStage
                 $results[] = $this->result($call, $index, LeadToolReply::error('not_allowed', $ctx->state->budget));
                 continue;
             }
-            $outcome = $this->tools->execute($call, $ctx);
+            $outcome = $this->tools->execute(new ToolCall($this->callId($call, $index), $call->name, $call->arguments), $ctx);
             if ($outcome->stop instanceof StageResult && 'wait_answer' !== $outcome->stop->next) {
                 return $outcome->stop;
             }
