@@ -70,7 +70,58 @@ final readonly class ReadStage implements ResearchStage
         return null;
     }
 
-    private function readOne(StageContext $ctx, Source $source): ?StageResult
+    /**
+     * Reads the named sources and returns the cards from this call.
+     * A stop from the reader ends the run before the next source. A budget
+     * that runs out mid-list goes to the writer, so what was read is kept.
+     * A source that was already read stays read, so a failed reread cannot
+     * hide the evidence it gave before.
+     *
+     * @param list<string> $ids
+     *
+     * @return array{cards: list<array<string, mixed>>, blocked: list<array{id: string, reason: string}>}|StageResult
+     */
+    public function readListed(StageContext $ctx, array $ids, ?string $question = null): array|StageResult
+    {
+        $cards = [];
+        $blocked = [];
+        foreach ($ids as $id) {
+            if (!$ctx->state->budget->canCall()) {
+                $ctx->state->advance(ResearchStatus::Writing);
+
+                return new StageResult('write');
+            }
+            $source = $ctx->state->ledger->source($id);
+            if (null === $source || null === $source->url) {
+                $blocked[] = ['id' => $id, 'reason' => 'That source cannot be read.'];
+                continue;
+            }
+            $wasRead = Source::READ === $source->status;
+            $before = $ctx->state->ledger->evidenceCount();
+            $stop = $this->readOne($ctx, $source, $question);
+            $current = $ctx->state->ledger->source($id);
+            $failed = null !== $current && Source::BLOCKED === $current->status;
+            if ($wasRead && null !== $current && Source::READ !== $current->status) {
+                $this->mark($ctx, $id, Source::READ);
+            }
+            if ($stop instanceof StageResult) {
+                return $stop;
+            }
+            if ($failed) {
+                $blocked[] = ['id' => $id, 'reason' => $current->details->reason ?? 'There was no text to read.'];
+                continue;
+            }
+            foreach (array_slice($ctx->state->ledger->toArray()['evidence'], $before) as $card) {
+                if (is_array($card)) {
+                    $cards[] = $card;
+                }
+            }
+        }
+
+        return ['cards' => $cards, 'blocked' => $blocked];
+    }
+
+    private function readOne(StageContext $ctx, Source $source, ?string $question = null): ?StageResult
     {
         $url = $source->url ?? '';
         $this->mark($ctx, $source->id, Source::READING);
@@ -94,8 +145,8 @@ final readonly class ReadStage implements ResearchStage
             $ctx,
             'reading',
             $ctx->roles->reader,
-            $this->prompt($ctx, $source, $map, $links),
-            'Extract evidence from the source.',
+            $this->prompt($ctx, $source, $map, $links, $question),
+            $this->ask($question),
             ResearchEvidenceSchema::build(),
         );
         if ($called->stop instanceof StageResult) {
@@ -142,14 +193,27 @@ final readonly class ReadStage implements ResearchStage
         }
     }
 
+    private function ask(?string $question): string
+    {
+        if (null === $question || '' === trim($question)) {
+            return 'Extract evidence from the source.';
+        }
+
+        return 'Answer this question from the source: '.ResearchPrompts::data($question);
+    }
+
     /**
      * @param list<string> $links
      */
-    private function prompt(StageContext $ctx, Source $source, PassageMap $map, array $links): string
+    private function prompt(StageContext $ctx, Source $source, PassageMap $map, array $links, ?string $question = null): string
     {
         $brief = $ctx->state->ledger->brief();
         $points = array_map(static fn (PlanPoint $point): string => $point->id.' '.$point->title, $ctx->state->ledger->points());
-        $sent = PassageFocus::pick($map->passages, $this->topics($ctx), self::PASSAGE_BUDGET);
+        $topics = $this->topics($ctx);
+        if (null !== $question && '' !== trim($question)) {
+            $topics[] = $question;
+        }
+        $sent = PassageFocus::pick($map->passages, $topics, self::PASSAGE_BUDGET);
         $lines = array_map(static fn (Passage $passage): string => '['.$passage->id.'] '.$passage->text, $sent);
         if (count($sent) < count($map->passages)) {
             $lines[] = '[note] Only the passages closest to the points were sent; the rest of this source was left out.';

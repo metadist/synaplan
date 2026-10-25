@@ -19,6 +19,8 @@ final readonly class ResearchConfig
     public const ENABLED = 'ENABLED';
     public const MAX_ACTIVE_RUNS = 'MAX_ACTIVE_RUNS';
     public const MAX_ACTIVE_THOROUGH = 'MAX_ACTIVE_THOROUGH_PER_USER';
+    public const LEAD_MODE = 'LEAD_MODE';
+    public const TOOL_MODE_MODELS = 'TOOL_MODE_MODELS';
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -47,6 +49,45 @@ final readonly class ResearchConfig
     public function maxActiveThorough(): int
     {
         return $this->bounded(self::MAX_ACTIVE_THOROUGH, 1, 0, 10);
+    }
+
+    /** auto, tools or rounds. Anything else is auto, so the model list decides. */
+    public function leadMode(): string
+    {
+        $stored = $this->configRepository->getValue(0, self::GROUP, self::LEAD_MODE);
+        $mode = is_string($stored) ? strtolower(trim($stored)) : 'auto';
+
+        return in_array($mode, ['auto', 'tools', 'rounds'], true) ? $mode : 'auto';
+    }
+
+    /**
+     * Catalog keys allowed to call tools. A missing or unreadable row is empty,
+     * so every model stays in round mode.
+     *
+     * @return list<string>
+     */
+    public function toolModeModels(): array
+    {
+        $stored = $this->configRepository->getValue(0, self::GROUP, self::TOOL_MODE_MODELS);
+        if (!is_string($stored) || '' === trim($stored)) {
+            return [];
+        }
+        try {
+            $decoded = json_decode($stored, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $keys = [];
+        foreach ($decoded as $key) {
+            if (is_string($key) && '' !== trim($key)) {
+                $keys[] = strtolower(trim($key));
+            }
+        }
+
+        return $keys;
     }
 
     private function bounded(string $setting, int $default, int $min, int $max): int

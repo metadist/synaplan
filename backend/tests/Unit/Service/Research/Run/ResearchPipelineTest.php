@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Research\Run;
 
+use App\Service\Research\Run\Lead\FixedLeadCatalog;
+use App\Service\Research\Run\Lead\FixedLeadSettings;
+use App\Service\Research\Run\Lead\LeadModeResolver;
+use App\Service\Research\Run\Lead\LeadRead;
+use App\Service\Research\Run\Lead\LeadSearch;
+use App\Service\Research\Run\Lead\LeadStage;
+use App\Service\Research\Run\Lead\LeadToolbox;
+use App\Service\Research\Run\Lead\ScriptedLead;
 use App\Service\Research\Run\Ledger\PassageSplitter;
 use App\Service\Research\Run\Ledger\PassageVerifier;
 use App\Service\Research\Run\Ledger\Source;
@@ -11,6 +19,7 @@ use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
+use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchPipeline;
 use App\Service\Research\Run\ResearchRoles;
@@ -313,12 +322,19 @@ final class ResearchPipelineTest extends TestCase
         );
         $store->save($state);
         $calls = new StageCall($caller);
+        $read = new ReadStage($calls, new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store);
         $pipeline = new ResearchPipeline(
             new BriefStage($calls),
             new PlanStage($calls),
             new GatherStage($calls, $search, new GatherChoice()),
-            new ReadStage($calls, new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store),
+            $read,
             new ReflectStage($calls),
+            new LeadStage(
+                new ScriptedLead(),
+                new LeadToolbox(new LeadSearch($search), new LeadRead($read)),
+                new LeadModeResolver(new FixedLeadSettings('auto'), new FixedLeadCatalog(null)),
+                new ResearchInputBudget(),
+            ),
             new WriteStage($calls),
             new DeliverStage(),
             $search,

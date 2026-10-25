@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
+use App\Service\Research\Run\Lead\LeadConversation;
 use App\Service\Research\Run\Ledger\EvidenceLedger;
 
 /**
@@ -27,6 +28,9 @@ final class ResearchRunState
     /** Evidence cards at the start of the current round. Not stored. */
     public int $evidenceBeforeRound = 0;
 
+    /** Tool turns of a lead that calls tools. Empty in round mode. */
+    public LeadConversation $conversation;
+
     public function __construct(
         public readonly ResearchRunRef $ref,
         public ResearchStatus $status,
@@ -37,6 +41,7 @@ final class ResearchRunState
         public ?ResearchOutcome $outcome = null,
         public ?\DateTimeImmutable $updatedAt = null,
     ) {
+        $this->conversation = new LeadConversation();
         $this->assertShape();
     }
 
@@ -80,6 +85,7 @@ final class ResearchRunState
             'parent' => $this->parent,
             'idempotency_key' => $this->idempotencyKey,
             'strategy_hint' => $this->strategyHint,
+            'conversation' => $this->conversation->toArray(),
         ];
     }
 
@@ -155,6 +161,10 @@ final class ResearchRunState
         $idempotency = $data['idempotency_key'] ?? null;
         $state->idempotencyKey = is_string($idempotency) && '' !== $idempotency ? $idempotency : null;
         $state->strategyHint = true === ($data['strategy_hint'] ?? false);
+        $conversation = $data['conversation'] ?? null;
+        if (is_array($conversation)) {
+            $state->conversation = LeadConversation::fromArray($conversation);
+        }
 
         return $state;
     }
