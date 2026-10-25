@@ -142,6 +142,10 @@ parameters:
     env(SIGNUP_IP_LIMIT): '5'
     env(SIGNUP_GLOBAL_LIMIT): '20'
     env(CHECKOUT_IP_LIMIT): '10'
+    # Pay-first checkout starts (no account yet): per client IP per hour and
+    # per email address per day.
+    env(CHECKOUT_START_IP_LIMIT): '5'
+    env(CHECKOUT_START_EMAIL_LIMIT): '30'
     env(PAID_SIGNUP_ALERT_LIMIT): '10'
     env(GOOGLE_CLIENT_SECRET): ''
     env(GITHUB_CLIENT_SECRET): ''
@@ -1098,6 +1102,21 @@ services:
             $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
             $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
             $cache: '@cache.app'
+
+    # Pay first (PF1): Stripe Checkout started with only an email address.
+    App\Service\Billing\PayFirst\PayFirstCheckout:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+            $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
+            $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
+
+    App\Service\Billing\PayFirst\StripeCheckoutSessionGateway:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+
+    App\Service\Billing\PayFirst\CheckoutSessionGateway:
+        alias: App\Service\Billing\PayFirst\StripeCheckoutSessionGateway
+        public: true
 
     App\Controller\StripeWebhookController:
         arguments:

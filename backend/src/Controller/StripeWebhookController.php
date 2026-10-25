@@ -6,6 +6,7 @@ use App\Entity\Topup;
 use App\Entity\User;
 use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\PayFirst\PayFirstCheckout;
 use App\Service\Billing\StripeEntitlement;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -229,6 +230,10 @@ class StripeWebhookController extends AbstractController
         // One-time budget top-ups (mode=payment) are credited to BUSER_TOPUPS.
         if ('topup' === ($session->metadata->type ?? null)) {
             return $this->handleTopupCompleted($session);
+        }
+
+        if ($this->isPayFirst($session)) {
+            return true;
         }
 
         // Get user from client_reference_id (user ID set during checkout creation)
@@ -624,6 +629,21 @@ class StripeWebhookController extends AbstractController
     /**
      * Find user by Stripe customer ID (searches in paymentDetails JSON).
      */
+    /**
+     * Pay-first sessions have no account yet; the account is created from the
+     * paid session (PF2). They are never attached by email to an existing
+     * account here.
+     */
+    private function isPayFirst(StripeObject $session): bool
+    {
+        if (PayFirstCheckout::FLOW !== ($session->metadata->flow ?? null)) {
+            return false;
+        }
+        $this->logger->info('Pay-first checkout completed; account creation is not enabled yet', ['session_id' => $session->id]);
+
+        return true;
+    }
+
     private function getUserByStripeCustomer(string $customerId): ?User
     {
         return $this->userRepository->findByStripeCustomerId($customerId);
