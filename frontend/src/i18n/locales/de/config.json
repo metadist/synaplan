@@ -912,6 +912,8 @@
       "errorActivating": "Fehler beim Aktivieren des API-Schlüssels",
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
+      "planRequired": "API-Schlüssel gehören zu einem bezahlten Tarif.",
+      "seePlans": "Tarife ansehen",
       "scopes": {
         "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Benutzer begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
         "iamRead": "Benutzer — Gruppen ansehen",

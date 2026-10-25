@@ -149,7 +149,7 @@ final class PlatformLinkControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createUser('pl-ex-admin@synaplan.internal', 'ADMIN');
-        $user = $this->createUser('pl-ex-user@synaplan.internal');
+        $user = $this->createUser('pl-ex-user@synaplan.internal', 'PRO');
 
         $this->authenticateClient($this->client, $admin);
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('example.com'));
@@ -295,8 +295,8 @@ final class PlatformLinkControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createUser('pl-move-admin@synaplan.internal', 'ADMIN');
-        $first = $this->createUser('pl-move-first@synaplan.internal');
-        $second = $this->createUser('pl-move-second@synaplan.internal');
+        $first = $this->createUser('pl-move-first@synaplan.internal', 'PRO');
+        $second = $this->createUser('pl-move-second@synaplan.internal', 'PRO');
 
         $this->authenticateClient($this->client, $admin);
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));
@@ -338,7 +338,7 @@ final class PlatformLinkControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createUser('pl-revoke-admin@synaplan.internal', 'ADMIN');
-        $person = $this->createUser('pl-revoke-person@synaplan.internal');
+        $person = $this->createUser('pl-revoke-person@synaplan.internal', 'PRO');
 
         $this->authenticateClient($this->client, $admin);
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));

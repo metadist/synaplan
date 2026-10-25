@@ -13,6 +13,7 @@ use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
 use App\Service\PlatformLink\Exception\PlatformLinkCodeException;
@@ -32,6 +33,7 @@ final readonly class PlatformLinkExchangeService
         private PlatformInstanceRepository $instanceRepository,
         private AuditLogWriter $auditLogWriter,
         private DeliveryNotifier $notifier,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -64,10 +66,7 @@ final readonly class PlatformLinkExchangeService
             throw PlatformLinkCodeException::unknown();
         }
 
-        $user = $this->userRepository->find($payload['userId']);
-        if (!$user instanceof User) {
-            throw PlatformLinkCodeException::unknown();
-        }
+        $user = $this->linkingUser($payload['userId']);
 
         $userCountBefore = $this->userRepository->count([]);
         $mailBefore = $user->getMail();
@@ -332,5 +331,20 @@ final readonly class PlatformLinkExchangeService
         };
 
         return sprintf('%s: %s (%s)', $prefix, $instance->getHost(), $externalId);
+    }
+
+    /**
+     * The account the code was issued for. Linking mints an API key, so a
+     * free account on an install that sells subscriptions is refused.
+     */
+    private function linkingUser(int $userId): User
+    {
+        $user = $this->userRepository->find($userId);
+        if (!$user instanceof User) {
+            throw PlatformLinkCodeException::unknown();
+        }
+        $this->premiumFeatureGate->assertApiKeysAllowed($user);
+
+        return $user;
     }
 }

@@ -279,6 +279,7 @@ final class PlatformIdentityRowsTest extends WebTestCase
             'source' => $source,
             'external_id' => $externalId,
             'email' => $email,
+            'level' => 'PRO',
         ]));
         self::assertContains($this->client->getResponse()->getStatusCode(), [Response::HTTP_OK, Response::HTTP_CREATED], $this->client->getResponse()->getContent());
         $body = $this->json();
@@ -397,7 +398,7 @@ final class PlatformIdentityRowsTest extends WebTestCase
         return $plain;
     }
 
-    private function createUser(string $email, string $level = 'NEW'): User
+    private function createUser(string $email, string $level = 'PRO'): User
     {
         $user = (new User())
             ->setMail($email)

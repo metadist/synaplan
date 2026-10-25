@@ -6,10 +6,13 @@ namespace App\Tests\Unit;
 
 use App\Entity\ApiKey;
 use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminUserProvisioningService;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
@@ -51,6 +54,7 @@ final class AdminUserProvisioningServiceTest extends TestCase
             $this->userLifecycle,
             new NullLogger(),
             $this->createStub(ExternalIdentityRepository::class),
+            self::openGate(),
         );
     }
 
@@ -101,6 +105,7 @@ final class AdminUserProvisioningServiceTest extends TestCase
             $lifecycle,
             new NullLogger(),
             $this->createStub(ExternalIdentityRepository::class),
+            self::openGate(),
         );
 
         $result = $service->provision('e2e', 'ext-1', 'a@b.test', null, 'NEW', 'SecurePass123!');
@@ -150,6 +155,7 @@ final class AdminUserProvisioningServiceTest extends TestCase
             $this->userLifecycle,
             new NullLogger(),
             $identities,
+            self::openGate(),
         );
 
         self::assertSame($user, $service->findByExternalIdentity('nextcloud', 'alice'));
@@ -164,6 +170,28 @@ final class AdminUserProvisioningServiceTest extends TestCase
 
         $this->assertSame(['*'], $result['entity']->getScopes());
         $this->assertSame('external-integration', $result['entity']->getName());
+    }
+
+    public function testMintApiKeyRejectsAFreeAccountWhenBillingIsOn(): void
+    {
+        $service = new AdminUserProvisioningService(
+            $this->userRepository,
+            $this->apiKeyRepository,
+            $this->em,
+            $this->userLifecycle,
+            new NullLogger(),
+            $this->createStub(ExternalIdentityRepository::class),
+            new PremiumFeatureGate(new BillingService('sk_test_suite', 'price_1TestSuitePro')),
+        );
+
+        $this->expectException(ApiKeyPlanRequiredException::class);
+
+        $service->mintApiKeyForUser($this->userWithId(150), 'Bot', []);
+    }
+
+    private static function openGate(): PremiumFeatureGate
+    {
+        return new PremiumFeatureGate(new BillingService('', ''));
     }
 
     private function userWithId(int $id): User

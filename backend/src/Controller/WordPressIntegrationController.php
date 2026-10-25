@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Service\Widget\WordPressIntegrationService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -139,6 +140,8 @@ class WordPressIntegrationController extends AbstractController
             $result = $callback();
 
             return $this->json($result);
+        } catch (ApiKeyPlanRequiredException) {
+            return $this->json(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
         } catch (\Throwable $e) {
             $this->logger->error('WordPress integration error', [
                 'error' => $e->getMessage(),

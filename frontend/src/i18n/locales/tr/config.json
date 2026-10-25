@@ -693,6 +693,8 @@
       "errorActivating": "API anahtarı etkinleştirilemedi",
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
+      "planRequired": "API anahtarları ücretli bir plana dahildir.",
+      "seePlans": "Planları gör",
       "scopes": {
         "hint": "Tam erişim için işaretlemeyin. Kullanıcılar kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
         "iamRead": "Kullanıcılar — grupları görüntüle",

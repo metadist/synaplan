@@ -12,6 +12,8 @@ use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\DeliveryNotifier;
 use App\Service\PlatformLink\LinkCodeService;
@@ -82,6 +84,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
             $this->createStub(PlatformInstanceRepository::class),
             $this->createStub(AuditLogWriter::class),
             $this->createStub(DeliveryNotifier::class),
+            new PremiumFeatureGate(new BillingService('', '')),
         );
 
         $result = $service->exchange('pi_aabbccddeeff', 'secret', str_repeat('ab', 16), '127.0.0.1');
@@ -223,6 +226,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
             $instances ?? $this->createStub(PlatformInstanceRepository::class),
             $audit ?? $this->createStub(AuditLogWriter::class),
             $this->createStub(DeliveryNotifier::class),
+            new PremiumFeatureGate(new BillingService('', '')),
         );
     }
 }
