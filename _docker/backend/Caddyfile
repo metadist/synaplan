@@ -227,12 +227,18 @@
 		# Worker mode cannot rewrite FrankenPHP's own 503 from handle_errors:
 		# the runtime writes the body and returns success. Production (and the
 		# busy-server profile) therefore proxies PHP to a localhost server that
-		# owns the two pools, and replaces only status 503. Dev stays on
-		# php_server directly, so the client address does not change.
+		# owns the two pools, and replaces only FrankenPHP's own 503. Dev stays
+		# on php_server directly, so the client address does not change.
+		# FrankenPHP's "no worker free in max_wait_time" answer is text/plain;
+		# a 503 the application sends (SIGNUP_PAUSED, SETUP_REQUIRED, …) is JSON
+		# with its own message and must reach the client unchanged.
 		@split_pools expression `{env.APP_ENV} == "prod" || {env.FRANKENPHP_BUSY_PROFILE} == "1"`
 		handle @split_pools {
 			reverse_proxy 127.0.0.1:9080 {
-				@busy status 503
+				@busy {
+					status 503
+					header Content-Type text/plain*
+				}
 				handle_response @busy {
 					@busy_api path /api/v1/messages/stream* /api/v1/widget/*/message /api/v1/tts/stream
 					handle @busy_api {
