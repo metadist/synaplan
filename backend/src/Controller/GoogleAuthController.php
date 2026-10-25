@@ -9,7 +9,6 @@ use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,7 +27,6 @@ class GoogleAuthController extends AbstractController
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
-        private EntityManagerInterface $em,
         private OAuthStateService $oauthStateService,
         private OAuthLoginResponder $oauthLoginResponder,
         private OAuthSignupGate $signupGate,
@@ -155,6 +153,7 @@ class GoogleAuthController extends AbstractController
                 $userInfo,
                 $googleRefreshToken,
                 AccountLanguage::normalize($statePayload['language'] ?? null),
+                $statePayload,
             );
 
             $this->logger->info('Google OAuth successful', [
@@ -174,7 +173,7 @@ class GoogleAuthController extends AbstractController
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $email = $userInfo['email'] ?? null;
         $googleId = $userInfo['id'] ?? null;
@@ -245,12 +244,7 @@ class GoogleAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->signupGate->completeNewUser($user);
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }

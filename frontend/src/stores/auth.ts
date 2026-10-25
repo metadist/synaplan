@@ -25,6 +25,40 @@ const AUTH_PRINCIPAL_CHANNEL = 'synaplan_auth_principal'
 
 type AuthPrincipalPayload = { userId: number | null; ts: number }
 
+type RegistrationState = {
+  loading: { value: boolean }
+  error: { value: string | null }
+  errorCode: { value: string | null }
+  clearError: () => void
+}
+
+async function submitRegistration(
+  email: string,
+  password: string,
+  challengeToken: string | undefined,
+  language: string | undefined,
+  admission: { plan?: string; code?: string } | undefined,
+  state: RegistrationState
+): Promise<{ success: boolean; mailDelivered: boolean }> {
+  state.loading.value = true
+  state.clearError()
+
+  try {
+    const result = await authService.register(email, password, challengeToken, language, admission)
+    if (result.success) {
+      return { success: true, mailDelivered: result.mailDelivered !== false }
+    }
+    state.error.value = result.error || 'Registration failed'
+    state.errorCode.value = result.code ?? null
+    return { success: false, mailDelivered: true }
+  } catch {
+    state.error.value = 'Network error'
+    return { success: false, mailDelivered: true }
+  } finally {
+    state.loading.value = false
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
@@ -296,30 +330,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(
+  function register(
     email: string,
     password: string,
     challengeToken?: string,
-    language?: string
+    language?: string,
+    admission?: { plan?: string; code?: string }
   ): Promise<{ success: boolean; mailDelivered: boolean }> {
-    loading.value = true
-    clearError()
-
-    try {
-      const result = await authService.register(email, password, challengeToken, language)
-
-      if (result.success) {
-        return { success: true, mailDelivered: result.mailDelivered !== false }
-      }
-      error.value = result.error || 'Registration failed'
-      errorCode.value = result.code ?? null
-      return { success: false, mailDelivered: true }
-    } catch {
-      error.value = 'Network error'
-      return { success: false, mailDelivered: true }
-    } finally {
-      loading.value = false
-    }
+    return submitRegistration(email, password, challengeToken, language, admission, {
+      loading,
+      error,
+      errorCode,
+      clearError,
+    })
   }
 
   async function logout(silent = false): Promise<void> {

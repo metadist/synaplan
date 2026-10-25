@@ -159,7 +159,6 @@
         "src/Controller/AuthController.php::AuthController::refreshOidcTokens": 105,
         "src/Controller/FileServeController.php::FileServeController::serve": 146,
         "src/Controller/GitHubAuthController.php::GitHubAuthController::callback": 108,
-        "src/Controller/GitHubAuthController.php::GitHubAuthController::findOrCreateUser": 109,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController::callback": 178,
         "src/Controller/MessageController.php::MessageController::sendMessage": 252,
         "src/Controller/MessageController.php::MessageController::uploadFileForChat": 225,

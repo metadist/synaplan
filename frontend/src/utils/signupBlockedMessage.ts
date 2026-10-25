@@ -11,6 +11,9 @@ const KEYS: Record<string, string> = {
   SIGNUP_PAUSED: 'auth.signupBlocked.paused',
   SIGNUP_CHALLENGE_FAILED: 'auth.signupBlocked.challengeFailed',
   SIGNUP_CHALLENGE_REQUIRED: 'auth.signupBlocked.challengeRequired',
+  SIGNUP_ADMISSION_REQUIRED: 'auth.signupBlocked.admissionRequired',
+  SIGNUP_CODE_INVALID: 'auth.signupBlocked.codeInvalid',
+  SIGNUP_PLAN_INVALID: 'auth.signupBlocked.planInvalid',
 }
 
 export function signupBlockedI18nKey(code: string | null | undefined): string | null {

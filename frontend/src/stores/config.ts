@@ -84,6 +84,10 @@ const config = {
     get registrationEnabled(): boolean {
       return getConfigSync().auth?.registrationEnabled ?? true
     },
+    /** open = anyone may sign up. admission = a paid plan or an invitation code. */
+    get registrationMode(): 'open' | 'admission' {
+      return getConfigSync().auth?.registrationMode === 'admission' ? 'admission' : 'open'
+    },
     /**
      * False when the operator disabled the anonymous guest trial
      * (GUEST_CHAT_ENABLED=false, issue #1517): guest-allowed routes then

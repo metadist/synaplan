@@ -9,7 +9,6 @@ use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,7 +28,6 @@ class GitHubAuthController extends AbstractController
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
-        private EntityManagerInterface $em,
         private OAuthStateService $oauthStateService,
         private OAuthLoginResponder $oauthLoginResponder,
         private OAuthSignupGate $signupGate,
@@ -175,7 +173,7 @@ class GitHubAuthController extends AbstractController
                 $userInfo,
                 $email,
                 $githubAccessToken,
-                AccountLanguage::normalize($statePayload['language'] ?? null),
+                AccountLanguage::normalize($statePayload['language'] ?? null), $statePayload,
             );
 
             $this->logger->info('GitHub OAuth successful', [
@@ -195,7 +193,7 @@ class GitHubAuthController extends AbstractController
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $githubId = $userInfo['id'] ?? null;
         $githubLogin = $userInfo['login'] ?? null;
@@ -287,12 +285,7 @@ class GitHubAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->signupGate->completeNewUser($user);
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }

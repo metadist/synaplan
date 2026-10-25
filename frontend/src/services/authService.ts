@@ -79,6 +79,8 @@ export interface AuthUser {
   mustChangePassword?: boolean
   /** Account language, or null when the account has none yet. Absent on older payloads. */
   language?: string | null
+  /** active, pending_payment, suspended, or banned. Absent on older servers. */
+  accountStatus?: string
 }
 
 /**
@@ -159,7 +161,8 @@ export const authService = {
     email: string,
     password: string,
     challengeToken?: string,
-    language?: string
+    language?: string,
+    admission?: { plan?: string; code?: string }
   ): Promise<{ success: boolean; error?: string; code?: string; mailDelivered?: boolean }> {
     try {
       const response = await authFetch(
@@ -174,6 +177,8 @@ export const authService = {
             challengeToken,
             recaptchaToken: challengeToken,
             language,
+            plan: admission?.plan,
+            code: admission?.code,
           }),
         },
         { bearer: false }

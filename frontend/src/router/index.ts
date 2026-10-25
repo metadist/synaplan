@@ -1026,7 +1026,6 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   const { isAuthenticated, isAdmin, user } = useAuth()
-
   if ('release' === setupGate) {
     next(isAuthenticated.value ? resolveDefaultRoute() : { name: 'login' })
     return
@@ -1045,9 +1044,10 @@ router.beforeEach(async (to, _from, next) => {
     mustChangePassword: true === user.value?.mustChangePassword,
     isPublicRoute,
     routeName: to.name,
+    accountStatus: user.value?.accountStatus,
   })
-  if ('force' === forcedPasswordChange) {
-    next({ name: CHANGE_PASSWORD_ROUTE })
+  if ('force' === forcedPasswordChange || 'pay' === forcedPasswordChange) {
+    next({ name: 'pay' === forcedPasswordChange ? 'subscription' : CHANGE_PASSWORD_ROUTE })
     return
   }
   if ('release' === forcedPasswordChange) {

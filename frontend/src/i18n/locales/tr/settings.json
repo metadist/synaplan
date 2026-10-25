@@ -187,6 +187,8 @@
     "title": "Abonelik Planları",
     "subtitle": "Daha fazla özellik ve daha yüksek limitler açın",
     "chooseYourPlan": "Planınızı Seçin",
+    "pendingTitle": "Ödeme bekleniyor",
+    "pendingBody": "Bitirmek için aşağıdan bir plan seçin. Ödeme tamamlanana kadar hesap sınırlı kalır.",
     "currentPlan": "Mevcut Plan",
     "yourPlan": "Planınız",
     "noActiveSubscription": "Aktif abonelik yok",

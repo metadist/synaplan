@@ -14,7 +14,6 @@ use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\TokenService;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -45,7 +44,6 @@ class AppleAuthController extends AbstractController
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly UserRepository $userRepository,
-        private readonly EntityManagerInterface $em,
         private readonly OAuthStateService $oauthStateService,
         private readonly OAuthLoginResponder $oauthLoginResponder,
         private readonly OAuthSignupGate $signupGate,
@@ -147,7 +145,7 @@ class AppleAuthController extends AbstractController
             $user = $this->findOrCreateUser(
                 $claims,
                 $profile,
-                AccountLanguage::normalize($statePayload['language'] ?? null),
+                AccountLanguage::normalize($statePayload['language'] ?? null), $statePayload,
             );
 
             $this->logger->info('Apple OAuth successful', ['user_id' => $user->getId(), 'native' => $native]);
@@ -213,11 +211,11 @@ class AppleAuthController extends AbstractController
 
         // MOBILE-APP SEAM: no browser challenge on the native sheet — only the signup limits and pause switch apply.
         try {
-            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], [], $request->getClientIp(), true);
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission = $this->nativeAdmission($body), $request->getClientIp(), true);
+            $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null), $nativeAdmission);
         } catch (SignupBlockedException $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
         }
-        $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null));
 
         $accessToken = $this->tokenService->generateAccessToken($user);
         $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
@@ -275,10 +273,32 @@ class AppleAuthController extends AbstractController
     }
 
     /**
+     * Plan or invitation code sent by the native register screen. Ignored while
+     * registration mode is open.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, string>
+     */
+    private function nativeAdmission(array $body): array
+    {
+        $state = [];
+        if (isset($body['code']) && is_string($body['code']) && '' !== trim($body['code'])) {
+            $state['code'] = trim($body['code']);
+        }
+        if (isset($body['plan']) && is_string($body['plan']) && '' !== trim($body['plan'])) {
+            $state['plan'] = strtoupper(trim($body['plan']));
+        }
+
+        return $state;
+    }
+
+    /**
      * @param array{sub: string, email: ?string, emailVerified: bool, isPrivateEmail: bool} $claims
      * @param array{firstName: ?string, lastName: ?string, email: ?string}                  $profile
+     * @param array<string, mixed>                                                          $admissionState
      */
-    private function findOrCreateUser(array $claims, array $profile, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $claims, array $profile, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $appleSub = $claims['sub'];
         $email = $claims['email'] ?? $profile['email'];
@@ -341,12 +361,7 @@ class AppleAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->signupGate->completeNewUser($user);
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }

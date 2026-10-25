@@ -9,6 +9,17 @@
 
         <!-- Main Content -->
         <template v-else>
+          <div
+            v-if="authUser?.accountStatus === 'pending_payment'"
+            class="alert-warning max-w-2xl mx-auto"
+            role="status"
+            data-testid="section-pending-payment"
+          >
+            <p class="font-semibold alert-warning-text mb-1">
+              {{ $t('subscription.pendingTitle') }}
+            </p>
+            <p class="alert-warning-text text-sm">{{ $t('subscription.pendingBody') }}</p>
+          </div>
           <!-- Header -->
           <div class="text-center mb-12">
             <h1 class="text-4xl font-bold txt-primary mb-3">
@@ -311,6 +322,7 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { subscriptionApi, type SubscriptionStatus } from '@/services/api/subscriptionApi'
 import { useConfigStore } from '@/stores/config'
+import { useAuth } from '@/composables/useAuth'
 import { useDialog } from '@/composables/useDialog'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { getNativePlatform } from '@/services/api/nativeRuntime'
@@ -322,6 +334,7 @@ const { formatDateTime } = useDateFormat()
 const route = useRoute()
 const router = useRouter()
 const config = useConfigStore()
+const { user: authUser } = useAuth()
 const dialog = useDialog()
 const subscriptionStatus = ref<SubscriptionStatus | null>(null)
 

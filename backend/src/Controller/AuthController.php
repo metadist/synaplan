@@ -16,7 +16,6 @@ use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
 use App\Service\Auth\TokenService;
-use App\Service\Chat\GuestSessionService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\MailerConfig;
@@ -178,6 +177,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
             ],
             'tokens' => $this->nativeTokenPayload($accessToken, $refreshToken),
@@ -200,6 +200,8 @@ class AuthController extends AbstractController
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
                 new OA\Property(property: 'language', type: 'string', nullable: true, description: 'UI language used during signup (de, en, es, fr, tr). Stored before the verification email is sent.', example: 'de'),
                 new OA\Property(property: 'challengeToken', type: 'string', nullable: true, description: 'Human-check token (Cloudflare Turnstile, or reCAPTCHA v3 as `recaptchaToken`). Required when the instance has a provider configured.'),
+                new OA\Property(property: 'plan', type: 'string', nullable: true, description: 'Paid plan when registration mode is admission: PRO, TEAM or BUSINESS.', example: 'TEAM'),
+                new OA\Property(property: 'code', type: 'string', nullable: true, description: 'Invitation code when registration mode is admission.'),
             ]
         )
     )]
@@ -243,26 +245,21 @@ class AuthController extends AbstractController
             return $this->signupBlocked($e);
         }
 
-        if (GuestSessionService::isReservedProcessorEmail($dto->email)) {
-            $this->logger->warning('Registration attempt with reserved guest-processor email', ['ip' => $request->getClientIp()]);
-
+        try {
+            $user = $this->userLifecycleService->createSignup(
+                $dto->email,
+                $dto->password,
+                null !== $dto->language ? ['language' => $dto->language] : [],
+                $dto->plan,
+                $dto->code,
+                $request->getClientIp(),
+            );
+        } catch (SignupBlockedException $e) {
+            return $this->signupBlocked($e);
+        }
+        if (!$user instanceof User) {
             return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
-
-        $existingUser = $this->userRepository->findOneBy(['mail' => $dto->email]);
-        if ($existingUser) {
-            // Security: same answer as for a new address, same timing (hash anyway).
-            $this->logger->warning('Registration attempt with existing email', ['email' => $dto->email, 'ip' => $request->getClientIp()]);
-            $this->passwordHasher->hashPassword($existingUser, $dto->password);
-
-            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
-        }
-
-        $user = $this->userLifecycleService->createUser(
-            email: $dto->email,
-            plainPassword: $dto->password,
-            userDetails: null !== $dto->language ? ['language' => $dto->language] : [],
-        );
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
@@ -420,6 +417,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
                 'language' => $user->getPreferredLanguage(),
@@ -696,7 +694,6 @@ class AuthController extends AbstractController
         $newTokens = $this->oidcTokenService->refreshOidcTokens($oidcRefreshToken, $provider);
 
         if (!$newTokens) {
-            // Keycloak rejected the refresh - user was logged out from Keycloak
             $this->logger->info('OIDC refresh rejected - user logged out from provider', [
                 'provider' => $provider,
             ]);
@@ -755,6 +752,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
             ],
         ]);
@@ -1161,6 +1159,7 @@ class AuthController extends AbstractController
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
                 'language' => $user->getPreferredLanguage(),

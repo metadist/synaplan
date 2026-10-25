@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Auth;
 
+use App\Entity\SignupCode;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -43,30 +45,42 @@ final readonly class OAuthSignupGate
         private ModelConfigService $modelConfig,
         private RateLimiterFactoryInterface $oauthSignupNonceLimiter,
         private LoggerInterface $logger,
+        private SignupAdmission $admission,
+        private EntityManagerInterface $em,
     ) {
     }
 
     /**
      * Extra fields for the signed state at the start of the flow.
      *
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     public function stateExtras(Request $request, string $provider): array
     {
+        $extras = [];
+        $plan = strtoupper(trim((string) $request->query->get('plan', '')));
+        if ('' !== $plan) {
+            $extras['plan'] = $plan;
+        }
+        $code = trim((string) $request->query->get('code', ''));
+        if ('' !== $code) {
+            $extras['code'] = $code;
+        }
+
         if (!$this->protection->challengeRequired()) {
-            return [];
+            return $extras;
         }
 
         $token = (string) $request->query->get('challenge', '');
         if ($this->protection->verifyHuman($token, 'signup', $request->getClientIp())) {
-            return [self::STATE_HUMAN => true];
+            return $extras + [self::STATE_HUMAN => true];
         }
 
         $this->logger->info('OAuth start without a passed human check; a new account will be refused on the callback', [
             'provider' => $provider,
         ]);
 
-        return [];
+        return $extras;
     }
 
     /**
@@ -140,6 +154,14 @@ final readonly class OAuthSignupGate
         }
 
         $this->protection->assertSignupAllowed($clientIp);
+        $this->admission->resolve($this->stateString($statePayload, 'plan'), $this->stateString($statePayload, 'code'));
+    }
+
+    private function stateString(array $state, string $key): ?string
+    {
+        $value = $state[$key] ?? null;
+
+        return is_string($value) && '' !== $value ? $value : null;
     }
 
     /**
@@ -167,9 +189,69 @@ final readonly class OAuthSignupGate
         }
     }
 
-    /** Everything a freshly created account needs besides its row. */
-    public function completeNewUser(User $user): void
+    /**
+     * Store the account. A returning user is saved as before. A new account
+     * is inserted, admitted and given its model defaults in one transaction,
+     * so a plan or invitation that fails rolls the user back with it.
+     *
+     * @param array<string, mixed> $state
+     *
+     * @throws SignupBlockedException
+     */
+    public function finishSignIn(User $user, bool $isNewUser, array $state = []): void
     {
+        $this->em->persist($user);
+        if (!$isNewUser) {
+            $this->em->flush();
+
+            return;
+        }
+
+        try {
+            $this->em->wrapInTransaction(function () use ($user, $state): void {
+                $this->em->flush();
+                $this->enroll($user, $state);
+            });
+        } catch (\Throwable $e) {
+            // The insert was rolled back. Drop it from the identity map so a
+            // later flush in this request cannot write the account anyway.
+            $this->em->clear();
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Model defaults, and in admission mode the plan or the invitation code
+     * carried in the OAuth state. Open mode ignores that state.
+     *
+     * Callers that have not opened a transaction yet should use
+     * {@see finishSignIn()} so a failed admission cannot leave the user row.
+     *
+     * @param array<string, mixed> $state
+     *
+     * @throws SignupBlockedException
+     */
+    public function completeNewUser(User $user, array $state = []): void
+    {
+        $this->enroll($user, $state);
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     *
+     * @throws SignupBlockedException
+     */
+    private function enroll(User $user, array $state): void
+    {
+        $admission = $this->admission->resolve($this->stateString($state, 'plan'), $this->stateString($state, 'code'));
+        if (null !== $admission) {
+            $this->admission->apply($user, $admission);
+            if ($admission['code'] instanceof SignupCode) {
+                $this->admission->commitCode($user, $admission['code']);
+            }
+        }
+
         $this->modelConfig->initializeNewUserDefaults((int) $user->getId());
     }
 }
