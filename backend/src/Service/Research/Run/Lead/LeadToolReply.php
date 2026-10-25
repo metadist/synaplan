@@ -25,7 +25,11 @@ final class LeadToolReply
             'error' => $code,
             'left' => self::left($budget),
         ];
-        $next = 'budget_used' === $code ? self::next($budget) : null;
+        $next = match ($code) {
+            'budget_used' => self::next($budget),
+            'read_first' => 'Search results are not evidence. Call read_sources on the results most likely to answer the plan, then finish.',
+            default => null,
+        };
         if (null !== $next) {
             $reply['next'] = $next;
         }

@@ -16,6 +16,7 @@ use App\Service\Research\Run\Lead\ModelLeadCatalog;
 use App\Service\Research\Run\Lead\ScriptedLead;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\Stage\ResearchLeadTurn;
 use App\Tests\Unit\Service\Research\Run\Lead\LeadEngineCases;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -163,6 +164,39 @@ final class ResearchLeadTest extends TestCase
 
         self::assertSame(['id', 'source', 'point', 'fact', 'quotes', 'confidence'], array_keys($card));
         self::assertSame(['The unit price is 12.40 EUR.'], $card['quotes']);
+    }
+
+    public function testAFinishBeforeAnyReadIsRefusedAndTheOtherCallsRun(): void
+    {
+        $bench = LeadBench::open();
+        $id = $bench->pricePage('https://maker.example/price');
+        $bench->reader->script[] = LeadBench::evidence();
+        $bench->lead->script[] = new ResearchLeadTurn(true, true, 'The snippets settle it.', [
+            new ToolCall('f', 'finish', ['reason' => 'covered', 'points' => [['id' => 'p1', 'status' => 'answered', 'note' => 'From snippets.']]]),
+            new ToolCall('r', 'read_sources', ['ids' => [$id], 'point' => 'p1']),
+        ], 'test:lead', null);
+
+        $next = $bench->stage->run($bench->ctx)->next;
+        $results = $bench->ctx->state->conversation->toArray()['turns'][0]['results'] ?? [];
+
+        self::assertSame('round', $next);
+        self::assertStringContainsString('"error":"read_first"', (string) ($results[0]['content'] ?? ''));
+        self::assertStringContainsString('"cards"', (string) ($results[1]['content'] ?? ''));
+        self::assertSame(1, $bench->ctx->state->ledger->evidenceCount());
+    }
+
+    public function testAFinishAfterAReadThatFoundNothingGoesToTheReport(): void
+    {
+        $bench = LeadBench::open();
+        $id = $bench->pricePage('https://maker.example/price');
+        $bench->pricePage('https://other.example/price');
+        $bench->ctx->state->ledger->markSource($id, Source::READ);
+        $bench->ctx->state->budget->spend('sources');
+        $bench->lead->script[] = new ResearchLeadTurn(true, true, '', [
+            new ToolCall('f', 'finish', ['reason' => 'nothing', 'points' => [['id' => 'p1', 'status' => 'open', 'note' => 'Not found.']]]),
+        ], 'test:lead', null);
+
+        self::assertSame('write', $bench->stage->run($bench->ctx)->next);
     }
 
     public function testAnUnknownToolIsNamed(): void
