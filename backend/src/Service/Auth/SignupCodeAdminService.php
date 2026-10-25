@@ -13,9 +13,9 @@ use App\Service\Iam\AuditLogWriter;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * What an administrator does with sign-up codes: issue one (the plain code
- * leaves the server exactly once, in the create response), change its label,
- * limit or expiry, revoke or restore it, and see who used it. Revoking keeps
+ * What an administrator does with sign-up codes: issue one, show it again
+ * to copy it, change its label, limit or expiry, revoke or restore it, and
+ * see who used it. Revoking keeps
  * the row and its uses; the people who signed up keep their accounts.
  * Every write and its audit row commit together or not at all.
  */
@@ -73,6 +73,7 @@ final readonly class SignupCodeAdminService
 
         $plain = $this->uniqueCode();
         $code->setCodeHash(SignupCodeRepository::hash($plain));
+        $code->setCode($plain);
         $code->setPrefix(substr($plain, 0, SignupCode::PREFIX_LENGTH));
         $this->em->wrapInTransaction(function () use ($code, $actor, $ip): void {
             $this->codes->save($code);
@@ -148,6 +149,26 @@ final readonly class SignupCodeAdminService
     }
 
     /**
+     * The code in groups of four for the administrator to copy. Each look is
+     * an audit row. A code created before codes were kept has none.
+     *
+     * @throws SignupCodeAdminException
+     */
+    public function reveal(User $actor, int $id, string $ip = ''): string
+    {
+        $code = $this->find($id);
+        $plain = $code->getCode();
+        if (null === $plain) {
+            throw SignupCodeAdminException::notStored($id);
+        }
+        $this->audit->record((int) $actor->getId(), 'signup_code.shown', self::RESOURCE_KIND, (string) $id, [
+            'prefix' => $code->getPrefix(),
+        ], $ip);
+
+        return self::display($plain);
+    }
+
+    /**
      * The accounts that signed up with this code, newest first. An erased
      * account has no row here any more; the code's counter still counts it.
      *
@@ -199,6 +220,7 @@ final readonly class SignupCodeAdminService
             'uses' => $code->getUses(),
             'expiresAt' => $code->getExpires(),
             'active' => $code->isActive(),
+            'codeStored' => null !== $code->getCode(),
             'state' => self::stateOf($code, $now),
             'createdAt' => $code->getCreated(),
             'createdById' => $code->getCreatedBy(),

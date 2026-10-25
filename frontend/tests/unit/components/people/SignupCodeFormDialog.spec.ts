@@ -28,6 +28,7 @@ const pilots: SignupCode = {
   uses: 2,
   expiresAt: 1789000000,
   active: true,
+  codeStored: true,
   state: 'active',
   createdAt: 1761400000,
   createdById: 1,

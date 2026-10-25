@@ -59,7 +59,7 @@ final class AdminSignupCodeControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
     }
 
-    public function testCreateReturnsTheCodeOnceAndTheListShowsOnlyItsPrefix(): void
+    public function testCreateReturnsTheCodeAndTheListShowsOnlyItsPrefix(): void
     {
         $admin = $this->loginAdmin();
 
@@ -200,6 +200,39 @@ final class AdminSignupCodeControllerTest extends WebTestCase
         $this->client->request('GET', self::PATH);
         $listed = array_values(array_filter($this->json()['codes'], static fn (array $c): bool => $c['id'] === $item['id']));
         self::assertSame('active', $listed[0]['state'], 'nothing was applied');
+    }
+
+    public function testTheAdministratorCanShowTheCodeAgainAndEachLookIsAudited(): void
+    {
+        $this->loginAdmin();
+        $created = $this->create(['label' => 'Show again', 'level' => 'PRO', 'validity' => 'forever']);
+        $id = $created['signupCode']['id'];
+        self::assertTrue($created['signupCode']['codeStored']);
+
+        $this->client->request('GET', self::PATH.'/'.$id.'/code');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame($created['code'], $this->json()['code']);
+        $this->client->request('GET', self::PATH.'/'.$id.'/code');
+        self::assertSame(2, $this->auditCount('signup_code.shown', $id));
+
+        $this->client->request('GET', self::PATH);
+        $listed = array_values(array_filter($this->json()['codes'], static fn (array $c): bool => $c['id'] === $id));
+        self::assertArrayNotHasKey('code', $listed[0], 'the list itself never carries the code');
+    }
+
+    public function testACodeFromBeforeCodesWereKeptCannotBeShown(): void
+    {
+        $this->loginAdmin();
+        $id = $this->create(['label' => 'Old', 'level' => 'NEW', 'validity' => 'forever'])['signupCode']['id'];
+        $this->em->getConnection()->executeStatement('UPDATE BSIGNUP_CODES SET BCODE = NULL WHERE BID = ?', [$id]);
+
+        $this->client->request('GET', self::PATH.'/'.$id.'/code');
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertSame('SIGNUP_CODE_NOT_STORED', $this->json()['code']);
+
+        $this->client->request('GET', self::PATH);
+        $listed = array_values(array_filter($this->json()['codes'], static fn (array $c): bool => $c['id'] === $id));
+        self::assertFalse($listed[0]['codeStored']);
     }
 
     public function testAnUnknownCodeIsNotFound(): void

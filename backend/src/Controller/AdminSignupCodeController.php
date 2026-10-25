@@ -60,7 +60,7 @@ final class AdminSignupCodeController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/signup-codes',
         operationId: 'createAdminSignupCode',
-        summary: 'Issue a sign-up code; the code is in this response only',
+        summary: 'Issue a sign-up code',
         tags: ['Admin Sign-up Codes'],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['label', 'level', 'validity'],
@@ -76,7 +76,7 @@ final class AdminSignupCodeController extends AbstractController
                 required: ['success', 'code', 'signupCode'],
                 properties: [
                     new OA\Property(property: 'success', type: 'boolean', example: true),
-                    new OA\Property(property: 'code', type: 'string', description: 'The plain code in groups of four; not retrievable again', example: 'R7KQ-M2XH-9TZA'),
+                    new OA\Property(property: 'code', type: 'string', description: 'The code in groups of four; GET {id}/code shows it again', example: 'R7KQ-M2XH-9TZA'),
                     new OA\Property(property: 'signupCode', ref: new Model(type: AdminSignupCode::class)),
                 ]
             )),
@@ -173,6 +173,34 @@ final class AdminSignupCodeController extends AbstractController
         return $this->json(['success' => true, 'signupCode' => $code]);
     }
 
+    #[Route('/{id}/code', name: 'code', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/admin/signup-codes/{id}/code',
+        operationId: 'showAdminSignupCode',
+        summary: 'The invitation code itself, to copy it again; each look is audited',
+        tags: ['Admin Sign-up Codes'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The code', content: new OA\JsonContent(
+                required: ['success', 'code'],
+                properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'code', type: 'string', description: 'In groups of four', example: 'R7KQ-M2XH-9TZA'),
+                ]
+            )),
+            new OA\Response(response: 403, description: 'Not an administrator'),
+            new OA\Response(response: 404, description: 'Unknown code (SIGNUP_CODE_NOT_FOUND) or created before codes were kept (SIGNUP_CODE_NOT_STORED)'),
+        ]
+    )]
+    public function code(int $id, Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        try {
+            return $this->json(['success' => true, 'code' => $this->service->reveal($user, $id, $request->getClientIp() ?? '')]);
+        } catch (SignupCodeAdminException $e) {
+            return $this->failure($e);
+        }
+    }
+
     #[Route('/{id}/uses', name: 'uses', methods: ['GET'], requirements: ['id' => '\d+'])]
     #[OA\Get(
         path: '/api/v1/admin/signup-codes/{id}/uses',
@@ -221,7 +249,7 @@ final class AdminSignupCodeController extends AbstractController
 
     private function failure(SignupCodeAdminException $e): JsonResponse
     {
-        $status = SignupCodeAdminException::NOT_FOUND === $e->getErrorCode() ? Response::HTTP_NOT_FOUND : Response::HTTP_BAD_REQUEST;
+        $status = SignupCodeAdminException::INVALID === $e->getErrorCode() ? Response::HTTP_BAD_REQUEST : Response::HTTP_NOT_FOUND;
 
         return $this->json(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getErrorCode()], $status);
     }

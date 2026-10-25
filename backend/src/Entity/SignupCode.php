@@ -9,9 +9,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 /**
  * An admission ticket an administrator hands out: whoever holds the code may
- * create an account without paying. The code itself is stored as a SHA-256
- * hash and shown once at creation; the four-character prefix lets the
- * administrator recognise it in the list.
+ * create an account without paying. Lookups use the SHA-256 hash; the code
+ * itself is kept so the administrator can show and copy it again. Codes from
+ * before that have only the hash and the four-character prefix.
  *
  * The tier is a property of the code (default member), never of the plan
  * the person clicked — a leaked member code opens member accounts only, and
@@ -40,6 +40,9 @@ class SignupCode
 
     #[ORM\Column(name: 'BPREFIX', length: 8)]
     private string $prefix = '';
+
+    #[ORM\Column(name: 'BCODE', length: 16, nullable: true)]
+    private ?string $code = null;
 
     #[ORM\Column(name: 'BLABEL', length: 120)]
     private string $label = '';
@@ -101,6 +104,18 @@ class SignupCode
     public function setPrefix(string $prefix): self
     {
         $this->prefix = $prefix;
+
+        return $this;
+    }
+
+    public function getCode(): ?string
+    {
+        return $this->code;
+    }
+
+    public function setCode(?string $code): self
+    {
+        $this->code = $code;
 
         return $this;
     }

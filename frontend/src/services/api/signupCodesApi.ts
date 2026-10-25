@@ -6,6 +6,7 @@ import {
   ListAdminSignupCodeUsesResponseSchema,
   ListAdminSignupCodesResponseSchema,
   RevokeAdminSignupCodeResponseSchema,
+  ShowAdminSignupCodeResponseSchema,
   UpdateAdminSignupCodeResponseSchema,
   createAdminSignupCode_Body,
   updateAdminSignupCode_Body,
@@ -50,6 +51,14 @@ export const signupCodesApi = {
       schema: RevokeAdminSignupCodeResponseSchema,
     })
     return res.signupCode
+  },
+
+  /** The code in groups of four; each call is an audit row. */
+  async show(id: number): Promise<string> {
+    const res = await httpClient(`${BASE}/${id}/code`, {
+      schema: ShowAdminSignupCodeResponseSchema,
+    })
+    return res.code
   },
 
   async uses(id: number): Promise<SignupCodeUse[]> {

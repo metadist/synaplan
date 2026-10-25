@@ -25,6 +25,7 @@ test.describe('@ci Admin invitation codes', () => {
     })
 
     let prefix = ''
+    let shown = ''
     await test.step('Create shows the code once in groups of four', async () => {
       await page.locator(selectors.signupCodes.create).first().click()
       const modal = page.locator(selectors.signupCodes.modal)
@@ -39,7 +40,8 @@ test.describe('@ci Admin invitation codes', () => {
       await expect(plain).toHaveText(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/, {
         timeout: TIMEOUTS.STANDARD,
       })
-      prefix = ((await plain.textContent()) ?? '').trim().slice(0, 4)
+      shown = ((await plain.textContent()) ?? '').trim()
+      prefix = shown.slice(0, 4)
       await modal.locator(selectors.signupCodes.done).click()
       await expect(modal).toBeHidden()
     })
@@ -52,7 +54,12 @@ test.describe('@ci Admin invitation codes', () => {
       await expect(row.locator(selectors.signupCodes.rowState)).toHaveText('Usable')
     })
 
-    await test.step('Revoke states the consequence and greys the row', async () => {
+    await test.step('A click on the code shows it again, unchanged', async () => {
+      await row.locator(selectors.signupCodes.rowPrefix).click()
+      await expect(row.locator(selectors.signupCodes.rowFullCode)).toHaveText(shown)
+    })
+
+    await test.step('Revoke states the consequence and marks the row', async () => {
       await row.locator(selectors.signupCodes.revoke).click()
       await expect(page.getByText('Nobody can use this code any more.')).toBeVisible()
       await page.locator(selectors.dialog.confirmBtn).click()
