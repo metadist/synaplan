@@ -2110,6 +2110,61 @@
       background-color: var(--brand-alpha-light);
     }
   }
+
+  /* Stacked table. Put `table-stack` on the wrapper of a plain <table>:
+     once the wrapper is narrower than 64rem every row becomes a card and
+     every cell a "label: value" line, instead of the trailing columns
+     (usually the actions) disappearing behind a horizontal scrollbar. The
+     wrapper is a size container, so the switch follows the card's real
+     width (sidebars included), not the viewport.
+     A cell with `data-label` (the header text) prints that label on the
+     left; a cell without one is the row's title and moves to the top.
+     Tokens: --txt-secondary exists in both themes; the card border comes
+     from the row's own border-color utilities. */
+  .table-stack {
+    container-type: inline-size;
+  }
+  @container (max-width: 63.99rem) {
+    .table-stack > table,
+    .table-stack > table > tbody {
+      display: block;
+    }
+    .table-stack > table > thead {
+      display: none;
+    }
+    .table-stack > table > tbody > tr {
+      display: flex;
+      flex-direction: column;
+      border-width: 1px;
+      border-radius: 0.75rem;
+      padding: 0.5rem 0.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .table-stack > table > tbody > tr > td {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem 1rem;
+      padding: 0.375rem 0.75rem;
+      text-align: right;
+    }
+    .table-stack > table > tbody > tr > td[data-label]::before {
+      content: attr(data-label);
+      flex: 0 0 auto;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--txt-secondary);
+      text-align: left;
+    }
+    .table-stack > table > tbody > tr > td:not([data-label]) {
+      order: -1;
+      justify-content: flex-start;
+      text-align: left;
+      font-weight: 600;
+      padding-bottom: 0.5rem;
+    }
+  }
 }
 
 /* Every button is 12px. Unlayered so a leftover rounded-lg utility cannot
