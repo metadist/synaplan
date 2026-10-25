@@ -600,6 +600,84 @@
       },
       "serviceDown": "{name} ist nicht erreichbar. {effect}",
       "serviceFailed": "{name} ist nicht fertig gestartet. {effect}"
+    },
+    "signupCodes": {
+      "title": "Einladungscodes",
+      "empty": "Noch keine Einladungscodes. Erstelle einen, um jemanden ohne Bezahlung hereinzulassen.",
+      "create": "Code erstellen",
+      "openModeNote": "Die Registrierung ist auf diesem Server offen, niemand braucht also schon einen Code. Codes von hier zählen, sobald die Registrierungseinstellungen einen bezahlten Tarif oder einen Einladungscode verlangen.",
+      "openSettings": "Registrierungseinstellungen öffnen",
+      "loadFailed": "Die Einladungscodes konnten nicht geladen werden. Es hat sich nichts geändert; versuche es erneut.",
+      "prefixAria": "Code, der mit {prefix} beginnt",
+      "shownOnce": "Kopiere diesen Code jetzt. Aus Sicherheitsgründen wird er nicht noch einmal angezeigt.",
+      "copy": "Code kopieren",
+      "copied": "Code kopiert.",
+      "copyFailed": "Kopieren hat nicht geklappt. Markiere den Code und kopiere ihn von Hand.",
+      "done": "Fertig",
+      "levels": {
+        "NEW": "Mitglied",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Unbegrenzt",
+        "week": "7 Tage",
+        "fiveMonths": "5 Monate"
+      },
+      "state": {
+        "active": "Nutzbar",
+        "expired": "Abgelaufen",
+        "used_up": "Aufgebraucht",
+        "revoked": "Widerrufen"
+      },
+      "facts": {
+        "grants": "Eröffnet ein Konto der Stufe {level}",
+        "validUntil": "gültig bis {date}",
+        "noEnd": "ohne Enddatum",
+        "usesOf": "{uses} von {max} Nutzungen",
+        "usesUnlimited": "{uses} Nutzung, ohne Grenze | {uses} Nutzungen, ohne Grenze",
+        "createdBy": "Erstellt von {email} am {date}",
+        "createdByGone": "Erstellt am {date} von einem Konto, das es nicht mehr gibt"
+      },
+      "actions": {
+        "uses": "Wer ihn genutzt hat",
+        "edit": "Bearbeiten",
+        "revoke": "Widerrufen",
+        "restore": "Wiederherstellen"
+      },
+      "revokeTitle": "Diesen Code widerrufen?",
+      "revokeBody": "Niemand kann diesen Code mehr nutzen. Bisher hat ihn niemand genutzt. | Niemand kann diesen Code mehr nutzen. Die eine Person, die ihn genutzt hat, behält ihr Konto. | Niemand kann diesen Code mehr nutzen. Die {count} Personen, die ihn genutzt haben, behalten ihre Konten.",
+      "revoked": "Der Code ist widerrufen. Mit Wiederherstellen gilt er wieder.",
+      "revokeFailed": "Der Code wurde nicht widerrufen und funktioniert weiter. Versuche es erneut.",
+      "restored": "Der Code funktioniert wieder.",
+      "restoreFailed": "Der Code wurde nicht wiederhergestellt und bleibt gesperrt. Versuche es erneut.",
+      "form": {
+        "titleCreate": "Einladungscode erstellen",
+        "titleEdit": "Einladungscode bearbeiten",
+        "titleCreated": "Dein neuer Einladungscode",
+        "label": "Bezeichnung",
+        "labelPlaceholder": "Zum Beispiel: Pilotkunden",
+        "labelHint": "Nur Administratoren sehen die Bezeichnung.",
+        "level": "Stufe des neuen Kontos",
+        "validity": "Gültig",
+        "validUntil": "Gültig bis",
+        "noEnd": "Ohne Enddatum",
+        "maxUses": "Wie viele Personen ihn nutzen können",
+        "unlimited": "Ohne Grenze",
+        "labelRequired": "Gib dem Code eine Bezeichnung.",
+        "maxUsesInvalid": "Gib eine ganze Zahl ab 1 ein oder wähle Ohne Grenze.",
+        "dateRequired": "Wähle ein Datum oder Ohne Enddatum.",
+        "createFailed": "Der Code wurde nicht erstellt. Es wurde nichts gespeichert; versuche es erneut.",
+        "saveFailed": "Die Änderungen wurden nicht gespeichert. Der Code funktioniert wie vorher.",
+        "saved": "Änderungen gespeichert."
+      },
+      "uses": {
+        "title": "Wer sich mit diesem Code registriert hat",
+        "empty": "Diesen Code hat noch niemand genutzt.",
+        "deleted": "Konto gelöscht",
+        "loadFailed": "Die Liste konnte nicht geladen werden. Schließe sie und öffne sie erneut."
+      }
     }
   },
   "statistics": {
@@ -892,7 +970,8 @@
       "policies": "Richtlinien",
       "linkedPlatforms": "Plattform-Instanzen",
       "moderation": "Moderation",
-      "audit": "Protokoll"
+      "audit": "Protokoll",
+      "signupCodes": "Einladungscodes"
     },
     "openPeople": "Benutzer öffnen",
     "backToOperate": "Zurück zu Betrieb",
@@ -1150,7 +1229,8 @@
       "groups": "Gruppen fassen Benutzer zusammen, damit du Assistenten teilen und Regeln einmal für alle festlegen kannst.",
       "policies": "Richtlinien legen fest, was eine Gruppe nutzen darf, zum Beispiel welche Funktionen oder Modelle.",
       "moderation": "Von Benutzern gemeldete Inhalte. Prüfe sie und behalte oder entferne sie.",
-      "audit": "Ein Protokoll, wer was auf diesem Server geändert hat, neueste zuerst."
+      "audit": "Ein Protokoll, wer was auf diesem Server geändert hat, neueste zuerst.",
+      "signup-codes": "Codes, mit denen sich jemand ohne Bezahlung registrieren kann. Du legst fest, welche Stufe das neue Konto bekommt, wie lange ein Code gilt und wie viele Personen ihn nutzen dürfen."
     }
   },
   "iam": {

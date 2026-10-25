@@ -596,6 +596,84 @@
       },
       "serviceDown": "{name} no es accesible. {effect}",
       "serviceFailed": "{name} no terminó de iniciarse. {effect}"
+    },
+    "signupCodes": {
+      "title": "Códigos de invitación",
+      "empty": "Aún no hay códigos de invitación. Crea uno para dejar entrar a alguien sin pago.",
+      "create": "Crear código",
+      "openModeNote": "El registro está abierto en este servidor, así que nadie necesita un código todavía. Los códigos que crees aquí cuentan en cuanto los ajustes de registro pidan un plan de pago o un código de invitación.",
+      "openSettings": "Abrir ajustes de registro",
+      "loadFailed": "No se pudieron cargar los códigos de invitación. No ha cambiado nada; inténtalo de nuevo.",
+      "prefixAria": "Código que empieza por {prefix}",
+      "shownOnce": "Copia este código ahora. Por seguridad no se vuelve a mostrar.",
+      "copy": "Copiar código",
+      "copied": "Código copiado.",
+      "copyFailed": "No se pudo copiar. Selecciona el código y cópialo a mano.",
+      "done": "Listo",
+      "levels": {
+        "NEW": "Miembro",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Para siempre",
+        "week": "7 días",
+        "fiveMonths": "5 meses"
+      },
+      "state": {
+        "active": "Utilizable",
+        "expired": "Caducado",
+        "used_up": "Agotado",
+        "revoked": "Revocado"
+      },
+      "facts": {
+        "grants": "Abre una cuenta de nivel {level}",
+        "validUntil": "válido hasta el {date}",
+        "noEnd": "sin fecha de fin",
+        "usesOf": "{uses} de {max} usos",
+        "usesUnlimited": "{uses} uso, sin límite | {uses} usos, sin límite",
+        "createdBy": "Creado por {email} el {date}",
+        "createdByGone": "Creado el {date} por una cuenta que ya no existe"
+      },
+      "actions": {
+        "uses": "Quién lo usó",
+        "edit": "Editar",
+        "revoke": "Revocar",
+        "restore": "Restaurar"
+      },
+      "revokeTitle": "¿Revocar este código?",
+      "revokeBody": "Nadie podrá usar este código. Todavía no lo ha usado nadie. | Nadie podrá usar este código. La persona que lo usó conserva su cuenta. | Nadie podrá usar este código. Las {count} personas que lo usaron conservan sus cuentas.",
+      "revoked": "El código está revocado. Restaurar lo vuelve a activar.",
+      "revokeFailed": "El código no se revocó y sigue funcionando. Inténtalo de nuevo.",
+      "restored": "El código vuelve a funcionar.",
+      "restoreFailed": "El código no se restauró y sigue sin poder usarse. Inténtalo de nuevo.",
+      "form": {
+        "titleCreate": "Crear un código de invitación",
+        "titleEdit": "Editar código de invitación",
+        "titleCreated": "Tu nuevo código de invitación",
+        "label": "Etiqueta",
+        "labelPlaceholder": "Por ejemplo: clientes piloto",
+        "labelHint": "Solo los administradores ven la etiqueta.",
+        "level": "Nivel de la nueva cuenta",
+        "validity": "Válido",
+        "validUntil": "Válido hasta",
+        "noEnd": "Sin fecha de fin",
+        "maxUses": "Cuántas personas pueden usarlo",
+        "unlimited": "Sin límite",
+        "labelRequired": "Ponle una etiqueta al código.",
+        "maxUsesInvalid": "Escribe un número entero de 1 o más, o elige Sin límite.",
+        "dateRequired": "Elige una fecha o Sin fecha de fin.",
+        "createFailed": "El código no se creó. No se guardó nada; inténtalo de nuevo.",
+        "saveFailed": "Los cambios no se guardaron. El código funciona como antes.",
+        "saved": "Cambios guardados."
+      },
+      "uses": {
+        "title": "Quién se registró con este código",
+        "empty": "Nadie ha usado este código todavía.",
+        "deleted": "Cuenta eliminada",
+        "loadFailed": "No se pudo cargar la lista. Ciérrala y ábrela de nuevo."
+      }
     }
   },
   "statistics": {
@@ -888,7 +966,8 @@
       "policies": "Políticas",
       "linkedPlatforms": "Instancias de plataforma",
       "moderation": "Moderación",
-      "audit": "Auditoría"
+      "audit": "Auditoría",
+      "signupCodes": "Códigos de invitación"
     },
     "openPeople": "Abrir Usuarios",
     "backToOperate": "Volver a Operar",
@@ -1146,7 +1225,8 @@
       "groups": "Los grupos reúnen usuarios para compartir asistentes y fijar reglas una sola vez para todas.",
       "policies": "Las políticas deciden qué puede usar un grupo, por ejemplo qué funciones o modelos.",
       "moderation": "Contenido que los usuarios han denunciado. Revísalo y consérvalo o elimínalo.",
-      "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero."
+      "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero.",
+      "signup-codes": "Códigos que permiten registrarse sin pagar. Tú decides el nivel de la nueva cuenta, cuánto tiempo vale un código y cuántas personas pueden usarlo."
     }
   },
   "iam": {
