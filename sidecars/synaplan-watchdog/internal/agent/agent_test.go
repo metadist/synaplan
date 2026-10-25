@@ -53,6 +53,7 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 				Hostname:      "79e4f90bc8c6",
 				Role:          "web",
 				Host:          "synweb100",
+				Address:       "10.0.0.2",
 				LogCollector:  "docker",
 				MemoryRSS:     100,
 				MemoryLimit:   200,
@@ -73,7 +74,7 @@ func TestTickStoresSnapshotAndDropsThreadPaths(t *testing.T) {
 	if !first.PHPReady || first.Runtime != "compose" || first.CPUUsageRatio != nil {
 		t.Fatalf("first sample = %+v", first)
 	}
-	if first.Hostname != "79e4f90bc8c6" || first.Role != "web" || first.Place.Host != "synweb100" {
+	if first.Hostname != "79e4f90bc8c6" || first.Role != "web" || first.Place.Host != "synweb100" || first.Place.Address != "10.0.0.2" {
 		t.Fatalf("place = %+v hostname %q role %q", first.Place, first.Hostname, first.Role)
 	}
 	if first.Logs.Collector != "docker" || first.Logs.EventRingHost != "79e4f90bc8c6" {

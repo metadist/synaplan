@@ -1503,6 +1503,7 @@
       },
       "place": {
         "machine": "makine {name}",
+        "address": "adres {address}",
         "pod": "pod {name}",
         "deployment": "deployment {name}",
         "namespace": "namespace {name}",

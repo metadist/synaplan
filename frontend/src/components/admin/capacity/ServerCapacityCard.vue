@@ -85,6 +85,7 @@ const placeParts = computed(() => {
   const { place } = props.server
   const parts: string[] = [runtimeLabel.value]
   if (place.host) parts.push(t('capacity.card.place.machine', { name: place.host }))
+  if (place.address) parts.push(t('capacity.card.place.address', { address: place.address }))
   if (place.pod) parts.push(t('capacity.card.place.pod', { name: place.pod }))
   if (place.deployment) parts.push(t('capacity.card.place.deployment', { name: place.deployment }))
   if (place.namespace) parts.push(t('capacity.card.place.namespace', { name: place.namespace }))

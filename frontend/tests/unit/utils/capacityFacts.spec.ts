@@ -27,6 +27,7 @@ function server(overrides: Partial<CapacityServer> & { id: string }): CapacitySe
     cpu: { cores: 8, limited: true, usage_ratio: 0.1 },
     place: {
       host: '',
+      address: '',
       pod: '',
       namespace: '',
       deployment: '',
@@ -73,6 +74,7 @@ describe('capacityFacts', () => {
           logs: { collector: 'kubernetes', event_ring_host: 'synaplan-web-7d9f-x2' },
           place: {
             host: 'node-a',
+            address: '',
             pod: 'synaplan-web-7d9f-x2',
             namespace: 'synaplan',
             deployment: 'synaplan-web',
@@ -98,6 +100,7 @@ describe('capacityFacts', () => {
         role: 'worker',
         place: {
           host: 'node-a',
+          address: '',
           pod: 'pod-worker-abc',
           namespace: 'ns',
           deployment: 'synaplan-worker',
@@ -110,6 +113,7 @@ describe('capacityFacts', () => {
         id: 'pod-web-xyz',
         place: {
           host: 'node-a',
+          address: '',
           pod: 'pod-web-xyz',
           namespace: 'ns',
           deployment: 'synaplan-web',

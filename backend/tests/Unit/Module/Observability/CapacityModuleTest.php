@@ -81,7 +81,7 @@ final class CapacityModuleTest extends TestCase
             'api' => ['total' => 0, 'busy' => 0],
             'memory' => ['rss_bytes' => 0, 'limit_bytes' => 0, 'limited' => false],
             'cpu' => ['cores' => 0.0, 'limited' => false, 'usage_ratio' => null],
-            'place' => ['host' => '', 'pod' => '', 'namespace' => '', 'deployment' => '', 'container' => '', 'cpu_request' => '', 'memory_limit' => ''],
+            'place' => ['host' => '', 'address' => '', 'pod' => '', 'namespace' => '', 'deployment' => '', 'container' => '', 'cpu_request' => '', 'memory_limit' => ''],
             'logs' => ['collector' => '', 'event_ring_host' => ''],
             'threads' => ['count' => 0, 'busy' => 0],
             'peak_today' => ['streams_busy' => 0, 'streams_total' => 0, 'at' => null],

@@ -21,7 +21,7 @@ use App\Service\Infrastructure\RedisService;
  *     php_ready: bool, admin_ok: bool, streams: Pool, api: Pool,
  *     memory: array{rss_bytes: int, limit_bytes: int, limited: bool},
  *     cpu: array{cores: float, limited: bool, usage_ratio: float|null},
- *     place: array{host: string, pod: string, namespace: string, deployment: string, container: string, cpu_request: string, memory_limit: string},
+     *     place: array{host: string, address: string, pod: string, namespace: string, deployment: string, container: string, cpu_request: string, memory_limit: string},
  *     logs: array{collector: string, event_ring_host: string},
  *     threads: array{count: int, busy: int},
  *     peak_today: array{streams_busy: int, streams_total: int, at: string|null}
@@ -149,12 +149,13 @@ final readonly class CapacityService
     /**
      * @param array<string, mixed> $place
      *
-     * @return array{host: string, pod: string, namespace: string, deployment: string, container: string, cpu_request: string, memory_limit: string}
+     * @return array{host: string, address: string, pod: string, namespace: string, deployment: string, container: string, cpu_request: string, memory_limit: string}
      */
     private function place(array $place): array
     {
         return [
             'host' => $this->str($place['host'] ?? null) ?? '',
+            'address' => $this->str($place['address'] ?? null) ?? '',
             'pod' => $this->str($place['pod'] ?? null) ?? '',
             'namespace' => $this->str($place['namespace'] ?? null) ?? '',
             'deployment' => $this->str($place['deployment'] ?? null) ?? '',

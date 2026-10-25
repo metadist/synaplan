@@ -29,6 +29,9 @@ type Pool struct {
 type Place struct {
 	// Host is the machine: the Kubernetes node, or SYNAPLAN_HOST_NAME on compose.
 	Host string `json:"host,omitempty"`
+	// Address is that machine's address (SYNAPLAN_NODE_ADDRESS). Empty when
+	// the install did not set one, or set the container's own loopback.
+	Address string `json:"address,omitempty"`
 	// Pod is the Kubernetes pod name.
 	Pod string `json:"pod,omitempty"`
 	// Namespace is the Kubernetes namespace.

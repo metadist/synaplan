@@ -2,6 +2,7 @@
 package host
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +16,7 @@ type Facts struct {
 	Hostname      string
 	Role          string
 	Host          string
+	Address       string
 	Pod           string
 	Namespace     string
 	Deployment    string
@@ -45,6 +47,7 @@ func Read(root string, env func(string) string) Facts {
 		Hostname: hostname(env),
 		Role:     firstNonEmpty(env("SYNAPLAN_ROLE"), "web"),
 		Host:     env("SYNAPLAN_HOST_NAME"),
+		Address:  nodeAddress(env("SYNAPLAN_NODE_ADDRESS")),
 	}
 	facts.LogCollector = collectorOf(facts.Runtime)
 	readMemory(root, &facts)
@@ -130,6 +133,18 @@ func collectorOf(runtime string) string {
 	default:
 		return "process"
 	}
+}
+
+// nodeAddress is SYNAPLAN_NODE_ADDRESS when it is a real unicast address.
+// Loopback, link-local and a value that is not an address are dropped:
+// 127.0.0.1 is this process, not the machine. The watchdog does not scan
+// interfaces, so a container's bridge address never appears here on its own.
+func nodeAddress(raw string) string {
+	ip := net.ParseIP(strings.TrimSpace(raw))
+	if ip == nil || !ip.IsGlobalUnicast() {
+		return ""
+	}
+	return ip.String()
 }
 
 func hostname(env func(string) string) string {

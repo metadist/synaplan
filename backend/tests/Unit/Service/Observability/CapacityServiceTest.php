@@ -62,7 +62,7 @@ final class CapacityServiceTest extends TestCase
                 'cpu_cores' => 10,
                 'cpu_limited' => false,
                 'cpu_usage_ratio' => 0.14,
-                'place' => ['host' => 'synweb101'],
+                'place' => ['host' => 'synweb101', 'address' => '10.0.0.7'],
                 'logs' => ['collector' => 'docker', 'event_ring_host' => '79e4f90bc8c6'],
                 'threads' => ['count' => 24, 'busy' => 5],
             ], JSON_THROW_ON_ERROR),
@@ -87,7 +87,9 @@ final class CapacityServiceTest extends TestCase
         self::assertSame(10.0, $live['cpu']['cores']);
         self::assertSame(0.14, $live['cpu']['usage_ratio']);
         self::assertSame('synweb101', $live['place']['host']);
+        self::assertSame('10.0.0.7', $live['place']['address']);
         self::assertSame('', $live['place']['pod']);
+        self::assertSame('', $silent['place']['address']);
         self::assertSame('docker', $live['logs']['collector']);
         self::assertSame(['count' => 24, 'busy' => 5], $live['threads']);
         self::assertSame(['streams_busy' => 14, 'streams_total' => 16, 'at' => '2026-10-24T11:40:05Z'], $live['peak_today']);

@@ -233,13 +233,17 @@ Three shapes, one snapshot (`03` §6.1):
 | Shape | `server_id` | `place.host` | Log row on the page |
 | ----- | ----------- | ------------ | ------------------- |
 | Single server (`deploy/compose.yaml`, Umbrel, CasaOS) | the container hostname, unless the operator sets `SYNAPLAN_SERVER_ID` | unset | `docker logs <hostname>` |
-| Several servers on compose (the platform's web1–web3) | `web1` … `web3`, exported by `updatewebN.sh` next to `SYNDBHOST` and passed through the compose file; the worker, bulk worker and scheduler on that node get `-worker`, `-bulk`, `-scheduler` | `SYNAPLAN_HOST_NAME` (`synweb100` …), same source | `docker logs <hostname>` on `<host>` |
+| Several servers on compose (the platform's web1–web3) | `web1` … `web3`, exported by `updatewebN.sh` next to `SYNDBHOST` and passed through the compose file; the worker, bulk worker and scheduler on that node get `-worker`, `-bulk`, `-scheduler` | `SYNAPLAN_HOST_NAME` (`synweb100` …), same source. `place.address` is `SYNAPLAN_NODE_ADDRESS`, the same private address as `SYNDBHOST` (`10.0.0.2`, `.7`, `.8`) | `docker logs <hostname>` on `<host>` |
 | Kubernetes (`synaplan-charts`) | the pod name, no setting needed | the node (Downward API) | `kubectl logs -n <namespace> <pod> -c <container>` |
 
-The platform compose carries the two variables and the role suffixes
+The platform compose carries the identity variables and the role suffixes
 (`synaplan-platform`, same day as AU6). The scripts export them next to
 `SYNDBHOST`, the per-node value that already tells a node which one it is;
 a `docker compose up` without the script falls back to container ids.
+None of them belong in the NFS `.env`: that file is one copy for all three
+nodes, so a name or an address written there would make every node report
+as the same server. The container's own `127.0.0.1` is not that address;
+the watchdog ignores it.
 
 ---
 

@@ -1507,6 +1507,7 @@
       },
       "place": {
         "machine": "machine {name}",
+        "address": "adresse {address}",
         "pod": "pod {name}",
         "deployment": "deployment {name}",
         "namespace": "namespace {name}",

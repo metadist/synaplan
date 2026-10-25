@@ -102,7 +102,9 @@ test.describe('@ci Capacity', () => {
     await expect(web1.locator(selectors.capacity.helper)).toContainText('web1-worker')
     await expect(web1.locator(selectors.capacity.helper)).toContainText('Background work')
     await web1.locator(selectors.capacity.technical).locator('summary').click()
-    await expect(web1.locator(selectors.capacity.place)).toHaveText('Docker · machine synweb100')
+    await expect(web1.locator(selectors.capacity.place)).toHaveText(
+      'Docker · machine synweb100 · address 10.0.0.2'
+    )
     await expect(web1.locator(selectors.capacity.logCommand)).toHaveText('docker logs 79e4f90bc8c6')
 
     await expect(web2.locator(selectors.capacity.connectedHere)).toBeVisible()
@@ -189,6 +191,7 @@ function server(id: string, overrides: Record<string, unknown> = {}): Record<str
     cpu: { cores: 8, limited: true, usage_ratio: 0.14 },
     place: {
       host: '',
+      address: '',
       pod: '',
       namespace: '',
       deployment: '',
@@ -204,8 +207,9 @@ function server(id: string, overrides: Record<string, unknown> = {}): Record<str
 }
 
 async function mockCluster(page: Page): Promise<void> {
-  const place = (host: string) => ({
+  const place = (host: string, address: string) => ({
     host,
+    address,
     pod: '',
     namespace: '',
     deployment: '',
@@ -225,7 +229,7 @@ async function mockCluster(page: Page): Promise<void> {
         servers: [
           server('web1', {
             hostname: '79e4f90bc8c6',
-            place: place('synweb100'),
+            place: place('synweb100', '10.0.0.2'),
             logs: { collector: 'docker', event_ring_host: '79e4f90bc8c6' },
             streams: { total: 24, busy: 22 },
             peak_today: { streams_busy: 22, streams_total: 24, at: new Date().toISOString() },
@@ -233,7 +237,7 @@ async function mockCluster(page: Page): Promise<void> {
           server('web1-worker', {
             hostname: 'a1b2c3d4e5f6',
             role: 'worker',
-            place: place('synweb100'),
+            place: place('synweb100', '10.0.0.2'),
             streams: { total: 0, busy: 0 },
             api: { total: 0, busy: 0 },
             memory: { rss_bytes: 111726592, limit_bytes: 0, limited: false },
@@ -244,7 +248,7 @@ async function mockCluster(page: Page): Promise<void> {
             reporting: false,
             updated_at: threeMinutesAgo,
             last_seen_at: threeMinutesAgo,
-            place: place('synweb101'),
+            place: place('synweb101', '10.0.0.7'),
             peak_today: { streams_busy: 0, streams_total: 0, at: null },
           }),
         ],

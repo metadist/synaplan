@@ -629,6 +629,7 @@ limits:
 | Field | Compose | Kubernetes | Source |
 | ----- | ------- | ---------- | ------ |
 | `place.host` | `SYNAPLAN_HOST_NAME` (the machine; optional) | the node, `SYNAPLAN_K8S_NODE` | env, Downward API `spec.nodeName` (AU8) |
+| `place.address` | `SYNAPLAN_NODE_ADDRESS` (the machine's address; optional). Loopback is dropped, and the watchdog never scans interfaces, so `127.0.0.1` and a container bridge address do not appear | the same variable, when the chart sets it | env. Not the `X-Synaplan-Server` header |
 | `place.pod` | — | the pod name | hostname |
 | `place.namespace` | — | the namespace | the service-account file, else `SYNAPLAN_K8S_NAMESPACE` |
 | `place.deployment` | — | `SYNAPLAN_K8S_DEPLOYMENT`, else the pod name without its ReplicaSet and pod suffixes | env (AU8), derived |

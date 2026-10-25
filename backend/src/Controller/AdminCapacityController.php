@@ -108,9 +108,10 @@ final class AdminCapacityController extends AbstractController
                                 property: 'place',
                                 type: 'object',
                                 description: 'Where the server runs. Empty strings where a field does not apply to the runtime.',
-                                required: ['host', 'pod', 'namespace', 'deployment', 'container', 'cpu_request', 'memory_limit'],
+                                required: ['host', 'address', 'pod', 'namespace', 'deployment', 'container', 'cpu_request', 'memory_limit'],
                                 properties: [
                                     new OA\Property(property: 'host', type: 'string', example: 'synweb100'),
+                                    new OA\Property(property: 'address', type: 'string', description: 'The machine address from SYNAPLAN_NODE_ADDRESS. Empty when unset. Loopback is never reported.', example: '10.0.0.2'),
                                     new OA\Property(property: 'pod', type: 'string', example: ''),
                                     new OA\Property(property: 'namespace', type: 'string', example: ''),
                                     new OA\Property(property: 'deployment', type: 'string', example: ''),

@@ -16,7 +16,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
 | 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | merged (`5e7a4ebdd`) | watchdog on `:8098`; `capacity:server:{id}` every 5 s with place and log source. No relay. Not rolled out |
 | 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | in review | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
-| 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | in review | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module |
+| 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | in review | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
 
 ## Baselines
 
