@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ResearchRunStateView',
     description: 'One research run as its owner reads it (research_protocol 1). Budget pairs are [used, limit].',
-    required: ['id', 'research_protocol', 'status', 'depth', 'question', 'stop_requested', 'created_at', 'updated_at'],
+    required: ['id', 'research_protocol', 'status', 'depth', 'question', 'stop_requested', 'write_requested', 'created_at', 'updated_at'],
     properties: [
         new OA\Property(property: 'id', type: 'string', example: 'rr_0123456789abcdef'),
         new OA\Property(property: 'research_protocol', type: 'integer', example: 1),
@@ -18,6 +18,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'question', type: 'string', example: 'Which suppliers deliver X in Germany?'),
         new OA\Property(property: 'parent', type: 'string', nullable: true, example: null),
         new OA\Property(property: 'stop_requested', type: 'boolean', example: false),
+        new OA\Property(property: 'write_requested', type: 'boolean', description: 'The person asked to write the report from what was already found.', example: false),
         new OA\Property(property: 'brief', type: 'object', nullable: true),
         new OA\Property(property: 'plan', type: 'object', nullable: true),
         new OA\Property(property: 'sources', type: 'array', items: new OA\Items(type: 'object')),

@@ -8,13 +8,17 @@ use App\AI\StructuredOutput\Schema\ResearchFinishSchema;
 use App\AI\StructuredOutput\Schema\ResearchJsonSchema;
 use App\AI\ToolCalling\ToolCall;
 use App\AI\ToolCalling\ToolDefinition;
+use App\Service\Research\Run\ResearchQuestion;
+use App\Service\Research\Run\ResearchQuestions;
+use App\Service\Research\Run\ResearchStatus;
+use App\Service\Research\Run\ResearchUnitPlan;
 use App\Service\Research\Run\Stage\StageContext;
+use App\Service\Research\Run\Stage\StageResult;
 
 /**
- * The tools the lead may call. Each one enforces the budget itself. Only
- * what can run is declared: asking the person waits until a run can wait
- * without holding a worker, and file search waits for the knowledge source
- * (RS9). A model that calls either anyway is refused.
+ * The tools the lead may call. Each one enforces the budget itself. Asking
+ * the person ends the turn and the run waits with no worker. File search
+ * waits for the knowledge source (RS9). A model that calls it anyway is refused.
  */
 final readonly class LeadToolbox
 {
@@ -47,6 +51,10 @@ final readonly class LeadToolbox
                 'source' => $source,
                 'question' => ['type' => 'string', 'maxLength' => 300],
             ], ['source', 'question'])),
+            new ToolDefinition('ask_user', 'Ask the person one question only they can answer. The run waits and this turn ends.', ResearchJsonSchema::object([
+                'question' => ['type' => 'string', 'maxLength' => 300],
+                'options' => ['type' => 'array', 'minItems' => 2, 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 120]],
+            ], ['question', 'options'])),
             new ToolDefinition('finish', 'End the research and give every plan point a status. This is the only way to end; never answer in text.', ResearchFinishSchema::schema()),
         ];
     }
@@ -57,8 +65,32 @@ final readonly class LeadToolbox
             'search' => new LeadToolOutcome($this->search->run($call, $ctx)),
             'read_sources' => $this->read->sources($call, $ctx),
             'reread' => $this->read->again($call, $ctx),
-            'ask_user', 'finish' => new LeadToolOutcome(LeadToolReply::error('not_allowed', $ctx->state->budget)),
+            'ask_user' => $this->ask($call, $ctx),
+            'finish' => new LeadToolOutcome(LeadToolReply::error('not_allowed', $ctx->state->budget)),
             default => new LeadToolOutcome(LeadToolReply::error('unknown_tool', $ctx->state->budget)),
         };
+    }
+
+    private function ask(ToolCall $call, StageContext $ctx): LeadToolOutcome
+    {
+        $left = $ctx->state->budget->extras()->questions - $ctx->state->questionsAsked;
+        $question = ResearchQuestion::fromTool($call->arguments);
+        if ($left < 1 || null === $question || null !== $ctx->state->questions) {
+            return new LeadToolOutcome(LeadToolReply::error('not_allowed', $ctx->state->budget));
+        }
+        $ctx->state->questions = new ResearchQuestions(
+            [$question],
+            ResearchUnitPlan::ROUND,
+            ResearchStatus::Gathering->value,
+            '' !== $call->id ? $call->id : 'call_0',
+        );
+        ++$ctx->state->questionsAsked;
+        $ctx->state->advance(ResearchStatus::WaitingAnswer);
+        $ctx->events->append($ctx->state->ref->id, 'question', $question->event());
+
+        return new LeadToolOutcome(
+            LeadToolReply::ok(['pending' => true], $ctx->state->budget),
+            new StageResult('wait_answer'),
+        );
     }
 }

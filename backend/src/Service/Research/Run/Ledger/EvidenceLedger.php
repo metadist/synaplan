@@ -124,6 +124,21 @@ final class EvidenceLedger
         $this->report = '' === $text ? null : $text;
     }
 
+    public function renamePoint(string $id, string $title): void
+    {
+        $point = $this->points[$id] ?? null;
+        $title = PlainText::line($title, 300);
+        if (null === $point || '' === $title) {
+            throw new \InvalidArgumentException('That plan point is not in this research.');
+        }
+        $this->points[$id] = new PlanPoint($id, $title, $point->status, $point->why, $point->queries);
+    }
+
+    public function dropPoint(string $id): void
+    {
+        unset($this->points[$id]);
+    }
+
     public function markPoint(string $id, string $status, string $note = ''): void
     {
         $point = $this->points[$id] ?? null;

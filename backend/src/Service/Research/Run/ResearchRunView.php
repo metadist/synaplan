@@ -25,7 +25,7 @@ final class ResearchRunView
     /**
      * @return array<string, mixed>
      */
-    public static function one(ResearchRunState $state, bool $stopRequested): array
+    public static function one(ResearchRunState $state, bool $stopRequested, bool $writeRequested = false): array
     {
         $ledger = $state->ledger->toArray();
         $budget = $state->budget->toArray();
@@ -39,6 +39,7 @@ final class ResearchRunView
             'question' => $state->ref->question,
             'parent' => $state->parent,
             'stop_requested' => $stopRequested,
+            'write_requested' => $writeRequested,
             'brief' => $ledger['brief'],
             'plan' => $ledger['plan'],
             'sources' => $ledger['sources'],

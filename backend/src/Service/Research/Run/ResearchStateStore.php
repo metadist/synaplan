@@ -226,6 +226,37 @@ final readonly class ResearchStateStore
         return null !== $this->keys->get(ResearchKey::stop($runId));
     }
 
+    /** Ask the next step to write the report instead of searching again. */
+    public function requestWriteNow(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        $this->keys->set(ResearchKey::writeNow($runId), '1', $this->ttlSeconds());
+    }
+
+    public function writeNowRequested(string $runId): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::writeNow($runId));
+    }
+
+    public function noteQueueNotice(string $runId, int $at): void
+    {
+        ResearchIds::assert($runId);
+        $this->keys->set(ResearchKey::queueNotice($runId), (string) $at, $this->ttlSeconds());
+    }
+
+    public function lastQueueNoticeAt(string $runId): ?int
+    {
+        ResearchIds::assert($runId);
+        $value = $this->keys->get(ResearchKey::queueNotice($runId));
+        if (!is_string($value) || !is_numeric($value)) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
     public function isClaimed(string $runId, int $seq): bool
     {
         ResearchIds::assert($runId);
@@ -388,6 +419,8 @@ final readonly class ResearchStateStore
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
         $this->keys->delete(ResearchKey::stop($runId));
+        $this->keys->delete(ResearchKey::writeNow($runId));
+        $this->keys->delete(ResearchKey::queueNotice($runId));
         $this->keys->delete(ResearchKey::delivered($runId));
         if (null !== $state && null !== $state->idempotencyKey) {
             $this->keys->delete(ResearchKey::idempotency($state->ref->userId, $state->idempotencyKey));

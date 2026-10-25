@@ -187,13 +187,15 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/input', name: 'api_research_input', methods: ['POST'])]
     #[Route('/v1/research/{id}/input', name: 'v1_research_input', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/research/{id}/input', summary: 'Answer a research question or approve its plan', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Post(path: '/api/v1/research/{id}/input', summary: 'Answer a research question, approve its plan, or write the report now', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(
         required: ['type'],
         properties: [
-            new OA\Property(property: 'type', type: 'string', enum: ['answer', 'skip_question', 'approve_plan']),
+            new OA\Property(property: 'type', type: 'string', enum: ['answer', 'skip_question', 'approve_plan', 'edit_plan', 'stop_gathering']),
             new OA\Property(property: 'question', type: 'string', nullable: true, example: 'q1'),
+            new OA\Property(property: 'choice', type: 'string', nullable: true, example: 'EU'),
             new OA\Property(property: 'text', type: 'string', nullable: true),
+            new OA\Property(property: 'points', type: 'array', items: new OA\Items(type: 'object'), nullable: true),
         ]
     ))]
     #[OA\Response(response: 200, description: 'The run continued', content: new OA\JsonContent(ref: new Model(type: ResearchRunStateView::class)))]
@@ -297,7 +299,11 @@ final class ResearchController extends AbstractController
 
     private function current(ResearchRunState $state): JsonResponse
     {
-        return new JsonResponse(ResearchRunView::one($state, $this->store->stopRequested($state->ref->id)));
+        return new JsonResponse(ResearchRunView::one(
+            $state,
+            $this->store->stopRequested($state->ref->id),
+            $this->store->writeNowRequested($state->ref->id),
+        ));
     }
 
     private function error(int $status, string $code, string $message): JsonResponse

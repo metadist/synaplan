@@ -17,6 +17,7 @@ final class StageContext
         public ResearchEventLog $events,
         public \DateTimeImmutable $today,
         public ResearchStop $stop,
+        public ResearchWriteNow $writeNow = new ResearchWriteNow(),
         public string $timezone = 'UTC',
         public string $rules = '',
         public string $turns = '',

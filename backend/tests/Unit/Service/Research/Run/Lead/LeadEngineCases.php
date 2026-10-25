@@ -15,6 +15,7 @@ use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
 use App\Service\Research\Run\ResearchRunState;
+use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\Stage\ResearchHit;
 use App\Service\Research\Run\Stage\ResearchLeadTurn;
 use App\Service\Research\Run\Stage\ResearchModelReply;
@@ -52,7 +53,7 @@ final class LeadEngineCases
             'the search past the budget is refused' => $this->secondSearchBudget(),
             'clearing keeps the tool call and the latest result' => $this->clearingKeepsCalls(),
             'a resumed run does not repeat the search' => $this->resumedTurn(),
-            'asking the person is refused' => $this->askUser(),
+            'asking the person waits' => $this->askUser(),
             'an unlisted model stays in round mode' => $this->unlistedModel(),
             'a listed model uses tools' => $this->listedModel(),
             'rounds wins over a listed model' => $this->roundsWins(),
@@ -320,9 +321,22 @@ final class LeadEngineCases
     private function askUser(): ?string
     {
         $bench = LeadBench::open();
-        $call = new ToolCall('a', 'ask_user', ['question' => 'Which shop?', 'options' => ['Alpha', 'Beta']]);
-        if ('not_allowed' !== ($this->body($bench->tools->execute($call, $bench->ctx)->json)['error'] ?? null)) {
-            return 'the question was accepted before a run can wait';
+        $bench->lead->script[] = $this->turn(new ToolCall('a', 'ask_user', [
+            'question' => 'Which shop?',
+            'options' => ['Alpha', 'Beta'],
+        ]));
+        if ('wait_answer' !== $bench->stage->run($bench->ctx)->next) {
+            return 'the question did not wait';
+        }
+        if (ResearchStatus::WaitingAnswer !== $bench->ctx->state->status || [] !== $bench->search->queries) {
+            return 'the question searched or kept a worker';
+        }
+        $again = $bench->tools->execute(new ToolCall('b', 'ask_user', [
+            'question' => 'Which year?',
+            'options' => ['2025', '2026'],
+        ]), $bench->ctx);
+        if ('not_allowed' !== ($this->body($again->json)['error'] ?? null)) {
+            return 'a second question was accepted after the budget was used';
         }
 
         return null;

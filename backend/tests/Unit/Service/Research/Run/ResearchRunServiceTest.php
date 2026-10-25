@@ -141,6 +141,77 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         ]);
     }
 
+    public function testAnAnswerContinuesAndASecondQuestionKeepsWaiting(): void
+    {
+        $opened = $this->runs->start($this->user, $this->body(), true, null);
+        $questions = \App\Service\Research\Run\ResearchQuestion::collect([
+            ['text' => 'Which year?', 'options' => ['2025', '2026'], 'allow_text' => false],
+            ['text' => 'Which shop?', 'options' => ['Alpha', 'Beta'], 'allow_text' => true],
+        ], 2);
+        $waiting = new ResearchRunState($opened->ref, ResearchStatus::WaitingAnswer, $opened->ledger, $opened->budget, 2, 1);
+        $waiting->questions = new \App\Service\Research\Run\ResearchQuestions($questions, ResearchUnitPlan::BRIEF_PLAN, ResearchStatus::Planning->value);
+        $this->store->save($waiting);
+
+        $still = $this->runs->input($this->user, $opened->ref->id, ['type' => 'answer', 'question' => 'q1', 'choice' => '2026']);
+
+        self::assertSame(ResearchStatus::WaitingAnswer, $still->status);
+        self::assertCount(1, $this->bus->sent);
+
+        $next = $this->runs->input($this->user, $opened->ref->id, ['type' => 'skip_question', 'question' => 'q2']);
+
+        self::assertSame(ResearchStatus::Planning, $next->status);
+        self::assertSame(ResearchUnitPlan::BRIEF_PLAN, $this->bus->sent[1]['unit']);
+        self::assertSame('2026', $next->replies[0]['answer']);
+        self::assertSame('Skipped', $next->replies[1]['answer']);
+    }
+
+    public function testAnEditedPlanKeepsTheNamedPointAndAddsTheNewOne(): void
+    {
+        $opened = $this->runs->start($this->user, $this->body(), true, null);
+        $opened->ledger->addPoint('Unit price');
+        $opened->ledger->addPoint('Warranty');
+        $waiting = new ResearchRunState($opened->ref, ResearchStatus::WaitingPlan, $opened->ledger, $opened->budget, 2, 1);
+        $this->store->save($waiting);
+
+        $state = $this->runs->input($this->user, $opened->ref->id, ['type' => 'edit_plan', 'points' => [
+            ['id' => 'p1', 'title' => 'Net price'],
+            ['title' => 'Delivery times'],
+        ]]);
+
+        self::assertSame(ResearchStatus::Gathering, $state->status);
+        self::assertSame(['Net price', 'Delivery times'], array_map(
+            static fn (\App\Service\Research\Run\Ledger\PlanPoint $point): string => $point->title,
+            $state->ledger->points(),
+        ));
+        self::assertSame(ResearchUnitPlan::ROUND, $this->bus->sent[1]['unit']);
+    }
+
+    public function testWriteNowOnAWaitingPlanGoesToTheReport(): void
+    {
+        $opened = $this->runs->start($this->user, $this->body(), true, null);
+        $waiting = new ResearchRunState($opened->ref, ResearchStatus::WaitingPlan, $opened->ledger, $opened->budget, 2, 1);
+        $this->store->save($waiting);
+
+        $state = $this->runs->input($this->user, $opened->ref->id, ['type' => 'stop_gathering']);
+
+        self::assertSame(ResearchStatus::Writing, $state->status);
+        self::assertTrue($this->store->writeNowRequested($opened->ref->id));
+        self::assertSame(ResearchUnitPlan::WRITE, $this->bus->sent[1]['unit']);
+    }
+
+    public function testWriteNowWhileGatheringOnlyRaisesTheFlag(): void
+    {
+        $opened = $this->runs->start($this->user, $this->body(), true, null);
+        $gathering = new ResearchRunState($opened->ref, ResearchStatus::Gathering, $opened->ledger, $opened->budget, 2, 1);
+        $this->store->save($gathering);
+
+        $state = $this->runs->input($this->user, $opened->ref->id, ['type' => 'stop_gathering']);
+
+        self::assertSame(ResearchStatus::Gathering, $state->status);
+        self::assertTrue($this->store->writeNowRequested($opened->ref->id));
+        self::assertCount(1, $this->bus->sent);
+    }
+
     public function testAFollowUpKeepsTheParent(): void
     {
         $started = $this->runs->start($this->user, $this->body(), true, null);

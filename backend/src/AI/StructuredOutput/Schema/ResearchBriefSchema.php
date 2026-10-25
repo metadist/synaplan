@@ -7,8 +7,8 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * What the sorter returns for tools:research_brief. Questions are accepted
- * and stored later; this step does not wait for an answer.
+ * What the sorter returns for tools:research_brief. Questions in ambiguity
+ * are asked when the depth still has question budget left.
  */
 final class ResearchBriefSchema
 {

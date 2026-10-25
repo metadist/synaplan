@@ -169,6 +169,59 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertSame([], $this->events->replay($waiting->ref->id, 0));
     }
 
+    public function testALeadQuestionSkippedAfterTenMinutesResumesTheRound(): void
+    {
+        $waiting = $this->waiting(ResearchStatus::WaitingAnswer);
+        $question = \App\Service\Research\Run\ResearchQuestion::collect([
+            ['text' => 'Which shop?', 'options' => ['Alpha', 'Beta']],
+        ], 1)[0];
+        $waiting->questions = new \App\Service\Research\Run\ResearchQuestions(
+            [$question],
+            ResearchUnitPlan::ROUND,
+            ResearchStatus::Gathering->value,
+            'a',
+        );
+        $waiting->conversation->append('', [[
+            'id' => 'a',
+            'type' => 'function',
+            'function' => ['name' => 'ask_user', 'arguments' => '{}'],
+        ]], [[
+            'id' => 'a',
+            'name' => 'ask_user',
+            'content' => '{"pending":true}',
+        ]]);
+        $this->store->save($waiting);
+        $this->age($waiting, 601);
+
+        $this->reaper(new ScriptedResearchUnits(new StageResult('round')))->reap();
+
+        $loaded = $this->store->load($waiting->ref->id);
+        self::assertSame(ResearchStatus::Gathering, $loaded?->status);
+        self::assertSame(ResearchUnitPlan::ROUND, $this->bus->sent[0]['unit'] ?? null);
+        self::assertSame('Skipped', $loaded->replies[0]['answer'] ?? null);
+        $content = $loaded->conversation->turns()[0]['results'][0]['content'] ?? '';
+        self::assertSame('{"skipped":true}', $content);
+    }
+
+    public function testAStepWaitingForAWorkerSaysSoAfterTwentySeconds(): void
+    {
+        $state = $this->openRun();
+        $this->age($state, ResearchReaper::QUEUE_AFTER_SECONDS);
+        $reaper = $this->reaper(new ScriptedResearchUnits(new StageResult('gather')));
+
+        $reaper->reap();
+        $first = $this->events->replay($state->ref->id, 0);
+        self::assertSame('queued', $first[0]['event'] ?? null);
+        self::assertSame(ResearchReaper::QUEUE_AFTER_SECONDS, $first[0]['data']['since_seconds'] ?? null);
+
+        $reaper->reap();
+        self::assertCount(1, $this->events->replay($state->ref->id, 0));
+
+        $this->clock->sleep(ResearchReaper::QUEUE_AFTER_SECONDS);
+        $reaper->reap();
+        self::assertCount(2, $this->events->replay($state->ref->id, 0));
+    }
+
     public function testAnUnconfirmedPlanStopsAfterADay(): void
     {
         $waiting = $this->waiting(ResearchStatus::WaitingPlan);

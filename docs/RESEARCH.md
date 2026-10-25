@@ -58,11 +58,14 @@ pay for another round and the report. A point the run calls answered
 without a finding stays open.
 
 When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
-uses that same round to call search, read or finish itself. The list is
+uses that same round to call search, read, ask or finish itself. The list is
 empty until a model passes the conformance suite, so a run keeps judging
 the round. Each tool stops at the budget and returns a short result, never
-the page. Asking the person is refused until a run can wait for the answer.
-Research as a whole stays off until `RESEARCH.ENABLED` is turned on.
+the page. A question, and a thorough plan, wait with no worker. An open
+question is skipped after 10 minutes and the run continues. A plan that is
+not confirmed within a day stops. Write now ends the search and writes the
+report from what was already found. Research as a whole stays off until
+`RESEARCH.ENABLED` is turned on.
 
 The conformance suite plays ten scenarios twice against one model — start
 with a search, search in parallel, read what was found, react to a refused

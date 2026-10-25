@@ -10,9 +10,12 @@ use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
 use App\Service\Research\Run\ResearchCapabilities;
 use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\ResearchReaper;
 use App\Service\Research\Run\ResearchReportDelivery;
 use App\Service\Research\Run\ResearchRunService;
+use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStateStore;
+use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchStoreUnavailable;
 
 /**
@@ -58,13 +61,24 @@ final class ResearchModule implements FeatureModuleInterface
             return ModuleStatus::absent('Research is turned off');
         }
         try {
-            $active = count($this->store->activeRuns());
+            $runs = $this->store->activeRuns();
         } catch (ResearchStoreUnavailable) {
             return new ModuleStatus(
                 configured: true,
                 healthy: false,
                 message: 'Research is on, but its store did not answer',
             );
+        }
+        $active = count($runs);
+        foreach ($runs as $run) {
+            if ($this->workerQuiet($run)) {
+                return new ModuleStatus(
+                    configured: true,
+                    healthy: false,
+                    message: 'No worker has picked up research units for 5 minutes.',
+                    details: ['active' => $active],
+                );
+            }
         }
 
         return new ModuleStatus(
@@ -73,6 +87,19 @@ final class ResearchModule implements FeatureModuleInterface
             message: $active.' research run(s) are in progress',
             details: ['active' => $active],
         );
+    }
+
+    private function workerQuiet(ResearchRunState $run): bool
+    {
+        if ($run->status->isTerminal()
+            || ResearchStatus::WaitingAnswer === $run->status
+            || ResearchStatus::WaitingPlan === $run->status
+            || $this->store->isClaimed($run->ref->id, $run->expectedSeq)) {
+            return false;
+        }
+        $updated = $run->updatedAt ?? $run->ref->createdAt;
+
+        return (new \DateTimeImmutable())->getTimestamp() - $updated->getTimestamp() >= ResearchReaper::QUIET_SECONDS;
     }
 
     public function capabilityIds(): array

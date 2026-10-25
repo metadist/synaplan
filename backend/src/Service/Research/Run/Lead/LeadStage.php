@@ -6,6 +6,7 @@ namespace App\Service\Research\Run\Lead;
 
 use App\AI\ToolCalling\ToolCall;
 use App\Service\Research\Run\ResearchInputBudget;
+use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\Stage\ResearchLeadCaller;
 use App\Service\Research\Run\Stage\ResearchLeadTurn;
@@ -114,10 +115,15 @@ final readonly class LeadStage
                 continue;
             }
             $outcome = $this->tools->execute($call, $ctx);
-            if ($outcome->stop instanceof StageResult) {
+            if ($outcome->stop instanceof StageResult && 'wait_answer' !== $outcome->stop->next) {
                 return $outcome->stop;
             }
             $results[] = $this->result($call, $index, $outcome->json);
+            if ($outcome->stop instanceof StageResult) {
+                $this->closeTurn($ctx, $turn, $rest, $wires, $results, $index);
+
+                return $outcome->stop;
+            }
         }
         $this->remember($ctx, $turn, $wires, $results);
         if (!$ctx->state->budget->canRound()) {
@@ -196,8 +202,37 @@ final readonly class LeadStage
             'READS' => (string) $budget->sourcesLeft(),
             'MINUTES' => (string) intdiv($budget->secondsLeft() + 59, 60),
             'BRIEF' => ResearchPrompts::data(null !== $brief ? $brief->goal : $ctx->state->ref->question),
-            'PLAN' => ResearchPrompts::data([] === $points ? 'none' : implode("\n", $points)),
+            'PLAN' => ResearchPrompts::data($this->planText($ctx, $points)),
         ]);
+    }
+
+    /**
+     * @param list<string> $points
+     */
+    private function planText(StageContext $ctx, array $points): string
+    {
+        $plan = [] === $points ? 'none' : implode("\n", $points);
+        $notes = ResearchNotes::text($ctx->state);
+
+        return '' === $notes ? $plan : $plan."\n".$notes;
+    }
+
+    /**
+     * A question ends the turn. Later calls in the same turn are not run,
+     * and each one still gets a result so the provider accepts the turn.
+     *
+     * @param list<ToolCall>                                         $calls
+     * @param list<array<string, mixed>>                             $wires
+     * @param list<array{id: string, name: string, content: string}> $results
+     */
+    private function closeTurn(StageContext $ctx, ResearchLeadTurn $turn, array $calls, array $wires, array $results, int $asked): void
+    {
+        for ($after = $asked + 1, $afterMax = count($calls); $after < $afterMax; ++$after) {
+            $wires[] = $this->wire($calls[$after], $after);
+            $results[] = $this->result($calls[$after], $after, LeadToolReply::error('not_allowed', $ctx->state->budget));
+        }
+        $this->remember($ctx, $turn, $wires, $results);
+        $this->roundEvent($ctx, 'wait_answer');
     }
 
     /**

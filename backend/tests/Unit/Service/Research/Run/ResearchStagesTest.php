@@ -30,6 +30,7 @@ use App\Service\Research\Run\Stage\GatherChoice;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
 use App\Service\Research\Run\Stage\ReadStage;
+use App\Service\Research\Run\Stage\ReflectStage;
 use App\Service\Research\Run\Stage\ResearchHit;
 use App\Service\Research\Run\Stage\ResearchModelReply;
 use App\Service\Research\Run\Stage\ResearchPage;
@@ -76,6 +77,76 @@ final class ResearchStagesTest extends TestCase
             $events = $ctx->events->replay($ctx->state->ref->id, 0);
             self::assertSame(['brief'], array_column($events, 'event'));
         }
+    }
+
+    public function testAStandardQuestionWaitsBeforeThePlan(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard);
+        $caller->script[] = $this->json([
+            'goal' => 'Was kostet eine Einheit?',
+            'output' => 'answer',
+            'audience' => 'the person asking',
+            'language' => 'de',
+            'time_frame' => null,
+            'region' => null,
+            'must_use' => [],
+            'must_avoid' => [],
+            'ambiguity' => [[
+                'id' => 'q1',
+                'text' => 'Which year?',
+                'options' => ['2025', '2026'],
+                'allow_text' => false,
+            ]],
+        ]);
+
+        $result = (new BriefStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('wait_answer', $result->next);
+        self::assertSame(ResearchStatus::WaitingAnswer, $ctx->state->status);
+        self::assertSame(['brief', 'question'], array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'));
+        self::assertSame(1, $ctx->state->questionsAsked);
+    }
+
+    public function testAThoroughPlanWaitsToBeConfirmed(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Thorough);
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json([
+            'points' => [[
+                'id' => 'x',
+                'title' => 'Unit price',
+                'why' => 'The goal asks for it.',
+                'queries' => [['q' => 'unit price 2026', 'language' => 'en']],
+                'scope' => 'web',
+            ]],
+            'outline' => ['Summary'],
+            'estimate' => ['minutes' => 1, 'cost' => 1],
+        ]);
+
+        $result = (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('wait_plan', $result->next);
+        self::assertSame(ResearchStatus::WaitingPlan, $ctx->state->status);
+        self::assertSame(['plan', 'plan_waiting'], array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'));
+    }
+
+    public function testARoundThatAsksThePersonWaits(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard);
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price');
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = $this->json([
+            'points' => [['id' => 'p1', 'status' => 'open', 'note' => 'Need the shop.']],
+            'actions' => [['type' => 'ask_user', 'question' => 'Which shop?', 'options' => ['Alpha', 'Beta']]],
+            'finish' => null,
+        ]);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('wait_answer', $result->next);
+        self::assertSame(ResearchStatus::WaitingAnswer, $ctx->state->status);
+        self::assertSame('Which shop?', $ctx->state->questions?->items[0]->text);
     }
 
     public function testABrokenBriefIsRetriedOnceThenFailsInPlainWords(): void
@@ -583,15 +654,15 @@ final class ResearchStagesTest extends TestCase
     /**
      * @return array{0: StageContext, 1: ReplayCaller}
      */
-    private function open(): array
+    private function open(ResearchDepth $depth = ResearchDepth::Quick): array
     {
         $created = new \DateTimeImmutable('2026-10-24T09:00:00+00:00');
         $clock = new MockClock($created);
         $keys = new MemoryResearchRunKeys($clock);
         $store = new ResearchStateStore($keys, $clock);
         $state = ResearchRunState::open(
-            ResearchRunRef::start(7, ResearchDepth::Quick, 'What does one unit cost?', null, $created),
-            $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $created),
+            ResearchRunRef::start(7, $depth, 'What does one unit cost?', null, $created),
+            $budget = ResearchBudget::for($depth, ResearchBudgetConfig::defaults($depth), $created),
         );
         $budget->at($created);
         $store->save($state);
