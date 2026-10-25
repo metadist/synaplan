@@ -706,6 +706,11 @@ run_scheduler_hourly_lane() {
     # Synaplan Demo: delivers a key revoke the server missed when the admin
     # left. A no-op (no network call) unless a revoke is pending.
     run_scheduler_job 900 bin/console --env="$env" app:freeapi:maintain --no-interaction
+
+    # Sign-ups that chose a plan and are still unpaid after 7 days are
+    # deleted through the regular erasure path. A no-op unless admission
+    # mode created pending accounts.
+    run_scheduler_job 900 bin/console --env="$env" app:signup:reap-pending --no-interaction
 }
 
 # shellcheck disable=SC2317

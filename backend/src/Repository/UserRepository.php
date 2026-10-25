@@ -173,6 +173,30 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
+     * Pending-payment sign-ups created before the cutoff, oldest first.
+     *
+     * @param string $createdBefore `Y-m-d H:i:s`, the format sign-up writes to BCREATED
+     *
+     * @return list<User>
+     */
+    public function findPendingPaymentCreatedBefore(string $createdBefore, int $limit): array
+    {
+        /** @var list<User> $users */
+        $users = $this->createQueryBuilder('u')
+            ->where('u.accountStatus = :status')
+            ->andWhere("u.created <> ''")
+            ->andWhere('u.created < :before')
+            ->setParameter('status', User::ACCOUNT_STATUS_PENDING_PAYMENT)
+            ->setParameter('before', $createdBefore)
+            ->orderBy('u.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $users;
+    }
+
+    /**
      * Find user by Stripe customer ID (searches in paymentDetails JSON).
      */
     public function findByStripeCustomerId(string $stripeCustomerId): ?User

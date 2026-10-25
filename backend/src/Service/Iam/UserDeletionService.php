@@ -56,7 +56,19 @@ final readonly class UserDeletionService
 
             $this->em->getConnection()->commit();
         } catch (\Throwable $e) {
-            $this->em->getConnection()->rollBack();
+            // A failed flush may already have ended the transaction; rolling
+            // back again would replace the real cause with NoActiveTransaction.
+            $connection = $this->em->getConnection();
+            if ($connection->isTransactionActive()) {
+                try {
+                    $connection->rollBack();
+                } catch (\Throwable $rollbackError) {
+                    $this->logger->warning('Rollback after a failed user deletion failed', [
+                        'user_id' => $userId,
+                        'error' => $rollbackError->getMessage(),
+                    ]);
+                }
+            }
 
             $this->logger->error('Failed to delete user', [
                 'user_id' => $userId,

@@ -40,6 +40,7 @@ final class ScheduledJobs
             'app:approvals:expire',
             'app:models:discover',
             'app:freeapi:maintain',
+            'app:signup:reap-pending',
         ],
         self::LANE_DAILY => [
             'app:updates:check',

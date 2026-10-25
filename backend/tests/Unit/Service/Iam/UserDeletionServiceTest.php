@@ -24,6 +24,7 @@ final class UserDeletionServiceTest extends TestCase
 {
     /** @var list<string> */
     private array $events = [];
+    private bool $inTransaction = false;
 
     public function testErasersRunInOrderInsideTheTransactionAndCleanupsAfterTheCommit(): void
     {
@@ -101,6 +102,25 @@ final class UserDeletionServiceTest extends TestCase
         self::assertSame(['begin', 'rollback'], $this->events);
     }
 
+    public function testAFlushThatEndedTheTransactionKeepsTheRealCause(): void
+    {
+        $user = $this->user(42, 'ada@example.test');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with('Failed to delete user', self::callback(
+            static fn (array $context): bool => 'Deadlock found' === $context['error'],
+        ));
+
+        $service = new UserDeletionService($this->entityManager($user, new \RuntimeException('Deadlock found')), [], $logger);
+
+        try {
+            $service->deleteUser($user);
+            self::fail('The failure must reach the caller.');
+        } catch (\RuntimeException $e) {
+            self::assertSame('Deadlock found', $e->getMessage());
+        }
+        self::assertSame(['begin', 'remove', 'flush'], $this->events);
+    }
+
     /**
      * @param (\Closure(UserErasure): mixed)|null $behaviour
      */
@@ -126,18 +146,22 @@ final class UserDeletionServiceTest extends TestCase
         return $user;
     }
 
-    private function entityManager(User $user): EntityManagerInterface
+    private function entityManager(User $user, ?\Throwable $flushFailure = null): EntityManagerInterface
     {
         $connection = $this->createStub(Connection::class);
         $connection->method('beginTransaction')->willReturnCallback(function (): void {
             $this->events[] = 'begin';
+            $this->inTransaction = true;
         });
         $connection->method('commit')->willReturnCallback(function (): void {
             $this->events[] = 'commit';
+            $this->inTransaction = false;
         });
         $connection->method('rollBack')->willReturnCallback(function (): void {
             $this->events[] = 'rollback';
+            $this->inTransaction = false;
         });
+        $connection->method('isTransactionActive')->willReturnCallback(fn (): bool => $this->inTransaction);
 
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getConnection')->willReturn($connection);
@@ -145,8 +169,13 @@ final class UserDeletionServiceTest extends TestCase
             self::assertSame($user, $entity);
             $this->events[] = 'remove';
         });
-        $em->method('flush')->willReturnCallback(function (): void {
+        $em->method('flush')->willReturnCallback(function () use ($flushFailure): void {
             $this->events[] = 'flush';
+            if (null !== $flushFailure) {
+                // The driver ended the transaction along with the failed statement.
+                $this->inTransaction = false;
+                throw $flushFailure;
+            }
         });
 
         return $em;
