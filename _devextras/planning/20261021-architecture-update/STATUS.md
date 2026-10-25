@@ -15,7 +15,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
 | 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
 | 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | merged (`5e7a4ebdd`) | watchdog on `:8098`; `capacity:server:{id}` every 5 s with place and log source. No relay. Not rolled out |
-| 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | in review | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33) |
+| 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | in review | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
+| 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | in review | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
 
 ## Baselines
 
@@ -28,6 +29,62 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-24 — AU7: capacity of every server on the system status page
+
+**Where it is.** Admin › Capacity, one click from System status in the
+Operate list (U2, U6). `GET /api/v1/admin/capacity/servers` reads the
+seen-list and every snapshot from Redis in one request; `served_by` names
+the answering server, the same value every response now carries in the
+`X-Synaplan-Server` header beside `X-Request-Id`. The `capacity` feature
+module is configured while `SYNAPLAN_WATCHDOG` is not `0`: off ⇒ no nav
+entry, the route is the not-found page, the API answers the module gate's
+404 (U11). The minimal lane sets it to `0`.
+
+**The card.** AI answers and other requests as "n of m at once" with
+today's peak and its time (from the watchdog's day peak), memory and
+processor against their limits, a sizing sentence once the peak reached
+80 % of the slots, and under Technical details: where the server runs
+(Docker on synweb100 · pod · deployment · namespace · declared resources),
+the PHP pools, the version, and the log row with the one command built from
+the watchdog's facts (`docker logs <hostname>`, `kubectl logs -n <ns> <pod>
+-c <container>`) plus **Open recent events**, which opens the event ring
+filtered by the server's `event_ring_host` and read through the authenticated client, so the native app's Bearer session works like a cookie; the ring's own page stays with AU33. Workers and
+the scheduler attach to the web server of their machine (same `place.host`,
+or the `-worker` / `-bulk` / `-scheduler` id the platform compose gives
+them) as compact rows; one with no web server of its own is a card with a
+role chip and no AI bars. A silent server keeps its card, greyed, with
+"Last report n min ago — the server may be down or restarting". An id whose
+last report has expired (a week) is not a card: there is nothing to show.
+The owner's first look on 2026-10-25 found two of my seeded walk entries
+drawn as zeroed web cards; the seeds are removed and the rule is the fix.
+
+**Walked (J-AU-2)** on the dev stack as `admin@synaplan.com`, with two
+seeded reports beside the real one (a silent `web2`, a `web1-worker`, a
+day peak of 14 of 16): the Operate entry appeared next to System status;
+the real server's card said "You are connected to this server." and
+"Reporting"; the seeded peak produced the sizing sentence; Technical
+details read "Docker" and `docker logs 965a483f0450`; the worker rendered
+as a role card without AI bars; `web2` greyed with its last report. Light
+and dark read; at 320 px the page has no horizontal overflow
+(`scrollWidth` 320) and every reading wraps. The light-mode walk found the
+peak note overflowing its column and a worker rendered as a web card; both
+fixed before the spec was written.
+
+**Gate.** PHPStan, deptrac, php-cs-fixer clean; module tests, the
+capacity service, the identity and the event-ring host filter are unit
+tested; the frontend ratchet made the route and the nav entry modules of
+their own (`router/capacityRoute.ts`, `composables/useCapacityNav.ts`);
+`capacityFacts.spec.ts` covers the log command, grouping and the hint;
+`capacity.spec.ts` (@ci) walks the real endpoint and the header, a mocked
+three-server cluster, and the 503 state; `minimal-stack.spec.ts` asserts
+the absent state. Five locales (`capacity.*`, `modules.capacity.label`,
+`nav.adminCapacity`, `pageTitles.adminCapacity`).
+
+**Carried.** "Busy answers today" (Caddy's 503 count) and the 24-hour
+sparkline stay with AU33's request timeline, which also gives the event ring its page.
 
 ---
 

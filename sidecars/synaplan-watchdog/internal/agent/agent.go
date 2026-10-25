@@ -98,6 +98,7 @@ func (a *Agent) Tick(ctx context.Context, now time.Time) capacity.Snapshot {
 		snap.CPULimited = facts.CPULimited
 		snap.Place = capacity.Place{
 			Host:        facts.Host,
+			Address:     facts.Address,
 			Pod:         facts.Pod,
 			Namespace:   facts.Namespace,
 			Deployment:  facts.Deployment,

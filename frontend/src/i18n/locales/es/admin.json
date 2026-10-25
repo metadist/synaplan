@@ -1377,6 +1377,9 @@
     },
     "freeapi": {
       "label": "Demo de Synaplan"
+    },
+    "capacity": {
+      "label": "Capacidad de los servidores"
     }
   },
   "partners": {
@@ -1441,6 +1444,80 @@
       "not_partner": "No se encontró esa conexión.",
       "bad_url": "Esa dirección no es un servidor https público.",
       "replay": "Esta solicitud ya se usó."
+    }
+  },
+  "capacity": {
+    "title": "Capacidad",
+    "subtitle": "Qué tan cargado está cada servidor de esta instalación y si alguno necesita ayuda.",
+    "loading": "Leyendo los servidores…",
+    "unavailable": "La capacidad no se puede leer ahora porque la caché compartida no responde. Los servidores siguen funcionando.",
+    "failed": "No se pudieron leer los servidores. Inténtelo de nuevo en un momento.",
+    "empty": "Ningún servidor ha informado todavía — los servidores informan en el primer minuto tras arrancar.",
+    "checkAgain": "Comprobar de nuevo",
+    "footer": "Solo los administradores ven esta página. Nada aquí cambia un servidor.",
+    "servers": {
+      "title": "Servidores",
+      "summary": "{count} servidor · actualizado hace {seconds} s | {count} servidores · actualizado hace {seconds} s",
+      "connectedTo": "Está conectado a {server}",
+      "owner": "Cada servidor de esta instalación informa aquí.",
+      "source": "Cada servidor se mide a sí mismo cada 5 segundos y conserva 24 horas."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Trabajo en segundo plano",
+      "scheduler": "Tareas programadas"
+    },
+    "card": {
+      "connectedHere": "Está conectado a este servidor.",
+      "reporting": "Informando",
+      "silentSeconds": "Último informe hace {count} s",
+      "silentMinutes": "Último informe hace {count} min — el servidor puede estar apagado o reiniciándose",
+      "silentUnknown": "Dejó de informar",
+      "aiAnswers": "Respuestas de IA",
+      "otherRequests": "Otras solicitudes",
+      "memory": "Memoria",
+      "processor": "Procesador",
+      "ofAtOnce": "{used} de {total} a la vez",
+      "noPools": "sin grupos separados",
+      "peakToday": "pico de hoy {count} ({time})",
+      "memoryOf": "{used} de {total}",
+      "memoryUnlimited": "{used} · sin límite",
+      "processorOf": "{percent} % de {cores} núcleos",
+      "processorMeasuring": "midiendo · {cores} núcleos",
+      "processorShort": "{percent} %",
+      "sizingHint": "En su pico de hoy, {server} respondió {peak} de las {total} solicitudes de IA que puede atender a la vez. Añada un servidor o aumente sus plazas de respuesta de IA — la guía de dimensionado muestra cómo.",
+      "technical": "Detalles técnicos",
+      "runsOn": "Se ejecuta en",
+      "workers": "PHP",
+      "logs": "Registros",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} plazas de respuesta de IA + {api} plazas de solicitud",
+      "poolsSingle": "un grupo de {count} hilos",
+      "logsStderr": "la salida de error del proceso",
+      "howToStop": "Un servidor deja de informar cuando su watchdog está apagado (SYNAPLAN_WATCHDOG=0).",
+      "helperSilent": "dejó de informar",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Directamente en la máquina"
+      },
+      "place": {
+        "machine": "máquina {name}",
+        "address": "dirección {address}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "límite de memoria {value}",
+        "cpuRequest": "procesador solicitado {value}"
+      }
+    },
+    "events": {
+      "open": "Mostrar eventos recientes",
+      "hide": "Ocultar eventos recientes",
+      "loading": "Leyendo eventos…",
+      "failed": "No se pudieron leer los eventos.",
+      "empty": "Sin avisos de este servidor en la última hora.",
+      "window": "Avisos y errores de la última hora, los más recientes primero, como máximo 20."
     }
   }
 }

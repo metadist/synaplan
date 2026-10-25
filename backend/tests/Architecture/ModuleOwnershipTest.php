@@ -55,6 +55,7 @@ final class ModuleOwnershipTest extends TestCase
         'chat_artifacts',
         'research',
         'freeapi',
+        'capacity',
     ];
 
     /**
@@ -75,6 +76,8 @@ final class ModuleOwnershipTest extends TestCase
             'LOG_FORMAT',
             'REDIS_DSN',
             'SYNAPLAN_PLATFORM',
+            // The server's name in the X-Synaplan-Server header on every response; the capacity module only reads the same name.
+            'SYNAPLAN_SERVER_ID',
             // Set by Kubernetes itself; tells the readiness list not to name compose commands.
             'KUBERNETES_SERVICE_HOST',
             'BOOTSTRAP_ADMIN_EMAIL',
@@ -239,7 +242,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(20, self::MODULE_IDS);
+        $this->assertCount(21, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

@@ -1381,6 +1381,9 @@
     },
     "freeapi": {
       "label": "Synaplan Demo"
+    },
+    "capacity": {
+      "label": "Server capacity"
     }
   },
   "partners": {
@@ -1445,6 +1448,80 @@
       "not_partner": "That connection was not found.",
       "bad_url": "That address is not a public https server.",
       "replay": "This request was already used."
+    }
+  },
+  "capacity": {
+    "title": "Capacity",
+    "subtitle": "How loaded each server of this installation is, and whether one needs help.",
+    "loading": "Reading the servers…",
+    "unavailable": "Capacity cannot be read right now because the shared cache does not answer. The servers keep working.",
+    "failed": "The servers could not be read. Try again in a moment.",
+    "empty": "No server has reported yet — servers report within a minute after they start.",
+    "checkAgain": "Check again",
+    "footer": "Only administrators see this page. Nothing here changes a server.",
+    "servers": {
+      "title": "Servers",
+      "summary": "{count} server · updated {seconds} s ago | {count} servers · updated {seconds} s ago",
+      "connectedTo": "You are connected to {server}",
+      "owner": "Every server of this installation reports here.",
+      "source": "Each server measures itself every 5 seconds and keeps 24 hours."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Background work",
+      "scheduler": "Scheduled jobs"
+    },
+    "card": {
+      "connectedHere": "You are connected to this server.",
+      "reporting": "Reporting",
+      "silentSeconds": "Last report {count} s ago",
+      "silentMinutes": "Last report {count} min ago — the server may be down or restarting",
+      "silentUnknown": "Stopped reporting",
+      "aiAnswers": "AI answers",
+      "otherRequests": "Other requests",
+      "memory": "Memory",
+      "processor": "Processor",
+      "ofAtOnce": "{used} of {total} at once",
+      "noPools": "no separate pools",
+      "peakToday": "peak today {count} ({time})",
+      "memoryOf": "{used} of {total}",
+      "memoryUnlimited": "{used} · no limit",
+      "processorOf": "{percent} % of {cores} cores",
+      "processorMeasuring": "measuring · {cores} cores",
+      "processorShort": "{percent} %",
+      "sizingHint": "At its peak today {server} answered {peak} of the {total} AI requests it can hold at once. Add a server or raise its AI answer slots — the sizing guide shows how.",
+      "technical": "Technical details",
+      "runsOn": "Runs on",
+      "workers": "PHP",
+      "logs": "Logs",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} AI answer slots + {api} request slots",
+      "poolsSingle": "one pool of {count} threads",
+      "logsStderr": "the process's error output",
+      "howToStop": "A server stops reporting when its watchdog is turned off (SYNAPLAN_WATCHDOG=0).",
+      "helperSilent": "stopped reporting",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Directly on the machine"
+      },
+      "place": {
+        "machine": "machine {name}",
+        "address": "address {address}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "memory limit {value}",
+        "cpuRequest": "processor request {value}"
+      }
+    },
+    "events": {
+      "open": "Show recent events",
+      "hide": "Hide recent events",
+      "loading": "Reading events…",
+      "failed": "The events could not be read.",
+      "empty": "No warnings from this server in the last hour.",
+      "window": "Warnings and errors of the last hour, newest first, at most 20."
     }
   }
 }

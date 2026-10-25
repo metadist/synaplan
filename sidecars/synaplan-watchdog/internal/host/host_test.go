@@ -14,12 +14,16 @@ func TestReadComposeCgroup(t *testing.T) {
 	writeFile(t, root, "sys/fs/cgroup/cpu.max", "800000 100000\n")
 	writeFile(t, root, "sys/fs/cgroup/cpu.stat", "usage_usec 5000000\nnr_periods 1\n")
 
-	env := map[string]string{"SYNAPLAN_HOST_NAME": "synweb100", "SYNAPLAN_ROLE": "web"}
+	env := map[string]string{
+		"SYNAPLAN_HOST_NAME":    "synweb100",
+		"SYNAPLAN_ROLE":         "web",
+		"SYNAPLAN_NODE_ADDRESS": "10.0.0.2",
+	}
 	facts := Read(root, func(key string) string { return env[key] })
 	if facts.Runtime != "compose" || facts.LogCollector != "docker" {
 		t.Fatalf("runtime = %s collector = %s", facts.Runtime, facts.LogCollector)
 	}
-	if facts.Host != "synweb100" || facts.Role != "web" || facts.Hostname == "" {
+	if facts.Host != "synweb100" || facts.Address != "10.0.0.2" || facts.Role != "web" || facts.Hostname == "" {
 		t.Fatalf("place = %+v", facts)
 	}
 	if facts.Pod != "" || facts.Deployment != "" {
@@ -70,6 +74,32 @@ func TestReadKubernetesAndProcRSS(t *testing.T) {
 	}
 	if facts.CPURequest != "1" || facts.MemoryRequest != "3Gi" {
 		t.Fatalf("requests = %s %s", facts.CPURequest, facts.MemoryRequest)
+	}
+}
+
+func TestNodeAddressKeepsAMachineAddressAndDropsLoopback(t *testing.T) {
+	root := t.TempDir()
+	cases := []struct{ raw, want string }{
+		{"10.0.0.7", "10.0.0.7"},
+		{" 46.224.110.180 ", "46.224.110.180"},
+		{"2001:db8::1", "2001:db8::1"},
+		{"127.0.0.1", ""},
+		{"::1", ""},
+		{"0.0.0.0", ""},
+		{"169.254.1.1", ""},
+		{"synweb100", ""},
+		{"", ""},
+	}
+	for _, c := range cases {
+		facts := Read(root, func(key string) string {
+			if key == "SYNAPLAN_NODE_ADDRESS" {
+				return c.raw
+			}
+			return ""
+		})
+		if facts.Address != c.want {
+			t.Errorf("address %q: got %q, want %q", c.raw, facts.Address, c.want)
+		}
 	}
 }
 

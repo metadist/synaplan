@@ -14,6 +14,7 @@ use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Federation\FederationModule;
+use App\Module\Observability\CapacityModule;
 use App\Module\Provider\FreeApiModule;
 use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
@@ -38,6 +39,7 @@ use App\Service\FreeApi\FreeApiState;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
+use App\Service\Observability\CapacityService;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Security\EncryptionService;
@@ -90,6 +92,8 @@ trait BuildsAllModules
             new ChatArtifactsModule($this->disabledArtifacts()),
             new ResearchModule($this->disabledResearch(), $this->createStub(ResearchStateStore::class)),
             $this->disabledFreeApi(),
+            // '0' is the one value that turns the watchdog off; unset means on.
+            new CapacityModule($this->createStub(CapacityService::class), '0'),
         ];
 
         $byId = [];

@@ -15,6 +15,9 @@ parameters:
     # nothing hard-codes a release number that inevitably drifts.
     app_version_default: 'dev'
 
+    # The capacity watchdog runs unless SYNAPLAN_WATCHDOG is set to 0.
+    synaplan_watchdog_default: '1'
+
     # Deployment platform hint for the release-notice guide link. Optional and
     # additive: an unset (or unknown) value means the self-hosted guide, so
     # nothing breaks when a deployment does not set it. deploy/compose.yaml
@@ -1354,6 +1357,18 @@ services:
     App\Module\Sidecar\LocalAiModule:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
+
+    # The watchdog is on unless SYNAPLAN_WATCHDOG says otherwise, exactly as
+    # the container entrypoint reads it; the module follows the same default.
+    App\Module\Observability\CapacityModule:
+        arguments:
+            $watchdog: '%env(default:synaplan_watchdog_default:SYNAPLAN_WATCHDOG)%'
+
+    # One server name for the capacity card, the X-Synaplan-Server header and
+    # the watchdog: SYNAPLAN_SERVER_ID, else the hostname (contracts §6.1).
+    App\Observability\ServerIdentity:
+        arguments:
+            $configuredId: '%env(default::SYNAPLAN_SERVER_ID)%'
 
     App\Module\Commerce\StripeBillingModule:
         arguments:

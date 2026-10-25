@@ -28,6 +28,7 @@ import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { idsReportedAsDown, servicesNeedingAttention } from '../utils/serviceReadiness'
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
+import { capacityNavEntries } from './useCapacityNav'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -339,9 +340,8 @@ export function useNavItems() {
     }
 
     if (canSeeOperate(authStore.isAdmin)) {
-      // One entry per topic: status pages first, then AI, people and the
-      // remaining platform settings. Model health is a tab of AI
-      // infrastructure, so its badge sits on that entry.
+      // One entry per topic: status pages first, then AI, people and platform
+      // settings. Model health is a tab of AI infrastructure; its badge sits there.
       const badge = (count: number) => (count > 0 ? String(count) : undefined)
       const adminChildren: NavChild[] = [
         {
@@ -357,6 +357,7 @@ export function useNavItems() {
           icon: AdjustmentsHorizontalIcon,
           badge: badge(disabledFeaturesCount.value + servicesDownCount.value),
         },
+        ...capacityNavEntries(t('nav.adminCapacity')),
         {
           key: 'admin-setup',
           path: '/admin/setup',

@@ -1381,6 +1381,9 @@
     },
     "freeapi": {
       "label": "Synaplan-Demo"
+    },
+    "capacity": {
+      "label": "Server-Kapazität"
     }
   },
   "partners": {
@@ -1445,6 +1448,80 @@
       "not_partner": "Diese Verbindung wurde nicht gefunden.",
       "bad_url": "Das ist keine öffentliche https-Adresse.",
       "replay": "Diese Anfrage wurde bereits verwendet."
+    }
+  },
+  "capacity": {
+    "title": "Kapazität",
+    "subtitle": "Wie ausgelastet jeder Server dieser Installation ist und ob einer Hilfe braucht.",
+    "loading": "Server werden gelesen…",
+    "unavailable": "Die Kapazität kann gerade nicht gelesen werden, weil der gemeinsame Cache nicht antwortet. Die Server arbeiten weiter.",
+    "failed": "Die Server konnten nicht gelesen werden. Versuchen Sie es gleich noch einmal.",
+    "empty": "Noch hat kein Server berichtet — Server berichten innerhalb einer Minute nach dem Start.",
+    "checkAgain": "Erneut prüfen",
+    "footer": "Nur Administratoren sehen diese Seite. Nichts hier verändert einen Server.",
+    "servers": {
+      "title": "Server",
+      "summary": "{count} Server · aktualisiert vor {seconds} s | {count} Server · aktualisiert vor {seconds} s",
+      "connectedTo": "Sie sind mit {server} verbunden",
+      "owner": "Jeder Server dieser Installation berichtet hier.",
+      "source": "Jeder Server misst sich alle 5 Sekunden selbst und behält 24 Stunden."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Hintergrundarbeit",
+      "scheduler": "Geplante Aufgaben"
+    },
+    "card": {
+      "connectedHere": "Sie sind mit diesem Server verbunden.",
+      "reporting": "Berichtet",
+      "silentSeconds": "Letzter Bericht vor {count} s",
+      "silentMinutes": "Letzter Bericht vor {count} min — der Server ist vielleicht aus oder startet neu",
+      "silentUnknown": "Berichtet nicht mehr",
+      "aiAnswers": "KI-Antworten",
+      "otherRequests": "Andere Anfragen",
+      "memory": "Speicher",
+      "processor": "Prozessor",
+      "ofAtOnce": "{used} von {total} gleichzeitig",
+      "noPools": "keine getrennten Pools",
+      "peakToday": "Spitze heute {count} ({time})",
+      "memoryOf": "{used} von {total}",
+      "memoryUnlimited": "{used} · kein Limit",
+      "processorOf": "{percent} % von {cores} Kernen",
+      "processorMeasuring": "wird gemessen · {cores} Kerne",
+      "processorShort": "{percent} %",
+      "sizingHint": "In der Spitze hat {server} heute {peak} der {total} KI-Anfragen beantwortet, die er gleichzeitig halten kann. Fügen Sie einen Server hinzu oder erhöhen Sie seine KI-Antwortplätze — der Sizing-Leitfaden zeigt wie.",
+      "technical": "Technische Details",
+      "runsOn": "Läuft auf",
+      "workers": "PHP",
+      "logs": "Logs",
+      "version": "Synaplan {version} · Watchdog {watchdog}",
+      "pools": "{streams} KI-Antwortplätze + {api} Anfrageplätze",
+      "poolsSingle": "ein Pool mit {count} Threads",
+      "logsStderr": "die Fehlerausgabe des Prozesses",
+      "howToStop": "Ein Server berichtet nicht mehr, wenn sein Watchdog abgeschaltet ist (SYNAPLAN_WATCHDOG=0).",
+      "helperSilent": "berichtet nicht mehr",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Direkt auf der Maschine"
+      },
+      "place": {
+        "machine": "Maschine {name}",
+        "address": "Adresse {address}",
+        "pod": "Pod {name}",
+        "deployment": "Deployment {name}",
+        "namespace": "Namespace {name}",
+        "memoryLimit": "Speicherlimit {value}",
+        "cpuRequest": "Prozessoranforderung {value}"
+      }
+    },
+    "events": {
+      "open": "Letzte Ereignisse anzeigen",
+      "hide": "Letzte Ereignisse ausblenden",
+      "loading": "Ereignisse werden gelesen…",
+      "failed": "Die Ereignisse konnten nicht gelesen werden.",
+      "empty": "Keine Warnungen von diesem Server in der letzten Stunde.",
+      "window": "Warnungen und Fehler der letzten Stunde, neueste zuerst, höchstens 20."
     }
   }
 }

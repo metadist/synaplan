@@ -188,6 +188,26 @@
     },
     "modules": [
         {
+            "id": "capacity",
+            "label_key": "modules.capacity.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "SYNAPLAN_WATCHDOG is off",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "SYNAPLAN_WATCHDOG"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/capacity",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "chat_artifacts",
             "label_key": "modules.chat_artifacts.label",
             "state": "absent",
