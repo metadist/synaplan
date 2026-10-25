@@ -307,7 +307,13 @@ export const useAuthStore = defineStore('auth', () => {
     clearError()
 
     try {
-      const result = await authService.register(email, password, challengeToken, language, admission)
+      const result = await authService.register(
+        email,
+        password,
+        challengeToken,
+        language,
+        admission
+      )
 
       if (result.success) {
         return { success: true, mailDelivered: result.mailDelivered !== false }

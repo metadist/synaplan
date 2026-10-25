@@ -146,9 +146,6 @@ final readonly class OAuthSignupGate
         if (null !== $existing) {
             return;
         }
-        if ($this->protection->isSignupPaused()) {
-            throw SignupBlockedException::paused();
-        }
         if (!$verifiedNative && $this->protection->challengeRequired() && true !== ($statePayload[self::STATE_HUMAN] ?? false)) {
             throw SignupBlockedException::challengeRequired();
         }

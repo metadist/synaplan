@@ -546,7 +546,9 @@ const admissionChoiceLabel = computed(() => {
 })
 
 function onAdmissionContinue(choice: { plan: string | null; code: string }) {
-  admissionChoice.value = choice.plan ? { plan: choice.plan, code: '' } : { plan: null, code: choice.code }
+  admissionChoice.value = choice.plan
+    ? { plan: choice.plan, code: '' }
+    : { plan: null, code: choice.code }
 }
 // Native OAuth errors surface through the same banner as registration errors.
 // Provider catalogue + the provider round trip live in the shared composable.

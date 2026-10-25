@@ -49,12 +49,7 @@ function submit() {
       {{ t('auth.admission.nativeNote') }}
     </p>
 
-    <div
-      v-else
-      role="radiogroup"
-      :aria-label="t('auth.admission.plansLabel')"
-      class="space-y-2"
-    >
+    <div v-else role="radiogroup" :aria-label="t('auth.admission.plansLabel')" class="space-y-2">
       <button
         v-for="plan in plans"
         :key="plan.id"
