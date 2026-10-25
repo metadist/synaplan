@@ -104,7 +104,7 @@
         {{ $t('admin.users.noUsers') }}
       </div>
       <div v-else>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto table-stack">
           <table class="w-full">
             <thead>
               <tr class="border-b border-light-border/30 dark:border-dark-border/20">
@@ -147,10 +147,10 @@
                 :key="user.id"
                 class="border-b border-light-border/30 dark:border-dark-border/20 hover:bg-black/5 dark:hover:bg-white/5"
               >
-                <td class="py-3 px-4 txt-secondary text-sm">#{{ user.id }}</td>
+                <td class="py-3 px-4 txt-secondary text-sm" data-label="ID">#{{ user.id }}</td>
                 <td class="py-3 px-4">
-                  <div class="flex items-center gap-2">
-                    <span class="txt-primary">{{ user.email || 'N/A' }}</span>
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                    <span class="txt-primary break-words min-w-0">{{ user.email || 'N/A' }}</span>
                     <Icon
                       v-if="user.emailVerified"
                       icon="mdi:check-decagram"
@@ -166,7 +166,7 @@
                     </span>
                   </div>
                 </td>
-                <td class="py-3 px-4">
+                <td class="py-3 px-4" :data-label="$t('admin.users.level')">
                   <select
                     :value="user.level"
                     class="px-3 py-1.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
@@ -184,9 +184,16 @@
                     <option value="ADMIN">ADMIN</option>
                   </select>
                 </td>
-                <td class="py-3 px-4 txt-secondary text-sm">{{ user.type }}</td>
-                <td class="py-3 px-4 txt-secondary text-sm">{{ user.providerId }}</td>
-                <td v-if="showIamColumns" class="py-3 px-4">
+                <td class="py-3 px-4 txt-secondary text-sm" :data-label="$t('admin.users.type')">
+                  {{ user.type }}
+                </td>
+                <td
+                  class="py-3 px-4 txt-secondary text-sm"
+                  :data-label="$t('admin.users.provider')"
+                >
+                  {{ user.providerId }}
+                </td>
+                <td v-if="showIamColumns" class="py-3 px-4" :data-label="$t('people.users.groups')">
                   <div class="flex flex-wrap gap-1">
                     <span v-for="group in user.groups ?? []" :key="group.id" class="pill text-xs">
                       {{ group.name }}
@@ -196,7 +203,11 @@
                     >
                   </div>
                 </td>
-                <td v-if="showIamColumns" class="py-3 px-4">
+                <td
+                  v-if="showIamColumns"
+                  class="py-3 px-4"
+                  :data-label="$t('people.users.identities')"
+                >
                   <div class="flex flex-wrap gap-1">
                     <span v-for="badge in user.identities ?? []" :key="badge" class="pill text-xs">
                       {{ badge }}
@@ -208,11 +219,14 @@
                     >
                   </div>
                 </td>
-                <td class="py-3 px-4 txt-secondary text-sm">
+                <td class="py-3 px-4 txt-secondary text-sm" :data-label="$t('admin.users.created')">
                   {{ formatDate(user.created) }}
                 </td>
-                <td class="py-3 px-4 text-right">
-                  <div v-if="user.id !== currentUserId" class="flex items-center justify-end gap-1">
+                <td class="py-3 px-4 text-right" :data-label="$t('admin.users.actions')">
+                  <div
+                    v-if="user.id !== currentUserId"
+                    class="flex flex-wrap items-center justify-end gap-1"
+                  >
                     <button
                       class="icon-ghost p-2 rounded-xl text-warning disabled:opacity-50"
                       :title="
