@@ -52,6 +52,7 @@ final class LeadConversation
         $clear = $this->overBudget($inputBudgetTokens);
         $last = count($this->turns) - 1;
         $messages = [];
+        $reminded = null === $this->reminder;
         foreach ($this->turns as $index => $turn) {
             $messages[] = [
                 'role' => 'assistant',
@@ -67,8 +68,13 @@ final class LeadConversation
                     'content' => $content,
                 ];
             }
+            // The reminder answers the first turn without a tool call, so two assistant messages never follow each other.
+            if (!$reminded && [] === $turn['calls']) {
+                $messages[] = ['role' => 'user', 'content' => $this->reminder];
+                $reminded = true;
+            }
         }
-        if (null !== $this->reminder) {
+        if (!$reminded && null !== $this->reminder) {
             $messages[] = ['role' => 'user', 'content' => $this->reminder];
         }
 

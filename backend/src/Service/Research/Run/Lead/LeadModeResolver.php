@@ -8,8 +8,8 @@ use App\Service\Research\Run\ResearchDepth;
 
 /**
  * Picks tool mode or round mode. `auto` uses tool mode only for a listed
- * model on a run that has rounds. A quick run stays in round mode unless
- * an administrator forces tools. The list is empty until a model passes
+ * model on a run that has rounds. A quick run has no lead rounds, so it
+ * stays in round mode even when tools are forced. The list is empty until a model passes
  * the conformance suite, so the default is round mode.
  */
 final readonly class LeadModeResolver
@@ -30,13 +30,13 @@ final readonly class LeadModeResolver
      */
     public function decide(string $mode, array $models, ?string $modelKey, ResearchDepth $depth): LeadMode
     {
-        if ('rounds' === $mode) {
+        if ('rounds' === $mode || ResearchDepth::Quick === $depth) {
             return LeadMode::Rounds;
         }
         if ('tools' === $mode) {
             return LeadMode::Tools;
         }
-        if (ResearchDepth::Quick === $depth || null === $modelKey) {
+        if (null === $modelKey) {
             return LeadMode::Rounds;
         }
 

@@ -72,7 +72,8 @@ final readonly class ReadStage implements ResearchStage
 
     /**
      * Reads the named sources and returns the cards from this call.
-     * A stop from the reader ends the run before the next source.
+     * A stop from the reader ends the run before the next source. A budget
+     * that runs out mid-list goes to the writer, so what was read is kept.
      *
      * @param list<string> $ids
      *
@@ -83,6 +84,11 @@ final readonly class ReadStage implements ResearchStage
         $cards = [];
         $blocked = [];
         foreach ($ids as $id) {
+            if (!$ctx->state->budget->canCall()) {
+                $ctx->state->advance(ResearchStatus::Writing);
+
+                return new StageResult('write');
+            }
             $source = $ctx->state->ledger->source($id);
             if (null === $source || null === $source->url) {
                 $blocked[] = ['id' => $id, 'reason' => 'That source cannot be read.'];
