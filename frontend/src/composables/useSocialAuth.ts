@@ -90,7 +90,9 @@ export function useSocialAuth() {
         }
         const result = appleSheet
           ? await startNativeAppleSignIn(admission)
-          : await startNativeOAuth(provider, challenge, admission)
+          : admission
+            ? await startNativeOAuth(provider, challenge, admission)
+            : await startNativeOAuth(provider, challenge)
         if (!result.success) {
           // A user-dismissed browser is a silent cancellation, not an error.
           if (!result.cancelled) {

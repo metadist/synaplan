@@ -482,7 +482,7 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 import { useSocialAuth } from '@/composables/useSocialAuth'
 import { consumePendingRedirect, isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
 import RegisterAdmissionStep from '@/components/auth/RegisterAdmissionStep.vue'
-import { subscriptionApi } from '@/services/api/subscriptionApi'
+import { useRegisterAdmission } from '@/composables/useRegisterAdmission'
 
 const router = useRouter()
 const route = useRoute()
@@ -526,30 +526,16 @@ const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
 const registrationNeedsAdmin = ref(false)
-const admissionMode = computed(() => config.auth.registrationMode === 'admission')
-const admissionChoice = ref<{ plan: string | null; code: string } | null>(null)
-const admissionPlans = ref<{ id: string; name: string; priceLabel: string }[]>([
-  { id: 'PRO', name: 'Pro', priceLabel: '' },
-  { id: 'TEAM', name: 'Team', priceLabel: '' },
-  { id: 'BUSINESS', name: 'Business', priceLabel: '' },
-])
-const showIdentity = computed(() => !admissionMode.value || admissionChoice.value !== null)
-const initialPlan = computed(() => {
-  const plan = String(route.query.plan || '').toUpperCase()
-  return ['PRO', 'TEAM', 'BUSINESS'].includes(plan) ? plan : null
-})
-const admissionChoiceLabel = computed(() => {
-  const choice = admissionChoice.value
-  if (!choice) return ''
-  if (choice.code) return choice.code
-  return admissionPlans.value.find((plan) => plan.id === choice.plan)?.name || choice.plan || ''
-})
-
-function onAdmissionContinue(choice: { plan: string | null; code: string }) {
-  admissionChoice.value = choice.plan
-    ? { plan: choice.plan, code: '' }
-    : { plan: null, code: choice.code }
-}
+const {
+  admissionMode,
+  admissionChoice,
+  admissionPlans,
+  showIdentity,
+  initialPlan,
+  admissionChoiceLabel,
+  onAdmissionContinue,
+  loadAdmissionPlans,
+} = useRegisterAdmission()
 // Native OAuth errors surface through the same banner as registration errors.
 // Provider catalogue + the provider round trip live in the shared composable.
 const {
@@ -569,23 +555,7 @@ const onEmailBlur = () => {
 
 onMounted(() => {
   loadSocialProviders()
-  if (!admissionMode.value || isNativeApp()) return
-  void subscriptionApi
-    .getPlans()
-    .then((response) => {
-      const next = response.plans
-        .filter((plan) => ['PRO', 'TEAM', 'BUSINESS'].includes(plan.id))
-        .map((plan) => ({
-          id: plan.id,
-          name: plan.name,
-          priceLabel: new Intl.NumberFormat(String(locale.value), {
-            style: 'currency',
-            currency: plan.currency || 'EUR',
-          }).format(plan.price),
-        }))
-      if (next.length > 0) admissionPlans.value = next
-    })
-    .catch(() => undefined)
+  void loadAdmissionPlans()
 })
 
 const handleRegister = async () => {

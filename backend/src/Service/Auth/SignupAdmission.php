@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Service\Auth;
 
 use App\Entity\SignupCode;
+use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SignupCodeRepository;
+use App\Repository\SubscriptionRepository;
+use App\Service\Billing\BillingService;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -23,6 +26,8 @@ final readonly class SignupAdmission
         private RegistrationConfig $registration,
         private SignupCodeRepository $codes,
         private EntityManagerInterface $em,
+        private BillingService $billing,
+        private SubscriptionRepository $subscriptions,
     ) {
     }
 
@@ -45,7 +50,7 @@ final readonly class SignupAdmission
             throw SignupBlockedException::admissionRequired();
         }
         if ($hasPlan) {
-            if (!in_array($plan, self::PLANS, true)) {
+            if (!in_array($plan, self::PLANS, true) || !$this->purchasable($plan)) {
                 throw SignupBlockedException::planInvalid();
             }
 
@@ -97,5 +102,21 @@ final readonly class SignupAdmission
         }
 
         $this->em->flush();
+    }
+
+    /**
+     * A paid plan is purchasable only while checkout is configured and the
+     * operator has not hidden that tier. A missing catalogue row still uses
+     * the built-in plan, matching the public price list.
+     */
+    private function purchasable(string $plan): bool
+    {
+        if (!$this->billing->isEnabled()) {
+            return false;
+        }
+
+        $row = $this->subscriptions->findByLevelAnyState($plan);
+
+        return !$row instanceof Subscription || $row->isActive();
     }
 }

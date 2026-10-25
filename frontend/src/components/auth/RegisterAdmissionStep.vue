@@ -20,7 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const selectedPlan = ref<string | null>(props.initialPlan)
+const selectedPlan = ref<string | null>(props.native ? null : props.initialPlan)
 const code = ref('')
 
 watch(code, (value) => {
@@ -49,7 +49,12 @@ function submit() {
       {{ t('auth.admission.nativeNote') }}
     </p>
 
-    <div v-else role="radiogroup" :aria-label="t('auth.admission.plansLabel')" class="space-y-2">
+    <div
+      v-else-if="plans.length > 0"
+      role="radiogroup"
+      :aria-label="t('auth.admission.plansLabel')"
+      class="space-y-2"
+    >
       <button
         v-for="plan in plans"
         :key="plan.id"
@@ -72,7 +77,7 @@ function submit() {
       </button>
     </div>
 
-    <p v-if="!native" class="my-4 text-center text-xs txt-secondary">
+    <p v-if="!native && plans.length > 0" class="my-4 text-center text-xs txt-secondary">
       {{ t('auth.admission.orCode') }}
     </p>
 

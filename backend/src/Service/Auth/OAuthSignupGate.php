@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Auth;
 
+use App\Entity\SignupCode;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -44,6 +46,7 @@ final readonly class OAuthSignupGate
         private RateLimiterFactoryInterface $oauthSignupNonceLimiter,
         private LoggerInterface $logger,
         private SignupAdmission $admission,
+        private EntityManagerInterface $em,
     ) {
     }
 
@@ -187,17 +190,64 @@ final readonly class OAuthSignupGate
     }
 
     /**
+     * Store the account. A returning user is saved as before. A new account
+     * is inserted, admitted and given its model defaults in one transaction,
+     * so a plan or invitation that fails rolls the user back with it.
+     *
+     * @param array<string, mixed> $state
+     *
+     * @throws SignupBlockedException
+     */
+    public function finishSignIn(User $user, bool $isNewUser, array $state = []): void
+    {
+        $this->em->persist($user);
+        if (!$isNewUser) {
+            $this->em->flush();
+
+            return;
+        }
+
+        try {
+            $this->em->wrapInTransaction(function () use ($user, $state): void {
+                $this->em->flush();
+                $this->enroll($user, $state);
+            });
+        } catch (\Throwable $e) {
+            // The insert was rolled back. Drop it from the identity map so a
+            // later flush in this request cannot write the account anyway.
+            $this->em->clear();
+
+            throw $e;
+        }
+    }
+
+    /**
      * Model defaults, and in admission mode the plan or the invitation code
      * carried in the OAuth state. Open mode ignores that state.
      *
+     * Callers that have not opened a transaction yet should use
+     * {@see finishSignIn()} so a failed admission cannot leave the user row.
+     *
      * @param array<string, mixed> $state
+     *
+     * @throws SignupBlockedException
      */
     public function completeNewUser(User $user, array $state = []): void
+    {
+        $this->enroll($user, $state);
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     *
+     * @throws SignupBlockedException
+     */
+    private function enroll(User $user, array $state): void
     {
         $admission = $this->admission->resolve($this->stateString($state, 'plan'), $this->stateString($state, 'code'));
         if (null !== $admission) {
             $this->admission->apply($user, $admission);
-            if ($admission['code'] instanceof \App\Entity\SignupCode) {
+            if ($admission['code'] instanceof SignupCode) {
                 $this->admission->commitCode($user, $admission['code']);
             }
         }

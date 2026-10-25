@@ -35,7 +35,7 @@ final class SignupBlockedException extends \RuntimeException
     {
         return new self(
             self::CODE_PAUSED,
-            'We are fixing our signup process after some attacks on the platform. Stay tuned.',
+            'Sign-up is paused for the moment. Please try again later.',
             Response::HTTP_SERVICE_UNAVAILABLE,
             0,
         );
@@ -75,7 +75,7 @@ final class SignupBlockedException extends \RuntimeException
     {
         return new self(
             self::CODE_PLAN_INVALID,
-            'Choose Pro, Team, or Business.',
+            'That plan is not available.',
             Response::HTTP_BAD_REQUEST,
             0,
         );

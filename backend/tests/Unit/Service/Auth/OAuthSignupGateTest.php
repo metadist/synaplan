@@ -11,6 +11,7 @@ use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
 use App\Service\ModelConfigService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -150,6 +151,42 @@ final class OAuthSignupGateTest extends TestCase
         $this->gate()->completeNewUser($user);
     }
 
+    public function testANewOAuthAccountIsAdmittedInsideOneTransaction(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $phase = 'before';
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist')->with($user);
+        $em->expects($this->once())->method('flush')->willReturnCallback(function () use (&$phase): void {
+            self::assertSame('inside', $phase);
+        });
+        $em->expects($this->once())->method('wrapInTransaction')->willReturnCallback(function (callable $fn) use (&$phase): void {
+            $phase = 'inside';
+            $fn();
+        });
+        $admission = $this->createMock(SignupAdmission::class);
+        $admission->method('resolve')->willThrowException(SignupBlockedException::codeInvalid());
+
+        $gate = new OAuthSignupGate(
+            $this->protection,
+            $this->users,
+            $this->modelConfig,
+            new RateLimiterFactory([
+                'id' => 'oauth_signup_nonce',
+                'policy' => 'sliding_window',
+                'limit' => 1,
+                'interval' => '10 minutes',
+            ], new InMemoryStorage()),
+            new NullLogger(),
+            $admission,
+            $em,
+        );
+
+        $this->expectException(SignupBlockedException::class);
+        $gate->finishSignIn($user, true, ['code' => 'ABCD2345']);
+    }
+
     private function gate(): OAuthSignupGate
     {
         $nonces = new RateLimiterFactory([
@@ -162,6 +199,6 @@ final class OAuthSignupGateTest extends TestCase
         $admission = $this->createMock(SignupAdmission::class);
         $admission->method('resolve')->willReturn(null);
 
-        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger(), $admission);
+        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger(), $admission, $this->createMock(EntityManagerInterface::class));
     }
 }

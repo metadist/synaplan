@@ -16,7 +16,6 @@ use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
 use App\Service\Auth\TokenService;
-use App\Service\Chat\GuestSessionService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\MailerConfig;
@@ -246,21 +245,6 @@ class AuthController extends AbstractController
             return $this->signupBlocked($e);
         }
 
-        if (GuestSessionService::isReservedProcessorEmail($dto->email)) {
-            $this->logger->warning('Registration attempt with reserved guest-processor email', ['ip' => $request->getClientIp()]);
-
-            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
-        }
-
-        $existingUser = $this->userRepository->findOneBy(['mail' => $dto->email]);
-        if ($existingUser) {
-            // Security: same answer as for a new address, same timing (hash anyway).
-            $this->logger->warning('Registration attempt with existing email', ['email' => $dto->email, 'ip' => $request->getClientIp()]);
-            $this->passwordHasher->hashPassword($existingUser, $dto->password);
-
-            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
-        }
-
         try {
             $user = $this->userLifecycleService->createSignup(
                 $dto->email,
@@ -268,9 +252,13 @@ class AuthController extends AbstractController
                 null !== $dto->language ? ['language' => $dto->language] : [],
                 $dto->plan,
                 $dto->code,
+                $request->getClientIp(),
             );
         } catch (SignupBlockedException $e) {
             return $this->signupBlocked($e);
+        }
+        if (!$user instanceof User) {
+            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
 
         // Generate verification token
@@ -706,7 +694,6 @@ class AuthController extends AbstractController
         $newTokens = $this->oidcTokenService->refreshOidcTokens($oidcRefreshToken, $provider);
 
         if (!$newTokens) {
-            // Keycloak rejected the refresh - user was logged out from Keycloak
             $this->logger->info('OIDC refresh rejected - user logged out from provider', [
                 'provider' => $provider,
             ]);

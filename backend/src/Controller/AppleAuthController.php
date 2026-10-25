@@ -14,7 +14,6 @@ use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\TokenService;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -45,7 +44,6 @@ class AppleAuthController extends AbstractController
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly UserRepository $userRepository,
-        private readonly EntityManagerInterface $em,
         private readonly OAuthStateService $oauthStateService,
         private readonly OAuthLoginResponder $oauthLoginResponder,
         private readonly OAuthSignupGate $signupGate,
@@ -213,12 +211,11 @@ class AppleAuthController extends AbstractController
 
         // MOBILE-APP SEAM: no browser challenge on the native sheet — only the signup limits and pause switch apply.
         try {
-            $nativeAdmission = $this->nativeAdmission($body);
-            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission, $request->getClientIp(), true);
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission = $this->nativeAdmission($body), $request->getClientIp(), true);
+            $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null), $nativeAdmission);
         } catch (SignupBlockedException $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
         }
-        $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null), $nativeAdmission);
 
         $accessToken = $this->tokenService->generateAccessToken($user);
         $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
@@ -364,12 +361,7 @@ class AppleAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->signupGate->completeNewUser($user, $admissionState);
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }
