@@ -678,6 +678,7 @@
         "title": "Qui s'est inscrit avec ce code",
         "empty": "Personne n'a encore utilisé ce code.",
         "deleted": "Compte supprimé",
+        "deletedAccounts": "{count} compte qui a utilisé ce code a été supprimé depuis. | {count} comptes qui ont utilisé ce code ont été supprimés depuis.",
         "loadFailed": "La liste n'a pas pu être chargée. Fermez-la et rouvrez-la."
       }
     }

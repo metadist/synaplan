@@ -86,8 +86,8 @@ final class AdminSignupCodeController extends AbstractController
     )]
     public function create(Request $request, #[CurrentUser] User $user): JsonResponse
     {
-        $body = $this->body($request);
         try {
+            $body = $this->body($request);
             $created = $this->service->create(
                 $user,
                 is_string($body['label'] ?? null) ? $body['label'] : '',
@@ -127,7 +127,7 @@ final class AdminSignupCodeController extends AbstractController
                     new OA\Property(property: 'signupCode', ref: new Model(type: AdminSignupCode::class)),
                 ]
             )),
-            new OA\Response(response: 400, description: 'Invalid value'),
+            new OA\Response(response: 400, description: 'Invalid value or a body that is not a JSON object'),
             new OA\Response(response: 403, description: 'Not an administrator'),
             new OA\Response(response: 404, description: 'Unknown code'),
         ]
@@ -202,13 +202,21 @@ final class AdminSignupCodeController extends AbstractController
     }
 
     /**
+     * A JSON object, or a 400: a malformed body must not be acknowledged as
+     * an update that was never applied.
+     *
      * @return array<string, mixed>
+     *
+     * @throws SignupCodeAdminException
      */
     private function body(Request $request): array
     {
         $body = json_decode($request->getContent(), true);
+        if (!is_array($body) || (array_is_list($body) && [] !== $body)) {
+            throw SignupCodeAdminException::invalid('The request body must be a JSON object.');
+        }
 
-        return is_array($body) ? $body : [];
+        return $body;
     }
 
     private function failure(SignupCodeAdminException $e): JsonResponse

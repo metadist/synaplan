@@ -160,6 +160,22 @@ describe('SignupCodesTab', () => {
     expect(wrapper.get('[data-testid="text-signup-code-state"]').text()).toBe('Expired')
   })
 
+  it('counts accounts that were deleted after using the code, and never fades a revoked row', async () => {
+    list.mockResolvedValue([{ ...pilots, active: false, state: 'revoked' }])
+    const wrapper = mountTab()
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="item-signup-code"]')
+    expect(row.classes()).not.toContain('opacity-60')
+    await row.get('[data-testid="btn-signup-code-uses"]').trigger('click')
+    await flushPromises()
+
+    expect(row.find('[data-testid="text-signup-code-uses-empty"]').exists()).toBe(false)
+    expect(row.get('[data-testid="text-signup-code-uses-deleted"]').text()).toBe(
+      '2 accounts that used this code have since been deleted.'
+    )
+  })
+
   it('says the list did not load instead of showing an empty page', async () => {
     list.mockRejectedValue(new Error('down'))
     const wrapper = mountTab()

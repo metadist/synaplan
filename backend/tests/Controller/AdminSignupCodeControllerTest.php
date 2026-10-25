@@ -186,6 +186,22 @@ final class AdminSignupCodeControllerTest extends WebTestCase
         self::assertTrue($this->redeemable($created['code']), 'restored');
     }
 
+    public function testAMalformedBodyIsRefusedAndChangesNothing(): void
+    {
+        $this->loginAdmin();
+        $item = $this->create(['label' => 'Body', 'level' => 'NEW', 'validity' => 'forever'])['signupCode'];
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->sendRaw('PATCH', self::PATH.'/'.$item['id'], '{"active":false'));
+        self::assertSame('SIGNUP_CODE_REQUEST_INVALID', $this->json()['code']);
+        self::assertSame(0, $this->auditCount('signup_code.updated', $item['id']));
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->sendRaw('PATCH', self::PATH.'/'.$item['id'], '["active"]'));
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->sendRaw('POST', self::PATH, 'not json'));
+
+        $this->client->request('GET', self::PATH);
+        $listed = array_values(array_filter($this->json()['codes'], static fn (array $c): bool => $c['id'] === $item['id']));
+        self::assertSame('active', $listed[0]['state'], 'nothing was applied');
+    }
+
     public function testAnUnknownCodeIsNotFound(): void
     {
         $this->loginAdmin();
@@ -235,6 +251,13 @@ final class AdminSignupCodeControllerTest extends WebTestCase
     private function send(string $method, string $path, array $body): void
     {
         $this->client->request($method, $path, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR));
+    }
+
+    private function sendRaw(string $method, string $path, string $body): int
+    {
+        $this->client->request($method, $path, [], [], ['CONTENT_TYPE' => 'application/json'], $body);
+
+        return $this->client->getResponse()->getStatusCode();
     }
 
     /**

@@ -10,40 +10,54 @@
     >
       {{ $t('admin.signupCodes.uses.loadFailed') }}
     </p>
-    <p
-      v-else-if="!uses.length"
-      class="text-sm txt-secondary"
-      data-testid="text-signup-code-uses-empty"
-    >
-      {{ $t('admin.signupCodes.uses.empty') }}
-    </p>
-    <ul v-else class="space-y-1" data-testid="list-signup-code-uses">
-      <li
-        v-for="use in uses"
-        :key="use.id"
-        class="flex flex-wrap items-baseline gap-x-2 text-sm"
-        data-testid="item-signup-code-use"
+    <template v-else>
+      <p
+        v-if="!uses.length && !deleted"
+        class="text-sm txt-secondary"
+        data-testid="text-signup-code-uses-empty"
       >
-        <span class="txt-primary break-words min-w-0">{{
-          use.email ?? $t('admin.signupCodes.uses.deleted')
-        }}</span>
-        <span class="txt-secondary text-xs">{{ formatDateTime(new Date(use.usedAt * 1000)) }}</span>
-      </li>
-    </ul>
+        {{ $t('admin.signupCodes.uses.empty') }}
+      </p>
+      <ul v-if="uses.length" class="space-y-1" data-testid="list-signup-code-uses">
+        <li
+          v-for="use in uses"
+          :key="use.id"
+          class="flex flex-wrap items-baseline gap-x-2 text-sm"
+          data-testid="item-signup-code-use"
+        >
+          <span class="txt-primary break-words min-w-0">{{
+            use.email ?? $t('admin.signupCodes.uses.deleted')
+          }}</span>
+          <span class="txt-secondary text-xs">{{
+            formatDateTime(new Date(use.usedAt * 1000))
+          }}</span>
+        </li>
+      </ul>
+      <p
+        v-if="deleted"
+        class="text-sm txt-secondary mt-1"
+        data-testid="text-signup-code-uses-deleted"
+      >
+        {{ $t('admin.signupCodes.uses.deletedAccounts', { count: deleted }, deleted) }}
+      </p>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { signupCodesApi, type SignupCodeUse } from '@/services/api/signupCodesApi'
 
-const props = defineProps<{ codeId: number }>()
+/** `used` is the code's counter; an erased account leaves it and loses its row. */
+const props = defineProps<{ codeId: number; used: number }>()
 
 const { formatDateTime } = useDateFormat()
 const uses = ref<SignupCodeUse[]>([])
 const loading = ref(true)
 const failed = ref(false)
+
+const deleted = computed(() => Math.max(0, props.used - uses.value.length))
 
 onMounted(async () => {
   try {

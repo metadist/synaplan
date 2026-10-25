@@ -1,7 +1,10 @@
 <template>
   <li
     class="surface-card rounded-xl p-4"
-    :class="{ 'opacity-60': code.state === 'revoked' }"
+    :class="{
+      'border border-dashed border-light-border/60 dark:border-dark-border/40':
+        code.state === 'revoked',
+    }"
     data-testid="item-signup-code"
     :data-code-id="code.id"
   >
@@ -74,7 +77,7 @@
         </button>
       </div>
     </div>
-    <SignupCodeUses v-if="showUses" :code-id="code.id" />
+    <SignupCodeUses v-if="showUses" :code-id="code.id" :used="code.uses" />
   </li>
 </template>
 

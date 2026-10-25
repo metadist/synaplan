@@ -678,6 +678,7 @@
         "title": "Who signed up with this code",
         "empty": "Nobody has used this code yet.",
         "deleted": "Account deleted",
+        "deletedAccounts": "{count} account that used this code has since been deleted. | {count} accounts that used this code have since been deleted.",
         "loadFailed": "The list could not be loaded. Close it and open it again."
       }
     }

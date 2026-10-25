@@ -674,6 +674,7 @@
         "title": "Bu kodla kimler kaydoldu",
         "empty": "Bu kodu henüz kimse kullanmadı.",
         "deleted": "Hesap silindi",
+        "deletedAccounts": "Bu kodu kullanan {count} hesap o zamandan beri silindi.",
         "loadFailed": "Liste yüklenemedi. Kapatıp yeniden açın."
       }
     }

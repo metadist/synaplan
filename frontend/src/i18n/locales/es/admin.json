@@ -674,6 +674,7 @@
         "title": "Quién se registró con este código",
         "empty": "Nadie ha usado este código todavía.",
         "deleted": "Cuenta eliminada",
+        "deletedAccounts": "{count} cuenta que usó este código se ha eliminado desde entonces. | {count} cuentas que usaron este código se han eliminado desde entonces.",
         "loadFailed": "No se pudo cargar la lista. Ciérrala y ábrela de nuevo."
       }
     }
