@@ -37,8 +37,8 @@ final class ReapPendingSignupsCommandTest extends TestCase
         $freshSecond = self::pendingUser(2);
 
         $users = $this->createMock(UserRepository::class);
-        $users->expects(self::exactly(2))->method('findPendingPaymentCreatedBefore')
-            ->willReturnCallback(function (string $before, int $afterId) use ($first, $second, $freshSecond): array {
+        $users->expects(self::exactly(2))->method('findPendingPaymentAfterId')
+            ->willReturnCallback(function (int $afterId) use ($first, $second, $freshSecond): array {
                 $this->events[] = 'page:after-'.$afterId;
 
                 return 0 === $afterId ? [$first, $second] : [$freshSecond];

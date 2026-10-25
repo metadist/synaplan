@@ -76,8 +76,7 @@ final class ReapPendingSignupsCommand extends Command
         $counts = [self::DELETED => 0, self::KEPT => 0, self::FAILED => 0];
         try {
             $cutoffTs = time() - self::PENDING_DAYS * 86400;
-            $cutoff = date('Y-m-d H:i:s', $cutoffTs);
-            $this->sweep($cutoff, $cutoffTs, $dryRun, $counts);
+            $this->sweep($cutoffTs, $dryRun, $counts);
 
             $this->logger->info('Pending sign-up reaper finished', [
                 'dry_run' => $dryRun,
@@ -85,10 +84,10 @@ final class ReapPendingSignupsCommand extends Command
                 'would_delete' => $dryRun ? $counts[self::DELETED] : 0,
                 'kept' => $counts[self::KEPT],
                 'failed' => $counts[self::FAILED],
-                'cutoff' => $cutoff,
+                'cutoff' => date('c', $cutoffTs),
             ]);
             $io->writeln(sprintf(
-                '%s %d pending sign-up(s) older than %d days; %d kept (subscription on record or unreadable sign-up date), %d failed.',
+                '%s %d pending sign-up(s) older than %d days; %d kept (younger, subscription on record, or unreadable sign-up date), %d failed.',
                 $dryRun ? 'Would delete' : 'Deleted',
                 $counts[self::DELETED],
                 self::PENDING_DAYS,
@@ -108,11 +107,11 @@ final class ReapPendingSignupsCommand extends Command
      *
      * @param array<string, int> $counts
      */
-    private function sweep(string $cutoff, int $cutoffTs, bool $dryRun, array &$counts): void
+    private function sweep(int $cutoffTs, bool $dryRun, array &$counts): void
     {
         $afterId = 0;
         while (!self::capReached($counts)) {
-            $page = $this->userRepository->findPendingPaymentCreatedBefore($cutoff, $afterId, self::PAGE_SIZE);
+            $page = $this->userRepository->findPendingPaymentAfterId($afterId, self::PAGE_SIZE);
             foreach ($page as $user) {
                 $afterId = (int) $user->getId();
                 $outcome = $this->reap($user, $cutoffTs, $dryRun);
@@ -181,16 +180,20 @@ final class ReapPendingSignupsCommand extends Command
     }
 
     /**
-     * BCREATED is a string written in more than one format over the years; the
-     * query compares it as text. An account whose date does not parse stays.
+     * BCREATED is a string written in more than one format over the years. An
+     * account whose date does not parse cleanly stays: a zero or overflowing
+     * date parses with a warning into some other day, and its age is unknown.
      */
     private static function createdBefore(string $created, int $cutoffTs): bool
     {
         foreach (self::CREATED_FORMATS as $format) {
             $parsed = \DateTimeImmutable::createFromFormat('!'.$format, $created);
-            if (false !== $parsed) {
-                return $parsed->getTimestamp() < $cutoffTs;
+            $problems = \DateTimeImmutable::getLastErrors();
+            if (false === $parsed || (false !== $problems && ($problems['warning_count'] > 0 || $problems['error_count'] > 0))) {
+                continue;
             }
+
+            return $parsed->getTimestamp() < $cutoffTs;
         }
 
         return false;
