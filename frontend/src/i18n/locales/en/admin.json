@@ -550,6 +550,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Open — anyone can sign up",
+          "admission": "Admission — a plan or an invitation code"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Standard (plain Docker)",
           "gvisor": "Strong isolation (gVisor)",

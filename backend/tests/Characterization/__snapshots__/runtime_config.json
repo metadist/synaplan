@@ -10,7 +10,8 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
-                "registrationEnabled": "bool"
+                "registrationEnabled": "bool",
+                "registrationMode": "string"
             },
             "billing": {
                 "enabled": "bool"
@@ -237,7 +238,8 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
-                "registrationEnabled": "bool"
+                "registrationEnabled": "bool",
+                "registrationMode": "string"
             },
             "billing": {
                 "enabled": "bool"
@@ -464,7 +466,8 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
-                "registrationEnabled": "bool"
+                "registrationEnabled": "bool",
+                "registrationMode": "string"
             },
             "billing": {
                 "enabled": "bool"

@@ -2,7 +2,9 @@
 
 namespace App\Security;
 
+use App\Entity\User;
 use App\Repository\ApiKeyRepository;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +30,7 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
 {
     public function __construct(
         private ApiKeyRepository $apiKeyRepository,
+        private UserRepository $userRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -104,6 +107,18 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         // Check if API key is active
         if (!$apiKeyEntity->isActive()) {
             $this->logger->warning('Inactive API key used', [
+                'key_id' => $apiKeyEntity->getId(),
+                'owner_id' => $apiKeyEntity->getOwnerId(),
+            ]);
+            throw new AuthenticationException('API key is inactive');
+        }
+
+        // The key's own flag is not the account. A pending-payment owner may
+        // sign in to pay, and that must not let their key spend the platform.
+        // The same refusal covers a suspended or deleted owner.
+        $owner = $this->userRepository->find($apiKeyEntity->getOwnerId());
+        if (!$owner instanceof User || !$owner->isActive()) {
+            $this->logger->warning('API key owner cannot use the platform', [
                 'key_id' => $apiKeyEntity->getId(),
                 'owner_id' => $apiKeyEntity->getOwnerId(),
             ]);

@@ -251,6 +251,16 @@ final readonly class StripeEntitlement
             return false;
         }
 
+        // A sign-up that chose this plan waited as pending_payment; the
+        // settled invoice is what makes the account usable.
+        if ($user->isPendingPayment()) {
+            $user->setAccountStatus(User::ACCOUNT_STATUS_ACTIVE);
+            $this->logger->info('Pending-payment account activated by settled invoice', [
+                'user_id' => $user->getId(),
+                'subscription_id' => $subscription->id ?? null,
+            ]);
+        }
+
         if ($user->isAdmin() || $user->getUserLevel() === $level) {
             return true;
         }

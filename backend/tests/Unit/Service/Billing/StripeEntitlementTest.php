@@ -105,6 +105,27 @@ final class StripeEntitlementTest extends TestCase
         $this->assertTrue($user->getPaymentDetails()['subscription']['settled']);
     }
 
+    /**
+     * Admission sign-up (AS1): an account that chose a plan waits as
+     * pending_payment; the settled invoice is what makes it usable. An
+     * unsettled one leaves it waiting.
+     */
+    public function testApplyActivatesAPendingPaymentAccountOnlyWhenSettled(): void
+    {
+        $user = $this->user('NEW');
+        $user->setAccountStatus(User::ACCOUNT_STATUS_PENDING_PAYMENT);
+        $subscription = $this->subscription(['id' => 'sub_p', 'status' => 'active']);
+
+        $this->assertFalse($this->entitlement->apply($user, $subscription, $this->object(['status' => 'open', 'paid' => false])));
+        $this->assertTrue($user->isPendingPayment(), 'an open invoice does not unlock the account');
+        $this->assertFalse($user->isActive());
+
+        $this->assertTrue($this->entitlement->apply($user, $subscription, $this->object(['status' => 'paid', 'paid' => true])));
+        $this->assertTrue($user->isActive());
+        $this->assertFalse($user->isPendingPayment());
+        $this->assertSame('BUSINESS', $user->getUserLevel());
+    }
+
     public function testApplyNeverLowersATierAndNeverTouchesAnAdmin(): void
     {
         $pro = $this->user('PRO');

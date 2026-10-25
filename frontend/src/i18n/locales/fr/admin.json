@@ -550,6 +550,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "Aide IA dans la palette de recherche (Ctrl/Cmd+K) : pour une question en langage courant, le modèle d’outils choisit le résultat le plus pertinent et l’explique en une phrase. Il ne modifie jamais rien de lui-même. Chaque utilisation est un court appel à l’IA. Désactivé : la recherche par mots-clés et par sens reste disponible."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Ouverte — tout le monde peut s'inscrire",
+          "admission": "Admission — un forfait ou un code d'invitation"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Standard (Docker simple)",
           "gvisor": "Isolation forte (gVisor)",

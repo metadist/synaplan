@@ -398,8 +398,9 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Suspended/banned accounts cannot sign in (Apple Guideline 1.2).
-        if (!$user->isActive()) {
+        // Suspended/banned accounts cannot sign in (Apple Guideline 1.2). A
+        // pending-payment account may: it has to reach the checkout.
+        if (!$user->canSignIn()) {
             return $this->accountSuspendedResponse($user, 'Login');
         }
 
@@ -510,7 +511,7 @@ class AuthController extends AbstractController
 
         $existingRefresh = $this->tokenService->validateRefreshToken($refreshTokenString);
         $refreshOwner = $existingRefresh?->getUser();
-        if ($refreshOwner instanceof User && !$refreshOwner->isActive()) {
+        if ($refreshOwner instanceof User && !$refreshOwner->canSignIn()) {
             return $this->tokenService->clearAuthCookies(
                 $this->accountSuspendedResponse($refreshOwner, 'Refresh')
             );
@@ -683,7 +684,7 @@ class AuthController extends AbstractController
             } catch (OidcAccessDeniedException) {
                 return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
             }
-            if ($knownUser instanceof User && !$knownUser->isActive()) {
+            if ($knownUser instanceof User && !$knownUser->canSignIn()) {
                 $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
                 $this->tokenService->clearAuthCookies($response);
                 $this->oidcTokenService->clearOidcCookies($response);
@@ -732,7 +733,7 @@ class AuthController extends AbstractController
             return $response;
         }
 
-        if (!$user->isActive()) {
+        if (!$user->canSignIn()) {
             $response = $this->accountSuspendedResponse($user, 'OIDC refresh');
             $this->tokenService->clearAuthCookies($response);
             $this->oidcTokenService->clearOidcCookies($response);

@@ -182,6 +182,13 @@ final readonly class SystemConfigValues
             $values[$key]['effectiveValue'] = $envOverride ? 'true' : 'false';
         }
 
+        // The registration mode is a select, not a toggle, but pinned the same way.
+        $modeOverride = $this->registrationConfig->modeEnvOverride();
+        if (null !== $modeOverride && isset($values['REGISTRATION_MODE'])) {
+            $values['REGISTRATION_MODE']['envOverride'] = true;
+            $values['REGISTRATION_MODE']['effectiveValue'] = $modeOverride;
+        }
+
         // Same rule for every wave feature flag on the Features tab: an
         // automated deployment pins it with FEATURE_<GROUP>_<SETTING>, and the
         // toggle must show that instead of pretending to be movable.
