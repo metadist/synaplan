@@ -35,6 +35,20 @@ final class PassageFocusTest extends TestCase
         self::assertLessThanOrEqual(400, array_sum(array_map(PassageFocus::cost(...), $sent)));
     }
 
+    public function testAYearInTheQuestionStillSelectsThePassage(): void
+    {
+        $passages = [];
+        for ($i = 1; $i <= 8; ++$i) {
+            $passages[] = new Passage('§'.$i, str_repeat('menu item ', 12));
+        }
+        $passages[] = new Passage('§9', 'Regulation (EU) 2024/1689 is the Artificial Intelligence Act.');
+        $passages[] = new Passage('§10', str_repeat('footer ', 12));
+
+        $ids = array_map(static fn (Passage $passage): string => $passage->id, PassageFocus::pick($passages, ['EU Artificial Intelligence Act 2024'], 200));
+
+        self::assertContains('§9', $ids);
+    }
+
     public function testWithNoSharedWordTheBeginningIsSent(): void
     {
         $passages = [];
