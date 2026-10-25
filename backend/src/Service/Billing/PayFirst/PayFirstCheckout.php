@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Billing\PayFirst;
 
+use App\Service\Billing\PlanAvailability;
 use App\Service\Billing\StripeEntitlement;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -29,6 +30,7 @@ final readonly class PayFirstCheckout
     public function __construct(
         private CheckoutSessionGateway $gateway,
         private StripeEntitlement $entitlement,
+        private PlanAvailability $plans,
         private RateLimiterFactoryInterface $checkoutStartIpLimiter,
         private RateLimiterFactoryInterface $checkoutStartEmailLimiter,
         private LoggerInterface $logger,
@@ -49,7 +51,7 @@ final readonly class PayFirstCheckout
         }
         $plan = strtoupper(trim($plan));
         $priceId = $this->entitlement->prices()[$plan] ?? '';
-        if ('' === $priceId) {
+        if ('' === $priceId || !$this->plans->isPurchasable($plan)) {
             throw PayFirstException::planInvalid();
         }
 

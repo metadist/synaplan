@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\Auth\TokenService;
 use App\Service\Billing\PayFirst\CheckoutSessionGateway;
 use App\Service\Billing\PayFirst\PayFirstCheckout;
 use App\Service\Billing\PayFirst\PayFirstConfig;
@@ -74,6 +75,16 @@ final class CheckoutStartControllerTest extends WebTestCase
         self::assertSame(hash('sha256', (string) $cookie->getValue()), $this->gateway->created[0]['metadata']['start_nonce_hash']);
         self::assertSame(self::EMAIL, $this->gateway->created[0]['customer_email']);
         self::assertSame(0, $this->em->getRepository(User::class)->count(['mail' => self::EMAIL]), 'no account before the payment');
+    }
+
+    public function testAStaleSessionCookieDoesNotBlockTheStart(): void
+    {
+        $this->switchOn();
+        $this->client->getCookieJar()->set(new \Symfony\Component\BrowserKit\Cookie(TokenService::ACCESS_COOKIE, 'stale.token.from-before-a-secret-rotation'));
+
+        $this->start(['email' => self::EMAIL, 'plan' => 'PRO']);
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
     }
 
     public function testRefusedInTheNativeApp(): void

@@ -12,6 +12,7 @@ use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanAvailability;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -89,8 +90,7 @@ final class SignupAdmissionTest extends TestCase
             $registration,
             $this->createMock(SignupCodeRepository::class),
             $this->createMock(EntityManagerInterface::class),
-            $billing,
-            $subscriptions,
+            new PlanAvailability($billing, $subscriptions),
         );
     }
 }

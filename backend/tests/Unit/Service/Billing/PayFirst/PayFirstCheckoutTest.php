@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Billing\PayFirst;
 
+use App\Entity\Subscription;
+use App\Repository\SubscriptionRepository;
 use App\Service\Auth\SignupAnomalyAlert;
+use App\Service\Billing\BillingService;
 use App\Service\Billing\PayFirst\PayFirstCheckout;
 use App\Service\Billing\PayFirst\PayFirstException;
+use App\Service\Billing\PlanAvailability;
 use App\Service\Billing\StripeEntitlement;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -76,6 +80,20 @@ final class PayFirstCheckoutTest extends TestCase
         self::assertSame([], $this->gateway->created);
     }
 
+    public function testATierTheOperatorDeactivatedIsNotSold(): void
+    {
+        $hidden = $this->createStub(Subscription::class);
+        $hidden->method('isActive')->willReturn(false);
+
+        try {
+            $this->checkout(proRow: $hidden)->start('ada@example.com', 'PRO', '203.0.113.1');
+            self::fail('A deactivated tier must not open Checkout');
+        } catch (PayFirstException $e) {
+            self::assertSame(PayFirstException::PLAN_INVALID, $e->getErrorCode());
+        }
+        self::assertSame([], $this->gateway->created);
+    }
+
     public function testOneConnectionIsLimitedBeforeStripeIsCalled(): void
     {
         $checkout = $this->checkout(perIp: 2);
@@ -102,11 +120,17 @@ final class PayFirstCheckoutTest extends TestCase
         $checkout->start('ada@example.com', 'PRO', '198.51.100.7');
     }
 
-    private function checkout(int $perIp = 100, int $perEmail = 100, string $team = 'price_team'): PayFirstCheckout
+    private function checkout(int $perIp = 100, int $perEmail = 100, string $team = 'price_team', ?Subscription $proRow = null): PayFirstCheckout
     {
+        $billing = $this->createStub(BillingService::class);
+        $billing->method('isEnabled')->willReturn(true);
+        $catalogue = $this->createStub(SubscriptionRepository::class);
+        $catalogue->method('findByLevelAnyState')->willReturnCallback(static fn (string $level): ?Subscription => 'PRO' === $level ? $proRow : null);
+
         return new PayFirstCheckout(
             $this->gateway,
             new StripeEntitlement($this->createStub(SignupAnomalyAlert::class), new NullLogger(), 'price_pro', $team, 'price_business'),
+            new PlanAvailability($billing, $catalogue),
             new RateLimiterFactory(['id' => 'checkout_start_ip', 'policy' => 'sliding_window', 'limit' => $perIp, 'interval' => '1 hour'], new InMemoryStorage()),
             new RateLimiterFactory(['id' => 'checkout_start_email', 'policy' => 'sliding_window', 'limit' => $perEmail, 'interval' => '1 day'], new InMemoryStorage()),
             new NullLogger(),
