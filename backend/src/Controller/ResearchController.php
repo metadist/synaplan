@@ -12,6 +12,7 @@ use App\Service\Research\Run\ResearchCapabilities;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchEventLog;
 use App\Service\Research\Run\ResearchEventStream;
+use App\Service\Research\Run\ResearchQueueWait;
 use App\Service\Research\Run\ResearchRejected;
 use App\Service\Research\Run\ResearchRunNotFound;
 use App\Service\Research\Run\ResearchRunService;
@@ -46,6 +47,7 @@ final class ResearchController extends AbstractController
         private readonly ResearchEventLog $events,
         private readonly ResearchStateStore $store,
         private readonly ResearchConfig $config,
+        private readonly ResearchQueueWait $queue,
     ) {
     }
 
@@ -164,21 +166,22 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/events', name: 'api_research_events', methods: ['GET'])]
     #[Route('/v1/research/{id}/events', name: 'v1_research_events', methods: ['GET'])]
-    #[OA\Get(path: '/api/v1/research/{id}/events', summary: 'Updates recorded for one research run', description: 'Returns the updates recorded so far as server-sent events and closes. Resume with the Last-Event-ID header or ?after=<seq>.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Get(path: '/api/v1/research/{id}/events', summary: 'Updates recorded for one research run', description: 'Returns the updates recorded so far as server-sent events and closes. Resume with the Last-Event-ID header or ?after=<seq>. When the next step has waited at least 20 seconds for a worker, a last `queued` frame without an id carries since_seconds; it is computed on each request and never replayed.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\Parameter(name: 'after', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 0))]
     #[OA\Response(response: 200, description: 'Server-sent events since the last one the client has', content: new OA\MediaType(mediaType: 'text/event-stream', schema: new OA\Schema(type: 'string')))]
     #[OA\Response(response: 404, description: 'No such run for this caller', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     public function events(string $id, Request $request, #[CurrentUser] ?User $user): Response
     {
         return $this->respond($user, false, function (User $user) use ($id, $request): Response {
-            $this->runs->state($user, $id);
+            $state = $this->runs->state($user, $id);
             $after = $request->headers->get('Last-Event-ID');
             if (!is_string($after) || '' === $after) {
                 $after = $request->query->get('after', '0');
             }
             $seq = is_numeric($after) ? max(0, (int) $after) : 0;
+            $body = ResearchEventStream::body($this->events->replay($id, $seq), $this->queue->since($state));
 
-            return new Response(ResearchEventStream::body($this->events->replay($id, $seq)), Response::HTTP_OK, [
+            return new Response($body, Response::HTTP_OK, [
                 'Content-Type' => 'text/event-stream',
                 'Cache-Control' => 'no-cache',
             ]);
@@ -315,6 +318,7 @@ final class ResearchController extends AbstractController
             $state,
             $this->store->stopRequested($state->ref->id),
             $this->store->writeNowRequested($state->ref->id),
+            $this->queue->since($state),
         ));
     }
 

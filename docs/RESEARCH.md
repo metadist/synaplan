@@ -67,7 +67,10 @@ them. An open question is skipped after roughly 10 minutes (the reaper runs
 every 5 minutes) and the run continues. A plan that is not confirmed within
 a day stops. An edited plan keeps at most the depth's number of points, and
 a new or renamed point is searched by its title. Write now ends the search
-and writes the report from what was already found. Research as a whole stays off until
+and writes the report from what was already found. When the next step has
+waited 20 seconds for a worker, the state carries `queued_since` and the
+events end with a `queued` frame. Both are computed on each request and
+never recorded, so they are as fresh as the client's poll. Research as a whole stays off until
 `RESEARCH.ENABLED` is turned on.
 
 The conformance suite plays ten scenarios twice against one model — start

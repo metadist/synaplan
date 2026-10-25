@@ -10,14 +10,11 @@ use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
 use App\Service\Research\Run\ResearchCapabilities;
 use App\Service\Research\Run\ResearchConfig;
-use App\Service\Research\Run\ResearchReaper;
-use App\Service\Research\Run\ResearchReply;
+use App\Service\Research\Run\ResearchQueueWait;
 use App\Service\Research\Run\ResearchReportDelivery;
 use App\Service\Research\Run\ResearchRunService;
-use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Research\Run\ResearchStoreUnavailable;
-use Psr\Clock\ClockInterface;
 
 /**
  * Long research runs. Off means a new run cannot start. A run that already
@@ -30,7 +27,7 @@ final class ResearchModule implements FeatureModuleInterface
     public function __construct(
         private readonly ResearchConfig $config,
         private readonly ResearchStateStore $store,
-        private readonly ClockInterface $clock,
+        private readonly ResearchQueueWait $queue,
     ) {
     }
 
@@ -73,7 +70,7 @@ final class ResearchModule implements FeatureModuleInterface
         }
         $active = count($runs);
         foreach ($runs as $run) {
-            if ($this->workerQuiet($run)) {
+            if ($this->queue->quiet($run)) {
                 return new ModuleStatus(
                     configured: true,
                     healthy: false,
@@ -89,18 +86,6 @@ final class ResearchModule implements FeatureModuleInterface
             message: $active.' research run(s) are in progress',
             details: ['active' => $active],
         );
-    }
-
-    private function workerQuiet(ResearchRunState $run): bool
-    {
-        if ($run->status->isTerminal()
-            || ResearchReply::isWaiting($run)
-            || $this->store->isClaimed($run->ref->id, $run->expectedSeq)) {
-            return false;
-        }
-        $updated = $run->updatedAt ?? $run->ref->createdAt;
-
-        return $this->clock->now()->getTimestamp() - $updated->getTimestamp() >= ResearchReaper::QUIET_SECONDS;
     }
 
     public function capabilityIds(): array

@@ -14,7 +14,6 @@ final readonly class ResearchEventLog
     /** @var list<string> */
     public const NAMES = [
         'run',
-        'queued',
         'brief',
         'question',
         'plan',

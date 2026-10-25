@@ -39,6 +39,7 @@ use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
 use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\ResearchQueueWait;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Security\EncryptionService;
 use Symfony\Component\Clock\MockClock;
@@ -89,7 +90,11 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
-            new ResearchModule($this->disabledResearch(), $this->createStub(ResearchStateStore::class), new MockClock()),
+            new ResearchModule(
+                $this->disabledResearch(),
+                $researchStore = $this->createStub(ResearchStateStore::class),
+                new ResearchQueueWait($researchStore, new MockClock()),
+            ),
             $this->disabledFreeApi(),
         ];
 

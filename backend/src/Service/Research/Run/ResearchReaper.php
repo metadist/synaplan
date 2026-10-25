@@ -19,8 +19,6 @@ final readonly class ResearchReaper
     public const ANSWER_WAIT_SECONDS = 600;
     public const PLAN_WAIT_SECONDS = 86400;
     public const STALL_SECONDS = 600;
-    public const QUEUE_AFTER_SECONDS = 20;
-    public const QUIET_SECONDS = 300;
 
     /** The first interrupt writes the report; a later one only closes the run, so it is paid for once. */
     private const WRITING_ATTEMPT = 2;
@@ -125,7 +123,6 @@ final readonly class ResearchReaper
 
             return;
         }
-        $this->noteQueued($state, $now);
         if (!$this->isStalled($state, $now)) {
             return;
         }
@@ -187,26 +184,6 @@ final readonly class ResearchReaper
         $this->bus->dispatch($saved->ref->id, ResearchUnitPlan::WRITE, $saved->expectedSeq, 0);
 
         return true;
-    }
-
-    /** The next step has been waiting for a worker. Say so, then again on each later pass. */
-    private function noteQueued(ResearchRunState $state, int $now): void
-    {
-        if ($this->store->isClaimed($state->ref->id, $state->expectedSeq)) {
-            return;
-        }
-        $since = $now - ($state->updatedAt ?? $state->ref->createdAt)->getTimestamp();
-        if ($since < self::QUEUE_AFTER_SECONDS) {
-            return;
-        }
-        $last = $this->store->lastQueueNoticeAt($state->ref->id);
-        if (null !== $last && $now - $last < self::QUEUE_AFTER_SECONDS) {
-            return;
-        }
-        if (!$this->record($state, 'queued', ['since_seconds' => $since])) {
-            return;
-        }
-        $this->store->noteQueueNotice($state->ref->id, $now);
     }
 
     private function stopWaiting(ResearchRunState $state): bool

@@ -205,23 +205,14 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertSame('{"skipped":true}', $content);
     }
 
-    public function testAStepWaitingForAWorkerSaysSoAfterTwentySeconds(): void
+    public function testAStepWaitingForAWorkerLeavesTheEventLogAlone(): void
     {
         $state = $this->openRun();
-        $this->age($state, ResearchReaper::QUEUE_AFTER_SECONDS);
-        $reaper = $this->reaper(new ScriptedResearchUnits(new StageResult('gather')));
+        $this->age($state, 60);
 
-        $reaper->reap();
-        $first = $this->events->replay($state->ref->id, 0);
-        self::assertSame('queued', $first[0]['event'] ?? null);
-        self::assertSame(ResearchReaper::QUEUE_AFTER_SECONDS, $first[0]['data']['since_seconds'] ?? null);
+        $this->reaper(new ScriptedResearchUnits(new StageResult('gather')))->reap();
 
-        $reaper->reap();
-        self::assertCount(1, $this->events->replay($state->ref->id, 0));
-
-        $this->clock->sleep(ResearchReaper::QUEUE_AFTER_SECONDS);
-        $reaper->reap();
-        self::assertCount(2, $this->events->replay($state->ref->id, 0));
+        self::assertSame([], $this->events->replay($state->ref->id, 0));
     }
 
     public function testWriteNowThatRacedIntoAWaitGoesToTheReport(): void

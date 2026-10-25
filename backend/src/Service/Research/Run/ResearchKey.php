@@ -72,11 +72,6 @@ final class ResearchKey
         return 'research:write:'.$id;
     }
 
-    public static function queueNotice(string $id): string
-    {
-        return 'research:queued:'.$id;
-    }
-
     public static function idempotency(int $userId, string $key): string
     {
         return 'research:idem:'.$userId.':'.hash('sha256', $key);

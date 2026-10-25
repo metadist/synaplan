@@ -25,7 +25,7 @@ final class ResearchRunView
     /**
      * @return array<string, mixed>
      */
-    public static function one(ResearchRunState $state, bool $stopRequested, bool $writeRequested): array
+    public static function one(ResearchRunState $state, bool $stopRequested, bool $writeRequested, ?int $queuedSince): array
     {
         $ledger = $state->ledger->toArray();
         $budget = $state->budget->toArray();
@@ -40,6 +40,7 @@ final class ResearchRunView
             'parent' => $state->parent,
             'stop_requested' => $stopRequested,
             'write_requested' => $writeRequested,
+            'queued_since' => $queuedSince,
             'questions' => null === $state->questions ? [] : array_map(
                 static fn (ResearchQuestion $item): array => $item->toArray(),
                 $state->questions->items,
