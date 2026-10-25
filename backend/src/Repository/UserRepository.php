@@ -173,21 +173,24 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
-     * Pending-payment sign-ups created before the cutoff, oldest first.
+     * One page of pending-payment sign-ups created before the cutoff, by id
+     * after $afterId, so a caller that keeps some rows still reaches the rest.
      *
      * @param string $createdBefore `Y-m-d H:i:s`, the format sign-up writes to BCREATED
      *
      * @return list<User>
      */
-    public function findPendingPaymentCreatedBefore(string $createdBefore, int $limit): array
+    public function findPendingPaymentCreatedBefore(string $createdBefore, int $afterId, int $limit): array
     {
         /** @var list<User> $users */
         $users = $this->createQueryBuilder('u')
             ->where('u.accountStatus = :status')
             ->andWhere("u.created <> ''")
             ->andWhere('u.created < :before')
+            ->andWhere('u.id > :after')
             ->setParameter('status', User::ACCOUNT_STATUS_PENDING_PAYMENT)
             ->setParameter('before', $createdBefore)
+            ->setParameter('after', $afterId)
             ->orderBy('u.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()

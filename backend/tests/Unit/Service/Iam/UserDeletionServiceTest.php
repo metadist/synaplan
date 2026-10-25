@@ -102,6 +102,24 @@ final class UserDeletionServiceTest extends TestCase
         self::assertSame(['begin', 'rollback'], $this->events);
     }
 
+    public function testAnAccountThatNoLongerQualifiesIsLeftUntouched(): void
+    {
+        $user = $this->user(42, 'ada@example.test');
+        $service = new UserDeletionService($this->entityManager($user), [$this->eraser('never')], new NullLogger());
+
+        self::assertFalse($service->deleteUserIf($user, static fn (User $fresh): bool => false));
+        self::assertSame(['begin', 'refresh', 'rollback'], $this->events);
+    }
+
+    public function testAnAccountThatStillQualifiesIsDeletedAfterTheLockedReread(): void
+    {
+        $user = $this->user(42, 'ada@example.test');
+        $service = new UserDeletionService($this->entityManager($user), [$this->eraser('files')], new NullLogger());
+
+        self::assertTrue($service->deleteUserIf($user, static fn (User $fresh): bool => true));
+        self::assertSame(['begin', 'refresh', 'erase:files:42:ada@example.test', 'remove', 'flush', 'commit'], $this->events);
+    }
+
     public function testAFlushThatEndedTheTransactionKeepsTheRealCause(): void
     {
         $user = $this->user(42, 'ada@example.test');
@@ -168,6 +186,9 @@ final class UserDeletionServiceTest extends TestCase
         $em->method('remove')->willReturnCallback(function (object $entity) use ($user): void {
             self::assertSame($user, $entity);
             $this->events[] = 'remove';
+        });
+        $em->method('refresh')->willReturnCallback(function (): void {
+            $this->events[] = 'refresh';
         });
         $em->method('flush')->willReturnCallback(function () use ($flushFailure): void {
             $this->events[] = 'flush';

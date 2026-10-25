@@ -52,6 +52,42 @@ final class ReapPendingSignupsCommandTest extends KernelTestCase
         self::assertSame([$young, $paying, $active], $this->remaining([$old, $young, $paying, $active]));
     }
 
+    public function testAPaymentRecordedAfterTheAccountWasLoadedKeepsIt(): void
+    {
+        $id = $this->user('race', User::ACCOUNT_STATUS_PENDING_PAYMENT, 8);
+        // The webhook writes through its own connection: the entity this
+        // kernel already holds still shows no subscription.
+        $this->em->getConnection()->executeStatement(
+            'UPDATE BUSER SET BPAYMENTDETAILS = :details WHERE BID = :id',
+            ['details' => json_encode(['subscription' => ['stripe_subscription_id' => 'sub_race']]), 'id' => $id],
+        );
+
+        $tester = $this->tester();
+        $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Deleted 0 pending sign-up(s)', $tester->getDisplay());
+        self::assertSame([$id], $this->remaining([$id]));
+    }
+
+    public function testKeptAccountsDoNotHideLaterOnes(): void
+    {
+        $kept = [];
+        for ($i = 0; $i < ReapPendingSignupsCommand::PAGE_SIZE; ++$i) {
+            $kept[] = $this->user('kept'.$i, User::ACCOUNT_STATUS_PENDING_PAYMENT, 8, ['stripe_subscription_id' => 'sub_'.$i], false);
+        }
+        $this->em->flush();
+        $kept = array_map(static fn (User $user): int => (int) $user->getId(), $kept);
+        $eligible = $this->user('after-kept', User::ACCOUNT_STATUS_PENDING_PAYMENT, 8);
+
+        $tester = $this->tester();
+        $tester->execute([]);
+
+        self::assertStringContainsString('Deleted 1 pending sign-up(s)', $tester->getDisplay());
+        self::assertSame([], $this->remaining([$eligible]));
+        self::assertCount(ReapPendingSignupsCommand::PAGE_SIZE, $this->remaining($kept));
+    }
+
     public function testDryRunDeletesNothing(): void
     {
         $old = $this->user('dry', User::ACCOUNT_STATUS_PENDING_PAYMENT, 9);
@@ -77,8 +113,10 @@ final class ReapPendingSignupsCommandTest extends KernelTestCase
 
     /**
      * @param array<string, string> $subscription
+     *
+     * @return ($flush is true ? int : User)
      */
-    private function user(string $name, string $status, int $ageDays, array $subscription = []): int
+    private function user(string $name, string $status, int $ageDays, array $subscription = [], bool $flush = true): int|User
     {
         $user = (new User())
             ->setMail(self::MAIL_PREFIX.$name.'-'.uniqid().'@synaplan.internal')
@@ -91,6 +129,9 @@ final class ReapPendingSignupsCommandTest extends KernelTestCase
             $user->setSubscriptionData($subscription);
         }
         $this->em->persist($user);
+        if (!$flush) {
+            return $user;
+        }
         $this->em->flush();
 
         return (int) $user->getId();
