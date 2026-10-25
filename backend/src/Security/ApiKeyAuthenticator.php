@@ -116,11 +116,10 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             throw new AuthenticationException('API key is inactive');
         }
 
-        // The key's own flag is not the account. A pending-payment owner may
-        // sign in to pay, and that must not let their key spend the platform.
-        // The same refusal covers a suspended or deleted owner.
+        // The key's own flag is not the account. A suspended or deleted owner
+        // cannot use the platform at all.
         $owner = $this->userRepository->find($apiKeyEntity->getOwnerId());
-        if (!$owner instanceof User || !$owner->isActive()) {
+        if (!$owner instanceof User || !$owner->canSignIn()) {
             $this->logger->warning('API key owner cannot use the platform', [
                 'key_id' => $apiKeyEntity->getId(),
                 'owner_id' => $apiKeyEntity->getOwnerId(),
@@ -128,9 +127,11 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             throw new AuthenticationException('API key is inactive');
         }
 
-        // A free account keeps the in-app chat. The key itself is the API,
-        // and that stays on a paid plan while this install sells one.
-        if (!$this->premiumFeatureGate->isUnlockedFor($owner)) {
+        // A pending-payment owner may sign in to pay, and that must not let
+        // their key spend the platform. A free account keeps the in-app chat.
+        // Both get the plan answer: the key itself is the API, and that stays
+        // on a paid plan while this install sells one.
+        if (!$owner->isActive() || !$this->premiumFeatureGate->isUnlockedFor($owner)) {
             $this->logger->warning('API key owner is not on a paid plan', [
                 'key_id' => $apiKeyEntity->getId(),
                 'owner_id' => $apiKeyEntity->getOwnerId(),
