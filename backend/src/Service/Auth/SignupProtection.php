@@ -14,6 +14,7 @@ final readonly class SignupProtection
     public function __construct(
         private SignupChallenge $challenge,
         private SignupGuard $guard,
+        private SignupAdmission $admission,
     ) {
     }
 
@@ -28,11 +29,13 @@ final readonly class SignupProtection
     }
 
     /**
+     * The limits always apply; the pause does not for a valid invitation code.
+     *
      * @throws SignupBlockedException
      */
-    public function assertSignupAllowed(?string $clientIp): void
+    public function assertSignupAllowed(?string $clientIp, ?string $invitationCode = null): void
     {
-        $this->guard->assertAllowed($clientIp);
+        $this->guard->assertAllowed($clientIp, $this->admission->holdsInvitation($invitationCode));
     }
 
     /**

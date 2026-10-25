@@ -83,6 +83,21 @@ final class SignupGuardTest extends TestCase
         }
     }
 
+    public function testAnInvitedPersonPassesThePauseButStillCountsAgainstTheLimits(): void
+    {
+        $this->config->method('getValue')->willReturn('true');
+        $guard = $this->guard(perIp: 1, global: 100);
+
+        $guard->assertAllowed('203.0.113.1', true);
+
+        try {
+            $guard->assertAllowed('203.0.113.1', true);
+            $this->fail('The per-IP limit applies to invited sign-ups too');
+        } catch (SignupBlockedException $e) {
+            $this->assertSame(SignupBlockedException::CODE_RATE_LIMITED, $e->getReasonCode());
+        }
+    }
+
     public function testEnvironmentPinsThePauseSwitchOverTheStoredRow(): void
     {
         $this->config->method('getValue')->willReturn('true');

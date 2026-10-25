@@ -153,7 +153,7 @@ final readonly class OAuthSignupGate
             throw SignupBlockedException::challengeRequired();
         }
 
-        $this->protection->assertSignupAllowed($clientIp);
+        $this->protection->assertSignupAllowed($clientIp, $this->stateString($statePayload, 'code'));
         $this->admission->resolve($this->stateString($statePayload, 'plan'), $this->stateString($statePayload, 'code'));
     }
 
