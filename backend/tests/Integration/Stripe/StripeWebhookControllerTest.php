@@ -417,6 +417,33 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->assertSame('NEW', $this->user->getUserLevel());
     }
 
+    public function testAPayFirstCheckoutIsNeverAttachedToAnExistingAccountByEmail(): void
+    {
+        // A pay-first session carries no client_reference_id and the buyer's
+        // email. Until the paid-account creator handles it (PF2), it must not
+        // fall back to the email lookup and hand the payment to whoever
+        // already holds that address.
+        $details = $this->user->getPaymentDetails();
+        unset($details['stripe_customer_id'], $details['stripe_session_id']);
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        $payload = $this->buildEventPayload('checkout.session.completed', [
+            'id' => 'cs_test_'.bin2hex(random_bytes(8)),
+            'object' => 'checkout.session',
+            'customer' => 'cus_payfirst_'.bin2hex(random_bytes(6)),
+            'customer_email' => $this->user->getMail(),
+            'mode' => 'subscription',
+            'metadata' => ['flow' => 'pay_first', 'plan' => 'PRO', 'start_nonce_hash' => str_repeat('a', 64)],
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertArrayNotHasKey('stripe_customer_id', $this->user->getPaymentDetails());
+        $this->assertArrayNotHasKey('stripe_session_id', $this->user->getPaymentDetails());
+    }
+
     public function testTopupCheckoutCreditsBudget(): void
     {
         // A one-time top-up arrives as checkout.session.completed with

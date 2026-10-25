@@ -101,6 +101,8 @@ security:
         - { path: ^/api/v1/auth/forgot-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
+        # Pay first: a person without an account starts Stripe Checkout
+        - { path: ^/api/v1/checkout/start$, methods: [POST], roles: PUBLIC_ACCESS }
         # Refresh is public on purpose: the 5-minute access cookie is often
         # expired (or unsigned after an APP_SECRET rotation) when this is
         # called. CookieTokenAuthenticator must not claim this path, or the

@@ -108,6 +108,20 @@ framework:
             limit: '%env(int:CHECKOUT_IP_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
+        # Pay-first checkout starts without an account (PayFirstCheckout):
+        # per client IP (CHECKOUT_START_IP_LIMIT, default 5 per hour) and per
+        # email address, keyed by its hash (CHECKOUT_START_EMAIL_LIMIT,
+        # default 30 per day).
+        checkout_start_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:CHECKOUT_START_IP_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        checkout_start_email:
+            policy: 'sliding_window'
+            limit: '%env(int:CHECKOUT_START_EMAIL_LIMIT)%'
+            interval: '1 day'
+            cache_pool: 'cache.rate_limiter'
         # Not a limit on anything a person does: counts paid tiers granted to
         # accounts younger than a day; when more than PAID_SIGNUP_ALERT_LIMIT
         # (default 10) land in an hour, SignupAnomalyAlert mails the operator.
