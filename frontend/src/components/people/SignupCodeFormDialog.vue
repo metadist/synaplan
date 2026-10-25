@@ -4,9 +4,9 @@
       v-if="open"
       class="modal-overlay fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4"
       @click.self="onBackdrop"
-      @keydown.esc="close"
     >
       <div
+        ref="panel"
         class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto scroll-thin p-4 sm:p-6 space-y-4"
         role="dialog"
         aria-modal="true"
@@ -15,34 +15,7 @@
       >
         <h3 class="text-base sm:text-lg font-semibold txt-primary">{{ title }}</h3>
 
-        <div v-if="createdCode" class="space-y-4" data-testid="section-signup-code-created">
-          <p class="text-sm txt-secondary">{{ $t('admin.signupCodes.shownOnce') }}</p>
-          <p
-            class="font-mono text-lg sm:text-xl tracking-wider txt-primary surface-chip rounded-xl px-4 py-3 text-center break-all select-all"
-            data-testid="text-signup-code-plain"
-          >
-            {{ createdCode }}
-          </p>
-          <div class="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              class="btn-secondary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2"
-              data-testid="btn-signup-code-copy"
-              @click="copy"
-            >
-              <ClipboardDocumentIcon class="w-4 h-4" />
-              {{ $t('admin.signupCodes.copy') }}
-            </button>
-            <button
-              type="button"
-              class="btn-primary px-4 py-2.5 text-sm font-medium"
-              data-testid="btn-signup-code-done"
-              @click="close"
-            >
-              {{ $t('admin.signupCodes.done') }}
-            </button>
-          </div>
-        </div>
+        <SignupCodeCreated v-if="createdCode" :code="createdCode" @done="close" />
 
         <form v-else class="space-y-4" novalidate @submit.prevent="submit">
           <div>
@@ -171,10 +144,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, toRef, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
+import SignupCodeCreated from '@/components/people/SignupCodeCreated.vue'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
+import { useModalFocus } from '@/composables/useModalFocus'
 import { useNotification } from '@/composables/useNotification'
 import {
   signupCodesApi,
@@ -191,7 +165,7 @@ const props = defineProps<{ open: boolean; code: SignupCode | null }>()
 const emit = defineEmits<{ close: []; created: [code: SignupCode]; saved: [code: SignupCode] }>()
 
 const { t } = useI18n()
-const { success, error: notifyError } = useNotification()
+const { success } = useNotification()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const uid = useId()
 
@@ -206,6 +180,11 @@ const saving = ref(false)
 const error = ref('')
 const createdCode = ref('')
 const labelInput = ref<HTMLInputElement | null>(null)
+const panel = ref<HTMLElement | null>(null)
+/** The expiry as the dialog opened, so a label-only edit leaves an exact expiry alone. */
+const openedExpiry = ref({ noEnd: true, validUntil: '' })
+
+useModalFocus(panel, toRef(props, 'open'), close)
 
 const title = computed(() => {
   if (createdCode.value) return t('admin.signupCodes.form.titleCreated')
@@ -224,6 +203,7 @@ watch(
     validity.value = 'forever'
     noEnd.value = code?.expiresAt == null
     validUntil.value = code?.expiresAt != null ? unixToDateInput(code.expiresAt) : ''
+    openedExpiry.value = { noEnd: noEnd.value, validUntil: validUntil.value }
     unlimited.value = code ? code.maxUses === null : false
     maxUses.value = code?.maxUses ?? 1
     error.value = ''
@@ -253,10 +233,15 @@ async function submit() {
   saving.value = true
   try {
     if (props.code) {
+      const expiryChanged =
+        noEnd.value !== openedExpiry.value.noEnd ||
+        validUntil.value !== openedExpiry.value.validUntil
       const saved = await signupCodesApi.update(props.code.id, {
         label: label.value.trim(),
         maxUses: limit,
-        expiresAt: noEnd.value ? null : dateInputToUnixEndOfDay(validUntil.value),
+        ...(expiryChanged
+          ? { expiresAt: noEnd.value ? null : dateInputToUnixEndOfDay(validUntil.value) }
+          : {}),
       })
       emit('saved', saved)
       success(t('admin.signupCodes.form.saved'))
@@ -280,17 +265,9 @@ async function submit() {
   }
 }
 
-async function copy() {
-  try {
-    await navigator.clipboard.writeText(createdCode.value)
-    success(t('admin.signupCodes.copied'))
-  } catch {
-    notifyError(t('admin.signupCodes.copyFailed'))
-  }
-}
-
+/** A pending request keeps the dialog open: a code created behind a closed dialog would be lost. */
 function close() {
-  emit('close')
+  if (!saving.value) emit('close')
 }
 
 /** The new code is shown once; a stray click beside the panel must not lose it. */

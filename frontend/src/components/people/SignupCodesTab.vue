@@ -101,7 +101,7 @@ const { t } = useI18n()
 const router = useRouter()
 const configStore = useConfigStore()
 const { confirm } = useDialog()
-const { success, error: notifyError } = useNotification()
+const { success, warning, error: notifyError } = useNotification()
 
 const codes = ref<SignupCode[]>([])
 const loading = ref(true)
@@ -149,8 +149,11 @@ async function revoke(code: SignupCode) {
 
 async function restore(code: SignupCode) {
   try {
-    replace(await signupCodesApi.update(code.id, { active: true }))
-    success(t('admin.signupCodes.restored'))
+    const restored = await signupCodesApi.update(code.id, { active: true })
+    replace(restored)
+    if (restored.state === 'expired') warning(t('admin.signupCodes.restoredExpired'))
+    else if (restored.state === 'used_up') warning(t('admin.signupCodes.restoredUsedUp'))
+    else success(t('admin.signupCodes.restored'))
   } catch {
     notifyError(t('admin.signupCodes.restoreFailed'))
   }

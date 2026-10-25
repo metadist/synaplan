@@ -651,6 +651,8 @@
       "revoked": "The code is revoked. Restore brings it back.",
       "revokeFailed": "The code was not revoked and still works. Try again.",
       "restored": "The code works again.",
+      "restoredExpired": "The code is no longer revoked, but its end date has passed. Set a later date under Edit so people can use it.",
+      "restoredUsedUp": "The code is no longer revoked, but all its uses are taken. Raise the limit under Edit so more people can use it.",
       "restoreFailed": "The code was not restored and still cannot be used. Try again.",
       "form": {
         "titleCreate": "Create an invitation code",

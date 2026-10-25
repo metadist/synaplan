@@ -647,6 +647,8 @@
       "revoked": "El código está revocado. Restaurar lo vuelve a activar.",
       "revokeFailed": "El código no se revocó y sigue funcionando. Inténtalo de nuevo.",
       "restored": "El código vuelve a funcionar.",
+      "restoredExpired": "El código ya no está revocado, pero su fecha de fin ya pasó. Pon una fecha posterior en Editar para que se pueda usar.",
+      "restoredUsedUp": "El código ya no está revocado, pero todos sus usos están agotados. Sube el límite en Editar para que más personas puedan usarlo.",
       "restoreFailed": "El código no se restauró y sigue sin poder usarse. Inténtalo de nuevo.",
       "form": {
         "titleCreate": "Crear un código de invitación",

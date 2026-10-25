@@ -647,6 +647,8 @@
       "revoked": "Kod iptal edildi. Geri getir ile yeniden geçerli olur.",
       "revokeFailed": "Kod iptal edilmedi ve çalışmaya devam ediyor. Tekrar deneyin.",
       "restored": "Kod yeniden çalışıyor.",
+      "restoredExpired": "Kod artık iptal edilmiş değil, ancak bitiş tarihi geçti. Kullanılabilmesi için Düzenle'de daha ileri bir tarih belirleyin.",
+      "restoredUsedUp": "Kod artık iptal edilmiş değil, ancak tüm kullanımları doldu. Daha fazla kişinin kullanabilmesi için Düzenle'de sınırı artırın.",
       "restoreFailed": "Kod geri getirilmedi ve kullanılamıyor. Tekrar deneyin.",
       "form": {
         "titleCreate": "Davet kodu oluştur",

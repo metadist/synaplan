@@ -7,6 +7,8 @@ const revoke = vi.fn()
 const update = vi.fn()
 const confirm = vi.fn()
 const push = vi.fn()
+const success = vi.fn()
+const warning = vi.fn()
 const config = { auth: { registrationMode: 'open' as 'open' | 'admission' } }
 
 vi.mock('@/services/api/signupCodesApi', () => ({
@@ -20,7 +22,7 @@ vi.mock('@/services/api/signupCodesApi', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+  useNotification: () => ({ success, warning, error: vi.fn() }),
 }))
 
 vi.mock('@/composables/useDialog', () => ({
@@ -63,6 +65,8 @@ describe('SignupCodesTab', () => {
     update.mockReset()
     confirm.mockReset()
     push.mockReset()
+    success.mockReset()
+    warning.mockReset()
     config.auth.registrationMode = 'open'
   })
 
@@ -137,6 +141,23 @@ describe('SignupCodesTab', () => {
     await flushPromises()
     expect(update).toHaveBeenCalledWith(7, { active: true })
     expect(wrapper.get('[data-testid="text-signup-code-state"]').text()).toBe('Usable')
+  })
+
+  it('does not claim a restored code works when it has expired', async () => {
+    const revoked = { ...pilots, active: false, state: 'revoked' as const }
+    list.mockResolvedValue([revoked])
+    update.mockResolvedValue({ ...pilots, expiresAt: 1, state: 'expired' })
+    const wrapper = mountTab()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-signup-code-restore"]').trigger('click')
+    await flushPromises()
+
+    expect(success).not.toHaveBeenCalled()
+    expect(warning).toHaveBeenCalledWith(
+      'The code is no longer revoked, but its end date has passed. Set a later date under Edit so people can use it.'
+    )
+    expect(wrapper.get('[data-testid="text-signup-code-state"]').text()).toBe('Expired')
   })
 
   it('says the list did not load instead of showing an empty page', async () => {

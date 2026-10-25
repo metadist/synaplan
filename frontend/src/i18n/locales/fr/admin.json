@@ -651,6 +651,8 @@
       "revoked": "Le code est révoqué. Rétablir le réactive.",
       "revokeFailed": "Le code n'a pas été révoqué et fonctionne toujours. Réessayez.",
       "restored": "Le code fonctionne de nouveau.",
+      "restoredExpired": "Le code n'est plus révoqué, mais sa date de fin est passée. Choisissez une date plus tardive dans Modifier pour qu'il soit utilisable.",
+      "restoredUsedUp": "Le code n'est plus révoqué, mais toutes ses utilisations sont épuisées. Augmentez la limite dans Modifier pour que d'autres personnes puissent l'utiliser.",
       "restoreFailed": "Le code n'a pas été rétabli et reste inutilisable. Réessayez.",
       "form": {
         "titleCreate": "Créer un code d'invitation",

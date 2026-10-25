@@ -651,6 +651,8 @@
       "revoked": "Der Code ist widerrufen. Mit Wiederherstellen gilt er wieder.",
       "revokeFailed": "Der Code wurde nicht widerrufen und funktioniert weiter. Versuche es erneut.",
       "restored": "Der Code funktioniert wieder.",
+      "restoredExpired": "Der Code ist nicht mehr widerrufen, aber sein Enddatum ist vorbei. Lege unter Bearbeiten ein späteres Datum fest, damit er wieder genutzt werden kann.",
+      "restoredUsedUp": "Der Code ist nicht mehr widerrufen, aber alle Nutzungen sind verbraucht. Erhöhe unter Bearbeiten die Grenze, damit weitere Personen ihn nutzen können.",
       "restoreFailed": "Der Code wurde nicht wiederhergestellt und bleibt gesperrt. Versuche es erneut.",
       "form": {
         "titleCreate": "Einladungscode erstellen",
