@@ -16,6 +16,9 @@ final class ScriptedModelCaller implements ResearchModelCaller
     /** @var list<ResearchModelReply> */
     public array $script = [];
 
+    /** Answered once the script is used up. */
+    public ?ResearchModelReply $fallback = null;
+
     /** @var list<string> */
     public array $users = [];
 
@@ -23,6 +26,6 @@ final class ScriptedModelCaller implements ResearchModelCaller
     {
         $this->users[] = $user;
 
-        return array_shift($this->script) ?? ResearchModelReply::failed();
+        return array_shift($this->script) ?? $this->fallback ?? ResearchModelReply::failed();
     }
 }

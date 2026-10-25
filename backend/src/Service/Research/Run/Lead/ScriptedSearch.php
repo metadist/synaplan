@@ -15,6 +15,14 @@ final class ScriptedSearch implements ResearchSearch
     /** @var array<string, list<ResearchHit>> */
     public array $hits = [];
 
+    /**
+     * Returned for a query that has no hits of its own, so a live lead's
+     * wording still finds something.
+     *
+     * @var list<ResearchHit>
+     */
+    public array $fallback = [];
+
     /** @var list<string> */
     public array $queries = [];
 
@@ -27,6 +35,6 @@ final class ScriptedSearch implements ResearchSearch
     {
         $this->queries[] = $query;
 
-        return array_slice($this->hits[$query] ?? [], 0, $limit);
+        return array_slice($this->hits[$query] ?? $this->fallback, 0, $limit);
     }
 }

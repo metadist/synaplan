@@ -2536,9 +2536,13 @@ How to work:
 - Never repeat a query. If a point stays open after two tries, change the
   words, the language or the source kind once more, then leave it open.
 - Call several tools in one turn when they do not depend on each other.
+- Use the point and source ids exactly as the plan and the results give them.
+- When a tool says no search is left, read what you found; when nothing is
+  left, call finish.
 - Call finish when every point is answered, when the budget is used, or when
   the last two turns found nothing new — with the status and a one-line note
-  per point.
+  per point. Never answer in text: finish is the only way to end, and the
+  report is written afterwards.
 PROMPT;
     }
 

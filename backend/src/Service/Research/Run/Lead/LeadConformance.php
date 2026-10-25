@@ -5,438 +5,407 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Lead;
 
 use App\AI\ToolCalling\ToolCall;
-use App\Service\Research\Run\Ledger\Source;
-use App\Service\Research\Run\ResearchDepth;
-use App\Service\Research\Run\ResearchEventLog;
-use App\Service\Research\Run\ResearchRunState;
-use App\Service\Research\Run\Stage\ResearchHit;
-use App\Service\Research\Run\Stage\ResearchLeadTurn;
-use App\Service\Research\Run\Stage\ResearchModelReply;
-use App\Service\Research\Run\Stage\ResearchStop;
-use App\Service\Research\Run\Stage\StageContext;
+use App\Service\Research\Run\Stage\ResearchLeadCaller;
 
 /**
- * Twenty scripted lead turns. The suite uses test doubles, so running it
- * does not call a provider and does not spend a key.
+ * Ten scenarios, each played twice, through the live lead caller: the model
+ * gets the run's prompt, history and tools, and the engine executes its calls
+ * on scripted search, pages and reader. Only the lead model is called. A model
+ * that passes all twenty turns may go on `RESEARCH.TOOL_MODE_MODELS`.
  */
-final class LeadConformance
+final readonly class LeadConformance
 {
-    public const CASES = 20;
+    public const SCENARIOS = 10;
+    public const RUNS = 2;
+    public const TURNS = self::SCENARIOS * self::RUNS;
+
+    private const PRICE_URL = 'https://maker.example/price-list';
+    private const SHOP_URL = 'https://shop.example/unit';
+    private const REFUSED = ['not_allowed', 'unknown_id', 'unknown_tool'];
+
+    public function __construct(private ResearchLeadCaller $caller)
+    {
+    }
 
     /**
-     * @return array<string, ?string> case name to a failure, or null when it passed
+     * @param (callable(string, ?string): void)|null $onTurn called after every turn
+     *
+     * @return array<string, ?string> turn name to a failure, or null when it passed
      */
-    public function results(): array
+    public function results(int $modelId, int $userId, ?callable $onTurn = null): array
     {
-        return [
-            'search spends one search' => $this->searchSpends(),
-            'a spent search budget runs nothing' => $this->searchBudget(),
-            'a repeated query is refused' => $this->repeatedQuery(),
-            'an unknown point is refused' => $this->unknownPoint(),
-            'file search is refused' => $this->filesScope(),
-            'a read returns cards and not the page' => $this->readCards(),
-            'a spent read budget runs nothing' => $this->readBudget(),
-            'an unknown source is refused' => $this->unknownSource(),
-            'reread of an unread source is refused' => $this->rereadUnread(),
-            'reread asks the sharper question' => $this->rereadQuestion(),
-            'finish drops the other calls' => $this->finishDropsSearch(),
-            'a turn with no tool gets one reminder' => $this->reminderThenStop(),
-            'two searches in one turn both run' => $this->twoSearches(),
-            'the search past the budget is refused' => $this->secondSearchBudget(),
-            'clearing keeps the tool call and the latest result' => $this->clearingKeepsCalls(),
-            'a resumed run does not repeat the search' => $this->resumedTurn(),
-            'asking the person is refused' => $this->askUser(),
-            'an unlisted model stays in round mode' => $this->unlistedModel(),
-            'a listed model uses tools' => $this->listedModel(),
-            'rounds wins over a listed model' => $this->roundsWins(),
+        $scenarios = [
+            'opens with a search' => $this->opensWithSearch(...),
+            'searches two points in one turn' => $this->searchesBothPoints(...),
+            'reads the source it found' => $this->readsFoundSource(...),
+            'does not repeat a refused query' => $this->avoidsRepeatedQuery(...),
+            'finishes when the budget is used' => $this->finishesOnBudget(...),
+            'finishes when two sources agree' => $this->finishesWhenCovered(...),
+            'stays valid after a long result' => $this->longResult(...),
+            'reads when no search is left' => $this->readsWhenSearchesUsed(...),
+            'moves on to the open point' => $this->movesToOpenPoint(...),
+            'finish names every point honestly' => $this->finishNamesEveryPoint(...),
         ];
-    }
-
-    private function searchSpends(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->search->hits['warranty terms'] = [$this->hit(str_repeat('A', 200), str_repeat('B', 400))];
-        $bench->lead->script[] = $this->turn($this->searchCall('c1', 'warranty terms'));
-        if ('round' !== $bench->stage->run($bench->ctx)->next) {
-            return 'the turn did not queue another turn';
-        }
-        if (['warranty terms'] !== $bench->search->queries) {
-            return 'the search did not run once';
-        }
-        $saved = $bench->ctx->state->conversation->toArray()['turns'][0]['results'][0]['content'] ?? '';
-        $body = $this->body(is_string($saved) ? $saved : '');
-        $title = $body['results'][0]['title'] ?? '';
-        $snippet = $body['results'][0]['snippet'] ?? '';
-        if (!is_string($title) || mb_strlen($title) > 120 || !is_string($snippet) || mb_strlen($snippet) > 300) {
-            return 'a result was longer than the lead may see';
-        }
-        if (!$this->hasEvent($bench, 'search', ['point', 'query', 'scope', 'results'])) {
-            return 'the search event does not match round mode';
-        }
-        if (!$this->hasEvent($bench, 'round', ['n', 'max', 'next'])) {
-            return 'the round event does not match round mode';
-        }
-
-        return null;
-    }
-
-    private function searchBudget(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->ctx->state->budget->spend('searches', 10);
-        $bench->search->hits['warranty'] = [$this->hit('Warranty', 'Two years')];
-        $json = $bench->tools->execute($this->searchCall('c1', 'warranty'), $bench->ctx)->json;
-        if ('budget_used' !== ($this->body($json)['error'] ?? null) || [] !== $bench->search->queries) {
-            return 'the search ran with no budget left';
-        }
-
-        return null;
-    }
-
-    private function repeatedQuery(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->ctx->state->ledger->addQuery('p1', 'Warranty Terms', 'web', 1);
-        $json = $bench->tools->execute($this->searchCall('c1', 'warranty terms'), $bench->ctx)->json;
-        if ('repeated_query' !== ($this->body($json)['error'] ?? null) || [] !== $bench->search->queries) {
-            return 'the repeated query ran';
-        }
-
-        return null;
-    }
-
-    private function unknownPoint(): ?string
-    {
-        $bench = LeadBench::open();
-        $call = new ToolCall('c1', 'search', ['point' => 'p9', 'query' => 'warranty', 'language' => 'en', 'scope' => 'web']);
-        if ('unknown_id' !== ($this->body($bench->tools->execute($call, $bench->ctx)->json)['error'] ?? null)) {
-            return 'an unknown point was searched';
-        }
-
-        return null;
-    }
-
-    private function filesScope(): ?string
-    {
-        $bench = LeadBench::open();
-        $call = new ToolCall('c1', 'search', ['point' => 'p1', 'query' => 'warranty', 'language' => 'en', 'scope' => 'files']);
-        $json = $bench->tools->execute($call, $bench->ctx)->json;
-        if ('not_allowed' !== ($this->body($json)['error'] ?? null) || [] !== $bench->search->queries) {
-            return 'a file search ran';
-        }
-
-        return null;
-    }
-
-    private function readCards(): ?string
-    {
-        $bench = LeadBench::open();
-        $id = $bench->pricePage('https://maker.example/price');
-        $bench->reader->script[] = $this->evidence();
-        $json = $bench->tools->execute(new ToolCall('r1', 'read_sources', ['ids' => [$id], 'point' => 'p1']), $bench->ctx)->json;
-        if (str_contains($json, 'SECRET PAGE BODY') || [] === ($this->body($json)['cards'] ?? [])) {
-            return 'the page leaked or no card was returned';
-        }
-
-        return null;
-    }
-
-    private function readBudget(): ?string
-    {
-        $bench = LeadBench::open();
-        $id = $bench->pricePage('https://maker.example/price');
-        $bench->ctx->state->budget->spend('sources', 15);
-        $json = $bench->tools->execute(new ToolCall('r1', 'read_sources', ['ids' => [$id], 'point' => 'p1']), $bench->ctx)->json;
-        if ('budget_used' !== ($this->body($json)['error'] ?? null) || 0 !== $bench->pages->opened) {
-            return 'a source was opened with no read budget';
-        }
-
-        return null;
-    }
-
-    private function unknownSource(): ?string
-    {
-        $bench = LeadBench::open();
-        $json = $bench->tools->execute(new ToolCall('r1', 'read_sources', ['ids' => ['s9'], 'point' => 'p1']), $bench->ctx)->json;
-        if ('unknown_id' !== ($this->body($json)['error'] ?? null)) {
-            return 'an unknown source was read';
-        }
-
-        return null;
-    }
-
-    private function rereadUnread(): ?string
-    {
-        $bench = LeadBench::open();
-        $id = $bench->pricePage('https://maker.example/price');
-        $json = $bench->tools->execute(new ToolCall('r1', 'reread', ['source' => $id, 'question' => 'Net or gross?']), $bench->ctx)->json;
-        if ('not_allowed' !== ($this->body($json)['error'] ?? null) || 0 !== $bench->pages->opened) {
-            return 'an unread source was read again';
-        }
-
-        return null;
-    }
-
-    private function rereadQuestion(): ?string
-    {
-        $bench = LeadBench::open();
-        $id = $bench->pricePage('https://maker.example/price');
-        $bench->ctx->state->ledger->markSource($id, Source::READ);
-        $bench->reader->script[] = $this->evidence();
-        $json = $bench->tools->execute(new ToolCall('r1', 'reread', ['source' => $id, 'question' => 'Is 12.40 net or gross?']), $bench->ctx)->json;
-        $asked = $bench->reader->users[0] ?? '';
-        if (!str_contains($asked, 'net or gross') || str_contains($json, 'SECRET PAGE BODY')) {
-            return 'the sharper question was not asked, or the page leaked';
-        }
-
-        return null;
-    }
-
-    private function finishDropsSearch(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->search->hits['warranty'] = [$this->hit('Warranty', 'Two years')];
-        $bench->lead->script[] = $this->turn(
-            new ToolCall('f', 'finish', ['reason' => 'covered', 'points' => [['id' => 'p1', 'status' => 'answered', 'note' => 'Agreed.']]]),
-            $this->searchCall('s', 'warranty'),
-        );
-        if ('write' !== $bench->stage->run($bench->ctx)->next || [] !== $bench->search->queries) {
-            return 'finish still searched';
-        }
-        if ('open' !== $bench->ctx->state->ledger->points()[0]->status) {
-            return 'a point with no finding was marked answered';
-        }
-
-        return null;
-    }
-
-    private function reminderThenStop(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->lead->script[] = new ResearchLeadTurn(true, true, 'thinking', [], 'test:lead', null);
-        $bench->lead->script[] = new ResearchLeadTurn(true, true, 'still thinking', [], 'test:lead', null);
-        $first = $bench->stage->run($bench->ctx);
-        if ('round' !== $first->next || !$bench->ctx->state->conversation->wasReminded()) {
-            return 'the empty turn did not remind the lead';
-        }
-        $second = $bench->stage->run($bench->ctx);
-        $prompt = $bench->lead->seen[1][0]['content'] ?? '';
-        if ('write' !== $second->next || !is_string($prompt) || !str_contains($prompt, 'Unit price')) {
-            return 'the second empty turn did not go to the report with the plan';
-        }
-
-        return null;
-    }
-
-    private function twoSearches(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->search->hits['alpha'] = [$this->hit('Alpha', 'One')];
-        $bench->search->hits['beta'] = [$this->hit('Beta', 'Two', 'https://example.com/beta')];
-        $bench->lead->script[] = $this->turn($this->searchCall('a', 'alpha'), $this->searchCall('b', 'beta'));
-        if ('round' !== $bench->stage->run($bench->ctx)->next || ['alpha', 'beta'] !== $bench->search->queries) {
-            return 'parallel searches did not both run';
-        }
-
-        return null;
-    }
-
-    private function secondSearchBudget(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->ctx->state->budget->spend('searches', 9);
-        $bench->search->hits['alpha'] = [$this->hit('Alpha', 'One')];
-        $bench->search->hits['beta'] = [$this->hit('Beta', 'Two', 'https://example.com/beta')];
-        $bench->lead->script[] = $this->turn($this->searchCall('a', 'alpha'), $this->searchCall('b', 'beta'));
-        $bench->stage->run($bench->ctx);
-        $second = $bench->ctx->state->conversation->toArray()['turns'][0]['results'][1]['content'] ?? '';
-        if (['alpha'] !== $bench->search->queries || !is_string($second) || !str_contains($second, 'budget_used')) {
-            return 'the second search ran after the budget was spent';
-        }
-
-        return null;
-    }
-
-    private function clearingKeepsCalls(): ?string
-    {
-        $talk = new LeadConversation();
-        $long = str_repeat('x', 800);
-        $call = static fn (string $id): array => ['id' => $id, 'type' => 'function', 'function' => ['name' => 'search', 'arguments' => '{}']];
-        $talk->append('first', [$call('c1')], [['id' => 'c1', 'name' => 'search', 'content' => $long]]);
-        $talk->append('second', [$call('c2')], [['id' => 'c2', 'name' => 'search', 'content' => $long.' fresh']]);
-        $messages = $talk->messagesFor(10, 'LEDGER');
-        $tools = array_values(array_filter($messages, static fn (array $message): bool => 'tool' === ($message['role'] ?? null)));
-        $calls = $messages[0]['tool_calls'][0]['function']['name'] ?? null;
-        $stored = $talk->toArray()['turns'][0]['results'][0]['content'] ?? '';
-        if ('LEDGER' !== ($tools[0]['content'] ?? null) || !str_contains((string) ($tools[1]['content'] ?? ''), 'fresh')) {
-            return 'older tool results were not replaced, or the latest was';
-        }
-        if ('search' !== $calls || $stored !== $long) {
-            return 'the tool call or the stored result was dropped';
-        }
-
-        return null;
-    }
-
-    private function resumedTurn(): ?string
-    {
-        $bench = LeadBench::open();
-        $bench->search->hits['warranty'] = [$this->hit('Warranty', 'Two years')];
-        $bench->lead->script[] = $this->turn($this->searchCall('c1', 'warranty'));
-        $bench->lead->script[] = $this->turn(new ToolCall('f', 'finish', [
-            'reason' => 'budget',
-            'points' => [['id' => 'p1', 'status' => 'thin', 'note' => 'One source.']],
-        ]));
-        $bench->stage->run($bench->ctx);
-        $restored = ResearchRunState::decode($bench->ctx->state->encode());
-        if (!$restored instanceof ResearchRunState) {
-            return 'the turn could not be restored';
-        }
-        $restored->budget->at($bench->ctx->today);
-        $again = new StageContext(
-            $restored,
-            $bench->ctx->roles,
-            new ResearchEventLog($bench->keys),
-            $bench->ctx->today,
-            new ResearchStop(),
-        );
-        $bench->stage->run($again);
-        $second = $bench->lead->seen[1] ?? [];
-        $roles = array_column($second, 'role');
-        if (['warranty'] !== $bench->search->queries || !in_array('tool', $roles, true)) {
-            return 'the resumed run repeated the search or forgot the tool result';
-        }
-
-        return null;
-    }
-
-    private function askUser(): ?string
-    {
-        $bench = LeadBench::open();
-        $call = new ToolCall('a', 'ask_user', ['question' => 'Which shop?', 'options' => ['Alpha', 'Beta']]);
-        if ('not_allowed' !== ($this->body($bench->tools->execute($call, $bench->ctx)->json)['error'] ?? null)) {
-            return 'the question was accepted before a run can wait';
-        }
-
-        return null;
-    }
-
-    private function unlistedModel(): ?string
-    {
-        $mode = $this->resolver('auto', ['anthropic:claude:chat'], 'other:model:chat')->resolve(3, ResearchDepth::Standard);
-        if (LeadMode::Rounds !== $mode) {
-            return 'a model that is not listed used tools';
-        }
-
-        return null;
-    }
-
-    private function listedModel(): ?string
-    {
-        $resolver = $this->resolver('auto', ['anthropic:claude:chat'], 'anthropic:claude:chat');
-        if (LeadMode::Tools !== $resolver->resolve(3, ResearchDepth::Standard)) {
-            return 'a listed model stayed in round mode';
-        }
-        if (LeadMode::Rounds !== $resolver->resolve(3, ResearchDepth::Quick)) {
-            return 'a quick run left round mode';
-        }
-
-        return null;
-    }
-
-    private function roundsWins(): ?string
-    {
-        $mode = $this->resolver('rounds', ['anthropic:claude:chat'], 'anthropic:claude:chat')->resolve(3, ResearchDepth::Standard);
-        if (LeadMode::Rounds !== $mode) {
-            return 'an explicit round setting used tools';
-        }
-
-        return null;
-    }
-
-    /**
-     * @param list<string> $models
-     */
-    private function resolver(string $mode, array $models, string $key): LeadModeResolver
-    {
-        return new LeadModeResolver(new FixedLeadSettings($mode, $models), new FixedLeadCatalog($key));
-    }
-
-    private function searchCall(string $id, string $query): ToolCall
-    {
-        return new ToolCall($id, 'search', [
-            'point' => 'p1',
-            'query' => $query,
-            'language' => 'en',
-            'scope' => 'web',
-        ]);
-    }
-
-    private function turn(ToolCall ...$calls): ResearchLeadTurn
-    {
-        return new ResearchLeadTurn(true, true, '', array_values($calls), 'test:lead', null);
-    }
-
-    private function hit(string $title, string $snippet, string $url = 'https://example.com/warranty'): ResearchHit
-    {
-        $hit = ResearchHit::from($url, $title, $snippet, '2026-01-01');
-        if (!$hit instanceof ResearchHit) {
-            throw new \RuntimeException('The conformance fixture needs a valid address.');
-        }
-
-        return $hit;
-    }
-
-    private function evidence(): ResearchModelReply
-    {
-        $data = [
-            'source_id' => 's1',
-            'useful' => true,
-            'published' => null,
-            'kind' => 'vendor',
-            'findings' => [[
-                'point' => 'p1',
-                'fact' => 'The unit price is 12.40 EUR.',
-                'passages' => ['§1'],
-                'quote' => ['text' => 'The unit price is 12.40 EUR.', 'passage' => '§1'],
-                'confidence' => 'high',
-            ]],
-            'leads' => [],
-            'flags' => [],
-        ];
-
-        return new ResearchModelReply(true, true, $data, (string) json_encode($data), 'test:reader', null);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function body(string $json): array
-    {
-        $data = json_decode($json, true);
-
-        return is_array($data) ? $data : [];
-    }
-
-    /**
-     * @param list<string> $keys
-     */
-    private function hasEvent(LeadBench $bench, string $name, array $keys): bool
-    {
-        foreach ($bench->keys->events as $body) {
-            $decoded = json_decode($body, true);
-            if (!is_array($decoded) || $name !== ($decoded['event'] ?? null) || !is_array($decoded['data'] ?? null)) {
-                continue;
-            }
-            foreach ($keys as $key) {
-                if (!array_key_exists($key, $decoded['data'])) {
-                    return false;
+        $results = [];
+        foreach ($scenarios as $name => $scenario) {
+            for ($run = 1; $run <= self::RUNS; ++$run) {
+                $label = $name.' (run '.$run.')';
+                $bench = LeadBench::open($this->caller, $modelId, $userId);
+                $failure = $scenario($bench);
+                $results[$label] = null === $failure ? null : $failure.$this->sent($bench);
+                if (null !== $onTurn) {
+                    $onTurn($label, $results[$label]);
                 }
             }
+        }
 
-            return true;
+        return $results;
+    }
+
+    private function opensWithSearch(LeadBench $bench): ?string
+    {
+        $this->offer($bench, self::PRICE_URL);
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+
+        return $this->has($calls, 'search', 'p1') ? null : 'the first turn did not search for p1';
+    }
+
+    private function searchesBothPoints(LeadBench $bench): ?string
+    {
+        $bench->ctx->state->ledger->addPoint('Warranty period of the Maker X100', 'Needed.');
+        $this->offer($bench, self::PRICE_URL);
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+
+        return $this->has($calls, 'search', 'p1') && $this->has($calls, 'search', 'p2')
+            ? null
+            : 'the first turn did not search both independent points';
+    }
+
+    private function readsFoundSource(LeadBench $bench): ?string
+    {
+        $id = $this->found($bench);
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+
+        return $this->reads($calls, $id) ? null : 'the model did not read the source it found';
+    }
+
+    private function avoidsRepeatedQuery(LeadBench $bench): ?string
+    {
+        $this->found($bench);
+        $this->prior($bench, $this->search($bench, 'unit price'));
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+        foreach ($calls as $call) {
+            if ('repeated_query' === $call['error']) {
+                return 'the model sent a query that was already refused';
+            }
+        }
+
+        return null;
+    }
+
+    private function finishesOnBudget(LeadBench $bench): ?string
+    {
+        $this->found($bench);
+        $this->spendAll($bench);
+        $this->prior($bench, $this->search($bench, 'unit price 2026'));
+        $points = $this->finishAfterBudget($bench);
+        if (is_string($points)) {
+            return $points;
+        }
+
+        return isset($points['p1']) ? null : 'finish did not give p1 a status';
+    }
+
+    /**
+     * Plays until finish. One more turn is allowed when every call of the
+     * first was refused for the budget: that costs nothing, and the refusal
+     * is how the model learns the budget is used.
+     *
+     * @return array<string, string>|string point statuses, or why it failed
+     */
+    private function finishAfterBudget(LeadBench $bench): array|string
+    {
+        for ($turn = 0; $turn < 2; ++$turn) {
+            $calls = $this->play($bench);
+            if (is_string($calls)) {
+                return $calls;
+            }
+            $points = $this->finished($calls);
+            if (null !== $points) {
+                return $points;
+            }
+            foreach ($calls as $call) {
+                if ('budget_used' !== $call['error']) {
+                    return 'the model kept working when the budget was used';
+                }
+            }
+        }
+
+        return 'the model did not call finish when the budget was used';
+    }
+
+    private function finishesWhenCovered(LeadBench $bench): ?string
+    {
+        $this->covered($bench);
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+        $points = $this->finished($calls);
+        if (null === $points) {
+            return 'the model kept working on a point two sources answer';
+        }
+
+        return 'answered' === ($points['p1'] ?? null) ? null : 'finish did not call p1 answered';
+    }
+
+    private function longResult(LeadBench $bench): ?string
+    {
+        for ($n = 1; $n <= 10; ++$n) {
+            $bench->search->fallback[] = LeadBench::hit(
+                'https://example.com/page-'.$n,
+                str_repeat('Unit price overview '.$n.' ', 8),
+                str_repeat('Prices, discounts and delivery terms for every unit and region. ', 6),
+            );
+        }
+        $this->prior($bench, $this->search($bench, 'unit price'));
+        $calls = $this->play($bench);
+
+        return is_string($calls) ? $calls : null;
+    }
+
+    private function readsWhenSearchesUsed(LeadBench $bench): ?string
+    {
+        $id = $this->found($bench);
+        $searches = $bench->ctx->state->budget->searchesLeft();
+        if ($searches > 0) {
+            $bench->ctx->state->budget->spend('searches', $searches);
+        }
+        $this->prior($bench, $this->search($bench, 'unit price list'));
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+        if ($this->has($calls, 'search', null)) {
+            return 'the model searched with no search left';
+        }
+
+        return $this->reads($calls, $id) ? null : 'the model did not read the source it still could';
+    }
+
+    private function movesToOpenPoint(LeadBench $bench): ?string
+    {
+        $bench->ctx->state->ledger->addPoint('Warranty period of the Maker X100', 'Needed.');
+        $this->covered($bench);
+        $calls = $this->play($bench);
+        if (is_string($calls)) {
+            return $calls;
+        }
+        if (null !== $this->finished($calls)) {
+            return 'the model finished with p2 open and budget left';
+        }
+        if ($this->has($calls, 'search', 'p1') || $this->has($calls, 'read_sources', 'p1')) {
+            return 'the model kept working on p1, which two sources answer';
+        }
+
+        return $this->has($calls, 'search', 'p2') || $this->has($calls, 'read_sources', 'p2')
+            ? null
+            : 'the model did not move on to p2';
+    }
+
+    private function finishNamesEveryPoint(LeadBench $bench): ?string
+    {
+        $bench->ctx->state->ledger->addPoint('Warranty period of the Maker X100', 'Needed.');
+        $this->found($bench);
+        $this->spendAll($bench);
+        $this->prior($bench, $this->search($bench, 'unit price 2026'));
+        $points = $this->finishAfterBudget($bench);
+        if (is_string($points)) {
+            return $points;
+        }
+        if (!isset($points['p1'], $points['p2'])) {
+            return 'finish did not give every point a status';
+        }
+
+        return in_array('answered', $points, true) ? 'finish called a point answered that no source supports' : null;
+    }
+
+    /** What the model sent in the played turn, so a failure can be read without a debugger. */
+    private function sent(LeadBench $bench): string
+    {
+        $turns = $bench->ctx->state->conversation->turns();
+        $turn = $turns[count($turns) - 1] ?? null;
+        if (null === $turn || $bench->ctx->state->status->isTerminal()) {
+            return '';
+        }
+        $parts = [];
+        foreach ($turn['calls'] as $wire) {
+            $function = is_array($wire['function'] ?? null) ? $wire['function'] : [];
+            $parts[] = (is_string($function['name'] ?? null) ? $function['name'] : '?')
+                .(is_string($function['arguments'] ?? null) ? $function['arguments'] : '');
+        }
+        if ('' !== trim($turn['content'])) {
+            $parts[] = 'text "'.trim($turn['content']).'"';
+        }
+
+        return [] === $parts ? '' : ' — sent '.mb_substr(implode(', ', $parts), 0, 300);
+    }
+
+    /**
+     * Runs one lead turn and returns its calls, or why the turn failed.
+     *
+     * @return list<array{name: string, args: array<string, mixed>, error: ?string}>|string
+     */
+    private function play(LeadBench $bench): array|string
+    {
+        $before = count($bench->ctx->state->conversation->turns());
+        if ('done' === $bench->stage->run($bench->ctx)->next) {
+            return 'the run ended instead of a turn: '.($bench->ctx->state->outcome->code ?? 'no outcome');
+        }
+        $turn = $bench->ctx->state->conversation->turns()[$before] ?? null;
+        if (null === $turn || [] === $turn['calls']) {
+            return 'the model answered without a tool call';
+        }
+        $calls = [];
+        foreach ($turn['calls'] as $index => $wire) {
+            $function = is_array($wire['function'] ?? null) ? $wire['function'] : [];
+            $args = json_decode(is_string($function['arguments'] ?? null) ? $function['arguments'] : '{}', true);
+            $body = json_decode($turn['results'][$index]['content'] ?? '', true);
+            $error = is_array($body) && is_string($body['error'] ?? null) ? $body['error'] : null;
+            $name = is_string($function['name'] ?? null) ? $function['name'] : '';
+            if (in_array($error, self::REFUSED, true)) {
+                return 'the engine refused '.$name.' ('.$error.')';
+            }
+            $calls[] = ['name' => $name, 'args' => is_array($args) ? $args : [], 'error' => $error];
+        }
+
+        return $calls;
+    }
+
+    /**
+     * @param list<array{name: string, args: array<string, mixed>, error: ?string}> $calls
+     */
+    private function has(array $calls, string $name, ?string $point): bool
+    {
+        foreach ($calls as $call) {
+            if ($name === $call['name'] && (null === $point || $point === ($call['args']['point'] ?? null))) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    /**
+     * @param list<array{name: string, args: array<string, mixed>, error: ?string}> $calls
+     */
+    private function reads(array $calls, string $sourceId): bool
+    {
+        foreach ($calls as $call) {
+            $ids = $call['args']['ids'] ?? null;
+            if ('read_sources' === $call['name'] && is_array($ids) && in_array($sourceId, $ids, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<array{name: string, args: array<string, mixed>, error: ?string}> $calls
+     *
+     * @return array<string, string>|null point id to status, or null without finish
+     */
+    private function finished(array $calls): ?array
+    {
+        foreach ($calls as $call) {
+            if ('finish' !== $call['name']) {
+                continue;
+            }
+            $points = [];
+            foreach (is_array($call['args']['points'] ?? null) ? $call['args']['points'] : [] as $point) {
+                if (is_array($point) && is_string($point['id'] ?? null) && is_string($point['status'] ?? null)) {
+                    $points[$point['id']] = $point['status'];
+                }
+            }
+
+            return $points;
+        }
+
+        return null;
+    }
+
+    /** One earlier search that found the price list. Returns its source id. */
+    private function found(LeadBench $bench): string
+    {
+        $this->offer($bench, self::PRICE_URL);
+        $bench->reader->fallback = LeadBench::evidence();
+        $this->prior($bench, $this->search($bench, 'unit price'));
+
+        return $bench->sourceId(self::PRICE_URL);
+    }
+
+    /** Two sources found and read, and both settle p1. */
+    private function covered(LeadBench $bench): void
+    {
+        $this->offer($bench, self::PRICE_URL, self::SHOP_URL);
+        $bench->reader->fallback = LeadBench::evidence();
+        $this->prior($bench, $this->search($bench, 'unit price'));
+        $ids = [$bench->sourceId(self::PRICE_URL), $bench->sourceId(self::SHOP_URL)];
+        $this->prior($bench, new ToolCall('read_'.count($bench->ctx->state->conversation->turns()), 'read_sources', ['ids' => $ids, 'point' => 'p1']));
+    }
+
+    private function offer(LeadBench $bench, string ...$urls): void
+    {
+        foreach ($urls as $url) {
+            $bench->search->fallback[] = LeadBench::hit($url, 'Maker X100 prices', 'Official price list for the Maker X100 and its accessories, updated 2026.');
+            $bench->servePage($url);
+        }
+    }
+
+    private function spendAll(LeadBench $bench): void
+    {
+        $budget = $bench->ctx->state->budget;
+        if ($budget->searchesLeft() > 0) {
+            $budget->spend('searches', $budget->searchesLeft());
+        }
+        if ($budget->sourcesLeft() > 0) {
+            $budget->spend('sources', $budget->sourcesLeft());
+        }
+    }
+
+    /** Executes calls on the bench and stores them as an earlier lead turn. */
+    private function prior(LeadBench $bench, ToolCall ...$calls): void
+    {
+        $wires = [];
+        $results = [];
+        foreach ($calls as $call) {
+            $wires[] = [
+                'id' => $call->id,
+                'type' => 'function',
+                'function' => ['name' => $call->name, 'arguments' => json_encode($call->arguments, JSON_THROW_ON_ERROR)],
+            ];
+            $results[] = ['id' => $call->id, 'name' => $call->name, 'content' => $bench->tools->execute($call, $bench->ctx)->json];
+        }
+        $bench->ctx->state->conversation->append('', $wires, $results);
+    }
+
+    private function search(LeadBench $bench, string $query): ToolCall
+    {
+        $id = 'search_'.count($bench->ctx->state->conversation->turns());
+
+        return new ToolCall($id, 'search', ['point' => 'p1', 'query' => $query, 'language' => 'en', 'scope' => 'web']);
     }
 }

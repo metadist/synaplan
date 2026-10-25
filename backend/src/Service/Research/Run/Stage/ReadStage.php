@@ -74,6 +74,8 @@ final readonly class ReadStage implements ResearchStage
      * Reads the named sources and returns the cards from this call.
      * A stop from the reader ends the run before the next source. A budget
      * that runs out mid-list goes to the writer, so what was read is kept.
+     * A source that was already read stays read, so a failed reread cannot
+     * hide the evidence it gave before.
      *
      * @param list<string> $ids
      *
@@ -94,13 +96,18 @@ final readonly class ReadStage implements ResearchStage
                 $blocked[] = ['id' => $id, 'reason' => 'That source cannot be read.'];
                 continue;
             }
+            $wasRead = Source::READ === $source->status;
             $before = $ctx->state->ledger->evidenceCount();
             $stop = $this->readOne($ctx, $source, $question);
+            $current = $ctx->state->ledger->source($id);
+            $failed = null !== $current && Source::BLOCKED === $current->status;
+            if ($wasRead && null !== $current && Source::READ !== $current->status) {
+                $this->mark($ctx, $id, Source::READ);
+            }
             if ($stop instanceof StageResult) {
                 return $stop;
             }
-            $current = $ctx->state->ledger->source($id);
-            if (null !== $current && Source::BLOCKED === $current->status) {
+            if ($failed) {
                 $blocked[] = ['id' => $id, 'reason' => $current->details->reason ?? 'There was no text to read.'];
                 continue;
             }

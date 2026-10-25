@@ -7,7 +7,11 @@ namespace App\Service\Research\Run\Lead;
 use App\Entity\Model;
 use App\Repository\ModelRepository;
 
-/** Reads the catalog key from the model row. A missing row has no key. */
+/**
+ * Reads the catalog key from the model row, normalised like
+ * `ModelCatalog::find()` (lower case, `:` in the provider id as `-`).
+ * A missing row has no key.
+ */
 final readonly class ModelLeadCatalog implements LeadCatalog
 {
     public function __construct(private ModelRepository $models)
@@ -27,6 +31,6 @@ final readonly class ModelLeadCatalog implements LeadCatalog
             return null;
         }
 
-        return $service.':'.$provider.':'.$tag;
+        return strtolower($service).':'.strtolower(str_replace(':', '-', $provider)).':'.strtolower($tag);
     }
 }

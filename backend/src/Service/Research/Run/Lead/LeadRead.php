@@ -8,6 +8,7 @@ use App\AI\ToolCalling\ToolCall;
 use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\Stage\ReadStage;
+use App\Service\Research\Run\Stage\ResearchPrompts;
 use App\Service\Research\Run\Stage\StageContext;
 use App\Service\Research\Run\Stage\StageResult;
 
@@ -57,7 +58,7 @@ final readonly class LeadRead
             return $this->refuse($known, $ctx);
         }
         $budget = $ctx->state->budget;
-        if ($budget->sourcesLeft() < count($ids) || $budget->callsLeft() <= count($ids) + self::WRITER_CALL - 1) {
+        if ($budget->sourcesLeft() < count($ids) || $budget->callsLeft() < count($ids) + self::WRITER_CALL) {
             return $this->refuse('budget_used', $ctx);
         }
         $read = $this->read->readListed($ctx, $ids, $question);
@@ -65,7 +66,40 @@ final readonly class LeadRead
             return new LeadToolOutcome('', $read);
         }
 
-        return new LeadToolOutcome(LeadToolReply::ok($read, $ctx->state->budget));
+        return new LeadToolOutcome(LeadToolReply::ok([
+            'cards' => array_map($this->card(...), $read['cards']),
+            'blocked' => array_map(
+                static fn (array $row): array => ['id' => $row['id'], 'reason' => ResearchPrompts::data($row['reason'])],
+                $read['blocked'],
+            ),
+        ], $ctx->state->budget));
+    }
+
+    /**
+     * The fields the lead needs to judge a point. Quotes come from the page,
+     * so every text is marked as data like the search results.
+     *
+     * @param array<string, mixed> $card
+     *
+     * @return array<string, mixed>
+     */
+    private function card(array $card): array
+    {
+        $quotes = [];
+        foreach (is_array($card['quotes'] ?? null) ? $card['quotes'] : [] as $quote) {
+            if (is_array($quote) && is_string($quote['text'] ?? null) && true === ($quote['verified'] ?? false)) {
+                $quotes[] = ResearchPrompts::data($quote['text']);
+            }
+        }
+
+        return [
+            'id' => $card['id'] ?? null,
+            'source' => $card['source'] ?? null,
+            'point' => $card['point'] ?? null,
+            'fact' => ResearchPrompts::data(is_string($card['fact'] ?? null) ? $card['fact'] : ''),
+            'quotes' => $quotes,
+            'confidence' => $card['confidence'] ?? null,
+        ];
     }
 
     /**

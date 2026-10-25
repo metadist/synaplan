@@ -21,14 +21,20 @@ final class LeadToolReply
 
     public static function error(string $code, ResearchBudget $budget): string
     {
-        return self::json([
+        $reply = [
             'error' => $code,
             'left' => self::left($budget),
-        ]);
+        ];
+        $next = 'budget_used' === $code ? self::next($budget) : null;
+        if (null !== $next) {
+            $reply['next'] = $next;
+        }
+
+        return self::json($reply);
     }
 
     /**
-     * @return array{searches: int, sources: int, rounds: int}
+     * @return array{searches: int, sources: int, turns: int}
      */
     private static function left(ResearchBudget $budget): array
     {
@@ -37,8 +43,19 @@ final class LeadToolReply
         return [
             'searches' => $budget->searchesLeft(),
             'sources' => $budget->sourcesLeft(),
-            'rounds' => max(0, $rounds[1] - $rounds[0]),
+            'turns' => max(0, $rounds[1] - $rounds[0]),
         ];
+    }
+
+    private static function next(ResearchBudget $budget): ?string
+    {
+        if ($budget->searchesLeft() > 0) {
+            return null;
+        }
+
+        return $budget->sourcesLeft() > 0
+            ? 'No search is left. Read sources you already found, or call finish.'
+            : 'Nothing is left to search or read. Call finish now.';
     }
 
     /**

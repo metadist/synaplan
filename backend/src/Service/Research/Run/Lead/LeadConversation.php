@@ -12,12 +12,17 @@ namespace App\Service\Research\Run\Lead;
  */
 final class LeadConversation
 {
+    private const CLEARED = '{"cleared":true,"note":"Removed to save space. The ledger summary in a later result covers it."}';
+
     /**
      * @var list<array{content: string, calls: list<array<string, mixed>>, results: list<array{id: string, name: string, content: string}>}>
      */
     private array $turns = [];
 
     private ?string $reminder = null;
+
+    /** Index of the turn the reminder answered. */
+    private int $reminderAfter = -1;
 
     /**
      * @param list<array<string, mixed>>                             $calls
@@ -36,6 +41,7 @@ final class LeadConversation
     {
         if (null === $this->reminder) {
             $this->reminder = $text;
+            $this->reminderAfter = count($this->turns) - 1;
         }
     }
 
@@ -45,22 +51,40 @@ final class LeadConversation
     }
 
     /**
+     * @return list<array{content: string, calls: list<array<string, mixed>>, results: list<array{id: string, name: string, content: string}>}>
+     */
+    public function turns(): array
+    {
+        return $this->turns;
+    }
+
+    /**
+     * Providers reject an assistant message with an empty `tool_calls` list,
+     * and Anthropic rejects one with empty text, so such turns are left out.
+     * Past the budget, every older tool result but one becomes a short
+     * marker and the last older one carries the ledger summary once.
+     *
      * @return list<array<string, mixed>>
      */
     public function messagesFor(int $inputBudgetTokens, string $ledgerSummary): array
     {
         $clear = $this->overBudget($inputBudgetTokens);
         $last = count($this->turns) - 1;
+        $summaryAt = $clear ? $this->lastOlderResult($last) : null;
         $messages = [];
-        $reminded = null === $this->reminder;
         foreach ($this->turns as $index => $turn) {
-            $messages[] = [
-                'role' => 'assistant',
-                'content' => $turn['content'],
-                'tool_calls' => $turn['calls'],
-            ];
-            foreach ($turn['results'] as $result) {
-                $content = $clear && $index < $last ? $ledgerSummary : $result['content'];
+            $message = ['role' => 'assistant', 'content' => $turn['content']];
+            if ([] !== $turn['calls']) {
+                $message['tool_calls'] = $turn['calls'];
+            }
+            if ([] !== $turn['calls'] || '' !== trim($turn['content'])) {
+                $messages[] = $message;
+            }
+            foreach ($turn['results'] as $position => $result) {
+                $content = $result['content'];
+                if ($clear && $index < $last) {
+                    $content = [$index, $position] === $summaryAt ? $ledgerSummary : self::CLEARED;
+                }
                 $messages[] = [
                     'role' => 'tool',
                     'tool_call_id' => $result['id'],
@@ -68,14 +92,9 @@ final class LeadConversation
                     'content' => $content,
                 ];
             }
-            // The reminder answers the first turn without a tool call, so two assistant messages never follow each other.
-            if (!$reminded && [] === $turn['calls']) {
+            if (null !== $this->reminder && $index === $this->reminderAfter) {
                 $messages[] = ['role' => 'user', 'content' => $this->reminder];
-                $reminded = true;
             }
-        }
-        if (!$reminded && null !== $this->reminder) {
-            $messages[] = ['role' => 'user', 'content' => $this->reminder];
         }
 
         return $messages;
@@ -89,6 +108,7 @@ final class LeadConversation
         return [
             'turns' => $this->turns,
             'reminder' => $this->reminder,
+            'reminder_after' => $this->reminderAfter,
         ];
     }
 
@@ -113,8 +133,37 @@ final class LeadConversation
         }
         $reminder = $data['reminder'] ?? null;
         $conversation->reminder = is_string($reminder) && '' !== $reminder ? $reminder : null;
+        $after = $data['reminder_after'] ?? null;
+        $conversation->reminderAfter = is_int($after) ? $after : $conversation->firstTurnWithoutCalls();
 
         return $conversation;
+    }
+
+    /** Where a reminder stored before `reminder_after` existed belongs. */
+    private function firstTurnWithoutCalls(): int
+    {
+        foreach ($this->turns as $index => $turn) {
+            if ([] === $turn['calls']) {
+                return $index;
+            }
+        }
+
+        return count($this->turns) - 1;
+    }
+
+    /**
+     * @return array{int, int}|null turn index and result position
+     */
+    private function lastOlderResult(int $last): ?array
+    {
+        for ($index = $last - 1; $index >= 0; --$index) {
+            $count = count($this->turns[$index]['results']);
+            if ($count > 0) {
+                return [$index, $count - 1];
+            }
+        }
+
+        return null;
     }
 
     private function overBudget(int $inputBudgetTokens): bool

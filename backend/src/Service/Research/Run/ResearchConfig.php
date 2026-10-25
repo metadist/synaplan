@@ -83,7 +83,7 @@ final readonly class ResearchConfig
         $keys = [];
         foreach ($decoded as $key) {
             if (is_string($key) && '' !== trim($key)) {
-                $keys[] = trim($key);
+                $keys[] = strtolower(trim($key));
             }
         }
 
