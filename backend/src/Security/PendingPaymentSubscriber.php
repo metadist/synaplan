@@ -89,6 +89,12 @@ final class PendingPaymentSubscriber implements EventSubscriberInterface
             return true;
         }
 
+        // While impersonating, the signed-in account is the pending user.
+        // Exit restores the administrator from the stashed session.
+        if ('POST' === $method && '/api/v1/admin/impersonate/exit' === $path) {
+            return true;
+        }
+
         foreach (self::PREFIXES as $prefix) {
             if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
                 return true;
