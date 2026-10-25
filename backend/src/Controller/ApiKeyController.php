@@ -4,7 +4,9 @@ namespace App\Controller;
 
 use App\Entity\ApiKey;
 use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\PlatformLink\PlatformLinkExchangeService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,6 +27,7 @@ class ApiKeyController extends AbstractController
     public function __construct(
         private ApiKeyRepository $apiKeyRepository,
         private PlatformLinkExchangeService $platformLinkExchangeService,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -156,6 +159,18 @@ class ApiKeyController extends AbstractController
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(
+                response: 403,
+                description: 'The account is not on a paid plan',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'error', type: 'string', example: 'API keys are part of a paid plan.'),
+                        new OA\Property(property: 'code', type: 'string', example: 'API_PLAN_REQUIRED'),
+                        new OA\Property(property: 'message', type: 'string', example: 'API keys are part of a paid plan.'),
+                    ]
+                )
+            ),
         ]
     )]
     public function create(
@@ -164,6 +179,10 @@ class ApiKeyController extends AbstractController
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->premiumFeatureGate->isUnlockedFor($user)) {
+            return $this->json(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -277,6 +296,13 @@ class ApiKeyController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
+        $data = is_array($data) ? $data : [];
+
+        // Turning a key off stays available. Creating one, or switching it
+        // back on, is the paid-plan action.
+        if (!$this->premiumFeatureGate->isUnlockedFor($user) && 'inactive' !== ($data['status'] ?? null)) {
+            return $this->json(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
+        }
 
         if (isset($data['status'])) {
             if (!in_array($data['status'], ['active', 'inactive'])) {
@@ -298,16 +324,21 @@ class ApiKeyController extends AbstractController
 
         $this->apiKeyRepository->save($apiKey);
 
-        return $this->json([
-            'success' => true,
-            'api_key' => [
-                'id' => $apiKey->getId(),
-                'name' => $apiKey->getName(),
-                'key_prefix' => substr($apiKey->getKey(), 0, 8).'...',
-                'status' => $apiKey->getStatus(),
-                'scopes' => $apiKey->getScopes(),
-                'last_used' => $apiKey->getLastUsed(),
-            ],
-        ]);
+        return $this->json(['success' => true, 'api_key' => $this->summary($apiKey)]);
+    }
+
+    /**
+     * @return array{id: ?int, name: string, key_prefix: string, status: string, scopes: array<mixed>, last_used: int}
+     */
+    private function summary(ApiKey $apiKey): array
+    {
+        return [
+            'id' => $apiKey->getId(),
+            'name' => $apiKey->getName(),
+            'key_prefix' => substr($apiKey->getKey(), 0, 8).'...',
+            'status' => $apiKey->getStatus(),
+            'scopes' => $apiKey->getScopes(),
+            'last_used' => $apiKey->getLastUsed(),
+        ];
     }
 }

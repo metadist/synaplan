@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 
@@ -32,6 +33,7 @@ final readonly class OutlookConnectService
         private PlatformInstanceRepository $instanceRepository,
         private RedirectUriPolicy $redirectUriPolicy,
         private AuditLogWriter $auditLogWriter,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -60,6 +62,8 @@ final readonly class OutlookConnectService
 
         $redirectUri = trim($redirectUri);
         $relay = '' === $redirectUri ? null : $this->acceptedRelay($user, $redirectUri, $ip);
+
+        $this->premiumFeatureGate->assertApiKeysAllowed($user);
 
         $plainKey = 'sk_'.bin2hex(random_bytes(29));
         $apiKey = new ApiKey();

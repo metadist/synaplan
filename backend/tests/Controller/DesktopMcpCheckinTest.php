@@ -291,10 +291,13 @@ final class DesktopMcpCheckinTest extends WebTestCase
                 ->setMail($email)
                 ->setType('WEB')
                 ->setProviderId('desktop-mcp-test-'.uniqid())
-                ->setUserLevel('NEW');
+                ->setUserLevel('PRO');
             $user->setCreated(date('YmdHis'));
             $user->setEmailVerified(true);
             $this->em->persist($user);
+            $this->em->flush();
+        } else {
+            $user->setUserLevel('PRO');
             $this->em->flush();
         }
 

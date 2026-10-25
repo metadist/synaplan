@@ -693,6 +693,8 @@
       "errorActivating": "Error al activar clave API",
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
+      "planRequired": "Las claves API forman parte de un plan de pago.",
+      "seePlans": "Ver planes",
       "scopes": {
         "hint": "Déjelo sin marcar para acceso completo. Marcar Usuarios limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
         "iamRead": "Usuarios — ver grupos",

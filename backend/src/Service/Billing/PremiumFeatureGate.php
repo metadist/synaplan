@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Billing;
 
 use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Service\RateLimitService;
 use App\Service\Usage\StorageQuotaService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -53,6 +54,17 @@ final readonly class PremiumFeatureGate
     public function isPaidLevel(string $level): bool
     {
         return \in_array(strtoupper($level), self::PAID_LEVELS, true);
+    }
+
+    /**
+     * API keys are a paid-plan feature once this install sells a subscription.
+     * An install without billing keeps keys open for every account.
+     */
+    public function assertApiKeysAllowed(User $user): void
+    {
+        if (!$this->isUnlockedFor($user)) {
+            throw new ApiKeyPlanRequiredException();
+        }
     }
 
     /**

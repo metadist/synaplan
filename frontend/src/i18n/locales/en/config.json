@@ -940,6 +940,8 @@
       "errorActivating": "Failed to activate API key",
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
+      "planRequired": "API keys are part of a paid plan.",
+      "seePlans": "See plans",
       "scopes": {
         "hint": "Leave unchecked for full access. Checking Users limits this key to Users. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
         "iamRead": "Users — view groups",

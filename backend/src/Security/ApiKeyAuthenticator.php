@@ -3,8 +3,10 @@
 namespace App\Security;
 
 use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,6 +34,7 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         private ApiKeyRepository $apiKeyRepository,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -125,6 +128,16 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             throw new AuthenticationException('API key is inactive');
         }
 
+        // A free account keeps the in-app chat. The key itself is the API,
+        // and that stays on a paid plan while this install sells one.
+        if (!$this->premiumFeatureGate->isUnlockedFor($owner)) {
+            $this->logger->warning('API key owner is not on a paid plan', [
+                'key_id' => $apiKeyEntity->getId(),
+                'owner_id' => $apiKeyEntity->getOwnerId(),
+            ]);
+            throw new ApiKeyPlanDeniedException();
+        }
+
         // Persist immediately. save($entity, false) never flushed on /v1
         // requests, so Last used stayed empty for keys in active use.
         $this->apiKeyRepository->touchLastUsed($apiKeyEntity);
@@ -162,20 +175,27 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         // Claude Code parses the Anthropic error envelope. The Synaplan
         // {success, error, message} shape is an unhelpful parse failure, and
         // a 401 of that shape is also retried for minutes.
+        $planDenied = $exception instanceof ApiKeyPlanDeniedException;
+        $status = $planDenied ? Response::HTTP_FORBIDDEN : Response::HTTP_UNAUTHORIZED;
+
         if (str_starts_with($request->getPathInfo(), '/v1/messages')) {
             return new JsonResponse([
                 'type' => 'error',
                 'error' => [
-                    'type' => 'authentication_error',
+                    'type' => $planDenied ? 'permission_error' : 'authentication_error',
                     'message' => $exception->getMessage(),
                 ],
-            ], Response::HTTP_UNAUTHORIZED);
+            ], $status);
+        }
+
+        if ($planDenied) {
+            return new JsonResponse(ApiKeyPlanRequiredException::responseBody(), $status);
         }
 
         return new JsonResponse([
             'success' => false,
             'error' => 'Authentication failed',
             'message' => $exception->getMessage(),
-        ], Response::HTTP_UNAUTHORIZED);
+        ], $status);
     }
 }

@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -43,6 +44,7 @@ final class AdminUserProvisioningService
         private readonly UserLifecycleService $userLifecycleService,
         private readonly LoggerInterface $logger,
         private readonly ExternalIdentityRepository $externalIdentityRepository,
+        private readonly PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -302,6 +304,8 @@ final class AdminUserProvisioningService
         if (null !== $instance) {
             $this->requireIdentityOnInstance($user, $instance);
         }
+
+        $this->premiumFeatureGate->assertApiKeysAllowed($user);
 
         $this->em->wrapInTransaction(function () use ($apiKey, $user, $instance): void {
             $this->apiKeyRepository->save($apiKey, false);
