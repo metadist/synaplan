@@ -31,6 +31,19 @@ final class ResearchRunState
     /** Tool turns of a lead that calls tools. Empty in round mode. */
     public LeadConversation $conversation;
 
+    /** Questions the run is waiting on. Null once they are all answered or skipped. */
+    public ?ResearchQuestions $questions = null;
+
+    /** How many questions this run has already asked, counted against the depth's budget. */
+    public int $questionsAsked = 0;
+
+    /**
+     * Answers already given, kept after the wait ends so the next step can use them.
+     *
+     * @var list<array{question: string, answer: string}>
+     */
+    public array $replies = [];
+
     public function __construct(
         public readonly ResearchRunRef $ref,
         public ResearchStatus $status,
@@ -86,6 +99,9 @@ final class ResearchRunState
             'idempotency_key' => $this->idempotencyKey,
             'strategy_hint' => $this->strategyHint,
             'conversation' => $this->conversation->toArray(),
+            'questions' => $this->questions?->toArray(),
+            'questions_asked' => $this->questionsAsked,
+            'replies' => $this->replies,
         ];
     }
 
@@ -165,6 +181,13 @@ final class ResearchRunState
         if (is_array($conversation)) {
             $state->conversation = LeadConversation::fromArray($conversation);
         }
+        $questions = $data['questions'] ?? null;
+        if (is_array($questions)) {
+            $state->questions = ResearchQuestions::fromArray($questions);
+        }
+        $asked = $data['questions_asked'] ?? 0;
+        $state->questionsAsked = is_numeric($asked) ? max(0, (int) $asked) : 0;
+        $state->replies = self::replies($data['replies'] ?? null);
 
         return $state;
     }
@@ -197,6 +220,25 @@ final class ResearchRunState
         if ($this->expectedSeq < 1 || $this->checkpointSeq !== $this->expectedSeq - 1) {
             throw new \InvalidArgumentException('Research progress is inconsistent.');
         }
+    }
+
+    /**
+     * @return list<array{question: string, answer: string}>
+     */
+    private static function replies(mixed $rows): array
+    {
+        if (!is_array($rows)) {
+            return [];
+        }
+        $replies = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || !is_string($row['question'] ?? null) || !is_string($row['answer'] ?? null)) {
+                continue;
+            }
+            $replies[] = ['question' => $row['question'], 'answer' => $row['answer']];
+        }
+
+        return $replies;
     }
 
     private static function stamp(\DateTimeImmutable $moment): string

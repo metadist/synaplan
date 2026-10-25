@@ -82,17 +82,23 @@ final readonly class ResearchRunService
             throw new ResearchRejected(409, 'not_waiting', null, 'This research has already finished.');
         }
         $type = is_string($body['type'] ?? null) ? $body['type'] : '';
-        if (ResearchStatus::WaitingAnswer === $state->status && in_array($type, ['answer', 'skip_question'], true)) {
-            return $this->continueWaiting($state, ResearchStatus::WaitingAnswer, ResearchStatus::Planning, ResearchUnitPlan::BRIEF_PLAN);
+        if ('stop_gathering' === $type) {
+            return $this->writeNow($state);
         }
-        if (ResearchStatus::WaitingPlan === $state->status && 'approve_plan' === $type) {
-            return $this->continueWaiting($state, ResearchStatus::WaitingPlan, ResearchStatus::Gathering, ResearchUnitPlan::ROUND);
+        $unit = null;
+        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh) use ($body, &$unit): bool {
+            $unit = ResearchReply::apply($fresh, $body);
+
+            return true;
+        });
+        if (null === $saved) {
+            throw new ResearchRejected(409, 'not_waiting', null, 'This research already moved on. Reload it to see where it is.');
         }
-        if (ResearchStatus::WaitingAnswer === $state->status || ResearchStatus::WaitingPlan === $state->status) {
-            throw new ResearchRejected(400, 'invalid', 'type', 'That reply is not available for this research.');
+        if (is_string($unit)) {
+            $this->bus->dispatch($saved->ref->id, $unit, $saved->expectedSeq, 0);
         }
 
-        throw new ResearchRejected(409, 'not_waiting', null, 'This research is not waiting for a reply.');
+        return $saved;
     }
 
     /**
@@ -155,20 +161,21 @@ final readonly class ResearchRunService
         $this->store->delete($state->ref->id);
     }
 
-    private function continueWaiting(ResearchRunState $state, ResearchStatus $waiting, ResearchStatus $next, string $unit): ResearchRunState
+    /**
+     * The flag is raised first, so a step that is underway writes next. A
+     * waiting run has no step underway and goes to the report at once.
+     */
+    private function writeNow(ResearchRunState $state): ResearchRunState
     {
-        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh) use ($waiting, $next): bool {
-            if ($waiting !== $fresh->status) {
-                return false;
-            }
-            $fresh->advance($next);
-
-            return true;
-        });
-        if (null === $saved) {
-            throw new ResearchRejected(409, 'not_waiting', null, 'This research already moved on. Reload it to see where it is.');
+        $this->store->requestWriteNow($state->ref->id);
+        if (!ResearchReply::isWaiting($state)) {
+            return $this->store->load($state->ref->id) ?? $state;
         }
-        $this->bus->dispatch($saved->ref->id, $unit, $saved->expectedSeq, 0);
+        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static fn (ResearchRunState $fresh): bool => ResearchReply::writeNow($fresh));
+        if (null === $saved) {
+            return $this->store->load($state->ref->id) ?? $state;
+        }
+        $this->bus->dispatch($saved->ref->id, ResearchUnitPlan::WRITE, $saved->expectedSeq, 0);
 
         return $saved;
     }

@@ -15,6 +15,10 @@ final class StageEnds
         if ($ctx->stop->requested()) {
             return self::finish($ctx, ResearchStatus::Stopped, new ResearchOutcome(ResearchOutcome::STOPPED_BY_USER), 'stopped');
         }
+        $writing = self::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
         if ($ctx->state->budget->canCall()) {
             return null;
         }
@@ -49,6 +53,18 @@ final class StageEnds
     public static function nothingFound(StageContext $ctx): StageResult
     {
         return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_NOTHING_FOUND), 'failed');
+    }
+
+    /** Write now: the report uses what was already found, and this step does not search. */
+    public static function writeNow(StageContext $ctx): ?StageResult
+    {
+        $status = $ctx->state->status;
+        if (!$ctx->writeNow->requested() || $status->isTerminal() || ResearchStatus::Writing === $status || ResearchStatus::Checking === $status) {
+            return null;
+        }
+        $ctx->state->advance(ResearchStatus::Writing);
+
+        return new StageResult('write');
     }
 
     public static function finish(StageContext $ctx, ResearchStatus $status, ResearchOutcome $outcome, string $event): StageResult

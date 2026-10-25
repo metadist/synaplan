@@ -289,6 +289,20 @@ final class ResearchPipelineTest extends TestCase
         self::assertSame('open', $context->state->ledger->points()[0]->status);
     }
 
+    public function testWriteNowSkipsTheRoundAndGoesToTheReport(): void
+    {
+        $caller = new ReplayCaller();
+        [$pipeline, $context] = $this->open($caller, new ReplaySearch(), ResearchDepth::Standard);
+        $this->ready($context);
+        $context->writeNow->writing = true;
+
+        $result = $pipeline->run($context, ResearchUnitPlan::ROUND);
+
+        self::assertSame('write', $result->next);
+        self::assertSame(ResearchStatus::Writing, $context->state->status);
+        self::assertSame([], $caller->seen);
+    }
+
     public function testAnUnreadTitleCannotCloseItsBlock(): void
     {
         $caller = new ReplayCaller();

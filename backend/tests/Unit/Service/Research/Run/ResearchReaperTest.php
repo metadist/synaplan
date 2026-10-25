@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Service\Research\Run\ResearchOutcome;
+use App\Service\Research\Run\ResearchQuestion;
+use App\Service\Research\Run\ResearchQuestions;
 use App\Service\Research\Run\ResearchReaper;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStatus;
@@ -167,6 +169,62 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertSame(ResearchStatus::WaitingAnswer, $this->store->load($waiting->ref->id)?->status);
         self::assertSame([], $this->bus->sent);
         self::assertSame([], $this->events->replay($waiting->ref->id, 0));
+    }
+
+    public function testALeadQuestionSkippedAfterTenMinutesResumesTheRound(): void
+    {
+        $waiting = $this->waiting(ResearchStatus::WaitingAnswer);
+        $question = ResearchQuestion::collect([
+            ['text' => 'Which shop?', 'options' => ['Alpha', 'Beta']],
+        ], 1)[0];
+        $waiting->questions = new ResearchQuestions(
+            [$question],
+            ResearchUnitPlan::ROUND,
+            ResearchStatus::Gathering->value,
+            'a',
+        );
+        $waiting->conversation->append('', [[
+            'id' => 'a',
+            'type' => 'function',
+            'function' => ['name' => 'ask_user', 'arguments' => '{}'],
+        ]], [[
+            'id' => 'a',
+            'name' => 'ask_user',
+            'content' => '{"pending":true}',
+        ]]);
+        $this->store->save($waiting);
+        $this->age($waiting, 601);
+
+        $this->reaper(new ScriptedResearchUnits(new StageResult('round')))->reap();
+
+        $loaded = $this->store->load($waiting->ref->id);
+        self::assertSame(ResearchStatus::Gathering, $loaded?->status);
+        self::assertSame(ResearchUnitPlan::ROUND, $this->bus->sent[0]['unit'] ?? null);
+        self::assertSame('Skipped', $loaded->replies[0]['answer'] ?? null);
+        $content = $loaded->conversation->turns()[0]['results'][0]['content'] ?? '';
+        self::assertSame('{"skipped":true}', $content);
+    }
+
+    public function testAStepWaitingForAWorkerLeavesTheEventLogAlone(): void
+    {
+        $state = $this->openRun();
+        $this->age($state, 60);
+
+        $this->reaper(new ScriptedResearchUnits(new StageResult('gather')))->reap();
+
+        self::assertSame([], $this->events->replay($state->ref->id, 0));
+    }
+
+    public function testWriteNowThatRacedIntoAWaitGoesToTheReport(): void
+    {
+        $waiting = $this->waiting(ResearchStatus::WaitingPlan);
+        $this->store->requestWriteNow($waiting->ref->id);
+
+        $counts = $this->reaper(new ScriptedResearchUnits(new StageResult('deliver')))->reap();
+
+        self::assertSame(1, $counts['continued']);
+        self::assertSame(ResearchStatus::Writing, $this->store->load($waiting->ref->id)?->status);
+        self::assertSame(ResearchUnitPlan::WRITE, $this->bus->sent[0]['unit'] ?? null);
     }
 
     public function testAnUnconfirmedPlanStopsAfterADay(): void

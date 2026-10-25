@@ -41,8 +41,10 @@ use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
 use App\Service\Observability\CapacityService;
 use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\ResearchQueueWait;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Security\EncryptionService;
+use Symfony\Component\Clock\MockClock;
 
 /**
  * Builds every v1 feature-module descriptor with stub collaborators, in the
@@ -90,7 +92,11 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
-            new ResearchModule($this->disabledResearch(), $this->createStub(ResearchStateStore::class)),
+            new ResearchModule(
+                $this->disabledResearch(),
+                $researchStore = $this->createStub(ResearchStateStore::class),
+                new ResearchQueueWait($researchStore, new MockClock()),
+            ),
             $this->disabledFreeApi(),
             // '0' is the one value that turns the watchdog off; unset means on.
             new CapacityModule($this->createStub(CapacityService::class), '0'),

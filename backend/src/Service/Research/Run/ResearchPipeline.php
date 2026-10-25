@@ -69,6 +69,10 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
 
     private function round(StageContext $ctx): StageResult
     {
+        $writing = StageEnds::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
         if ($this->lead->active($ctx)) {
             return $this->lead->run($ctx);
         }

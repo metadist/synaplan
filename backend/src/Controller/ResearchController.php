@@ -12,6 +12,7 @@ use App\Service\Research\Run\ResearchCapabilities;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchEventLog;
 use App\Service\Research\Run\ResearchEventStream;
+use App\Service\Research\Run\ResearchQueueWait;
 use App\Service\Research\Run\ResearchRejected;
 use App\Service\Research\Run\ResearchRunNotFound;
 use App\Service\Research\Run\ResearchRunService;
@@ -46,6 +47,7 @@ final class ResearchController extends AbstractController
         private readonly ResearchEventLog $events,
         private readonly ResearchStateStore $store,
         private readonly ResearchConfig $config,
+        private readonly ResearchQueueWait $queue,
     ) {
     }
 
@@ -164,21 +166,22 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/events', name: 'api_research_events', methods: ['GET'])]
     #[Route('/v1/research/{id}/events', name: 'v1_research_events', methods: ['GET'])]
-    #[OA\Get(path: '/api/v1/research/{id}/events', summary: 'Updates recorded for one research run', description: 'Returns the updates recorded so far as server-sent events and closes. Resume with the Last-Event-ID header or ?after=<seq>.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Get(path: '/api/v1/research/{id}/events', summary: 'Updates recorded for one research run', description: 'Returns the updates recorded so far as server-sent events and closes. Resume with the Last-Event-ID header or ?after=<seq>. When the next step has waited at least 20 seconds for a worker, a last `queued` frame without an id carries since_seconds; it is computed on each request and never replayed.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\Parameter(name: 'after', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 0))]
     #[OA\Response(response: 200, description: 'Server-sent events since the last one the client has', content: new OA\MediaType(mediaType: 'text/event-stream', schema: new OA\Schema(type: 'string')))]
     #[OA\Response(response: 404, description: 'No such run for this caller', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     public function events(string $id, Request $request, #[CurrentUser] ?User $user): Response
     {
         return $this->respond($user, false, function (User $user) use ($id, $request): Response {
-            $this->runs->state($user, $id);
+            $state = $this->runs->state($user, $id);
             $after = $request->headers->get('Last-Event-ID');
             if (!is_string($after) || '' === $after) {
                 $after = $request->query->get('after', '0');
             }
             $seq = is_numeric($after) ? max(0, (int) $after) : 0;
+            $body = ResearchEventStream::body($this->events->replay($id, $seq), $this->queue->since($state));
 
-            return new Response(ResearchEventStream::body($this->events->replay($id, $seq)), Response::HTTP_OK, [
+            return new Response($body, Response::HTTP_OK, [
                 'Content-Type' => 'text/event-stream',
                 'Cache-Control' => 'no-cache',
             ]);
@@ -187,13 +190,27 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/input', name: 'api_research_input', methods: ['POST'])]
     #[Route('/v1/research/{id}/input', name: 'v1_research_input', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/research/{id}/input', summary: 'Answer a research question or approve its plan', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Post(path: '/api/v1/research/{id}/input', summary: 'Answer a research question, approve its plan, or write the report now', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(
         required: ['type'],
         properties: [
-            new OA\Property(property: 'type', type: 'string', enum: ['answer', 'skip_question', 'approve_plan']),
+            new OA\Property(property: 'type', type: 'string', enum: ['answer', 'skip_question', 'approve_plan', 'edit_plan', 'stop_gathering']),
             new OA\Property(property: 'question', type: 'string', nullable: true, example: 'q1'),
+            new OA\Property(property: 'choice', type: 'string', nullable: true, example: 'EU'),
             new OA\Property(property: 'text', type: 'string', nullable: true),
+            new OA\Property(
+                property: 'points',
+                description: 'edit_plan only. A point with an id keeps that point and may rename it; a point with only a title is added; a point left out is dropped.',
+                type: 'array',
+                nullable: true,
+                items: new OA\Items(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'string', nullable: true, example: 'p1'),
+                        new OA\Property(property: 'title', type: 'string', nullable: true, maxLength: 300, example: 'Delivery times'),
+                    ],
+                ),
+            ),
         ]
     ))]
     #[OA\Response(response: 200, description: 'The run continued', content: new OA\JsonContent(ref: new Model(type: ResearchRunStateView::class)))]
@@ -297,7 +314,12 @@ final class ResearchController extends AbstractController
 
     private function current(ResearchRunState $state): JsonResponse
     {
-        return new JsonResponse(ResearchRunView::one($state, $this->store->stopRequested($state->ref->id)));
+        return new JsonResponse(ResearchRunView::one(
+            $state,
+            $this->store->stopRequested($state->ref->id),
+            $this->store->writeNowRequested($state->ref->id),
+            $this->queue->since($state),
+        ));
     }
 
     private function error(int $status, string $code, string $message): JsonResponse

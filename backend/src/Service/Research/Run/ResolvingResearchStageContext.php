@@ -7,6 +7,7 @@ namespace App\Service\Research\Run;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Research\Run\Stage\ResearchStop;
+use App\Service\Research\Run\Stage\ResearchWriteNow;
 use App\Service\Research\Run\Stage\StageContext;
 use Psr\Clock\ClockInterface;
 
@@ -39,6 +40,7 @@ final readonly class ResolvingResearchStageContext implements ResearchStageConte
             $this->events,
             $this->clock->now(),
             new ResearchStop(false, fn (): bool => $this->store->stopRequested($runId)),
+            new ResearchWriteNow(false, fn (): bool => $this->store->writeNowRequested($runId)),
         );
     }
 }

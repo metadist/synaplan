@@ -226,6 +226,20 @@ final readonly class ResearchStateStore
         return null !== $this->keys->get(ResearchKey::stop($runId));
     }
 
+    /** Ask the next step to write the report instead of searching again. */
+    public function requestWriteNow(string $runId): void
+    {
+        ResearchIds::assert($runId);
+        $this->keys->set(ResearchKey::writeNow($runId), '1', $this->ttlSeconds());
+    }
+
+    public function writeNowRequested(string $runId): bool
+    {
+        ResearchIds::assert($runId);
+
+        return null !== $this->keys->get(ResearchKey::writeNow($runId));
+    }
+
     public function isClaimed(string $runId, int $seq): bool
     {
         ResearchIds::assert($runId);
@@ -388,6 +402,7 @@ final readonly class ResearchStateStore
         $this->keys->delete(ResearchKey::events($runId));
         $this->keys->delete(ResearchKey::eventSeq($runId));
         $this->keys->delete(ResearchKey::stop($runId));
+        $this->keys->delete(ResearchKey::writeNow($runId));
         $this->keys->delete(ResearchKey::delivered($runId));
         if (null !== $state && null !== $state->idempotencyKey) {
             $this->keys->delete(ResearchKey::idempotency($state->ref->userId, $state->idempotencyKey));

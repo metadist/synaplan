@@ -67,6 +67,11 @@ final class ResearchKey
         return 'research:stop:'.$id;
     }
 
+    public static function writeNow(string $id): string
+    {
+        return 'research:write:'.$id;
+    }
+
     public static function idempotency(int $userId, string $key): string
     {
         return 'research:idem:'.$userId.':'.hash('sha256', $key);

@@ -50,6 +50,23 @@ final class LeadConversation
         return null !== $this->reminder;
     }
 
+    /** The answer that arrived while the run was waiting, in place of the pending tool result. */
+    public function replaceResult(string $id, string $content): bool
+    {
+        foreach ($this->turns as $index => $turn) {
+            foreach ($turn['results'] as $at => $result) {
+                if ($result['id'] !== $id) {
+                    continue;
+                }
+                $this->turns[$index]['results'][$at]['content'] = $content;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @return list<array{content: string, calls: list<array<string, mixed>>, results: list<array{id: string, name: string, content: string}>}>
      */

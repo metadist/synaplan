@@ -281,7 +281,7 @@ SSE frames `id: <seq>\nevent: <name>\ndata: <json>`. The first frame after
 | Event | Data |
 | ----- | ---- |
 | `run` | `{ id, status, depth, research_protocol: 1 }` |
-| `queued` | `{ since_seconds }` — the next unit is waiting for a worker (sent every 20 s while waiting) |
+| `queued` | `{ since_seconds }` — the next unit has waited 20 s or more for a worker. Computed on each request, sent last and without an id, never replayed; the state carries the same value as `queued_since` |
 | `brief` | `{ goal, language, output, time_frame }` |
 | `question` | `{ id, text, options, allow_text }` |
 | `plan` | `{ points: [ { id, title } ], outline, estimate: { minutes, cost }, disclosures }` |

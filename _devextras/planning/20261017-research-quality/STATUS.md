@@ -18,7 +18,7 @@ chat message.
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
-| RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
+| RS7 | in progress | Both modes measured 2026-10-25 on the smoke set. Round-mode recall 0.67, tool-mode 0.28. Sonnet conformance 20/20, gpt-oss-120b 12/20. Tool mode is below the spike, so the exit bar is not met. Flag stays off |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
@@ -37,6 +37,84 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-25 — RS7 smoke, conformance and queue wait
+
+Local m4 stack, branch `feat/research-rs7-wait`
+([#2741](https://github.com/metadist/synaplan/pull/2741)), measured after
+`12421b548` with the year fix below already in the worker. Research was
+pinned on with `RESEARCH_ENABLED=1` for the window and removed afterwards.
+The database row stays `0`. After the window, `LEAD_MODE` is `auto`,
+`TOOL_MODE_MODELS` is `[]`, and a start returns `404 feature_not_configured`.
+User 1, `CHAT` and `SORT` both `BMODELS` 379 (Claude Sonnet 5.5,
+`anthropic:claude-sonnet-5-5`). The `SORT` pin was removed afterwards.
+Web search was the keyed Brave provider. `knowledge_available` is false
+(RS9), `read_documents` is false. Corpus
+`backend/tests/Eval/research/corpus.json`, sha256
+`56c371a25e01520f6d601da376b3df4a11ff6d3c245f8a8eb532a99624c844fa`,
+`--corpus=smoke` (10 items, all standard depth). No question was opened
+and no plan waited.
+
+There is no engine arm in `app:research:eval`. Each run is
+`POST /api/v1/research` (depth `standard`, three at a time, repeat 2).
+The text is scored by:
+
+```bash
+app:research:eval --corpus=smoke --arm=b1 --import=<reports>
+```
+
+The `ms` column of that command is 0. Times below are the driver's wall
+clock. A percentile is linear: rank `(n-1)*p`.
+
+Round mode is `LEAD_MODE=auto` with an empty tool list. Repeat 1 scored
+**0.67 across 9**. Repeat 2 under the three-wide queue scored **0.33**:
+reg-01, reg-02 and tech-01 ended `stopped_limit` (the 360 s wall includes
+queue time). Those three, rerun one at a time, all finished `complete`
+with recall 1.00 (extra 1.004018 USD). Repeat 2 with those three texts
+replaced scored **0.67 across 9**. fact-01 is 0.00 on both repeats.
+doc-01 and mix-01 are 0.00 on both (no knowledge source). trap-01
+abstained on both. Dropping doc-01 and mix-01, the web-only mean is
+**0.86 across 7**. The 20 loaded runs spent **4.149274 USD** (median
+0.200263). Wall time p50 **251.0 s**, p95 **380.0 s** (the first six times
+are `updated_at - created_at`, because that driver hung before it wrote
+them). Queue sample is only steps whose `queued_since` reached 20 s: 24
+steps, p50 **65.0 s**, p95 **234.5 s**. The first six runs were not polled.
+
+Tool mode is `LEAD_MODE=tools`, worker restarted before the pass, same
+user, model, corpus and width. Repeat 1 scored **0.22 across 9**, repeat 2
+**0.33 across 9**. The per-item mean is **0.28**. Hits are reg-02 and
+tech-01 on both repeats, and sci-01 on repeat 2. trap-01 abstained on
+both. The 20 runs spent **1.416622 USD** (median 0.040058). Wall time p50
+**90.3 s**, p95 **162.2 s**. Queue sample: 13 steps, p50 **39.0 s**, p95
+**70.8 s**.
+
+Both loaded passes together: 37 steps at or above 20 s, p50 **54.0 s**,
+p95 **176.0 s**. One local worker, three runs at a time. A step picked up
+before 20 s is not in the sample. This is not a production queue.
+
+Conformance, same day, `app:research:conformance <key> --user=1`:
+
+| Key | Result |
+| --- | ------ |
+| `anthropic:claude-sonnet-5-5:chat` | 20/20 |
+| `anthropic:claude-sonnet-5:chat` | 20/20 |
+| `groq:openai/gpt-oss-120b:chat` | 12/20 |
+
+None of them was added to `TOOL_MODE_MODELS`.
+
+RS6 has no corpus recall (the 2026-10-24 row is one Eiffel Tower
+question), so "above the RS6 row" was not run. The spike on 2026-10-23 is
+the starter set of 20 (16 scored), not this smoke set: S-R 0.63, S-T 0.81.
+Round mode at 0.67 sits above S-R and 14 points below S-T. Tool mode at
+0.28 sits below both, past the 3-point smoke noise band. The exit bar is
+not met. RS7 stays in progress. Citation precision was not judged.
+
+The first fact-01 pilot (`rr_5e918f332bb61e77`) stuck in gathering:
+`str_contains()` rejected the year `2024`, which PHP stores as an int
+array key. That run was cancelled and is not in the scores. `PassageFocus`
+now casts terms to strings, and the scored runs include that fix.
 
 ---
 

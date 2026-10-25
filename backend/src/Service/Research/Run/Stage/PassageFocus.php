@@ -83,7 +83,13 @@ final class PassageFocus
             }
         }
 
-        return array_keys($terms);
+        $words = [];
+        foreach (array_keys($terms) as $term) {
+            // A year such as "2024" is stored as an int key, and str_contains rejects that.
+            $words[] = (string) $term;
+        }
+
+        return $words;
     }
 
     /**

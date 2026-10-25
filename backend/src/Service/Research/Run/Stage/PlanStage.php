@@ -6,11 +6,13 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchPlanSchema;
 use App\Service\Research\Run\Ledger\PlanPoint;
+use App\Service\Research\Run\ResearchDepth;
+use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
 
 /**
- * Builds the plan and starts gathering at once. Confirming a thorough plan
- * is a later step, so this one does not wait.
+ * Builds the plan. A thorough run waits for the person to confirm it, with
+ * no worker held. A shorter run starts gathering at once.
  */
 final readonly class PlanStage implements ResearchStage
 {
@@ -42,7 +44,7 @@ final readonly class PlanStage implements ResearchStage
             'planning',
             $ctx->roles->lead,
             $system,
-            'Plan the research.',
+            $this->request($ctx),
             ResearchPlanSchema::build(),
         );
         if ($called->stop instanceof StageResult) {
@@ -92,7 +94,6 @@ final readonly class PlanStage implements ResearchStage
             }
         }
         $ctx->state->ledger->setOutline($outline);
-        $ctx->state->advance(ResearchStatus::Gathering);
         $ctx->events->append($ctx->state->ref->id, 'plan', [
             'points' => array_map(static fn (PlanPoint $point): array => [
                 'id' => $point->id,
@@ -104,7 +105,25 @@ final readonly class PlanStage implements ResearchStage
                 'cost' => $ctx->state->budget->toArray()['cost']['estimate'],
             ],
         ]);
+        $writing = StageEnds::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
+        if (ResearchDepth::Thorough === $ctx->state->ref->depth) {
+            $ctx->state->advance(ResearchStatus::WaitingPlan);
+            $ctx->events->append($ctx->state->ref->id, 'plan_waiting', []);
+
+            return new StageResult('wait_plan');
+        }
+        $ctx->state->advance(ResearchStatus::Gathering);
 
         return new StageResult('gather');
+    }
+
+    private function request(StageContext $ctx): string
+    {
+        $notes = ResearchNotes::text($ctx->state);
+
+        return '' === $notes ? 'Plan the research.' : "Plan the research.\n".$notes;
     }
 }

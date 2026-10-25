@@ -11,7 +11,11 @@ use App\Service\Research\Run\Loop\LoopAction;
 use App\Service\Research\Run\Loop\LoopActions;
 use App\Service\Research\Run\Loop\LoopRules;
 use App\Service\Research\Run\Loop\LoopStop;
+use App\Service\Research\Run\ResearchNotes;
+use App\Service\Research\Run\ResearchQuestion;
+use App\Service\Research\Run\ResearchQuestions;
 use App\Service\Research\Run\ResearchStatus;
+use App\Service\Research\Run\ResearchUnitPlan;
 
 /**
  * After a round, the lead judges the plan and names the next searches.
@@ -52,7 +56,7 @@ final readonly class ReflectStage implements ResearchStage
             'planning',
             $ctx->roles->lead,
             $this->prompt($ctx, $early->hint),
-            'Decide the next step.',
+            $this->request($ctx),
             ResearchDecisionSchema::build(),
         );
         if ($called->stop instanceof StageResult) {
@@ -70,7 +74,14 @@ final readonly class ReflectStage implements ResearchStage
         }
         $decision = $this->judge($ctx, false, $finish, $progress);
         if (LoopStop::CONTINUE === $decision->next) {
-            $this->queue($ctx, $this->actions->keep($data, $ctx->state->ledger, $ctx->state->budget, 0));
+            $kept = $this->actions->keep($data, $ctx->state->ledger, $ctx->state->budget, $ctx->state->questionsAsked);
+            $ask = $this->question($kept);
+            $this->queue($ctx, $kept);
+            if ($ask instanceof LoopAction && !$ctx->writeNow->requested() && $this->pose($ctx, $ask)) {
+                $this->roundEvent($ctx, 'wait_answer');
+
+                return new StageResult('wait_answer');
+            }
             if (!$this->hasWork($ctx)) {
                 $decision = new LoopStop(LoopStop::WRITE, 'nothing_queued', null, false);
             }
@@ -92,7 +103,7 @@ final readonly class ReflectStage implements ResearchStage
             $ctx->state->ledger,
             $ctx->state->budget,
             $stopped,
-            false,
+            $ctx->writeNow->requested(),
             $finish,
             $progress,
             $ctx->state->strategyHint,
@@ -134,8 +145,49 @@ final readonly class ReflectStage implements ResearchStage
         if (LoopStop::HALT === $stop->next && null !== $stop->outcome) {
             return StageEnds::finish($ctx, ResearchStatus::Stopped, $stop->outcome, 'stopped');
         }
+        if ($ctx->writeNow->requested() && !$ctx->state->status->isTerminal()) {
+            $ctx->state->advance(ResearchStatus::Writing);
+        }
 
         return new StageResult('write');
+    }
+
+    /**
+     * @param list<LoopAction> $actions
+     */
+    private function question(array $actions): ?LoopAction
+    {
+        foreach ($actions as $action) {
+            if (LoopAction::ASK_USER === $action->type) {
+                return $action;
+            }
+        }
+
+        return null;
+    }
+
+    private function pose(StageContext $ctx, LoopAction $action): bool
+    {
+        $question = ResearchQuestion::fromTool([
+            'question' => $action->question ?? '',
+            'options' => $action->options,
+        ]);
+        if (null === $question) {
+            return false;
+        }
+        $ctx->state->questions = new ResearchQuestions([$question], ResearchUnitPlan::ROUND, ResearchStatus::Gathering->value);
+        ++$ctx->state->questionsAsked;
+        $ctx->state->advance(ResearchStatus::WaitingAnswer);
+        $ctx->events->append($ctx->state->ref->id, 'question', $question->event());
+
+        return true;
+    }
+
+    private function request(StageContext $ctx): string
+    {
+        $notes = ResearchNotes::text($ctx->state);
+
+        return '' === $notes ? 'Decide the next step.' : "Decide the next step.\n".$notes;
     }
 
     /**

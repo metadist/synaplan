@@ -33,7 +33,11 @@ final class ResearchUnitPlan
         }
 
         return match ($finished) {
-            self::BRIEF_PLAN => 'gather' === $stageNext ? self::ROUND : null,
+            self::BRIEF_PLAN => match ($stageNext) {
+                'gather' => self::ROUND,
+                'write' => self::WRITE,
+                default => null,
+            },
             self::ROUND => match ($stageNext) {
                 'write' => self::WRITE,
                 'round' => self::ROUND,

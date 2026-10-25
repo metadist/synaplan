@@ -6,11 +6,14 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchBriefSchema;
 use App\Service\Research\Run\Ledger\ResearchBrief;
+use App\Service\Research\Run\ResearchQuestion;
+use App\Service\Research\Run\ResearchQuestions;
 use App\Service\Research\Run\ResearchStatus;
+use App\Service\Research\Run\ResearchUnitPlan;
 
 /**
- * Turns the question into a brief. Questions in the answer are not asked yet:
- * the run goes on to the plan.
+ * Turns the question into a brief. Questions the brief lists, up to the
+ * depth's budget, are asked before the plan. The run waits with no worker.
  */
 final readonly class BriefStage implements ResearchStage
 {
@@ -65,13 +68,31 @@ final readonly class BriefStage implements ResearchStage
         }
 
         $ctx->state->ledger->setBrief($brief);
-        $ctx->state->advance(ResearchStatus::Planning);
         $ctx->events->append($ctx->state->ref->id, 'brief', [
             'goal' => $brief->goal,
             'language' => $brief->language,
             'output' => $brief->output,
             'time_frame' => $brief->timeFrame,
         ]);
+        $writing = StageEnds::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
+        $questions = ResearchQuestion::collect(
+            $data['ambiguity'] ?? [],
+            $ctx->state->budget->extras()->questions - $ctx->state->questionsAsked,
+        );
+        if ([] !== $questions) {
+            $ctx->state->questions = new ResearchQuestions($questions, ResearchUnitPlan::BRIEF_PLAN, ResearchStatus::Planning->value);
+            $ctx->state->questionsAsked += count($questions);
+            $ctx->state->advance(ResearchStatus::WaitingAnswer);
+            foreach ($questions as $question) {
+                $ctx->events->append($ctx->state->ref->id, 'question', $question->event());
+            }
+
+            return new StageResult('wait_answer');
+        }
+        $ctx->state->advance(ResearchStatus::Planning);
 
         return new StageResult('plan');
     }
