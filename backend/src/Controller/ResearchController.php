@@ -195,7 +195,19 @@ final class ResearchController extends AbstractController
             new OA\Property(property: 'question', type: 'string', nullable: true, example: 'q1'),
             new OA\Property(property: 'choice', type: 'string', nullable: true, example: 'EU'),
             new OA\Property(property: 'text', type: 'string', nullable: true),
-            new OA\Property(property: 'points', type: 'array', items: new OA\Items(type: 'object'), nullable: true),
+            new OA\Property(
+                property: 'points',
+                description: 'edit_plan only. A point with an id keeps that point and may rename it; a point with only a title is added; a point left out is dropped.',
+                type: 'array',
+                nullable: true,
+                items: new OA\Items(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'string', nullable: true, example: 'p1'),
+                        new OA\Property(property: 'title', type: 'string', nullable: true, maxLength: 300, example: 'Delivery times'),
+                    ],
+                ),
+            ),
         ]
     ))]
     #[OA\Response(response: 200, description: 'The run continued', content: new OA\JsonContent(ref: new Model(type: ResearchRunStateView::class)))]

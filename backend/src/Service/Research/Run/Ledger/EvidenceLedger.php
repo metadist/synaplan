@@ -124,14 +124,17 @@ final class EvidenceLedger
         $this->report = '' === $text ? null : $text;
     }
 
-    public function renamePoint(string $id, string $title): void
+    /**
+     * @param list<array{q?: string, language?: string, scope?: string}> $queries replace the planned queries
+     */
+    public function renamePoint(string $id, string $title, array $queries): void
     {
         $point = $this->points[$id] ?? null;
         $title = PlainText::line($title, 300);
         if (null === $point || '' === $title) {
             throw new \InvalidArgumentException('That plan point is not in this research.');
         }
-        $this->points[$id] = new PlanPoint($id, $title, $point->status, $point->why, $point->queries);
+        $this->points[$id] = new PlanPoint($id, $title, $point->status, $point->why, $this->queriesOf($queries));
     }
 
     public function dropPoint(string $id): void

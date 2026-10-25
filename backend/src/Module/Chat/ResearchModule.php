@@ -11,12 +11,13 @@ use App\Module\Contract\ModuleStatus;
 use App\Service\Research\Run\ResearchCapabilities;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchReaper;
+use App\Service\Research\Run\ResearchReply;
 use App\Service\Research\Run\ResearchReportDelivery;
 use App\Service\Research\Run\ResearchRunService;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStateStore;
-use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchStoreUnavailable;
+use Psr\Clock\ClockInterface;
 
 /**
  * Long research runs. Off means a new run cannot start. A run that already
@@ -29,6 +30,7 @@ final class ResearchModule implements FeatureModuleInterface
     public function __construct(
         private readonly ResearchConfig $config,
         private readonly ResearchStateStore $store,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -92,14 +94,13 @@ final class ResearchModule implements FeatureModuleInterface
     private function workerQuiet(ResearchRunState $run): bool
     {
         if ($run->status->isTerminal()
-            || ResearchStatus::WaitingAnswer === $run->status
-            || ResearchStatus::WaitingPlan === $run->status
+            || ResearchReply::isWaiting($run)
             || $this->store->isClaimed($run->ref->id, $run->expectedSeq)) {
             return false;
         }
         $updated = $run->updatedAt ?? $run->ref->createdAt;
 
-        return (new \DateTimeImmutable())->getTimestamp() - $updated->getTimestamp() >= ResearchReaper::QUIET_SECONDS;
+        return $this->clock->now()->getTimestamp() - $updated->getTimestamp() >= ResearchReaper::QUIET_SECONDS;
     }
 
     public function capabilityIds(): array

@@ -77,7 +77,7 @@ final readonly class ReflectStage implements ResearchStage
             $kept = $this->actions->keep($data, $ctx->state->ledger, $ctx->state->budget, $ctx->state->questionsAsked);
             $ask = $this->question($kept);
             $this->queue($ctx, $kept);
-            if ($ask instanceof LoopAction && $this->pose($ctx, $ask)) {
+            if ($ask instanceof LoopAction && !$ctx->writeNow->requested() && $this->pose($ctx, $ask)) {
                 $this->roundEvent($ctx, 'wait_answer');
 
                 return new StageResult('wait_answer');

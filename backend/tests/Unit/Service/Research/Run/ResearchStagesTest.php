@@ -13,6 +13,7 @@ use App\AI\StructuredOutput\Schema\ResearchTriageSchema;
 use App\Prompt\PromptCatalog;
 use App\Service\Research\Run\Ledger\PassageSplitter;
 use App\Service\Research\Run\Ledger\PassageVerifier;
+use App\Service\Research\Run\Ledger\ResearchBrief;
 use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
@@ -35,6 +36,7 @@ use App\Service\Research\Run\Stage\ResearchHit;
 use App\Service\Research\Run\Stage\ResearchModelReply;
 use App\Service\Research\Run\Stage\ResearchPage;
 use App\Service\Research\Run\Stage\ResearchStop;
+use App\Service\Research\Run\Stage\ResearchWriteNow;
 use App\Service\Research\Run\Stage\StageCall;
 use App\Service\Research\Run\Stage\StageContext;
 use App\Service\Research\Run\Stage\WriteStage;
@@ -110,7 +112,7 @@ final class ResearchStagesTest extends TestCase
     public function testAThoroughPlanWaitsToBeConfirmed(): void
     {
         [$ctx, $caller] = $this->open(ResearchDepth::Thorough);
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $caller->script[] = $this->json([
             'points' => [[
                 'id' => 'x',
@@ -130,10 +132,33 @@ final class ResearchStagesTest extends TestCase
         self::assertSame(['plan', 'plan_waiting'], array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'));
     }
 
+    public function testWriteNowDuringTheThoroughPlanCallDoesNotWaitForConfirmation(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Thorough);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json([
+            'points' => [[
+                'id' => 'x',
+                'title' => 'Unit price',
+                'why' => 'The goal asks for it.',
+                'queries' => [['q' => 'unit price 2026', 'language' => 'en']],
+                'scope' => 'web',
+            ]],
+            'outline' => ['Summary'],
+            'estimate' => ['minutes' => 1, 'cost' => 1],
+        ]);
+        $ctx->writeNow = new ResearchWriteNow(false, static fn (): bool => [] !== $caller->seen);
+
+        $result = (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('write', $result->next);
+        self::assertSame(ResearchStatus::Writing, $ctx->state->status);
+    }
+
     public function testARoundThatAsksThePersonWaits(): void
     {
         [$ctx, $caller] = $this->open(ResearchDepth::Standard);
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Unit price');
         $ctx->state->advance(ResearchStatus::Gathering);
         $caller->script[] = $this->json([
@@ -181,7 +206,7 @@ final class ResearchStagesTest extends TestCase
     public function testThePlanUsesTheBudgetEstimateNotTheModels(): void
     {
         [$ctx, $caller] = $this->open();
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $caller->script[] = $this->json([
             'points' => [[
                 'id' => 'x',
@@ -206,7 +231,7 @@ final class ResearchStagesTest extends TestCase
     public function testAHostileTitleDoesNotBecomeASearchOrASource(): void
     {
         [$ctx, $caller] = $this->open();
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief(
+        $ctx->state->ledger->setBrief(new ResearchBrief(
             'Find the price',
             'en',
             'answer',
@@ -246,7 +271,7 @@ final class ResearchStagesTest extends TestCase
     public function testAVerdictMapKeyedByHitIdIsReadTheSameWay(): void
     {
         [$ctx, $caller] = $this->open();
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Unit price', 'Needed.', [[
             'q' => 'unit price',
             'language' => 'en',
@@ -320,7 +345,7 @@ final class ResearchStagesTest extends TestCase
     public function testASpareIsReadWhenTheBestPicksAreBlocked(): void
     {
         [$ctx, $caller] = $this->open();
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Unit price', 'Needed.', [['q' => 'unit price', 'language' => 'en', 'scope' => 'web']]);
         $search = new ReplaySearch();
         $verdicts = [];
@@ -501,7 +526,7 @@ final class ResearchStagesTest extends TestCase
     public function testAQuickRunLeavesItsLastCallToTheWriter(): void
     {
         [$ctx, $caller] = $this->open();
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Unit price');
         $pages = new ReplayPages();
         foreach (['a', 'b', 'c', 'd'] as $host) {
@@ -695,7 +720,7 @@ final class ResearchStagesTest extends TestCase
 
     private function readyToRead(StageContext $ctx): void
     {
-        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Unit price');
         $ctx->state->ledger->addSource(\App\Service\Research\Run\Ledger\Source::web('https://maker.example/price', 'Price list'));
         $ctx->state->advance(ResearchStatus::Gathering);

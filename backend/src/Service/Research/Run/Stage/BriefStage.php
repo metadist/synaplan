@@ -74,6 +74,10 @@ final readonly class BriefStage implements ResearchStage
             'output' => $brief->output,
             'time_frame' => $brief->timeFrame,
         ]);
+        $writing = StageEnds::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
         $questions = ResearchQuestion::collect(
             $data['ambiguity'] ?? [],
             $ctx->state->budget->extras()->questions - $ctx->state->questionsAsked,

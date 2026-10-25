@@ -78,7 +78,7 @@ final readonly class ResearchReaper
     private function reapClaim(array $claim, array &$counts): void
     {
         $state = $this->store->load($claim['runId']);
-        if (null === $state || $state->status->isTerminal() || $state->expectedSeq !== $claim['seq'] || self::isWaiting($state)) {
+        if (null === $state || $state->status->isTerminal() || $state->expectedSeq !== $claim['seq'] || ResearchReply::isWaiting($state)) {
             $this->store->release($claim['runId'], $claim['seq'], $claim['token']);
 
             return;
@@ -104,6 +104,13 @@ final readonly class ResearchReaper
     {
         $now = $this->clock->now()->getTimestamp();
         $age = $now - ($state->updatedAt ?? $state->ref->createdAt)->getTimestamp();
+        if (ResearchReply::isWaiting($state) && $this->store->writeNowRequested($state->ref->id)) {
+            if ($this->writeAfterWait($state)) {
+                ++$counts['continued'];
+            }
+
+            return;
+        }
         if (ResearchStatus::WaitingAnswer === $state->status) {
             if ($age >= self::ANSWER_WAIT_SECONDS && $this->continueAfterQuestion($state)) {
                 ++$counts['continued'];
@@ -166,6 +173,18 @@ final readonly class ResearchReaper
             return false;
         }
         $this->bus->dispatch($saved->ref->id, $unit, $saved->expectedSeq, 0);
+
+        return true;
+    }
+
+    /** Write now arrived while the step that opened this wait was still underway. */
+    private function writeAfterWait(ResearchRunState $state): bool
+    {
+        $saved = $this->underClaim($state, static fn (ResearchRunState $fresh): bool => ResearchReply::writeNow($fresh));
+        if (null === $saved) {
+            return false;
+        }
+        $this->bus->dispatch($saved->ref->id, ResearchUnitPlan::WRITE, $saved->expectedSeq, 0);
 
         return true;
     }
@@ -266,10 +285,5 @@ final readonly class ResearchReaper
         }
 
         return true;
-    }
-
-    private static function isWaiting(ResearchRunState $state): bool
-    {
-        return ResearchStatus::WaitingAnswer === $state->status || ResearchStatus::WaitingPlan === $state->status;
     }
 }

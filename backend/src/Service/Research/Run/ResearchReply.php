@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run;
 
 use App\Service\Research\Run\Ledger\PlainText;
+use App\Service\Research\Run\Stage\StageBudget;
 
 /**
  * One reply while a run is waiting. Answering the last open question, or
@@ -43,11 +44,33 @@ final class ResearchReply
         foreach ($wait->items as $item) {
             if ($item->open()) {
                 $item->skipped = true;
-                self::remember($state, $item->text, 'Skipped');
+                self::remember($state, $item->text, ResearchNotes::SKIPPED);
             }
         }
 
         return self::finish($state, $wait);
+    }
+
+    /**
+     * Write now on a waiting run: open questions are dropped and the report
+     * is written from what was already found.
+     *
+     * @return bool false when the run is no longer waiting
+     */
+    public static function writeNow(ResearchRunState $state): bool
+    {
+        if (!self::isWaiting($state)) {
+            return false;
+        }
+        $state->questions = null;
+        $state->advance(ResearchStatus::Writing);
+
+        return true;
+    }
+
+    public static function isWaiting(ResearchRunState $state): bool
+    {
+        return ResearchStatus::WaitingAnswer === $state->status || ResearchStatus::WaitingPlan === $state->status;
     }
 
     /**
@@ -59,15 +82,18 @@ final class ResearchReply
             throw new ResearchRejected(400, 'invalid', 'type', 'That reply is not available for this research.');
         }
         $wait = $state->questions;
+        if (null === $wait) {
+            throw new ResearchRejected(409, 'not_waiting', 'question', 'This research is not waiting for a reply.');
+        }
         $question = self::openQuestion($wait, $body);
         if ('skip_question' === $type) {
             $question->skipped = true;
-            self::remember($state, $question->text, 'Skipped');
+            self::remember($state, $question->text, ResearchNotes::SKIPPED);
         } else {
             $question->answer = self::choice($question, $body);
             self::remember($state, $question->text, $question->answer);
         }
-        if (null === $wait || $wait->anyOpen()) {
+        if ($wait->anyOpen()) {
             return null;
         }
 
@@ -80,7 +106,7 @@ final class ResearchReply
     private static function plan(ResearchRunState $state, string $type, array $body): string
     {
         if ('edit_plan' === $type) {
-            ResearchPlanEdit::apply($state->ledger, $body);
+            ResearchPlanEdit::apply($state->ledger, $body, StageBudget::view($state->budget)['pointsMax']);
         } elseif ('approve_plan' !== $type) {
             throw new ResearchRejected(400, 'invalid', 'type', 'That reply is not available for this research.');
         }
@@ -92,11 +118,8 @@ final class ResearchReply
     /**
      * @param array<string, mixed> $body
      */
-    private static function openQuestion(?ResearchQuestions $wait, array $body): ResearchQuestion
+    private static function openQuestion(ResearchQuestions $wait, array $body): ResearchQuestion
     {
-        if (null === $wait) {
-            throw new ResearchRejected(409, 'not_waiting', 'question', 'This research is not waiting for a reply.');
-        }
         $id = is_string($body['question'] ?? null) ? $body['question'] : '';
         if ('' === $id) {
             $open = array_values(array_filter($wait->items, static fn (ResearchQuestion $item): bool => $item->open()));

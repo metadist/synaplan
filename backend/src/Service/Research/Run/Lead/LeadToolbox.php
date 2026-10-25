@@ -75,7 +75,7 @@ final readonly class LeadToolbox
     {
         $left = $ctx->state->budget->extras()->questions - $ctx->state->questionsAsked;
         $question = ResearchQuestion::fromTool($call->arguments);
-        if ($left < 1 || null === $question || null !== $ctx->state->questions) {
+        if ($left < 1 || null === $question || null !== $ctx->state->questions || $ctx->writeNow->requested()) {
             return new LeadToolOutcome(LeadToolReply::error('not_allowed', $ctx->state->budget));
         }
         $ctx->state->questions = new ResearchQuestions(

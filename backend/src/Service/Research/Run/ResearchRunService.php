@@ -161,23 +161,19 @@ final readonly class ResearchRunService
         $this->store->delete($state->ref->id);
     }
 
+    /**
+     * The flag is raised first, so a step that is underway writes next. A
+     * waiting run has no step underway and goes to the report at once.
+     */
     private function writeNow(ResearchRunState $state): ResearchRunState
     {
         $this->store->requestWriteNow($state->ref->id);
-        if (ResearchStatus::WaitingAnswer !== $state->status && ResearchStatus::WaitingPlan !== $state->status) {
+        if (!ResearchReply::isWaiting($state)) {
             return $this->store->load($state->ref->id) ?? $state;
         }
-        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh): bool {
-            if (ResearchStatus::WaitingAnswer !== $fresh->status && ResearchStatus::WaitingPlan !== $fresh->status) {
-                return false;
-            }
-            $fresh->questions = null;
-            $fresh->advance(ResearchStatus::Writing);
-
-            return true;
-        });
+        $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static fn (ResearchRunState $fresh): bool => ResearchReply::writeNow($fresh));
         if (null === $saved) {
-            throw new ResearchRejected(409, 'not_waiting', null, 'This research already moved on. Reload it to see where it is.');
+            return $this->store->load($state->ref->id) ?? $state;
         }
         $this->bus->dispatch($saved->ref->id, ResearchUnitPlan::WRITE, $saved->expectedSeq, 0);
 

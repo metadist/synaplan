@@ -58,7 +58,8 @@ final class StageEnds
     /** Write now: the report uses what was already found, and this step does not search. */
     public static function writeNow(StageContext $ctx): ?StageResult
     {
-        if (!$ctx->writeNow->requested() || $ctx->state->status->isTerminal() || ResearchStatus::Writing === $ctx->state->status) {
+        $status = $ctx->state->status;
+        if (!$ctx->writeNow->requested() || $status->isTerminal() || ResearchStatus::Writing === $status || ResearchStatus::Checking === $status) {
             return null;
         }
         $ctx->state->advance(ResearchStatus::Writing);

@@ -41,6 +41,7 @@ use App\Service\Iap\IapPricingService;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Security\EncryptionService;
+use Symfony\Component\Clock\MockClock;
 
 /**
  * Builds every v1 feature-module descriptor with stub collaborators, in the
@@ -88,7 +89,7 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
-            new ResearchModule($this->disabledResearch(), $this->createStub(ResearchStateStore::class)),
+            new ResearchModule($this->disabledResearch(), $this->createStub(ResearchStateStore::class), new MockClock()),
             $this->disabledFreeApi(),
         ];
 

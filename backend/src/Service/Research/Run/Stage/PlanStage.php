@@ -105,6 +105,10 @@ final readonly class PlanStage implements ResearchStage
                 'cost' => $ctx->state->budget->toArray()['cost']['estimate'],
             ],
         ]);
+        $writing = StageEnds::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
         if (ResearchDepth::Thorough === $ctx->state->ref->depth) {
             $ctx->state->advance(ResearchStatus::WaitingPlan);
             $ctx->events->append($ctx->state->ref->id, 'plan_waiting', []);

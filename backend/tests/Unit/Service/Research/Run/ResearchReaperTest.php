@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Service\Research\Run\ResearchOutcome;
+use App\Service\Research\Run\ResearchQuestion;
+use App\Service\Research\Run\ResearchQuestions;
 use App\Service\Research\Run\ResearchReaper;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStatus;
@@ -172,10 +174,10 @@ final class ResearchReaperTest extends ResearchUnitCase
     public function testALeadQuestionSkippedAfterTenMinutesResumesTheRound(): void
     {
         $waiting = $this->waiting(ResearchStatus::WaitingAnswer);
-        $question = \App\Service\Research\Run\ResearchQuestion::collect([
+        $question = ResearchQuestion::collect([
             ['text' => 'Which shop?', 'options' => ['Alpha', 'Beta']],
         ], 1)[0];
-        $waiting->questions = new \App\Service\Research\Run\ResearchQuestions(
+        $waiting->questions = new ResearchQuestions(
             [$question],
             ResearchUnitPlan::ROUND,
             ResearchStatus::Gathering->value,
@@ -220,6 +222,18 @@ final class ResearchReaperTest extends ResearchUnitCase
         $this->clock->sleep(ResearchReaper::QUEUE_AFTER_SECONDS);
         $reaper->reap();
         self::assertCount(2, $this->events->replay($state->ref->id, 0));
+    }
+
+    public function testWriteNowThatRacedIntoAWaitGoesToTheReport(): void
+    {
+        $waiting = $this->waiting(ResearchStatus::WaitingPlan);
+        $this->store->requestWriteNow($waiting->ref->id);
+
+        $counts = $this->reaper(new ScriptedResearchUnits(new StageResult('deliver')))->reap();
+
+        self::assertSame(1, $counts['continued']);
+        self::assertSame(ResearchStatus::Writing, $this->store->load($waiting->ref->id)?->status);
+        self::assertSame(ResearchUnitPlan::WRITE, $this->bus->sent[0]['unit'] ?? null);
     }
 
     public function testAnUnconfirmedPlanStopsAfterADay(): void

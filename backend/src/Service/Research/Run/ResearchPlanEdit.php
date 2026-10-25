@@ -10,18 +10,25 @@ use App\Service\Research\Run\Ledger\PlainText;
 /**
  * The person's replacement for a plan that is waiting. A point named by id
  * stays, and may get a new title. A point with only a title is added. A
- * point that is not named is dropped. The plan must still have one point.
+ * point that is not named is dropped. The plan keeps between one point and
+ * the depth's maximum.
+ *
+ * A new or renamed point is searched by its title, because the planner's
+ * queries were written for the old wording.
  */
 final class ResearchPlanEdit
 {
     /**
      * @param array<string, mixed> $body
      */
-    public static function apply(EvidenceLedger $ledger, array $body): void
+    public static function apply(EvidenceLedger $ledger, array $body, int $maxPoints): void
     {
         $rows = $body['points'] ?? null;
         if (!is_array($rows) || [] === $rows) {
             throw new ResearchRejected(400, 'invalid', 'points', 'Name the points the plan should keep.');
+        }
+        if (count($rows) > $maxPoints) {
+            throw new ResearchRejected(400, 'invalid', 'points', sprintf('This research can follow at most %d points.', $maxPoints));
         }
         $known = [];
         foreach ($ledger->points() as $point) {
@@ -47,19 +54,27 @@ final class ResearchPlanEdit
             }
             $add[] = $title;
         }
-        if ([] === $keep && [] === $add) {
-            throw new ResearchRejected(400, 'invalid', 'points', 'The plan needs at least one point.');
-        }
+        $language = $ledger->brief()->language ?? 'en';
         foreach (array_keys($known) as $id) {
             if (!isset($keep[$id])) {
                 $ledger->dropPoint($id);
             }
         }
         foreach ($keep as $id => $title) {
-            $ledger->renamePoint($id, $title);
+            if ($title !== $known[$id]) {
+                $ledger->renamePoint($id, $title, [self::query($title, $language)]);
+            }
         }
         foreach ($add as $title) {
-            $ledger->addPoint($title);
+            $ledger->addPoint($title, '', [self::query($title, $language)]);
         }
+    }
+
+    /**
+     * @return array{q: string, language: string, scope: string}
+     */
+    private static function query(string $title, string $language): array
+    {
+        return ['q' => $title, 'language' => $language, 'scope' => 'web'];
     }
 }
