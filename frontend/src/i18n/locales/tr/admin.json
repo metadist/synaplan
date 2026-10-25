@@ -596,6 +596,90 @@
       },
       "serviceDown": "{name} erişilemiyor. {effect}",
       "serviceFailed": "{name} başlatmayı tamamlamadı. {effect}"
+    },
+    "signupCodes": {
+      "title": "Davet kodları",
+      "empty": "Henüz davet kodu yok. Birini ödeme yapmadan içeri almak için bir kod oluşturun.",
+      "create": "Kod oluştur",
+      "openModeNote": "Bu sunucuda kayıt açık, bu yüzden henüz kimsenin koda ihtiyacı yok. Burada oluşturduğunuz kodlar, kayıt ayarları ücretli bir plan veya davet kodu istediği anda geçerli olur.",
+      "openSettings": "Kayıt ayarlarını aç",
+      "loadFailed": "Davet kodları yüklenemedi. Hiçbir şey değişmedi; tekrar deneyin.",
+      "prefixAria": "{prefix} ile başlayan kod",
+      "shownOnce": "Bu kodu şimdi kopyalayın. Güvenlik nedeniyle tekrar gösterilmez.",
+      "copy": "Kodu kopyala",
+      "copied": "Kod kopyalandı.",
+      "copyFailed": "Kopyalama çalışmadı. Kodu seçip elle kopyalayın.",
+      "done": "Tamam",
+      "levels": {
+        "NEW": "Üye",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Süresiz",
+        "week": "7 gün",
+        "fiveMonths": "5 ay"
+      },
+      "state": {
+        "active": "Kullanılabilir",
+        "expired": "Süresi doldu",
+        "used_up": "Tükendi",
+        "revoked": "İptal edildi"
+      },
+      "facts": {
+        "grants": "{level} seviyesinde bir hesap açar",
+        "validUntil": "{date} tarihine kadar geçerli",
+        "noEnd": "bitiş tarihi yok",
+        "usesOf": "{uses}/{max} kullanım",
+        "usesUnlimited": "{uses} kullanım, sınır yok",
+        "createdBy": "{email} tarafından {date} tarihinde oluşturuldu",
+        "createdByGone": "{date} tarihinde artık var olmayan bir hesap tarafından oluşturuldu"
+      },
+      "actions": {
+        "uses": "Kimler kullandı",
+        "edit": "Düzenle",
+        "revoke": "İptal et",
+        "restore": "Geri getir"
+      },
+      "revokeTitle": "Bu kod iptal edilsin mi?",
+      "revokeBody": "Bu kodu artık kimse kullanamaz. Henüz kimse kullanmadı. | Bu kodu artık kimse kullanamaz. Kodu kullanan kişi hesabını korur. | Bu kodu artık kimse kullanamaz. Kodu kullanan {count} kişi hesaplarını korur.",
+      "revoked": "Kod iptal edildi. Geri getir ile yeniden geçerli olur.",
+      "revokeFailed": "Kod iptal edilmedi ve çalışmaya devam ediyor. Tekrar deneyin.",
+      "restored": "Kod yeniden çalışıyor.",
+      "restoredExpired": "Kod artık iptal edilmiş değil, ancak bitiş tarihi geçti. Kullanılabilmesi için Düzenle'de daha ileri bir tarih belirleyin.",
+      "restoredUsedUp": "Kod artık iptal edilmiş değil, ancak tüm kullanımları doldu. Daha fazla kişinin kullanabilmesi için Düzenle'de sınırı artırın.",
+      "restoreFailed": "Kod geri getirilmedi ve kullanılamıyor. Tekrar deneyin.",
+      "changeUnconfirmed": "Değişikliği doğrulayamadık. Liste artık kodun güncel durumunu gösteriyor.",
+      "form": {
+        "titleCreate": "Davet kodu oluştur",
+        "titleEdit": "Davet kodunu düzenle",
+        "titleCreated": "Yeni davet kodunuz",
+        "label": "Etiket",
+        "labelPlaceholder": "Örneğin: pilot müşteriler",
+        "labelHint": "Etiketi yalnızca yöneticiler görür.",
+        "level": "Yeni hesabın seviyesi",
+        "validity": "Geçerlilik",
+        "validUntil": "Geçerlilik bitişi",
+        "noEnd": "Bitiş tarihi yok",
+        "maxUses": "Kaç kişi kullanabilir",
+        "unlimited": "Sınır yok",
+        "labelRequired": "Koda bir etiket verin.",
+        "maxUsesInvalid": "1 veya daha büyük bir tam sayı girin ya da Sınır yok seçin.",
+        "dateRequired": "Bir tarih seçin ya da Bitiş tarihi yok seçin.",
+        "createFailed": "Kod oluşturulmadı. Hiçbir şey kaydedilmedi; tekrar deneyin.",
+        "createUnconfirmed": "Kodun oluşturulup oluşturulmadığını doğrulayamadık. Listeye bakın: bu etiketle bir kod görünürse iptal edin ve yenisini oluşturun, çünkü kodu tekrar gösterilemez.",
+        "saveFailed": "Değişiklikler kaydedilmedi. Kod eskisi gibi çalışıyor.",
+        "saveUnconfirmed": "Değişikliklerin kaydedilip kaydedilmediğini doğrulayamadık. Liste artık kodun güncel durumunu gösteriyor.",
+        "saved": "Değişiklikler kaydedildi."
+      },
+      "uses": {
+        "title": "Bu kodla kimler kaydoldu",
+        "empty": "Bu kodu henüz kimse kullanmadı.",
+        "deleted": "Hesap silindi",
+        "deletedAccounts": "Bu kodu kullanan {count} hesap o zamandan beri silindi.",
+        "loadFailed": "Liste yüklenemedi. Kapatıp yeniden açın."
+      }
     }
   },
   "statistics": {
@@ -888,7 +972,8 @@
       "policies": "Kurallar",
       "linkedPlatforms": "Platform örnekleri",
       "moderation": "Moderasyon",
-      "audit": "Kayıt"
+      "audit": "Kayıt",
+      "signupCodes": "Davet kodları"
     },
     "openPeople": "Kullanıcılar’ı aç",
     "backToOperate": "İşlet’e dön",
@@ -1146,7 +1231,8 @@
       "groups": "Gruplar kullanıcıları bir araya getirir; asistanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
       "policies": "Politikalar bir grubun neleri kullanabileceğini belirler, örneğin hangi özellikleri veya modelleri.",
       "moderation": "Kullanıcıların bildirdiği içerikler. İnceleyin, sonra tutun veya kaldırın.",
-      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce."
+      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce.",
+      "signup-codes": "Birinin ödeme yapmadan kaydolmasını sağlayan kodlar. Yeni hesabın seviyesini, kodun ne kadar geçerli olacağını ve kaç kişinin kullanabileceğini siz belirlersiniz."
     }
   },
   "iam": {

@@ -62,7 +62,7 @@ final readonly class AuthTab implements SystemConfigTab
             ),
             'REGISTRATION_MODE' => new FieldDefinition(
                 type: 'select',
-                description: 'How a visitor gets an account. "open": anyone may create a free account (the default for a self-hosted install). "admission": a new account needs either a paid plan — the account waits as "pending payment" until the first invoice is paid and is removed after 7 days without one — or a sign-up code you create under People → Sign-up codes. Existing accounts are not affected. Takes effect immediately, no restart.',
+                description: 'How a visitor gets an account. "open": anyone may create a free account (the default for a self-hosted install). "admission": a new account needs either a paid plan — the account waits as "pending payment" until the first invoice is paid and is removed after 7 days without one — or an invitation code you create under People → Invitation codes. Existing accounts are not affected. Takes effect immediately, no restart.',
                 default: RegistrationConfig::MODE_OPEN,
                 row: new DatabaseRow(RegistrationConfig::CONFIG_GROUP, RegistrationConfig::KEY_MODE),
                 options: RegistrationConfig::MODES,

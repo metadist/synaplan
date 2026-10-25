@@ -600,6 +600,90 @@
       },
       "serviceDown": "{name} est injoignable. {effect}",
       "serviceFailed": "{name} n’a pas fini de démarrer. {effect}"
+    },
+    "signupCodes": {
+      "title": "Codes d'invitation",
+      "empty": "Aucun code d'invitation pour l'instant. Créez-en un pour laisser entrer quelqu'un sans paiement.",
+      "create": "Créer un code",
+      "openModeNote": "L'inscription est ouverte sur ce serveur, personne n'a donc encore besoin d'un code. Les codes créés ici comptent dès que les réglages d'inscription demandent un forfait payant ou un code d'invitation.",
+      "openSettings": "Ouvrir les réglages d'inscription",
+      "loadFailed": "Les codes d'invitation n'ont pas pu être chargés. Rien n'a changé ; réessayez.",
+      "prefixAria": "Code commençant par {prefix}",
+      "shownOnce": "Copiez ce code maintenant. Par sécurité, il ne sera plus affiché.",
+      "copy": "Copier le code",
+      "copied": "Code copié.",
+      "copyFailed": "La copie n'a pas fonctionné. Sélectionnez le code et copiez-le à la main.",
+      "done": "Terminé",
+      "levels": {
+        "NEW": "Membre",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Sans limite de durée",
+        "week": "7 jours",
+        "fiveMonths": "5 mois"
+      },
+      "state": {
+        "active": "Utilisable",
+        "expired": "Expiré",
+        "used_up": "Épuisé",
+        "revoked": "Révoqué"
+      },
+      "facts": {
+        "grants": "Ouvre un compte de niveau {level}",
+        "validUntil": "valable jusqu'au {date}",
+        "noEnd": "sans date de fin",
+        "usesOf": "{uses} utilisations sur {max}",
+        "usesUnlimited": "{uses} utilisation, sans limite | {uses} utilisations, sans limite",
+        "createdBy": "Créé par {email} le {date}",
+        "createdByGone": "Créé le {date} par un compte qui n'existe plus"
+      },
+      "actions": {
+        "uses": "Qui l'a utilisé",
+        "edit": "Modifier",
+        "revoke": "Révoquer",
+        "restore": "Rétablir"
+      },
+      "revokeTitle": "Révoquer ce code ?",
+      "revokeBody": "Plus personne ne pourra utiliser ce code. Personne ne l'a encore utilisé. | Plus personne ne pourra utiliser ce code. La personne qui l'a utilisé garde son compte. | Plus personne ne pourra utiliser ce code. Les {count} personnes qui l'ont utilisé gardent leur compte.",
+      "revoked": "Le code est révoqué. Rétablir le réactive.",
+      "revokeFailed": "Le code n'a pas été révoqué et fonctionne toujours. Réessayez.",
+      "restored": "Le code fonctionne de nouveau.",
+      "restoredExpired": "Le code n'est plus révoqué, mais sa date de fin est passée. Choisissez une date plus tardive dans Modifier pour qu'il soit utilisable.",
+      "restoredUsedUp": "Le code n'est plus révoqué, mais toutes ses utilisations sont épuisées. Augmentez la limite dans Modifier pour que d'autres personnes puissent l'utiliser.",
+      "restoreFailed": "Le code n'a pas été rétabli et reste inutilisable. Réessayez.",
+      "changeUnconfirmed": "Nous n'avons pas pu confirmer la modification. La liste affiche maintenant l'état actuel du code.",
+      "form": {
+        "titleCreate": "Créer un code d'invitation",
+        "titleEdit": "Modifier le code d'invitation",
+        "titleCreated": "Votre nouveau code d'invitation",
+        "label": "Libellé",
+        "labelPlaceholder": "Par exemple : clients pilotes",
+        "labelHint": "Seuls les administrateurs voient le libellé.",
+        "level": "Niveau du nouveau compte",
+        "validity": "Validité",
+        "validUntil": "Valable jusqu'au",
+        "noEnd": "Sans date de fin",
+        "maxUses": "Nombre de personnes qui peuvent l'utiliser",
+        "unlimited": "Sans limite",
+        "labelRequired": "Donnez un libellé au code.",
+        "maxUsesInvalid": "Saisissez un nombre entier d'au moins 1, ou choisissez Sans limite.",
+        "dateRequired": "Choisissez une date, ou Sans date de fin.",
+        "createFailed": "Le code n'a pas été créé. Rien n'a été enregistré ; réessayez.",
+        "createUnconfirmed": "Nous n'avons pas pu confirmer la création du code. Vérifiez la liste : si un code avec ce libellé apparaît, révoquez-le et créez-en un nouveau, car son code ne peut plus être affiché.",
+        "saveFailed": "Les modifications n'ont pas été enregistrées. Le code fonctionne comme avant.",
+        "saveUnconfirmed": "Nous n'avons pas pu confirmer l'enregistrement des modifications. La liste affiche maintenant l'état actuel du code.",
+        "saved": "Modifications enregistrées."
+      },
+      "uses": {
+        "title": "Qui s'est inscrit avec ce code",
+        "empty": "Personne n'a encore utilisé ce code.",
+        "deleted": "Compte supprimé",
+        "deletedAccounts": "{count} compte qui a utilisé ce code a été supprimé depuis. | {count} comptes qui ont utilisé ce code ont été supprimés depuis.",
+        "loadFailed": "La liste n'a pas pu être chargée. Fermez-la et rouvrez-la."
+      }
     }
   },
   "statistics": {
@@ -892,7 +976,8 @@
       "policies": "Règles",
       "linkedPlatforms": "Instances de plateforme",
       "moderation": "Modération",
-      "audit": "Journal"
+      "audit": "Journal",
+      "signupCodes": "Codes d'invitation"
     },
     "openPeople": "Ouvrir Utilisateurs",
     "backToOperate": "Retour à Exploitation",
@@ -1150,7 +1235,8 @@
       "groups": "Les groupes réunissent des utilisateurs pour partager des assistants et fixer des règles une seule fois pour tous.",
       "policies": "Les règles décident de ce qu’un groupe peut utiliser, par exemple quelles fonctions ou quels modèles.",
       "moderation": "Contenus signalés par des utilisateurs. Examinez-les, puis conservez-les ou supprimez-les.",
-      "audit": "Un journal de qui a modifié quoi sur ce serveur, les plus récents d’abord."
+      "audit": "Un journal de qui a modifié quoi sur ce serveur, les plus récents d’abord.",
+      "signup-codes": "Des codes qui permettent de s'inscrire sans payer. Vous choisissez le niveau du nouveau compte, la durée de validité d'un code et le nombre de personnes qui peuvent l'utiliser."
     }
   },
   "iam": {

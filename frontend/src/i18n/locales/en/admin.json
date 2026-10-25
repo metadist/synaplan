@@ -600,6 +600,90 @@
       },
       "serviceDown": "{name} is not reachable. {effect}",
       "serviceFailed": "{name} did not finish starting. {effect}"
+    },
+    "signupCodes": {
+      "title": "Invitation codes",
+      "empty": "No invitation codes yet. Create one to let someone in without payment.",
+      "create": "Create code",
+      "openModeNote": "Sign-up is open on this server, so nobody needs a code yet. Codes you create here start to count once the sign-up settings ask for a paid plan or an invitation code.",
+      "openSettings": "Open sign-up settings",
+      "loadFailed": "The invitation codes could not be loaded. Nothing changed; try again.",
+      "prefixAria": "Code starting with {prefix}",
+      "shownOnce": "Copy this code now. For security it is not shown again.",
+      "copy": "Copy code",
+      "copied": "Code copied.",
+      "copyFailed": "Copying did not work. Select the code and copy it by hand.",
+      "done": "Done",
+      "levels": {
+        "NEW": "Member",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "For ever",
+        "week": "For 7 days",
+        "fiveMonths": "For 5 months"
+      },
+      "state": {
+        "active": "Usable",
+        "expired": "Expired",
+        "used_up": "Used up",
+        "revoked": "Revoked"
+      },
+      "facts": {
+        "grants": "Opens a {level} account",
+        "validUntil": "valid until {date}",
+        "noEnd": "no end date",
+        "usesOf": "{uses} of {max} uses",
+        "usesUnlimited": "{uses} use, no limit | {uses} uses, no limit",
+        "createdBy": "Created by {email} on {date}",
+        "createdByGone": "Created on {date} by an account that no longer exists"
+      },
+      "actions": {
+        "uses": "Who used it",
+        "edit": "Edit",
+        "revoke": "Revoke",
+        "restore": "Restore"
+      },
+      "revokeTitle": "Revoke this code?",
+      "revokeBody": "Nobody can use this code any more. Nobody has used it yet. | Nobody can use this code any more. The one person who used it keeps their account. | Nobody can use this code any more. The {count} people who used it keep their accounts.",
+      "revoked": "The code is revoked. Restore brings it back.",
+      "revokeFailed": "The code was not revoked and still works. Try again.",
+      "restored": "The code works again.",
+      "restoredExpired": "The code is no longer revoked, but its end date has passed. Set a later date under Edit so people can use it.",
+      "restoredUsedUp": "The code is no longer revoked, but all its uses are taken. Raise the limit under Edit so more people can use it.",
+      "restoreFailed": "The code was not restored and still cannot be used. Try again.",
+      "changeUnconfirmed": "We could not confirm the change. The list now shows the current state of the code.",
+      "form": {
+        "titleCreate": "Create an invitation code",
+        "titleEdit": "Edit invitation code",
+        "titleCreated": "Your new invitation code",
+        "label": "Label",
+        "labelPlaceholder": "For example: Pilot customers",
+        "labelHint": "Only administrators see the label.",
+        "level": "Level of the new account",
+        "validity": "Valid",
+        "validUntil": "Valid until",
+        "noEnd": "No end date",
+        "maxUses": "How many people can use it",
+        "unlimited": "No limit",
+        "labelRequired": "Give the code a label.",
+        "maxUsesInvalid": "Enter a whole number of 1 or more, or choose No limit.",
+        "dateRequired": "Pick a date, or choose No end date.",
+        "createFailed": "The code was not created. Nothing was saved; try again.",
+        "createUnconfirmed": "We could not confirm whether the code was created. Check the list: if a code with this label appears, revoke it and create a new one, because its code cannot be shown again.",
+        "saveFailed": "The changes were not saved. The code works as before.",
+        "saveUnconfirmed": "We could not confirm whether the changes were saved. The list now shows the current state of the code.",
+        "saved": "Changes saved."
+      },
+      "uses": {
+        "title": "Who signed up with this code",
+        "empty": "Nobody has used this code yet.",
+        "deleted": "Account deleted",
+        "deletedAccounts": "{count} account that used this code has since been deleted. | {count} accounts that used this code have since been deleted.",
+        "loadFailed": "The list could not be loaded. Close it and open it again."
+      }
     }
   },
   "statistics": {
@@ -892,7 +976,8 @@
       "policies": "Policies",
       "linkedPlatforms": "Platform instances",
       "moderation": "Moderation",
-      "audit": "Audit"
+      "audit": "Audit",
+      "signupCodes": "Invitation codes"
     },
     "openPeople": "Open Users",
     "backToOperate": "Back to Operate",
@@ -1150,7 +1235,8 @@
       "groups": "Groups bundle users so you can share assistants and set rules once for all of them.",
       "policies": "Policies decide what a group may use, for example which features or models.",
       "moderation": "Content users reported. Review it, then keep or remove it.",
-      "audit": "A record of who changed what on this server, newest first."
+      "audit": "A record of who changed what on this server, newest first.",
+      "signup-codes": "Codes that let someone sign up without paying. You decide the level of the new account, how long a code works and how many people may use it."
     }
   },
   "iam": {
