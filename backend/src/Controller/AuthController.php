@@ -178,6 +178,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
             ],
             'tokens' => $this->nativeTokenPayload($accessToken, $refreshToken),
@@ -200,6 +201,8 @@ class AuthController extends AbstractController
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
                 new OA\Property(property: 'language', type: 'string', nullable: true, description: 'UI language used during signup (de, en, es, fr, tr). Stored before the verification email is sent.', example: 'de'),
                 new OA\Property(property: 'challengeToken', type: 'string', nullable: true, description: 'Human-check token (Cloudflare Turnstile, or reCAPTCHA v3 as `recaptchaToken`). Required when the instance has a provider configured.'),
+                new OA\Property(property: 'plan', type: 'string', nullable: true, description: 'Paid plan when registration mode is admission: PRO, TEAM or BUSINESS.', example: 'TEAM'),
+                new OA\Property(property: 'code', type: 'string', nullable: true, description: 'Invitation code when registration mode is admission.'),
             ]
         )
     )]
@@ -258,11 +261,17 @@ class AuthController extends AbstractController
             return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
 
-        $user = $this->userLifecycleService->createUser(
-            email: $dto->email,
-            plainPassword: $dto->password,
-            userDetails: null !== $dto->language ? ['language' => $dto->language] : [],
-        );
+        try {
+            $user = $this->userLifecycleService->createSignup(
+                $dto->email,
+                $dto->password,
+                null !== $dto->language ? ['language' => $dto->language] : [],
+                $dto->plan,
+                $dto->code,
+            );
+        } catch (SignupBlockedException $e) {
+            return $this->signupBlocked($e);
+        }
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
@@ -420,6 +429,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
                 'language' => $user->getPreferredLanguage(),
@@ -755,6 +765,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
             ],
         ]);
@@ -1161,6 +1172,7 @@ class AuthController extends AbstractController
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
                 'language' => $user->getPreferredLanguage(),

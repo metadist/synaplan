@@ -43,30 +43,41 @@ final readonly class OAuthSignupGate
         private ModelConfigService $modelConfig,
         private RateLimiterFactoryInterface $oauthSignupNonceLimiter,
         private LoggerInterface $logger,
+        private SignupAdmission $admission,
     ) {
     }
 
     /**
      * Extra fields for the signed state at the start of the flow.
      *
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     public function stateExtras(Request $request, string $provider): array
     {
+        $extras = [];
+        $plan = strtoupper(trim((string) $request->query->get('plan', '')));
+        if ('' !== $plan) {
+            $extras['plan'] = $plan;
+        }
+        $code = trim((string) $request->query->get('code', ''));
+        if ('' !== $code) {
+            $extras['code'] = $code;
+        }
+
         if (!$this->protection->challengeRequired()) {
-            return [];
+            return $extras;
         }
 
         $token = (string) $request->query->get('challenge', '');
         if ($this->protection->verifyHuman($token, 'signup', $request->getClientIp())) {
-            return [self::STATE_HUMAN => true];
+            return $extras + [self::STATE_HUMAN => true];
         }
 
         $this->logger->info('OAuth start without a passed human check; a new account will be refused on the callback', [
             'provider' => $provider,
         ]);
 
-        return [];
+        return $extras;
     }
 
     /**
@@ -135,11 +146,22 @@ final readonly class OAuthSignupGate
         if (null !== $existing) {
             return;
         }
+        if ($this->protection->isSignupPaused()) {
+            throw SignupBlockedException::paused();
+        }
         if (!$verifiedNative && $this->protection->challengeRequired() && true !== ($statePayload[self::STATE_HUMAN] ?? false)) {
             throw SignupBlockedException::challengeRequired();
         }
 
         $this->protection->assertSignupAllowed($clientIp);
+        $this->admission->resolve($this->stateString($statePayload, 'plan'), $this->stateString($statePayload, 'code'));
+    }
+
+    private function stateString(array $state, string $key): ?string
+    {
+        $value = $state[$key] ?? null;
+
+        return is_string($value) && '' !== $value ? $value : null;
     }
 
     /**
@@ -167,9 +189,22 @@ final readonly class OAuthSignupGate
         }
     }
 
-    /** Everything a freshly created account needs besides its row. */
-    public function completeNewUser(User $user): void
+    /**
+     * Model defaults, and in admission mode the plan or the invitation code
+     * carried in the OAuth state. Open mode ignores that state.
+     *
+     * @param array<string, mixed> $state
+     */
+    public function completeNewUser(User $user, array $state = []): void
     {
+        $admission = $this->admission->resolve($this->stateString($state, 'plan'), $this->stateString($state, 'code'));
+        if (null !== $admission) {
+            $this->admission->apply($user, $admission);
+            if ($admission['code'] instanceof \App\Entity\SignupCode) {
+                $this->admission->commitCode($user, $admission['code']);
+            }
+        }
+
         $this->modelConfig->initializeNewUserDefaults((int) $user->getId());
     }
 }

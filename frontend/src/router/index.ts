@@ -1027,6 +1027,15 @@ router.beforeEach(async (to, _from, next) => {
 
   const { isAuthenticated, isAdmin, user } = useAuth()
 
+  if (
+    user.value?.accountStatus === 'pending_payment' &&
+    to.name !== 'subscription' &&
+    to.name !== 'login'
+  ) {
+    next({ name: 'subscription' })
+    return
+  }
+
   if ('release' === setupGate) {
     next(isAuthenticated.value ? resolveDefaultRoute() : { name: 'login' })
     return

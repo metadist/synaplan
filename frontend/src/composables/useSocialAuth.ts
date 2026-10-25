@@ -61,7 +61,11 @@ export function useSocialAuth() {
    * flow); a user-dismissed sheet/browser returns `false` without setting
    * `error`. On the web this navigates away and never returns `true`.
    */
-  async function signInWith(provider: string, redirect?: string): Promise<boolean> {
+  async function signInWith(
+    provider: string,
+    redirect?: string,
+    admission?: { plan?: string; code?: string }
+  ): Promise<boolean> {
     // OAuth round-trip strips the SPA's URL state, so stash the intent
     // for OAuthCallback to pick up. setPendingRedirect validates internally.
     if (redirect) setPendingRedirect(redirect)
@@ -85,8 +89,8 @@ export function useSocialAuth() {
           }
         }
         const result = appleSheet
-          ? await startNativeAppleSignIn()
-          : await startNativeOAuth(provider, challenge)
+          ? await startNativeAppleSignIn(admission)
+          : await startNativeOAuth(provider, challenge, admission)
         if (!result.success) {
           // A user-dismissed browser is a silent cancellation, not an error.
           if (!result.cancelled) {
@@ -112,6 +116,8 @@ export function useSocialAuth() {
     const params = new URLSearchParams({ language: String(locale.value) })
     const challenge = await getChallengeToken('signup')
     if (challenge) params.set('challenge', challenge)
+    if (admission?.plan) params.set('plan', admission.plan)
+    if (admission?.code) params.set('code', admission.code)
     window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
     return false
   }

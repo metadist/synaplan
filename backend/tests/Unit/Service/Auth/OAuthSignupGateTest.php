@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Auth;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\OAuthSignupGate;
+use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
 use App\Service\ModelConfigService;
@@ -158,6 +159,9 @@ final class OAuthSignupGateTest extends TestCase
             'interval' => '10 minutes',
         ], new InMemoryStorage());
 
-        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger());
+        $admission = $this->createMock(SignupAdmission::class);
+        $admission->method('resolve')->willReturn(null);
+
+        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger(), $admission);
     }
 }

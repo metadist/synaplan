@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Iam;
 
 use App\Entity\User;
+use App\Service\Auth\SignupAdmission;
+use App\Service\Auth\SignupBlockedException;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Email\EmailChatService;
 use App\Service\ModelConfigService;
@@ -33,7 +35,41 @@ final readonly class UserLifecycleService
         private UserPasswordHasherInterface $passwordHasher,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
+        private SignupAdmission $signupAdmission,
     ) {
+    }
+
+    /**
+     * Email/password sign-up. Open mode ignores plan and code. Admission mode
+     * requires exactly one of them.
+     *
+     * @param array<string, mixed> $userDetails
+     *
+     * @throws SignupBlockedException
+     */
+    public function createSignup(string $email, string $plainPassword, array $userDetails, ?string $plan, ?string $code): User
+    {
+        $admission = $this->signupAdmission->resolve($plan, $code);
+        $level = 'NEW';
+        if (null !== $admission && $admission['code'] instanceof \App\Entity\SignupCode) {
+            $level = $admission['code']->getLevel();
+        }
+
+        $user = $this->createUser($email, $plainPassword, 'local', 'WEB', $level, false, $userDetails);
+        if (null === $admission) {
+            return $user;
+        }
+        if (null !== $admission['plan']) {
+            $this->signupAdmission->apply($user, $admission);
+            $this->em->flush();
+
+            return $user;
+        }
+        if ($admission['code'] instanceof \App\Entity\SignupCode) {
+            $this->signupAdmission->commitCode($user, $admission['code']);
+        }
+
+        return $user;
     }
 
     /**

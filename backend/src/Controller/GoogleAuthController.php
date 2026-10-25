@@ -155,6 +155,7 @@ class GoogleAuthController extends AbstractController
                 $userInfo,
                 $googleRefreshToken,
                 AccountLanguage::normalize($statePayload['language'] ?? null),
+                $statePayload,
             );
 
             $this->logger->info('Google OAuth successful', [
@@ -174,7 +175,7 @@ class GoogleAuthController extends AbstractController
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $email = $userInfo['email'] ?? null;
         $googleId = $userInfo['id'] ?? null;
@@ -249,7 +250,7 @@ class GoogleAuthController extends AbstractController
         $this->em->flush();
 
         if ($isNewUser) {
-            $this->signupGate->completeNewUser($user);
+            $this->signupGate->completeNewUser($user, $admissionState);
         }
 
         return $user;

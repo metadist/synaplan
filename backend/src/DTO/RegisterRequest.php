@@ -30,4 +30,14 @@ class RegisterRequest
      */
     #[Assert\Choice(choices: AccountLanguage::SUPPORTED)]
     public ?string $language = null;
+
+    /**
+     * Paid plan (PRO, TEAM, BUSINESS). Used only when registration mode is admission.
+     */
+    public ?string $plan = null;
+
+    /**
+     * Invitation code. Used only when registration mode is admission.
+     */
+    public ?string $code = null;
 }

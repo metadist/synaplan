@@ -39,13 +39,16 @@ export function nativeProviderLoginUrl(
   apiBase: string,
   provider: string,
   language: string,
-  challenge = ''
+  challenge = '',
+  admission?: { plan?: string; code?: string }
 ): string {
   const params = new URLSearchParams({
     native: '1',
     language,
   })
   if (challenge !== '') params.set('challenge', challenge)
+  if (admission?.plan) params.set('plan', admission.plan)
+  if (admission?.code) params.set('code', admission.code)
   return `${apiBase}/api/v1/auth/${provider}/login?${params}`
 }
 
@@ -57,7 +60,8 @@ const BROWSER_DISMISS_GRACE_MS = 800
 
 export async function startNativeOAuth(
   provider: string,
-  challenge = ''
+  challenge = '',
+  admission?: { plan?: string; code?: string }
 ): Promise<NativeOAuthResult> {
   return new Promise<NativeOAuthResult>((resolve) => {
     let settled = false
@@ -146,7 +150,8 @@ export async function startNativeOAuth(
       getNativeApiBaseUrl(),
       provider,
       String(i18n.global.locale.value),
-      challenge
+      challenge,
+      admission
     )
     Browser.open({ url: authUrl }).catch(() => {
       void finish({ success: false, error: 'Could not open the browser' })

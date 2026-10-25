@@ -175,7 +175,7 @@ class GitHubAuthController extends AbstractController
                 $userInfo,
                 $email,
                 $githubAccessToken,
-                AccountLanguage::normalize($statePayload['language'] ?? null),
+                AccountLanguage::normalize($statePayload['language'] ?? null), $statePayload,
             );
 
             $this->logger->info('GitHub OAuth successful', [
@@ -195,7 +195,7 @@ class GitHubAuthController extends AbstractController
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $githubId = $userInfo['id'] ?? null;
         $githubLogin = $userInfo['login'] ?? null;
@@ -291,7 +291,7 @@ class GitHubAuthController extends AbstractController
         $this->em->flush();
 
         if ($isNewUser) {
-            $this->signupGate->completeNewUser($user);
+            $this->signupGate->completeNewUser($user, $admissionState);
         }
 
         return $user;
