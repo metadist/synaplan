@@ -597,7 +597,7 @@ One Go binary, `sidecars/synaplan-watchdog`, in the backend image.
 
 | Mode / endpoint | Since | Does |
 | --------------- | ----- | ---- |
-| agent loop | AU6 | every 5 s: read `http://localhost:2019/metrics` and `/frankenphp/threads`, cgroup limits (`/sys/fs/cgroup/memory.max`, `cpu.max`), `/proc` RSS, Kubernetes facts; write `capacity:server:{serverId}` (TTL 20 s) and the one-minute aggregate `capacity:agg:{serverId}:{minute}` (TTL 24 h) to Redis |
+| agent loop | AU6 | every 5 s: read `http://localhost:2019/metrics` and `/frankenphp/threads`, cgroup limits (`/sys/fs/cgroup/memory.max`, `cpu.max`), `/proc` RSS, Kubernetes facts; write `capacity:server:{serverId}` (TTL 20 s), the one-minute aggregate `capacity:agg:{serverId}:{minute}` (TTL 24 h), the field `{serverId}` = last report time in the hash `capacity:seen` (TTL 7 d, refreshed), the same body once more as `capacity:last:{serverId}` (TTL 7 d, so a silent server keeps its role, machine and log source on the page), and the day's high-water mark `capacity:peak:{serverId}:{day}` (held AI answers, when; TTL 48 h) to Redis, every key under the application prefix `synaplan:<APP_ENV>:` that `RedisService` puts on its own keys, so PHP reads them and a dev and a test stack on one Redis stay apart. The hash is how the page lists a server whose snapshot has expired ("last report 3 minutes ago") |
 | `GET :8098/live` | AU6 | 200 while the watchdog runs |
 | `GET :8098/ready` | AU6 | 200 when PHP answered its own probe (`GET /api/health/ready`, AU2) within 2 s in the last 10 s, Redis answers, and the server is not draining; else 503 |
 | `GET :8098/metrics` | AU6 | FrankenPHP's metrics passed through plus `synaplan_*` (§9) |
@@ -621,7 +621,7 @@ log line and a response header all point at one thing:
 | ----- | ---- | ------------- |
 | `server_id` | `SYNAPLAN_SERVER_ID`, else the hostname. On Kubernetes the hostname is the pod name, so nothing has to be set. On compose the hostname is a container id (`79e4f90bc8c6`) unless the compose file sets `SYNAPLAN_SERVER_ID`; the platform cluster sets `web1` … `web3` from `updatewebN.sh`, a single-server install leaves it unset and sees its hostname | watchdog (snapshot); PHP (`X-Synaplan-Server` response header and the capacity API's `served_by`, AU7) |
 | `hostname` | the container hostname, unchanged | watchdog (snapshot); PHP's event ring (`host`) already writes this |
-| `role` | `SYNAPLAN_ROLE`, else `web` | watchdog. Workers and the scheduler do not run a watchdog in S0; their heartbeats already carry the hostname (`ScheduledJobStatusStore`) and join the page in AU33 |
+| `role` | `SYNAPLAN_ROLE`, else `web` | watchdog. Every role runs it: the web role reports its pools and PHP readiness; a worker or the scheduler reports its place, memory and processor, is ready when Redis answers, and publishes no slot gauges. On compose, several roles on one machine need distinct ids (`web1`, `web1-worker`, `web1-bulk`, `web1-scheduler`), which the watchdog derives itself: a worker or the scheduler appends its role to an explicit id that carries none (`web1` → `web1-worker`), so one env file shared by several containers cannot make two roles overwrite one snapshot; the platform compose spells the suffixes out and the watchdog keeps them. On Kubernetes every pod name is distinct by itself |
 
 The snapshot `capacity:server:{id}` (AU6) carries, next to the pools and the
 limits:

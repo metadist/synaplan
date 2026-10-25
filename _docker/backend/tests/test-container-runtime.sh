@@ -858,8 +858,9 @@ assert_not_contains "chown -R www-data:www-data /var/www/backend/var /var/www/ba
 assert_not_contains "chmod -R 775 /var/www/backend/var /var/www/backend/public/up" "$ENTRYPOINT" \
     "the entrypoint no longer chmods the whole var tree on every start"
 
-echo "Case 13: the web role restarts the watchdog, and off means no process"
-assert_contains "start_watchdog" "$ENTRYPOINT" "the web role starts the watchdog before FrankenPHP"
+echo "Case 13: every role restarts the watchdog, and off means no process"
+assert_eq 3 "$(grep -c '^[[:space:]]*start_watchdog$' "$ENTRYPOINT")" \
+    "the entrypoint starts the watchdog for the web, worker and scheduler roles"
 
 WATCHDOG_LOG="$TMP_DIR/watchdog.log"
 cat > "$TMP_DIR/bin/synaplan-watchdog" <<'EOF'
@@ -879,22 +880,6 @@ chmod +x "$TMP_DIR/bin/synaplan-watchdog"
 )
 assert_eq "" "$( [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ] && echo started || true )" \
     "SYNAPLAN_WATCHDOG=0 does not start a supervisor"
-
-(
-    export SYNAPLAN_ROLE=worker
-    export SYNAPLAN_WATCHDOG=1
-    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/synaplan-watchdog"
-    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
-    export WATCHDOG_LOG
-    start_watchdog
-)
-if [ -f "$WATCHDOG_LOG" ]; then
-    FAIL=$((FAIL + 1))
-    echo "FAIL: a worker role started the watchdog" >&2
-else
-    PASS=$((PASS + 1))
-    echo "PASS: a worker role does not start the watchdog"
-fi
 
 (
     export SYNAPLAN_ROLE=web

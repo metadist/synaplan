@@ -43,6 +43,15 @@ func (r *Redis) Get(ctx context.Context, key string) ([]byte, error) {
 	return body, nil
 }
 
+// PutField sets one hash field and refreshes the hash TTL in one round trip.
+func (r *Redis) PutField(ctx context.Context, key, field, value string, ttl time.Duration) error {
+	pipe := r.client.Pipeline()
+	pipe.HSet(ctx, key, field, value)
+	pipe.Expire(ctx, key, ttl)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
 // Ping checks that Redis answers.
 func (r *Redis) Ping(ctx context.Context) error {
 	return r.client.Ping(ctx).Err()
@@ -62,6 +71,11 @@ func (Unconfigured) Put(context.Context, string, []byte, time.Duration) error {
 // Get reports that Redis is not configured.
 func (Unconfigured) Get(context.Context, string) ([]byte, error) {
 	return nil, ErrUnconfigured
+}
+
+// PutField drops the write.
+func (Unconfigured) PutField(context.Context, string, string, string, time.Duration) error {
+	return ErrUnconfigured
 }
 
 // Ping reports that Redis is not configured.

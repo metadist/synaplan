@@ -29,10 +29,12 @@ type PHPProbe interface {
 type Agent struct {
 	ID      string
 	Version string
-	Admin   AdminAPI
-	Probe   PHPProbe
-	Read    func() host.Facts
-	Store   store.Store
+	// Prefix is the application's Redis key prefix (capacity.KeyPrefix).
+	Prefix string
+	Admin  AdminAPI
+	Probe  PHPProbe
+	Read   func() host.Facts
+	Store  store.Store
 
 	mu        sync.Mutex
 	prevCPU   cpuPoint
@@ -149,10 +151,19 @@ func phpFresh(readyAt time.Time, latency time.Duration, at time.Time) bool {
 }
 
 // PHPFresh reports whether the last good probe still counts at the given time.
+// A role without a probe has no PHP to wait for and is always fresh.
 func (a *Agent) PHPFresh(at time.Time) bool {
+	if a.Probe == nil {
+		return true
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return phpFresh(a.phpReady, a.phpLate, at)
+}
+
+// ServesPHP is true when this agent watches a FrankenPHP process.
+func (a *Agent) ServesPHP() bool {
+	return a.Admin != nil
 }
 
 func (a *Agent) cpuRatio(now time.Time, facts host.Facts) *float64 {
@@ -187,12 +198,19 @@ func (a *Agent) publish(ctx context.Context, now time.Time, snap capacity.Snapsh
 		log.Printf("watchdog: snapshot: %v", err)
 		return
 	}
-	if err := a.Store.Put(ctx, capacity.SnapshotKey(a.ID), body, capacity.SnapshotTTL); err != nil {
+	if err := a.Store.Put(ctx, capacity.SnapshotKey(a.Prefix, a.ID), body, capacity.SnapshotTTL); err != nil {
 		log.Printf("watchdog: snapshot store: %v", err)
+	}
+	if err := a.Store.Put(ctx, capacity.LastKey(a.Prefix, a.ID), body, capacity.SeenTTL); err != nil {
+		log.Printf("watchdog: last report store: %v", err)
+	}
+	if err := a.Store.PutField(ctx, capacity.SeenHashKey(a.Prefix), a.ID, snap.UpdatedAt, capacity.SeenTTL); err != nil {
+		log.Printf("watchdog: seen store: %v", err)
 	}
 	minute := capacity.Minute(now)
 	agg := capacity.Aggregate{}
-	raw, err := a.Store.Get(ctx, capacity.AggregateKey(a.ID, minute))
+	aggKey := capacity.AggregateKey(a.Prefix, a.ID, minute)
+	raw, err := a.Store.Get(ctx, aggKey)
 	if err != nil {
 		log.Printf("watchdog: aggregate read: %v", err)
 		return
@@ -208,8 +226,35 @@ func (a *Agent) publish(ctx context.Context, now time.Time, snap capacity.Snapsh
 	if err != nil {
 		return
 	}
-	if err := a.Store.Put(ctx, capacity.AggregateKey(a.ID, minute), encoded, capacity.AggregateTTL); err != nil {
+	if err := a.Store.Put(ctx, aggKey, encoded, capacity.AggregateTTL); err != nil {
 		log.Printf("watchdog: aggregate store: %v", err)
+	}
+	a.publishPeak(ctx, now, snap)
+}
+
+// publishPeak keeps the day's high-water mark of held AI answers, which the
+// capacity page shows as "peak today" and reads for its sizing hint.
+func (a *Agent) publishPeak(ctx context.Context, now time.Time, snap capacity.Snapshot) {
+	day := capacity.Day(now)
+	key := capacity.PeakKey(a.Prefix, a.ID, day)
+	peak := capacity.Peak{}
+	raw, err := a.Store.Get(ctx, key)
+	if err != nil {
+		log.Printf("watchdog: peak read: %v", err)
+		return
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &peak); err != nil {
+			peak = capacity.Peak{}
+		}
+	}
+	peak = capacity.RaisePeak(peak, day, snap)
+	encoded, err := json.Marshal(peak)
+	if err != nil {
+		return
+	}
+	if err := a.Store.Put(ctx, key, encoded, capacity.PeakTTL); err != nil {
+		log.Printf("watchdog: peak store: %v", err)
 	}
 }
 

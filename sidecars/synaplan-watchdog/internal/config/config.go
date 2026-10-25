@@ -9,8 +9,11 @@ import (
 
 // Config is everything the process reads at boot.
 type Config struct {
-	Listen      string
-	ServerID    string
+	Listen   string
+	ServerID string
+	Role     string
+	// KeyPrefix is `synaplan:<APP_ENV>:`, the application's Redis namespace.
+	KeyPrefix   string
 	Version     string
 	RedisURL    string
 	AdminURL    string
@@ -26,9 +29,12 @@ func FromEnv() Config {
 
 // From reads an injected environment, used by tests.
 func From(env func(string) string) Config {
+	role := first(env("SYNAPLAN_ROLE"), "web")
 	cfg := Config{
 		Listen:      ":8098",
-		ServerID:    serverID(env),
+		ServerID:    serverID(env, role),
+		Role:        role,
+		KeyPrefix:   keyPrefix(env("APP_ENV")),
 		Version:     first(env("APP_VERSION"), "dev"),
 		RedisURL:    first(env("REDIS_URL"), env("REDIS_DSN")),
 		AdminURL:    first(env("WATCHDOG_ADMIN_URL"), "http://127.0.0.1:2019"),
@@ -44,13 +50,52 @@ func From(env func(string) string) Config {
 	return cfg
 }
 
-func serverID(env func(string) string) string {
-	raw := first(env("SYNAPLAN_SERVER_ID"), env("HOSTNAME"))
-	safe := sanitize(raw)
-	if safe == "" {
-		return "synaplan"
+// ServesPHP is true for the role that runs FrankenPHP. The other roles have
+// no admin API and no readiness URL to probe.
+func (c Config) ServesPHP() bool {
+	return c.Role == "web"
+}
+
+// keyPrefix mirrors RedisService's `synaplan:<env>:`. An unset APP_ENV is
+// prod, which is what the image runs when nothing says otherwise.
+func keyPrefix(appEnv string) string {
+	appEnv = sanitize(appEnv)
+	if appEnv == "" {
+		appEnv = "prod"
 	}
-	return safe
+	return "synaplan:" + appEnv + ":"
+}
+
+// roleSuffixes are the ids a compose file gives the roles that share one
+// machine with the web container (platform: web1-worker, web1-bulk, …).
+var roleSuffixes = []string{"-worker", "-bulk", "-scheduler"}
+
+// serverID is SYNAPLAN_SERVER_ID, else the hostname. Several containers on
+// one machine often load the same env file, so an explicit id on a worker
+// or the scheduler gets its role appended unless the id already carries
+// one; otherwise two roles would overwrite one snapshot in turns.
+func serverID(env func(string) string, role string) string {
+	explicit := sanitize(env("SYNAPLAN_SERVER_ID"))
+	if explicit == "" {
+		hostname := sanitize(env("HOSTNAME"))
+		if hostname == "" {
+			return "synaplan"
+		}
+		return hostname
+	}
+	if role == "web" || hasRoleSuffix(explicit) {
+		return explicit
+	}
+	return explicit + "-" + sanitize(role)
+}
+
+func hasRoleSuffix(id string) bool {
+	for _, suffix := range roleSuffixes {
+		if strings.HasSuffix(id, suffix) && len(id) > len(suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func sanitize(raw string) string {

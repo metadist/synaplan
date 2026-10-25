@@ -36,4 +36,7 @@ func TestRedisRoundTripWhenReachable(t *testing.T) {
 	if err != nil || missing != nil {
 		t.Fatalf("missing = %q err %v", missing, err)
 	}
+	if err := opened.PutField(ctx, "capacity:seen:watchdog-test", "watchdog-test", "2026-10-24T18:00:00Z", time.Minute); err != nil {
+		t.Fatal(err)
+	}
 }

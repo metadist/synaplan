@@ -10,6 +10,12 @@ const (
 	SnapshotTTL = 20 * time.Second
 	// AggregateTTL keeps one minute of peaks for a day.
 	AggregateTTL = 24 * time.Hour
+	// SeenKey is the hash of every server id that reported, with its last
+	// report time. A server that stops reporting stays listed here, so the
+	// page can say "last report 3 minutes ago" after its snapshot expired.
+	SeenKey = "capacity:seen"
+	// SeenTTL drops a server that has not reported for a week.
+	SeenTTL = 7 * 24 * time.Hour
 )
 
 // Pool is one PHP worker pool.
@@ -89,14 +95,72 @@ type Aggregate struct {
 	CPUUsageMax    float64 `json:"cpu_usage_max"`
 }
 
+// KeyPrefix is what the application's RedisService puts before every key:
+// `synaplan:<APP_ENV>:`. The watchdog writes under the same prefix so PHP
+// reads the snapshots, and so a dev and a test stack on one Redis stay apart.
+func KeyPrefix(appEnv string) string {
+	if appEnv == "" {
+		appEnv = "prod"
+	}
+	return "synaplan:" + appEnv + ":"
+}
+
 // SnapshotKey is the live report for one server.
-func SnapshotKey(serverID string) string {
-	return "capacity:server:" + serverID
+func SnapshotKey(prefix, serverID string) string {
+	return prefix + "capacity:server:" + serverID
 }
 
 // AggregateKey is one minute of peaks for one server.
-func AggregateKey(serverID, minute string) string {
-	return "capacity:agg:" + serverID + ":" + minute
+func AggregateKey(prefix, serverID, minute string) string {
+	return prefix + "capacity:agg:" + serverID + ":" + minute
+}
+
+// SeenHashKey is the seen-list under the prefix.
+func SeenHashKey(prefix string) string {
+	return prefix + SeenKey
+}
+
+// LastKey is the last report of a server, kept as long as the seen-list
+// (SeenTTL). The live snapshot expires after 20 seconds; this copy lets the
+// page show a silent server with its role, machine and log source instead
+// of a bare id.
+func LastKey(prefix, serverID string) string {
+	return prefix + "capacity:last:" + serverID
+}
+
+// PeakTTL keeps a day's peak long enough to be read as "yesterday".
+const PeakTTL = 48 * time.Hour
+
+// Peak is capacity:peak:{id}:{day}: the most AI answers held at once that day.
+type Peak struct {
+	Day            string `json:"day"`
+	StreamsBusyMax int    `json:"streams_busy_max"`
+	StreamsTotal   int    `json:"streams_total"`
+	At             string `json:"at"`
+}
+
+// PeakKey is one UTC day's peak for one server.
+func PeakKey(prefix, serverID, day string) string {
+	return prefix + "capacity:peak:" + serverID + ":" + day
+}
+
+// Day is the UTC day used in the peak key.
+func Day(now time.Time) string {
+	return now.UTC().Format("20060102")
+}
+
+// RaisePeak records a new high-water mark; an equal or lower sample leaves
+// the earlier time in place.
+func RaisePeak(current Peak, day string, snap Snapshot) Peak {
+	if current.Day != day {
+		current = Peak{Day: day, StreamsBusyMax: -1}
+	}
+	if snap.Streams.Busy > current.StreamsBusyMax {
+		current.StreamsBusyMax = snap.Streams.Busy
+		current.At = snap.UpdatedAt
+	}
+	current.StreamsTotal = snap.Streams.Total
+	return current
 }
 
 // Minute is the UTC minute used in the aggregate key.

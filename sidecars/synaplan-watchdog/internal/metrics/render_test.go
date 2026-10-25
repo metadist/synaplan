@@ -33,6 +33,16 @@ func TestRenderPassesFrankenPHPThrough(t *testing.T) {
 	}
 }
 
+func TestWorkerRenderHasNoSlotGauges(t *testing.T) {
+	body := Render("", capacity.Snapshot{ServerID: "web1-worker", Role: "worker", Runtime: "compose", Version: "dev"})
+	if !strings.Contains(body, `synaplan_server_info{server="web1-worker",role="worker"`) {
+		t.Fatalf("missing server info:\n%s", body)
+	}
+	if strings.Contains(body, "synaplan_stream_slots") {
+		t.Fatalf("a worker reported stream slots:\n%s", body)
+	}
+}
+
 func TestRenderQuotesALabel(t *testing.T) {
 	body := Render("", capacity.Snapshot{ServerID: `web"1`})
 	if !strings.Contains(body, `server="web\"1"`) {

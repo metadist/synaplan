@@ -14,7 +14,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
 | 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
 | 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
-| 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | in review | watchdog on `:8098`; `capacity:server:{id}` every 5 s. No relay. Not rolled out |
+| 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | merged (`5e7a4ebdd`) | watchdog on `:8098`; `capacity:server:{id}` every 5 s with place and log source. No relay. Not rolled out |
+| 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | in review | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33) |
 
 ## Baselines
 
@@ -62,9 +63,17 @@ identity rule shared with PHP, the Downward API variables for the chart,
 and the "You are connected to" header for AU7 are written in `03` §6.1 and
 `04` §4.1, §5.2, §6. On the dev stack the snapshot read
 `"hostname":"<container id>","role":"web","place":{},"logs":{"collector":"docker","event_ring_host":"<container id>"}`.
-The platform cluster still needs `SYNAPLAN_SERVER_ID` and
-`SYNAPLAN_HOST_NAME` in its compose file (private repo, after this release);
-without them its three cards are container ids.
+**Redis namespace (same day).** PHP's `RedisService` prefixes every key with `synaplan:<APP_ENV>:`; the watchdog now writes under that prefix (`APP_ENV` from the container, `prod` when unset), so the capacity page reads the snapshots and a dev stack next to a test stack does not see the other's servers. The seen-list `capacity:seen` (hash, 7 days) keeps a silent server on the page with its last report time.
+
+**Every role (same day).** The worker and scheduler roles start the same
+watchdog. Without FrankenPHP it skips the admin API and the PHP probe: its
+report is place, memory and processor, `/ready` is Redis alone, `/metrics`
+answers 200 with `synaplan_server_info{role="worker"}` and no slot gauges.
+On compose, roles on one machine need distinct ids; the platform compose
+derives `web1-worker`, `web1-bulk` and `web1-scheduler` from the exported
+`SYNAPLAN_SERVER_ID`, and `updatewebN.sh` exports it with
+`SYNAPLAN_HOST_NAME` next to `SYNDBHOST` ([synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33)). Kubernetes pod names are distinct on their own. The
+Downward API variables are AU8's, in `synaplan-charts`.
 
 **Dev stack, 2026-10-24.** Rebuilt `backend` (classic mode, no worker pools).
 `:8098` is not published. `/live` 200. `/ready` 200 once
