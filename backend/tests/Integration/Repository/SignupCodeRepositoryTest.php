@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Repository;
 use App\Entity\SignupCode;
 use App\Entity\SignupCodeUse;
 use App\Repository\SignupCodeRepository;
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -98,6 +99,29 @@ final class SignupCodeRepositoryTest extends KernelTestCase
 
         self::assertNull($this->codes->redeem($code, 2001), 'the database state decides, not the in-memory entity');
         self::assertSame(0, $code->getUses());
+    }
+
+    public function testAStaleManagerCannotWriteItsCounterOverAnotherManagersIncrement(): void
+    {
+        [, $code] = $this->persistCode(maxUses: 5);
+        $id = (int) $code->getId();
+        self::assertNotNull($this->codes->redeem($code, 1001));
+        self::assertSame(1, $code->getUses());
+
+        $other = new EntityManager($this->em->getConnection(), $this->em->getConfiguration());
+        $fresh = $other->find(SignupCode::class, $id);
+        self::assertInstanceOf(SignupCode::class, $fresh);
+        $other->getConnection()->executeStatement(
+            'UPDATE BSIGNUP_CODES SET BUSES = BUSES + 1 WHERE BID = ? AND (BMAXUSES IS NULL OR BUSES < BMAXUSES)',
+            [$id],
+        );
+        $fresh->syncUses(2);
+        $other->flush();
+
+        // This manager still holds 1. Flushing it used to store 1 and reopen the use.
+        $this->em->flush();
+
+        self::assertSame(2, (int) $this->em->getConnection()->fetchOne('SELECT BUSES FROM BSIGNUP_CODES WHERE BID = ?', [$id]));
     }
 
     public function testUnlimitedCodesHaveNoCeiling(): void

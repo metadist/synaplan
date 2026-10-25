@@ -179,9 +179,12 @@ const displayedValue = computed(() =>
   isPinnedByEnv.value ? (props.value.effectiveValue ?? localValue.value) : localValue.value
 )
 
-const effectiveValueLabel = computed(() =>
-  props.value.effectiveValue === 'true' ? t('common.enabled') : t('common.disabled')
-)
+const effectiveValueLabel = computed(() => {
+  if (props.schema.type === 'select') {
+    return optionLabel(props.value.effectiveValue ?? localValue.value)
+  }
+  return props.value.effectiveValue === 'true' ? t('common.enabled') : t('common.disabled')
+})
 
 const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 
@@ -279,9 +282,11 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
     <div v-else-if="schema.type === 'select' && schema.options" class="flex gap-2">
       <select
         :id="fieldKey"
-        :value="localValue"
-        :disabled="disabled"
-        class="flex-1 px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+        :value="displayedValue"
+        :disabled="disabled || isPinnedByEnv"
+        :class="[
+          'flex-1 px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed',
+        ]"
         @change="handleInput"
       >
         <option v-for="opt in schema.options" :key="opt" :value="opt">

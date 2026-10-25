@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Entity\ApiKey;
+use App\Entity\User;
 use App\Repository\ApiKeyRepository;
+use App\Repository\UserRepository;
 use App\Security\ApiKeyAuthenticator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -16,16 +18,21 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
 class ApiKeyAuthenticatorTest extends TestCase
 {
     private ApiKeyRepository&MockObject $apiKeyRepository;
+    private UserRepository&MockObject $users;
     private LoggerInterface&MockObject $logger;
     private ApiKeyAuthenticator $authenticator;
+    private ?User $owner = null;
 
     protected function setUp(): void
     {
         $this->apiKeyRepository = $this->createMock(ApiKeyRepository::class);
+        $this->users = $this->createMock(UserRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->users->method('find')->willReturnCallback(fn () => $this->owner ?? new User());
 
         $this->authenticator = new ApiKeyAuthenticator(
             $this->apiKeyRepository,
+            $this->users,
             $this->logger
         );
     }
@@ -82,6 +89,25 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->apiKeyRepository
             ->method('findActiveByKey')
             ->willReturn($apiKey);
+
+        $this->expectException(AuthenticationException::class);
+        $this->expectExceptionMessage('API key is inactive');
+
+        $this->authenticator->authenticate($request);
+    }
+
+    public function testAuthenticateRejectsAPendingPaymentOwner(): void
+    {
+        $apiKey = $this->createMock(ApiKey::class);
+        $apiKey->method('isActive')->willReturn(true);
+        $apiKey->method('getId')->willReturn(1);
+        $apiKey->method('getOwnerId')->willReturn(10);
+        $this->owner = (new User())->setAccountStatus(User::ACCOUNT_STATUS_PENDING_PAYMENT);
+
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'pending-owner');
+        $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
+        $this->apiKeyRepository->expects($this->never())->method('touchLastUsed');
 
         $this->expectException(AuthenticationException::class);
         $this->expectExceptionMessage('API key is inactive');

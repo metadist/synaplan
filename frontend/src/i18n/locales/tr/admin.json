@@ -546,6 +546,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Açık — herkes kaydolabilir",
+          "admission": "Kabul — bir plan veya bir davet kodu"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Standart (düz Docker)",
           "gvisor": "Güçlü yalıtım (gVisor)",

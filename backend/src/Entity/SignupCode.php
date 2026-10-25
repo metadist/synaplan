@@ -50,7 +50,12 @@ class SignupCode
     #[ORM\Column(name: 'BMAXUSES', type: 'integer', nullable: true)]
     private ?int $maxUses = 1;
 
-    #[ORM\Column(name: 'BUSES', type: 'integer', options: ['default' => 0])]
+    /**
+     * Incremented by the redeem UPDATE, never by the unit of work. An
+     * updatable column lets a manager that still holds the old count flush
+     * that count back over a redemption that already happened.
+     */
+    #[ORM\Column(name: 'BUSES', type: 'integer', updatable: false, options: ['default' => 0])]
     private int $uses = 0;
 
     /** Unix timestamp; null means the code never expires. */
@@ -204,7 +209,10 @@ class SignupCode
         return $this->active && !$this->isExpired($now) && !$this->isExhausted();
     }
 
-    /** The persisted use count after {@see SignupCodeRepository::redeem()}; not a public setter. */
+    /**
+     * Remember the count the redeem UPDATE just stored. In memory only:
+     * the column is not updatable, so a later flush cannot write it back.
+     */
     public function syncUses(int $uses): void
     {
         $this->uses = $uses;
