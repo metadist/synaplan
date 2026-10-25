@@ -107,17 +107,38 @@ class ApiKeyAuthenticatorTest extends TestCase
         $apiKey->method('isActive')->willReturn(true);
         $apiKey->method('getId')->willReturn(1);
         $apiKey->method('getOwnerId')->willReturn(10);
-        $this->owner = (new User())->setAccountStatus(User::ACCOUNT_STATUS_PENDING_PAYMENT);
+        $this->owner = (new User())->setUserLevel('PRO')->setAccountStatus(User::ACCOUNT_STATUS_PENDING_PAYMENT);
 
         $request = new Request();
         $request->headers->set('X-API-Key', 'pending-owner');
         $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
         $this->apiKeyRepository->expects($this->never())->method('touchLastUsed');
 
-        $this->expectException(AuthenticationException::class);
-        $this->expectExceptionMessage('API key is inactive');
+        // Not paid yet: the plan answer (403, recovery is paying), even for
+        // the level the checkout is about to grant.
+        $this->expectException(ApiKeyPlanDeniedException::class);
+        $this->expectExceptionMessage(ApiKeyPlanRequiredException::MESSAGE);
 
-        $this->authenticator->authenticate($request);
+        $this->authenticatorWithBilling(true)->authenticate($request);
+    }
+
+    public function testAuthenticateRejectsASuspendedOwnerWithoutThePlanAnswer(): void
+    {
+        $apiKey = $this->activeKey();
+        $this->owner = (new User())->setUserLevel('PRO')->setAccountStatus(User::ACCOUNT_STATUS_SUSPENDED);
+
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'suspended-owner');
+        $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
+        $this->apiKeyRepository->expects($this->never())->method('touchLastUsed');
+
+        try {
+            $this->authenticatorWithBilling(true)->authenticate($request);
+            $this->fail('A suspended owner must not authenticate.');
+        } catch (AuthenticationException $e) {
+            $this->assertNotInstanceOf(ApiKeyPlanDeniedException::class, $e);
+            $this->assertSame('API key is inactive', $e->getMessage());
+        }
     }
 
     public function testAuthenticateSucceedsWithValidKey(): void
