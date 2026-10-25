@@ -58,6 +58,7 @@ final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterf
         $payload = [
             'auth' => [
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
+                'registrationMode' => $this->registrationConfig->mode(),
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
                 'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],

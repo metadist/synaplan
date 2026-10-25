@@ -1788,6 +1788,21 @@
                 "tab": "auth",
                 "type": "boolean"
             },
+            "REGISTRATION_MODE": {
+                "dbGroup": "ACCESS",
+                "dbKey": "REGISTRATION_MODE",
+                "default": "open",
+                "description": "How a visitor gets an account. \"open\": anyone may create a free account (the default for a self-hosted install). \"admission\": a new account needs either a paid plan — the account waits as \"pending payment\" until the first invoice is paid and is removed after 7 days without one — or a sign-up code you create under People → Sign-up codes. Existing accounts are not affected. Takes effect immediately, no restart.",
+                "options": [
+                    "open",
+                    "admission"
+                ],
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "select"
+            },
             "SAVEDTASKS_ENABLED": {
                 "dbGroup": "SAVEDTASKS",
                 "dbKey": "ENABLED",
@@ -2252,6 +2267,7 @@
                     {
                         "fields": [
                             "REGISTRATION_ENABLED",
+                            "REGISTRATION_MODE",
                             "GUEST_CHAT_ENABLED",
                             "SIGNUP_PAUSED"
                         ],
@@ -3692,6 +3708,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
@@ -4985,6 +5007,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
             },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
@@ -7158,6 +7186,21 @@
                 "tab": "auth",
                 "type": "boolean"
             },
+            "REGISTRATION_MODE": {
+                "dbGroup": "ACCESS",
+                "dbKey": "REGISTRATION_MODE",
+                "default": "open",
+                "description": "How a visitor gets an account. \"open\": anyone may create a free account (the default for a self-hosted install). \"admission\": a new account needs either a paid plan — the account waits as \"pending payment\" until the first invoice is paid and is removed after 7 days without one — or a sign-up code you create under People → Sign-up codes. Existing accounts are not affected. Takes effect immediately, no restart.",
+                "options": [
+                    "open",
+                    "admission"
+                ],
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "select"
+            },
             "SAVEDTASKS_ENABLED": {
                 "dbGroup": "SAVEDTASKS",
                 "dbKey": "ENABLED",
@@ -7622,6 +7665,7 @@
                     {
                         "fields": [
                             "REGISTRATION_ENABLED",
+                            "REGISTRATION_MODE",
                             "GUEST_CHAT_ENABLED",
                             "SIGNUP_PAUSED"
                         ],
@@ -9215,6 +9259,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
@@ -10372,6 +10422,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
             },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
@@ -11548,6 +11604,12 @@
                 "isSet": true,
                 "locked": false,
                 "value": "false"
+            },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
             },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
@@ -12833,6 +12895,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": true,
@@ -14116,6 +14184,12 @@
                 "isSet": true,
                 "locked": false,
                 "value": "true"
+            },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
             },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,

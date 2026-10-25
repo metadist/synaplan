@@ -133,6 +133,8 @@ final class TokenServiceTest extends TestCase
         $user->method('getRoles')->willReturn(['ROLE_USER']);
         $user->method('getUserLevel')->willReturn('PRO');
         $user->method('isActive')->willReturn($active);
+        // A suspended mock may not sign in either; pending_payment is not modelled here.
+        $user->method('canSignIn')->willReturn($active);
 
         return $user;
     }

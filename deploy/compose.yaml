@@ -86,6 +86,9 @@ x-app-environment: &app-environment
   # install reachable from the open internet that nobody watches wants
   # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
+  # "open" (default) or "admission": pay for a plan or hold an invitation code.
+  # Empty keeps the application default / the value set in the admin UI.
+  REGISTRATION_MODE: "${REGISTRATION_MODE:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   # Feature-flag pins (docs/FEATURE_FLAGS.md). Every flag is ON by default and
   # managed under Operate > System configuration > Features; an empty value here

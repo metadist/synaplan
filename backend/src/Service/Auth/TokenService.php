@@ -190,8 +190,9 @@ final readonly class TokenService
 
         // /auth/refresh is PUBLIC_ACCESS so the firewall user_checker never
         // runs here. Refuse before minting an access cookie or sliding the
-        // 30-day BTOKENS expiry, or a suspended account stays signed in.
-        if (!$user->isActive()) {
+        // 30-day BTOKENS expiry, or a suspended account stays signed in. A
+        // pending-payment account keeps its session so it can pay.
+        if (!$user->canSignIn()) {
             $this->logger->warning('Refresh blocked for suspended account', [
                 'user_id' => $user->getId(),
             ]);
