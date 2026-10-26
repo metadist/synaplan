@@ -50,7 +50,7 @@ final class ResearchRunView
             'sources' => $ledger['sources'],
             'evidence' => $ledger['evidence'],
             'report' => null === $report ? null : ['markdown' => $report, 'version' => 1],
-            'check' => null,
+            'check' => $state->ledger->check(),
             'outcome' => $state->outcome?->toArray(),
             'models' => $ledger['models'],
             'budget' => [

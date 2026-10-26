@@ -66,7 +66,7 @@ final readonly class WriteStage implements ResearchStage
             ]);
         }
 
-        return new StageResult('deliver');
+        return new StageResult('check');
     }
 
     private function evidence(StageContext $ctx): string

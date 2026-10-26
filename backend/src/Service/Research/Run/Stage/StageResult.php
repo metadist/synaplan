@@ -7,7 +7,7 @@ namespace App\Service\Research\Run\Stage;
 final readonly class StageResult
 {
     /** @var list<string> */
-    public const NAMES = ['plan', 'gather', 'read', 'round', 'write', 'deliver', 'wait_answer', 'wait_plan', 'done'];
+    public const NAMES = ['plan', 'gather', 'read', 'round', 'write', 'check', 'deliver', 'wait_answer', 'wait_plan', 'done'];
 
     public function __construct(public string $next)
     {

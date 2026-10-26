@@ -19,7 +19,7 @@ chat message.
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
-| RS8 | in progress | Free check only, not applied to a run. Seeded draft in `DraftCheckTest`: 6 of 6 planted errors caught, 0 of 6 supported statements flagged. Checker model, removal and revision are not built. Flag stays off |
+| RS8 | in progress | Free check plus the checker model. A cited statement that is not supported is removed and listed; the report ends with the count. Seeded draft still 6/6 and 0/6. Thorough revision is not built. Citation precision was not measured. Flag stays off |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
@@ -37,6 +37,29 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-26 — RS8 checker model, standard removal
+
+No live run. After the report, `CheckStage` runs the free check and then
+asks the checker model, in batches that fit its input budget, for a
+verdict on every cited statement that passed. `supported` stays.
+`partial`, `unsupported`, `contradicted` and a missing verdict are
+removed and listed under "Not confirmed". A free-check failure is removed
+the same way and is not sent to the model. The report ends with how many
+statements a source backs, and names the provider when the checker and
+the writer share a family. The run summary uses those counts. Every
+depth, including thorough, uses this removal; a revision that keeps the
+supported part is not built. `softened` in the check event is 0.
+
+Command:
+
+```bash
+php bin/phpunit tests/Unit/Service/Research/Run/CheckStageTest.php
+```
+
+Citation precision was not measured. This is not the RS8 exit.
 
 ---
 

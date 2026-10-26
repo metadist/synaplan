@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\AI\StructuredOutput\Schema\ResearchBriefSchema;
+use App\AI\StructuredOutput\Schema\ResearchCheckSchema;
 use App\AI\StructuredOutput\Schema\ResearchDecisionSchema;
 use App\AI\StructuredOutput\Schema\ResearchEvidenceSchema;
 use App\AI\StructuredOutput\Schema\ResearchFinishSchema;
@@ -436,7 +437,7 @@ final class ResearchStagesTest extends TestCase
         $write = new WriteStage(new StageCall($caller));
 
         self::assertSame('write', $read->run($ctx)->next);
-        self::assertSame('deliver', $write->run($ctx)->next);
+        self::assertSame('check', $write->run($ctx)->next);
 
         $facts = [];
         foreach ($ctx->state->ledger->evidenceForWriter()['p1'] ?? [] as $card) {
@@ -510,7 +511,7 @@ final class ResearchStagesTest extends TestCase
         self::assertSame('gather', (new PlanStage($calls))->run($ctx)->next);
         self::assertSame('read', (new GatherStage($calls, $search, new GatherChoice()))->run($ctx)->next);
         self::assertSame('write', (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store))->run($ctx)->next);
-        self::assertSame('deliver', (new WriteStage($calls))->run($ctx)->next);
+        self::assertSame('check', (new WriteStage($calls))->run($ctx)->next);
         $done = (new DeliverStage())->run($ctx);
 
         self::assertSame('done', $done->next);
@@ -561,7 +562,7 @@ final class ResearchStagesTest extends TestCase
         $calls = new StageCall($caller);
 
         self::assertSame('write', (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx)->next);
-        self::assertSame('deliver', (new WriteStage($calls))->run($ctx)->next);
+        self::assertSame('check', (new WriteStage($calls))->run($ctx)->next);
         (new DeliverStage())->run($ctx);
 
         self::assertCount(3, $caller->seen);
@@ -648,7 +649,7 @@ final class ResearchStagesTest extends TestCase
     public function testResearchPromptsStayInternal(): void
     {
         $topics = array_column(PromptCatalog::all(), 'topic');
-        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_lead', 'tools:research_write'] as $topic) {
+        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_lead', 'tools:research_write', 'tools:research_check'] as $topic) {
             self::assertContains($topic, $topics);
         }
         $read = null;
@@ -673,6 +674,7 @@ final class ResearchStagesTest extends TestCase
             ['class' => ResearchEvidenceSchema::class],
             ['class' => ResearchDecisionSchema::class],
             ['class' => ResearchFinishSchema::class],
+            ['class' => ResearchCheckSchema::class],
         ];
     }
 

@@ -10,7 +10,7 @@ use App\Service\Research\Run\Ledger\PassageText;
  * The free half of the fact-check. A cited statement must point at evidence
  * that exists, and its numbers, dates and proper names must be in that
  * evidence. A sentence that states a fact and cites nothing is flagged.
- * Nothing here calls a model, and a run does not use this yet.
+ * The check stage runs this before the checker model.
  */
 final readonly class DraftCheck
 {

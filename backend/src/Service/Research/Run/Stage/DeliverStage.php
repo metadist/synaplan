@@ -43,15 +43,18 @@ final readonly class DeliverStage implements ResearchStage
             $ctx->events->append($ctx->state->ref->id, 'point', ['id' => $point->id, 'status' => $status]);
         }
 
-        $outcome = $open > 0
-            ? new ResearchOutcome(ResearchOutcome::COMPLETE_PARTIAL, [
+        if ($open > 0) {
+            $outcome = new ResearchOutcome(ResearchOutcome::COMPLETE_PARTIAL, [
                 'open' => $open,
                 'points' => count($ledger->points()),
-            ])
-            : new ResearchOutcome(ResearchOutcome::COMPLETE, [
-                'statements' => $cited['statements'],
-                'supported' => $cited['supported'],
             ]);
+        } else {
+            $check = $ledger->check();
+            $outcome = new ResearchOutcome(ResearchOutcome::COMPLETE, [
+                'statements' => null !== $check ? $check['statements'] : $cited['statements'],
+                'supported' => null !== $check ? $check['supported'] : $cited['supported'],
+            ]);
+        }
 
         return StageEnds::finish($ctx, ResearchStatus::Complete, $outcome, 'complete');
     }

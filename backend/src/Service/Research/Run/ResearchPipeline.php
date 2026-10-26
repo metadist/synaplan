@@ -6,6 +6,7 @@ namespace App\Service\Research\Run;
 
 use App\Service\Research\Run\Lead\LeadStage;
 use App\Service\Research\Run\Stage\BriefStage;
+use App\Service\Research\Run\Stage\CheckStage;
 use App\Service\Research\Run\Stage\DeliverStage;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
@@ -20,7 +21,7 @@ use App\Service\Research\Run\Stage\WriteStage;
 /**
  * Runs one research step. Brief and plan share a step. A round is search,
  * reading and the decision to search again, or one turn where the lead
- * calls the tools itself. The queue stays on four messages. A run with
+ * calls the tools itself. The fact-check follows the report. A run with
  * nothing it could search ends before the first paid call.
  */
 final readonly class ResearchPipeline implements ResearchUnitRunner
@@ -33,6 +34,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
         private ReflectStage $reflect,
         private LeadStage $lead,
         private WriteStage $write,
+        private CheckStage $check,
         private DeliverStage $deliver,
         private ResearchSearch $search,
     ) {
@@ -44,6 +46,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
             ResearchUnitPlan::BRIEF_PLAN => $this->briefPlan($ctx),
             ResearchUnitPlan::ROUND => $this->round($ctx),
             ResearchUnitPlan::WRITE => $this->write->run($ctx),
+            ResearchUnitPlan::CHECK => $this->check->run($ctx),
             ResearchUnitPlan::DELIVER => $this->deliver->run($ctx),
             default => throw new \InvalidArgumentException('Unknown research unit.'),
         };

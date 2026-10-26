@@ -19,6 +19,7 @@ final readonly class StageCall
         'planning' => 'lead',
         'reading' => 'reader',
         'writing' => 'writer',
+        'checker' => 'checker',
     ];
 
     public function __construct(private ResearchModelCaller $models)
