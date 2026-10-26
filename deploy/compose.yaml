@@ -210,7 +210,7 @@ x-app-volumes: &app-volumes
 
 services:
   secrets-init:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     restart: "no"
     environment:
       APP_SECRET: "${APP_SECRET:-}"
@@ -491,7 +491,7 @@ services:
   # the network. It runs as root so it can read the mode-0600 key; it does
   # not run the application.
   tls-proxy:
-    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
     profiles: [local-tls]
     user: "0:0"
     ports:
@@ -723,7 +723,7 @@ services:
     networks: [internal]
 
   whisper-models:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     profiles: [local-ai]
     # The model name is passed as an environment variable and expanded by the
     # container's shell inside quotes, instead of being interpolated by Compose
