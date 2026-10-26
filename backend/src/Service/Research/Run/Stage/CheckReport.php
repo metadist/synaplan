@@ -9,8 +9,8 @@ namespace App\Service\Research\Run\Stage;
  * stays. The rest is listed under Not confirmed, and the report ends with
  * the count. The writer already keeps a Not confirmed section for gaps; the
  * removed statements join it instead of opening a second one. A thorough
- * revision, which would keep the supported part of a partial statement, is
- * a later step, so every depth uses this removal.
+ * run may replace this with one writer revision; every other depth uses
+ * this removal.
  */
 final class CheckReport
 {
@@ -30,6 +30,15 @@ final class CheckReport
         'es' => '%1$d de %2$d afirmaciones están respaldadas por una fuente.',
         'fr' => '%1$d affirmations sur %2$d s\'appuient sur une source.',
         'tr' => '%2$d ifadeden %1$d tanesi bir kaynakla destekleniyor.',
+    ];
+
+    /** @var array<string, string> */
+    private const SOFTENED = [
+        'de' => '%d wurden auf den Teil gekürzt, den eine Quelle belegt.',
+        'en' => '%d were shortened to the part a source backs.',
+        'es' => '%d se acortaron a la parte que respalda una fuente.',
+        'fr' => '%d ont été réduites à la partie qu\'une source confirme.',
+        'tr' => '%d tanesi bir kaynağın desteklediği kısma kısaltıldı.',
     ];
 
     /** @var array<string, string> */
@@ -96,9 +105,42 @@ final class CheckReport
         }
 
         $language = isset(self::HEADING[$language]) ? $language : 'en';
-        $report = self::list(self::tidy($report), $listed, $language);
+
+        return self::close(self::list(self::tidy($report), $listed, $language), $language, $counts, $sameProvider);
+    }
+
+    /**
+     * The Not confirmed section, heading included, or an empty string when
+     * the report has none.
+     */
+    public static function notConfirmedBody(string $report): string
+    {
+        $lines = self::lines($report);
+        $section = self::section($lines);
+        if (null === $section) {
+            return '';
+        }
+
+        return implode("\n", array_slice($lines, $section['start'], $section['end'] - $section['start']));
+    }
+
+    /**
+     * Appends the count, and the same-provider sentence when it applies.
+     * The report text itself is left as it is. Softened statements are
+     * part of the supported count and are named so the reader knows the
+     * text was shortened.
+     *
+     * @param array{statements: int, supported: int, removed: int} $counts
+     */
+    public static function close(string $report, string $language, array $counts, bool $sameProvider, int $softened = 0): string
+    {
+        $language = isset(self::HEADING[$language]) ? $language : 'en';
+        $report = trim($report);
         if ($counts['statements'] > 0) {
             $report .= "\n\n".sprintf(self::BACKED[$language], $counts['supported'], $counts['statements']);
+            if ($softened > 0) {
+                $report .= ' '.sprintf(self::SOFTENED[$language], $softened);
+            }
             if ($counts['removed'] > 0) {
                 $report .= ' '.sprintf(self::REMOVED[$language], $counts['removed']);
             }

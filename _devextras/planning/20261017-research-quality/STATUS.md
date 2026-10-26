@@ -19,7 +19,7 @@ chat message.
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
-| RS8 | in progress | Free check plus the checker model. A cited statement that is not supported is removed and listed; the report ends with the count. Seeded draft still 6/6 and 0/6. Thorough revision is not built. Citation precision was not measured. Flag stays off |
+| RS8 | in progress | Free check, checker model, and one thorough revision. Seeded draft 6/6 caught, 0/6 false alarms. Smoke 2026-10-26, tool mode: citation precision 79.8 % without the check (RS7 reports) and 96.0 % with it; fact recall unchanged at 0.78 across 9. Exit met on these numbers, judges not calibrated. Waits for the owner to accept. Flag stays off |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
@@ -37,6 +37,82 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-26 — RS8 thorough revision
+
+No live run. When the checker returns a `partial` verdict, a thorough run
+makes one writer call (`tools:research_revise`). Without a partial there is
+nothing a revision could keep, so no call is made. A `partial` statement
+keeps the part the source backs, counts as softened, and the closing count
+names it. Every cited sentence of the revision must be a supported
+statement verbatim or a shortened partial that keeps its id; a reworded
+`unsupported` or `contradicted` statement that stays cited is rejected, and
+the Not confirmed section may not gain a citation (`[e1, e2]` markers
+included). A revision that adds a fact the draft did not have is rejected,
+and the standard removal stands, so the run still delivers. Standard and
+quick do not revise. A thorough run with no model call left removes
+instead. `softened` stays 0 on that path.
+
+Command:
+
+```bash
+php bin/phpunit tests/Unit/Service/Research/Run/CheckStageTest.php
+```
+
+The live smoke below ran at standard depth, so it does not exercise the
+revision.
+
+---
+
+## 2026-10-26 — RS8 exit: citation precision before and after the check
+
+Local m4 stack, branch `feat/research-thorough-revision` (checker from
+#2789). Research was pinned on for the window and turned off afterwards:
+`RESEARCH_ENABLED` unset in backend and worker, `RESEARCH.ENABLED` `0`,
+`LEAD_MODE` `auto`, `TOOL_MODE_MODELS` `[]`, no `SORT` pin. User 1, `CHAT`
+and `SORT` `BMODELS` 379 (Claude Sonnet 5.5), `LEAD_MODE` `tools`, Brave,
+smoke 10, standard, repeat 2, concurrency 2. Corpus sha256
+`56c371a25e01520f6d601da376b3df4a11ff6d3c245f8a8eb532a99624c844fa`.
+
+"Before" is the RS7 read-first smoke of 2026-10-25 (`rs7-tools-readfirst`,
+same questions, same mode, no fact-check), each report with the passages
+its evidence ids point to. "After" is this run (`rs8-tools-smoke`). Both
+were judged together, shuffled with seed 1, with no arm name:
+
+```bash
+docker compose exec -T backend php bin/console app:research:citations \
+  --answers=/tmp/rs8-answers-rs7.json,/tmp/rs8-answers-rs8.json \
+  --judges=openai:gpt-6.1-sol,xai:grok-4.7 --user=1 --sample=0 \
+  --out=/tmp/rs8-citations
+```
+
+Judges GPT-6.1 Sol and Grok 4.7; neither is the Claude writer. No third
+judge (no Google key here), so a split stays "uncertain" and is left out.
+**No human calibration exists (`06` §4); the numbers are a signal.**
+
+| Date | Step | Arm | Corpus | Depth | Recall | Citation precision | Coverage | Abstention | Cost | Time p50 / p95 | Command |
+| ---- | ---- | --- | ------ | ----- | ------ | ------------------ | -------- | ---------- | ---- | -------------- | ------- |
+| 2026-10-25 | RS7 | tools, no check | smoke 10 | standard, repeat 2 | 0.78 across 9 | 79.8 % (313 of 392; 32 uncertain), judges agree on 92.5 % | not judged | trap-01 abstained both times | sum 2.76 USD, median 0.116 | 174.6 / 292.7 s | HTTP `POST /api/v1/research`, then `app:research:citations` |
+| 2026-10-26 | RS8 | tools, with check | smoke 10 | standard, repeat 2 | 0.78 across 9 | 96.0 % (217 of 226; 21 uncertain), judges agree on 91.5 % | not judged | trap-01 abstained both times | sum 2.47 USD, median 0.117 | 98.4 / 138.5 s | HTTP `POST /api/v1/research`, then `app:research:citations` |
+
+Recall: `app:research:eval --corpus=full --arm=b1 --import=…` per repeat,
+both repeats 0.78 across 9 (0.875 across the 8 web items with a match
+string), the same as the RS7 row. mix-01 is 0.00 both times, as before.
+Outcomes of 20: complete 13, complete_partial 4, failed_nothing_found 3
+(doc-01#1, trap-01 twice). The check removed between 7 and 15 statements
+per report; the report states the count. Judge tokens: GPT-6.1 Sol 95149,
+Grok 4.7 1232491; the judges wrote no usage row.
+
+The report's sample of rejected pairs shows three RS8 statements; two are
+sentences about what the sources do not say (p551, p571). The RS7
+rejections there include wrong article numbers, dates a passage does not
+hold, and list fragments.
+
+Exit (`07` RS8): rates in STATUS, and smoke citation precision above the
+RS7 row (96.0 % against 79.8 %). RS8 stays in progress until the owner
+accepts this.
 
 ---
 

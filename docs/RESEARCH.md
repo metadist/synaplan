@@ -71,10 +71,15 @@ again), and the report ends with how many statements a source backs. A
 batch holds at most 30 statements; when the budget runs out after the
 first batch, the statements not yet checked count as not confirmed and
 the report is still delivered. When the
-checker and the writer are the same provider, the report says so. Every
-depth uses this removal until a thorough run can revise a statement
-without adding a fact. A revision that adds a problem the draft before it
-did not have is already rejected.
+checker and the writer are the same provider, the report says so. Standard
+and quick remove every statement that is not supported. When the checker
+marks a statement partial, a thorough run tries one revision first: the
+partial statement keeps the part a source backs, and the closing count
+says how many were shortened. Every cited sentence of the revision must be
+a supported statement or such a shortened one; a reworded unsupported or
+contradicted statement cannot stay cited, and nothing under Not confirmed
+gains a citation. If the revision breaks one of these rules or adds a
+fact, the removal stands and the person still gets the report.
 
 When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
 uses that same round to call search, read, ask or finish itself. The list is

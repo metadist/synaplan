@@ -6,6 +6,7 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchCheckSchema;
 use App\Service\Research\Run\Ledger\PassageText;
+use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchStatus;
 
@@ -13,9 +14,14 @@ use App\Service\Research\Run\ResearchStatus;
  * Checks the report. The free check runs first and costs nothing. The
  * checker model then judges every cited statement that passed it, in
  * batches that fit its input budget. A statement that is not supported is
- * removed and listed. The report ends with the count. When the budget runs
- * out after the first batch, the statements not yet checked count as not
- * confirmed, so the paid report is still delivered.
+ * removed and listed. When a thorough run has a partial statement, it
+ * tries one revision that keeps the supported part; if that revision adds
+ * a fact or keeps a rejected statement, the removal stands. Without a
+ * partial statement a revision could only remove, so no call is made. The
+ * report ends with
+ * the count. When the budget runs out after the first batch, the
+ * statements not yet checked count as not confirmed, so the paid report
+ * is still delivered.
  */
 final readonly class CheckStage implements ResearchStage
 {
@@ -28,20 +34,21 @@ final readonly class CheckStage implements ResearchStage
         private ResearchInputBudget $budgets,
         private CheckBatches $batches = new CheckBatches(),
         private int $batchChars = 0,
+        private CheckRevision $revision = new CheckRevision(new DraftCheck()),
     ) {
     }
 
     public function run(StageContext $ctx): StageResult
     {
-        $report = $ctx->state->ledger->report();
-        if (null === $report || '' === trim($report)) {
+        $original = $ctx->state->ledger->report();
+        if (null === $original || '' === trim($original)) {
             return new StageResult('deliver');
         }
         $ctx->state->advance(ResearchStatus::Checking);
         $ctx->events->append($ctx->state->ref->id, 'checking', []);
 
         $passages = $this->passages($ctx);
-        $sorted = $this->sort(CheckReport::withoutNotConfirmed($report), $passages);
+        $sorted = $this->sort(CheckReport::withoutNotConfirmed($original), $passages);
         $verdicts = [];
         foreach ($this->batches->groups($sorted['ask'], $this->chars()) as $index => $group) {
             if ($index > 0 && !$ctx->state->budget->canCall() && !$ctx->stop->requested()) {
@@ -67,22 +74,30 @@ final readonly class CheckStage implements ResearchStage
 
         $counts = $this->counts($sorted, $verdicts);
         $brief = $ctx->state->ledger->brief();
-        $ctx->state->ledger->setReport(CheckReport::apply(
-            $report,
-            $sorted['drop'],
-            $verdicts,
-            $sorted['ask'],
-            null !== $brief ? $brief->language : 'en',
-            $counts,
-            $ctx->roles->checkerSameFamily,
-        ));
-        $ctx->state->ledger->setCheck($counts['statements'], $counts['supported'], $counts['removed']);
-        $ctx->events->append($ctx->state->ref->id, 'check', [
-            'statements' => $counts['statements'],
-            'supported' => $counts['supported'],
-            'softened' => 0,
-            'removed' => $counts['removed'],
-        ]);
+        $language = null !== $brief ? $brief->language : 'en';
+        $sameProvider = $ctx->roles->checkerSameFamily;
+        $report = CheckReport::apply($original, $sorted['drop'], $this->labels($verdicts), $sorted['ask'], $language, $counts, $sameProvider);
+        $revised = $this->revise($ctx, $original, $passages, $sorted, $verdicts, $language, $report);
+        if ($revised instanceof StageResult) {
+            $this->record($ctx, $counts, $counts['supported'], 0);
+
+            return $revised;
+        }
+        if (is_string($revised)) {
+            $tally = $this->tally($sorted, $verdicts);
+            $counts = [
+                'statements' => $tally['statements'],
+                'supported' => $tally['supported'] + $tally['softened'],
+                'removed' => $tally['removed'],
+            ];
+            $report = CheckReport::close($revised, $language, $counts, $sameProvider, $tally['softened']);
+            $this->record($ctx, $counts, $tally['supported'], $tally['softened']);
+            $ctx->state->ledger->setReport($report);
+
+            return new StageResult('deliver');
+        }
+        $this->record($ctx, $counts, $counts['supported'], 0);
+        $ctx->state->ledger->setReport($report);
 
         return new StageResult('deliver');
     }
@@ -126,7 +141,7 @@ final readonly class CheckStage implements ResearchStage
 
     /**
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, string>                                                                                                                    $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      *
      * @return array{statements: int, supported: int, removed: int}
      */
@@ -134,7 +149,7 @@ final readonly class CheckStage implements ResearchStage
     {
         $supported = 0;
         foreach ($sorted['ask'] as $item) {
-            if ('supported' === ($verdicts[$item['id']] ?? 'unsupported')) {
+            if ('supported' === ($verdicts[$item['id']]['verdict'] ?? 'unsupported')) {
                 ++$supported;
             }
         }
@@ -154,7 +169,7 @@ final readonly class CheckStage implements ResearchStage
      *
      * @param list<array{id: string, sentence: string, bare: string, passages: string}> $group
      *
-     * @return array<string, string>|null null when the answer has no verdict list at all
+     * @return array<string, array{verdict: string, part: string}>|null null when the answer has no verdict list at all
      */
     private function verdicts(mixed $data, array $group): ?array
     {
@@ -171,10 +186,144 @@ final readonly class CheckStage implements ResearchStage
             if (!isset($asked[$id]) || isset($out[$id]) || !in_array($row['verdict'], self::VERDICTS, true)) {
                 continue;
             }
-            $out[$id] = $row['verdict'];
+            $out[$id] = [
+                'verdict' => $row['verdict'],
+                'part' => is_string($row['unsupported_part'] ?? null) ? $row['unsupported_part'] : '',
+            ];
         }
 
         return $out;
+    }
+
+    /**
+     * @param array<string, array{verdict: string, part: string}> $verdicts
+     *
+     * @return array<string, string>
+     */
+    private function labels(array $verdicts): array
+    {
+        $flat = [];
+        foreach ($verdicts as $id => $row) {
+            $flat[$id] = $row['verdict'];
+        }
+
+        return $flat;
+    }
+
+    /**
+     * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
+     *
+     * @return array{statements: int, supported: int, softened: int, removed: int}
+     */
+    private function tally(array $sorted, array $verdicts): array
+    {
+        $supported = 0;
+        $softened = 0;
+        $removed = count($sorted['drop']);
+        foreach ($sorted['ask'] as $item) {
+            $verdict = $verdicts[$item['id']]['verdict'] ?? 'unsupported';
+            if ('supported' === $verdict) {
+                ++$supported;
+            } elseif ('partial' === $verdict) {
+                ++$softened;
+            } else {
+                ++$removed;
+            }
+        }
+
+        return [
+            'statements' => $supported + $softened + $removed,
+            'supported' => $supported,
+            'softened' => $softened,
+            'removed' => $removed,
+        ];
+    }
+
+    /**
+     * @param array{statements: int, supported: int, removed: int} $counts
+     */
+    private function record(StageContext $ctx, array $counts, int $supported, int $softened): void
+    {
+        $ctx->state->ledger->setCheck($counts['statements'], $counts['supported'], $counts['removed']);
+        $ctx->events->append($ctx->state->ref->id, 'check', [
+            'statements' => $counts['statements'],
+            'supported' => $supported,
+            'softened' => $softened,
+            'removed' => $counts['removed'],
+        ]);
+    }
+
+    /**
+     * @param array<string, string>                                                                                                                    $passages
+     * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
+     */
+    private function revise(StageContext $ctx, string $original, array $passages, array $sorted, array $verdicts, string $language, string $fallback): string|StageResult|null
+    {
+        if (!$this->wantsRevision($ctx, $sorted, $verdicts)) {
+            return null;
+        }
+        $ctx->state->ledger->setReport($fallback);
+        $called = $this->calls->prose(
+            $ctx,
+            'writing',
+            $ctx->roles->writer,
+            ResearchPrompts::fill('tools:research_revise', [
+                'NOT_CONFIRMED_TITLE' => CheckReport::notConfirmedTitle($language),
+                'REPORT' => ResearchPrompts::data($original),
+                'VERDICTS' => ResearchPrompts::data($this->verdictBlock($sorted, $verdicts)),
+            ]),
+            'Revise the report.',
+        );
+        if ($called instanceof StageResult) {
+            return $called;
+        }
+        if (!$called instanceof ResearchModelReply || !$this->revision->acceptable($original, $called->text, $passages, $sorted, $verdicts)) {
+            return null;
+        }
+
+        return $called->text;
+    }
+
+    /**
+     * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
+     */
+    private function wantsRevision(StageContext $ctx, array $sorted, array $verdicts): bool
+    {
+        if (ResearchDepth::Thorough !== $ctx->state->ref->depth || !$ctx->state->budget->canCall() || $ctx->stop->requested()) {
+            return false;
+        }
+        foreach ($sorted['ask'] as $item) {
+            if ('partial' === ($verdicts[$item['id']]['verdict'] ?? 'unsupported')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
+     */
+    private function verdictBlock(array $sorted, array $verdicts): string
+    {
+        $lines = [];
+        foreach ($sorted['drop'] as $item) {
+            $lines[] = 'remove: '.$item['text'];
+        }
+        foreach ($sorted['ask'] as $item) {
+            $row = $verdicts[$item['id']] ?? ['verdict' => 'unsupported', 'part' => ''];
+            $line = $item['id'].' '.$row['verdict'].': '.$item['bare'];
+            if ('partial' === $row['verdict'] && '' !== trim($row['part'])) {
+                $line .= ' | unsupported part: '.$row['part'];
+            }
+            $lines[] = $line;
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
