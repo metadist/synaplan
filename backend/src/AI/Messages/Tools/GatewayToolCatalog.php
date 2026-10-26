@@ -54,7 +54,7 @@ final readonly class GatewayToolCatalog
 
     public function __construct(
         private McpToolCatalogAdapter $mcpCatalogAdapter,
-        private WebSearchTool $webSearchTool,
+        private NativeToolRegistry $nativeTools,
         private AnalyzeImageTool $analyzeImageTool,
         private MessagesGatewayConfig $config,
         private CacheItemPoolInterface $cache,
@@ -109,6 +109,15 @@ final readonly class GatewayToolCatalog
             $names[] = WebSearchTool::NAME;
         }
 
+        if ($this->offersWebFetch($userId)) {
+            $names[] = WebFetchTool::NAME;
+        }
+
+        if ($this->offersKnowledge($userId)) {
+            $names[] = KnowledgeSearchTool::NAME;
+            $names[] = ReadDocumentTool::NAME;
+        }
+
         if ($this->offersAnalyzeImage($userId)) {
             $names[] = AnalyzeImageTool::NAME;
         }
@@ -137,6 +146,9 @@ final readonly class GatewayToolCatalog
         }
         if (isset($snapshot['dispatch'][CodeExecutionTool::NAME])) {
             $replaced[] = CodeExecutionTool::NAME;
+        }
+        if (isset($snapshot['dispatch'][WebFetchTool::NAME])) {
+            $replaced[] = WebFetchTool::NAME;
         }
 
         return $replaced;
@@ -209,6 +221,8 @@ final readonly class GatewayToolCatalog
         $userId = (int) $user->getId();
 
         $this->appendWebSearch($snapshot, $userId, $requestBody);
+        $this->appendWebFetch($snapshot, $userId, $requestBody);
+        $this->appendKnowledge($snapshot, $userId, $requestBody, $assistant);
         $this->appendAnalyzeImage($snapshot, $userId, $requestBody);
         $this->appendCodeExecution($snapshot, $user, $requestBody, $assistant);
 
@@ -307,8 +321,57 @@ final readonly class GatewayToolCatalog
             return;
         }
 
-        $this->addNativeTool($snapshot, $this->webSearchTool->declaration(), WebSearchTool::NAME);
+        $this->addNativeTool($snapshot, $this->nativeTools->webSearch()->declaration(), WebSearchTool::NAME);
         $snapshot['web_search'] = self::WEB_SEARCH_SYNAPLAN;
+    }
+
+    /**
+     * Offer Synaplan's page reader when this route is not still carrying
+     * Anthropic's server tool. `auto` on Anthropic leaves that declaration in
+     * the body, so this stays quiet and Anthropic keeps reading the page.
+     *
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendWebFetch(array &$snapshot, int $userId, array $requestBody): void
+    {
+        if (!$this->offersWebFetch($userId)) {
+            return;
+        }
+        if ($this->hasClientToolNamed($requestBody, WebFetchTool::NAME)) {
+            return;
+        }
+        if ($this->hasServerWebFetch($requestBody)) {
+            return;
+        }
+
+        $this->addNativeTool($snapshot, $this->nativeTools->webFetch()->declaration(), WebFetchTool::NAME);
+    }
+
+    /**
+     * Offer the folder tools only on a turn that already has a pinned folder
+     * or an assistant with knowledge scopes, and only for the key kind the
+     * setting allows. The first-turn injection stays; these are the next look.
+     *
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendKnowledge(array &$snapshot, int $userId, array $requestBody, ?RuntimeProfile $assistant): void
+    {
+        if (!$this->offersKnowledge($userId)) {
+            return;
+        }
+        $search = $this->nativeTools->knowledgeSearch();
+        $read = $this->nativeTools->readDocument();
+        if (null === $search || null === $read || !$search->isOffered($this->config->knowledgeTools($userId), $assistant, $userId)) {
+            return;
+        }
+        if (!$this->hasClientToolNamed($requestBody, KnowledgeSearchTool::NAME)) {
+            $this->addNativeTool($snapshot, $search->declaration(), KnowledgeSearchTool::NAME);
+        }
+        if (!$this->hasClientToolNamed($requestBody, ReadDocumentTool::NAME)) {
+            $this->addNativeTool($snapshot, $read->declaration(), ReadDocumentTool::NAME);
+        }
     }
 
     /**
@@ -367,7 +430,21 @@ final readonly class GatewayToolCatalog
             MessagesGatewayConfig::WEB_SEARCH_PASSTHROUGH,
         ];
 
-        return !\in_array($mode, $handledUpstream, true) && $this->webSearchTool->isAvailable();
+        return !\in_array($mode, $handledUpstream, true) && $this->nativeTools->webSearch()->isAvailable();
+    }
+
+    private function offersWebFetch(int $userId): bool
+    {
+        return MessagesGatewayConfig::WEB_FETCH_AUTO === $this->config->webFetchMode($userId)
+            && $this->config->webFetchMaxPerTurn($userId) > 0;
+    }
+
+    private function offersKnowledge(int $userId): bool
+    {
+        return \in_array($this->config->knowledgeTools($userId), [
+            MessagesGatewayConfig::KNOWLEDGE_DESKTOP,
+            MessagesGatewayConfig::KNOWLEDGE_ALL,
+        ], true);
     }
 
     private function offersAnalyzeImage(int $userId): bool
@@ -403,6 +480,20 @@ final readonly class GatewayToolCatalog
     {
         foreach ($this->clientTools($requestBody) as $tool) {
             if (AnthropicServerTools::isWebSearch($tool)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     */
+    private function hasServerWebFetch(array $requestBody): bool
+    {
+        foreach ($this->clientTools($requestBody) as $tool) {
+            if (AnthropicServerTools::isWebFetch($tool)) {
                 return true;
             }
         }

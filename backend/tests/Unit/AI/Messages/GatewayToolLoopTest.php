@@ -10,14 +10,21 @@ use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\KnowledgeSearchTool;
+use App\AI\Messages\Tools\NativeToolRegistry;
 use App\AI\Messages\Tools\ServerToolReplay;
+use App\AI\Messages\Tools\WebFetchBudget;
+use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Context\ContextCondenser;
 use App\Service\Mcp\McpClient;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Research\UrlContentResult;
+use App\Service\Research\UrlContentService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -52,10 +59,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('mcpMaxIterations')->willReturn(8);
+        $config->method('webSearchMaxRounds')->willReturn(2);
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $client,
             $servers,
@@ -180,11 +188,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -283,11 +291,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $client,
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
             ]),
@@ -336,11 +344,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
             ]),
@@ -407,11 +415,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
             httpExecutor: $executor,
@@ -520,11 +528,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $this->createMock(WebSearchTool::class),
+            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
             httpExecutor: $executor,
@@ -631,11 +639,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -686,7 +694,8 @@ final class GatewayToolLoopTest extends TestCase
                 $this->assertSame('user', $last['role']);
                 $this->assertIsString($last['content']);
                 $this->assertStringContainsString('Do not search again', $last['content']);
-                $this->assertStringContainsString('http URL', $last['content']);
+                $this->assertStringContainsString('https URLs', $last['content']);
+                $this->assertStringNotContainsString('one or two sentences', $last['content']);
 
                 return [
                     'status' => 200,
@@ -741,11 +750,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -850,11 +859,11 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
         );
@@ -915,7 +924,8 @@ final class GatewayToolLoopTest extends TestCase
                 $last = $body['messages'][array_key_last($body['messages'])];
                 $this->assertSame('user', $last['role']);
                 $this->assertIsString($last['content']);
-                $this->assertStringContainsString('http URL', $last['content']);
+                $this->assertStringContainsString('https URLs', $last['content']);
+                $this->assertStringNotContainsString('one or two sentences', $last['content']);
 
                 return [
                     'status' => 200,
@@ -1172,6 +1182,105 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertStringContainsString('https://nodejs.org', $result['body']['content'][0]['text']);
     }
 
+    public function testWrapUpAsksForACompleteSourcedAnswer(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->exactly(2))->method('execute')->willReturn([
+            'text' => 'See https://nodejs.org/en',
+            'isError' => false,
+            'query' => 'node lts',
+            'resultCount' => 1,
+        ]);
+
+        $loop = $this->webSearchLoop($webSearch);
+        $calls = 0;
+        $instruction = null;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls, &$instruction): array {
+                ++$calls;
+                if ($calls <= 2) {
+                    return $this->toolUseBody('toolu_search_'.$calls, 'web_search', ['query' => 'node lts']);
+                }
+
+                $this->assertArrayNotHasKey('tools', $body);
+                $last = $body['messages'][array_key_last($body['messages'])];
+                $instruction = $last['content'];
+
+                return $this->textBody('Node.js 24 is the current LTS. https://nodejs.org/en');
+            }
+        );
+
+        $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        $this->assertSame(GatewayToolLoop::WRAP_UP_AFTER_SEARCH, $instruction);
+        $this->assertStringNotContainsString('one or two sentences', (string) $instruction);
+    }
+
+    public function testConfiguredLimitOfThreeAllowsAThirdSearch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->exactly(3))->method('execute')->willReturn([
+            'text' => 'See https://nodejs.org/en',
+            'isError' => false,
+            'query' => 'node lts',
+            'resultCount' => 1,
+        ]);
+
+        $loop = $this->webSearchLoop($webSearch, 3);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if ($calls <= 3) {
+                    $this->assertArrayHasKey('tools', $body);
+
+                    return $this->toolUseBody('toolu_search_'.$calls, 'web_search', ['query' => 'node lts '.$calls]);
+                }
+
+                $this->assertArrayNotHasKey('tools', $body);
+
+                return $this->textBody('Node.js 24 is the current LTS. https://nodejs.org/en');
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        $this->assertSame(4, $calls);
+        $this->assertSame(200, $result['status']);
+    }
+
     public function testUnpairedWebFetchIsDroppedBeforeTheNextUpstreamCall(): void
     {
         $user = $this->createMock(User::class);
@@ -1301,6 +1410,252 @@ final class GatewayToolLoopTest extends TestCase
         self::assertSame(200, $result['status']);
     }
 
+    public function testMixedWriteFileAndWebFetchDoesNotReturnAnUnpairedFetch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $fetch = $this->createMock(WebFetchTool::class);
+        $fetch->expects($this->once())
+            ->method('execute')
+            ->willReturn([
+                'text' => "Title: Node.js\nURL: https://nodejs.org/en\n\nNode.js 24 is the current LTS.",
+                'isError' => false,
+                'url' => 'https://nodejs.org/en',
+            ]);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), webFetch: $fetch);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_fetch',
+                                    'name' => 'web_fetch',
+                                    'input' => ['url' => 'https://nodejs.org/en'],
+                                ],
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_write',
+                                    'name' => 'write_file',
+                                    'input' => ['path' => 'notes.md'],
+                                ],
+                            ],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('web_fetch', $names);
+                self::assertNotContains('write_file', $names);
+                self::assertSame('tool_result', $body['messages'][2]['content'][0]['type']);
+                self::assertStringContainsString('https://nodejs.org/en', (string) $body['messages'][2]['content'][0]['content']);
+
+                return $this->toolUseBody('toolu_write', 'write_file', ['path' => 'notes.md']);
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Save the current Node LTS']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webFetchSnapshot(),
+        );
+
+        self::assertSame(2, $calls);
+        self::assertSame(200, $result['status']);
+        self::assertIsArray($result['body']);
+        $returned = array_map(
+            static fn (array $block): string => (string) ($block['name'] ?? ''),
+            $result['body']['content'],
+        );
+        self::assertSame(['write_file'], $returned);
+        self::assertSame([], ServerToolReplay::unpairedUseIds($result['body']['content']));
+    }
+
+    public function testStreamMixedWriteFileAndWebFetchReadsThePageBeforeWriteFile(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $fetch = $this->createMock(WebFetchTool::class);
+        $fetch->expects($this->once())
+            ->method('execute')
+            ->with(['url' => 'https://nodejs.org/en'], $user, $this->isInstanceOf(WebFetchBudget::class))
+            ->willReturn([
+                'text' => "Title: Node.js\nURL: https://nodejs.org/en\n\nNode.js 24 is the current LTS.",
+                'isError' => false,
+                'url' => 'https://nodejs.org/en',
+            ]);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), webFetch: $fetch);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('stream')->willReturnCallback(
+            function (array $body, array $context, callable $emit) use (&$calls): MessagesUsage {
+                self::assertTrue($context['parsed_events'] ?? false);
+                ++$calls;
+                if (1 === $calls) {
+                    $this->emitStreamToolTurn($emit, [
+                        ['id' => 'toolu_fetch', 'name' => 'web_fetch', 'input' => ['url' => 'https://nodejs.org/en']],
+                        ['id' => 'toolu_write', 'name' => 'write_file', 'input' => ['path' => 'notes.md']],
+                    ]);
+
+                    return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame('assistant', $assistant['role']);
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('web_fetch', $names);
+                self::assertNotContains('write_file', $names);
+                self::assertSame('tool_result', $body['messages'][2]['content'][0]['type']);
+                self::assertStringContainsString('https://nodejs.org/en', (string) $body['messages'][2]['content'][0]['content']);
+
+                $this->emitStreamToolTurn($emit, [
+                    ['id' => 'toolu_write', 'name' => 'write_file', 'input' => ['path' => 'notes.md', 'content' => 'Node.js 24 is the current LTS.']],
+                ]);
+
+                return new MessagesUsage(20, 8, 0, 0, 'tool_use');
+            }
+        );
+
+        $events = [];
+        $usage = $loop->runStream(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Save the current Node LTS']],
+                'stream' => true,
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webFetchSnapshot(),
+            static function (string|array $chunk) use (&$events): void {
+                if (\is_array($chunk)) {
+                    $events[] = $chunk;
+                }
+            },
+        );
+
+        self::assertSame(2, $calls);
+        self::assertSame('tool_use', $usage->stopReason);
+        $names = [];
+        $partials = '';
+        foreach ($events as $event) {
+            $name = $event['data']['content_block']['name'] ?? null;
+            if (\is_string($name)) {
+                $names[] = $name;
+            }
+            $partial = $event['data']['delta']['partial_json'] ?? null;
+            if (\is_string($partial)) {
+                $partials .= $partial;
+            }
+        }
+        self::assertSame(['write_file'], $names);
+        self::assertStringContainsString('Node.js 24 is the current LTS.', $partials);
+        self::assertStringNotContainsString('{"path":"notes.md"}', $partials);
+        $types = array_map(static fn (array $event): string => (string) ($event['data']['type'] ?? ''), $events);
+        self::assertContains('message_stop', $types);
+        $serverTools = [];
+        foreach ($events as $event) {
+            $listed = $event['data']['delta']['synaplan_server_tools'] ?? null;
+            if (\is_array($listed)) {
+                $serverTools = $listed;
+            }
+        }
+        self::assertContains('web_fetch', $serverTools);
+        self::assertNotContains('write_file', $serverTools);
+    }
+
+    public function testStreamPageLimitHoldsAcrossToolRounds(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $pages = $this->createMock(UrlContentService::class);
+        $pages->expects($this->once())
+            ->method('fetchForReading')
+            ->willReturn(new UrlContentResult(
+                url: 'https://example.com/one',
+                extractedText: 'First page.',
+                title: 'One',
+                hostname: 'example.com',
+                success: true,
+                finalUrl: 'https://example.com/one',
+            ));
+        $fetch = new WebFetchTool($pages, $this->createStub(ContextCondenser::class), new NullLogger());
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), webFetch: $fetch, webFetchMax: 1);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('stream')->willReturnCallback(
+            function (array $body, array $context, callable $emit) use (&$calls): MessagesUsage {
+                ++$calls;
+                if (1 === $calls) {
+                    $this->emitStreamToolTurn($emit, [['id' => 'toolu_a', 'name' => 'web_fetch', 'input' => ['url' => 'https://example.com/one']]]);
+
+                    return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+                }
+                if (2 === $calls) {
+                    $this->emitStreamToolTurn($emit, [['id' => 'toolu_b', 'name' => 'web_fetch', 'input' => ['url' => 'https://example.com/two']]]);
+
+                    return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+                }
+
+                $last = $body['messages'][\count($body['messages']) - 1]['content'][0];
+                self::assertTrue($last['is_error'] ?? false);
+                self::assertStringContainsString(WebFetchTool::PAGE_LIMIT_MESSAGE, (string) $last['content']);
+                $this->emitStreamToolTurn($emit, [['id' => 'toolu_w', 'name' => 'write_file', 'input' => ['path' => 'a.md']]]);
+
+                return new MessagesUsage(8, 4, 0, 0, 'tool_use');
+            }
+        );
+
+        $loop->runStream(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Read two pages']],
+                'stream' => true,
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webFetchSnapshot(),
+            static function (): void {
+            },
+        );
+
+        self::assertSame(3, $calls);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1324,7 +1679,126 @@ final class GatewayToolLoopTest extends TestCase
         ];
     }
 
-    private function webSearchLoop(WebSearchTool $webSearch): GatewayToolLoop
+    /**
+     * @return array<string, mixed>
+     */
+    private function webFetchSnapshot(): array
+    {
+        return [
+            'tools' => [[
+                'name' => 'web_fetch',
+                'description' => 'Read one public web page',
+                'input_schema' => ['type' => 'object'],
+            ]],
+            'dispatch' => [
+                'web_fetch' => [
+                    'kind' => GatewayToolCatalog::KIND_NATIVE,
+                    'serverId' => 0,
+                    'tool' => 'web_fetch',
+                    'annotations' => ['readOnlyHint' => true],
+                ],
+            ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
+        ];
+    }
+
+    public function testMixedWriteFileAndKnowledgeSearchDoesNotReturnAnUnpairedSearch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $search = $this->createMock(KnowledgeSearchTool::class);
+        $search->expects($this->once())
+            ->method('execute')
+            ->willReturn([
+                'text' => "file: invoice.pdf\nfile_id: 12\nchunk_id: 34\nscore: 0.81\n\nTotal 40",
+                'isError' => false,
+                'summary' => 'invoice total',
+            ]);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class), knowledge: $search);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_search',
+                                    'name' => 'knowledge_search',
+                                    'input' => ['query' => 'invoice total'],
+                                ],
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_write',
+                                    'name' => 'write_file',
+                                    'input' => ['path' => 'notes.md'],
+                                ],
+                            ],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('knowledge_search', $names);
+                self::assertNotContains('write_file', $names);
+                self::assertStringContainsString('file_id: 12', (string) $body['messages'][2]['content'][0]['content']);
+
+                return $this->toolUseBody('toolu_write', 'write_file', ['path' => 'notes.md']);
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'Save the invoice total']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            [
+                'tools' => [[
+                    'name' => 'knowledge_search',
+                    'description' => 'Search the pinned folder',
+                    'input_schema' => ['type' => 'object'],
+                ]],
+                'dispatch' => [
+                    'knowledge_search' => [
+                        'kind' => GatewayToolCatalog::KIND_NATIVE,
+                        'serverId' => 0,
+                        'tool' => 'knowledge_search',
+                        'annotations' => ['readOnlyHint' => true],
+                    ],
+                ],
+                'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
+            ],
+        );
+
+        self::assertSame(2, $calls);
+        $returned = array_map(
+            static fn (array $block): string => (string) ($block['name'] ?? ''),
+            $result['body']['content'],
+        );
+        self::assertSame(['write_file'], $returned);
+        self::assertSame([], ServerToolReplay::unpairedUseIds($result['body']['content']));
+    }
+
+    private function webSearchLoop(WebSearchTool $webSearch, int $maxRounds = 2, ?WebFetchTool $webFetch = null, int $webFetchMax = 3, ?KnowledgeSearchTool $knowledge = null): GatewayToolLoop
     {
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
@@ -1332,14 +1806,79 @@ final class GatewayToolLoopTest extends TestCase
 
         return new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            $webSearch,
+            new NativeToolRegistry($webSearch, $webFetch ?? $this->createMock(WebFetchTool::class), $knowledge),
             $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
-            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => $maxRounds, 'webFetchMaxPerTurn' => $webFetchMax]),
             $rateLimits,
             new NullLogger(),
         );
+    }
+
+    /**
+     * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
+     * @param list<array{id: string, name: string, input: array<string, mixed>}>      $tools
+     */
+    private function emitStreamToolTurn(callable $emit, array $tools): void
+    {
+        $emit([
+            'event' => 'message_start',
+            'data' => [
+                'type' => 'message_start',
+                'message' => [
+                    'id' => 'msg_stream',
+                    'type' => 'message',
+                    'role' => 'assistant',
+                    'usage' => ['input_tokens' => 8, 'output_tokens' => 0],
+                ],
+            ],
+        ]);
+        foreach ($tools as $index => $tool) {
+            $emit([
+                'event' => 'content_block_start',
+                'data' => [
+                    'type' => 'content_block_start',
+                    'index' => $index,
+                    'content_block' => [
+                        'type' => 'tool_use',
+                        'id' => $tool['id'],
+                        'name' => $tool['name'],
+                        'input' => [],
+                    ],
+                ],
+            ]);
+            $emit([
+                'event' => 'content_block_delta',
+                'data' => [
+                    'type' => 'content_block_delta',
+                    'index' => $index,
+                    'delta' => [
+                        'type' => 'input_json_delta',
+                        'partial_json' => json_encode($tool['input'], JSON_THROW_ON_ERROR),
+                    ],
+                ],
+            ]);
+            $emit([
+                'event' => 'content_block_stop',
+                'data' => [
+                    'type' => 'content_block_stop',
+                    'index' => $index,
+                ],
+            ]);
+        }
+        $emit([
+            'event' => 'message_delta',
+            'data' => [
+                'type' => 'message_delta',
+                'delta' => ['stop_reason' => 'tool_use'],
+                'usage' => ['output_tokens' => 4],
+            ],
+        ]);
+        $emit([
+            'event' => 'message_stop',
+            'data' => ['type' => 'message_stop'],
+        ]);
     }
 
     /**

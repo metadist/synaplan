@@ -13,6 +13,17 @@
 //              images; do not rebuild or retest the same tree.
 //   heavy    — everything else. Full tests, and on main/tags the publish path.
 //
+// Sidecar jobs (compute, transcriber, voice) are not part of "full tests".
+// Each runs only when the diff touches that sidecar, or when the diff is
+// unknown, or when this file or ci.yml changed. A rename counts both the
+// new path and the previous path. A file list that hits the GitHub cap
+// (3,000 on a pull request, 300 on a compare) is treated as unknown.
+// A thin or promote run skips
+// them: those trees were already tested. The Go suite itself is not reduced.
+// A sidecar this diff asked for must succeed. A skip is accepted only when
+// it was not asked for. The socket guard stays in the lint job, because it
+// scans every file.
+//
 // The pin path list is the catalog reader plus the Umbrel package prefix the
 // rollout guard already allows, so a sixth pin file cannot be forgotten here
 // without also being forgotten there.
@@ -26,6 +37,50 @@ import { CATALOG_PATHS } from './read-release-version.mjs'
 const PLAIN_RELEASE_TAG_REF = /^refs\/tags\/v\d+\.\d+\.\d+$/
 const UNKNOWN_CHANGE = '__unknown__'
 
+/** GitHub stops listing files past these counts, with no truncation flag. */
+export const GITHUB_DIFF_ENTRY_CAP = {
+  pull_request: 3000,
+  push: 300,
+}
+
+/**
+ * True when a file list is long enough that later paths may be missing.
+ * An event with no known cap fails closed.
+ */
+export const diffListTruncated = (eventName, entryCount) => {
+  const cap = GITHUB_DIFF_ENTRY_CAP[eventName]
+  if (cap == null) {
+    return true
+  }
+
+  return Number(entryCount) >= cap
+}
+
+/**
+ * Turn the workflow's F/P listing into paths. The listing arrives on stdin,
+ * never as a process argument: a pull request near the 3,000 cap is larger
+ * than the command-line limit. A capped list becomes the unknown marker.
+ */
+export const decodeListedDiff = (eventName, text) => {
+  const lines = String(text ?? '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+  const entries = lines.filter((line) => line.startsWith('F\t')).length
+  if (diffListTruncated(eventName, entries)) {
+    return { truncated: true, entries, paths: [UNKNOWN_CHANGE] }
+  }
+
+  return {
+    truncated: false,
+    entries,
+    paths: lines
+      .filter((line) => line.startsWith('F\t') || line.startsWith('P\t'))
+      .map((line) => line.slice(2))
+      .filter(Boolean),
+  }
+}
+
 export const PIN_PATH_PREFIXES = ['deploy/umbrel/synaplan/', 'deploy/casaos/Synaplan/']
 
 export const isPinPath = (path) => {
@@ -37,6 +92,73 @@ export const isPinPath = (path) => {
     return true
   }
   return PIN_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
+
+/**
+ * Paths that exercise one sidecar's own CI job. A prefix matches a directory.
+ * The socket guard is not here: it scans every file, so the lint job
+ * runs it on every pull request.
+ */
+export const SIDECAR_PATHS = {
+  compute: ['sidecars/synaplan-compute/'],
+  watchdog: ['sidecars/synaplan-watchdog/'],
+  transcriber: ['sidecars/synaplan-transcriber/'],
+  voice: ['sidecars/synaplan-voice/'],
+}
+
+/** Changing the rule itself retests every sidecar. */
+const SIDECAR_RULE_PATHS = ['.github/workflows/ci.yml', 'scripts/ci-change-scope.mjs']
+
+const normalizeFiles = (files) =>
+  [...new Set((files ?? []).map((file) => String(file).trim()).filter(Boolean))]
+
+const matchesSidecar = (path, prefixes) =>
+  prefixes.some((prefix) => (prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix))
+
+/**
+ * Which sidecar jobs this diff needs. Fail closed: an empty or unreadable
+ * diff, a release tag that must rebuild, or a change to the CI rule tests
+ * every sidecar. Thin and promote skip them.
+ *
+ * @returns {{ compute: boolean, watchdog: boolean, transcriber: boolean, voice: boolean }}
+ */
+export const sidecarsForChange = ({ eventName, ref, files = [], mode }) => {
+  const none = { compute: false, watchdog: false, transcriber: false, voice: false }
+  const all = { compute: true, watchdog: true, transcriber: true, voice: true }
+  if (mode === 'thin' || mode === 'promote') {
+    return none
+  }
+  if (eventName === 'push' && String(ref ?? '').startsWith('refs/tags/')) {
+    return all
+  }
+
+  const paths = normalizeFiles(files)
+  if (paths.length === 0 || paths.includes(UNKNOWN_CHANGE)) {
+    return all
+  }
+  if (paths.some((path) => SIDECAR_RULE_PATHS.includes(path))) {
+    return all
+  }
+
+  return {
+    compute: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.compute)),
+    watchdog: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.watchdog)),
+    transcriber: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.transcriber)),
+    voice: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.voice)),
+  }
+}
+
+/**
+ * A sidecar this diff asked for must succeed. A skipped job is acceptable
+ * only when it was not asked for. Cancelled and failed never are.
+ */
+export const sidecarResultOk = (needed, result) => {
+  const required = needed === true || needed === 'true'
+  if (required) {
+    return result === 'success'
+  }
+
+  return result === 'success' || result === 'skipped'
 }
 
 export const isPinOnlyChange = (files) => {
@@ -97,13 +219,25 @@ const readFiles = (arguments_) => {
 }
 
 export const runCli = (arguments_ = []) => {
+  const eventName = readOption(arguments_, '--event')
+  const ref = readOption(arguments_, '--ref')
+  const files = readFiles(arguments_)
   const result = classifyCiChangeScope({
-    eventName: readOption(arguments_, '--event'),
-    ref: readOption(arguments_, '--ref'),
-    files: readFiles(arguments_),
+    eventName,
+    ref,
+    files,
     canPromote: readOption(arguments_, '--can-promote') === 'true',
   })
-  return `mode=${result.mode}\nreason=${result.reason}\n`
+  const sidecars = sidecarsForChange({ eventName, ref, files, mode: result.mode })
+  return [
+    `mode=${result.mode}`,
+    `reason=${result.reason}`,
+    `compute=${sidecars.compute}`,
+    `watchdog=${sidecars.watchdog}`,
+    `transcriber=${sidecars.transcriber}`,
+    `voice=${sidecars.voice}`,
+    '',
+  ].join('\n')
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

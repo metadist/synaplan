@@ -10,7 +10,8 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
-                "registrationEnabled": "bool"
+                "registrationEnabled": "bool",
+                "registrationMode": "string"
             },
             "billing": {
                 "enabled": "bool"
@@ -99,6 +100,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "capacity": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "chat_artifacts": {
                     "configured": "bool",
                     "gated": "bool"
@@ -148,6 +153,10 @@
                     "gated": "bool"
                 },
                 "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "research": {
                     "configured": "bool",
                     "gated": "bool"
                 },
@@ -200,6 +209,10 @@
                 "webSpeechEnabled": "bool",
                 "whisperEnabled": "bool"
             },
+            "turnstile": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
             "usageTaximeter": {
                 "enabled": "bool"
             },
@@ -225,7 +238,8 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
-                "registrationEnabled": "bool"
+                "registrationEnabled": "bool",
+                "registrationMode": "string"
             },
             "billing": {
                 "enabled": "bool"
@@ -314,6 +328,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "capacity": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "chat_artifacts": {
                     "configured": "bool",
                     "gated": "bool"
@@ -363,6 +381,10 @@
                     "gated": "bool"
                 },
                 "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "research": {
                     "configured": "bool",
                     "gated": "bool"
                 },
@@ -416,6 +438,10 @@
                 "webSpeechEnabled": "bool",
                 "whisperEnabled": "bool"
             },
+            "turnstile": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
             "usageTaximeter": {
                 "enabled": "bool"
             },
@@ -440,7 +466,8 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
-                "registrationEnabled": "bool"
+                "registrationEnabled": "bool",
+                "registrationMode": "string"
             },
             "billing": {
                 "enabled": "bool"
@@ -529,6 +556,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "capacity": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "chat_artifacts": {
                     "configured": "bool",
                     "gated": "bool"
@@ -581,6 +612,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "research": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "searxng": {
                     "configured": "bool",
                     "gated": "bool"
@@ -629,6 +664,10 @@
                 "speechToTextAvailable": "bool",
                 "webSpeechEnabled": "bool",
                 "whisperEnabled": "bool"
+            },
+            "turnstile": {
+                "enabled": "bool",
+                "siteKey": "string"
             },
             "usageTaximeter": {
                 "enabled": "bool"

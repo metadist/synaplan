@@ -71,6 +71,57 @@ describe('ConfigField — boolean pinned by an environment variable', () => {
   })
 })
 
+describe('ConfigField — select pinned by an environment variable', () => {
+  const selectSchema: ConfigFieldSchema = {
+    tab: 'auth',
+    section: 'access',
+    type: 'select',
+    sensitive: false,
+    description: 'How a visitor gets an account.',
+    default: 'open',
+    source: 'database',
+    options: ['open', 'admission'],
+  }
+
+  const mountSelect = (value: Partial<ConfigValue> = {}) =>
+    mount(ConfigField, {
+      props: {
+        fieldKey: 'REGISTRATION_MODE',
+        schema: selectSchema,
+        value: { value: 'open', isSet: false, isMasked: false, ...value } as ConfigValue,
+      },
+    })
+
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
+  it('shows the pinned mode, locks the select, and names that mode', () => {
+    const wrapper = mountSelect({ value: 'open', envOverride: true, effectiveValue: 'admission' })
+    const select = wrapper.get('select')
+
+    expect(select.attributes('disabled')).toBeDefined()
+    expect((select.element as HTMLSelectElement).value).toBe('admission')
+    expect(wrapper.get('[data-testid="config-field-env-override-hint"]').text()).toContain(
+      'Admission — a plan or an invitation code'
+    )
+    expect(wrapper.get('[data-testid="config-field-env-override-hint"]').text()).not.toContain(
+      'Disabled'
+    )
+  })
+
+  it('keeps an unpinned select editable', async () => {
+    const wrapper = mountSelect()
+    const select = wrapper.get('select')
+
+    expect(select.attributes('disabled')).toBeUndefined()
+    await select.setValue('admission')
+
+    expect(wrapper.emitted('update')).toBeUndefined()
+    expect(wrapper.text()).toContain('Unsaved changes')
+  })
+})
+
 describe('ConfigField — clearing a saved value', () => {
   const textSchema: ConfigFieldSchema = {
     tab: 'branding',

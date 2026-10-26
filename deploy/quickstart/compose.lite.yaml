@@ -8,7 +8,7 @@
 # are omitted to save ~2 GB of images and RAM. Same volume names as compose.yaml,
 # so switching between compose.lite.yaml and compose.yaml keeps every chat and file.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.5.2}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.5.4}
 
 x-app-command: &app-command
   - |
@@ -21,8 +21,13 @@ x-app-command: &app-command
 x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
+  FRANKENPHP_WORKER_NUM: ${FRANKENPHP_WORKER_NUM:-16}
+  FRANKENPHP_STREAM_WORKER_NUM: ${FRANKENPHP_STREAM_WORKER_NUM:-}
+  FRANKENPHP_NUM_THREADS: ${FRANKENPHP_NUM_THREADS:-}
+  FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
+  FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: lite
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.5.2}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.5.4}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000} http://localhost:${SYNAPLAN_HTTP_PORT:-8000}}
@@ -411,7 +416,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis:/data
@@ -424,7 +429,7 @@ services:
     restart: unless-stopped
 
   tika:
-    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
     command: -h 0.0.0.0 -p 9998
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]

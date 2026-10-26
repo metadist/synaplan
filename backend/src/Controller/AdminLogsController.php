@@ -58,6 +58,7 @@ final class AdminLogsController extends AbstractController
             new OA\Parameter(name: 'since_minutes', in: 'query', required: false, description: 'Only events from the last N minutes (capped at 7 days, the ring retention).', schema: new OA\Schema(type: 'integer', maximum: self::MAX_WINDOW_MINUTES, minimum: 1)),
             new OA\Parameter(name: 'q', in: 'query', required: false, description: 'Case-insensitive substring match across event/message/exception/route/provider/model (recent mode).', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'request_id', in: 'query', required: false, description: 'Filter by correlation id (recent mode).', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'host', in: 'query', required: false, description: 'Only events a given server produced: its container hostname, the `event_ring_host` of the capacity report (recent mode).', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1, maximum: self::MAX_LIMIT, default: 50)),
         ],
     )]
@@ -142,6 +143,9 @@ final class AdminLogsController extends AbstractController
         $requestId = $request->query->get('request_id');
         $requestId = \is_string($requestId) && '' !== trim($requestId) ? $requestId : null;
 
+        $host = $request->query->get('host');
+        $host = \is_string($host) && '' !== trim($host) ? trim($host) : null;
+
         $limit = $request->query->getInt('limit', 50);
         $limit = max(1, min(self::MAX_LIMIT, $limit));
 
@@ -150,7 +154,7 @@ final class AdminLogsController extends AbstractController
         return $this->json([
             'success' => true,
             'mode' => 'recent',
-            'events' => $this->store->recent($level, $sinceTs, $query, $requestId, $limit),
+            'events' => $this->store->recent($level, $sinceTs, $query, $requestId, $limit, $host),
         ]);
     }
 }

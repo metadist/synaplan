@@ -13,8 +13,9 @@ use App\Service\Email\MailerConfig;
 use App\Service\Setup\SetupStateService;
 
 /**
- * Sign-in, guest trial, mail, reCAPTCHA, the setup wizard and the
- * signed-in chat-ready signal on the public runtime payload.
+ * Sign-in, guest trial, mail, the human check (Turnstile / reCAPTCHA), the
+ * setup wizard and the signed-in chat-ready signal on the public runtime
+ * payload.
  */
 final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterface
 {
@@ -26,15 +27,21 @@ final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterf
         private SetupStateService $setupState,
         private ConfigRepository $configRepository,
         private ChatReadinessService $chatReadiness,
+        private TurnstileVerifier $turnstile,
+        private string $turnstileSiteKey = '',
     ) {
     }
 
     public function contribute(RuntimeConfigContext $context): array
     {
         $user = $context->user;
+        // Turnstile wins over reCAPTCHA when both are configured — the same
+        // order as SignupChallenge on the server, so the browser never sends a
+        // token the server cannot verify.
+        $turnstileConfigured = $this->turnstile->isConfigured() && '' !== trim($this->turnstileSiteKey);
         $recaptchaEnabled = ($_ENV['RECAPTCHA_ENABLED'] ?? 'false') === 'true';
         $recaptchaSiteKey = $_ENV['RECAPTCHA_SITE_KEY'] ?? '';
-        $recaptchaConfigured = $recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey;
+        $recaptchaConfigured = !$turnstileConfigured && $recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey;
 
         $googleTagEnabled = '1' === $this->configRepository->getValue(0, 'GOOGLE_TAG', 'ENABLED');
         $googleTagIdRaw = $this->configRepository->getValue(0, 'GOOGLE_TAG', 'TAG_ID') ?? '';
@@ -51,12 +58,17 @@ final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterf
         $payload = [
             'auth' => [
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
+                'registrationMode' => $this->registrationConfig->mode(),
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
                 'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],
             'recaptcha' => [
                 'enabled' => $recaptchaConfigured,
                 'siteKey' => $recaptchaConfigured ? $recaptchaSiteKey : '',
+            ],
+            'turnstile' => [
+                'enabled' => $turnstileConfigured,
+                'siteKey' => $turnstileConfigured ? trim($this->turnstileSiteKey) : '',
             ],
             'googleTag' => [
                 'enabled' => $googleTagEnabled && !empty($googleTagId),

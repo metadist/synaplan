@@ -75,6 +75,8 @@ final class DesktopControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $user = $this->createUser('desktop-rest-pair@synaplan.internal');
+        $user->setUserLevel('PRO');
+        $this->em->flush();
         $this->authenticateClient($this->client, $user);
 
         $this->client->request('POST', '/api/v1/desktop/pairing-codes');
@@ -100,6 +102,30 @@ final class DesktopControllerTest extends WebTestCase
         self::assertInstanceOf(ApiKey::class, $apiKey);
         self::assertSame(ApiKeyScope::pairingScopes(), $apiKey->getScopes());
         self::assertTrue(ApiKeyScope::isRestricted($apiKey->getScopes()));
+    }
+
+    public function testPairRefusesAFreeAccount(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('desktop-rest-free@synaplan.internal');
+        $user->setUserLevel('NEW');
+        $this->em->flush();
+        $this->authenticateClient($this->client, $user);
+
+        $this->client->request('POST', '/api/v1/desktop/pairing-codes');
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $code = $this->json()['code'];
+
+        $this->client->getCookieJar()->clear();
+        $this->postJson('/api/v1/desktop/pair', [
+            'code' => $code,
+            'deviceName' => 'CI laptop',
+            'capabilities' => ['skill.run'],
+        ]);
+
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertSame('API_PLAN_REQUIRED', $this->json()['code']);
+        self::assertNull($this->em->getRepository(ApiKey::class)->findOneBy(['ownerId' => $user->getId()]));
     }
 
     public function testPairWithInvalidCodeReturns400(): void

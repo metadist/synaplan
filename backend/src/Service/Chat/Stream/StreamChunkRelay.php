@@ -37,16 +37,49 @@ final class StreamChunkRelay
 
     private string $reasoningBuffer = '';
     private bool $hasReasoningStarted = false;
+
+    /** Nanoseconds (hrtime) when reasoning opened and when the first answer token arrived. */
+    private ?int $reasoningOpenedNs = null;
+    private ?int $reasoningClosedNs = null;
+    private bool $answerStarted = false;
+    private bool $insideInlineThink = false;
+    private string $inlineCarry = '';
+
+    /** @var \Closure(): int|null */
+    private ?\Closure $clock;
     private string $jsonBuffer = '';
     private bool $isBufferingJson = false;
     private bool $fileGenAnnounced = false;
     private ?string $fileGenFilename = null;
 
+    /**
+     * @param \Closure(): int|null $clock monotonic nanoseconds; tests pass their own
+     */
     public function __construct(
         private readonly SseWriter $sse,
         private readonly MediaCancellationStore $cancellationStore,
         private readonly string $trackId,
+        ?\Closure $clock = null,
     ) {
+        $this->clock = $clock;
+    }
+
+    /**
+     * Seconds from the first reasoning chunk to the first answer token
+     * (or to finish(), when the answer never started). Null when this turn
+     * streamed no reasoning. Reasoning that arrives after the answer has
+     * started is not counted: the header says how long was thought before
+     * the answer.
+     */
+    public function reasoningSeconds(): ?int
+    {
+        if (null === $this->reasoningOpenedNs || null === $this->reasoningClosedNs) {
+            return null;
+        }
+
+        $elapsed = ($this->reasoningClosedNs - $this->reasoningOpenedNs) / 1_000_000_000;
+
+        return max(1, (int) round($elapsed));
     }
 
     /**
@@ -80,11 +113,8 @@ final class StreamChunkRelay
      */
     public function finish(): void
     {
-        if ($this->hasReasoningStarted) {
-            $this->reasoningBuffer .= '</think>';
-            $this->sse->send('data', ['chunk' => $this->reasoningBuffer]);
-            $this->responseText .= $this->reasoningBuffer;
-        }
+        $this->stopReasoningClock();
+        $this->closeReasoning();
 
         $this->streamedVisibleText = $this->responseText;
         if ($this->isBufferingJson && '' !== trim($this->jsonBuffer)) {
@@ -111,6 +141,11 @@ final class StreamChunkRelay
         }
 
         if ('reasoning' !== $type) {
+            // An empty delta or a tool-call delta is not an answer token: it may
+            // flush the reasoning buffer, but the clock runs until real text.
+            if ('tool_call_delta' !== $type && '' !== $content) {
+                $this->noteAnswer();
+            }
             $this->closeReasoning();
             $this->responseText .= $content;
             if (!empty($content)) {
@@ -123,6 +158,7 @@ final class StreamChunkRelay
         if (!$this->hasReasoningStarted) {
             $this->reasoningBuffer = '<think>';
             $this->hasReasoningStarted = true;
+            $this->beginReasoningClock();
             // A status the moment the model starts reasoning, so the bubble
             // does not sit empty for the whole reasoning window. No message:
             // the client localizes the label itself.
@@ -145,6 +181,9 @@ final class StreamChunkRelay
     private function relayText(mixed $chunk): bool
     {
         $this->closeReasoning();
+        if (is_string($chunk)) {
+            $this->observeInline($chunk);
+        }
 
         // `'' !== trim()`, not empty(): PHP calls "0" empty.
         if (is_string($chunk) && '' !== trim($chunk)
@@ -237,6 +276,93 @@ final class StreamChunkRelay
                 ],
             ]);
         }
+    }
+
+    private function beginReasoningClock(): void
+    {
+        if ($this->answerStarted) {
+            return;
+        }
+        $this->reasoningOpenedNs ??= $this->now();
+    }
+
+    private function stopReasoningClock(): void
+    {
+        if (null === $this->reasoningOpenedNs) {
+            return;
+        }
+        $this->reasoningClosedNs ??= $this->now();
+    }
+
+    private function noteAnswer(): void
+    {
+        $this->answerStarted = true;
+        $this->stopReasoningClock();
+    }
+
+    /**
+     * Plain-text providers (Groq with Qwen) send `<think>` inside the content
+     * string, sometimes split across chunks. Only the text after the closing
+     * tag is the answer the clock stops on.
+     */
+    private function observeInline(string $chunk): void
+    {
+        $text = $this->inlineCarry.$chunk;
+        $this->inlineCarry = '';
+        $held = self::danglingTag($text);
+        if ('' !== $held) {
+            $text = substr($text, 0, -strlen($held));
+            $this->inlineCarry = $held;
+        }
+
+        while ('' !== $text) {
+            $tag = $this->insideInlineThink ? '</think>' : '<think>';
+            $at = strpos($text, $tag);
+            if (false === $at) {
+                $this->seeInline($text);
+
+                return;
+            }
+            if ($at > 0) {
+                $this->seeInline(substr($text, 0, $at));
+            }
+            if ($this->insideInlineThink) {
+                $this->insideInlineThink = false;
+            } else {
+                $this->beginReasoningClock();
+                $this->insideInlineThink = true;
+            }
+            $text = substr($text, $at + strlen($tag));
+        }
+    }
+
+    private function seeInline(string $text): void
+    {
+        if ($this->insideInlineThink || '' === $text) {
+            return;
+        }
+        $this->noteAnswer();
+    }
+
+    private static function danglingTag(string $text): string
+    {
+        foreach (['</think>', '<think>'] as $tag) {
+            $limit = min(strlen($tag) - 1, strlen($text));
+            for ($length = $limit; $length > 0; --$length) {
+                if (str_ends_with($text, substr($tag, 0, $length))) {
+                    return substr($text, -$length);
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function now(): int
+    {
+        $clock = $this->clock ?? static fn (): int => hrtime(true);
+
+        return $clock();
     }
 
     private function closeReasoning(): void

@@ -62,7 +62,10 @@ search or vision:
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
 | `WEB_SEARCH_MODE` | `auto` | How to answer Anthropic’s `web_search_*` server tool — `auto`, `synaplan`, `passthrough` or `off` (see [Web search](#web-search)) |
-| `WEB_FETCH_MODE` | `auto` | How to handle Anthropic’s `web_fetch_*` server tool — `auto`/`passthrough` forward to Anthropic (inject if missing), or `off` (see [Web fetch](#web-fetch)) |
+| `WEB_SEARCH_MAX_ROUNDS` | `2` | How many Synaplan web searches one message may run before the assistant answers from what it found, as fully as the question needs, and cites the https URLs. Range 1–6. |
+| `WEB_FETCH_MODE` | `auto` | Who reads a page. `auto`: Anthropic on Anthropic routes, Synaplan on every other route. `passthrough`: only Anthropic. `off`: drop the tool (see [Web fetch](#web-fetch)) |
+| `WEB_FETCH_MAX_PER_TURN` | `3` | How many pages Synaplan may open in one message on a non-Anthropic route. Range 0–10. `0` opens none. Anthropic routes keep Anthropic’s own limit |
+| `KNOWLEDGE_TOOLS` | `desktop` | Who can search a pinned knowledge folder. `desktop`: paired desktop keys. `all`: every coding client. `off`: neither tool. A folder still has to be pinned on the message (see [Knowledge tools](#knowledge-tools)) |
 | `VISION_MODE` | `auto` | Which model reads an image turn: `auto` (Synaplan PIC2TEXT when the resolved model lacks vision, otherwise passthrough), `synaplan`, `passthrough`, or `off` (see [Vision](#vision)) |
 | `VISION_IMAGE_DETAIL` | `auto` | Resolution hint for upstreams that expose one — `auto`, `low` or `high` |
 | `VISION_MAX_IMAGES` | `0` | Max image blocks forwarded per request, newest kept; `0` means unlimited |
@@ -111,23 +114,42 @@ Other Anthropic server tools (`code_execution_*` and friends) stay on the wire f
 
 When Synaplan runs the search it uses `BraveSearchService` in the same server-side loop as MCP tools. The client sees one continuous message; intermediate tool rounds are suppressed from the SSE stream, with keep-alive pings while a tool runs.
 
+After `WEB_SEARCH_MAX_ROUNDS` searches (default 2, the same ceiling as before), Synaplan stops offering the search tool and asks the model to answer the question completely from those results, citing every https URL it uses. Raising the limit lets a message search again with different words; it does not by itself read the pages.
+
 Synaplan stays out of the way when the client ships its own runnable tool named `web_search`.
 
 Every response to a request that declared web search carries `x-synaplan-web-search: synaplan|passthrough|off`, so a model answering without search can be told apart from a misconfigured gateway.
 
 ### Web fetch
 
-`WEB_FETCH_MODE` controls Anthropic’s `web_fetch_*` server tool (read a specific URL). Synaplan **never** fetches the page itself — only `api.anthropic.com` can honour the capability:
+`WEB_FETCH_MODE` decides who reads a page the client asked for with `web_fetch`.
 
 | Mode | Behaviour |
 | ---- | --------- |
-| `auto` (default) | On Anthropic routes, keep the client’s declaration or inject `web_fetch_20250910` when it was omitted, and ensure the `anthropic-beta` header includes `web-fetch-2025-09-10`. On OpenAI/Gemini aliases the declaration is dropped (those providers cannot run it). |
-| `passthrough` | Same as `auto` — explicit “leave it to Anthropic” label. |
+| `auto` (default) | On Anthropic routes, keep the client’s declaration or inject `web_fetch_20250910` when it was omitted, and ensure the `anthropic-beta` header includes `web-fetch-2025-09-10`. Anthropic still reads the page. On every other route Synaplan replaces that server tool with an executable `web_fetch` of the same name, opens the page itself, and condenses a long page before it reaches the model. |
+| `passthrough` | Same as `auto` on Anthropic. On every other route the server tool is dropped, because there is no Anthropic upstream to leave it with. |
 | `off` | Drop `web_fetch_*` and do not inject. |
+
+`WEB_FETCH_MAX_PER_TURN` (default 3, range 0–10) is how many pages Synaplan may open in one message. `0` opens none. A missing row uses 3, so existing installs keep that cap until an admin changes it. Anthropic routes keep Anthropic’s own `max_uses`.
 
 When a client already ships an executable tool named `web_fetch` (with `input_schema`), Synaplan leaves that client tool alone.
 
-Responses carry `x-synaplan-web-fetch: passthrough|off` when the policy touched the request.
+Responses carry `x-synaplan-web-fetch: passthrough|synaplan|off` when the policy chose a handler. `synaplan` means this route reads the page itself; with a page limit of `0` a non-Anthropic route reports `off`.
+
+Synaplan reads pages through the same SSRF guard as every other user-initiated fetch: every redirect hop is checked, the hostname is pinned to the public address the check accepted, and private, loopback and link-local targets come back as an error tool result. Logs and the usage ledger keep the URL without its query string.
+
+### Knowledge tools
+
+When a message pins a knowledge folder (`x-synaplan-rag-group-key`) or an assistant that already has knowledge folders, and `KNOWLEDGE_TOOLS` allows the key, Synaplan offers two tools it runs itself:
+
+| Tool | What it does |
+| ---- | ------------ |
+| `knowledge_search` | Searches that folder again. Returns the file name, file id, chunk id, score and text. At most 10 passages. |
+| `read_document` | Reads one file from that folder. `around` is a chunk id from the search; omitting it reads the start of the file. A short file comes back whole. |
+
+The first-turn passages stay. The tool descriptions say to use them when those passages are not enough. A folder shared as “Can view”, or a folder the caller does not have, comes back as an error and is not searched. `desktop` (the default) limits this to paired desktop keys. `all` includes every other coding client. `off` offers neither tool. `POST /v1/chat/completions` does not run them.
+
+The client never has to answer these calls. A turn that also asks for a client tool such as `write_file` still returns only that client tool.
 
 ## Vision
 

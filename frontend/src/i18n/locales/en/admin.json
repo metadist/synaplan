@@ -550,6 +550,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Open — anyone can sign up",
+          "admission": "Admission — a plan or an invitation code"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Standard (plain Docker)",
           "gvisor": "Strong isolation (gVisor)",
@@ -596,6 +600,94 @@
       },
       "serviceDown": "{name} is not reachable. {effect}",
       "serviceFailed": "{name} did not finish starting. {effect}"
+    },
+    "signupCodes": {
+      "title": "Invitation codes",
+      "empty": "No invitation codes yet. Create one to let someone in without payment.",
+      "create": "Create code",
+      "openModeNote": "Sign-up is open on this server, so nobody needs a code yet. Codes you create here start to count once the sign-up settings ask for a paid plan or an invitation code.",
+      "openSettings": "Open sign-up settings",
+      "loadFailed": "The invitation codes could not be loaded. Nothing changed; try again.",
+      "show": "Show code",
+      "hide": "Hide code",
+      "showAria": "Show the code starting with {prefix}",
+      "notStored": "This code was created before codes were kept, so it cannot be shown again. Revoke it and create a new one if you need to share it.",
+      "showFailed": "The code could not be loaded. Try again.",
+      "shownOnce": "Copy the code and send it to the person. You can show it again any time by clicking it in the list.",
+      "copy": "Copy code",
+      "copied": "Code copied.",
+      "copyFailed": "Copying did not work. Select the code and copy it by hand.",
+      "done": "Done",
+      "levels": {
+        "NEW": "Member",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "For ever",
+        "week": "For 7 days",
+        "fiveMonths": "For 5 months"
+      },
+      "state": {
+        "active": "Usable",
+        "expired": "Expired",
+        "used_up": "Used up",
+        "revoked": "Revoked"
+      },
+      "facts": {
+        "grants": "Opens a {level} account",
+        "validUntil": "valid until {date}",
+        "noEnd": "no end date",
+        "usesOf": "{uses} of {max} uses",
+        "usesUnlimited": "{uses} use, no limit | {uses} uses, no limit",
+        "createdBy": "Created by {email} on {date}",
+        "createdByGone": "Created on {date} by an account that no longer exists"
+      },
+      "actions": {
+        "uses": "Who used it",
+        "edit": "Edit",
+        "revoke": "Revoke",
+        "restore": "Restore"
+      },
+      "revokeTitle": "Revoke this code?",
+      "revokeBody": "Nobody can use this code any more. Nobody has used it yet. | Nobody can use this code any more. The one person who used it keeps their account. | Nobody can use this code any more. The {count} people who used it keep their accounts.",
+      "revoked": "The code is revoked. Restore brings it back.",
+      "revokeFailed": "The code was not revoked and still works. Try again.",
+      "restored": "The code works again.",
+      "restoredExpired": "The code is no longer revoked, but its end date has passed. Set a later date under Edit so people can use it.",
+      "restoredUsedUp": "The code is no longer revoked, but all its uses are taken. Raise the limit under Edit so more people can use it.",
+      "restoreFailed": "The code was not restored and still cannot be used. Try again.",
+      "changeUnconfirmed": "We could not confirm the change. The list now shows the current state of the code.",
+      "form": {
+        "titleCreate": "Create an invitation code",
+        "titleEdit": "Edit invitation code",
+        "titleCreated": "Your new invitation code",
+        "label": "Label",
+        "labelPlaceholder": "For example: Pilot customers",
+        "labelHint": "Only administrators see the label.",
+        "level": "Level of the new account",
+        "validity": "Valid",
+        "validUntil": "Valid until",
+        "noEnd": "No end date",
+        "maxUses": "How many people can use it",
+        "unlimited": "No limit",
+        "labelRequired": "Give the code a label.",
+        "maxUsesInvalid": "Enter a whole number of 1 or more, or choose No limit.",
+        "dateRequired": "Pick a date, or choose No end date.",
+        "createFailed": "The code was not created. Nothing was saved; try again.",
+        "createUnconfirmed": "We could not confirm whether the code was created. Check the list: if a code with this label appears, click it to show the code.",
+        "saveFailed": "The changes were not saved. The code works as before.",
+        "saveUnconfirmed": "We could not confirm whether the changes were saved. The list now shows the current state of the code.",
+        "saved": "Changes saved."
+      },
+      "uses": {
+        "title": "Who signed up with this code",
+        "empty": "Nobody has used this code yet.",
+        "deleted": "Account deleted",
+        "deletedAccounts": "{count} account that used this code has since been deleted. | {count} accounts that used this code have since been deleted.",
+        "loadFailed": "The list could not be loaded. Close it and open it again."
+      }
     }
   },
   "statistics": {
@@ -888,7 +980,8 @@
       "policies": "Policies",
       "linkedPlatforms": "Platform instances",
       "moderation": "Moderation",
-      "audit": "Audit"
+      "audit": "Audit",
+      "signupCodes": "Invitation codes"
     },
     "openPeople": "Open Users",
     "backToOperate": "Back to Operate",
@@ -1029,6 +1122,7 @@
         "MCP_MAX_ITERATIONS": "Tool rounds",
         "WEB_SEARCH_MODE": "Web search",
         "WEB_FETCH_MODE": "Web fetch",
+        "KNOWLEDGE_TOOLS": "Knowledge folder search",
         "VISION_MODE": "Image understanding",
         "VISION_IMAGE_DETAIL": "Image detail",
         "VISION_MAX_IMAGES": "Images per request",
@@ -1047,6 +1141,17 @@
       "status": "Status",
       "actions": "Actions",
       "approve": "Approve",
+      "approveHost": "Approve host",
+      "hostPlaceholder": "Delivery hostname, e.g. files.example.lan",
+      "approveHostSentence": "{host} is on a private network ({address}). Synaplan will call it to deliver copies and requests. Approve only clouds you run.",
+      "approveHostTitle": "Approve this address?",
+      "canReach": "Synaplan can reach this cloud.",
+      "cannotReach": "Synaplan cannot reach this cloud.",
+      "reachNotChecked": "Not checked whether Synaplan can reach this cloud.",
+      "removeHost": "Remove {host}",
+      "hostApproved": "{host} approved.",
+      "hostRemoved": "{host} removed.",
+      "hostError": "The hostname could not be changed.",
       "revoke": "Revoke",
       "approved": "Platform approved.",
       "revoked": "Platform revoked.",
@@ -1134,7 +1239,8 @@
       "groups": "Groups bundle users so you can share assistants and set rules once for all of them.",
       "policies": "Policies decide what a group may use, for example which features or models.",
       "moderation": "Content users reported. Review it, then keep or remove it.",
-      "audit": "A record of who changed what on this server, newest first."
+      "audit": "A record of who changed what on this server, newest first.",
+      "signup-codes": "Codes that let someone sign up without paying. You decide the level of the new account, how long a code works and how many people may use it."
     }
   },
   "iam": {
@@ -1364,8 +1470,14 @@
     "chat_artifacts": {
       "label": "HTML and SVG preview"
     },
+    "research": {
+      "label": "Research"
+    },
     "freeapi": {
       "label": "Synaplan Demo"
+    },
+    "capacity": {
+      "label": "Server capacity"
     }
   },
   "partners": {
@@ -1430,6 +1542,80 @@
       "not_partner": "That connection was not found.",
       "bad_url": "That address is not a public https server.",
       "replay": "This request was already used."
+    }
+  },
+  "capacity": {
+    "title": "Capacity",
+    "subtitle": "How loaded each server of this installation is, and whether one needs help.",
+    "loading": "Reading the servers…",
+    "unavailable": "Capacity cannot be read right now because the shared cache does not answer. The servers keep working.",
+    "failed": "The servers could not be read. Try again in a moment.",
+    "empty": "No server has reported yet — servers report within a minute after they start.",
+    "checkAgain": "Check again",
+    "footer": "Only administrators see this page. Nothing here changes a server.",
+    "servers": {
+      "title": "Servers",
+      "summary": "{count} server · updated {seconds} s ago | {count} servers · updated {seconds} s ago",
+      "connectedTo": "You are connected to {server}",
+      "owner": "Every server of this installation reports here.",
+      "source": "Each server measures itself every 5 seconds and keeps 24 hours."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Background work",
+      "scheduler": "Scheduled jobs"
+    },
+    "card": {
+      "connectedHere": "You are connected to this server.",
+      "reporting": "Reporting",
+      "silentSeconds": "Last report {count} s ago",
+      "silentMinutes": "Last report {count} min ago — the server may be down or restarting",
+      "silentUnknown": "Stopped reporting",
+      "aiAnswers": "AI answers",
+      "otherRequests": "Other requests",
+      "memory": "Memory",
+      "processor": "Processor",
+      "ofAtOnce": "{used} of {total} at once",
+      "noPools": "no separate pools",
+      "peakToday": "peak today {count} ({time})",
+      "memoryOf": "{used} of {total}",
+      "memoryUnlimited": "{used} · no limit",
+      "processorOf": "{percent} % of {cores} cores",
+      "processorMeasuring": "measuring · {cores} cores",
+      "processorShort": "{percent} %",
+      "sizingHint": "At its peak today {server} answered {peak} of the {total} AI requests it can hold at once. Add a server or raise its AI answer slots — the sizing guide shows how.",
+      "technical": "Technical details",
+      "runsOn": "Runs on",
+      "workers": "PHP",
+      "logs": "Logs",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} AI answer slots + {api} request slots",
+      "poolsSingle": "one pool of {count} threads",
+      "logsStderr": "the process's error output",
+      "howToStop": "A server stops reporting when its watchdog is turned off (SYNAPLAN_WATCHDOG=0).",
+      "helperSilent": "stopped reporting",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Directly on the machine"
+      },
+      "place": {
+        "machine": "machine {name}",
+        "address": "address {address}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "memory limit {value}",
+        "cpuRequest": "processor request {value}"
+      }
+    },
+    "events": {
+      "open": "Show recent events",
+      "hide": "Hide recent events",
+      "loading": "Reading events…",
+      "failed": "The events could not be read.",
+      "empty": "No warnings from this server in the last hour.",
+      "window": "Warnings and errors of the last hour, newest first, at most 20."
     }
   }
 }

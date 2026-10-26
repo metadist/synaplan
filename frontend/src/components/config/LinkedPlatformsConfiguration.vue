@@ -127,7 +127,16 @@
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium txt-primary">
                 {{ clientLabel(link.client) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm txt-secondary">{{ link.host }}</td>
+              <td class="px-6 py-4 text-sm txt-secondary">
+                <span class="whitespace-nowrap">{{ link.host }}</span>
+                <p
+                  v-if="readScopeLine(link)"
+                  class="mt-1 min-w-[12rem] text-xs txt-secondary"
+                  data-testid="text-read-scope"
+                >
+                  {{ readScopeLine(link) }}
+                </p>
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm txt-primary">
                 {{ link.external_id }}
               </td>
@@ -197,6 +206,21 @@ function clientLabel(client: string): string {
   const key = `platformConnect.clients.${client}`
   const translated = t(key)
   return translated === key ? client : translated
+}
+
+/**
+ * "Synaplan may read: …" — only for a cloud whose app hands files to a run.
+ * An older server sends neither field, so the line stays away.
+ */
+function readScopeLine(link: PlatformLink): string {
+  if (link.can_read !== true || !link.read_scope) return ''
+  const { mode, folders } = link.read_scope
+  if (mode === 'all') return t('apps.readScope.line', { what: t('apps.readScope.all') })
+  const what =
+    mode === 'allowed' && folders.length > 0
+      ? t('apps.readScope.allowed', { folders: folders.join(', ') })
+      : t('apps.readScope.watched')
+  return t('apps.readScope.line', { what })
 }
 
 function formatSeen(value: number | undefined): string {

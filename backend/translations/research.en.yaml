@@ -1,0 +1,23 @@
+research:
+  outcome:
+    complete: 'Done: %statements% statements, %supported% backed by a source.'
+    complete_partial: 'Done with gaps: %open% of %points% points could not be confirmed. They are listed under Not confirmed.'
+    complete_snippets_only: 'No page could be opened, so this report is based on search summaries only. It says so where it matters.'
+    stopped_by_user: 'Stopped. No new work was started after you pressed Stop; a step that was already underway may still count. What was found so far is kept.'
+    stopped_budget: 'Stopped because your monthly AI budget is used up. The report covers %covered% of %points% points.'
+    stopped_limit: 'Stopped because this research reached its limit for this depth. What was found covers %covered% of %points% points.'
+    stopped_waiting: 'Stopped because the plan was not confirmed within a day. Start it again when you are ready.'
+    stopped_by_admin: 'Research was turned off on your Synaplan workspace. What was found so far is kept.'
+    failed_no_sources: 'There was nothing to research: turn on the web or add files to this project.'
+    failed_nothing_found: 'The sources that were searched held nothing that answers this question. Try rewording it or add files to this project.'
+    failed_role_unavailable: 'The %role% model of this project is not available, and no other model in this project can stand in. Nothing was charged.'
+    failed_model_error: 'The %role% model stopped answering. Nothing else was charged; try again or pick another model.'
+    failed_interrupted: 'The research was interrupted on the server. Start it again — the sources found so far are kept here.'
+    unknown: 'The research stopped. Start it again if you still need the answer.'
+  role:
+    reading: 'reading'
+    sorting: 'sorting'
+    planning: 'planning'
+    writing: 'writing'
+    fact-checking: 'fact-checking'
+    selected: 'selected'

@@ -2,12 +2,10 @@
 
 namespace App\Service\Widget;
 
-use App\Entity\ApiKey;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
-use App\Repository\ApiKeyRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
@@ -30,7 +28,7 @@ final readonly class WordPressIntegrationService
         private readonly HttpClientInterface $httpClient,
         private readonly EntityManagerInterface $em,
         private readonly UserRepository $userRepository,
-        private readonly ApiKeyRepository $apiKeyRepository,
+        private readonly WordPressApiKeyIssuer $apiKeyIssuer,
         private readonly PromptRepository $promptRepository,
         private readonly PromptService $promptService,
         private readonly FileStorageService $fileStorageService,
@@ -125,45 +123,14 @@ final readonly class WordPressIntegrationService
      */
     public function step2CreateApiKey(int $userId): array
     {
-        $user = $this->requireUser($userId);
+        $issued = $this->apiKeyIssuer->issueFor($this->requireUser($userId));
 
-        // Check if user already has a WordPress Plugin API key
-        $existingApiKeys = $this->apiKeyRepository->findBy(['ownerId' => $userId, 'status' => 'active']);
-        foreach ($existingApiKeys as $existingKey) {
-            if ('WordPress Plugin' === $existingKey->getName()) {
-                $this->logger->debug('WordPress wizard: Reusing existing API key', [
-                    'user_id' => $userId,
-                ]);
-
-                return [
-                    'success' => true,
-                    'data' => [
-                        'user_id' => $userId,
-                        'api_key' => $existingKey->getKey(),
-                        'existing_key' => true,
-                    ],
-                ];
-            }
+        $data = ['user_id' => $userId, 'api_key' => $issued['api_key']];
+        if ($issued['existing']) {
+            $data['existing_key'] = true;
         }
 
-        // Create new API key
-        $apiKey = new ApiKey();
-        $apiKey->setOwner($user);
-        $apiKey->setOwnerId($userId);
-        $apiKey->setName('WordPress Plugin');
-        $apiKey->setKey($this->generateApiKey());
-        $apiKey->setScopes(['widgets', 'api']);
-        $apiKey->setStatus('active');
-
-        $this->apiKeyRepository->save($apiKey);
-
-        return [
-            'success' => true,
-            'data' => [
-                'user_id' => $userId,
-                'api_key' => $apiKey->getKey(),
-            ],
-        ];
+        return ['success' => true, 'data' => $data];
     }
 
     /**
@@ -425,11 +392,6 @@ final readonly class WordPressIntegrationService
         return $user;
     }
 
-    private function generateApiKey(): string
-    {
-        return 'sk_live_'.bin2hex(random_bytes(24));
-    }
-
     private function buildMessageForFile(int $userId, string $path, string $extension, string $originalName, string $fileText): Message
     {
         $message = new Message();
@@ -485,12 +447,6 @@ final readonly class WordPressIntegrationService
      */
     public function getUserByApiKey(string $token): ?int
     {
-        $apiKey = $this->apiKeyRepository->findActiveByKey($token);
-
-        if (!$apiKey) {
-            return null;
-        }
-
-        return $apiKey->getOwnerId();
+        return $this->apiKeyIssuer->ownerOfActiveKey($token);
     }
 }

@@ -63,6 +63,46 @@ describe('MessagesGatewayAdminSettings', () => {
     mockSaveFlags.mockResolvedValue({ success: true, updated: {} })
   })
 
+  it('saves a new folder-search setting on its own', async () => {
+    const wrapper = mountPanel(baseStatus({ knowledge_tools: 'desktop' }))
+    const select = wrapper.find('[data-testid="select-agents-knowledge-tools"]')
+
+    expect((select.element as HTMLSelectElement).value).toBe('desktop')
+
+    await select.setValue('all')
+    await select.trigger('change')
+    await flushPromises()
+
+    expect(mockSaveFlags).toHaveBeenCalledWith({ knowledge_tools: 'all' })
+  })
+
+  it('saves a new page limit on its own', async () => {
+    const wrapper = mountPanel(baseStatus({ web_fetch_max_per_turn: 3 }))
+    const input = wrapper.find('[data-testid="input-agents-web-fetch-pages"]')
+
+    expect((input.element as HTMLInputElement).value).toBe('3')
+    expect(input.attributes('min')).toBe('0')
+    expect(input.attributes('max')).toBe('10')
+
+    await input.setValue(4)
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(mockSaveFlags).toHaveBeenCalledWith({ web_fetch_max_per_turn: 4 })
+  })
+
+  it('disables the page limit unless Synaplan reads pages itself', () => {
+    const passthrough = mountPanel(baseStatus({ web_fetch_mode: 'passthrough' }))
+    expect(
+      passthrough.find('[data-testid="input-agents-web-fetch-pages"]').attributes('disabled')
+    ).toBeDefined()
+
+    const auto = mountPanel(baseStatus({ web_fetch_mode: 'auto' }))
+    expect(
+      auto.find('[data-testid="input-agents-web-fetch-pages"]').attributes('disabled')
+    ).toBeUndefined()
+  })
+
   it('sends only the setting that changed', async () => {
     const wrapper = mountPanel()
 

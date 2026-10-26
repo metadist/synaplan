@@ -18,6 +18,21 @@ class PlatformInstanceRepository extends ServiceEntityRepository
         parent::__construct($registry, PlatformInstance::class);
     }
 
+    /**
+     * @return list<PlatformInstance>
+     */
+    public function findByOidcClientId(string $oidcClientId): array
+    {
+        if ('' === $oidcClientId) {
+            return [];
+        }
+
+        /** @var list<PlatformInstance> $rows */
+        $rows = $this->findBy(['oidcClientId' => $oidcClientId]);
+
+        return $rows;
+    }
+
     public function findByInstanceId(string $instanceId): ?PlatformInstance
     {
         $row = $this->findOneBy(['instanceId' => $instanceId]);

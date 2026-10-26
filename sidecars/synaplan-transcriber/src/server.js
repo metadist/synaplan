@@ -161,8 +161,13 @@ export function createApp(config, { synaplan, plugin = null, log = () => {} } = 
     }
     const notesRef = url.searchParams.get('notes')
     if (notesRef) {
-      if (!plugin || !isSessionRef(notesRef)) {
+      if (!isSessionRef(notesRef)) {
         refuse(socket, 400, 'Bad Request')
+        return
+      }
+      if (!plugin) {
+        log(`Notes ${notesRef}: SYNAPLAN_TRANSCRIBER_SECRET is not set, connection refused.`)
+        refuse(socket, 503, 'Service Unavailable')
         return
       }
       const meetingId = url.searchParams.get('sessionId') || url.searchParams.get('meetingId') || ''
@@ -170,6 +175,11 @@ export function createApp(config, { synaplan, plugin = null, log = () => {} } = 
       return
     }
     const meetingId = url.searchParams.get('sessionId') || url.searchParams.get('meetingId') || 'meeting'
+    if (!synaplan) {
+      log(`Meeting ${meetingId}: captions without meeting notes need SYNAPLAN_API_KEY, connection refused.`)
+      refuse(socket, 503, 'Service Unavailable')
+      return
+    }
     sockets.handleUpgrade(request, socket, head, (ws) => {
       const session = createMeetingSession({
         meetingId,

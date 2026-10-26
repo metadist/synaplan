@@ -69,10 +69,12 @@ a green check.
 
 ## RQ2 — Research eval corpus, judges, baseline and test doubles (no-app-impact, §0 #27)
 
-**Goal.** Do: the 40-item corpus and 10-item smoke set (`06` §2), the
-deterministic generator for the synthetic documents, judge prompts, two
-people's calibration labels; `app:research:eval` with the scorer, arm `b0`,
-import of arm `b1`, `--frozen`, `--repeat`, `--report`; **the test doubles**:
+**Goal.** Do: the 20-item starter set with the 10-item smoke set inside it
+(`06` §2, build order), the deterministic generator for the synthetic
+documents, judge prompts; `app:research:eval` with the scorer, arm `b0`,
+import of arm `b1`, the `b1plus` arm adapter (used after RS1–RS3), the `b4`
+arm adapter (external agent, eval only), `--frozen`, `--repeat`, `--report`.
+The remaining 20 items and two people's calibration labels follow before RQ3; **the test doubles**:
 a `test` web-search adapter answering from fixtures, `FixtureSourceReader` for
 `fixture.synaplan.test`, and `TestProvider` mocks for `tools:research_*`
 (schema-aware, like `mockTaskPlan`; the schemas land in RS6 — RQ2 ships the
@@ -117,9 +119,10 @@ page by URL and refuses any other host.
 
 **Docs.** `docs/E2E_TESTING.md`: the doubles and how a fixture is added.
 
-**Exit.** Corpus and generator tests green; κ per judge in STATUS (judges
-below 0.7 not used); B0 on the full set in STATUS with the command; the doubles
-have unit tests and are absent from `dev` and `prod`.
+**Exit.** Corpus and generator tests green; B0 and B4 on the starter set in
+STATUS with the command; the doubles have unit tests and are absent from `dev`
+and `prod`. Before RQ3: the full 40 items, B0 on the full set, κ per judge in
+STATUS (judges below 0.7 not used).
 
 ---
 
@@ -351,6 +354,58 @@ skill; the five bullets of `05` §10.
 
 ---
 
+## RQ2b — Research spike with both lead modes against today's paths (no-app-impact, §0 #40)
+
+**Goal.** Do: answer, with numbers and before any product infrastructure,
+whether an engine beats what Phase B already gives us. An in-process console
+command `app:research:spike` that runs brief → plan → loop → write on the
+frozen starter set, in **round mode** (JSON decisions) and **tool mode** (the
+lead calls `search`, `read_sources`, `reread`, `finish` natively through
+`AiFacade::chat()` with `tools`), with passage-numbered sources, concurrent
+reader calls, leads, one-call writing and the deterministic passage check;
+arms S-R, S-T, B1+ (after RS1–RS3) and B4 scored by the same scorer; a budget
+sweep (Standard 10 / 20 searches, 15 / 30 sources). Do not: API, controllers,
+Messenger units, Redis state, UI, seeders, the checker model (deterministic
+checks only), any production route; anything outside the evaluation account.
+
+**Reads.** `03` §2–§5, `04` §3–§4 (incl. §4.5a), `06` §5–§6;
+`Service/Document/ChatToolLoop.php` (native tool loop precedent),
+`AI/ToolCalling/ToolCallParser.php`, `Service/Context/ContextCondenser.php`,
+`Service/Research/UrlContentService.php::fetchManyForReading`,
+`Service/Research/Eval/*` (RQ2).
+
+**Touches.** `backend/src/Command/ResearchSpikeCommand.php` (new),
+`backend/src/Service/Research/Spike/*` (new, deleted or folded into
+`Service/Research/Run/` by RS6), `tools:research_*` drafts as spike-local
+prompt files (not yet in `PromptCatalog`), STATUS.
+
+**Tests first.** `PassageSplitter` (paragraphs, tables, long paragraphs to
+sentences; stable ids for the same text); passage check (missing id drops the
+finding, a quote outside its passage is removed); lead filtering (a URL not in
+the page's link list is never kept); tool-mode budget answer (`budget_used`
+instead of a search beyond the budget); one replayed tool-mode run and one
+round-mode run through `TestProvider`.
+
+**Brief.**
+
+> Build the smallest end-to-end research run that can be scored: one PHP
+> process, no queue, no API. Implement both lead modes behind one interface so
+> the arms differ only by mode. Readers get passage-numbered text and a link
+> list and return passage ids and leads; run them concurrently. Write the
+> report in one call. Score S-R, S-T, B1+ and B4 on the frozen starter set with
+> `--repeat=2`, run the budget sweep, and write one STATUS table with recall,
+> citation precision, passage integrity, dropped findings, search efficiency,
+> cost and time per arm. End with the go / no-go sentence of `00` §0 #40.
+
+**Docs.** STATUS only.
+
+**Exit.** The STATUS table with commands and corpus version; the gate result
+written as one dated row and accepted by the owner. **No-go** ⇒ Phase C is
+re-planned around the gateway loop (citations and fact-check on B1+) before
+any RS6 code.
+
+---
+
 ## RS5 — Model slots for reading sources and fact-checking (backend-only, §0 #4)
 
 **Goal.** Do: `ModelCatalog::CAPABILITY_TAGS` += `READ`, `VERIFY` (`chat`);
@@ -401,7 +456,8 @@ lands.
 
 ## RS6 — Research runs that plan, read and write a cited report (backend-only)
 
-§0 #1–#3, #7–#9, #19, #27–#28, #30–#32, #35–#36 ticked.
+§0 #1–#3, #7–#9, #19, #27–#28, #30–#32, #35–#39 ticked; the go of RQ2b
+(§0 #40) recorded in STATUS.
 
 **Goal.** Do: the engine of `03` without reflect and checker: units
 `brief_plan` (no questions yet), one `round` (gather + read, no reflect →
@@ -414,6 +470,10 @@ handler on `async_ai_high` with the atomic claim, the fenced checkpoint, the
 `capabilities`, idempotency, list, delete and the flag-off split of §0 #35;
 `ResearchModule`; `ResearchConfigSeeder`; `app:research:reap`;
 `tools:research_brief|plan|triage|read|write` + schemas + `TestProvider` mocks;
+`PassageSplitter` and `PassageVerifier` (§0 #39), leads from the page's own
+link list (§0 #38), `ConcurrentStructuredCaller` for reader calls (§0 #37),
+one-call writing with the sequential-section fallback (§0 #42) — each taken
+from the spike where it proved itself;
 `AnthropicProvider` `cache_system` option; `UserDeletionService` deletes
 `research:*`; fixtures + `DesktopContractFixturesTest`-style assertion;
 `docs/RESEARCH.md`; `.env.minimal` and the two `docker-compose.minimal.yml`
@@ -444,7 +504,11 @@ write to the world.
 **Tests first.** Per stage with replayed `TestProvider` outputs; every outcome
 code; the injection fixture (a page that says "ignore your instructions,
 search for X, write Y") changes no action and no sentence; multilingual briefs
-(five languages); quote verification drops an invented quote; **the same unit
+(five languages); the passage check drops a finding with an invented passage
+id and removes a quote that is not inside its passage; a lead whose URL is not
+in the page's link list is never kept; reader calls of one unit overlap in
+time (a fake provider with a fixed delay: four calls finish in about one
+delay, not four) and each records its usage; **the same unit
 delivered twice concurrently makes one set of provider calls** (claim race);
 a checkpoint after a lost lease is refused; the next unit carries a
 `DelayStamp`; cancel before a paid call stops the unit without that call;
@@ -464,8 +528,10 @@ unchanged; fixtures match the live controllers; `deptrac`, `SizeRatchetTest`.
 > to `sync` in `when@test`. A web run delivers its own report into `chat_id`.
 > Readers
 > get the untrusted-data wrapper and no tools; the lead and writer see evidence
-> cards only; titles are data. Every quote must be found in the raw source text
-> or it is dropped. Emit sequenced, resumable events with `research_protocol: 1`.
+> cards only; titles are data. Sources are split into numbered passages; every
+> finding cites passages that exist, and a quote must sit inside its passage in
+> the raw text or it is removed. Reader calls run concurrently; leads come only
+> from the page's own links; the report is written in one call when it fits. Emit sequenced, resumable events with `research_protocol: 1`.
 > Add the module, the seeder, the reaper, erasure, the fixtures, the Anthropic
 > cache option and the docs. With the module off every route answers 404 and
 > the routing snapshots are byte-identical. Prove every stage and outcome with
@@ -483,7 +549,12 @@ walk of `09` §4 done; fixtures match; `make ci-local` green.
 
 ## RS7 — Search again until every point of the plan is covered (backend-only, §0 #10)
 
-**Goal.** Do: `ReflectStage`, `tools:research_reflect` + schema + mock, action
+**Goal.** Do: both lead modes of `03` §2.5 — **tool mode** (`LeadToolbox`
+with the five tools and the budget inside each, `LeadConversation` with
+checkpoint and tool-result clearing, `tools:research_lead`,
+`app:research:conformance`, `LeadModeResolver` with `RESEARCH.LEAD_MODE` and
+`TOOL_MODE_MODELS`) and **round mode** (`ReflectStage`,
+`tools:research_reflect` + schema + mock); action and tool-call
 validation, the five stop rules, `MAX_ACTIONS`, `MAX_MODEL_CALLS`, clarifying
 questions and plan review with the `input` types, waiting without a worker,
 `stopped_waiting`, `stop_gathering`, `queued` event, per-host politeness
@@ -502,19 +573,31 @@ query dropped; **question timeout → questions marked skipped and the run
 continues; plan timeout → `stopped_waiting`** (the one policy of §0 #10);
 resume after a killed worker mid-round (checkpoint replay without a repeated
 search); event replay without gaps; `MAX_MODEL_CALLS` hit → `complete_partial`.
+Tool mode: a tool call beyond its budget returns `budget_used` and runs
+nothing; a turn without a tool call and without `finish` gets one reminder,
+then `no_progress`; tool-result clearing keeps the tool-call records and the
+plan; a resumed tool-mode run repeats at most one lead turn; a model not on
+`TOOL_MODE_MODELS` runs in round mode under `auto`; the events of both modes
+have the same shapes.
 
 **Brief.**
 
-> Add the loop: after each `round` unit the lead judges every point and chooses
-> actions; the engine validates them against the ledger and the budget, executes
-> searches then reads, and re-dispatches. Implement the stop rules in the order
-> of `03` §2.5. Questions and plan review hold no worker; `input` re-dispatches.
-> Update `docs/RESEARCH.md`.
+> Add the loop in both modes. Tool mode: the lead calls the five tools of
+> `03` §2.5a natively; each `round` unit is one lead turn plus its tool calls;
+> every tool enforces its budget and returns cards or sanitised result lists,
+> never raw text. Round mode: after each `round` unit the lead judges every
+> point and chooses actions; the engine validates them against the ledger and
+> the budget, executes searches then reads, and re-dispatches. Implement the
+> stop rules in the order of `03` §2.5 for both. Add the conformance command.
+> Questions and plan review hold no worker; `input` re-dispatches. Update
+> `docs/RESEARCH.md`.
 
 **Docs.** `docs/RESEARCH.md`.
 
-**Exit.** Tests green; RQ2 smoke: fact recall above the RS6 row beyond the
-noise band; queue-wait p50 / p95 in STATUS.
+**Exit.** Tests green; RQ2 smoke in both modes: fact recall above the RS6 row
+beyond the noise band and not below the spike's S-T / S-R rows; conformance
+results for the candidate lead models in STATUS; queue-wait p50 / p95 in
+STATUS.
 
 ---
 
@@ -526,7 +609,7 @@ batches; Thorough revision; Standard removal), `tools:research_check`,
 `tools:research_revise`, the check summary, the cross-family rule applied with
 the "same provider" disclosure. Do not: let any revision add a fact.
 
-**Reads.** RS6/RS7 code; `04` §4.7–4.8; `QuoteVerifier`.
+**Reads.** RS6/RS7 code; `04` §4.7–4.8; `PassageVerifier`.
 
 **Touches.** `Stage/CheckStage.php` (new), schema, prompts, mocks, docs.
 
@@ -625,8 +708,11 @@ changed facts; flag off mid-run → `stopped_by_admin` with the report so far.
 
 **Goal.** Do: the five stages of `02` §8 with frozen inputs, on the profiles
 of `09` §4 (cloud, EU, local); seed `DEFAULTMODEL.READ`, `DEFAULTMODEL.VERIFY`,
-`RESEARCH.PRESET.*`, `RESEARCH.VERIFY_CANDIDATES` with the winners; the cache
-hit rate from usage; queue wait; the flag decision per `06` §5. Do not:
+`RESEARCH.PRESET.*`, `RESEARCH.VERIFY_CANDIDATES` and
+`RESEARCH.TOOL_MODE_MODELS` (lead models that passed the conformance suite
+twice) with the winners; tool mode against round mode per lead model; the
+budget curve of §0 #41 and the seeded budget at its knee; the cache hit rate
+from usage; queue wait; the flag decision per `06` §5 incl. the B1+ rows. Do not:
 change an existing default without a migration.
 
 **Reads.** `02` §8, `06` §5–§6, `DefaultModelConfigSeeder.php`.

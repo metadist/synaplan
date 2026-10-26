@@ -37,7 +37,9 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertFalse($this->config->allowOperatorKey(1));
         $this->assertTrue($this->config->isBudgetNoticeEnabled(1));
         $this->assertSame(MessagesGatewayConfig::WEB_SEARCH_AUTO, $this->config->webSearchMode(1));
+        $this->assertSame(2, $this->config->webSearchMaxRounds(1));
         $this->assertSame(MessagesGatewayConfig::WEB_FETCH_AUTO, $this->config->webFetchMode(1));
+        $this->assertSame(3, $this->config->webFetchMaxPerTurn(1));
         $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));
         $this->assertSame(MessagesGatewayConfig::DEFAULT_UPSTREAM_URL, $this->config->upstreamUrl());
         $this->assertSame([], $this->config->modelAliases());
@@ -162,10 +164,35 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->stubGlobalRows([
             'VISION_MAX_IMAGES' => '5000',
             'MCP_MAX_ITERATIONS' => '999',
+            'WEB_SEARCH_MAX_ROUNDS' => '99',
+            'WEB_FETCH_MAX_PER_TURN' => '99',
         ]);
 
         $this->assertSame(MessagesGatewayConfig::MAX_VISION_MAX_IMAGES, $this->config->visionMaxImages(1));
         $this->assertSame(MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS, $this->config->mcpMaxIterations(1));
+        $this->assertSame(MessagesGatewayConfig::MAX_WEB_SEARCH_MAX_ROUNDS, $this->config->webSearchMaxRounds(1));
+        $this->assertSame(MessagesGatewayConfig::MAX_WEB_FETCH_MAX_PER_TURN, $this->config->webFetchMaxPerTurn(1));
+    }
+
+    public function testKnowledgeToolsDefaultToDesktop(): void
+    {
+        $this->stubGlobalRows([]);
+
+        $this->assertSame(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, $this->config->knowledgeTools(1));
+    }
+
+    public function testUnknownKnowledgeToolsValueFallsBackToDesktop(): void
+    {
+        $this->stubGlobalRows(['KNOWLEDGE_TOOLS' => 'everyone']);
+
+        $this->assertSame(MessagesGatewayConfig::KNOWLEDGE_DESKTOP, $this->config->knowledgeTools(1));
+    }
+
+    public function testWebFetchCapOfZeroStaysZero(): void
+    {
+        $this->stubGlobalRows(['WEB_FETCH_MAX_PER_TURN' => '0']);
+
+        $this->assertSame(0, $this->config->webFetchMaxPerTurn(1));
     }
 
     /**

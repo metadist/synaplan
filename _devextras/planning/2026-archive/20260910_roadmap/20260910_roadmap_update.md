@@ -98,7 +98,7 @@ exit is met.
 | 3 | AI Plugs | [`2026-archive/20260903_ai_plugs/`](../20260903_ai_plugs/00_master_plan.md) | S1–S6 on `main`. `PL37` leftover. Intermezzo reuses the plug-declaration pattern. |
 | 4 | Tools, Approval & Workflows | [`2026-archive/20260903_tools_approval_workflows/`](../20260903_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 started (#1821): Steps + webhook live; TL41, TL45–TL47 and J-TL-5 still open. |
 | 5 | Secure Compute | [`20260903_secure_compute/`](../../20260903_secure_compute/00_master_plan.md) | A0–A2 on `main` (#1774, `sidecars/synaplan-compute`, no PHP client). A3 + B1–B4 = Wave 5. First PHP feature that must be born as a module. |
-| 6 | More Nextcloud | [`20260903_more_nextcloud/`](../../20260903_more_nextcloud/00_master_plan.md) | S1 on `main`. S2–S3 stay in partner repos; not a Wave 4/5 blocker. |
+| 6 | More Nextcloud | [`20260903_more_nextcloud/`](../20260903_more_nextcloud/00_master_plan.md) | S1 on `main`. S2–S3 stay in partner repos; not a Wave 4/5 blocker. |
 
 Release classes still follow `.github/mobile-impact-policy.json`. No track
 here is `store-required`.

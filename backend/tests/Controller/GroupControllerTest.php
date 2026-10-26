@@ -72,6 +72,8 @@ final class GroupControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $user = $this->createUser('iam-mine-read-key@synaplan.internal');
+        $user->setUserLevel('PRO');
+        $this->em->flush();
         $group = new Group();
         $group->setName('Sales');
         $group->setSlug('sales-read-key-'.uniqid());

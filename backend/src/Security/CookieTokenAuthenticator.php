@@ -41,6 +41,15 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
      *
      * @var list<string>
      */
+    /**
+     * Public endpoints for people without an account. A stale access or OIDC
+     * cookie (APP_SECRET rotated, account deleted) must not turn them into a
+     * 401 before they start.
+     */
+    private const ANONYMOUS_PATHS = [
+        '/api/v1/checkout/start',
+    ];
+
     private const ACCESS_COOKIE_AUTH_PATHS = [
         '/api/v1/auth/me',
         '/api/v1/auth/logout',
@@ -73,7 +82,7 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        if ($this->isCredentialExchangePath($request)) {
+        if ($this->isCredentialExchangePath($request) || \in_array($request->getPathInfo(), self::ANONYMOUS_PATHS, true)) {
             return false;
         }
 

@@ -11,6 +11,7 @@ export function useAuth() {
     impersonator: computed(() => authStore.impersonator),
     loading: computed(() => authStore.loading),
     error: computed(() => authStore.error),
+    errorCode: computed(() => authStore.errorCode),
     isAuthenticated: computed(() => authStore.isAuthenticated),
     userLevel: computed(() => authStore.userLevel),
     isPro: computed(() => authStore.isPro),

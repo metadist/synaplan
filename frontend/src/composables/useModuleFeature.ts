@@ -33,6 +33,7 @@ export type ModuleId =
   | 'whatsapp'
   | 'telegram'
   | 'freeapi'
+  | 'capacity'
 
 type RuntimeModules = NonNullable<
   z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>['modules']

@@ -64,7 +64,7 @@ export default defineConfig({
           ],
         },
       },
-      grepInvert: /@oidc-redirect|@noci|@visual|@ollama|@minimal/,
+      grepInvert: /@oidc-redirect|@noci|@visual|@ollama|@minimal|@busy/,
     },
     {
       name: 'firefox',
@@ -85,6 +85,18 @@ export default defineConfig({
       name: 'chromium-oidc-redirect',
       use: { ...devices['Desktop Chrome'] },
       grep: /@oidc-redirect/,
+    },
+    {
+      // AU3: one stream worker and a one-second wait, on docker-compose.busy.yml.
+      // Excluded from the sharded chromium run, which stays in classic mode.
+      name: 'chromium-busy',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@busy/,
     },
     {
       // Intermezzo S4: the core stack with every optional feature module
@@ -131,6 +143,17 @@ export default defineConfig({
         },
       },
       grep: /@layout/,
+    },
+    {
+      // Real providers, linked clouds, or other maintainer-workstation-only walks.
+      name: 'chromium-noci',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@noci/,
     },
     {
       // Visual snapshots (hard-capped, see layout guard docs). CI-only:

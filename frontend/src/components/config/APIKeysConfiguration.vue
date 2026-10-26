@@ -52,7 +52,18 @@
       </button>
     </div>
 
-    <div class="surface-card p-6" data-testid="section-create-key">
+    <div v-if="!isPro" class="surface-card p-6" data-testid="section-plan-required">
+      <p class="text-sm txt-primary mb-4">{{ $t('config.apiKeys.planRequired') }}</p>
+      <router-link
+        to="/subscription"
+        class="btn-primary px-4 py-2.5 text-sm font-medium inline-flex items-center"
+        data-testid="link-see-plans"
+      >
+        {{ $t('config.apiKeys.seePlans') }}
+      </router-link>
+    </div>
+
+    <div v-else class="surface-card p-6" data-testid="section-create-key">
       <div class="flex flex-col gap-4">
         <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
           <input
@@ -180,7 +191,7 @@
     </div>
 
     <div
-      v-else-if="apiKeys.length === 0"
+      v-else-if="isPro && apiKeys.length === 0"
       class="surface-card p-12 text-center"
       data-testid="section-empty"
     >
@@ -188,7 +199,11 @@
       <p class="txt-secondary text-lg">{{ $t('config.apiKeys.noKeys') }}</p>
     </div>
 
-    <div v-else class="surface-card overflow-hidden" data-testid="section-keys-table">
+    <div
+      v-else-if="apiKeys.length > 0"
+      class="surface-card overflow-hidden"
+      data-testid="section-keys-table"
+    >
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead class="border-b border-light-border/30 dark:border-dark-border/20">
@@ -286,7 +301,7 @@
                     {{ $t('config.apiKeys.actions.revoke') }}
                   </button>
                   <button
-                    v-else
+                    v-else-if="isPro"
                     class="text-sm text-green-500 hover:text-green-600 font-medium"
                     data-testid="btn-activate"
                     @click="activateAPIKey(apiKey.id)"
@@ -447,7 +462,9 @@ import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { getConfigSync } from '@/services/api/httpClient'
+import { useAuth } from '@/composables/useAuth'
 
+const { isPro } = useAuth()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { t } = useI18n()

@@ -8,6 +8,7 @@ use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Auth\RegistrationConfig;
+use App\Service\Auth\SignupPauseSwitch;
 use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Feature\FeatureFlagEnv;
@@ -35,6 +36,7 @@ final readonly class SystemConfigValues
         private GuestChatConfig $guestChatConfig,
         private FeatureFlagEnv $featureFlagEnv = new FeatureFlagEnv(),
         private ?ChatArtifactsConfig $chatArtifactsConfig = null,
+        private ?SignupPauseSwitch $signupPauseSwitch = null,
     ) {
     }
 
@@ -170,6 +172,7 @@ final readonly class SystemConfigValues
             'REGISTRATION_ENABLED' => $this->registrationConfig->envOverride(),
             'GUEST_CHAT_ENABLED' => $this->guestChatConfig->envOverride(),
             'CHAT_ARTIFACTS_ENABLED' => $this->chatArtifactsConfig?->envOverride(),
+            'SIGNUP_PAUSED' => $this->signupPauseSwitch?->envOverride(),
         ] as $key => $envOverride) {
             if (!isset($values[$key]) || null === $envOverride) {
                 continue;
@@ -177,6 +180,13 @@ final readonly class SystemConfigValues
 
             $values[$key]['envOverride'] = true;
             $values[$key]['effectiveValue'] = $envOverride ? 'true' : 'false';
+        }
+
+        // The registration mode is a select, not a toggle, but pinned the same way.
+        $modeOverride = $this->registrationConfig->modeEnvOverride();
+        if (null !== $modeOverride && isset($values['REGISTRATION_MODE'])) {
+            $values['REGISTRATION_MODE']['envOverride'] = true;
+            $values['REGISTRATION_MODE']['effectiveValue'] = $modeOverride;
         }
 
         // Same rule for every wave feature flag on the Features tab: an

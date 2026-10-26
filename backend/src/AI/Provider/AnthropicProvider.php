@@ -1562,7 +1562,8 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                         'type' => 'tool_use',
                         'id' => (string) ($call['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
                         'name' => (string) ($fn['name'] ?? 'tool'),
-                        'input' => is_array($decoded) ? $decoded : [],
+                        // Anthropic requires an object; an empty PHP array would encode as [].
+                        'input' => is_array($decoded) && [] !== $decoded ? $decoded : new \stdClass(),
                     ];
                 }
                 $converted[] = [

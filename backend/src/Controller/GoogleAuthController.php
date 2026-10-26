@@ -6,9 +6,9 @@ use App\Entity\User;
 use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
 use App\Service\Auth\OAuthLoginResponder;
-use App\Service\ModelConfigService;
+use App\Service\Auth\OAuthSignupGate;
+use App\Service\Auth\SignupBlockedException;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,10 +27,9 @@ class GoogleAuthController extends AbstractController
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
-        private EntityManagerInterface $em,
         private OAuthStateService $oauthStateService,
         private OAuthLoginResponder $oauthLoginResponder,
-        private ModelConfigService $modelConfigService,
+        private OAuthSignupGate $signupGate,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
@@ -57,9 +56,11 @@ class GoogleAuthController extends AbstractController
         // the signed state so the callback knows which flow to complete.
         $native = $request->query->getBoolean('native');
 
-        // Generate signed state token (no session required)
+        // Signed state (no session required). It also records whether the
+        // browser passed the human check, which the callback requires before
+        // it creates a NEW account.
         $state = $this->oauthStateService->generateState('google', AccountLanguage::withSignupLanguage(
-            $native ? ['native' => true] : [],
+            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'google'),
             $request->query->get('language'),
         ));
 
@@ -145,16 +146,14 @@ class GoogleAuthController extends AbstractController
 
             $userInfo = $userInfoResponse->toArray();
 
-            $this->logger->info('Google user info retrieved', [
-                'email' => $userInfo['email'] ?? 'unknown',
-                'verified' => $userInfo['verified_email'] ?? false,
-            ]);
-
-            // Find or create user
+            // A new account needs the human check from the start of the flow
+            // and a free signup slot; an existing account signs in as before.
+            $this->signupGate->assertGoogleSignup($userInfo['email'] ?? null, $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $googleRefreshToken,
                 AccountLanguage::normalize($statePayload['language'] ?? null),
+                $statePayload,
             );
 
             $this->logger->info('Google OAuth successful', [
@@ -165,17 +164,16 @@ class GoogleAuthController extends AbstractController
 
             // Web → cookies + SPA redirect; native → deep-link handoff token.
             return $this->oauthLoginResponder->success($user, $request, 'google', $native);
+        } catch (SignupBlockedException $e) {
+            return $this->oauthLoginResponder->error('google', $e->getMessage(), $native, ['error_code' => $e->getErrorCodeParam()]);
         } catch (\Exception $e) {
-            $this->logger->error('Google OAuth callback error', [
-                'error' => $e->getMessage(),
-                'trace' => substr($e->getTraceAsString(), 0, 1000),
-            ]);
+            $this->logger->error('Google OAuth callback error', ['error' => $e->getMessage(), 'trace' => substr($e->getTraceAsString(), 0, 1000)]);
 
             return $this->oauthLoginResponder->error('google', 'Failed to authenticate with Google', $native);
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $email = $userInfo['email'] ?? null;
         $googleId = $userInfo['id'] ?? null;
@@ -246,12 +244,7 @@ class GoogleAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->modelConfigService->initializeNewUserDefaults($user->getId());
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }

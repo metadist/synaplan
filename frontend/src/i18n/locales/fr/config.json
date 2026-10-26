@@ -95,6 +95,7 @@
       "descriptionHeader": "DESCRIPTION",
       "admin": {
         "catalogSubtitle": "Recherchez et modifiez le catalogue de modèles du système.",
+        "withdrawn": "N'est plus proposé par {provider}. Il reste ici jusqu'à ce que vous le supprimiez.",
         "bulkImportSubtitle": "Générer et appliquer du SQL à partir de la documentation des fournisseurs (avancé).",
         "addModels": "Import groupé (SQL)",
         "urlsLabel": "URL (une par ligne)",
@@ -155,6 +156,11 @@
         "modelCreated": "Modèle créé",
         "modelSaved": "Modèle enregistré",
         "modelDeleted": "Modèle supprimé",
+        "deletedMoved": "Retiré. {job} utilise maintenant {model}.",
+        "deletedMovedMany": "Retiré. Ce qui utilisait ce modèle utilise maintenant un autre modèle disponible.",
+        "deletedCleared": "Retiré. {job} n’a pas de modèle tant que vous n’en choisissez pas un sur cette page. Rien d’autre n’a changé.",
+        "deletedMovedAndCleared": "Retiré. Une partie utilise maintenant un autre modèle. {job} n’a pas de modèle tant que vous n’en choisissez pas un sur cette page.",
+        "someJobs": "Une partie",
         "appliedStatements": "{count} instruction(s) appliquée(s)",
         "failedGenerate": "Échec de la génération du SQL",
         "failedApply": "Échec de l’application du SQL",
@@ -932,6 +938,8 @@
       "errorActivating": "Échec de l’activation de la clé API",
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
+      "planRequired": "Les clés API font partie d'une offre payante.",
+      "seePlans": "Voir les offres",
       "scopes": {
         "hint": "Laissez décoché pour un accès complet. Cocher Utilisateurs limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
         "iamRead": "Utilisateurs — voir les groupes",

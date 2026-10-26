@@ -25,6 +25,19 @@ final class ServerToolReplayTest extends TestCase
         self::assertSame('web_search', $clean[0]['name']);
     }
 
+    public function testSynaplanWebFetchIsANormalToolUse(): void
+    {
+        $content = [[
+            'type' => 'tool_use',
+            'id' => 'toolu_fetch',
+            'name' => 'web_fetch',
+            'input' => ['url' => 'https://example.com'],
+        ]];
+
+        self::assertSame([], ServerToolReplay::unpairedUseIds($content));
+        self::assertSame($content, ServerToolReplay::sanitizeAssistantContent($content));
+    }
+
     public function testPairedWebFetchIsKeptWithItsResult(): void
     {
         $content = $this->loadBlocks('web_fetch_paired_assistant.json');

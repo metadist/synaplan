@@ -223,7 +223,7 @@ final readonly class MessageApiFormatter
             'topic' => $m->getTopic(),
             'originalTopic' => $originalTopic,
             'originalMediaType' => $originalMediaType,
-            'language' => $m->getLanguage(),
+            'language' => $m->getLanguage(), 'thinking_seconds' => $this->thinkingSeconds($m),
             'createdAt' => $m->getDateTime(),
             'quotedText' => $quotedText,
             'quotedMessageId' => null !== $quotedMessageIdMeta ? (int) $quotedMessageIdMeta : null,
@@ -295,6 +295,17 @@ final readonly class MessageApiFormatter
         $id = (int) $raw;
 
         return $id > 0 ? $id : null;
+    }
+
+    private function thinkingSeconds(Message $m): ?int
+    {
+        $raw = $m->getMeta('thinking_seconds');
+        if (!is_string($raw) || !ctype_digit($raw)) {
+            return null;
+        }
+        $seconds = (int) $raw;
+
+        return $seconds > 0 ? $seconds : null;
     }
 
     /**

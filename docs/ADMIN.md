@@ -156,6 +156,14 @@ read back out of the database.
 
 ### Health Check Endpoint
 
+Three addresses, three jobs:
+
+| Address | Who can call it | What it tells you |
+| ------- | --------------- | ----------------- |
+| `GET /api/health` | anyone | Providers, local speech and Redis. A full picture, slower. |
+| `GET /api/health/ready` | anyone | Only whether Redis answers. Use this when a load balancer asks "can this server take a request?". |
+| `GET /api/health/probe` | an API key | Whether sign-in still works. This is the one for Uptime Robot. |
+
 `GET /api/health/probe` exercises the auth stack (DB via API-Key lookup, email-verified gate, token generation) and returns `STATUS:OK` or `STATUS:ERROR`.
 
 Protected by standard API-Key authentication (`X-API-Key` header). No sensitive details in the response — diagnostics are logged server-side only.
@@ -193,7 +201,7 @@ Jobs run in five lanes, so a slow job never holds up the others:
 |------|------|------|
 | Every minute | each tick | unconfirmed copy clean-up, media reaper, stuck chats, desktop jobs, inbound mail handlers |
 | Saved Tasks | each tick | `app:saved-tasks:tick` |
-| Hourly | once an hour | expired temporary files, expired approvals, new-model discovery |
+| Hourly | once an hour | expired temporary files, expired approvals, new-model discovery, Synaplan Demo maintenance, unpaid sign-ups older than 7 days |
 | Daily | once a day at `SYNAPLAN_SCHEDULER_DAILY_AT` (UTC, default `03:30`) | update check, model availability, message digest, documentation sync, approval digest |
 | Model health | every 15 minutes | `app:model:health-check` |
 
@@ -393,6 +401,75 @@ does **not** do that — the refresh tokens are plain database rows.
 ### HTTPS
 
 Always run behind a reverse proxy (nginx, Caddy, Traefik) with TLS termination. Synaplan does not handle TLS directly.
+
+### Account creation: limits, human check, kill switch
+
+Every path that creates an account — the email form and the Google, GitHub
+and Apple callbacks — goes through the same protection. Existing accounts are
+never throttled; only *new* accounts are.
+
+| Control | Where | Default |
+| ------- | ----- | ------- |
+| New accounts per client IP per hour | `SIGNUP_IP_LIMIT` | 5 |
+| New accounts installation-wide per 10 minutes | `SIGNUP_GLOBAL_LIMIT` | 20 (tripping it mails the operator) |
+| Stripe checkouts per client IP per hour | `CHECKOUT_IP_LIMIT` | 10 |
+| Paid tiers for day-old accounts per hour before an alert | `PAID_SIGNUP_ALERT_LIMIT` | 10 |
+| **Pause sign-up** | Admin → System configuration → Sign-in & registration (or `SIGNUP_PAUSED=true`) | off |
+| Human check | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (Cloudflare Turnstile), else `RECAPTCHA_*` | none |
+| Alert inbox | `APP_ADMIN_EMAIL` (fallback `APP_SENDER_EMAIL`) | — |
+
+The per-IP windows need the real client address. Behind Cloudflare or a load
+balancer set `SYMFONY_TRUSTED_PROXIES` (and `SYMFONY_TRUSTED_HEADERS=x-forwarded-for`);
+without them every request looks like the proxy and the per-IP limit turns
+into a second installation-wide one.
+
+The pause switch is the emergency brake during a flood of fake accounts: it
+takes effect at once on all nodes (shared Redis + BCONFIG), refuses every new
+account with a sentence that says so, and leaves sign-in untouched. The refused
+person sees one of three sentences — too many sign-ups from this connection,
+sign-up is paused, or "please start the sign-up from the website" when an
+OAuth flow was started without the human check. The limits share one
+rate-limiter cache, so they hold across a multi-node deployment.
+
+Turnstile wins over reCAPTCHA when both are configured and fails closed:
+Cloudflare unreachable means the sign-up is refused, not waved through. The
+browser obtains a token before the redirect to Google, GitHub or Apple, and
+the native app does the same inside the app before it opens the system
+browser, then sends that token on the start URL. The callback refuses a new
+account whose flow did not pass it. Adding `?native=true` to the start URL
+does not skip that check — the flag only chooses where the answer is sent.
+An installed app that does not yet send the token cannot create a new social
+account while a human check is configured; signing in to an existing account
+still works. The iOS Sign in with Apple sheet is the one path without a
+browser challenge, because Apple has already signed the identity token; it
+still counts against the limits. One solved check authorises one OAuth
+state: the state's nonce is spent on first use.
+
+The alert mail (`[INCIDENT][Synaplan] Unusual account creation`) is sent once
+per hour per signal and always logged at `critical`, so a log-based pager works
+on an install without mail. Why this exists: `docs/PAYMENTS_CHANNELS.md`,
+section "Stripe payment methods".
+
+### Who may create an account: open or admission
+
+`REGISTRATION_MODE` (or Admin → System configuration → Sign-in & registration) decides how a
+visitor gets an account while self-registration is on:
+
+| Mode | A new account needs |
+| ---- | ------------------- |
+| `open` (default) | nothing — anyone may sign up; a self-hosted install keeps this |
+| `admission` | a paid plan or an invitation code; the hosted platform runs this |
+
+In admission mode the register page offers the plans and an invitation-code
+field. Create codes under **People → Invitation codes**: a label, the tier the
+account gets, how long the code is valid and how often it may be used. The
+list shows each code again on click, so you can copy it any time, and the
+usage list shows who signed up with it.
+
+A sign-up with a plan waits as `pending_payment` until the first invoice is
+paid; one that never pays is deleted 7 days after sign-up by the hourly job
+`app:signup:reap-pending` ([details](BILLING_SELFHOST.md#unpaid-sign-ups)).
+Existing accounts are never affected by the mode.
 
 ---
 

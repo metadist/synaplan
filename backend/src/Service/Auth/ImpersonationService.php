@@ -254,7 +254,7 @@ final readonly class ImpersonationService
         }
 
         $target = $this->userRepository->find($payload['user_id']);
-        if (!$target instanceof User || !$target->isActive()) {
+        if (!$target instanceof User || !$target->canSignIn()) {
             return null;
         }
 

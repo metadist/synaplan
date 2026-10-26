@@ -65,6 +65,11 @@ final readonly class TikaExtractor implements ContentExtractorInterface
         );
     }
 
+    public function runsInCloud(): bool
+    {
+        return false;
+    }
+
     public function health(): PlugHealth
     {
         if (!$this->tikaClient->isEnabled()) {

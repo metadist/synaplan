@@ -67,6 +67,11 @@ final readonly class NativeTextExtractor implements ContentExtractorInterface
         );
     }
 
+    public function runsInCloud(): bool
+    {
+        return false;
+    }
+
     public function health(): PlugHealth
     {
         return PlugHealth::available();

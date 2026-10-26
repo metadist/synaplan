@@ -5,8 +5,10 @@
  * screens inside an embedded WebView, so the native shell drives OAuth through
  * the system browser and receives the result via a custom-scheme deep link:
  *
- *   1. Open `{api}/api/v1/auth/{provider}/login?native=1` in the system browser
- *      (Custom Tab / SFSafariViewController).
+ *   1. Open `{api}/api/v1/auth/{provider}/login?native=1&challenge=…` in the
+ *      system browser (Custom Tab / SFSafariViewController). `challenge` is
+ *      the human-check token solved in the app; `native` only selects the
+ *      deep-link return path.
  *   2. The backend completes OAuth and redirects to
  *      `com.synaplan.app://oauth/callback?handoff=<signed>` (or `?error=...`).
  *   3. Android/iOS route that deep link back into the app → `appUrlOpen` fires.
@@ -32,13 +34,35 @@ export interface NativeOAuthResult {
 
 const CALLBACK_MARKER = '://oauth'
 
+/** System-browser start URL. `native` selects the return path; it is not a human check. */
+export function nativeProviderLoginUrl(
+  apiBase: string,
+  provider: string,
+  language: string,
+  challenge = '',
+  admission?: { plan?: string; code?: string }
+): string {
+  const params = new URLSearchParams({
+    native: '1',
+    language,
+  })
+  if (challenge !== '') params.set('challenge', challenge)
+  if (admission?.plan) params.set('plan', admission.plan)
+  if (admission?.code) params.set('code', admission.code)
+  return `${apiBase}/api/v1/auth/${provider}/login?${params}`
+}
+
 // Grace window after the in-app browser reports it closed, to let a
 // near-simultaneous deep-link callback (appUrlOpen) win before we treat the
 // closure as a cancellation. This reconciles the unspecified ordering of the
 // two independent native events — it is not a logic-race workaround.
 const BROWSER_DISMISS_GRACE_MS = 800
 
-export async function startNativeOAuth(provider: string): Promise<NativeOAuthResult> {
+export async function startNativeOAuth(
+  provider: string,
+  challenge = '',
+  admission?: { plan?: string; code?: string }
+): Promise<NativeOAuthResult> {
   return new Promise<NativeOAuthResult>((resolve) => {
     let settled = false
     let urlListener: { remove: () => Promise<void> } | undefined
@@ -122,11 +146,13 @@ export async function startNativeOAuth(provider: string): Promise<NativeOAuthRes
       }
     })
 
-    const params = new URLSearchParams({
-      native: '1',
-      language: String(i18n.global.locale.value),
-    })
-    const authUrl = `${getNativeApiBaseUrl()}/api/v1/auth/${provider}/login?${params}`
+    const authUrl = nativeProviderLoginUrl(
+      getNativeApiBaseUrl(),
+      provider,
+      String(i18n.global.locale.value),
+      challenge,
+      admission
+    )
     Browser.open({ url: authUrl }).catch(() => {
       void finish({ success: false, error: 'Could not open the browser' })
     })

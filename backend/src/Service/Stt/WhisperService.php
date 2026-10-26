@@ -3,8 +3,11 @@
 namespace App\Service\Stt;
 
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 /**
  * Whisper.cpp Service for Audio Transcription.
@@ -19,6 +22,14 @@ readonly class WhisperService
     private const OPTIMAL_SAMPLE_RATE = 16000;
     private const OPTIMAL_CHANNELS = 1;
 
+    /** A successful `--help` and model scan stays valid for five minutes. */
+    private const PROBE_OK_SECONDS = 300;
+
+    /** A failed probe is retried after one minute, not on every health call. */
+    private const PROBE_FAILED_SECONDS = 60;
+
+    private CacheInterface $availabilityCache;
+
     public function __construct(
         private LoggerInterface $logger,
         private string $whisperBinary = '/usr/local/bin/whisper',
@@ -26,7 +37,9 @@ readonly class WhisperService
         private string $defaultModel = 'base',
         private string $ffmpegBinary = '/usr/bin/ffmpeg',
         private bool $whisperEnabled = true,
+        ?CacheInterface $availabilityCache = null,
     ) {
+        $this->availabilityCache = $availabilityCache ?? new ArrayAdapter();
     }
 
     /**
@@ -187,6 +200,12 @@ readonly class WhisperService
     /**
      * Check if Whisper can transcribe (binary runs, default model and FFmpeg
      * are present).
+     *
+     * The probe — `whisper --help` and the model scan — is cached for five
+     * minutes when it succeeds and for one minute when it fails. A missing
+     * binary or model returns at once and is not cached, so installing
+     * Whisper shows up on the next check. The result is kept per server. A
+     * cache outage still runs the probe.
      */
     public function isAvailable(): bool
     {
@@ -199,7 +218,31 @@ readonly class WhisperService
             return false;
         }
 
-        // Check if shared libraries are available by running --help
+        try {
+            return $this->availabilityCache->get(
+                $this->availabilityCacheKey(),
+                function (ItemInterface $item): bool {
+                    $available = $this->probeAvailability();
+                    $item->expiresAfter($available ? self::PROBE_OK_SECONDS : self::PROBE_FAILED_SECONDS);
+
+                    return $available;
+                },
+            );
+        } catch (\Throwable $e) {
+            $this->logger->debug('WhisperService: availability cache unavailable', [
+                'exception' => $e::class,
+            ]);
+
+            return $this->probeAvailability();
+        }
+    }
+
+    /**
+     * Run `whisper --help` and confirm the model directory, default model and
+     * FFmpeg. Caller has already passed {@see isInstalled()}.
+     */
+    private function probeAvailability(): bool
+    {
         $process = new Process([$this->whisperBinary, '--help']);
         $process->setTimeout(5);
 
@@ -222,7 +265,6 @@ readonly class WhisperService
             return false;
         }
 
-        // Check if model directory exists
         if (!is_dir($this->whisperModelsPath)) {
             $this->logger->debug('WhisperService: Models directory not found', [
                 'path' => $this->whisperModelsPath,
@@ -231,7 +273,6 @@ readonly class WhisperService
             return false;
         }
 
-        // Check if default model exists
         $modelPath = $this->getModelPath($this->defaultModel);
         if (!file_exists($modelPath)) {
             $this->logger->debug('WhisperService: Default model not found', [
@@ -242,7 +283,6 @@ readonly class WhisperService
             return false;
         }
 
-        // Check if FFmpeg is available (needed for audio conversion)
         if (!$this->isFfmpegAvailable()) {
             $this->logger->debug('WhisperService: FFmpeg not available', [
                 'ffmpeg_path' => $this->ffmpegBinary,
@@ -252,6 +292,23 @@ readonly class WhisperService
         }
 
         return true;
+    }
+
+    /**
+     * The pool is shared across servers, but the binary, models and FFmpeg
+     * are per server, so the host name is part of the key.
+     */
+    private function availabilityCacheKey(): string
+    {
+        $material = implode('|', [
+            (string) gethostname(),
+            $this->whisperBinary,
+            $this->whisperModelsPath,
+            $this->defaultModel,
+            $this->ffmpegBinary,
+        ]);
+
+        return 'whisper.'.substr(hash('sha256', $material), 0, 32);
     }
 
     /**

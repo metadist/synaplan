@@ -424,10 +424,15 @@
     "webSearchHint": "Otomatik seçenek, bir arama sağlayıcısı yapılandırıldığında Synaplan'ın kendi aramasını kullanır, aksi halde isteği AI sağlayıcısına iletir.",
     "webSearchUnavailable": "Bu örnekte yapılandırılmış bir arama sağlayıcısı yok, bu yüzden istekler AI sağlayıcısına iletilir. Bunları yalnızca Anthropic yanıtlayabilir.",
     "webFetchLabel": "Web sayfalarını oku (web fetch)",
-    "webFetchModeAuto": "Otomatik — Anthropic sayfayı getirir (önerilen)",
-    "webFetchModePassthrough": "Web fetch'i her zaman Anthropic'e ilet",
+    "webFetchModeAuto": "Otomatik (önerilir)",
+    "webFetchModePassthrough": "Sayfayı yalnızca Anthropic okur",
     "webFetchModeOff": "Web fetch yok",
-    "webFetchHint": "Synaplan sayfaları kendisi indirmez. Anthropic modellerinde gateway, modelin bir URL açabilmesi için Anthropic'in web_fetch aracını tutar veya ekler. Diğer AI sağlayıcıları bu aracı çalıştıramaz.",
+    "webFetchHint": "Otomatik, Anthropic modellerinde sayfayı Anthropic'in okumasını sağlar. Diğer her modelde sayfayı Synaplan açar, aşağıdaki sınıra kadar. İsteği iletmek yalnızca Anthropic ile çalışır.",
+    "knowledgeToolsLabel": "Sabitlenmiş bilgi klasöründe ara",
+    "knowledgeToolsDesktop": "Yalnızca Desktop (önerilen)",
+    "knowledgeToolsAll": "Ağ geçidindeki her anahtar",
+    "knowledgeToolsOff": "Klasör araması yok",
+    "knowledgeToolsHint": "Bir bilgi klasörü sabitlendiğinde, ilk parçalar yetmezse model klasörde yeniden arayabilir ve bir dosya açabilir. Yalnızca Desktop önerilen ayardır.",
     "visionLabel": "Bağlı AI asistanları için görüntü anlama",
     "visionModeAuto": "Otomatik (önerilen)",
     "visionModeSynaplan": "Her zaman Synaplan'ın görüntü modelini kullan",
@@ -476,10 +481,13 @@
       "activeTools": {
         "title": "Şu anda sizin adınıza çalışıyor",
         "empty": "Synaplan kendi araçlarından hiçbirini çalıştırmıyor. Bağlı AI asistanları yalnızca kendi programlarının sunduğu araçları alır.",
-        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca asistan istediğinde çalışır.",
+        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca asistan istediğinde çalışır. Sayfa okuma, sayfa sınırında durur. Klasör araması yalnızca bir bilgi klasörü sabitliyken çalışır.",
         "mcpServers": "ayrıca 1 bağlı araç sunucusunun araçları | ayrıca {count} bağlı araç sunucusunun araçları",
         "tools": {
           "web_search": "Web araması",
+          "web_fetch": "Web sayfası oku",
+          "knowledge_search": "Bilgi klasöründe ara",
+          "read_document": "Klasördeki bir dosyayı oku",
           "analyze_image": "Görüntü analizi"
         }
       },
@@ -503,6 +511,14 @@
       "toolRounds": {
         "label": "Mesaj başına en fazla araç turu",
         "description": "Bir AI asistanının yanıt vermek zorunda kalmadan önce kaç kez araç kullanıp yeniden düşünebileceği. Yüksek değerler daha titiz çalışmaya izin verir ve daha pahalıdır."
+      },
+      "webSearchRounds": {
+        "label": "Yanıttan önce web aramaları",
+        "description": "Bir mesajda bu kadar aramadan sonra asistan bulduklarından yanıt verir ve her kaynağı adlandırır. Kısa bir soru için 2 yeterlidir. İlk sonuçlar yetmezse yükseltin."
+      },
+      "webFetchPages": {
+        "label": "Bir mesajda açılacak sayfalar",
+        "description": "Bir mesajda bu kadar sayfadan sonra asistan daha fazlasını açmaz ve okuduklarından yanıt verir. Normal bir soru için 3 yeterlidir. 0, sayfa açılmadığı anlamına gelir."
       },
       "imageDetail": {
         "label": "Görsel kalitesi",
@@ -529,7 +545,8 @@
         "label": "Her oturumun özetini sakla",
         "description": "Synaplan her aracı oturumunun kısa bir özetini sohbet geçmişinize yazar, böylece sonradan neyin üzerinde çalışıldığını görebilirsiniz."
       },
-      "requiresMcpTools": "Yukarıda araçlarınızı açtığınızda kullanılabilir."
+      "requiresMcpTools": "Yukarıda araçlarınızı açtığınızda kullanılabilir.",
+      "requiresWebFetchAuto": "Yalnızca yukarıda web sayfası okuma Otomatik olarak ayarlandığında geçerlidir."
     },
     "loadError": "Claude Code ayarları yüklenemedi.",
     "source": {
@@ -983,6 +1000,12 @@
       "copy": "Adresi kopyala",
       "copied": "Adres kopyalandı",
       "copyFailed": "Adres kopyalanamadı. Seçip elle kopyalayın."
+    },
+    "readScope": {
+      "line": "Synaplan şunları okuyabilir: {what}.",
+      "watched": "izlediğiniz klasörler",
+      "allowed": "izlediğiniz klasörler, {folders}",
+      "all": "tüm dosyalarınız"
     }
   }
 }

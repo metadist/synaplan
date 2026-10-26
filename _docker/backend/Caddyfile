@@ -1,6 +1,7 @@
 {
 	# Global options
-	#
+	metrics
+
 	# FrankenPHP bootstrap. The synaplan-base-php image's
 	# /usr/local/bin/synaplan-php-configure shim materializes
 	# /etc/caddy/synaplan-worker-mode.Caddyfile on container startup:
@@ -22,13 +23,13 @@
 	# SSE/poll routes were removed in the realtime/Centrifugo migration,
 	# so only the AI streaming endpoints stay on this exclusion list.
 	@not_streaming {
-		# /v1/messages is the Anthropic-compatible gateway (Claude Code SSE).
-		# Exclude it from gzip/zstd or Caddy buffers the stream into one chunk.
-		# /connection/* is the Centrifugo WebSocket upgrade. Compressing it,
-		# or attaching the document security headers below, makes Firefox
-		# refuse the handshake (NS_ERROR_WEBSOCKET_CONNECTION_REFUSED) while
-		# the chat page is still loading.
-		not path /api/v1/messages/stream /api/v1/widget/*/message /v1/messages /connection/*
+		# The long routes (03 §5) and the Centrifugo WebSocket upgrade.
+		# gzip/zstd would buffer a stream into one chunk. Compressing
+		# /connection/*, or attaching the document security headers below,
+		# makes Firefox refuse the handshake
+		# (NS_ERROR_WEBSOCKET_CONNECTION_REFUSED) while the chat page is
+		# still loading.
+		not path /api/v1/messages/stream* /api/v1/widget/*/message /v1/chat/completions /v1/messages /v1/audio/transcriptions/sessions/*/stream /api/v1/tts/stream /mcp /connection/*
 	}
 	encode @not_streaming zstd gzip
 
@@ -223,8 +224,61 @@
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	handle @backend_php {
-		root * /var/www/backend/public
-		php_server
+		# Worker mode cannot rewrite FrankenPHP's own 503 from handle_errors:
+		# the runtime writes the body and returns success. Production (and the
+		# busy-server profile) therefore proxies PHP to a localhost server that
+		# owns the two pools, and replaces only FrankenPHP's own 503. Dev stays
+		# on php_server directly, so the client address does not change.
+		# FrankenPHP's "no worker free in max_wait_time" answer is text/plain;
+		# a 503 the application sends (SIGNUP_PAUSED, SETUP_REQUIRED, …) is JSON
+		# with its own message and must reach the client unchanged.
+		@split_pools expression `{env.APP_ENV} == "prod" || {env.FRANKENPHP_BUSY_PROFILE} == "1"`
+		handle @split_pools {
+			reverse_proxy 127.0.0.1:9080 {
+				@busy {
+					status 503
+					header Content-Type text/plain*
+				}
+				handle_response @busy {
+					@busy_api path /api/v1/messages/stream* /api/v1/widget/*/message /api/v1/tts/stream
+					handle @busy_api {
+						header Retry-After "5"
+						header Content-Type "application/json"
+						respond `{"error":"server_busy","retryAfter":5}` 503
+					}
+					@busy_openai path /v1/chat/completions /v1/audio/transcriptions/sessions/*/stream
+					handle @busy_openai {
+						header Retry-After "5"
+						header Content-Type "application/json"
+						respond `{"error":{"message":"Synaplan is busy. Retry in a few seconds.","type":"server_error","code":"server_busy"}}` 503
+					}
+					@busy_anthropic path /v1/messages
+					handle @busy_anthropic {
+						header Retry-After "5"
+						header Content-Type "application/json"
+						respond `{"type":"error","error":{"type":"overloaded_error","message":"Synaplan is busy. Retry in a few seconds."}}` 503
+					}
+					@busy_mcp path /mcp
+					handle @busy_mcp {
+						header Retry-After "5"
+						header Content-Type "application/json"
+						respond `{"jsonrpc":"2.0","error":{"code":-32000,"message":"Synaplan is busy. Retry in a few seconds."},"id":null}` 503
+					}
+					handle {
+						header Retry-After "5"
+						header Content-Type "application/json"
+						respond `{"error":"server_busy","retryAfter":5}` 503
+					}
+				}
+				handle_response {
+					copy_response
+				}
+			}
+		}
+		handle {
+			root * /var/www/backend/public
+			php_server
+		}
 	}
 
 	# Fallback to frontend SPA (index.html)
@@ -239,5 +293,16 @@
 		root * /var/www/frontend
 		rewrite * /index.html
 		file_server
+	}
+}
+
+# Localhost only. Production and the busy-server profile proxy PHP here so a
+# 503 from a full worker pool can be replaced. Dev does not send traffic here.
+# The workers file is empty unless those modes installed the two pools.
+:9080 {
+	bind 127.0.0.1
+	root * /var/www/backend/public
+	php_server {
+		import /etc/caddy/synaplan-php-workers.caddy
 	}
 }

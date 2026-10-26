@@ -4,7 +4,7 @@
 
 **We produce AI freedom.**
 
-[**Try it hosted**](https://web.synaplan.com/) or [**run it yourself in three minutes**](#quickstart) — open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG over your docs, embeddable widget, MCP, and see the cost of every answer. Apache-2.0.
+[**Try it hosted**](https://web.synaplan.com/) or [**run it yourself in three minutes**](#quickstart) — open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG over your docs, embeddable widget, MCP, and see the cost of every answer. Apache-2.0. On web.synaplan.com you sign up with a paid plan or an invitation code. We send invitation codes to friends and partners who want to try it; write to [team@synaplan.com](mailto:team@synaplan.com). Running it yourself stays free.
 
 [Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iOS](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) &nbsp;·&nbsp; [Desktop](https://github.com/metadist/synaplan-desktop) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
 
@@ -57,7 +57,7 @@ If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ## Why Synaplan
 
-- **Freedom, not a plan tier.** The whole platform — backend, frontend, widgets, plugins — is Apache-2.0 and starts with one command. Self-hosted is the same software as the cloud.
+- **Freedom, not a plan tier.** The whole platform — backend, frontend, widgets, plugins — is Apache-2.0 and starts with one command. Self-hosted is the same software as the cloud, and a self-hosted install still lets people create their own accounts. The hosted platform at [web.synaplan.com](https://web.synaplan.com/) admits a new account with a paid plan or an invitation code. Friends and partners can ask for a code at [team@synaplan.com](mailto:team@synaplan.com).
 - **Hundreds of models, one place.** OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, HuggingFace, sovereign EU providers, and any local model via Ollama. Swap a provider per task in the UI.
 - **The planner spends the expensive model only where it matters.** A request becomes a small task graph (extract → summarize → generate → reply). Live cards show the steps. Every answer shows what it cost.
 - **Yours, including offline.** On-prem, EU cloud, or fully air-gapped. No training on your data. No forced telemetry.

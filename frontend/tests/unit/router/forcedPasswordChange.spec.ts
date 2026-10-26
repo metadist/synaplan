@@ -47,4 +47,20 @@ describe('resolveForcedPasswordChange', () => {
       'release'
     )
   })
+
+  it('sends a pending payment to the plan page before the password rule', () => {
+    expect(
+      resolveForcedPasswordChange(
+        navigation({ accountStatus: 'pending_payment', mustChangePassword: true })
+      )
+    ).toBe('pay')
+  })
+
+  it('lets a pending payment finish checkout', () => {
+    expect(
+      resolveForcedPasswordChange(
+        navigation({ accountStatus: 'pending_payment', routeName: 'subscription-success' })
+      )
+    ).toBeNull()
+  })
 })

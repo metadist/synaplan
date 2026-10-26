@@ -435,7 +435,7 @@ class MessageController extends AbstractController
                                 new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
                                 new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
                                 new OA\Property(property: 'voiceReplyFailed', type: 'string', nullable: true, description: 'Voice-reply failure reason when TTS was requested but no audio was stored (provider_error, empty_text, rate_limited)'),
-                                new OA\Property(property: 'language', type: 'string', nullable: true),
+                                new OA\Property(property: 'language', type: 'string', nullable: true), new OA\Property(property: 'thinking_seconds', type: 'integer', nullable: true, description: 'Seconds from the first reasoning chunk to the first answer token. Null when none was stored.'),
                                 new OA\Property(property: 'createdAt', type: 'string', nullable: true),
                                 new OA\Property(
                                     property: 'files',

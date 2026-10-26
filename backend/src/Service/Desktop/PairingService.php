@@ -11,6 +11,7 @@ use App\Repository\ApiKeyRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Desktop\Exception\PairingException;
 
 /**
@@ -28,6 +29,7 @@ final readonly class PairingService
         private DesktopDeviceRepository $deviceRepository,
         private UserRepository $userRepository,
         private string $appUrl,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -49,6 +51,8 @@ final readonly class PairingService
         if (!$owner instanceof User) {
             throw new PairingException(\sprintf('Cannot pair: user %d no longer exists.', $userId));
         }
+
+        $this->premiumFeatureGate->assertApiKeysAllowed($owner);
 
         $name = self::sanitizeDeviceName($deviceName);
         $cleanCapabilities = self::sanitizeCapabilities($capabilities);

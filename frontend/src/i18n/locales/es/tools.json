@@ -424,10 +424,15 @@
     "webSearchHint": "El modo automático usa la búsqueda propia de Synaplan cuando hay un proveedor de búsqueda configurado y, si no, transfiere la petición al proveedor de IA.",
     "webSearchUnavailable": "En esta instancia no hay ningún proveedor de búsqueda configurado, así que las peticiones se transfieren al proveedor de IA. Solo Anthropic puede atenderlas.",
     "webFetchLabel": "Leer páginas web (web fetch)",
-    "webFetchModeAuto": "Automático — Anthropic obtiene la página (recomendado)",
-    "webFetchModePassthrough": "Pasar siempre web fetch a Anthropic",
+    "webFetchModeAuto": "Automático (recomendado)",
+    "webFetchModePassthrough": "Solo Anthropic lee la página",
     "webFetchModeOff": "Sin web fetch",
-    "webFetchHint": "Synaplan no descarga páginas. En modelos Anthropic el gateway mantiene o añade la herramienta web_fetch de Anthropic para que el modelo pueda abrir una URL. Otros proveedores de IA no pueden ejecutar esta herramienta.",
+    "webFetchHint": "Automático deja que Anthropic lea la página en los modelos Anthropic. En cualquier otro modelo, Synaplan abre la página, hasta el límite de abajo. Pasar la solicitud solo funciona con Anthropic.",
+    "knowledgeToolsLabel": "Buscar en la carpeta de conocimiento fijada",
+    "knowledgeToolsDesktop": "Solo Desktop (recomendado)",
+    "knowledgeToolsAll": "Cualquier clave de la pasarela",
+    "knowledgeToolsOff": "Sin búsqueda en carpetas",
+    "knowledgeToolsHint": "Cuando hay una carpeta de conocimiento fijada, el modelo puede volver a buscar en ella y abrir un archivo si los primeros fragmentos no bastan. Solo Desktop es el ajuste recomendado.",
     "visionLabel": "Visión para los asistentes de IA conectados",
     "visionModeAuto": "Automático (recomendado)",
     "visionModeSynaplan": "Usar siempre el modelo de visión de Synaplan",
@@ -476,10 +481,13 @@
       "activeTools": {
         "title": "Ejecutándose en su nombre ahora mismo",
         "empty": "Synaplan no ejecuta ninguna herramienta propia. Los asistentes de IA conectados solo reciben las herramientas que aporta su propio programa.",
-        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide.",
+        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide. La lectura de páginas se detiene en el límite de páginas. La búsqueda en la carpeta solo se ejecuta mientras hay una carpeta de conocimiento fijada.",
         "mcpServers": "más las herramientas de 1 servidor de herramientas conectado | más las herramientas de {count} servidores de herramientas conectados",
         "tools": {
           "web_search": "Búsqueda web",
+          "web_fetch": "Leer una página web",
+          "knowledge_search": "Buscar en la carpeta de conocimiento",
+          "read_document": "Leer un archivo de la carpeta",
           "analyze_image": "Análisis de imágenes"
         }
       },
@@ -503,6 +511,14 @@
       "toolRounds": {
         "label": "Máximo de rondas de herramientas por mensaje",
         "description": "Cuántas veces puede un asistente de IA usar una herramienta y volver a pensar antes de tener que responder. Valores más altos permiten un trabajo más minucioso y cuestan más."
+      },
+      "webSearchRounds": {
+        "label": "Búsquedas web antes de responder",
+        "description": "Tras este número de búsquedas en un mensaje, el asistente responde con lo que encontró y nombra cada fuente. 2 basta para una pregunta breve. Súbalo si los primeros resultados no alcanzan."
+      },
+      "webFetchPages": {
+        "label": "Páginas que abrir en un mensaje",
+        "description": "Tras este número de páginas en un mensaje, el asistente deja de abrir más y responde con lo que leyó. 3 basta para una pregunta normal. 0 significa que no abre páginas."
       },
       "imageDetail": {
         "label": "Calidad de imagen",
@@ -529,7 +545,8 @@
         "label": "Conservar un resumen de cada sesión",
         "description": "Synaplan escribe un resumen breve de cada sesión de agente en su historial de chat para que después pueda ver en qué se trabajó."
       },
-      "requiresMcpTools": "Disponible cuando active sus herramientas arriba."
+      "requiresMcpTools": "Disponible cuando active sus herramientas arriba.",
+      "requiresWebFetchAuto": "Solo se aplica cuando la lectura de páginas web está en Automático arriba."
     },
     "loadError": "No se pudieron cargar los ajustes de Claude Code.",
     "source": {
@@ -983,6 +1000,12 @@
       "copy": "Copiar dirección",
       "copied": "Dirección copiada",
       "copyFailed": "No se pudo copiar la dirección. Selecciónala y cópiala a mano."
+    },
+    "readScope": {
+      "line": "Synaplan puede leer: {what}.",
+      "watched": "las carpetas que vigilas",
+      "allowed": "las carpetas que vigilas, {folders}",
+      "all": "todos tus archivos"
     }
   }
 }

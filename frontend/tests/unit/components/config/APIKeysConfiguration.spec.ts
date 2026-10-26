@@ -3,9 +3,10 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 
 import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
 
-const { listApiKeys, createApiKey } = vi.hoisted(() => ({
+const { listApiKeys, createApiKey, auth } = vi.hoisted(() => ({
   listApiKeys: vi.fn(),
   createApiKey: vi.fn(),
+  auth: { isPro: true },
 }))
 
 vi.mock('vue-router', () => ({
@@ -24,6 +25,10 @@ vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => ({ features: { computeEnabled: false } }),
 }))
 
+vi.mock('@/composables/useAuth', () => ({
+  useAuth: () => ({ isPro: auth.isPro }),
+}))
+
 vi.mock('@/services/api/apiKeysApi', () => ({
   listApiKeys,
   createApiKey,
@@ -38,6 +43,7 @@ describe('APIKeysConfiguration — one-time key dialog', () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    auth.isPro = true
     listApiKeys.mockResolvedValue({ api_keys: [] })
     createApiKey.mockResolvedValue({
       success: true,
@@ -142,5 +148,39 @@ describe('APIKeysConfiguration — one-time key dialog', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }))
 
     expect(document.activeElement).toBe(document.querySelector('[data-testid="btn-copy"]'))
+  })
+
+  it('offers plans instead of a key form on a free account', async () => {
+    auth.isPro = false
+    const page = await mountPage()
+
+    expect(page.find('[data-testid="section-plan-required"]').exists()).toBe(true)
+    expect(page.find('[data-testid="section-create-key"]').exists()).toBe(false)
+    expect(page.text()).toContain('API keys are part of a paid plan.')
+    expect(page.get('[data-testid="link-see-plans"]').text()).toContain('See plans')
+    expect(page.find('[data-testid="section-empty"]').exists()).toBe(false)
+    expect(page.find('[data-testid="section-keys-table"]').exists()).toBe(false)
+  })
+
+  it('keeps existing keys on a free account so they can be turned off, not back on', async () => {
+    auth.isPro = false
+    listApiKeys.mockResolvedValue({
+      api_keys: [
+        {
+          id: 3,
+          name: 'Old key',
+          key_prefix: 'sk_abcde...',
+          status: 'inactive',
+          scopes: [],
+          created: 1_700_000_000,
+          last_used: 0,
+        },
+      ],
+    })
+    const page = await mountPage()
+
+    expect(page.find('[data-testid="section-keys-table"]').exists()).toBe(true)
+    expect(page.find('[data-testid="btn-activate"]').exists()).toBe(false)
+    expect(page.find('[data-testid="btn-delete"]').exists()).toBe(true)
   })
 })

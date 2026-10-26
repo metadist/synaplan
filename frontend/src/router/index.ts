@@ -35,6 +35,7 @@ import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
 import { assistantsRouteGuard } from '@/router/assistantGuards'
+import { capacityRoute } from '@/router/capacityRoute'
 import { aiModelsTabRedirect, routingRedirect, topicsRedirect } from '@/router/aiSettingsRedirects'
 import {
   approvalsRouteGuard,
@@ -681,6 +682,7 @@ const router = createRouter({
         i18n: ['admin', 'config'],
       },
     },
+    capacityRoute,
     {
       path: '/setup/status',
       name: 'setup-status',
@@ -1024,7 +1026,6 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   const { isAuthenticated, isAdmin, user } = useAuth()
-
   if ('release' === setupGate) {
     next(isAuthenticated.value ? resolveDefaultRoute() : { name: 'login' })
     return
@@ -1043,9 +1044,10 @@ router.beforeEach(async (to, _from, next) => {
     mustChangePassword: true === user.value?.mustChangePassword,
     isPublicRoute,
     routeName: to.name,
+    accountStatus: user.value?.accountStatus,
   })
-  if ('force' === forcedPasswordChange) {
-    next({ name: CHANGE_PASSWORD_ROUTE })
+  if ('force' === forcedPasswordChange || 'pay' === forcedPasswordChange) {
+    next({ name: 'pay' === forcedPasswordChange ? 'subscription' : CHANGE_PASSWORD_ROUTE })
     return
   }
   if ('release' === forcedPasswordChange) {

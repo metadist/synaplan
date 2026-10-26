@@ -35,6 +35,7 @@ final class EmailWebhookDocReferenceTest extends TestCase
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(4);
+        $user->method('isActive')->willReturn(true);
 
         $chat = $this->createMock(Chat::class);
         $chat->method('getId')->willReturn(9);

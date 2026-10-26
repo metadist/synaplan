@@ -53,8 +53,16 @@
         <env name="STRIPE_PRICE_PRO" value="price_1TestSuitePro" force="true" />
         <env name="STRIPE_PRICE_TEAM" value="price_1TestSuiteTeam" force="true" />
         <env name="STRIPE_PRICE_BUSINESS" value="price_1TestSuiteBusiness" force="true" />
-        <!-- Force the SEPA-enabled allowlist so a developer's local .env can't suppress it. -->
-        <env name="STRIPE_PAYMENT_METHODS" value="card,link,sepa_debit,klarna" force="true" />
+        <!-- Force the shipped allowlist (no sepa_debit) so a developer's local .env can't widen it. -->
+        <env name="STRIPE_PAYMENT_METHODS" value="card,link,klarna" force="true" />
+        <!-- Account-creation limits wide open: the suites register many users from one IP. -->
+        <env name="SIGNUP_IP_LIMIT" value="100000" force="true" />
+        <env name="SIGNUP_GLOBAL_LIMIT" value="100000" force="true" />
+        <env name="CHECKOUT_IP_LIMIT" value="100000" force="true" />
+        <env name="PAID_SIGNUP_ALERT_LIMIT" value="100000" force="true" />
+        <env name="TURNSTILE_SECRET_KEY" value="" force="true" />
+        <env name="TURNSTILE_SITE_KEY" value="" force="true" />
+        <env name="SIGNUP_PAUSED" value="" force="true" />
         <!-- Whisper / TTS (defaults for testing) -->
         <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
         <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />
@@ -71,6 +79,12 @@
         <env name="SEARXNG_BASE_URL" value="" force="true" />
         <server name="OFFICE_CONVERT_URL" value="" force="true" />
         <env name="OFFICE_CONVERT_TIMEOUT_MS" value="60000" force="true" />
+        <!-- The dev container sets TELEGRAM_ENABLED=false. That beats .env.test
+             unless forced, so the channel-access test 404s locally and passes in CI. -->
+        <env name="TELEGRAM_ENABLED" value="true" force="true" />
+        <env name="TELEGRAM_API_BASE_URL" value="http://telegram-stub:3998" force="true" />
+        <env name="TELEGRAM_WEBHOOK_BASE_URL" value="https://e2e.synaplan.test" force="true" />
+        <env name="TELEGRAM_ALLOW_LOCAL_WEBHOOK" value="false" force="true" />
     </php>
 
     <testsuites>

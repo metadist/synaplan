@@ -82,6 +82,7 @@
       "saveReplacedNone": "{model} ist gespeichert, kann aber gerade nicht genutzt werden, und kein anderes Modell kann einspringen. Prüfe den Anbieter unter Admin → KI-Anbieter.",
       "admin": {
         "catalogSubtitle": "System-Modellkatalog durchsuchen und bearbeiten.",
+        "withdrawn": "Wird von {provider} nicht mehr angeboten. Es bleibt hier, bis du es entfernst.",
         "bulkImportSubtitle": "SQL aus Anbieter-Dokumentation erzeugen und anwenden (erweitert).",
         "addModels": "Massenimport (SQL)",
         "urlsLabel": "URLs (eine pro Zeile)",
@@ -142,6 +143,11 @@
         "modelCreated": "Modell erstellt",
         "modelSaved": "Modell gespeichert",
         "modelDeleted": "Modell gelöscht",
+        "deletedMoved": "Entfernt. {job} verwendet jetzt {model}.",
+        "deletedMovedMany": "Entfernt. Die Bereiche, die dieses Modell genutzt haben, verwenden jetzt ein anderes verfügbares Modell.",
+        "deletedCleared": "Entfernt. {job} hat kein Modell, bis du auf dieser Seite eines wählst. Sonst wurde nichts geändert.",
+        "deletedMovedAndCleared": "Entfernt. Einige Bereiche verwenden jetzt ein anderes Modell. {job} hat kein Modell, bis du auf dieser Seite eines wählst.",
+        "someJobs": "Einige Bereiche",
         "appliedStatements": "{count} Anweisung(en) angewendet",
         "failedGenerate": "SQL-Generierung fehlgeschlagen",
         "failedApply": "SQL-Anwendung fehlgeschlagen",
@@ -906,6 +912,8 @@
       "errorActivating": "Fehler beim Aktivieren des API-Schlüssels",
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
+      "planRequired": "API-Schlüssel gehören zu einem bezahlten Tarif.",
+      "seePlans": "Tarife ansehen",
       "scopes": {
         "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Benutzer begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
         "iamRead": "Benutzer — Gruppen ansehen",

@@ -893,7 +893,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
         foreach (str_split($result['content'], 10) as $chunk) {
             $callback($chunk);
-            usleep(50000);
+            usleep(TestProviderChunkDelay::microseconds());
         }
 
         return ['usage' => $result['usage']];

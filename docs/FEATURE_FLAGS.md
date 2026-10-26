@@ -122,6 +122,14 @@ does not move this setting). System assistants and plugin-pack assistants
 are the platform's own shares and stay shared with every account on every
 value; a share a person created does not.
 
+## Research
+
+Research is **off** on a new install. `RESEARCH.ENABLED` is seeded as `0`
+and is never turned on by an upgrade. `RESEARCH_ENABLED=1` pins it on and
+`RESEARCH_ENABLED=0` pins it off; an empty variable follows the database row.
+This is a module switch, not one of the flags the September waves turned on.
+See `docs/RESEARCH.md`.
+
 ## For developers
 
 - `App\Service\Feature\FeatureFlagEnv` derives the variable name

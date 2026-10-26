@@ -23,10 +23,16 @@ final class RegistrationConfigTest extends TestCase
     private bool $envWasSet = false;
     private ConfigRepository&MockObject $configRepository;
 
+    private ?string $originalModeEnv = null;
+    private bool $modeEnvWasSet = false;
+
     protected function setUp(): void
     {
         $this->envWasSet = \array_key_exists('REGISTRATION_ENABLED', $_ENV);
         $this->originalEnv = $this->envWasSet ? (string) $_ENV['REGISTRATION_ENABLED'] : null;
+        $this->modeEnvWasSet = \array_key_exists('REGISTRATION_MODE', $_ENV);
+        $this->originalModeEnv = $this->modeEnvWasSet ? (string) $_ENV['REGISTRATION_MODE'] : null;
+        unset($_ENV['REGISTRATION_MODE']);
         $this->configRepository = $this->createMock(ConfigRepository::class);
     }
 
@@ -36,6 +42,11 @@ final class RegistrationConfigTest extends TestCase
             $_ENV['REGISTRATION_ENABLED'] = $this->originalEnv;
         } else {
             unset($_ENV['REGISTRATION_ENABLED']);
+        }
+        if ($this->modeEnvWasSet) {
+            $_ENV['REGISTRATION_MODE'] = $this->originalModeEnv;
+        } else {
+            unset($_ENV['REGISTRATION_MODE']);
         }
     }
 
@@ -113,6 +124,75 @@ final class RegistrationConfigTest extends TestCase
         $this->config()->store(false);
     }
 
+    // --- Registration mode (admission sign-up, AS1) ---
+
+    public function testModeIsOpenWhenNothingIsSet(): void
+    {
+        $this->givenStoredMode(null);
+
+        self::assertSame(RegistrationConfig::MODE_OPEN, $this->config()->mode());
+        self::assertFalse($this->config()->isAdmissionMode());
+        self::assertFalse($this->config()->isModeLockedByEnv());
+    }
+
+    public function testStoredModeAppliesWhenEnvIsUnset(): void
+    {
+        $this->givenStoredMode('admission');
+
+        self::assertTrue($this->config()->isAdmissionMode());
+    }
+
+    public function testEnvModeWinsOverTheStoredOneAndIsCaseInsensitive(): void
+    {
+        $_ENV['REGISTRATION_MODE'] = ' Admission ';
+        $this->givenStoredMode('open');
+
+        self::assertSame(RegistrationConfig::MODE_ADMISSION, $this->config()->mode());
+        self::assertTrue($this->config()->isModeLockedByEnv());
+        self::assertSame(RegistrationConfig::MODE_ADMISSION, $this->config()->modeEnvOverride());
+    }
+
+    /**
+     * A typo in .env must not lock the install into a mode that does not
+     * exist, and an empty value is the deployment templates' "not set".
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function unknownModeProvider(): iterable
+    {
+        yield 'empty' => [''];
+        yield 'typo' => ['admision'];
+        yield 'boolean-ish' => ['true'];
+    }
+
+    #[DataProvider('unknownModeProvider')]
+    public function testUnknownEnvModeIsTreatedAsUnset(string $value): void
+    {
+        $_ENV['REGISTRATION_MODE'] = $value;
+        $this->givenStoredMode('admission');
+
+        self::assertSame(RegistrationConfig::MODE_ADMISSION, $this->config()->mode(), 'the stored value applies');
+        self::assertNull($this->config()->modeEnvOverride());
+    }
+
+    public function testUnknownStoredModeFallsBackToOpen(): void
+    {
+        $this->givenStoredMode('whatever');
+
+        self::assertSame(RegistrationConfig::MODE_OPEN, $this->config()->mode());
+    }
+
+    public function testStoreModeWritesTheRowAndRefusesUnknownValues(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, RegistrationConfig::CONFIG_GROUP, RegistrationConfig::KEY_MODE, 'admission');
+        $this->config()->storeMode(RegistrationConfig::MODE_ADMISSION);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->config()->storeMode('closed');
+    }
+
     private function config(): RegistrationConfig
     {
         return new RegistrationConfig($this->configRepository);
@@ -123,6 +203,14 @@ final class RegistrationConfigTest extends TestCase
         $this->configRepository->expects($this->any())
             ->method('getValue')
             ->with(0, RegistrationConfig::CONFIG_GROUP, RegistrationConfig::KEY_ENABLED)
+            ->willReturn($value);
+    }
+
+    private function givenStoredMode(?string $value): void
+    {
+        $this->configRepository->expects($this->any())
+            ->method('getValue')
+            ->with(0, RegistrationConfig::CONFIG_GROUP, RegistrationConfig::KEY_MODE)
             ->willReturn($value);
     }
 }

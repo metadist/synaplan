@@ -8,6 +8,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
+  KnowledgeToolsMode,
   MessagesGatewaySettings,
   MessagesGatewayStatus,
   WebFetchMode,
@@ -23,6 +24,10 @@ import GatewaySettingToggle from './GatewaySettingToggle.vue'
 
 const MIN_TOOL_ROUNDS = 1
 const MAX_TOOL_ROUNDS = 32
+const MIN_WEB_SEARCH_ROUNDS = 1
+const MAX_WEB_SEARCH_ROUNDS = 6
+const MIN_WEB_FETCH_PAGES = 0
+const MAX_WEB_FETCH_PAGES = 10
 
 const props = defineProps<{
   form: GatewayForm
@@ -61,10 +66,22 @@ const webSearchOptions = computed(() => [
   { value: 'off', label: t('messagesGateway.webSearchModeOff') },
 ])
 
+/** Synaplan only opens pages itself in automatic mode; the limit means nothing otherwise. */
+const webFetchPagesDisabled = computed(() => props.form.web_fetch_mode !== 'auto')
+const webFetchPagesNote = computed(() =>
+  webFetchPagesDisabled.value ? t('messagesGateway.settings.requiresWebFetchAuto') : undefined
+)
+
 const webFetchOptions = computed(() => [
   { value: 'auto', label: t('messagesGateway.webFetchModeAuto') },
   { value: 'passthrough', label: t('messagesGateway.webFetchModePassthrough') },
   { value: 'off', label: t('messagesGateway.webFetchModeOff') },
+])
+
+const knowledgeOptions = computed(() => [
+  { value: 'desktop', label: t('messagesGateway.knowledgeToolsDesktop') },
+  { value: 'all', label: t('messagesGateway.knowledgeToolsAll') },
+  { value: 'off', label: t('messagesGateway.knowledgeToolsOff') },
 ])
 </script>
 
@@ -138,6 +155,19 @@ const webFetchOptions = computed(() => [
       </GatewaySettingRow>
 
       <GatewaySettingRow
+        :label="$t('messagesGateway.settings.webSearchRounds.label')"
+        :description="$t('messagesGateway.settings.webSearchRounds.description')"
+      >
+        <GatewaySettingNumber
+          :model-value="form.web_search_max_rounds"
+          :min="MIN_WEB_SEARCH_ROUNDS"
+          :max="MAX_WEB_SEARCH_ROUNDS"
+          data-testid="input-agents-web-search-rounds"
+          @change="emit('change', { web_search_max_rounds: $event })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
         :label="$t('messagesGateway.webFetchLabel')"
         :description="$t('messagesGateway.webFetchHint')"
       >
@@ -146,6 +176,34 @@ const webFetchOptions = computed(() => [
           :options="webFetchOptions"
           data-testid="select-agents-web-fetch"
           @update:model-value="emit('change', { web_fetch_mode: $event as WebFetchMode })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
+        :label="$t('messagesGateway.settings.webFetchPages.label')"
+        :description="$t('messagesGateway.settings.webFetchPages.description')"
+        :note="webFetchPagesNote"
+        :disabled="webFetchPagesDisabled"
+      >
+        <GatewaySettingNumber
+          :model-value="form.web_fetch_max_per_turn"
+          :min="MIN_WEB_FETCH_PAGES"
+          :max="MAX_WEB_FETCH_PAGES"
+          :disabled="webFetchPagesDisabled"
+          data-testid="input-agents-web-fetch-pages"
+          @change="emit('change', { web_fetch_max_per_turn: $event })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
+        :label="$t('messagesGateway.knowledgeToolsLabel')"
+        :description="$t('messagesGateway.knowledgeToolsHint')"
+      >
+        <GatewaySettingSelect
+          :model-value="form.knowledge_tools"
+          :options="knowledgeOptions"
+          data-testid="select-agents-knowledge-tools"
+          @update:model-value="emit('change', { knowledge_tools: $event as KnowledgeToolsMode })"
         />
       </GatewaySettingRow>
     </div>

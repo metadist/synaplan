@@ -98,6 +98,11 @@ class SubscriptionControllerEndpointTest extends WebTestCase
         $this->assertLessThan($byId['TEAM']['price'], $byId['PRO']['price']);
         $this->assertLessThan($byId['BUSINESS']['price'], $byId['TEAM']['price']);
 
+        // API keys are a paid-plan feature from Pro up (PremiumFeatureGate), so
+        // the cheapest paid card must say so; Team inherits it via "Everything in Pro".
+        $this->assertContains('API Access', $byId['PRO']['features']);
+        $this->assertNotContains('API Access', $byId['TEAM']['features']);
+
         // The frontend renders these arrays verbatim; missing keys would break the cards.
         foreach ($byId as $plan) {
             $this->assertArrayHasKey('features', $plan);

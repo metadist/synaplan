@@ -89,6 +89,9 @@ import {
   type AuthoredStep,
 } from './stepTypes'
 
+/** A Saved Task step can only run custom HTTP and MCP tools (backend `ToolCallRunner`). */
+const STEP_TOOL_SOURCES = ['custom', 'mcp']
+
 const props = defineProps<{
   open: boolean
   task: SavedTask
@@ -115,7 +118,9 @@ watch(
     steps.value = stepsFromGraph(props.task.graph)
     error.value = ''
     try {
-      tools.value = await toolsApi.list()
+      tools.value = (await toolsApi.list()).filter((tool) =>
+        STEP_TOOL_SOURCES.includes(tool.source)
+      )
     } catch {
       tools.value = []
     }

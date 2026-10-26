@@ -78,17 +78,23 @@ not by the model (the schema accepts it so one shape serves state and plan).
   "findings": [
     { "point": "p2",
       "fact": "Base price 12.40 EUR per unit (net).",
-      "quotes": [ { "text": "Grundpreis netto 12,40 € je Einheit", "location": "Tabelle 1" } ],
+      "passages": ["§14"],
+      "quote": { "text": "Grundpreis netto 12,40 € je Einheit", "passage": "§14" },
       "confidence": "high" }
   ],
+  "leads": [ { "link": "L7", "point": "p3" } ],
   "flags": []
 }
 ```
 
-`quotes[].text` ≤ 40 words; the engine adds `verified: true|false` per quote
-after the raw-text check and drops unverified quotes and findings without a
-verified quote. `flags` ⊂ outdated | opinion_or_advertising | contradicts_itself
-| partial_text | machine_translation | unclear_author.
+`passages` 1–5 ids of the form `§<n>` from the passage map the engine built
+(§0 #39); `quote` nullable, `text` ≤ 25 words, `passage` one of `passages`.
+The engine drops a finding whose passages do not all exist, removes a quote
+not found inside its passage (the finding stays), and stores `verified` on the
+quote. `leads` ≤ 5, `link` an `L<n>` id from the link list it passed in; the
+engine resolves it to the extracted URL or drops it (§0 #38). `flags` ⊂
+outdated | opinion_or_advertising | contradicts_itself | partial_text |
+machine_translation | unclear_author.
 
 ### 1.5 `ResearchDecisionSchema` (`tools:research_reflect`)
 
@@ -110,6 +116,23 @@ budget | no_progress is a **top-level field, not an action type** — the prompt
 says so in the same words (`04` §4.5); when it is set, `actions` must be `[]`
 and the engine ignores any present. Actions ≤ `MAX_ACTIONS` (6 Standard, 10
 Thorough) — the engine drops the rest.
+
+### 1.5a Lead tools and `ResearchFinishSchema` (`tools:research_lead`, tool mode)
+
+Declared natively on the lead call (`AiFacade::chat()` with `tools`); the
+arguments are validated like a schema answer, results are JSON strings.
+
+| Tool | Arguments (JSON Schema, additionalProperties false) | Result |
+| ---- | ---------------------------------------------------- | ------ |
+| `search` | `{ point: "p<n>", query: string ≤ 200, language: ISO 639-1, scope: web \| files \| both }` | `{ results: [ { id, title, host, kind?, date?, snippet } ], left: { searches } }` |
+| `read_sources` | `{ ids: ["s<n>"] 1–8, point: "p<n>" }` | `{ cards: [ ResearchEvidence §1.4 with ids e<n> ], blocked: [ { id, reason } ], left: { sources } }` |
+| `reread` | `{ source: "s<n>", question: string ≤ 300 }` | same as `read_sources` for one source |
+| `ask_user` | `{ question: string ≤ 300, options: [string] 2–4 }` | `{ answer }` or `{ skipped: true }` (the unit ends and the run waits) |
+| `finish` | `ResearchFinishSchema`: `{ reason: covered \| budget \| no_progress, points: [ { id, status, note } ] }` | — (ends the loop) |
+
+Any call the engine refuses returns `{ error: budget_used | unknown_id |
+repeated_query | not_allowed, left: {…} }`. Titles and snippets are truncated
+and sanitised as in `03` §2.4 and sit inside the data wrapper.
 
 ### 1.6 `ResearchCheckSchema` (`tools:research_check`)
 
@@ -217,7 +240,8 @@ fields rejected.
                  "host": "lieferant-a.example", "file_id": null,
                  "published": "2026-03-01", "class": "vendor", "status": "read", "reason": null } ],
   "evidence": [ { "id": "e12", "source": "s3", "point": "p2", "fact": "Base price 12.40 EUR per unit (net).",
-                  "quotes": [ { "text": "Grundpreis netto 12,40 € je Einheit", "location": "Tabelle 1", "verified": true } ] } ],
+                  "passages": [ { "id": "§14", "text": "Grundpreis netto 12,40 € je Einheit, zzgl. Versand." } ],
+                  "quote": { "text": "Grundpreis netto 12,40 € je Einheit", "passage": "§14", "verified": true } } ],
   "report": {
     "markdown": "… Der Grundpreis liegt bei 12,40 € netto je Einheit. [3] …",
     "version": 1,
@@ -241,7 +265,10 @@ written; its `citations` list every `[n]` occurrence in reading order (`n` is
 the occurrence index, `marker` the source number shown, `sentence` the text
 the marker closes) so a client renders chips and the source drawer from the
 state alone and can write `.sources.json` after a reconnect; `sources_order`
-is the numbering of the sources list. `evidence` carries only verified quotes.
+is the numbering of the sources list. `evidence` carries the cited passages
+as text (so the source drawer shows them without the raw source, which is
+dropped at `deliver`) and only verified quotes. Sources found through a lead
+carry `origin: "link"` and `from: "s<n>"`.
 `check` is `{ statements, supported, softened, removed }`; `outcome` is
 `{ code, params, text }` (`03` §7.5). The `source` event (§2.6) carries `url`
 or `file_id` too, so a live client needs no extra request.
@@ -254,7 +281,7 @@ SSE frames `id: <seq>\nevent: <name>\ndata: <json>`. The first frame after
 | Event | Data |
 | ----- | ---- |
 | `run` | `{ id, status, depth, research_protocol: 1 }` |
-| `queued` | `{ since_seconds }` — the next unit is waiting for a worker (sent every 20 s while waiting) |
+| `queued` | `{ since_seconds }` — the next unit has waited 20 s or more for a worker. Computed on each request, sent last and without an id, never replayed; the state carries the same value as `queued_since` |
 | `brief` | `{ goal, language, output, time_frame }` |
 | `question` | `{ id, text, options, allow_text }` |
 | `plan` | `{ points: [ { id, title } ], outline, estimate: { minutes, cost }, disclosures }` |
@@ -280,8 +307,8 @@ SSE frames `id: <seq>\nevent: <name>\ndata: <json>`. The first frame after
 | `unit` | Does | Cap |
 | ------ | ---- | --- |
 | `brief_plan` | brief, questions (then waits), plan (then waits in Thorough) | 60 s |
-| `round` | execute the last decision's actions (searches, then reads with `FETCH_PARALLEL`), then one reflect call → next decision | `UNIT_SECONDS` (120); reads that do not fit roll into the next `round` unit with the same decision |
-| `write` | one call (Standard) or one section (Thorough; `seq` = section index) | 120 s |
+| `round` | round mode: execute the last decision's actions (searches, then reads with `FETCH_PARALLEL` fetches and `READ_PARALLEL` concurrent reader calls), then one reflect call → next decision; tool mode: one lead turn and the execution of its tool calls, then checkpoint the lead conversation | `UNIT_SECONDS` (120); reads that do not fit roll into the next `round` unit with the same decision or tool call |
+| `write` | one call; one section per unit only when the writer's `max_output` is too small for the depth (§0 #42; `seq` = section index) | 120 s |
 | `check` | deterministic checks + checker batches; revision in Thorough | 120 s |
 | `deliver` | final state, usage totals, `complete` event, drop source texts | 10 s |
 
@@ -316,6 +343,11 @@ insert-if-missing by `ResearchConfigSeeder`.
 | `BUDGET.<DEPTH>.RESULTS_PER_SEARCH` | 8 · 10 · 10 | 1–20 | `GatherStage` |
 | `BUDGET.<DEPTH>.SOURCES` | 4 · 15 · 40 | 1–100 | `ReadStage` |
 | `BUDGET.<DEPTH>.FETCH_PARALLEL` | 4 · 4 · 6 | 1–8 | `ReadStage` |
+| `BUDGET.<DEPTH>.READ_PARALLEL` | 4 · 6 · 8 | 1–16 | `ConcurrentStructuredCaller` (§0 #37) |
+| `LEAD_MODE` | `auto` | `auto` · `tools` · `rounds` | `LeadModeResolver` (§0 #2) |
+| `TOOL_MODE_MODELS` | `[]` (code), seeded by RQ3 | JSON list of catalog keys that passed `app:research:conformance` | `LeadModeResolver` |
+| `PASSAGE_MAX_CHARS` | 600 | 200–2000 | `PassageSplitter` (§0 #39) |
+| `LEADS_PER_SOURCE` | 5 | 0–10 | `ReadStage` (§0 #38) |
 | `BUDGET.<DEPTH>.WALL_SECONDS` | 60 · 360 · 1200 | 30–7200 | `ResearchBudget` |
 | `BUDGET.<DEPTH>.COST_CAP` | 0.10 · 1.00 · 5.00 | ≥ 0 | `ResearchBudget` |
 | `BUDGET.<DEPTH>.QUESTIONS` | 0 · 1 · 3 | 0–3 | `BriefStage` |
@@ -397,10 +429,37 @@ final class EvidenceLedger
     public static function fromArray(array $a): self; public function toArray(): array;
 }
 
-final readonly class QuoteVerifier
+final readonly class PassageSplitter
 {
-    public function verify(string $quote, string $rawText): ?QuoteMatch;   // whitespace, quotes, hyphenation, number separators normalised
-    public function numbersSupported(string $sentence, array $quotes): bool;
+    public function split(string $rawText, int $maxChars): PassageMap;    // §1…§n: paragraph, table row, list item; long paragraphs into sentences; same text → same ids
+}
+
+final readonly class PassageVerifier
+{
+    public function passagesExist(array $passageIds, PassageMap $map): bool;
+    public function quoteInPassage(string $quote, string $passageId, PassageMap $map): ?QuoteMatch;   // whitespace, quotes, hyphenation, number separators normalised
+    public function numbersSupported(string $sentence, array $passageTexts): bool;
+}
+
+/** Runs up to $parallel structured calls at once over AiFacade (HTTP multiplexing); usage recorded and cancel checked per request. */
+final readonly class ConcurrentStructuredCaller
+{
+    public function callAll(array $requests, int $parallel, CancelFlag $cancel): array;   // list<StructuredResult|CallFailed>, same order as $requests
+}
+
+final readonly class LeadModeResolver { public function resolve(int $leadModelId, ResearchDepth $depth): LeadMode; }   // tools | rounds, from LEAD_MODE and TOOL_MODE_MODELS
+
+final readonly class LeadToolbox
+{
+    public function definitions(): array;                                    // the five tools of §1.5a
+    public function execute(ToolCall $call, StageContext $ctx): string;      // JSON result; enforces the budget, never returns raw source text
+}
+
+final class LeadConversation
+{
+    public function append(array $assistantTurn, array $toolResults): void;
+    public function messagesFor(int $inputBudgetTokens, string $ledgerSummary): array;   // tool-result clearing past 60 % of the budget
+    public static function fromArray(array $a): self; public function toArray(): array;
 }
 
 final readonly class ResearchStateStore
@@ -428,6 +487,10 @@ interface ResearchSourceReaderInterface { public function read(Source $source, R
 final readonly class ResearchSourceReader implements ResearchSourceReaderInterface {}   // HTML via UrlContentService, documents via extractionChain('document', allowCloud), knowledge chunks
 final readonly class FixtureSourceReader implements ResearchSourceReaderInterface {}    // test env: fixture.synaplan.test → files
 
+RQ2 ships a smaller stub of that interface: `read(string $url): SourceRead`.
+RS6 replaces the stub with the signature above. The fixture host stays
+`fixture.synaplan.test`, and any other host is refused without a network call.
+
 final readonly class ResearchOutcome { public string $code; public array $params; public function text(): string; }
 ```
 
@@ -442,7 +505,9 @@ active / queued / failed-24h counts and "no worker picked up units for N
 minutes" when the oldest queued unit is older than 5 min; `routeNames()` the
 research routes; `mobileClass()` backend-only.
 
-Commands: `app:research:reap` (LANE_TICK), `app:research:eval` (RQ2).
+Commands: `app:research:reap` (LANE_TICK), `app:research:eval` (RQ2),
+`app:research:spike` (RQ2b, eval account only), `app:research:conformance`
+(RS7, tool-mode suite).
 
 ---
 

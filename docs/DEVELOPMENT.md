@@ -252,6 +252,10 @@ No extra repo or external service needed.
 
 ---
 
+## Runtime benchmarks
+
+`make perf-runtime` measures the running dev stack: health latency and runtime-config throughput on a temporary FrankenPHP worker (`:8090`), a slow `test-model` stream (`SYNAPLAN_TEST_PROVIDER_CHUNK_MS`, default 50), and the phase table from `app:perf:chat-stream` when that account's chat model is the test provider. It does not call a paid provider unless you pass `--with-providers`. The target prints a table, writes `backend/var/perf/runtime-<date>.json`, and exits non-zero when an in-force budget in `_devextras/perf/runtime/budgets.json` is missed. On the way out — including after a failure — it stops the extra FrankenPHP, deletes `var/cache/prod`, and revokes the temporary API key.
+
 ## Code Quality
 
 ```bash

@@ -11,6 +11,8 @@ use App\Repository\ApiKeyRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Desktop\PairingService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -27,7 +29,13 @@ final class PairingServiceTest extends TestCase
         $this->apiKeyRepository = $this->createMock(ApiKeyRepository::class);
         $this->deviceRepository = $this->createMock(DesktopDeviceRepository::class);
         $this->userRepository = $this->createMock(UserRepository::class);
-        $this->service = new PairingService($this->apiKeyRepository, $this->deviceRepository, $this->userRepository, 'https://web.synaplan.com/');
+        $this->service = new PairingService(
+            $this->apiKeyRepository,
+            $this->deviceRepository,
+            $this->userRepository,
+            'https://web.synaplan.com/',
+            new PremiumFeatureGate(new BillingService('', '')),
+        );
     }
 
     private function stubUser(int $id): User

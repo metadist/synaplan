@@ -10,10 +10,10 @@ use App\Repository\UserRepository;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
 use App\Service\Auth\OAuthLoginResponder;
+use App\Service\Auth\OAuthSignupGate;
+use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\TokenService;
-use App\Service\ModelConfigService;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -44,10 +44,9 @@ class AppleAuthController extends AbstractController
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly UserRepository $userRepository,
-        private readonly EntityManagerInterface $em,
         private readonly OAuthStateService $oauthStateService,
         private readonly OAuthLoginResponder $oauthLoginResponder,
-        private readonly ModelConfigService $modelConfigService,
+        private readonly OAuthSignupGate $signupGate,
         private readonly AppleClientSecretGenerator $clientSecretGenerator,
         private readonly AppleIdentityTokenVerifier $identityTokenVerifier,
         private readonly TokenService $tokenService,
@@ -73,7 +72,7 @@ class AppleAuthController extends AbstractController
         }
 
         $state = $this->oauthStateService->generateState('apple', AccountLanguage::withSignupLanguage(
-            $native ? ['native' => true] : [],
+            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'apple'),
             $request->query->get('language'),
         ));
 
@@ -142,18 +141,18 @@ class AppleAuthController extends AbstractController
 
             $claims = $this->identityTokenVerifier->verify($identityToken);
             $profile = $this->parseUserField($userField);
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $claims,
                 $profile,
-                AccountLanguage::normalize($statePayload['language'] ?? null),
+                AccountLanguage::normalize($statePayload['language'] ?? null), $statePayload,
             );
 
-            $this->logger->info('Apple OAuth successful', [
-                'user_id' => $user->getId(),
-                'native' => $native,
-            ]);
+            $this->logger->info('Apple OAuth successful', ['user_id' => $user->getId(), 'native' => $native]);
 
             return $this->oauthLoginResponder->success($user, $request, 'apple', $native);
+        } catch (SignupBlockedException $e) {
+            return $this->oauthLoginResponder->error('apple', $e->getMessage(), $native, ['error_code' => $e->getErrorCodeParam()]);
         } catch (\Throwable $e) {
             $this->logger->error('Apple OAuth callback error', ['error' => $e->getMessage()]);
 
@@ -188,9 +187,7 @@ class AppleAuthController extends AbstractController
     {
         $decoded = json_decode($request->getContent(), true);
         $body = is_array($decoded) ? $decoded : [];
-        $identityToken = isset($body['identityToken']) && is_string($body['identityToken'])
-            ? $body['identityToken']
-            : null;
+        $identityToken = isset($body['identityToken']) && is_string($body['identityToken']) ? $body['identityToken'] : null;
 
         if (null === $identityToken || '' === $identityToken) {
             return new JsonResponse(['success' => false, 'error' => 'Missing identity token'], Response::HTTP_BAD_REQUEST);
@@ -212,11 +209,13 @@ class AppleAuthController extends AbstractController
             'email' => isset($body['email']) && is_string($body['email']) ? $body['email'] : null,
         ];
 
-        $user = $this->findOrCreateUser(
-            $claims,
-            $profile,
-            AccountLanguage::normalize($body['language'] ?? null),
-        );
+        // MOBILE-APP SEAM: no browser challenge on the native sheet — only the signup limits and pause switch apply.
+        try {
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission = $this->nativeAdmission($body), $request->getClientIp(), true);
+            $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null), $nativeAdmission);
+        } catch (SignupBlockedException $e) {
+            return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
+        }
 
         $accessToken = $this->tokenService->generateAccessToken($user);
         $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
@@ -274,10 +273,32 @@ class AppleAuthController extends AbstractController
     }
 
     /**
+     * Plan or invitation code sent by the native register screen. Ignored while
+     * registration mode is open.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, string>
+     */
+    private function nativeAdmission(array $body): array
+    {
+        $state = [];
+        if (isset($body['code']) && is_string($body['code']) && '' !== trim($body['code'])) {
+            $state['code'] = trim($body['code']);
+        }
+        if (isset($body['plan']) && is_string($body['plan']) && '' !== trim($body['plan'])) {
+            $state['plan'] = strtoupper(trim($body['plan']));
+        }
+
+        return $state;
+    }
+
+    /**
      * @param array{sub: string, email: ?string, emailVerified: bool, isPrivateEmail: bool} $claims
      * @param array{firstName: ?string, lastName: ?string, email: ?string}                  $profile
+     * @param array<string, mixed>                                                          $admissionState
      */
-    private function findOrCreateUser(array $claims, array $profile, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $claims, array $profile, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $appleSub = $claims['sub'];
         $email = $claims['email'] ?? $profile['email'];
@@ -340,12 +361,7 @@ class AppleAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->modelConfigService->initializeNewUserDefaults((int) $user->getId());
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }

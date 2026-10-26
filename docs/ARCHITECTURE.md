@@ -88,6 +88,20 @@ Large OpenAPI response schemas live in `App\Attribute\OpenApi\Config\*`, so
 the routes stay in one controller: the spec orders `paths` by route
 registration, and the frontend pins a hash of the spec.
 
+## Readiness — `GET /api/health/ready`
+
+`GET /api/health` reports providers, Whisper and Redis. Whisper's probe
+(`whisper --help` and the model scan) is cached for five minutes when it
+succeeds and for one minute when it fails, so a health poll does not start
+a program on every call. The result is kept per server, because the binary
+and the models live on each server. A missing binary is not cached.
+
+`GET /api/health/ready` is the short probe for a load balancer or the
+watchdog. It pings Redis and returns `status` plus that Redis result. It
+does not ask a provider, does not start a program and does not query the
+database. Redis down is `503`, the same rule as `/api/health`. Both are
+public. `GET /api/health/probe` stays the authenticated check.
+
 ## Chat turn — `ChatHandler`
 
 `App\Service\Message\Handler\ChatHandler` answers a message with the model the
@@ -148,6 +162,41 @@ flowchart LR
   apps read them. A new event is a `feat:` with frontend work.
 - **Stop.** `CancelledTurns` flags a turn the caller owns and stores the
   partial answer the client sends.
+## Two worker pools
+
+Production worker mode runs two FrankenPHP pools from
+`_docker/backend/synaplan-worker-mode.Caddyfile`. `streams` takes the long
+routes (chat and its re-attach, the widget message, both gateways, the
+dictation session stream, TTS and `/mcp`). `api` takes every other request,
+including the usage CSV export and a one-shot transcription that only
+streams a result it already has. `FRANKENPHP_STREAM_WORKER_NUM` defaults to
+`FRANKENPHP_WORKER_NUM`, so stream capacity stays what it is today and short
+requests get a pool of their own. A request that waits longer than
+`FRANKENPHP_MAX_WAIT_TIME` (15 seconds) is a 503. FrankenPHP writes that
+503 itself, so the public listener proxies PHP to `127.0.0.1:9080` in
+worker mode and replaces only that status with a `server_busy` body and
+`Retry-After: 5`. The entrypoint trusts that localhost hop, which keeps the
+client address Caddy accepted. Dev and the ordinary test stack stay on
+`php_server` directly and do not proxy.
+
+Adding the stream pool holds one more set of database connections on each
+web node. Check Galera `max_connections` before enabling it, and enable it
+on one node first.
+
+- **Database.** A FrankenPHP worker keeps its Doctrine connections between
+  requests, so a held connection follows every worker, streaming or idle.
+  `DatabaseConnectionRelease` closes every open connection that is outside a
+  transaction; Doctrine reconnects on the next query. `ChatReplyGenerator`
+  calls it right before the provider stream of a chat answer (web chat and
+  widget) and once more on the stream's first chunk, because provider setup
+  (endpoint, credentials) can reconnect in between;
+  `StreamedResponseConnectionRelease` calls it on `terminate`
+  after every `StreamedResponse`, so a worker idle between streams holds
+  none. The gateways (`/v1/chat/completions`, `/v1/messages`) and file
+  analysis give theirs back only after the response for now: their
+  provider calls run through `AiFacade` and the gateway loops, which the
+  size ledger freezes; the before-call release joins the AI call pipeline
+  (architecture update, S1).
 
 `tests/Characterization/StreamTranscriptCharacterizationTest.php` locks the
 ordered event names and payload shapes of six turns; a split that changes a
@@ -423,6 +472,13 @@ backups); `SystemConfigService` is the facade the controller and Smart
 Search call. `SystemConfigSchemaCharacterizationTest` pins the schema and
 the values, `SystemConfigTabOrderTest` the tab order and that every field
 sits in exactly one section.
+
+## Research runs
+
+A research run is stored in Redis, not in a table. `ResearchModule` is off
+until `RESEARCH_ENABLED` or `RESEARCH.ENABLED` is on. The start route queues
+one step; `ResearchUnitWorker` runs that step and queues the next. A web
+run's last step writes the report into the chat. See `docs/RESEARCH.md`.
 
 ## Where new code goes
 

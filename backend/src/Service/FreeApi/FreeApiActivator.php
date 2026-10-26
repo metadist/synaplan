@@ -130,6 +130,8 @@ final readonly class FreeApiActivator
             if (null !== $leftBecause) {
                 $this->leave();
                 $this->logger->info('Synaplan Demo left by the scheduler', ['reason' => $leftBecause]);
+            } else {
+                $this->binder->realignPurposeRows();
             }
         }
 
@@ -222,7 +224,7 @@ final readonly class FreeApiActivator
                 $this->state->saveSnapshot($this->binder->snapshot());
             }
             $modelIds = $this->binder->importAliases($issued->aliases);
-            if (!isset($modelIds['free-chat'])) {
+            if (!isset($modelIds['free-chat'][FreeApiAliases::TAGS['free-chat']])) {
                 throw FreeApiException::invalidResponse('no chat alias');
             }
             $bound = $this->binder->bind($modelIds);

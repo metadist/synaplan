@@ -2,7 +2,11 @@
 
 namespace App\Security;
 
+use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
+use App\Repository\UserRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,7 +32,9 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
 {
     public function __construct(
         private ApiKeyRepository $apiKeyRepository,
+        private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -52,9 +58,12 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             return true;
         }
 
-        // Accept any Bearer on /v1/ routes (OpenAI-compatible format)
+        // Accept any Bearer on /v1/ routes (OpenAI-compatible format).
+        // A JWT is not an API key. Claiming it lets a successful organisation
+        // login fall through to this check, which then answers 401.
         if (str_starts_with($request->getPathInfo(), '/v1/')
-            && str_starts_with($authHeader, 'Bearer ')) {
+            && str_starts_with($authHeader, 'Bearer ')
+            && 3 !== count(explode('.', substr($authHeader, 7)))) {
             return true;
         }
 
@@ -107,6 +116,29 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             throw new AuthenticationException('API key is inactive');
         }
 
+        // The key's own flag is not the account. A suspended or deleted owner
+        // cannot use the platform at all.
+        $owner = $this->userRepository->find($apiKeyEntity->getOwnerId());
+        if (!$owner instanceof User || !$owner->canSignIn()) {
+            $this->logger->warning('API key owner cannot use the platform', [
+                'key_id' => $apiKeyEntity->getId(),
+                'owner_id' => $apiKeyEntity->getOwnerId(),
+            ]);
+            throw new AuthenticationException('API key is inactive');
+        }
+
+        // A pending-payment owner may sign in to pay, and that must not let
+        // their key spend the platform. A free account keeps the in-app chat.
+        // Both get the plan answer: the key itself is the API, and that stays
+        // on a paid plan while this install sells one.
+        if (!$owner->isActive() || !$this->premiumFeatureGate->isUnlockedFor($owner)) {
+            $this->logger->warning('API key owner is not on a paid plan', [
+                'key_id' => $apiKeyEntity->getId(),
+                'owner_id' => $apiKeyEntity->getOwnerId(),
+            ]);
+            throw new ApiKeyPlanDeniedException();
+        }
+
         // Persist immediately. save($entity, false) never flushed on /v1
         // requests, so Last used stayed empty for keys in active use.
         $this->apiKeyRepository->touchLastUsed($apiKeyEntity);
@@ -144,20 +176,27 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         // Claude Code parses the Anthropic error envelope. The Synaplan
         // {success, error, message} shape is an unhelpful parse failure, and
         // a 401 of that shape is also retried for minutes.
+        $planDenied = $exception instanceof ApiKeyPlanDeniedException;
+        $status = $planDenied ? Response::HTTP_FORBIDDEN : Response::HTTP_UNAUTHORIZED;
+
         if (str_starts_with($request->getPathInfo(), '/v1/messages')) {
             return new JsonResponse([
                 'type' => 'error',
                 'error' => [
-                    'type' => 'authentication_error',
+                    'type' => $planDenied ? 'permission_error' : 'authentication_error',
                     'message' => $exception->getMessage(),
                 ],
-            ], Response::HTTP_UNAUTHORIZED);
+            ], $status);
+        }
+
+        if ($planDenied) {
+            return new JsonResponse(ApiKeyPlanRequiredException::responseBody(), $status);
         }
 
         return new JsonResponse([
             'success' => false,
             'error' => 'Authentication failed',
             'message' => $exception->getMessage(),
-        ], Response::HTTP_UNAUTHORIZED);
+        ], $status);
     }
 }

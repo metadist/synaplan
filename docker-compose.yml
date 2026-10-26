@@ -175,7 +175,7 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: node:24@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0
+    image: node:24@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -218,6 +218,7 @@ services:
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
+      - ./plugins:/plugins:ro
     # NO depends_on -- on purpose. The frontend must start IMMEDIATELY so the
     # boot-status onboarding page binds :5173 within seconds of `up -d`, even
     # while the backend image is still building on a fresh checkout. The only
@@ -251,7 +252,7 @@ services:
   # rendering chunks (native binary + JS heap), which OOM-killed every build
   # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:24@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0
+    image: node:24@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
     container_name: synaplan-frontend-widgets
     working_dir: /app
     # Wait for the generated Zod schemas before the first build: src/generated/
@@ -311,12 +312,22 @@ services:
       - ./frontend/dist-widget:/var/www/widgets
       - ./plugins:/plugins:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_docker/backend/synaplan-worker-mode.Caddyfile:/usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile:ro
+      - ./_docker/backend/synaplan-php-workers.Caddyfile:/usr/local/etc/php/templates/synaplan-php-workers.Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
+      # Worker-pool settings. Dev stays in classic mode (the base image writes
+      # a stub snippet), so these do nothing until a production boot. They are
+      # here so a copied compose file shows the same knobs as deploy/.
+      FRANKENPHP_WORKER_NUM: ${FRANKENPHP_WORKER_NUM:-16}
+      FRANKENPHP_STREAM_WORKER_NUM: ${FRANKENPHP_STREAM_WORKER_NUM:-}
+      FRANKENPHP_NUM_THREADS: ${FRANKENPHP_NUM_THREADS:-}
+      FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
+      FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
       # Demo user fixtures. Set SEED_DEMO_DATA=false to boot an EMPTY database
       # and walk through the first-run setup wizard at /setup, the way a
       # production install sees it. Production never loads fixtures at all.
@@ -408,6 +419,13 @@ services:
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
+      # Account-creation limits: wide open on the dev stack because the E2E
+      # suites register dozens of users from localhost in one run. Production
+      # keeps the backend/.env.example defaults (5 per IP per hour, 20 per
+      # 10 minutes installation-wide).
+      SIGNUP_IP_LIMIT: ${SIGNUP_IP_LIMIT:-100000}
+      SIGNUP_GLOBAL_LIMIT: ${SIGNUP_GLOBAL_LIMIT:-100000}
+      CHECKOUT_IP_LIMIT: ${CHECKOUT_IP_LIMIT:-100000}
       # Stripe Payment Integration - loaded from backend/.env via env_file
       # (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_*)
       # OAuth Social Login Providers (loaded from backend/.env via env_file)
@@ -858,7 +876,7 @@ services:
     # client publications from 7.x, whereas Redis 8.x dropped pub/sub fan-out to
     # the Centrifugo node (control messages arrived, publications did not),
     # which silently broke realtime delivery to dashboard + widget clients.
-    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     container_name: synaplan-redis
     command: >-
       redis-server
@@ -886,7 +904,7 @@ services:
   # Authentication uses short-lived JWTs issued by the PHP backend.
   # ----------------------------------------------------------------------------
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
+    image: centrifugo/centrifugo:v6.10.2@sha256:34b84f823515927266ce3abfb840fd9e0acabb58805e7e896f5de731217a627d
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -927,7 +945,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:2e6cc92ffa43b4b1a2e70e315407e00ac97ec125afc71277d73c7efe01c4f31b
+    image: ollama/ollama:latest@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8
     container_name: synaplan-ollama
     depends_on:
       backend:
@@ -973,7 +991,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
@@ -1010,7 +1028,7 @@ services:
   # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
   # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
   docling:
-    image: ghcr.io/docling-project/docling-serve-cpu:v1.37.0@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.1@sha256:203c2ce82f19413bc3b83641962082165510352b9f93c1a840c0036be616eebf
     container_name: synaplan-docling
     depends_on:
       backend:
@@ -1052,7 +1070,7 @@ services:
   # then set FREEAPI_BASE_URL=http://freeapi-fake:8787 and FEATURE_FREEAPI_ENABLED=true.
   # Canned answers, in-memory state; see _devextras/freeapi-fake/README.md.
   freeapi-fake:
-    image: node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
     container_name: synaplan-freeapi-fake
     profiles: [freeapi-fake]
     restart: unless-stopped
@@ -1129,7 +1147,7 @@ services:
   # and point TELEGRAM_API_BASE_URL at http://telegram-stub:3998 on backend and worker.
   telegram-stub:
     profiles: [telegram-stub]
-    image: node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
     container_name: synaplan-telegram-stub
     user: node
     working_dir: /app
@@ -1176,7 +1194,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+    image: quay.io/keycloak/keycloak:26.8@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -1211,7 +1229,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.8@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+    image: quay.io/keycloak/keycloak:26.8@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:
@@ -1370,6 +1388,7 @@ services:
       TRANSCRIBER_LANGUAGE: ${TRANSCRIBER_LANGUAGE:-auto}
       TRANSCRIBER_AUTH_TOKEN: ${TRANSCRIBER_AUTH_TOKEN:-}
       SYNAPLAN_URL: http://backend:8000
+      SYNAPLAN_TRANSCRIBER_SECRET: ${SYNAPLAN_TRANSCRIBER_SECRET:-}
       SYNAPLAN_API_KEY: ${SYNAPLAN_API_KEY:-}
       SYNAPLAN_STT_MODEL: ${SYNAPLAN_STT_MODEL:-}
       COMMIT_AFTER_MS: ${COMMIT_AFTER_MS:-8000}
@@ -1416,7 +1435,7 @@ services:
 
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
-    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
     container_name: synaplan-qdrant
     depends_on:
       backend:

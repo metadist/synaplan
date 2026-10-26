@@ -36,7 +36,7 @@ role filled from a different provider.
 | Role | Family | Job in a run | UI name (Desktop, Models → Research team) |
 | ---- | ------ | ------------ | ----------------------------------------- |
 | **Sorter** | Organize | Turn the question into a brief; fan out search queries; drop duplicates; triage results (relevant, authoritative, fresh); pick what to read | not shown (Details only) |
-| **Reader** | Organize | Read one source with the plan's points as the lens; return an evidence card: facts, verbatim quotes with location, date, kind, warning flags | Reading sources |
+| **Reader** | Organize | Read one source with the plan's points as the lens; return an evidence card: facts citing numbered passages (optionally a short quote), date, kind, warning flags, links worth following | Reading sources |
 | **Indexer** | Organize | Embed, keyword-index and rerank knowledge passages; at upload, write a one-paragraph document card per file | not shown (workspace setting) |
 | **Lead** | Create | Plan the points and the outline; after each round, judge each point (answered, thin, conflicting, open) and choose the next actions; decide when to stop | Thinking and writing |
 | **Writer** | Create | Write the report from evidence only, section by section; later rewrite, shorten, translate, add a table | Thinking and writing |
@@ -54,12 +54,15 @@ and writes"; the engine keeps them separate so an admin can split them.
 | Sorter | 20–40 | 1–4k → 0.2–1k tokens | Reliable JSON, low latency, low price | Multilingual queries | low / minimal | 1,000 |
 | Reader | 20–60 | 5–60k → 0.5–1.5k (bounded by the model's context, §0 #31) | Faithful extraction, low input price, ≥ 32k context (128k+ for whole documents) | 1M context for whole documents; cache pricing | low | 1,500 |
 | Indexer | per chunk | — | Multilingual embeddings in one vector space with the workspace | Local reranker for EU / local worlds | — | — |
-| Lead | 5–15 | 10–80k → 1–4k | Judgement over many rounds, reliable JSON, prompt caching | Large context, reasoning effort control | medium (Standard), high (Thorough) | 4,000 |
+| Lead | 5–15 (round mode) · 10–40 turns (tool mode) | 10–80k → 1–4k | Judgement over many rounds, reliable JSON, prompt caching | Reliable native tool calling (passes the conformance suite → tool mode), large context, reasoning effort control | medium (Standard), high (Thorough) | 4,000 |
 | Writer | 2–8 | 15–60k → 3–16k | Long output (≥ 32k), language quality in five locales, citation discipline | 128k output for long reports | medium | 8,000 per section |
 | Checker | 1–4 | 10–40k → 1–3k | Different provider family from the writer, reliable JSON, strict reading | Low price | medium | 3,000 |
 
-None of the roles needs native tool calling (§0 #2): every decision comes back
-as JSON, so local models behind `OllamaProvider` can fill every role.
+No role **requires** native tool calling (§0 #2): in round mode every decision
+comes back as JSON, so local models behind `OllamaProvider` can fill every
+role. A lead model that passes the conformance suite runs in tool mode and
+drives the search itself; that is the default for frontier leads once RQ3
+lists them in `TOOL_MODE_MODELS`.
 
 ---
 
@@ -279,10 +282,11 @@ rule are computable instead of guessed.
 
 | Stage | Varies | Fixed | Metrics | Cost control |
 | ----- | ------ | ----- | ------- | ------------ |
-| 1 Reader | Gemini 3.8 Flash, GPT-6 Luna, GLM-5.3-Flash, gpt-oss-120b (Groq), Muse Spark 1.3 | Lead / writer Sonnet 5.5 | Quote exactness (deterministic), evidence fact recall, cost per source, time per source | Reader calls only, on stored source texts — no new searches |
+| 1 Reader | Gemini 3.8 Flash, GPT-6 Luna, GLM-5.3-Flash, gpt-oss-120b (Groq), Muse Spark 1.3 | Lead / writer Sonnet 5.5 | Passage integrity and dropped findings (deterministic), evidence fact recall, leads that settled a point, cost per source, time per source | Reader calls only, on stored source texts — no new searches |
 | 2 Lead / writer | Opus 5.5, Sonnet 5.5, GPT-6.1 Sol, Gemini 3.1 Pro, Grok 4.7 | Stage 1 reader | Report fact recall, citation precision, coverage, abstention, judge rating, cost, time | Same frozen search results for every arm |
+| 2b Lead mode | Tool mode vs round mode for every stage-2 lead that passed the conformance suite | Stage 2 winners | Fact recall, citation precision, search efficiency, cost, time | Live loop on the smoke set (modes differ in what they search, so frozen search results do not apply) |
 | 3 Checker | Same family vs other family; Gemini 3.8 Flash, GPT-6.1 Sol, Sonnet 5.5 | Stage 2 winner | Detection rate of seeded false statements, false alarms on true ones | Drafts reused |
-| 4 Single vs team | Stage 1–3 team vs single model (lead model for every role) | — | All report metrics, cost, time | Smoke set + 10 Thorough items |
+| 4 Single vs team | Stage 1–3 team vs single model (lead model for every role) vs B1+ and B4 | — | All report metrics, cost, time | Smoke set + 10 Thorough items |
 | 5 Worlds | EU and local presets | — | All report metrics, time | Smoke set |
 
 **Frozen inputs.** Stage 2 and later replay recorded search results and fetched

@@ -157,12 +157,17 @@ final readonly class PlannerChannelCatalog
             $this->persistKey($connection, $key);
         }
 
+        $capabilities = self::capabilitiesForKind($kind);
+        if ('webdav' === $connection->getType()) {
+            $capabilities[] = 'folder_fetch';
+        }
+
         return new PlannerChannel(
             $key,
             $kind,
             $connection->getName(),
             $id,
-            self::capabilitiesForKind($kind),
+            $capabilities,
         );
     }
 

@@ -7,15 +7,16 @@ namespace App\AI\Messages\Tools;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 
 /**
- * Ensures Anthropic's `web_fetch_*` server tool reaches api.anthropic.com.
+ * Decides who reads a page the client asked for with `web_fetch`.
  *
- * Unlike {@see WebSearchTool}, Synaplan does not execute page fetches itself —
- * only Anthropic can honour the server tool. This policy therefore:
- *
- * - on Anthropic routes: keep / inject the declaration and make sure the
- *   `anthropic-beta` header carries the web-fetch beta when needed;
- * - on OpenAI / Gemini aliases: drop the declaration (those translators cannot
- *   map it) and report `off` so clients can tell why fetch is unavailable.
+ * - on Anthropic routes: keep / inject the server-tool declaration and make
+ *   sure the `anthropic-beta` header carries the web-fetch beta when needed.
+ *   Anthropic still reads the page;
+ * - on every other route, `auto` drops that server-tool declaration so the
+ *   translator is not handed a shape it cannot map. {@see GatewayToolCatalog}
+ *   then offers an executable `web_fetch` of the same name, which
+ *   {@see WebFetchTool} runs. `passthrough`, `off` and a page limit of 0
+ *   still drop it, because there is no Anthropic upstream to leave it with.
  *
  * @phpstan-type PolicyResult array{
  *     body: array<string, mixed>,
@@ -28,6 +29,7 @@ final class WebFetchPolicy
 {
     public const HANDLING_NONE = 'none';
     public const HANDLING_PASSTHROUGH = 'passthrough';
+    public const HANDLING_SYNAPLAN = 'synaplan';
     public const HANDLING_OFF = 'off';
 
     /** Stable Anthropic server-tool shape the model understands today. */
@@ -42,6 +44,7 @@ final class WebFetchPolicy
 
     /**
      * @param array<string, mixed> $requestBody
+     * @param int                  $synaplanPages pages Synaplan may open per message; 0 means it reads none
      *
      * @return PolicyResult
      */
@@ -50,6 +53,7 @@ final class WebFetchPolicy
         string $provider,
         string $mode,
         ?string $anthropicBeta,
+        int $synaplanPages = MessagesGatewayConfig::DEFAULT_WEB_FETCH_MAX_PER_TURN,
     ): array {
         $isAnthropic = 'anthropic' === strtolower($provider);
         $declared = $this->hasServerWebFetch($requestBody);
@@ -68,17 +72,29 @@ final class WebFetchPolicy
             );
         }
 
-        // auto / passthrough — never Synaplan-executed.
         if (!$isAnthropic) {
-            if (!$declared) {
+            if ($clientOwns) {
                 return $this->result($requestBody, $anthropicBeta, self::HANDLING_NONE, false);
             }
 
+            if (MessagesGatewayConfig::WEB_FETCH_PASSTHROUGH === $mode || $synaplanPages <= 0) {
+                if (!$declared) {
+                    return $this->result($requestBody, $anthropicBeta, self::HANDLING_NONE, false);
+                }
+
+                return $this->result(
+                    $this->stripServerWebFetch($requestBody),
+                    $anthropicBeta,
+                    self::HANDLING_OFF,
+                    true,
+                );
+            }
+
             return $this->result(
-                $this->stripServerWebFetch($requestBody),
+                $declared ? $this->stripServerWebFetch($requestBody) : $requestBody,
                 $anthropicBeta,
-                self::HANDLING_OFF,
-                true,
+                self::HANDLING_SYNAPLAN,
+                $declared,
             );
         }
 

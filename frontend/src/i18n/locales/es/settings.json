@@ -187,6 +187,8 @@
     "title": "Planes de Suscripción",
     "subtitle": "Desbloquea más funciones y límites más altos",
     "chooseYourPlan": "Elige Tu Plan",
+    "pendingTitle": "Pago pendiente",
+    "pendingBody": "Elige un plan abajo para terminar. La cuenta sigue limitada hasta que el pago se complete. Sin pago, se elimina 7 días después del registro.",
     "currentPlan": "Plan Actual",
     "yourPlan": "Tu Plan",
     "noActiveSubscription": "Sin suscripción activa",

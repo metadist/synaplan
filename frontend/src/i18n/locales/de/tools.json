@@ -421,10 +421,15 @@
     "webSearchHint": "Automatisch nutzt die eigene Suche von Synaplan, sofern ein Suchanbieter konfiguriert ist, und reicht die Anfrage sonst an den KI-Anbieter weiter.",
     "webSearchUnavailable": "Auf dieser Instanz ist kein Suchanbieter konfiguriert. Anfragen werden an den KI-Anbieter weitergereicht und nur Anthropic kann sie beantworten.",
     "webFetchLabel": "Webseiten lesen (Web-Fetch)",
-    "webFetchModeAuto": "Automatisch — Anthropic holt die Seite (empfohlen)",
-    "webFetchModePassthrough": "Web-Fetch immer an Anthropic weiterreichen",
+    "webFetchModeAuto": "Automatisch (empfohlen)",
+    "webFetchModePassthrough": "Nur Anthropic liest die Seite",
     "webFetchModeOff": "Kein Web-Fetch",
-    "webFetchHint": "Synaplan lädt Seiten nicht selbst. Bei Anthropic-Modellen behält oder ergänzt das Gateway Anthropics web_fetch-Werkzeug, damit das Modell eine URL öffnen kann. Andere KI-Anbieter können dieses Werkzeug nicht ausführen.",
+    "webFetchHint": "Automatisch lässt Anthropic die Seite bei Anthropic-Modellen lesen. Bei jedem anderen Modell öffnet Synaplan die Seite selbst, höchstens so oft wie unten eingestellt. Weiterleiten funktioniert nur bei Anthropic.",
+    "knowledgeToolsLabel": "Angehefteten Wissensordner durchsuchen",
+    "knowledgeToolsDesktop": "Nur Desktop (empfohlen)",
+    "knowledgeToolsAll": "Jeder Schlüssel am Coding-Gateway",
+    "knowledgeToolsOff": "Keine Ordnersuche",
+    "knowledgeToolsHint": "Wenn ein Wissensordner angeheftet ist, kann das Modell darin weiter suchen und eine Datei öffnen, falls die ersten Textstellen nicht reichen. Nur Desktop ist die empfohlene Einstellung.",
     "visionLabel": "Bildverständnis für verbundene KI-Assistenten",
     "visionModeAuto": "Automatisch (empfohlen)",
     "visionModeSynaplan": "Immer das Bildmodell von Synaplan verwenden",
@@ -473,10 +478,13 @@
       "activeTools": {
         "title": "Läuft gerade in Ihrem Auftrag",
         "empty": "Synaplan führt keine eigenen Tools aus. Verbundene KI-Assistenten erhalten nur die Tools, die ihr eigenes Programm mitbringt.",
-        "hint": "Eine einzelne Nachricht kann eines davon trotzdem auslassen: Bringt ein Programm ein eigenes Tool mit demselben Namen mit, behält es dieses, und die Websuche läuft nur, wenn der Assistent danach fragt.",
+        "hint": "Eine einzelne Nachricht kann eines davon trotzdem auslassen: Bringt ein Programm ein eigenes Tool mit demselben Namen mit, behält es dieses, und die Websuche läuft nur, wenn der Assistent danach fragt. Das Lesen von Seiten endet am Seitenlimit. Die Ordnersuche läuft nur, solange ein Wissensordner angeheftet ist.",
         "mcpServers": "dazu die Tools von 1 verbundenen Tool-Server | dazu die Tools von {count} verbundenen Tool-Servern",
         "tools": {
           "web_search": "Websuche",
+          "web_fetch": "Webseite lesen",
+          "knowledge_search": "Wissensordner durchsuchen",
+          "read_document": "Datei im Ordner lesen",
           "analyze_image": "Bildanalyse"
         }
       },
@@ -500,6 +508,14 @@
       "toolRounds": {
         "label": "Maximale Werkzeugrunden pro Nachricht",
         "description": "Wie oft ein KI-Assistent ein Werkzeug nutzen und erneut nachdenken darf, bevor er antworten muss. Höhere Werte erlauben gründlicheres Arbeiten und kosten mehr."
+      },
+      "webSearchRounds": {
+        "label": "Websuchen vor der Antwort",
+        "description": "Nach so vielen Suchen in einer Nachricht antwortet der Assistent aus dem, was er gefunden hat, und nennt jede Quelle. 2 reicht für eine kurze Frage. Erhöhen Sie den Wert, wenn die ersten Treffer nicht genügen."
+      },
+      "webFetchPages": {
+        "label": "Seiten in einer Nachricht",
+        "description": "Nach so vielen Seiten in einer Nachricht hört der Assistent auf, weitere zu öffnen, und antwortet aus dem Gelesenen. 3 reicht für eine normale Frage. 0 bedeutet, dass keine Seite geöffnet wird."
       },
       "imageDetail": {
         "label": "Bildqualität",
@@ -526,7 +542,8 @@
         "label": "Zusammenfassung jeder Sitzung behalten",
         "description": "Synaplan schreibt zu jeder Agenten-Sitzung eine kurze Zusammenfassung in Ihren Chat-Verlauf, damit Sie später sehen, woran gearbeitet wurde."
       },
-      "requiresMcpTools": "Verfügbar, sobald Ihre Werkzeuge oben eingeschaltet sind."
+      "requiresMcpTools": "Verfügbar, sobald Ihre Werkzeuge oben eingeschaltet sind.",
+      "requiresWebFetchAuto": "Gilt nur, wenn „Webseiten lesen“ oben auf Automatisch steht."
     },
     "loadError": "Die Claude-Code-Einstellungen konnten nicht geladen werden.",
     "source": {
@@ -980,6 +997,12 @@
       "copy": "Adresse kopieren",
       "copied": "Adresse kopiert",
       "copyFailed": "Die Adresse konnte nicht kopiert werden. Markiere sie und kopiere sie von Hand."
+    },
+    "readScope": {
+      "line": "Synaplan darf lesen: {what}.",
+      "watched": "die Ordner, die du beobachtest",
+      "allowed": "die Ordner, die du beobachtest, {folders}",
+      "all": "alle deine Dateien"
     }
   }
 }

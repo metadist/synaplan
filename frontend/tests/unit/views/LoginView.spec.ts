@@ -26,13 +26,14 @@ vi.mock('@/services/api/nativeServer', () => ({
 }))
 vi.mock('@/services/api/nativeOAuth', () => ({ startNativeOAuth: vi.fn() }))
 vi.mock('@/services/api/nativeAppleAuth', () => ({ startNativeAppleSignIn: vi.fn() }))
-vi.mock('@/composables/useRecaptcha', () => ({
-  useRecaptcha: () => ({ getToken: vi.fn() }),
+vi.mock('@/composables/useSignupChallenge', () => ({
+  useSignupChallenge: () => ({ getToken: vi.fn(async () => ''), isEnabled: false, provider: null }),
 }))
 vi.mock('@/composables/useAuth', () => ({
   useAuth: () => ({
     login: vi.fn(),
     error: { value: '' },
+    errorCode: { value: null },
     loading: { value: false },
     clearError: vi.fn(),
   }),

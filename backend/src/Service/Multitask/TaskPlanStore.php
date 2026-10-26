@@ -110,7 +110,7 @@ final readonly class TaskPlanStore
      * user prompt. A miss only affects that transient reload view, never the
      * turn, so failures are logged and swallowed.
      *
-     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int, ask_user?: ?array<string, mixed>} $result
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int, ask_user?: ?array<string, mixed>, folder_read?: ?array<string, mixed>} $result
      */
     public function updateNodeStatus(int $messageId, string $nodeId, string $status, array $result = []): void
     {
@@ -271,7 +271,7 @@ final readonly class TaskPlanStore
     /**
      * Encode card body fields into the BRESULTREF / BERROR columns (#1343).
      *
-     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int, ask_user?: ?array<string, mixed>} $result
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int, ask_user?: ?array<string, mixed>, folder_read?: ?array<string, mixed>} $result
      *
      * @return array{BRESULTREF: ?string, BERROR: ?string}
      */
@@ -295,8 +295,10 @@ final readonly class TaskPlanStore
         if (true === ($result['step_output_truncated'] ?? false)) {
             $ref['step_output_truncated'] = true;
         }
-        if (is_array($result['ask_user'] ?? null)) {
-            $ref['ask_user'] = $result['ask_user'];
+        foreach (['ask_user', 'folder_read'] as $key) {
+            if (is_array($result[$key] ?? null)) {
+                $ref[$key] = $result[$key];
+            }
         }
 
         $error = $result['error'] ?? null;
@@ -341,8 +343,10 @@ final readonly class TaskPlanStore
         if (true === ($decoded['step_output_truncated'] ?? false)) {
             $out['step_output_truncated'] = true;
         }
-        if (is_array($decoded['ask_user'] ?? null)) {
-            $out['ask_user'] = $decoded['ask_user'];
+        foreach (['ask_user', 'folder_read'] as $key) {
+            if (is_array($decoded[$key] ?? null)) {
+                $out[$key] = $decoded[$key];
+            }
         }
 
         return $out;

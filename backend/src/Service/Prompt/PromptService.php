@@ -5,8 +5,12 @@ namespace App\Service\Prompt;
 use App\Entity\Prompt;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Service\File\ConnectedFolderReadHonestyPrompt;
+use App\Service\Multitask\Execution\NodeContext;
+use App\Service\Multitask\Plan\TaskNode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Service for loading prompts with their metadata (AI model, tools, etc.).
@@ -48,6 +52,8 @@ final readonly class PromptService
         private PromptMetaRepository $promptMetaRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        #[Autowire(lazy: true)]
+        private ?ConnectedFolderReadHonestyPrompt $connectedFolderReadHonesty = null,
     ) {
     }
 
@@ -298,5 +304,16 @@ final readonly class PromptService
         $this->em->flush();
 
         return $prompt;
+    }
+
+    /**
+     * @param array<string, mixed> $inputs
+     */
+    public function connectedFolderReadHonestyForRunner(
+        TaskNode $node,
+        NodeContext $context,
+        array $inputs,
+    ): string {
+        return $this->connectedFolderReadHonesty?->forChatRunner($node, $context, $inputs) ?? '';
     }
 }

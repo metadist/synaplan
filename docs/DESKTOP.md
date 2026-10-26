@@ -97,7 +97,7 @@ Historically any `sk_*` key had **full** account access. Desktop pairing does
 
 | Scope | Grants |
 | ----- | ------ |
-| `desktop:messages` | `/v1/*` (chat/messages, models, token count) |
+| `desktop:messages` | `/v1/*` (chat/messages, models, token count, research) |
 | `desktop:mcp` | `/mcp` (the two agent tools + the base MCP tools) |
 | `desktop:files` | `/api/v1/files*` (upload the result artifact, list/download what the owner already may) |
 | `desktop:jobs` | `/api/v1/desktop/*` (check-in / report, job status) |
@@ -106,6 +106,8 @@ A restricted key **cannot** reach admin, user management, webhooks, or anything
 else — so a stolen laptop is a *revoke*, not an account takeover. Enforcement is
 central (`App\Security\ApiKeyScopeSubscriber`); the vocabulary and prefix map
 live in `App\Security\ApiKeyScope`.
+
+When a message pins a knowledge folder, a paired desktop key can ask Synaplan to search that folder again (`knowledge_search`) and to read one file in it (`read_document`). Synaplan runs both inside the gateway. Desktop does not answer them. Other coding-client keys do not get the tools until an admin sets `KNOWLEDGE_TOOLS` to `all`. See [Knowledge tools](ANTHROPIC_COMPATIBLE_API.md#knowledge-tools).
 
 The **Outlook add-in (Synamail)** is the other integration that mints restricted
 keys (`messages:*`, `chats:*`, `files:*`, `rag:*` — issued by its connect flow
@@ -248,7 +250,7 @@ These routes are for Synaplan Desktop. They are not a public Assistants CRUD.
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
-| `GET` | `/v1/models/catalog` | Selectable models in eight groups (`CHAT`, `SOUND2TEXT`, `TEXT2SOUND`, `PIC2TEXT`, `TEXT2PIC`, `TEXT2VID`, `VECTORIZE`, `ANALYZE`). `id` is the catalog key `service:providerId:tag`. Unavailable rows stay listed with `available` / `unavailableReason`. `defaults` is the workspace DEFAULTMODEL key per group; `VECTORIZE` is the platform index model (Ollama `bge-m3` unless the operator changed it). Desktop shows that key on the Embed slot (locked) and never sends `vectorize_model` — `DESKTOP:` folders always index with VECTORIZE so search and index stay in one space. |
+| `GET` | `/v1/models/catalog` | Selectable models in eight groups (`CHAT`, `SOUND2TEXT`, `TEXT2SOUND`, `PIC2TEXT`, `TEXT2PIC`, `TEXT2VID`, `VECTORIZE`, `ANALYZE`). `id` is the catalog key `service:providerId:tag`. Unavailable rows stay listed with `available` / `unavailableReason`. `maxOutput` is the provider output ceiling when the model row has one, and is omitted when unknown. `defaults` is the workspace DEFAULTMODEL key per group; `VECTORIZE` is the platform index model (Ollama `bge-m3` unless the operator changed it). Desktop shows that key on the Embed slot (locked) and never sends `vectorize_model` — `DESKTOP:` folders always index with VECTORIZE so search and index stay in one space. |
 | `GET` | `/v1/assistants` | Reader `publicView` list, including `models.chat` / `vision` / `vectorize`. `AGENTS.ENABLED` off → **404** with code `assistants_disabled` (not an empty list). |
 | `GET` | `/v1/assistants/{id}` | One runnable Assistant. Same 404 when the flag is off. |
 | `POST` | `/v1/messages` | Existing Anthropic SSE. Optional headers `x-synaplan-agent-id` and `x-synaplan-rag-group-key` (`DESKTOP:{projectId}`). The JSON `model` (provider id or catalog key) **always wins** over the Assistant recipe. Any catalog **chat** model on Anthropic, Gemini, or an OpenAI-compatible host (Groq, Mistral, Ollama, …) is translated; `MODEL_ALIASES` is not required. |

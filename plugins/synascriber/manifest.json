@@ -1,0 +1,26 @@
+{
+  "id": "synascriber",
+  "name": "synascriber",
+  "namespace": "Plugin\\SynaScriber",
+  "version": "0.4.1",
+  "displayName": "Meeting notes",
+  "description": "Written notes of Jitsi meetings in openDesk. Speech becomes text on your organisation's servers; audio is not kept.",
+  "author": "metadist",
+  "homepage": "https://github.com/metadist/synaScriber",
+  "license": "Apache-2.0",
+  "minSynaplanVersion": "5.1.3",
+  "capabilities": ["api", "frontend", "migrations"],
+  "routes": [
+    {"path": "/api/v1/plugins/synascriber/jitsi/silent", "method": "GET", "description": "Public: where Keycloak returns after the Jitsi button's sign-in; hands the code to the Jitsi window named in jitsi_url"},
+    {"path": "/api/v1/plugins/synascriber/jitsi/state", "method": "GET", "description": "Plugin on/off, languages, folder, and the room's active notes (Jitsi loader, Keycloak bearer)"},
+    {"path": "/api/v1/plugins/synascriber/jitsi/sessions", "method": "POST", "description": "Start meeting notes in a room"},
+    {"path": "/api/v1/plugins/synascriber/jitsi/sessions/{ref}/stop", "method": "POST", "description": "Stop meeting notes"},
+    {"path": "/api/v1/plugins/synascriber/me/sessions", "method": "GET", "description": "Meeting notes started by the signed-in person"},
+    {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}", "method": "GET", "description": "Transcriber: bind to an active session (X-Transcriber-Secret)"},
+    {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}/audio", "method": "POST", "description": "Transcriber: one audio window (Ogg Opus) for one speaker"},
+    {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}/preview", "method": "POST", "description": "Transcriber: live caption of the window so far, never stored"},
+    {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}/events", "method": "POST", "description": "Transcriber: lifecycle events; the bridge closing writes the transcript"},
+    {"path": "/api/v1/plugins/synascriber/admin/status", "method": "GET", "description": "Admin: settings and connection checks"},
+    {"path": "/api/v1/plugins/synascriber/admin/settings", "method": "PUT", "description": "Admin: update settings"}
+  ]
+}

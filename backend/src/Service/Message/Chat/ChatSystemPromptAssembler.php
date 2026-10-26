@@ -68,6 +68,7 @@ final readonly class ChatSystemPromptAssembler
         }
 
         $prompt .= $this->sections->conversationFileContext($turn->message, $turn->thread);
+        $prompt .= $this->sections->connectedFolderReadHonesty($turn->message, $turn->thread);
         $languageDirective = self::languageDirective($turn->language());
         $prompt .= $languageDirective;
         $prompt .= $this->situation($turn, $options);
@@ -127,6 +128,7 @@ final readonly class ChatSystemPromptAssembler
         }
 
         $prompt .= $this->sections->conversationFileContext($turn->message, $turn->thread);
+        $prompt .= $this->sections->connectedFolderReadHonesty($turn->message, $turn->thread);
         $languageDirective = self::languageDirective($turn->language());
         $prompt .= $languageDirective;
 

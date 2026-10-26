@@ -29,7 +29,11 @@
             data-testid="guest-banner-signup"
             class="group relative text-xs font-semibold text-white whitespace-nowrap px-2.5 py-1 rounded-full bg-brand shadow-sm overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40 sm:px-3"
           >
-            <span class="relative z-10">{{ $t('guest.banner.signUp') }}</span>
+            <span class="relative z-10">{{
+              config.auth.registrationMode === 'admission'
+                ? $t('guest.banner.signUpAdmission')
+                : $t('guest.banner.signUp')
+            }}</span>
             <span class="cta-shimmer" />
           </router-link>
         </template>

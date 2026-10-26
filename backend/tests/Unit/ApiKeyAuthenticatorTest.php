@@ -5,8 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Entity\ApiKey;
+use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
+use App\Repository\UserRepository;
 use App\Security\ApiKeyAuthenticator;
+use App\Security\ApiKeyPlanDeniedException;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -16,17 +22,23 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
 class ApiKeyAuthenticatorTest extends TestCase
 {
     private ApiKeyRepository&MockObject $apiKeyRepository;
+    private UserRepository&MockObject $users;
     private LoggerInterface&MockObject $logger;
     private ApiKeyAuthenticator $authenticator;
+    private ?User $owner = null;
 
     protected function setUp(): void
     {
         $this->apiKeyRepository = $this->createMock(ApiKeyRepository::class);
+        $this->users = $this->createMock(UserRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->users->method('find')->willReturnCallback(fn () => $this->owner ?? new User());
 
         $this->authenticator = new ApiKeyAuthenticator(
             $this->apiKeyRepository,
-            $this->logger
+            $this->users,
+            $this->logger,
+            self::gate(false),
         );
     }
 
@@ -87,6 +99,46 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->expectExceptionMessage('API key is inactive');
 
         $this->authenticator->authenticate($request);
+    }
+
+    public function testAuthenticateRejectsAPendingPaymentOwner(): void
+    {
+        $apiKey = $this->createMock(ApiKey::class);
+        $apiKey->method('isActive')->willReturn(true);
+        $apiKey->method('getId')->willReturn(1);
+        $apiKey->method('getOwnerId')->willReturn(10);
+        $this->owner = (new User())->setUserLevel('PRO')->setAccountStatus(User::ACCOUNT_STATUS_PENDING_PAYMENT);
+
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'pending-owner');
+        $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
+        $this->apiKeyRepository->expects($this->never())->method('touchLastUsed');
+
+        // Not paid yet: the plan answer (403, recovery is paying), even for
+        // the level the checkout is about to grant.
+        $this->expectException(ApiKeyPlanDeniedException::class);
+        $this->expectExceptionMessage(ApiKeyPlanRequiredException::MESSAGE);
+
+        $this->authenticatorWithBilling(true)->authenticate($request);
+    }
+
+    public function testAuthenticateRejectsASuspendedOwnerWithoutThePlanAnswer(): void
+    {
+        $apiKey = $this->activeKey();
+        $this->owner = (new User())->setUserLevel('PRO')->setAccountStatus(User::ACCOUNT_STATUS_SUSPENDED);
+
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'suspended-owner');
+        $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
+        $this->apiKeyRepository->expects($this->never())->method('touchLastUsed');
+
+        try {
+            $this->authenticatorWithBilling(true)->authenticate($request);
+            $this->fail('A suspended owner must not authenticate.');
+        } catch (AuthenticationException $e) {
+            $this->assertNotInstanceOf(ApiKeyPlanDeniedException::class, $e);
+            $this->assertSame('API key is inactive', $e->getMessage());
+        }
     }
 
     public function testAuthenticateSucceedsWithValidKey(): void
@@ -337,5 +389,89 @@ class ApiKeyAuthenticatorTest extends TestCase
         $request = new Request(['api_key' => '']);
 
         $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testAuthenticateRejectsAFreeAccountWhenBillingIsOn(): void
+    {
+        $authenticator = $this->authenticatorWithBilling(true);
+        $this->owner = new User();
+        $apiKey = $this->activeKey();
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'free-key');
+        $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
+        $this->apiKeyRepository->expects($this->never())->method('touchLastUsed');
+
+        $this->expectException(ApiKeyPlanDeniedException::class);
+        $this->expectExceptionMessage(ApiKeyPlanRequiredException::MESSAGE);
+
+        $authenticator->authenticate($request);
+    }
+
+    public function testAuthenticateAllowsAPaidAccountWhenBillingIsOn(): void
+    {
+        $authenticator = $this->authenticatorWithBilling(true);
+        $this->owner = (new User())->setUserLevel('PRO');
+        $apiKey = $this->activeKey();
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'paid-key');
+        $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
+        $this->apiKeyRepository->expects($this->once())->method('touchLastUsed');
+
+        $passport = $authenticator->authenticate($request);
+
+        $this->assertSame($apiKey, $request->attributes->get('api_key'));
+        $this->assertNotNull($passport);
+    }
+
+    public function testPlanDenialAnswers403(): void
+    {
+        $request = Request::create('/v1/chat/completions', 'POST');
+        $response = $this->authenticator->onAuthenticationFailure($request, new ApiKeyPlanDeniedException());
+
+        $this->assertSame(403, $response->getStatusCode());
+        $content = json_decode((string) $response->getContent(), true);
+        $this->assertSame(ApiKeyPlanRequiredException::CODE, $content['code']);
+        $this->assertSame(ApiKeyPlanRequiredException::MESSAGE, $content['message']);
+    }
+
+    public function testPlanDenialOnMessagesUsesPermissionError(): void
+    {
+        $request = Request::create('/v1/messages', 'POST');
+        $response = $this->authenticator->onAuthenticationFailure($request, new ApiKeyPlanDeniedException());
+
+        $this->assertSame(403, $response->getStatusCode());
+        $content = json_decode((string) $response->getContent(), true);
+        $this->assertSame('permission_error', $content['error']['type']);
+        $this->assertSame(ApiKeyPlanRequiredException::MESSAGE, $content['error']['message']);
+    }
+
+    private function authenticatorWithBilling(bool $enabled): ApiKeyAuthenticator
+    {
+        return new ApiKeyAuthenticator(
+            $this->apiKeyRepository,
+            $this->users,
+            $this->logger,
+            self::gate($enabled),
+        );
+    }
+
+    private static function gate(bool $billingEnabled): PremiumFeatureGate
+    {
+        return new PremiumFeatureGate(new BillingService(
+            $billingEnabled ? 'sk_test_suite' : '',
+            $billingEnabled ? 'price_1TestSuitePro' : '',
+        ));
+    }
+
+    private function activeKey(): ApiKey&MockObject
+    {
+        $apiKey = $this->createMock(ApiKey::class);
+        $apiKey->method('isActive')->willReturn(true);
+        $apiKey->method('getId')->willReturn(1);
+        $apiKey->method('getOwnerId')->willReturn(10);
+        $apiKey->method('getName')->willReturn('Test Key');
+        $apiKey->method('getScopes')->willReturn(['*']);
+
+        return $apiKey;
     }
 }

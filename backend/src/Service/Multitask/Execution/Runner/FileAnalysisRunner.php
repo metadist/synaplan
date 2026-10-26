@@ -10,8 +10,10 @@ use App\Repository\FileRepository;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
+use App\Service\Multitask\Execution\InputFileText;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepFiles;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -33,12 +35,15 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class FileAnalysisRunner implements TaskRunner
 {
+    private const MAX_LEGACY_FILES = 20;
+
     public function __construct(
         private FileAnalysisHandler $handler,
         private LoggerInterface $logger,
         private ?ConversationFileCatalog $conversationFiles = null,
         private ?FileRepository $fileRepository = null,
         private ?ChatErrorPresenter $errorPresenter = null,
+        private ?InputFileText $fileText = null,
     ) {
     }
 
@@ -63,6 +68,8 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $prompt = $this->stringInput($inputs['prompt'] ?? $inputs['text'] ?? null);
 
         $synthetic = $this->syntheticMessage($context, $prompt);
+        $stepFiles = StepFiles::of($node, $context, $inputs);
+        $this->attachStoredFiles($synthetic, $stepFiles, $context);
 
         // Issue #1080: a DAG can chain image_generation → file_analysis →
         // text2sound, so the file to analyze may be produced by an UPSTREAM node
@@ -73,7 +80,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
         // "skipped". When the inbound message already carries its own files the
         // user's upload wins; otherwise fall back to the upstream-generated file.
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
-            $this->attachUpstreamFile($synthetic, $inputs);
+            $this->attachUpstreamFile($synthetic, $stepFiles);
         }
 
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
@@ -160,6 +167,28 @@ final readonly class FileAnalysisRunner implements TaskRunner
     }
 
     /**
+     * Files an earlier step stored (a folder read, a cloud pickup) join the
+     * turn's own uploads, every one of them, with their text. A legacy single
+     * upload moves into the file list first, because the analysis reads that
+     * list instead of the legacy fields once it has entries.
+     *
+     * @param list<array<mixed>> $descriptors {@see StepFiles::of()}
+     */
+    private function attachStoredFiles(Message $message, array $descriptors, NodeContext $context): void
+    {
+        if (null === $this->fileText || [] === StepFiles::storedIds($descriptors)) {
+            return;
+        }
+        $messageId = $context->message->getId();
+        if ($message->getFiles()->isEmpty() && $message->getFile() > 0 && null !== $this->fileRepository && null !== $messageId) {
+            foreach ($this->fileRepository->findFilesByMessageIds((int) $message->getUserId(), [$messageId], self::MAX_LEGACY_FILES) as $legacy) {
+                $message->addFile($legacy);
+            }
+        }
+        $this->fileText->attachTo($message, $descriptors);
+    }
+
+    /**
      * Lift the first resolved upstream file descriptor out of the node's inputs
      * onto the synthetic message's legacy single-file fields (issue #1080).
      *
@@ -170,11 +199,13 @@ final readonly class FileAnalysisRunner implements TaskRunner
      * `/api/v1/files/uploads/...` form to a relative upload path itself, so
      * surfacing one path is enough to route a generated image to the vision model.
      *
-     * @param array<string, mixed> $inputs
+     * @param list<array<mixed>> $descriptors {@see StepFiles::of()}
      */
-    private function attachUpstreamFile(Message $message, array $inputs): void
+    private function attachUpstreamFile(Message $message, array $descriptors): void
     {
-        $descriptor = $this->firstUpstreamFile($inputs);
+        // A stored file is attached by id or not at all, never by its path.
+        $paths = array_values(array_filter($descriptors, static fn (array $descriptor): bool => !isset($descriptor['file_id'])));
+        $descriptor = $paths[0] ?? null;
         if (null === $descriptor) {
             return;
         }
@@ -244,58 +275,6 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $this->logger->info('FileAnalysisRunner: analyzing conversation file by path', [
             'path' => $pick->relativePath,
         ]);
-    }
-
-    /**
-     * Find the first upstream file descriptor among the resolved inputs. The
-     * `prompt`/`text` inputs are skipped; every other value is scanned because it
-     * may be a single descriptor or a list of them.
-     *
-     * @param array<string, mixed> $inputs
-     *
-     * @return array<string, mixed>|null
-     */
-    private function firstUpstreamFile(array $inputs): ?array
-    {
-        foreach ($inputs as $key => $value) {
-            if ('prompt' === $key || 'text' === $key) {
-                continue;
-            }
-            $descriptor = $this->findDescriptor($value);
-            if (null !== $descriptor) {
-                return $descriptor;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Recursively locate the first file descriptor (an array carrying a `path` or
-     * `local_path`) inside a resolved input value.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function findDescriptor(mixed $value): ?array
-    {
-        if (!is_array($value)) {
-            return null;
-        }
-
-        $hasPath = (isset($value['local_path']) && is_string($value['local_path']) && '' !== $value['local_path'])
-            || (isset($value['path']) && is_string($value['path']) && '' !== $value['path']);
-        if ($hasPath) {
-            return $value;
-        }
-
-        foreach ($value as $item) {
-            $descriptor = $this->findDescriptor($item);
-            if (null !== $descriptor) {
-                return $descriptor;
-            }
-        }
-
-        return null;
     }
 
     private function stringInput(mixed $value): ?string

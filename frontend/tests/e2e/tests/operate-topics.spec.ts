@@ -38,9 +38,14 @@ test.describe('@ci Operate topics', () => {
       const flyout = await openOperatePanel(page)
       const links = flyout.locator('[data-testid^="link-sidebar-v2-admin-"]')
       await expect(links.last()).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      // Partners is listed only when the install has a public https address.
+      // Partners is listed only when the install has a public https address;
+      // Capacity only while the watchdog reports (capacity.spec.ts covers it).
       const ids = await links.evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')))
-      expect(ids.filter((id) => id !== 'link-sidebar-v2-admin-partners')).toEqual([
+      const environmentDependent = [
+        'link-sidebar-v2-admin-partners',
+        'link-sidebar-v2-admin-capacity',
+      ]
+      expect(ids.filter((id) => !environmentDependent.includes(id ?? ''))).toEqual([
         'link-sidebar-v2-admin-dashboard',
         'link-sidebar-v2-admin-features',
         'link-sidebar-v2-admin-setup',

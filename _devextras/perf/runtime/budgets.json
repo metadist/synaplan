@@ -1,0 +1,60 @@
+{
+  "rows": [
+    {
+      "id": "health_p95_idle_1",
+      "metric": "health.clients1.p95_ms",
+      "max": 15,
+      "enforce": true,
+      "label": "GET /api/health p95, 1 client, worker mode",
+      "note": "Master plan section 6. After AU2 the budget is 5 ms."
+    },
+    {
+      "id": "health_p95_idle_8",
+      "metric": "health.clients8.p95_ms",
+      "max": 15,
+      "enforce": false,
+      "label": "GET /api/health p95, 8 clients, worker mode",
+      "note": "Recorded beside the idle budget. Section 6's 15 ms is the one-client idle row; eight clients are not that row."
+    },
+    {
+      "id": "probe_while_saturated",
+      "metric": "saturation.probe_p95_ms",
+      "max": 50,
+      "enforce": false,
+      "label": "API probe p95 while 12 slow streams hold 8 workers",
+      "note": "In force after AU3. A single pool waits about 11 s; recorded, not failed."
+    },
+    {
+      "id": "pipeline_overhead",
+      "metric": "pipeline.p95_ms",
+      "max": 1,
+      "enforce": false,
+      "label": "Pipeline overhead per AI call",
+      "note": "AU10 onward. Not measured by this target yet."
+    },
+    {
+      "id": "gateway_ttft",
+      "metric": "gateway.ttft_p50_ms",
+      "max": null,
+      "enforce": false,
+      "label": "Gateway time to first text token, test-model",
+      "note": "AU1 baseline against test-model. Later, gateway minus direct stays within this baseline plus 15 ms median."
+    },
+    {
+      "id": "watchdog_hop",
+      "metric": "watchdog.ttfb_p95_ms",
+      "max": 5,
+      "enforce": false,
+      "label": "Watchdog hop TTFB",
+      "note": "AU31."
+    },
+    {
+      "id": "streams_held",
+      "metric": "streams.held",
+      "min": 500,
+      "enforce": false,
+      "label": "Streams held per server at 10 s",
+      "note": "AU31. Minimum 500 once that step lands."
+    }
+  ]
+}

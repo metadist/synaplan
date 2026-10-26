@@ -7,7 +7,6 @@ namespace App\Service\Admin;
 use App\AI\Credential\ChatReadinessService;
 use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
-use App\Repository\ConfigRepository;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,11 +16,11 @@ final readonly class AdminModelsService
     public function __construct(
         private EntityManagerInterface $em,
         private ModelRepository $modelRepository,
-        private ConfigRepository $configRepository,
         private ModelImportService $importService,
         private ModelSqlValidator $sqlValidator,
         private ModelPriceHistoryRepository $priceHistoryRepository,
         private ChatReadinessService $chatReadiness,
+        private DefaultModelMover $defaultModelMover,
     ) {
     }
 
@@ -174,23 +173,24 @@ final readonly class AdminModelsService
         return $model;
     }
 
-    public function deleteModel(int $id): void
+    /**
+     * @return array{
+     *     moved: list<array{setting: string, scope: string, ownerId: int, modelId: int, modelName: string}>,
+     *     cleared: list<array{setting: string, scope: string, ownerId: int}>
+     * }
+     */
+    public function deleteModel(int $id): array
     {
         $model = $this->modelRepository->find($id);
         if (!$model) {
             throw new ModelNotFoundException('Model not found');
         }
 
-        $usageCount = $this->configRepository->count([
-            'group' => 'DEFAULTMODEL',
-            'value' => (string) $id,
-        ]);
-        if ($usageCount > 0) {
-            throw new ModelConflictException('Model is referenced by DEFAULTMODEL configuration. Change defaults first before deleting.');
-        }
-
+        $released = $this->defaultModelMover->release($model);
         $this->em->remove($model);
         $this->em->flush();
+
+        return $released;
     }
 
     /**

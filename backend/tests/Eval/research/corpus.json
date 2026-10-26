@@ -1,0 +1,340 @@
+[
+  {
+    "id": "fact-01",
+    "category": "current",
+    "language": "en",
+    "question": "What is the number of the EU Artificial Intelligence Act published in 2024?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The Act is Regulation (EU) 2024/1689.", "kind": "fact", "match": ["2024/1689"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": "2027-06-01",
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "cmp-01",
+    "category": "comparison",
+    "language": "en",
+    "question": "Which of SearXNG and Brave Search is the self-hosted metasearch engine?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "SearXNG is the self-hosted engine.", "kind": "fact", "match": ["SearXNG"] }
+    ],
+    "preferred_sources": ["docs.searxng.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "reg-01",
+    "category": "regulation",
+    "language": "de",
+    "question": "Innerhalb welcher Frist in Stunden muss eine meldepflichtige Datenschutzverletzung der Aufsichtsbehörde gemeldet werden?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "Die Frist beträgt 72 Stunden.", "kind": "fact", "match": ["72"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "reg-02",
+    "category": "regulation",
+    "language": "de",
+    "question": "Welcher Artikel der DSGVO regelt das Recht auf Löschung?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "Artikel 17 regelt das Recht auf Löschung.", "kind": "fact", "match": ["17"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "tech-01",
+    "category": "technical",
+    "language": "en",
+    "question": "Which HTTP status code means the resource was created?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "HTTP 201 means created.", "kind": "fact", "match": ["201"] }
+    ],
+    "preferred_sources": ["developer.mozilla.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "sci-01",
+    "category": "science",
+    "language": "en",
+    "question": "What is the defined speed of light in vacuum, in metres per second?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The speed is 299792458 metres per second.", "kind": "fact", "match": ["299792458"] }
+    ],
+    "preferred_sources": ["www.bipm.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "local-01",
+    "category": "local",
+    "language": "es",
+    "question": "¿Cuál es la capital de España?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "La capital es Madrid.", "kind": "fact", "match": ["Madrid"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "doc-01",
+    "category": "documents",
+    "language": "de",
+    "question": "Wie lang ist die Kündigungsfrist im Rahmenvertrag A?",
+    "depth": "standard",
+    "sources": { "web": false, "knowledge": true },
+    "gold": [
+      { "id": "g1", "assertion": "Die Kündigungsfrist beträgt drei Monate.", "kind": "fact", "match": ["drei Monate"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "mix-01",
+    "category": "mixed",
+    "language": "de",
+    "question": "Nenne die Vertragsnummer aus dem Rahmenvertrag A und die Meldefrist einer Datenschutzverletzung in Stunden.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": true },
+    "gold": [
+      { "id": "g1", "assertion": "Die Vertragsnummer ist ZEBRA-41 und die Frist beträgt 72 Stunden.", "kind": "fact", "match": ["ZEBRA-41", "72"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "trap-01",
+    "category": "trap",
+    "language": "de",
+    "question": "Welche Pflichten nennt Artikel 4 der Synaplan-Verordnung von 2019?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": { "kind": "abstain", "forbidden": ["Synaplan-Verordnung verpflichtet"] },
+    "smoke": true,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "fact-02",
+    "category": "current",
+    "language": "en",
+    "question": "In which year was EU Regulation 2024/1689, the Artificial Intelligence Act, published?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "It was published in 2024.", "kind": "fact", "match": ["2024"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": "2027-06-01",
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "cmp-02",
+    "category": "comparison",
+    "language": "en",
+    "question": "Which database uses TCP port 5432 by default, PostgreSQL or MariaDB?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "PostgreSQL uses port 5432.", "kind": "fact", "match": ["PostgreSQL"] }
+    ],
+    "preferred_sources": ["www.postgresql.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "reg-03",
+    "category": "regulation",
+    "language": "de",
+    "question": "Wie lautet die Nummer der Datenschutz-Grundverordnung?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "Die Nummer ist 2016/679.", "kind": "fact", "match": ["2016/679"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "tech-02",
+    "category": "technical",
+    "language": "en",
+    "question": "What does HTTP status 404 mean?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "404 means Not Found.", "kind": "fact", "match": ["Not Found"] }
+    ],
+    "preferred_sources": ["developer.mozilla.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "sci-02",
+    "category": "science",
+    "language": "en",
+    "question": "What is the chemical symbol of water?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The symbol is H2O.", "kind": "fact", "match": ["H2O"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "local-02",
+    "category": "local",
+    "language": "fr",
+    "question": "Quelle est la capitale de la France ?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "La capitale est Paris.", "kind": "fact", "match": ["Paris"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "doc-02",
+    "category": "documents",
+    "language": "de",
+    "question": "Wie hoch ist der Listenpreis in EUR in der Preisliste?",
+    "depth": "standard",
+    "sources": { "web": false, "knowledge": true },
+    "gold": [
+      { "id": "g1", "assertion": "Der Listenpreis beträgt 1500 EUR.", "kind": "fact", "match": ["1500"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "doc-03",
+    "category": "documents",
+    "language": "de",
+    "question": "Welches Kickoff-Datum steht im Protokoll?",
+    "depth": "standard",
+    "sources": { "web": false, "knowledge": true },
+    "gold": [
+      { "id": "g1", "assertion": "Das Kickoff ist am 14. März.", "kind": "fact", "match": ["14. März"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "mix-02",
+    "category": "mixed",
+    "language": "en",
+    "question": "What is the list price in EUR from the price list, and which TCP port does PostgreSQL use by default?",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": true },
+    "gold": [
+      { "id": "g1", "assertion": "The list price is 1500 EUR and PostgreSQL uses port 5432.", "kind": "fact", "match": ["1500", "5432"] }
+    ],
+    "preferred_sources": ["www.postgresql.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  },
+  {
+    "id": "trap-02",
+    "category": "trap",
+    "language": "en",
+    "question": "Confirm that the EU AI Act was published as Regulation 2019/1.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The Act is Regulation 2024/1689.", "kind": "fact", "match": ["2024/1689"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": "2027-06-01",
+    "trap": { "kind": "outdated", "forbidden": ["2019/1 is the AI Act"] },
+    "smoke": false,
+    "written_by": "rq2",
+    "checked_on": "2026-10-22"
+  }
+]

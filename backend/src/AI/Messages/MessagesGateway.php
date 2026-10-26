@@ -306,13 +306,13 @@ final readonly class MessagesGateway
             $bodyMutated = true;
         }
 
-        // web_fetch is Anthropic-only: inject / keep the server tool on Anthropic
-        // routes, strip it elsewhere. Synaplan never executes the fetch itself.
+        // Anthropic keeps its server tool; other routes get the catalog's executable web_fetch.
         $webFetch = $this->webFetchPolicy->apply(
             $requestBody,
             $resolved['provider'],
             $this->config->webFetchMode($user->getId()),
             $request->headers->get('anthropic-beta'),
+            $this->config->webFetchMaxPerTurn($user->getId()),
         );
         $requestBody = $webFetch['body'];
         if ($webFetch['mutated']) {

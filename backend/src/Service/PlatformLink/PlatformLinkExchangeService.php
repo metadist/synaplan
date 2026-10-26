@@ -13,6 +13,7 @@ use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
 use App\Service\PlatformLink\Exception\PlatformLinkCodeException;
@@ -32,6 +33,7 @@ final readonly class PlatformLinkExchangeService
         private PlatformInstanceRepository $instanceRepository,
         private AuditLogWriter $auditLogWriter,
         private DeliveryNotifier $notifier,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -64,10 +66,7 @@ final readonly class PlatformLinkExchangeService
             throw PlatformLinkCodeException::unknown();
         }
 
-        $user = $this->userRepository->find($payload['userId']);
-        if (!$user instanceof User) {
-            throw PlatformLinkCodeException::unknown();
-        }
+        $user = $this->linkingUser($payload['userId']);
 
         $userCountBefore = $this->userRepository->count([]);
         $mailBefore = $user->getMail();
@@ -103,7 +102,7 @@ final readonly class PlatformLinkExchangeService
             $instance->getClient(),
             $payload['externalId'],
             $instance->getInstanceId(),
-            (int) $apiKey->getId(),
+            (int) $apiKey->getId(), ExternalIdentity::MODE_LINK,
         );
 
         $instance->touchLastSeen();
@@ -170,7 +169,7 @@ final readonly class PlatformLinkExchangeService
     }
 
     /**
-     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, can_copy: bool}>
+     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, can_copy: bool, can_read: bool, read_scope: array{mode: string, folders: list<string>}}>
      */
     public function listForUser(int $userId): array
     {
@@ -202,10 +201,28 @@ final readonly class PlatformLinkExchangeService
                 'created' => $identity->getCreated(),
                 'last_seen' => $identity->getLastSeen(),
                 'can_copy' => $instance->canReceiveCopies(),
+                'can_read' => $instance->reports('pickups'),
+                'read_scope' => $this->readScopeOf($identity),
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * @return array{mode: string, folders: list<string>}
+     */
+    private function readScopeOf(ExternalIdentity $identity): array
+    {
+        $scope = $identity->readScope();
+        $folders = [];
+        foreach ($scope['folders'] as $folder) {
+            if ('' !== $folder['path']) {
+                $folders[] = $folder['path'];
+            }
+        }
+
+        return ['mode' => in_array($scope['mode'], ['watched', 'allowed', 'all'], true) ? $scope['mode'] : 'watched', 'folders' => $folders];
     }
 
     /**
@@ -314,5 +331,20 @@ final readonly class PlatformLinkExchangeService
         };
 
         return sprintf('%s: %s (%s)', $prefix, $instance->getHost(), $externalId);
+    }
+
+    /**
+     * The account the code was issued for. Linking mints an API key, so a
+     * free account on an install that sells subscriptions is refused.
+     */
+    private function linkingUser(int $userId): User
+    {
+        $user = $this->userRepository->find($userId);
+        if (!$user instanceof User) {
+            throw PlatformLinkCodeException::unknown();
+        }
+        $this->premiumFeatureGate->assertApiKeysAllowed($user);
+
+        return $user;
     }
 }

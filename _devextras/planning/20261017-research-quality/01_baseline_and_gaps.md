@@ -28,7 +28,10 @@ because of the **harness** around the model, not the model:
 Synaplan already owns most of the parts — search, page reading, condensing,
 knowledge search with rerank, a planner, a desktop agent loop, a rich model
 catalog — but wires them as **retrieve-then-answer once**. This plan rewires
-them into a loop with a division of labour.
+them into a loop with a division of labour, in which the lead model drives the
+tools itself wherever its tool calling is reliable and the engine keeps the
+budget, the quarantine and the citation checks (`00` §0 #2, revised
+2026-10-22).
 
 ---
 

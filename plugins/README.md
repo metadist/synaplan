@@ -7,6 +7,15 @@ autoconfigures its services. The plugins directory can be overridden with the
 `PLUGINS_DIR` environment variable (defaults to `/plugins`, then
 `backend/plugins`).
 
+## Frontend files
+
+Files under `plugins/<id>/frontend/` are served publicly at
+`/api/v1/plugins/<id>/assets/<path>` (and, for the plugin page inside
+Synaplan, at `/api/v1/user/<userId>/plugins/<id>/assets/<path>` once the user
+installed the plugin). Use the first address for pages outside Synaplan, such
+as a script tag in another app: it does not depend on an account. Nothing
+outside `frontend/` is reachable, so never put a secret there.
+
 ## Contributing a plug adapter
 
 A **plug** is a capability slot with interchangeable providers. A plugin can
@@ -64,10 +73,20 @@ Steps:
    The `class` must live under the plugin `namespace`; the `key` must match your
    adapter's `key()`. Two adapters on the same port may not share a key (prefix
    with the plugin id when in doubt) — a collision is a boot error.
-6. **Ship a contract test** on recorded fixtures under
-   `plugins/<id>/backend/tests/` — no live network in tests.
-7. **Locales:** descriptor labels are plain strings; plugins have no i18n hook
-   in v1 (documented limitation).
+6. **Ship a contract test** under `backend/tests/Plugin/<PluginId>/`.
+   `plugins/<id>/backend/tests/` keeps fixtures only — PHPUnit, PHPStan and
+   php-cs-fixer already reach the test tree next to the app.
+7. **Locales:** a plugin page ships `frontend/locales/{de,en,es,fr,tr}.json`.
+   Synaplan loads the active locale (English as fallback) and passes `t(key)`
+   and `locale` into `mount`. Keys are the plugin's own. A script outside the
+   app, such as the Jitsi loader, fetches
+   `/api/v1/plugins/<id>/assets/locales/<lang>.json`.
+8. **Checks.** Plugin PHP is in `make -C backend lint` and `make -C backend phpstan`
+   (level 5, findings fixed in the plugin). Plugin JavaScript is in
+   `make -C frontend lint` (ESLint + Prettier). `make plugins-format` writes
+   the fixes; the running containers mount `plugins/` read-only. A host
+   PHPStan run without `/plugins` fails, which is the honest outcome — the
+   gate runs in the container and in CI, where `/plugins` exists.
 
 See `plugins/serper_search/` for a complete, minimal reference: one manifest,
 one adapter, a pure result mapper, and a fixture. Its behavioural contract is

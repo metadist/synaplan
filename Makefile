@@ -1,4 +1,4 @@
-.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal
+.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal perf-runtime
 
 up: ## Start the stack (status page first, then remaining images)
 	./scripts/compose-up.sh
@@ -14,6 +14,14 @@ help: ## Show this help
 lint: ## Check code quality (backend PSR-12 + frontend types)
 	$(MAKE) -C backend lint
 	$(MAKE) -C frontend lint
+
+plugins-format: ## Format plugins/ (read-write one-off; service mounts stay read-only)
+	docker compose run --rm --no-deps --entrypoint ./vendor/bin/php-cs-fixer \
+		-v ./plugins:/plugins:rw -w /var/www/backend backend \
+		fix --config=.php-cs-fixer.dist.php /plugins
+	docker compose run --rm --no-deps --entrypoint /bin/bash \
+		-v ./plugins:/plugins:rw -v ./frontend:/app -w /app frontend \
+		-lc 'if [ ! -x node_modules/.bin/prettier ]; then npm ci; fi; npx prettier --write --config /app/.prettierrc "/plugins/**/*.js"'
 
 format: ## Fix code formatting (backend + frontend)
 	$(MAKE) -C backend format
@@ -77,3 +85,6 @@ build: ## Build everything (frontend app + widget)
 deps: ## Install all dependencies (backend + frontend)
 	$(MAKE) -C backend deps
 	$(MAKE) -C frontend deps
+
+perf-runtime: ## Runtime benchmarks on the dev stack. ARGS=--with-providers opts into paid providers.
+	./_devextras/perf/runtime/run.sh $(ARGS)

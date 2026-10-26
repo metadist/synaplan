@@ -80,6 +80,15 @@ final class SetupLockdownSubscriberTest extends WebTestCase
         );
     }
 
+    public function testTheReadinessProbeStaysReachable(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $client->request('GET', '/api/health/ready');
+
+        self::assertResponseIsSuccessful();
+    }
+
     /**
      * The SPA cannot learn that it should go to /setup any other way, so this is
      * the one endpoint whose availability the whole flow depends on.

@@ -6,6 +6,8 @@ PHP does not see the media. Configuration, the Jitsi snippet, and saved transcri
 
 Operator guide: [`docs/OPENDESK_MEETING_NOTES.md`](../../docs/OPENDESK_MEETING_NOTES.md).
 
+The image is `ghcr.io/metadist/synaplan-transcriber`. CI publishes `ci-<sha>-amd64` from the tested tar and `ci-<sha>-arm64` from a native build, then a manifest under `latest` on `main` or `<version>`, `<major>.<minor>` and `<major>` on a release tag. A promote tag moves those aliases onto the already published digests. There is no short-commit tag.
+
 ```bash
 npm test
 npm start
@@ -20,3 +22,12 @@ Modes (`TRANSCRIBER_MODE`):
 | `opendesk` | Both. This is the openDesk default |
 
 `GET /health` reports which side is on. `GET /element-call` explains why live Element Call captions are not in this version: the bot would have to join as a visible participant.
+
+## Prosody module
+
+`prosody/mod_synascriber.lua` is Jitsi's side of meeting notes: loaded on
+Jitsi's Prosody (`XMPP_MODULES=synascriber`, secret `SYNASCRIBER_SECRET`), it
+lets the synascriber plugin switch the bridge transcription per room
+(`POST /synascriber/start`, `/stop`, `GET /state`, `/health`). It ships in
+this image under `/app/prosody/`; synaplan-charts copies it into the Prosody
+pod with an init container.

@@ -103,7 +103,7 @@ final readonly class ChatRunner implements TaskRunner
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
-        $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
+        $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt'], $inputs);
         $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text, $modelId);
         $ragChunks = 0;
         $ragSources = [];
@@ -439,8 +439,16 @@ final readonly class ChatRunner implements TaskRunner
         );
     }
 
-    private function systemPrompt(TaskNode $node, string $language, NodeContext $context, ?string $topicPrompt = null): string
-    {
+    /**
+     * @param array<string, mixed> $inputs
+     */
+    private function systemPrompt(
+        TaskNode $node,
+        string $language,
+        NodeContext $context,
+        ?string $topicPrompt,
+        array $inputs,
+    ): string {
         $task = null !== $topicPrompt && '' !== $topicPrompt
             ? $topicPrompt
             : match ($node->capability) {
@@ -455,7 +463,9 @@ final readonly class ChatRunner implements TaskRunner
                 default => 'You are a helpful assistant.',
             };
 
-        return $this->withAssistantInstructions($task, $context).$this->pipelineDirective($context);
+        return $this->withAssistantInstructions($task, $context)
+            .$this->pipelineDirective($context)
+            .$this->promptService->connectedFolderReadHonestyForRunner($node, $context, $inputs);
     }
 
     /**

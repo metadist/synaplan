@@ -1788,6 +1788,21 @@
                 "tab": "auth",
                 "type": "boolean"
             },
+            "REGISTRATION_MODE": {
+                "dbGroup": "ACCESS",
+                "dbKey": "REGISTRATION_MODE",
+                "default": "open",
+                "description": "How a visitor gets an account. \"open\": anyone may create a free account (the default for a self-hosted install). \"admission\": a new account needs either a paid plan — the account waits as \"pending payment\" until the first invoice is paid and is removed after 7 days without one — or an invitation code you create under People → Invitation codes. Existing accounts are not affected. Takes effect immediately, no restart.",
+                "options": [
+                    "open",
+                    "admission"
+                ],
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "select"
+            },
             "SAVEDTASKS_ENABLED": {
                 "dbGroup": "SAVEDTASKS",
                 "dbKey": "ENABLED",
@@ -1797,6 +1812,17 @@
                 "sensitive": false,
                 "source": "database",
                 "tab": "routing",
+                "type": "boolean"
+            },
+            "SIGNUP_PAUSED": {
+                "dbGroup": "SIGNUP",
+                "dbKey": "PAUSED",
+                "default": "false",
+                "description": "Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. In admission mode a valid invitation code still opens an account; the sign-up limits apply to it. Existing accounts sign in as usual. Takes effect immediately, no restart.",
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
                 "type": "boolean"
             },
             "SYNAPLAN_TTS_URL": {
@@ -1965,6 +1991,22 @@
                 "source": "database",
                 "tab": "ai",
                 "type": "password"
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile secret key",
+                "section": "recaptcha",
+                "sensitive": true,
+                "tab": "auth",
+                "type": "password"
+            },
+            "TURNSTILE_SITE_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile site key. With both Turnstile keys set, Turnstile runs in front of sign-up, sign-in and every Google/GitHub/Apple start, and reCAPTCHA is ignored. Fails closed.",
+                "section": "recaptcha",
+                "sensitive": false,
+                "tab": "auth",
+                "type": "text"
             },
             "USAGE_TAXIMETER_ENABLED": {
                 "dbGroup": "USAGE_TAXIMETER",
@@ -2225,20 +2267,24 @@
                     {
                         "fields": [
                             "REGISTRATION_ENABLED",
-                            "GUEST_CHAT_ENABLED"
+                            "REGISTRATION_MODE",
+                            "GUEST_CHAT_ENABLED",
+                            "SIGNUP_PAUSED"
                         ],
                         "id": "access",
                         "label": "Who can use this instance"
                     },
                     {
                         "fields": [
+                            "TURNSTILE_SITE_KEY",
+                            "TURNSTILE_SECRET_KEY",
                             "RECAPTCHA_ENABLED",
                             "RECAPTCHA_SITE_KEY",
                             "RECAPTCHA_SECRET_KEY",
                             "RECAPTCHA_MIN_SCORE"
                         ],
                         "id": "recaptcha",
-                        "label": "reCAPTCHA v3"
+                        "label": "Human check (Turnstile, reCAPTCHA v3)"
                     },
                     {
                         "fields": [
@@ -3662,11 +3708,23 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
@@ -3757,6 +3815,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -4363,6 +4431,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
                 "isSet": false,
@@ -4440,6 +4514,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "FEATURE_MODULES_GATE_RESEARCH": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "FEATURE_MODULES_GATE_SEARXNG": {
                 "isMasked": false,
@@ -4928,11 +5008,23 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
@@ -5023,6 +5115,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -6087,6 +6189,17 @@
                 "tab": "features",
                 "type": "boolean"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "dbGroup": "MODULES",
+                "dbKey": "GATE_CAPACITY",
+                "default": "true",
+                "description": "Hide the \"capacity\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. On is the shipped default for new installs. Configure the module first — see Operate → System status.",
+                "section": "modules",
+                "sensitive": false,
+                "source": "database",
+                "tab": "features",
+                "type": "boolean"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "dbGroup": "MODULES",
                 "dbKey": "GATE_CHAT_ARTIFACTS",
@@ -6224,6 +6337,17 @@
                 "dbKey": "GATE_PIPER_TTS",
                 "default": "true",
                 "description": "Hide the \"piper_tts\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. On is the shipped default for new installs. Configure the module first — see Operate → System status.",
+                "section": "modules",
+                "sensitive": false,
+                "source": "database",
+                "tab": "features",
+                "type": "boolean"
+            },
+            "FEATURE_MODULES_GATE_RESEARCH": {
+                "dbGroup": "MODULES",
+                "dbKey": "GATE_RESEARCH",
+                "default": "false",
+                "description": "Hide the \"research\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. Off (the shipped default) keeps the module visible with a \"needs setup\" state. Configure the module first — see Operate → System status.",
                 "section": "modules",
                 "sensitive": false,
                 "source": "database",
@@ -7062,6 +7186,21 @@
                 "tab": "auth",
                 "type": "boolean"
             },
+            "REGISTRATION_MODE": {
+                "dbGroup": "ACCESS",
+                "dbKey": "REGISTRATION_MODE",
+                "default": "open",
+                "description": "How a visitor gets an account. \"open\": anyone may create a free account (the default for a self-hosted install). \"admission\": a new account needs either a paid plan — the account waits as \"pending payment\" until the first invoice is paid and is removed after 7 days without one — or an invitation code you create under People → Invitation codes. Existing accounts are not affected. Takes effect immediately, no restart.",
+                "options": [
+                    "open",
+                    "admission"
+                ],
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "select"
+            },
             "SAVEDTASKS_ENABLED": {
                 "dbGroup": "SAVEDTASKS",
                 "dbKey": "ENABLED",
@@ -7071,6 +7210,17 @@
                 "sensitive": false,
                 "source": "database",
                 "tab": "routing",
+                "type": "boolean"
+            },
+            "SIGNUP_PAUSED": {
+                "dbGroup": "SIGNUP",
+                "dbKey": "PAUSED",
+                "default": "false",
+                "description": "Pause sign-up. Emergency switch for a flood of fake accounts: while on, no new account can be created on any path (email, Google, GitHub, Apple) and the person is told sign-up is paused. In admission mode a valid invitation code still opens an account; the sign-up limits apply to it. Existing accounts sign in as usual. Takes effect immediately, no restart.",
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
                 "type": "boolean"
             },
             "SYNAPLAN_TTS_URL": {
@@ -7239,6 +7389,22 @@
                 "source": "database",
                 "tab": "ai",
                 "type": "password"
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile secret key",
+                "section": "recaptcha",
+                "sensitive": true,
+                "tab": "auth",
+                "type": "password"
+            },
+            "TURNSTILE_SITE_KEY": {
+                "default": "",
+                "description": "Cloudflare Turnstile site key. With both Turnstile keys set, Turnstile runs in front of sign-up, sign-in and every Google/GitHub/Apple start, and reCAPTCHA is ignored. Fails closed.",
+                "section": "recaptcha",
+                "sensitive": false,
+                "tab": "auth",
+                "type": "text"
             },
             "USAGE_TAXIMETER_ENABLED": {
                 "dbGroup": "USAGE_TAXIMETER",
@@ -7499,20 +7665,24 @@
                     {
                         "fields": [
                             "REGISTRATION_ENABLED",
-                            "GUEST_CHAT_ENABLED"
+                            "REGISTRATION_MODE",
+                            "GUEST_CHAT_ENABLED",
+                            "SIGNUP_PAUSED"
                         ],
                         "id": "access",
                         "label": "Who can use this instance"
                     },
                     {
                         "fields": [
+                            "TURNSTILE_SITE_KEY",
+                            "TURNSTILE_SECRET_KEY",
                             "RECAPTCHA_ENABLED",
                             "RECAPTCHA_SITE_KEY",
                             "RECAPTCHA_SECRET_KEY",
                             "RECAPTCHA_MIN_SCORE"
                         ],
                         "id": "recaptcha",
-                        "label": "reCAPTCHA v3"
+                        "label": "Human check (Turnstile, reCAPTCHA v3)"
                     },
                     {
                         "fields": [
@@ -7776,6 +7946,7 @@
                     },
                     {
                         "fields": [
+                            "FEATURE_MODULES_GATE_CAPACITY",
                             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS",
                             "FEATURE_MODULES_GATE_COMPUTE",
                             "FEATURE_MODULES_GATE_DOCLING",
@@ -7789,6 +7960,7 @@
                             "FEATURE_MODULES_GATE_OFFICE_CONVERT",
                             "FEATURE_MODULES_GATE_OPENDESK_STT",
                             "FEATURE_MODULES_GATE_PIPER_TTS",
+                            "FEATURE_MODULES_GATE_RESEARCH",
                             "FEATURE_MODULES_GATE_SEARXNG",
                             "FEATURE_MODULES_GATE_STRIPE_BILLING",
                             "FEATURE_MODULES_GATE_TELEGRAM",
@@ -8516,6 +8688,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
                 "isSet": false,
@@ -8593,6 +8771,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "FEATURE_MODULES_GATE_RESEARCH": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "FEATURE_MODULES_GATE_SEARXNG": {
                 "isMasked": false,
@@ -9075,11 +9259,23 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
@@ -9170,6 +9366,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -10217,11 +10423,23 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
@@ -10312,6 +10530,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -11377,11 +11605,23 @@
                 "locked": false,
                 "value": "false"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "SYNAPLAN_TTS_URL": {
                 "isMasked": false,
@@ -11472,6 +11712,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -12074,6 +12324,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
                 "isSet": false,
@@ -12151,6 +12407,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "FEATURE_MODULES_GATE_RESEARCH": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "FEATURE_MODULES_GATE_SEARXNG": {
                 "isMasked": false,
@@ -12633,9 +12895,21 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": true,
+                "locked": false,
+                "value": "false"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
                 "locked": false,
                 "value": "false"
             },
@@ -12728,6 +13002,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {
@@ -13330,6 +13614,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_CAPACITY": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS": {
                 "isMasked": false,
                 "isSet": false,
@@ -13407,6 +13697,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "FEATURE_MODULES_GATE_RESEARCH": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "FEATURE_MODULES_GATE_SEARXNG": {
                 "isMasked": false,
@@ -13889,10 +14185,22 @@
                 "locked": false,
                 "value": "true"
             },
+            "REGISTRATION_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "open"
+            },
             "SAVEDTASKS_ENABLED": {
                 "isMasked": false,
                 "isSet": true,
                 "locked": true,
+                "value": "false"
+            },
+            "SIGNUP_PAUSED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
                 "value": "false"
             },
             "SYNAPLAN_TTS_URL": {
@@ -13984,6 +14292,16 @@
                 "isMasked": false,
                 "isSet": false,
                 "keySource": "none",
+                "value": ""
+            },
+            "TURNSTILE_SECRET_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "TURNSTILE_SITE_KEY": {
+                "isMasked": false,
+                "isSet": false,
                 "value": ""
             },
             "USAGE_TAXIMETER_ENABLED": {

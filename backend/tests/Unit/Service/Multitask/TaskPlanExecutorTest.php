@@ -296,6 +296,11 @@ final class TaskPlanExecutorTest extends TestCase
         $this->assertFailedCapabilityDoesNotFallBack('mcp_action', 'Confluence reported an error: space not found');
     }
 
+    public function testARefusedFolderReadDoesNotFallBackToLegacyRouter(): void
+    {
+        $this->assertFailedCapabilityDoesNotFallBack('folder_fetch', 'Synaplan may not read HR/Contracts in your Nextcloud. Nothing was read.');
+    }
+
     private function assertFailedCapabilityDoesNotFallBack(string $capability, string $error): void
     {
         $plan = TaskPlan::fromArray([

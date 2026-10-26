@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Research;
 use App\Plug\PlugConfigService;
 use App\Service\Context\CondensedText;
 use App\Service\Context\ContextCondenser;
+use App\Service\Research\Run\Source\ResearchSourceReader;
 use App\Service\Research\UrlContentResult;
 use App\Service\Research\UrlContentService;
 use App\Service\Research\WebResearchService;
@@ -314,8 +315,68 @@ final class WebResearchServiceTest extends TestCase
         self::assertCount(3, $read->pages);
     }
 
-    private function service(): WebResearchService
+    public function testDeepenLeavesDocumentsUnreadWhenTheFlagIsOff(): void
     {
-        return new WebResearchService($this->urlContent, $this->condenser, $this->plugConfig, new NullLogger());
+        $this->plugConfig->method('isWebSearchReadDocumentsEnabled')->willReturn(false);
+        $reader = $this->createMock(ResearchSourceReader::class);
+        $reader->expects(self::never())->method('fetchForDeepen');
+        $fetched = [];
+        $this->urlContent->method('fetchForReading')->willReturnCallback(function (string $url) use (&$fetched): UrlContentResult {
+            $fetched[] = $url;
+
+            return new UrlContentResult($url, str_repeat('Article body. ', 40), 'Title', 'alpha.example', true);
+        });
+        $results = ['query' => 'q', 'results' => [
+            ['title' => 'Report', 'url' => 'https://gov.example.de/report.pdf', 'description' => ''],
+            ['title' => 'Page', 'url' => 'https://alpha.example/story', 'description' => ''],
+        ]];
+
+        $out = $this->service($reader)->deepen($results, 'What does it say?', 7);
+
+        self::assertSame(['https://alpha.example/story'], $fetched);
+        self::assertArrayNotHasKey('page_content', $out['results'][0]);
+        self::assertTrue($out['results'][1]['fetched']);
+    }
+
+    public function testDeepenReadsADocumentWhenTheFlagIsOnAndStillSkipsMedia(): void
+    {
+        $this->plugConfig->method('isWebSearchReadDocumentsEnabled')->willReturn(true);
+        $reader = $this->createMock(ResearchSourceReader::class);
+        $reader->expects(self::once())->method('fetchForDeepen')->willReturnCallback(
+            static fn (string $url, int $maxChars, ?int $userId): UrlContentResult => new UrlContentResult($url, str_repeat('Article 72. ', 40), '', 'gov.example.de', true),
+        );
+        $fetched = [];
+        $this->urlContent->method('fetchForReading')->willReturnCallback(function (string $url) use (&$fetched): UrlContentResult {
+            $fetched[] = $url;
+
+            return new UrlContentResult($url, str_repeat('Article body. ', 40), 'Title', 'alpha.example', true);
+        });
+        $started = [];
+        $this->urlContent->method('startReading')->willReturnCallback(function (string $url) use (&$started): null {
+            $started[] = $url;
+
+            return null;
+        });
+        $results = ['query' => 'q', 'results' => [
+            ['title' => 'Report', 'url' => 'https://gov.example.de/report.pdf', 'description' => ''],
+            ['title' => 'Page', 'url' => 'https://alpha.example/story', 'description' => ''],
+            ['title' => 'Archive', 'url' => 'https://files.example/bundle.zip', 'description' => ''],
+            ['title' => 'Photo', 'url' => 'https://images.example/scan.jpg', 'description' => ''],
+        ]];
+
+        $out = $this->service($reader)->deepen($results, 'What does it say?', 7);
+
+        self::assertSame(['https://alpha.example/story'], $fetched);
+        self::assertSame(['https://alpha.example/story'], $started);
+        self::assertStringContainsString('Article 72.', $out['results'][0]['page_content']);
+        self::assertTrue($out['results'][0]['fetched']);
+        self::assertTrue($out['results'][1]['fetched']);
+        self::assertArrayNotHasKey('page_content', $out['results'][2]);
+        self::assertArrayNotHasKey('page_content', $out['results'][3]);
+    }
+
+    private function service(?ResearchSourceReader $reader = null): WebResearchService
+    {
+        return new WebResearchService($this->urlContent, $this->condenser, $this->plugConfig, new NullLogger(), $reader);
     }
 }

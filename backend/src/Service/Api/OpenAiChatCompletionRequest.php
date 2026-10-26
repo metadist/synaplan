@@ -28,7 +28,7 @@ final readonly class OpenAiChatCompletionRequest
         public mixed $toolChoice,
         public ?bool $parallelToolCalls,
         public bool $includeUsage,
-        public ?string $reasoningEffort = null,
+        public OpenAiChatCompletionFlags $flags = new OpenAiChatCompletionFlags(),
     ) {
     }
 
@@ -101,7 +101,10 @@ final readonly class OpenAiChatCompletionRequest
             toolChoice: $toolChoice,
             parallelToolCalls: $parallelToolCalls,
             includeUsage: $includeUsage,
-            reasoningEffort: $reasoningEffort,
+            flags: new OpenAiChatCompletionFlags(
+                reasoningEffort: $reasoningEffort,
+                incognito: true === ($body['incognito'] ?? false),
+            ),
         );
     }
 
@@ -141,8 +144,8 @@ final readonly class OpenAiChatCompletionRequest
         if (null !== $this->parallelToolCalls) {
             $options['parallel_tool_calls'] = $this->parallelToolCalls;
         }
-        if (null !== $this->reasoningEffort) {
-            $options['reasoning_effort'] = $this->reasoningEffort;
+        if (null !== $this->flags->reasoningEffort) {
+            $options['reasoning_effort'] = $this->flags->reasoningEffort;
         }
 
         return $options;

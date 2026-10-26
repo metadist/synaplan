@@ -11,6 +11,11 @@
 x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
+  FRANKENPHP_WORKER_NUM: ${FRANKENPHP_WORKER_NUM:-16}
+  FRANKENPHP_STREAM_WORKER_NUM: ${FRANKENPHP_STREAM_WORKER_NUM:-}
+  FRANKENPHP_NUM_THREADS: ${FRANKENPHP_NUM_THREADS:-}
+  FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
+  FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   # Selects the update guide the admin UI links to. An unknown value means the
   # self-hosted guide, which is close enough: Umbrel updates arrive through the
   # App Store, not through a manual pull.
@@ -19,7 +24,7 @@ x-app-environment: &app-environment
   # (together with the image pin below and umbrel-app.yml) to the version whose
   # image was just published. Do not edit by hand —
   # scripts/set-release-version.mjs owns these three lines.
-  APP_VERSION: "5.5.2"
+  APP_VERSION: "5.5.4"
 
   # umbrelOS serves apps over plain HTTP on the device's .local domain. Synaplan
   # derives the auth cookies' Secure flag from this scheme, so the session
@@ -85,7 +90,7 @@ x-app-environment: &app-environment
 # then hands over to Caddy/FrankenPHP, which binds port 80 inside the container.
 # Tag and digest are maintained by CI together with APP_VERSION above —
 # scripts/set-release-version.mjs owns this line.
-x-app-image: &app-image ghcr.io/metadist/synaplan:5.5.2@sha256:91c9b4023e10465d15b65d3156f6663ef21d724455364f1c82b6cd15081db37e
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.5.4@sha256:fd9acafaf6c5295b862f7b56b46f64c9d6ddd53643b333d20907f68b2ec9f773
 
 # Uploaded and generated files. The web role writes them, the worker reads them
 # back while processing a job, so all three app roles share the directory.
@@ -191,7 +196,7 @@ services:
     restart: on-failure
 
   redis:
-    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     user: "1000:1000"
     volumes:
@@ -205,7 +210,7 @@ services:
     restart: on-failure
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
+    image: centrifugo/centrifugo:v6.10.2@sha256:34b84f823515927266ce3abfb840fd9e0acabb58805e7e896f5de731217a627d
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     user: "1000:1000"
     environment:
@@ -226,7 +231,7 @@ services:
     restart: on-failure
 
   tika:
-    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
     command: -h 0.0.0.0 -p 9998
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
@@ -237,7 +242,7 @@ services:
     restart: on-failure
 
   qdrant:
-    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
     volumes:
       - ${APP_DATA_DIR}/data/qdrant:/qdrant/storage
     healthcheck:

@@ -62,20 +62,9 @@ final readonly class ImportedModelListingCheck
             }
             ++$checked;
 
-            $offered = [];
-            foreach ($result->models as $discovered) {
-                $offered[$discovered->providerId] = true;
-            }
-
-            foreach ($rows as $model) {
-                $present = isset($offered[$model->getProviderId()]);
-                if ($dryRun) {
-                    continue;
-                }
-                $applied = $this->reconcile($model, $present, $now);
-                $markedOffline += $applied['disabled'] ? 1 : 0;
-                $restored += $applied['reEnabled'] ? 1 : 0;
-            }
+            $applied = $this->applyOffered($rows, $this->offeredIds($result), $dryRun, $now);
+            $markedOffline += $applied['disabled'];
+            $restored += $applied['reEnabled'];
         }
 
         if (!$dryRun) {
@@ -88,6 +77,56 @@ final readonly class ImportedModelListingCheck
             'markedOffline' => $markedOffline,
             'restored' => $restored,
         ];
+    }
+
+    /**
+     * Same reconciliation as {@see run()} for one source the admin just listed.
+     * An unsuccessful listing writes nothing.
+     */
+    public function applySuccessfulListing(string $source, DiscoveryResult $result): void
+    {
+        if (!$result->ok) {
+            return;
+        }
+        $rows = $this->importedModelsBySource()[$source] ?? [];
+        $this->applyOffered($rows, $this->offeredIds($result), false, time());
+        $this->em->flush();
+    }
+
+    /**
+     * @param list<Model>         $rows
+     * @param array<string, true> $offered
+     *
+     * @return array{disabled: int, reEnabled: int}
+     */
+    private function applyOffered(array $rows, array $offered, bool $dryRun, int $now): array
+    {
+        $disabled = 0;
+        $reEnabled = 0;
+        foreach ($rows as $model) {
+            $present = isset($offered[$model->getProviderId()]);
+            if ($dryRun) {
+                continue;
+            }
+            $applied = $this->reconcile($model, $present, $now);
+            $disabled += $applied['disabled'] ? 1 : 0;
+            $reEnabled += $applied['reEnabled'] ? 1 : 0;
+        }
+
+        return ['disabled' => $disabled, 'reEnabled' => $reEnabled];
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function offeredIds(DiscoveryResult $result): array
+    {
+        $offered = [];
+        foreach ($result->models as $discovered) {
+            $offered[$discovered->providerId] = true;
+        }
+
+        return $offered;
     }
 
     /**
@@ -109,7 +148,21 @@ final readonly class ImportedModelListingCheck
             $health->setLastFailure($now);
         }
 
-        return $this->autoDisabler->apply($verdict, $model, $health, $now);
+        $applied = $this->autoDisabler->apply($verdict, $model, $health, $now);
+        $this->markWithdrawn($model, !$present);
+
+        return $applied;
+    }
+
+    private function markWithdrawn(Model $model, bool $withdrawn): void
+    {
+        $json = $model->getJson();
+        $meta = is_array($json['meta'] ?? null) ? $json['meta'] : [];
+        $import = is_array($meta['import'] ?? null) ? $meta['import'] : [];
+        $import['withdrawn'] = $withdrawn;
+        $meta['import'] = $import;
+        $json['meta'] = $meta;
+        $model->setJson($json);
     }
 
     private function verdict(Model $model, bool $present): ModelHealthVerdict

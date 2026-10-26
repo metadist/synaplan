@@ -75,6 +75,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
+import { signupBlockedI18nKey } from '@/utils/signupBlockedMessage'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -111,6 +112,8 @@ const oauthErrorMessage = (
   if (errorCode === 'oidc_access_denied') return t('auth.oidcAccessDenied')
   if (errorCode === 'oidc_auth_failed') return t('auth.oidcAuthFailed')
   if (errorCode === 'oidc_not_authorized') return t('auth.oidcNotAuthorized')
+  const blockedKey = signupBlockedI18nKey(errorCode)
+  if (blockedKey) return t(blockedKey)
   if (errorParam) return decodeURIComponent(errorParam)
   return t('auth.socialLoginError')
 }

@@ -68,8 +68,13 @@ final readonly class CastingContextProvider implements PluginContextProviderInte
 
         if (!empty($productions)) {
             $context .= "\n### Productions matching query:\n";
-            foreach ($productions as $idx => $production) {
-                $context .= $this->formatProduction($idx + 1, $production);
+            $number = 1;
+            foreach ($productions as $production) {
+                if (!is_array($production)) {
+                    continue;
+                }
+                $context .= $this->formatProduction($number, $production);
+                ++$number;
                 if (strlen($context) > self::MAX_CONTEXT_LENGTH) {
                     break;
                 }
@@ -78,8 +83,13 @@ final readonly class CastingContextProvider implements PluginContextProviderInte
 
         if (strlen($context) < self::MAX_CONTEXT_LENGTH && !empty($auditions)) {
             $context .= "\n### Active Auditions:\n";
-            foreach ($auditions as $idx => $audition) {
-                $context .= $this->formatAudition($idx + 1, $audition);
+            $number = 1;
+            foreach ($auditions as $audition) {
+                if (!is_array($audition)) {
+                    continue;
+                }
+                $context .= $this->formatAudition($number, $audition);
+                ++$number;
                 if (strlen($context) > self::MAX_CONTEXT_LENGTH) {
                     break;
                 }
@@ -112,7 +122,7 @@ final readonly class CastingContextProvider implements PluginContextProviderInte
     {
         $name = $production['title'] ?? $production['name'] ?? 'Unknown';
         $category = $production['category'] ?? $production['type'] ?? '';
-        $line = sprintf("[%d] \"%s\"", $num, $name);
+        $line = sprintf('[%d] "%s"', $num, $name);
 
         if (!empty($category)) {
             $line .= ' - '.$category;
@@ -176,7 +186,7 @@ final readonly class CastingContextProvider implements PluginContextProviderInte
         $productionName = $audition['production_title'] ?? $audition['production_name'] ?? $audition['production']['name'] ?? 'Unknown Production';
         $deadline = $audition['deadline'] ?? $audition['deadline_at'] ?? '';
 
-        $line = sprintf("[%d] Audition for \"%s\"", $num, $productionName);
+        $line = sprintf('[%d] Audition for "%s"', $num, $productionName);
 
         if (!empty($deadline)) {
             $line .= ' - Deadline: '.$deadline;

@@ -87,7 +87,47 @@ class PlatformInstance
     #[ORM\Column(name: 'BAPPCAPABILITIES', length: 255, nullable: true)]
     private ?string $appCapabilities = null;
 
+    /** Whether the last delivery probe got any HTTP answer; null = never probed. */
+    #[ORM\Column(name: 'BREACHABLE', type: 'boolean', nullable: true)]
+    private ?bool $reachable = null;
+
+    /** The OIDC client this cloud's tokens name as azp, when it reported one. */
+    #[ORM\Column(name: 'BOIDCCLIENTID', length: 191, nullable: true)]
+    private ?string $oidcClientId = null;
+
+    #[ORM\Column(name: 'BAPPVERSION', length: 32, nullable: true)]
+    private ?string $appVersion = null;
+
+    /**
+     * Private hostnames an administrator approved for delivery (02 §6.2).
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(name: 'BAPPROVEDHOSTS', type: 'json', nullable: true)]
+    private ?array $approvedHosts = null;
+
+    /** The cloud's own instance id, for identity adoption (02 §3.1). */
+    #[ORM\Column(name: 'BSERVERID', length: 64, nullable: true)]
+    private ?string $serverId = null;
+
     public const CAPABILITY_DELIVERIES = 'deliveries';
+
+    /**
+     * Every app capability name the core knows (02 §8.1). A PATCH may report
+     * more; names outside this list are ignored, so a newer app keeps
+     * working with an older core.
+     *
+     * @var list<string>
+     */
+    public const APP_CAPABILITIES = [
+        'deliveries',
+        'pickups',
+        'read_scope',
+        'source_events',
+        'watches',
+        'trials',
+        'file_sets',
+    ];
 
     /**
      * @param list<string>|null $redirectUris
@@ -219,8 +259,71 @@ class PlatformInstance
      */
     public function setAppCapabilities(array $names): void
     {
-        $known = array_values(array_intersect([self::CAPABILITY_DELIVERIES], $names));
+        $known = array_values(array_unique(array_intersect(self::APP_CAPABILITIES, $names)));
         $this->appCapabilities = [] === $known ? null : json_encode($known, JSON_THROW_ON_ERROR);
+    }
+
+    public function isReachable(): ?bool
+    {
+        return $this->reachable;
+    }
+
+    public function setReachable(?bool $reachable): void
+    {
+        $this->reachable = $reachable;
+    }
+
+    public function getOidcClientId(): ?string
+    {
+        return $this->oidcClientId;
+    }
+
+    public function setOidcClientId(?string $oidcClientId): void
+    {
+        $this->oidcClientId = $oidcClientId;
+    }
+
+    public function getAppVersion(): ?string
+    {
+        return $this->appVersion;
+    }
+
+    public function setAppVersion(?string $appVersion): void
+    {
+        $this->appVersion = $appVersion;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getApprovedHosts(): array
+    {
+        return $this->approvedHosts ?? [];
+    }
+
+    /**
+     * @param list<string> $hosts
+     */
+    public function setApprovedHosts(array $hosts): void
+    {
+        $clean = [];
+        foreach ($hosts as $host) {
+            $host = strtolower(trim($host));
+            if ('' !== $host && !in_array($host, $clean, true)) {
+                $clean[] = $host;
+            }
+        }
+        $this->approvedHosts = [] === $clean ? null : $clean;
+    }
+
+    public function getServerId(): ?string
+    {
+        return $this->serverId;
+    }
+
+    public function setServerId(?string $serverId): void
+    {
+        $this->serverId = $serverId;
     }
 
     public function canReceiveCopies(): bool
@@ -229,5 +332,13 @@ class PlatformInstance
             && is_string($this->deliveryUrl)
             && '' !== $this->deliveryUrl
             && in_array(self::CAPABILITY_DELIVERIES, $this->getAppCapabilities(), true);
+    }
+
+    public function reports(string $capability): bool
+    {
+        return $this->isActive()
+            && is_string($this->deliveryUrl)
+            && '' !== $this->deliveryUrl
+            && in_array($capability, $this->getAppCapabilities(), true);
     }
 }

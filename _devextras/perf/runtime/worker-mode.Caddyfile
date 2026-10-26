@@ -1,0 +1,24 @@
+# Second FrankenPHP inside the dev backend container, in production worker
+# mode, for the runtime spike only. Started by run.sh on :8090 with its admin
+# API on :2020 (Docker network only, never published). Same code and database
+# as the dev backend; APP_ENV=prod with its own var/cache/prod.
+{
+	admin 0.0.0.0:2020
+	auto_https off
+	metrics
+	frankenphp {
+		num_threads {$SPIKE_NUM_THREADS:12}
+		worker {
+			file /var/www/backend/public/index.php
+			num {$SPIKE_WORKER_NUM:8}
+			env APP_RUNTIME App\Runtime\FrankenPhpRuntime
+			env SYNAPLAN_TEST_PROVIDER_CHUNK_MS {$SYNAPLAN_TEST_PROVIDER_CHUNK_MS:50}
+		}
+	}
+	order php_server before file_server
+}
+
+:8090 {
+	root * /var/www/backend/public
+	php_server
+}

@@ -75,7 +75,14 @@ final readonly class InboundEmailIntake
         if (isset($account['error'])) {
             throw $this->refuseSender((string) $account['error'], $fromEmail, $toEmail, $subject, $messageId, $reportsToDiscord);
         }
-        $this->checkLimit($account['user'], $fromEmail, $toEmail, $subject, $messageId, $reportsToDiscord);
+        $sender = $account['user'] ?? null;
+        if (!$sender instanceof User || !$sender->isActive()) {
+            $reason = $sender instanceof User && $sender->isPendingPayment()
+                ? 'This account is waiting for payment. Finish checkout to use Synaplan.'
+                : 'This account cannot receive replies.';
+            throw $this->refuseSender($reason, $fromEmail, $toEmail, $subject, $messageId, $reportsToDiscord);
+        }
+        $this->checkLimit($sender, $fromEmail, $toEmail, $subject, $messageId, $reportsToDiscord);
 
         return new InboundEmail(
             fromEmail: $fromEmail,

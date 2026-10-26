@@ -96,6 +96,18 @@ final readonly class SsrfGuard
     }
 
     /**
+     * Every A and AAAA answer for a hostname, unfiltered. Callers that
+     * approve private targets use this to refuse a name when any answer
+     * lands somewhere forbidden.
+     *
+     * @return list<string>
+     */
+    public function resolvedIps(string $host): array
+    {
+        return $this->resolveIps(strtolower(trim($host, "[] \t")));
+    }
+
+    /**
      * Public A/AAAA (or the literal IP) after the same private/reserved filter
      * as {@see isBlockedHost}. Empty when the name does not resolve or every
      * answer is blocked. Callers that already passed {@see isBlockedHost} get
@@ -126,6 +138,25 @@ final readonly class SsrfGuard
         }
 
         return array_values(array_unique($ips));
+    }
+
+    /**
+     * HTTP client `resolve` option that connects a hostname to the public
+     * address this guard accepted. Without it the client resolves the name a
+     * second time, and a rebinding DNS answer could point it somewhere
+     * private. Literal IPs and names that do not resolve need no pin.
+     *
+     * @return array{resolve?: array<string, string>}
+     */
+    public function pinnedResolveOption(string $url): array
+    {
+        $host = (string) parse_url($url, \PHP_URL_HOST);
+        if ('' === $host || false !== filter_var(trim($host, '[]'), \FILTER_VALIDATE_IP)) {
+            return [];
+        }
+        $pinned = $this->pinnedIps($host);
+
+        return [] === $pinned ? [] : ['resolve' => [$host => $pinned[0]]];
     }
 
     /**

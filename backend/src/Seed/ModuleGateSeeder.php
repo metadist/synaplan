@@ -21,7 +21,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 final readonly class ModuleGateSeeder implements SeederInterface
 {
     /** Module ids whose `MODULES.GATE_<ID>` seeds ON for new installs. */
-    private const DEFAULT_ON = ['tika', 'docling', 'office_convert', 'searxng', 'piper_tts', 'local_ai', 'higgsfield', 'google_ai', 'thehive', 'stripe_billing', 'mobile_iap', 'whatsapp', 'telegram', 'compute', 'opendesk_stt', 'federation', 'chat_artifacts', 'live_voice', 'freeapi'];
+    private const DEFAULT_ON = ['tika', 'docling', 'office_convert', 'searxng', 'piper_tts', 'local_ai', 'higgsfield', 'google_ai', 'thehive', 'stripe_billing', 'mobile_iap', 'whatsapp', 'telegram', 'compute', 'opendesk_stt', 'federation', 'chat_artifacts', 'live_voice', 'freeapi', 'capacity'];
 
     public function __construct(
         private Connection $connection,

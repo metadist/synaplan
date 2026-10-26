@@ -15,6 +15,9 @@ parameters:
     # nothing hard-codes a release number that inevitably drifts.
     app_version_default: 'dev'
 
+    # The capacity watchdog runs unless SYNAPLAN_WATCHDOG is set to 0.
+    synaplan_watchdog_default: '1'
+
     # Deployment platform hint for the release-notice guide link. Optional and
     # additive: an unset (or unknown) value means the self-hosted guide, so
     # nothing breaks when a deployment does not set it. deploy/compose.yaml
@@ -130,6 +133,20 @@ parameters:
     env(OIDC_BEARER_AUDIENCE): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
+    env(TURNSTILE_SECRET_KEY): ''
+    env(TURNSTILE_SITE_KEY): ''
+    # Account-creation limits (SignupGuard, SubscriptionController, SignupAnomalyAlert).
+    # New accounts per client IP per hour, installation-wide per 10 minutes,
+    # checkouts per client IP per hour, paid grants to fresh accounts per hour
+    # before the operator is alerted.
+    env(SIGNUP_IP_LIMIT): '5'
+    env(SIGNUP_GLOBAL_LIMIT): '20'
+    env(CHECKOUT_IP_LIMIT): '10'
+    # Pay-first checkout starts (no account yet): per client IP per hour and
+    # per email address per day.
+    env(CHECKOUT_START_IP_LIMIT): '5'
+    env(CHECKOUT_START_EMAIL_LIMIT): '30'
+    env(PAID_SIGNUP_ALERT_LIMIT): '10'
     env(GOOGLE_CLIENT_SECRET): ''
     env(GITHUB_CLIENT_SECRET): ''
     env(OIDC_CLIENT_SECRET): ''
@@ -186,6 +203,8 @@ parameters:
     env(SEARXNG_BASE_URL): ''
     # HTML/SVG chat preview. Empty = off. The dev compose defaults this to 1.
     env(CHAT_ARTIFACTS_ENABLED): ''
+    # Research runs. Empty = off. Set to 1 to pin research on.
+    env(RESEARCH_ENABLED): ''
     # Synaplan Demo server. Empty = module absent; the switch is FREEAPI.ENABLED.
     env(FREEAPI_BASE_URL): ''
     # Set by CI runners; keeps automated runs away from real third-party servers.
@@ -242,6 +261,9 @@ parameters:
     # themselves has no reason to change it. Marketplace images that generate a
     # per-instance password set this to true.
     env(BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE): 'false'
+
+    # How long a run waits for a linked cloud to send the files it was asked for.
+    env(PICKUP_WAIT_SEC): '600'
 
     # Live voice stays off until an operator points at the sidecar and sets a secret.
     env(LIVE_VOICE_GATEWAY_URL): ''
@@ -308,6 +330,9 @@ services:
             - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
             # One pulse per Telegram turn. Its callbacks are not services.
             - '../src/Service/Telegram/TelegramTypingPulse.php'
+            # Research-eval doubles exist only in the test environment (RQ2).
+            - '../src/Plug/WebSearch/Adapter/TestWebSearchAdapter.php'
+            - '../src/Service/Research/Run/Source/FixtureSourceReader.php'
 
     # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
     # the project dir for Symfony Process cwd. Alias binds the interface.
@@ -705,6 +730,7 @@ services:
             $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
             $ffmpegBinary: '%env(FFMPEG_BINARY)%'
             $whisperEnabled: '%env(bool:WHISPER_ENABLED)%'
+            $availabilityCache: '@cache.app'
 
     # Brave Search API Service
     App\Service\Search\BraveSearchService:
@@ -1072,22 +1098,56 @@ services:
     App\Controller\SubscriptionController:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
-            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
-            $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
-            $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
             $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
             $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
             $cache: '@cache.app'
 
+    # Pay first (PF1): Stripe Checkout started with only an email address.
+    App\Service\Billing\PayFirst\PayFirstCheckout:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+            $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
+            $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
+
+    App\Service\Billing\PayFirst\StripeCheckoutSessionGateway:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+
+    App\Service\Billing\PayFirst\CheckoutSessionGateway:
+        alias: App\Service\Billing\PayFirst\StripeCheckoutSessionGateway
+        public: true
+
     App\Controller\StripeWebhookController:
         arguments:
             $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $cache: '@cache.app'
+
+    # Price → tier mapping and the "paid only when settled" rule shared by the
+    # webhook, the sync endpoint and the plan catalogue.
+    App\Service\Billing\StripeEntitlement:
+        arguments:
             $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
             $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
+
+    # Operator alert for unusual account creation (mail once per hour per signal).
+    App\Service\Auth\SignupAnomalyAlert:
+        arguments:
+            $adminEmail: '%env(string:default::APP_ADMIN_EMAIL)%'
+            $senderEmail: '%env(string:default::APP_SENDER_EMAIL)%'
             $cache: '@cache.app'
+
+    # Cloudflare Turnstile — the human check in front of sign-up and sign-in.
+    # Takes precedence over reCAPTCHA v3 when TURNSTILE_SECRET_KEY is set.
+    App\Service\Auth\TurnstileVerifier:
+        arguments:
+            $secretKey: '%env(TURNSTILE_SECRET_KEY)%'
+
+    App\Service\Auth\AuthRuntimeConfig:
+        arguments:
+            $turnstileSiteKey: '%env(TURNSTILE_SITE_KEY)%'
 
     # Shared Chat Page Controller (serves Open Graph meta tags for social media)
     App\Controller\SharedChatPageController:
@@ -1271,6 +1331,10 @@ services:
         arguments:
             $envValue: '%env(CHAT_ARTIFACTS_ENABLED)%'
 
+    App\Service\Research\Run\ResearchConfig:
+        arguments:
+            $envValue: '%env(RESEARCH_ENABLED)%'
+
     App\Service\FreeApi\FreeApiConfig:
         arguments:
             $baseUrl: '%env(FREEAPI_BASE_URL)%'
@@ -1312,6 +1376,18 @@ services:
     App\Module\Sidecar\LocalAiModule:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
+
+    # The watchdog is on unless SYNAPLAN_WATCHDOG says otherwise, exactly as
+    # the container entrypoint reads it; the module follows the same default.
+    App\Module\Observability\CapacityModule:
+        arguments:
+            $watchdog: '%env(default:synaplan_watchdog_default:SYNAPLAN_WATCHDOG)%'
+
+    # One server name for the capacity card, the X-Synaplan-Server header and
+    # the watchdog: SYNAPLAN_SERVER_ID, else the hostname (contracts §6.1).
+    App\Observability\ServerIdentity:
+        arguments:
+            $configuredId: '%env(default::SYNAPLAN_SERVER_ID)%'
 
     App\Module\Commerce\StripeBillingModule:
         arguments:
@@ -1578,21 +1654,20 @@ services:
     App\Service\Widget\WidgetEventStoreInterface:
         alias: App\Service\Widget\DatabaseWidgetEventStore
 
-# TestProvider: mock AI for dev/test only. Not registered in prod.
-# Duplicated because Symfony when@ blocks don't support when@dev,test.
-when@dev:
-    services:
-        App\AI\Provider\TestProvider:
-            arguments:
-                $uploadDir: '%kernel.project_dir%/var/uploads'
-            tags:
-                - { name: 'app.ai.chat', key: 'test' }
-                - { name: 'app.ai.embedding', key: 'test' }
-                - { name: 'app.ai.vision', key: 'test' }
-                - { name: 'app.ai.image_generation', key: 'test' }
-                - { name: 'app.ai.speech_to_text', key: 'test' }
-                - { name: 'app.ai.text_to_speech', key: 'test' }
-                - { name: 'app.ai.file_analysis', key: 'test' }
+    # Mock AI for dev and test. PerfTestProviderPass removes it from every
+    # other environment unless SYNAPLAN_PERF_TEST_PROVIDER=1, so a benchmark
+    # worker can stream test-model without a paid provider.
+    App\AI\Provider\TestProvider:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'test' }
+            - { name: 'app.ai.embedding', key: 'test' }
+            - { name: 'app.ai.vision', key: 'test' }
+            - { name: 'app.ai.image_generation', key: 'test' }
+            - { name: 'app.ai.speech_to_text', key: 'test' }
+            - { name: 'app.ai.text_to_speech', key: 'test' }
+            - { name: 'app.ai.file_analysis', key: 'test' }
 
 when@test:
     services:
@@ -1601,15 +1676,13 @@ when@test:
         App\Realtime\Publisher\RealtimePublisherInterface:
             alias: App\Realtime\Publisher\NullPublisher
 
-        App\AI\Provider\TestProvider:
+        # Fixture web search and fixture pages. Absent from dev and prod:
+        # the classes are excluded from the resource above.
+        App\Plug\WebSearch\Adapter\TestWebSearchAdapter:
             arguments:
-                $uploadDir: '%kernel.project_dir%/var/uploads'
-            tags:
-                - { name: 'app.ai.chat', key: 'test' }
-                - { name: 'app.ai.embedding', key: 'test' }
-                - { name: 'app.ai.vision', key: 'test' }
-                - { name: 'app.ai.image_generation', key: 'test' }
-                - { name: 'app.ai.speech_to_text', key: 'test' }
-                - { name: 'app.ai.text_to_speech', key: 'test' }
-                - { name: 'app.ai.file_analysis', key: 'test' }
+                $fixturesDir: '%kernel.project_dir%/tests/Fixtures/research/search'
+            tags: ['app.plug.web_search']
+        App\Service\Research\Run\Source\FixtureSourceReader:
+            arguments:
+                $pagesDir: '%kernel.project_dir%/tests/Fixtures/research/pages'
 

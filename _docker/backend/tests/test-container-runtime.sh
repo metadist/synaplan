@@ -54,7 +54,7 @@ assert_not_contains() {
 }
 
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+trap 'if [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ]; then kill "$(cat "$TMP_DIR/runtime/watchdog.supervisor.pid")" 2>/dev/null || true; fi; rm -rf "$TMP_DIR"' EXIT
 mkdir -p "$TMP_DIR/bin" "$TMP_DIR/app/bin" "$TMP_DIR/runtime"
 touch "$TMP_DIR/app/bin/console"
 COMMAND_LOG="$TMP_DIR/commands.log"
@@ -218,6 +218,7 @@ run_scheduler_for_test "$CASE2_LOG" || CASE2_STATUS=$?
 assert_eq 0 "$CASE2_STATUS" "scheduler completes one cycle under set -e"
 assert_contains "app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "scheduler runs media reaper"
 assert_contains "app:chat:reap-stuck --no-interaction" "$COMMAND_LOG" "scheduler runs stuck-chat reaper"
+assert_contains "app:research:reap --no-interaction" "$COMMAND_LOG" "scheduler runs research reaper"
 assert_contains "app:desktop:reap-jobs --no-interaction" "$COMMAND_LOG" "scheduler runs desktop job reaper"
 assert_contains "app:voice:reap-sessions --no-interaction" "$COMMAND_LOG" "scheduler runs live-voice reaper"
 assert_contains "app:process-mail-handlers --no-interaction" "$COMMAND_LOG" "scheduler runs mail handlers"
@@ -240,6 +241,7 @@ assert_contains "app:scheduler:claim health --interval=900 --no-interaction" "$C
 assert_contains "TIMEOUT --signal=TERM --kill-after=5 30 php bin/console --env=prod app:scheduler:claim daily --at=03:30 --no-interaction" "$COMMAND_LOG" "slot claims are capped at 30s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "tick jobs are capped at 300s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:chat:reap-stuck --no-interaction" "$COMMAND_LOG" "stuck-chat reaper is capped at 300s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:research:reap --no-interaction" "$COMMAND_LOG" "research reaper is capped at 300s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:desktop:reap-jobs --no-interaction" "$COMMAND_LOG" "desktop reaper is capped at 300s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:process-mail-handlers --no-interaction" "$COMMAND_LOG" "mail handlers are capped at 300s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 900 php bin/console --env=prod app:files:reap-ephemeral --no-interaction" "$COMMAND_LOG" "hourly jobs are capped at 900s"
@@ -836,6 +838,91 @@ assert_eq 0 "$(runtime_status_under_set_e "$TMP_DIR/app" require_console)" \
 assert_eq 78 "$(BOOTSTRAP_ADMIN_EMAIL=admin@example.com BOOTSTRAP_ADMIN_PASSWORD= \
     runtime_status_under_set_e "$TMP_DIR/app" require_bootstrap_admin_pair)" \
     "a half-configured bootstrap pair keeps exit code 78 under set -e"
+
+echo "Case 12: the entrypoint repairs permissions recursively only when a tree needs it"
+
+# var/uploads is a shared NFS mount with tens of thousands of files in
+# production, and the recursive chown/chmod this replaces cost one NFS
+# operation per file on every backend and scheduler start of every node,
+# for a tree that is already www-data:775. The per-tree guard and the
+# forced-repair escape hatch are entrypoint wiring, so — like Case 9 —
+# they are asserted on the script text.
+assert_contains "ensure_writable_tree /var/www/backend/var/uploads" "$ENTRYPOINT" \
+    "the entrypoint checks the uploads tree on its own"
+assert_contains "ensure_writable_tree /var/www/backend/public/up" "$ENTRYPOINT" \
+    "the entrypoint checks the public uploads directory on its own"
+assert_contains "SYNAPLAN_REPAIR_PERMISSIONS" "$ENTRYPOINT" \
+    "the entrypoint keeps a forced recursive repair for restores"
+assert_not_contains "chown -R www-data:www-data /var/www/backend/var /var/www/backend/public/up" "$ENTRYPOINT" \
+    "the entrypoint no longer chowns the whole var tree on every start"
+assert_not_contains "chmod -R 775 /var/www/backend/var /var/www/backend/public/up" "$ENTRYPOINT" \
+    "the entrypoint no longer chmods the whole var tree on every start"
+
+echo "Case 13: every role restarts the watchdog, and off means no process"
+assert_eq 3 "$(grep -c '^[[:space:]]*start_watchdog$' "$ENTRYPOINT")" \
+    "the entrypoint starts the watchdog for the web, worker and scheduler roles"
+
+WATCHDOG_LOG="$TMP_DIR/watchdog.log"
+cat > "$TMP_DIR/bin/synaplan-watchdog" <<'EOF'
+#!/bin/sh
+printf '%s\n' "started" >> "$WATCHDOG_LOG"
+exit 0
+EOF
+chmod +x "$TMP_DIR/bin/synaplan-watchdog"
+
+(
+    export SYNAPLAN_ROLE=web
+    export SYNAPLAN_WATCHDOG=0
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/synaplan-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    export WATCHDOG_LOG
+    start_watchdog
+)
+assert_eq "" "$( [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ] && echo started || true )" \
+    "SYNAPLAN_WATCHDOG=0 does not start a supervisor"
+
+(
+    export SYNAPLAN_ROLE=web
+    export SYNAPLAN_WATCHDOG=1
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/missing-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    start_watchdog
+)
+status=$?
+assert_eq 0 "$status" "a missing watchdog binary does not fail the web role"
+
+: > "$WATCHDOG_LOG"
+(
+    export SYNAPLAN_ROLE=web
+    export SYNAPLAN_WATCHDOG=1
+    export SYNAPLAN_WATCHDOG_BIN="$TMP_DIR/bin/synaplan-watchdog"
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    export WATCHDOG_LOG
+    export WATCHDOG_RESTART_DELAY=0
+    start_watchdog
+)
+started=0
+i=0
+while [ "$i" -lt 50 ]; do
+    if [ -f "$WATCHDOG_LOG" ]; then
+        started="$(wc -l < "$WATCHDOG_LOG" | tr -d ' ')"
+    fi
+    if [ "$started" -ge 2 ]; then
+        break
+    fi
+    i=$((i + 1))
+    sleep 0.1
+done
+if [ -f "$TMP_DIR/runtime/watchdog.supervisor.pid" ]; then
+    kill "$(cat "$TMP_DIR/runtime/watchdog.supervisor.pid")" 2>/dev/null || true
+fi
+if [ "$started" -ge 2 ]; then
+    PASS=$((PASS + 1))
+    echo "PASS: the watchdog is started again after it exits"
+else
+    FAIL=$((FAIL + 1))
+    echo "FAIL: the watchdog was not restarted (starts=${started})" >&2
+fi
 
 TOTAL=$((PASS + FAIL))
 echo "${PASS}/${TOTAL} assertions passed"

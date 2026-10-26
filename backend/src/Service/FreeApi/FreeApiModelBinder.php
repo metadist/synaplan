@@ -39,7 +39,7 @@ final readonly class FreeApiModelBinder
     /**
      * @param list<array{id: string, name: string}> $aliases the aliases the server offers this key
      *
-     * @return array<string, int> alias => model id, active and selectable
+     * @return array<string, array<string, int>> alias => tag => model id, active and selectable
      */
     public function importAliases(array $aliases): array
     {
@@ -51,22 +51,45 @@ final readonly class FreeApiModelBinder
                 continue;
             }
             $names[$alias['id']] = mb_substr($alias['name'], 0, self::MAX_NAME);
-            $rows[] = ['providerId' => $alias['id'], 'name' => $names[$alias['id']], 'tags' => [$tag], 'priceKnown' => true, 'priceIn' => 0.0, 'priceOut' => 0.0];
+            $tags = array_values(array_unique([$tag, ...FreeApiAliases::ADDITIONAL_TAGS[$alias['id']] ?? []]));
+            $rows[] = ['providerId' => $alias['id'], 'name' => $names[$alias['id']], 'tags' => $tags, 'priceKnown' => true, 'priceIn' => 0.0, 'priceOut' => 0.0];
         }
         $this->importer->apply(ModelDiscoveryService::OPENAI_COMPATIBLE_PREFIX.FreeApiConfig::ENDPOINT_NAME, $rows);
 
         $ids = [];
         foreach ($this->demoModels() as $model) {
             $alias = $model->getProviderId();
-            if (!isset($names[$alias]) || FreeApiAliases::TAGS[$alias] !== $model->getTag()) {
+            if (!isset($names[$alias]) || !\in_array($model->getTag(), $this->tagsFor($alias), true)) {
                 continue;
             }
             $model->setActive(1)->setSelectable(1)->setName($names[$alias]);
-            $ids[$alias] = (int) $model->getId();
+            $ids[$alias][$model->getTag()] = (int) $model->getId();
         }
         $this->em->flush();
 
         return $ids;
+    }
+
+    /**
+     * An install that turned the Demo on before the memory-extraction row
+     * existed still has MEM pointing at the chat-tagged sorter. Re-import the
+     * extra tag and move that binding, and only that binding.
+     */
+    public function realignPurposeRows(): void
+    {
+        $aliases = [];
+        foreach ($this->demoModels() as $model) {
+            $alias = $model->getProviderId();
+            if (!isset(FreeApiAliases::TAGS[$alias])) {
+                continue;
+            }
+            $aliases[$alias] = ['id' => $alias, 'name' => $model->getName()];
+        }
+        if ([] === $aliases) {
+            return;
+        }
+
+        $this->moveLegacyBindings($this->importAliases(array_values($aliases)));
     }
 
     /**
@@ -85,7 +108,7 @@ final readonly class FreeApiModelBinder
     }
 
     /**
-     * @param array<string, int> $aliasModelIds alias => model id
+     * @param array<string, array<string, int>> $aliasModelIds alias => tag => model id
      *
      * @return list<string> capabilities now answered by the Demo
      */
@@ -94,14 +117,57 @@ final readonly class FreeApiModelBinder
         $keepVectorize = $this->repository->hasStoredVectors();
         $bound = [];
         foreach (FreeApiAliases::BINDINGS as $capability => $alias) {
-            if (!isset($aliasModelIds[$alias]) || (FreeApiAliases::VECTORIZE === $capability && $keepVectorize)) {
+            $modelId = $this->modelIdFor($aliasModelIds, $capability, $alias);
+            if (null === $modelId || (FreeApiAliases::VECTORIZE === $capability && $keepVectorize)) {
                 continue;
             }
-            $this->configRepository->setValue(0, self::DEFAULT_GROUP, $capability, (string) $aliasModelIds[$alias]);
+            $this->configRepository->setValue(0, self::DEFAULT_GROUP, $capability, (string) $modelId);
             $bound[] = $capability;
         }
 
         return $bound;
+    }
+
+    /**
+     * @param array<string, array<string, int>> $aliasModelIds
+     */
+    private function moveLegacyBindings(array $aliasModelIds): void
+    {
+        foreach (FreeApiAliases::BINDING_TAGS as $capability => $tag) {
+            $alias = FreeApiAliases::BINDINGS[$capability];
+            $wantedId = $aliasModelIds[$alias][$tag] ?? null;
+            $legacyId = $aliasModelIds[$alias][FreeApiAliases::TAGS[$alias]] ?? null;
+            if (null === $wantedId || null === $legacyId) {
+                continue;
+            }
+            $current = $this->configRepository->getValue(0, self::DEFAULT_GROUP, $capability);
+            if ((string) $legacyId === (string) $current) {
+                $this->configRepository->setValue(0, self::DEFAULT_GROUP, $capability, (string) $wantedId);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, int>> $aliasModelIds
+     */
+    private function modelIdFor(array $aliasModelIds, string $capability, string $alias): ?int
+    {
+        $tag = FreeApiAliases::BINDING_TAGS[$capability] ?? FreeApiAliases::TAGS[$alias];
+
+        return $aliasModelIds[$alias][$tag] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function tagsFor(string $alias): array
+    {
+        $primary = FreeApiAliases::TAGS[$alias] ?? null;
+        if (null === $primary) {
+            return [];
+        }
+
+        return array_values(array_unique([$primary, ...FreeApiAliases::ADDITIONAL_TAGS[$alias] ?? []]));
     }
 
     /**

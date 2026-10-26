@@ -19,6 +19,18 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_extid_user')]
 class ExternalIdentity
 {
+    public const MODE_SSO = 'sso';
+
+    public const MODE_LINK = 'link';
+
+    public const MODE_PROVISION = 'provision';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_PAUSED = 'paused';
+
+    public const STATUS_REVOKED = 'revoked';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -39,11 +51,25 @@ class ExternalIdentity
     #[ORM\Column(name: 'BAPIKEYID', type: 'bigint', nullable: true)]
     private ?int $apiKeyId = null;
 
+    /** sso, link, provision — or null for an oidc: login row. */
+    #[ORM\Column(name: 'BMODE', length: 16, nullable: true)]
+    private ?string $mode = null;
+
+    #[ORM\Column(name: 'BSTATUS', length: 16, options: ['default' => 'active'])]
+    private string $status = self::STATUS_ACTIVE;
+
+    #[ORM\Column(name: 'BREVOKEDAT', type: 'bigint', nullable: true)]
+    private ?int $revokedAt = null;
+
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
 
     #[ORM\Column(name: 'BLASTSEEN', type: 'bigint', options: ['default' => 0])]
     private int $lastSeen = 0;
+
+    /** JSON mirror of what this person lets Synaplan read in the cloud. */
+    #[ORM\Column(name: 'BREADSCOPE', type: 'text', nullable: true)]
+    private ?string $readScope = null;
 
     public function __construct()
     {
@@ -139,6 +165,50 @@ class ExternalIdentity
         return $this;
     }
 
+    public function getMode(): ?string
+    {
+        return $this->mode;
+    }
+
+    public function setMode(?string $mode): self
+    {
+        $this->mode = $mode;
+
+        return $this;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): self
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function getRevokedAt(): ?int
+    {
+        return $this->revokedAt;
+    }
+
+    public function setRevokedAt(?int $revokedAt): self
+    {
+        $this->revokedAt = $revokedAt;
+
+        return $this;
+    }
+
+    /**
+     * Paused or revoked: bearer calls from this cloud are refused.
+     */
+    public function isOff(): bool
+    {
+        return self::STATUS_PAUSED === $this->status || self::STATUS_REVOKED === $this->status;
+    }
+
     /**
      * Short badge label for the Users page (OIDC / Nextcloud / …).
      */
@@ -155,5 +225,34 @@ class ExternalIdentity
             'outlook' => 'Outlook',
             default => $this->source,
         };
+    }
+
+    /**
+     * @return array{mode: string, folders: list<array{id: string, path: string}>}
+     */
+    public function readScope(): array
+    {
+        $decoded = null !== $this->readScope ? json_decode($this->readScope, true) : null;
+        $mode = is_array($decoded) && is_string($decoded['mode'] ?? null) ? $decoded['mode'] : 'watched';
+        $folders = [];
+        foreach (is_array($decoded['folders'] ?? null) ? $decoded['folders'] : [] as $folder) {
+            if (!is_array($folder)) {
+                continue;
+            }
+            $folders[] = [
+                'id' => is_string($folder['id'] ?? null) ? $folder['id'] : '',
+                'path' => is_string($folder['path'] ?? null) ? $folder['path'] : '',
+            ];
+        }
+
+        return ['mode' => $mode, 'folders' => $folders];
+    }
+
+    /**
+     * @param array{mode: string, folders: list<array{id: string, path: string}>} $scope
+     */
+    public function setReadScope(array $scope): void
+    {
+        $this->readScope = json_encode($scope, JSON_THROW_ON_ERROR);
     }
 }

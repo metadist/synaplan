@@ -53,7 +53,9 @@ final class ModuleOwnershipTest extends TestCase
         'opendesk_stt',
         'live_voice',
         'chat_artifacts',
+        'research',
         'freeapi',
+        'capacity',
     ];
 
     /**
@@ -74,6 +76,8 @@ final class ModuleOwnershipTest extends TestCase
             'LOG_FORMAT',
             'REDIS_DSN',
             'SYNAPLAN_PLATFORM',
+            // The server's name in the X-Synaplan-Server header on every response; the capacity module only reads the same name.
+            'SYNAPLAN_SERVER_ID',
             // Set by Kubernetes itself; tells the readiness list not to name compose commands.
             'KUBERNETES_SERVICE_HOST',
             'BOOTSTRAP_ADMIN_EMAIL',
@@ -82,6 +86,10 @@ final class ModuleOwnershipTest extends TestCase
             'GUEST_MAX_SESSIONS_PER_IP',
             'DEFAULT_USER_PLUGINS',
             'MCP_ALLOWED_HOSTS',
+            // Operator inbox and sender for incident mail (SignupAnomalyAlert);
+            // the mail transport itself is infrastructure (MAILER_DSN).
+            'APP_ADMIN_EMAIL',
+            'APP_SENDER_EMAIL',
         ],
         // Product-defining AI providers. Keys are also entered at runtime via
         // ProviderKeyStore; the provider set is the product, not an add-on.
@@ -150,6 +158,17 @@ final class ModuleOwnershipTest extends TestCase
             'RECAPTCHA_ENABLED',
             'RECAPTCHA_SECRET_KEY',
             'RECAPTCHA_MIN_SCORE',
+            // Human check and account-creation limits (2026-10-24 fake-signup
+            // burst). Anti-abuse is core: an install without keys keeps
+            // working, the limits are always on.
+            'TURNSTILE_SITE_KEY',
+            'TURNSTILE_SECRET_KEY',
+            'SIGNUP_IP_LIMIT',
+            'SIGNUP_GLOBAL_LIMIT',
+            'CHECKOUT_IP_LIMIT',
+            'CHECKOUT_START_IP_LIMIT',
+            'CHECKOUT_START_EMAIL_LIMIT',
+            'PAID_SIGNUP_ALERT_LIMIT',
         ],
         // Native app shell identity (deep links, Sign in with Apple audience).
         'mobile_shell' => [
@@ -200,6 +219,10 @@ final class ModuleOwnershipTest extends TestCase
         'messages_gateway' => [
             'MESSAGES_GATEWAY_UPSTREAM_URL',
         ],
+        // How long a run waits for a linked cloud to send the files it was asked for.
+        'cloud_pickup' => [
+            'PICKUP_WAIT_SEC',
+        ],
         // Set by every CI runner, not by operators; only keeps automated runs off real servers.
         'ci_runtime' => [
             'CI',
@@ -221,7 +244,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(19, self::MODULE_IDS);
+        $this->assertCount(21, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);
