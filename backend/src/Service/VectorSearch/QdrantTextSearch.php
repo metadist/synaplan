@@ -32,7 +32,12 @@ final class QdrantTextSearch
      */
     public static function withText(array $filter, string $query): array
     {
-        $text = ['key' => self::FIELD, 'match' => ['text' => $query]];
+        // `match.text` requires every token, so match any single query word and let rank() order them.
+        $any = array_map(
+            static fn (string $token): array => ['key' => self::FIELD, 'match' => ['text' => $token]],
+            self::tokens($query) ?: [$query],
+        );
+        $text = ['should' => $any];
         if (isset($filter['should']) && is_array($filter['should'])) {
             foreach ($filter['should'] as $i => $branch) {
                 if (!is_array($branch)) {

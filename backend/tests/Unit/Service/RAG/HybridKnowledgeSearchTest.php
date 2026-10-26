@@ -100,8 +100,12 @@ final class HybridKnowledgeSearchTest extends TestCase
 
         $with = QdrantTextSearch::withText($filter, 'Art. 17');
 
-        self::assertSame('Art. 17', $with['should'][0]['must'][1]['match']['text']);
-        self::assertSame('Art. 17', $with['should'][1]['must'][1]['match']['text']);
+        $words = static fn (array $branch): array => array_map(
+            static fn (array $condition): string => $condition['match']['text'],
+            $branch['must'][1]['should'],
+        );
+        self::assertSame(['art', '17'], $words($with['should'][0]));
+        self::assertSame(['art', '17'], $words($with['should'][1]));
         self::assertArrayNotHasKey('must', array_diff_key($with, ['should' => true]));
     }
 
