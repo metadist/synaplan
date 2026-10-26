@@ -35,6 +35,16 @@ final readonly class PayFirstConfig
         return $this->isSwitchedOn() && $this->billing->isEnabled() && $this->registration->isEnabled();
     }
 
+    /**
+     * Whether a paid pay-first session can still become an account. Only
+     * billing matters: a payment taken before the switch went off keeps its
+     * account.
+     */
+    public function canSettle(): bool
+    {
+        return $this->billing->isEnabled();
+    }
+
     public function isSwitchedOn(): bool
     {
         $fromEnv = $this->envOverride();

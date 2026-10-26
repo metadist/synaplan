@@ -6,6 +6,7 @@ use App\Entity\Topup;
 use App\Entity\User;
 use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\PayFirst\PaidAccountCreator;
 use App\Service\Billing\PayFirst\PayFirstCheckout;
 use App\Service\Billing\StripeEntitlement;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -48,6 +49,7 @@ class StripeWebhookController extends AbstractController
         private string $stripeSecretKey,
         private StripeEntitlement $entitlement,
         private TopupRepository $topupRepository,
+        private PaidAccountCreator $paidAccounts,
     ) {
     }
 
@@ -630,16 +632,17 @@ class StripeWebhookController extends AbstractController
      * Find user by Stripe customer ID (searches in paymentDetails JSON).
      */
     /**
-     * Pay-first sessions have no account yet; the account is created from the
-     * paid session (PF2). They are never attached by email to an existing
-     * account here.
+     * Pay-first sessions have no account yet: the account is created from the
+     * paid session through the same creator `/welcome` uses (PF2). A Stripe
+     * failure throws, so the webhook answers 500 and Stripe retries.
      */
     private function isPayFirst(StripeObject $session): bool
     {
         if (PayFirstCheckout::FLOW !== ($session->metadata->flow ?? null)) {
             return false;
         }
-        $this->logger->info('Pay-first checkout completed; account creation is not enabled yet', ['session_id' => $session->id]);
+        $outcome = $this->paidAccounts->settleSession((string) $session->id);
+        $this->logger->info('Pay-first checkout completed', ['session_id' => $session->id, 'outcome' => $outcome?->kind]);
 
         return true;
     }

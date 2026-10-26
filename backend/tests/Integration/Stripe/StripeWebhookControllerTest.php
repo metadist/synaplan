@@ -7,8 +7,12 @@ namespace App\Tests\Integration\Stripe;
 use App\Entity\Topup;
 use App\Entity\User;
 use App\Repository\TopupRepository;
+use App\Service\Billing\PayFirst\CheckoutSessionGateway;
+use App\Service\Billing\PayFirst\PaidAccountCreator;
+use App\Service\Billing\StripeEntitlement;
 use App\Tests\Integration\Stripe\Mock\StripeMockHttpClient;
 use App\Tests\Integration\Stripe\Mock\StripeSignatureHelper;
+use App\Tests\Unit\Service\Billing\PayFirst\RecordingGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\CurlClient;
@@ -417,31 +421,38 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->assertSame('NEW', $this->user->getUserLevel());
     }
 
-    public function testAPayFirstCheckoutIsNeverAttachedToAnExistingAccountByEmail(): void
+    public function testAPaidPayFirstCheckoutPutsThePlanOnTheAccountThatHoldsTheAddress(): void
     {
-        // A pay-first session carries no client_reference_id and the buyer's
-        // email. Until the paid-account creator handles it (PF2), it must not
-        // fall back to the email lookup and hand the payment to whoever
-        // already holds that address.
+        // Decision D5: a pay-first session carries no client_reference_id; the
+        // paid plan goes onto the account that already holds the address,
+        // through the same creator /welcome uses, and nobody is signed in.
         $details = $this->user->getPaymentDetails();
         unset($details['stripe_customer_id'], $details['stripe_session_id']);
         $this->user->setPaymentDetails($details);
         $this->em->flush();
 
+        $sessionId = 'cs_test_'.bin2hex(random_bytes(8));
+        $gateway = new RecordingGateway();
+        $gateway->priceId = static::getContainer()->get(StripeEntitlement::class)->prices()['PRO'];
+        $checkout = $gateway->paidSession($sessionId, mb_strtolower($this->user->getMail()));
+        $this->client->disableReboot();
+        static::getContainer()->set(CheckoutSessionGateway::class, $gateway);
+
         $payload = $this->buildEventPayload('checkout.session.completed', [
-            'id' => 'cs_test_'.bin2hex(random_bytes(8)),
+            'id' => $sessionId,
             'object' => 'checkout.session',
-            'customer' => 'cus_payfirst_'.bin2hex(random_bytes(6)),
+            'customer' => $checkout->customerId,
             'customer_email' => $this->user->getMail(),
             'mode' => 'subscription',
-            'metadata' => ['flow' => 'pay_first', 'plan' => 'PRO', 'start_nonce_hash' => str_repeat('a', 64)],
+            'metadata' => ['flow' => 'pay_first', 'plan' => 'PRO', 'start_nonce_hash' => $checkout->startNonceHash],
         ]);
         $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
         $this->assertResponseIsSuccessful();
 
         $this->em->refresh($this->user);
-        $this->assertArrayNotHasKey('stripe_customer_id', $this->user->getPaymentDetails());
-        $this->assertArrayNotHasKey('stripe_session_id', $this->user->getPaymentDetails());
+        $this->assertSame($checkout->customerId, $this->user->getStripeCustomerId());
+        $this->assertSame('PRO', $this->user->getUserLevel());
+        $this->assertArrayNotHasKey(PaidAccountCreator::SESSION_KEY, $this->user->getPaymentDetails(), 'An existing account is never marked as made by the session, so /welcome cannot sign into it.');
     }
 
     public function testTopupCheckoutCreditsBudget(): void
