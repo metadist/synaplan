@@ -17,6 +17,7 @@ import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
 import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
 import { codeSignupRoutes } from '@/router/codeSignupRoutes'
+import { loginLinkRoutes } from '@/router/loginLinkRoutes'
 import { resolveRegistrationRedirect } from '@/router/registrationGate'
 import {
   ensureWizardRequired,
@@ -125,6 +126,7 @@ const router = createRouter({
     },
     ...payFirstRoutes,
     ...codeSignupRoutes,
+    ...loginLinkRoutes,
     {
       path: '/forgot-password',
       name: 'forgot-password',

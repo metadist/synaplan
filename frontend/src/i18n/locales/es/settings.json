@@ -104,6 +104,8 @@
       "optionalAction": "Establecer una contraseña",
       "optionalDone": "Tu contraseña está lista. Puedes entrar con ella o con un enlace.",
       "optionalFailed": "No se estableció la contraseña. Inténtalo de nuevo.",
+      "optionalWeak": "La contraseña debe tener al menos 8 caracteres e incluir una mayúscula, una minúscula y un número.",
+      "optionalAlreadySet": "Esta cuenta ya tiene una forma de iniciar sesión.",
       "mismatch": "Las contraseñas no coinciden",
       "tooShort": "La contraseña debe tener al menos 8 caracteres",
       "profileSavedPasswordRejected": "Tu perfil se ha guardado. La contraseña no se ha cambiado, porque la contraseña actual es incorrecta.",

@@ -298,6 +298,8 @@
       "optionalAction": "Définir un mot de passe",
       "optionalDone": "Votre mot de passe est défini. Vous pouvez vous connecter avec lui ou avec un lien.",
       "optionalFailed": "Le mot de passe n'a pas été défini. Réessayez.",
+      "optionalWeak": "Le mot de passe doit compter au moins 8 caractères et inclure une majuscule, une minuscule et un chiffre.",
+      "optionalAlreadySet": "Ce compte a déjà un moyen de se connecter.",
       "mismatch": "Les mots de passe ne correspondent pas",
       "tooShort": "Le mot de passe doit contenir au moins 8 caractères",
       "profileSavedPasswordRejected": "Votre profil a été enregistré. Le mot de passe n'a pas été modifié, car le mot de passe actuel est incorrect.",

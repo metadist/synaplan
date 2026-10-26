@@ -76,6 +76,21 @@ final readonly class TokenService
     }
 
     /**
+     * The mailbox generation already on this request's access token.
+     * Null when the request did not arrive with one, so a new sign-in
+     * takes the account's current generation instead.
+     */
+    public function carriedMailboxGeneration(Request $request): ?int
+    {
+        if (!$request->attributes->has('access_token_mbg')) {
+            return null;
+        }
+        $carried = $request->attributes->get('access_token_mbg');
+
+        return is_int($carried) || (is_string($carried) && ctype_digit($carried)) ? (int) $carried : 0;
+    }
+
+    /**
      * Remember which account this access token belongs to and which mailbox
      * generation it was minted with. Cookie and query-string authentication
      * both go through here, so neither path can skip the key-minting cutoff.

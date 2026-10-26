@@ -11,7 +11,7 @@
     </div>
     <template v-if="payFirst">
       <p v-if="sent" class="text-sm txt-secondary" role="status" data-testid="text-email-link-sent">
-        {{ $t('auth.emailLinkSent', { email }) }}
+        {{ $t('auth.emailLinkSent', { email: sentTo }) }}
       </p>
       <p v-else-if="errorText" class="text-sm text-red-600 dark:text-red-400" role="alert">
         {{ errorText }}
@@ -40,18 +40,22 @@ const props = defineProps<{ email: string }>()
 const { t } = useI18n()
 const payFirst = computed(() => getConfigSync().auth?.payFirst === true)
 const sent = ref(false)
+const sentTo = ref('')
 const sending = ref(false)
 const errorText = ref('')
 
 async function send(): Promise<void> {
   errorText.value = ''
-  if (!validateEmail(props.email)) {
+  sent.value = false
+  const address = props.email.trim()
+  if (!validateEmail(address)) {
     errorText.value = t('auth.emailLinkNeedEmail')
     return
   }
   sending.value = true
   try {
-    await requestEmailSignInLink(props.email.trim())
+    await requestEmailSignInLink(address)
+    sentTo.value = address
     sent.value = true
   } catch {
     errorText.value = t('auth.emailLinkFailed')

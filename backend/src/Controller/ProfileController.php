@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\Billing\PayFirst\PayFirstConfig;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Email\EmailChatService;
 use App\Service\Iam\UserDeletionService;
@@ -30,7 +29,6 @@ class ProfileController extends AbstractController
         private UserDeletionService $userDeletionService,
         private LoggerInterface $logger,
         private UserRepository $userRepository,
-        private PayFirstConfig $payFirst,
     ) {
     }
 
@@ -447,58 +445,6 @@ class ProfileController extends AbstractController
             'error' => $code,
             'message' => $message,
         ], $status);
-    }
-
-    #[Route('/password/initial', name: 'set_initial_password', methods: ['POST'])]
-    #[OA\Post(
-        path: '/api/v1/profile/password/initial',
-        summary: 'Set a password on an account that does not have one',
-        description: 'Only while pay first is on. An account that already has a password, or that signs in through an organisation, is refused.',
-        security: [['Bearer' => []]],
-        tags: ['Profile']
-    )]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            required: ['newPassword'],
-            properties: [
-                new OA\Property(property: 'newPassword', type: 'string', format: 'password', example: 'NewSecure1'),
-            ]
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Password set')]
-    #[OA\Response(response: 400, description: 'The password is too short or too simple')]
-    #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 403, description: 'This account already has a password or is managed elsewhere (PASSWORD_ALREADY_SET)')]
-    #[OA\Response(response: 404, description: 'Pay first is not active (PAY_FIRST_OFF)')]
-    public function setInitialPassword(Request $request, #[CurrentUser] ?User $user): JsonResponse
-    {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-        if (!$this->payFirst->isActive()) {
-            return $this->json(['success' => false, 'error' => 'Not found.', 'code' => 'PAY_FIRST_OFF'], Response::HTTP_NOT_FOUND);
-        }
-        if ($user->isManagedExternally() || $user->canChangePassword()) {
-            return $this->json([
-                'success' => false,
-                'error' => 'This account already has a way to sign in.',
-                'code' => 'PASSWORD_ALREADY_SET',
-            ], Response::HTTP_FORBIDDEN);
-        }
-        $body = json_decode($request->getContent(), true);
-        $newPassword = is_array($body) && is_string($body['newPassword'] ?? null) ? $body['newPassword'] : '';
-        if (strlen($newPassword) < 8 || !preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/', $newPassword)) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-        $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
-        $user->setMustChangePassword(false);
-        $this->userRepository->save($user);
-
-        return $this->json(['success' => true]);
     }
 
     #[Route('/password', name: 'change_password', methods: ['PUT'])]

@@ -2,6 +2,7 @@
  * Profile API - User Profile Management
  */
 
+import { SetInitialPasswordResponseSchema } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
 export interface Profile {
@@ -62,10 +63,11 @@ export const profileApi = {
     })
   },
 
-  async setInitialPassword(newPassword: string): Promise<unknown> {
+  async setInitialPassword(newPassword: string): Promise<{ success: boolean }> {
     return httpClient('/api/v1/profile/password/initial', {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
+      schema: SetInitialPasswordResponseSchema,
     })
   },
 

@@ -345,6 +345,16 @@ class ProfileControllerTest extends WebTestCase
             '/api/v1/profile/password/initial',
             [],
             [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$token, 'CONTENT_TYPE' => 'text/plain'],
+            'not-json'
+        );
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+
+        $this->client->request(
+            'POST',
+            '/api/v1/profile/password/initial',
+            [],
+            [],
             ['HTTP_AUTHORIZATION' => 'Bearer '.$token, 'CONTENT_TYPE' => 'application/json'],
             json_encode(['newPassword' => 'NewSecure1'], JSON_THROW_ON_ERROR)
         );

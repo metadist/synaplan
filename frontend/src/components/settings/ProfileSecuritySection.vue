@@ -62,9 +62,6 @@
         <p v-if="optionalError" class="text-sm text-red-600 dark:text-red-400" role="alert">
           {{ optionalError }}
         </p>
-        <p v-if="optionalDone" class="text-sm txt-secondary" role="status">
-          {{ $t('profile.changePassword.optionalDone') }}
-        </p>
         <button
           type="button"
           class="btn-primary px-4 py-2.5 text-sm font-medium w-fit"
@@ -75,6 +72,10 @@
           {{ $t('profile.changePassword.optionalAction') }}
         </button>
       </div>
+
+      <p v-if="optionalDone" class="text-sm txt-secondary mb-6" role="status">
+        {{ $t('profile.changePassword.optionalDone') }}
+      </p>
 
       <div v-if="canChangePassword" class="grid grid-cols-1 gap-6 max-w-2xl">
         <div data-testid="field-current-password">
@@ -187,6 +188,7 @@ const {
   authProvider,
   externalAuthLastLogin,
   markPasswordTouched,
+  loadProfile,
   showBiometricSection,
   biometricLockOn,
   toggleBiometricLock,
@@ -222,12 +224,22 @@ async function setOptionalPassword(): Promise<void> {
     newPassword.value = ''
     confirmPassword.value = ''
   } catch (error) {
+    const code = error instanceof ApiError ? error.code : undefined
     optionalError.value =
-      error instanceof ApiError && error.message
-        ? error.message
-        : t('profile.changePassword.optionalFailed')
+      code === 'PASSWORD_ALREADY_SET'
+        ? t('profile.changePassword.optionalAlreadySet')
+        : code === 'PASSWORD_TOO_WEAK'
+          ? t('profile.changePassword.optionalWeak')
+          : t('profile.changePassword.optionalFailed')
   } finally {
     optionalSaving.value = false
+  }
+  if (optionalDone.value) {
+    try {
+      await loadProfile()
+    } catch {
+      // The password is already set. The change form appears on the next load.
+    }
   }
 }
 </script>

@@ -298,6 +298,8 @@
       "optionalAction": "Set a password",
       "optionalDone": "Your password is set. You can sign in with it or with an emailed link.",
       "optionalFailed": "The password was not set. Try again.",
+      "optionalWeak": "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+      "optionalAlreadySet": "This account already has a way to sign in.",
       "mismatch": "Passwords do not match",
       "tooShort": "Password must be at least 8 characters",
       "profileSavedPasswordRejected": "Your profile was saved. The password was not changed, because the current password is wrong.",
