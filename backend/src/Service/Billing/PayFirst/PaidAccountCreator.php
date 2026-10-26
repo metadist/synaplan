@@ -28,6 +28,8 @@ final readonly class PaidAccountCreator
     public const SESSION_KEY = 'pay_first_session';
     public const PASSWORD_LINK_TTL_SECONDS = 7 * 86400;
     private const LOCK_TTL_SECONDS = 60.0;
+    /** Stripe subscription states that can no longer charge anyone. */
+    private const ENDED_STATUSES = ['canceled', 'incomplete_expired', 'expired', 'revoked', 'refunded'];
 
     public function __construct(
         private CheckoutSessionGateway $gateway,
@@ -63,7 +65,9 @@ final readonly class PaidAccountCreator
             return PaidAccountOutcome::pending($checkout->plan);
         }
 
-        $lock = $this->lockFactory->createLock('pay-first-account-'.$checkout->sessionId, self::LOCK_TTL_SECONDS);
+        // Per address, not per session: two purchases for one address must
+        // not both pass the existing-account checks.
+        $lock = $this->lockFactory->createLock(self::lockKey($checkout->email), self::LOCK_TTL_SECONDS);
         $lock->acquire(true);
         try {
             $byCustomer = $this->users->findByStripeCustomerId((string) $checkout->customerId);
@@ -87,6 +91,11 @@ final readonly class PaidAccountCreator
         }
     }
 
+    public static function lockKey(string $email): string
+    {
+        return 'pay-first-account-'.hash('sha256', mb_strtolower(trim($email)));
+    }
+
     public static function madeFrom(User $user, PaidCheckout $checkout): bool
     {
         return ($user->getPaymentDetails()[self::SESSION_KEY] ?? null) === $checkout->sessionId;
@@ -97,10 +106,14 @@ final readonly class PaidAccountCreator
      */
     private function create(PaidCheckout $checkout, \Closure $purchase): PaidAccountOutcome
     {
-        $user = $this->lifecycle->createUser($checkout->email, bin2hex(random_bytes(32)));
-        $purchase($user, true);
+        // The account, its purchase and its set-password token land together
+        // or not at all; a half-made account would read as an old one on retry.
+        [$user, $token] = $this->em->wrapInTransaction(function () use ($checkout, $purchase): array {
+            $user = $this->lifecycle->createUser($checkout->email, bin2hex(random_bytes(32)));
+            $purchase($user, true);
 
-        $token = $this->tokens->createToken($user, 'password_reset', self::PASSWORD_LINK_TTL_SECONDS);
+            return [$user, $this->tokens->createToken($user, 'password_reset', self::PASSWORD_LINK_TTL_SECONDS)];
+        });
         $this->mailer->accountReady($checkout->email, $checkout->plan, $token->getToken(), $user->getLocale());
         $this->logger->info('Pay-first account created', ['user_id' => $user->getId(), 'session_id' => $checkout->sessionId, 'plan' => $checkout->plan]);
 
@@ -112,8 +125,7 @@ final readonly class PaidAccountCreator
      */
     private function attach(User $user, PaidCheckout $checkout, \Closure $purchase): PaidAccountOutcome
     {
-        $current = $user->getSubscriptionData()['stripe_subscription_id'] ?? null;
-        if ($user->hasActiveSubscription() && $current !== $checkout->subscriptionId) {
+        if (self::hasOtherLiveSubscription($user, $checkout)) {
             // Two live subscriptions for one person: change nothing and let
             // an operator refund the new one rather than guess which to keep.
             $this->logger->critical('Pay-first payment for an address whose account already has a live subscription; refund it in Stripe', [
@@ -130,6 +142,22 @@ final readonly class PaidAccountCreator
         $this->logger->info('Pay-first plan added to an existing account', ['user_id' => $user->getId(), 'session_id' => $checkout->sessionId]);
 
         return PaidAccountOutcome::existing($user, $checkout->plan);
+    }
+
+    /**
+     * Any subscription on record that Stripe or a store may still charge —
+     * not only the ones that grant access today (trialing, past_due, …).
+     */
+    private static function hasOtherLiveSubscription(User $user, PaidCheckout $checkout): bool
+    {
+        $sub = $user->getSubscriptionData();
+        $id = $sub['stripe_subscription_id'] ?? null;
+        if (null !== $id && $id === $checkout->subscriptionId) {
+            return false;
+        }
+        $status = is_string($sub['status'] ?? null) ? $sub['status'] : null;
+
+        return null !== $status && !in_array($status, self::ENDED_STATUSES, true);
     }
 
     private function recordPurchase(User $user, PaidCheckout $checkout, bool $newAccount, StripeObject $subscription, ?StripeObject $invoice): void

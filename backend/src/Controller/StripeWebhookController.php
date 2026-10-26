@@ -132,7 +132,7 @@ class StripeWebhookController extends AbstractController
         // Handle the event
         try {
             $handled = match ($event->type) {
-                'checkout.session.completed' => $this->handleCheckoutCompleted($event->data->object),
+                'checkout.session.completed', 'checkout.session.async_payment_succeeded' => $this->handleCheckoutCompleted($event->data->object),
                 'customer.subscription.created' => $this->handleSubscriptionCreated($event->data->object),
                 'customer.subscription.updated' => $this->handleSubscriptionUpdated($event->data->object),
                 'customer.subscription.deleted' => $this->handleSubscriptionDeleted($event->data->object),

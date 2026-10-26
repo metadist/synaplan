@@ -6,6 +6,7 @@ namespace App\Service\Billing\PayFirst;
 
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * `/welcome` asks for the account a paid session made (PF2, D3).
@@ -24,6 +25,7 @@ final readonly class PayFirstClaim
         private CheckoutSessionGateway $gateway,
         private PaidAccountCreator $creator,
         private EntityManagerInterface $em,
+        private LockFactory $lockFactory,
     ) {
     }
 
@@ -60,14 +62,23 @@ final readonly class PayFirstClaim
             return false;
         }
 
-        $details = $user->getPaymentDetails();
-        if (isset($details[self::SIGNED_IN_KEY])) {
-            return false;
-        }
-        $details[self::SIGNED_IN_KEY] = time();
-        $user->setPaymentDetails($details);
-        $this->em->flush();
+        // Two claims with the same nonce may arrive together; the grant is
+        // decided on a fresh read under a lock, so only the first one wins.
+        $lock = $this->lockFactory->createLock('pay-first-sign-in-'.$checkout->sessionId, 30.0);
+        $lock->acquire(true);
+        try {
+            $this->em->refresh($user);
+            $details = $user->getPaymentDetails();
+            if (isset($details[self::SIGNED_IN_KEY])) {
+                return false;
+            }
+            $details[self::SIGNED_IN_KEY] = time();
+            $user->setPaymentDetails($details);
+            $this->em->flush();
 
-        return true;
+            return true;
+        } finally {
+            $lock->release();
+        }
     }
 }

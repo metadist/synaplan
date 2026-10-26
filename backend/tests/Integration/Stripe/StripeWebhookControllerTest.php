@@ -455,6 +455,37 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->assertArrayNotHasKey(PaidAccountCreator::SESSION_KEY, $this->user->getPaymentDetails(), 'An existing account is never marked as made by the session, so /welcome cannot sign into it.');
     }
 
+    public function testADelayedPaymentCreatesTheAccountWithoutTheBrowser(): void
+    {
+        // A delayed method (SEPA) completes the session unpaid; the money
+        // arrives with async_payment_succeeded, and the buyer may never
+        // come back to /welcome.
+        $sessionId = 'cs_test_'.bin2hex(random_bytes(8));
+        $email = 'async-'.bin2hex(random_bytes(4)).'@test.synaplan.com';
+        $gateway = new RecordingGateway();
+        $gateway->priceId = static::getContainer()->get(StripeEntitlement::class)->prices()['PRO'];
+        $checkout = $gateway->paidSession($sessionId, $email);
+        $this->client->disableReboot();
+        static::getContainer()->set(CheckoutSessionGateway::class, $gateway);
+
+        $payload = $this->buildEventPayload('checkout.session.async_payment_succeeded', [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'customer' => $checkout->customerId,
+            'customer_email' => $email,
+            'mode' => 'subscription',
+            'metadata' => ['flow' => 'pay_first', 'plan' => 'PRO', 'start_nonce_hash' => $checkout->startNonceHash],
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $created = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
+        $this->assertInstanceOf(User::class, $created);
+        $this->assertSame('PRO', $created->getUserLevel());
+        $this->assertSame($sessionId, $created->getPaymentDetails()[PaidAccountCreator::SESSION_KEY]);
+        static::getContainer()->get(\App\Service\Iam\UserDeletionService::class)->deleteUser($created);
+    }
+
     public function testTopupCheckoutCreditsBudget(): void
     {
         // A one-time top-up arrives as checkout.session.completed with

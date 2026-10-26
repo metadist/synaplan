@@ -13,9 +13,11 @@ use App\Service\Billing\StripeEntitlement;
 use App\Service\Iam\UserDeletionService;
 use App\Tests\Unit\Service\Billing\PayFirst\RecordingGateway;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\BrowserKit\Cookie;
+use Symfony\Component\Mime\Email;
 
 /**
  * Pay first, PF2: the account exists only after the payment, the browser that
@@ -72,6 +74,23 @@ final class CheckoutClaimControllerTest extends WebTestCase
         self::assertSame(1, $this->countUsers('ada'.self::DOMAIN));
     }
 
+    public function testTheSetPasswordMailLeadsToAWorkingLogin(): void
+    {
+        $this->gateway->paidSession('cs_password', 'gus'.self::DOMAIN, 'nonce');
+        $this->claim('cs_password');
+        self::assertSame('ready', $this->json()['status']);
+
+        $mail = self::getMailerMessage();
+        self::assertInstanceOf(Email::class, $mail);
+        self::assertSame(1, preg_match('#/reset-password\?token=([0-9a-f]{64})#', (string) $mail->getHtmlBody(), $m));
+
+        $this->post('/api/v1/auth/reset-password', ['token' => $m[1], 'password' => 'Fresh-Pass-2026']);
+        self::assertResponseIsSuccessful();
+        $this->post('/api/v1/auth/login', ['email' => 'gus'.self::DOMAIN, 'password' => 'Fresh-Pass-2026']);
+        self::assertResponseIsSuccessful();
+        self::assertTrue($this->user('gus'.self::DOMAIN)->isEmailVerified());
+    }
+
     public function testAnotherBrowserSeesTheAccountButIsNotSignedIn(): void
     {
         $this->gateway->paidSession('cs_other', 'bea'.self::DOMAIN, 'the-buyers-nonce');
@@ -101,11 +120,22 @@ final class CheckoutClaimControllerTest extends WebTestCase
         self::assertSame(1, $this->countUsers('cleo'.self::DOMAIN));
     }
 
-    public function testAnAccountWithAnotherLiveSubscriptionIsLeftAlone(): void
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function liveStatuses(): iterable
+    {
+        yield 'active' => ['active'];
+        yield 'trialing' => ['trialing'];
+        yield 'past due' => ['past_due'];
+    }
+
+    #[DataProvider('liveStatuses')]
+    public function testAnAccountWithAnotherLiveSubscriptionIsLeftAlone(string $status): void
     {
         $existing = (new User())->setMail('fay'.self::DOMAIN)->setType('WEB')->setProviderId('local')->setUserLevel('TEAM');
         $existing->setCreated(date('Y-m-d H:i:s'));
-        $existing->setSubscriptionData(['stripe_subscription_id' => 'sub_live', 'status' => 'active', 'subscription_end' => time() + 86400]);
+        $existing->setSubscriptionData(['stripe_subscription_id' => 'sub_live', 'status' => $status, 'subscription_end' => time() - 86400]);
         $this->em->persist($existing);
         $this->em->flush();
         $this->gateway->paidSession('cs_conflict', 'fay'.self::DOMAIN, 'nonce');
@@ -152,7 +182,15 @@ final class CheckoutClaimControllerTest extends WebTestCase
 
     private function claim(string $sessionId): void
     {
-        $this->client->request('POST', self::PATH, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode(['sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+        $this->post(self::PATH, ['sessionId' => $sessionId]);
+    }
+
+    /**
+     * @param array<string, string> $body
+     */
+    private function post(string $path, array $body): void
+    {
+        $this->client->request('POST', $path, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR));
     }
 
     /**
