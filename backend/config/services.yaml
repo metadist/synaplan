@@ -147,6 +147,9 @@ parameters:
     env(CHECKOUT_START_IP_LIMIT): '5'
     env(CHECKOUT_START_EMAIL_LIMIT): '30'
     env(CHECKOUT_CLAIM_IP_LIMIT): '60'
+    # One-time sign-in links: per client IP and per address, per hour.
+    env(EMAIL_LINK_IP_LIMIT): '10'
+    env(EMAIL_LINK_ADDRESS_LIMIT): '5'
     env(PAID_SIGNUP_ALERT_LIMIT): '10'
     env(GOOGLE_CLIENT_SECRET): ''
     env(GITHUB_CLIENT_SECRET): ''

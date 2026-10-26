@@ -90,6 +90,22 @@ class VerificationTokenRepository extends ServiceEntityRepository
         return 1 === $changed;
     }
 
+    /**
+     * Drops every token of one type for an account, e.g. sign-in links once
+     * the address they were sent to is no longer the account's address.
+     */
+    public function deleteForUser(int $userId, string $type): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->delete()
+            ->where('t.userId = :userId')
+            ->andWhere('t.type = :type')
+            ->setParameter('userId', $userId)
+            ->setParameter('type', $type)
+            ->getQuery()
+            ->execute();
+    }
+
     public function markAsUsed(VerificationToken $token): void
     {
         $token->setUsed(true);

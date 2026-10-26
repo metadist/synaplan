@@ -131,6 +131,21 @@ framework:
             limit: '%env(int:CHECKOUT_CLAIM_IP_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
+        # One-time sign-in links (EmailLinkSignIn): per client IP and per
+        # address (keyed by its hash), so the generic answer cannot be used
+        # to flood a mailbox or probe addresses.
+        # (EMAIL_LINK_IP_LIMIT, default 10 per hour; EMAIL_LINK_ADDRESS_LIMIT,
+        # default 5 per hour).
+        email_link_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:EMAIL_LINK_IP_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        email_link_address:
+            policy: 'sliding_window'
+            limit: '%env(int:EMAIL_LINK_ADDRESS_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
         # Not a limit on anything a person does: counts paid tiers granted to
         # accounts younger than a day; when more than PAID_SIGNUP_ALERT_LIMIT
         # (default 10) land in an hour, SignupAnomalyAlert mails the operator.

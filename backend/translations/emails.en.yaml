@@ -55,3 +55,10 @@ email:
       title: 'Your %plan% plan is on your Synaplan account'
       body: 'This email address already had a Synaplan account, so the %plan% plan was added to it. Sign in as usual to use it.'
       button: 'Sign in'
+
+  login_link:
+    title: 'Your sign-in link for Synaplan'
+    body: 'Use this button to sign in. It works once, for 15 minutes.'
+    button: 'Sign in'
+    or_copy: 'Or copy this link into your browser:'
+    not_you: 'If you did not ask for this, ignore this mail; nobody can sign in without the link.'
