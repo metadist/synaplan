@@ -1,5 +1,7 @@
 # synascriber: meeting notes for Jitsi in openDesk
 
+How it works, who talks to whom, what is stored where: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 Jitsi's bridge streams each speaker's audio to the transcriber
 ([sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/)); the
 transcriber sends short audio windows to this plugin; the plugin gets the
