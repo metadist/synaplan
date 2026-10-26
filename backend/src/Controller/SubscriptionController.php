@@ -70,6 +70,7 @@ class SubscriptionController extends AbstractController
                 '15× more usage than the free plan',
                 'Advanced AI Models',
                 'Priority Support',
+                'API Access',
             ],
         ],
         'TEAM' => [
@@ -80,7 +81,6 @@ class SubscriptionController extends AbstractController
                 '40× more usage than the free plan',
                 'Team Collaboration',
                 'Custom Prompts',
-                'API Access',
             ],
         ],
         'BUSINESS' => [

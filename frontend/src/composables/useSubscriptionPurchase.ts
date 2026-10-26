@@ -46,13 +46,13 @@ const PLAN_BENEFITS: Record<string, PlanBenefit[]> = {
     { key: 'usage', params: { factor: 15 } },
     { key: 'advancedModels' },
     { key: 'prioritySupport' },
+    { key: 'apiAccess' },
   ],
   TEAM: [
     { key: 'everythingInPro' },
     { key: 'usage', params: { factor: 40 } },
     { key: 'teamCollaboration' },
     { key: 'customPrompts' },
-    { key: 'apiAccess' },
   ],
   BUSINESS: [
     { key: 'everythingInTeam' },
