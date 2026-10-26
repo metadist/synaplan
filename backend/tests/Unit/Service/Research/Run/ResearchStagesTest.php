@@ -11,10 +11,13 @@ use App\AI\StructuredOutput\Schema\ResearchEvidenceSchema;
 use App\AI\StructuredOutput\Schema\ResearchFinishSchema;
 use App\AI\StructuredOutput\Schema\ResearchPlanSchema;
 use App\AI\StructuredOutput\Schema\ResearchTriageSchema;
+use App\Entity\File;
 use App\Prompt\PromptCatalog;
+use App\Repository\FileRepository;
 use App\Service\Research\Run\Ledger\PassageSplitter;
 use App\Service\Research\Run\Ledger\PassageVerifier;
 use App\Service\Research\Run\Ledger\ResearchBrief;
+use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
@@ -36,6 +39,8 @@ use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
 use App\Service\Research\Run\Stage\ReadStage;
 use App\Service\Research\Run\Stage\ReflectStage;
+use App\Service\Research\Run\Stage\ResearchFilePage;
+use App\Service\Research\Run\Stage\ResearchFileSearch;
 use App\Service\Research\Run\Stage\ResearchHit;
 use App\Service\Research\Run\Stage\ResearchModelReply;
 use App\Service\Research\Run\Stage\ResearchPage;
@@ -332,6 +337,64 @@ final class ResearchStagesTest extends TestCase
         ];
     }
 
+    public function testAFilesQueryKeepsTheFileAndTheReaderOpensItsText(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->addPoint('Article', 'Needed.', [['q' => 'Art. 17', 'language' => 'en', 'scope' => 'files']]);
+        $search = new ReplaySearch();
+        $files = $this->createMock(ResearchFileSearch::class);
+        $files->method('find')->willReturn([['file_id' => 17, 'title' => 'GDPR']]);
+        $file = $this->createMock(File::class);
+        $file->method('getFileText')->willReturn('Article 17 gives a right to erasure.');
+        $repo = $this->createMock(FileRepository::class);
+        $repo->expects($this->once())->method('find')->with(17)->willReturn($file);
+        $caller->script[] = $this->json([
+            'source_id' => 's1',
+            'useful' => false,
+            'published' => null,
+            'kind' => 'document',
+            'findings' => [],
+            'leads' => [],
+            'flags' => [],
+        ]);
+
+        (new GatherStage(new StageCall($caller), $search, new GatherChoice(), $files))->run($ctx);
+        (new ReadStage(new StageCall($caller), new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store(), new ResearchFilePage($repo)))->run($ctx);
+
+        $sources = $ctx->state->ledger->sources();
+        self::assertSame([], $search->queries);
+        self::assertCount(1, $sources);
+        self::assertSame(Source::FILE, $sources[0]->kind);
+        self::assertSame(17, $sources[0]->fileId);
+        self::assertSame(Source::READ, $sources[0]->status);
+        self::assertStringContainsString('right to erasure', $caller->seen[0]['system']);
+    }
+
+    public function testABothQuerySearchesTheWebAndKeepsTheFile(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the article', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Article', 'Needed.', [['q' => 'Art. 17', 'language' => 'en', 'scope' => 'both']]);
+        $search = new ReplaySearch();
+        $search->hits['Art. 17'] = [
+            ResearchHit::from('https://law.example/17', 'Article 17', 'A right to erasure', null),
+        ];
+        $files = $this->createMock(ResearchFileSearch::class);
+        $files->method('find')->willReturn([['file_id' => 17, 'title' => 'GDPR']]);
+        $caller->script[] = $this->json([
+            'results' => [
+                ['id' => 'r1', 'point' => 'p1', 'kind' => 'primary', 'fresh' => true, 'read' => true, 'reason' => 'The article'],
+            ],
+        ]);
+
+        (new GatherStage(new StageCall($caller), $search, new GatherChoice(), $files))->run($ctx);
+
+        $kinds = array_map(static fn (Source $source): string => $source->kind, $ctx->state->ledger->sources());
+        self::assertSame(['Art. 17'], $search->queries);
+        self::assertContains(Source::FILE, $kinds);
+        self::assertContains(Source::WEB, $kinds);
+    }
+
     public function testTheTriagePromptAsksForTheSchemaShape(): void
     {
         $prompt = null;
@@ -535,7 +598,7 @@ final class ResearchStagesTest extends TestCase
         $pages = new ReplayPages();
         foreach (['a', 'b', 'c', 'd'] as $host) {
             $url = 'https://'.$host.'.example/price';
-            $ctx->state->ledger->addSource(\App\Service\Research\Run\Ledger\Source::web($url, 'Price '.$host));
+            $ctx->state->ledger->addSource(Source::web($url, 'Price '.$host));
             $pages->pages[$url] = new ResearchPage(false, 'The unit price is 12.40 EUR.', '', []);
         }
         $ctx->state->advance(ResearchStatus::Gathering);
@@ -729,7 +792,7 @@ final class ResearchStagesTest extends TestCase
     {
         $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Unit price');
-        $ctx->state->ledger->addSource(\App\Service\Research\Run\Ledger\Source::web('https://maker.example/price', 'Price list'));
+        $ctx->state->ledger->addSource(Source::web('https://maker.example/price', 'Price list'));
         $ctx->state->advance(ResearchStatus::Gathering);
     }
 }

@@ -369,6 +369,7 @@
     "intro": "An overview of your vector storage — how many files have been indexed and how many vectors (chunks) are stored for semantic search.",
     "provider": "Vector store",
     "providerHint": "The active backend where your vectors are stored.",
+    "providerMeaningOnly": "This store finds passages by meaning. It does not look up an exact word or number.",
     "online": "Online",
     "offline": "Offline",
     "myTitle": "Your vectors",

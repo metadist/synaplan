@@ -107,6 +107,21 @@ instead of recording an "on" run that equals "off". It temporarily sets
 `PLUGS.RERANK.ENABLED=1` while the "on" pass runs and restores the previous
 value afterwards — on a busy instance, run it off-peak.
 
+On Qdrant, knowledge search also matches the words in a chunk. The text
+index is created the first time the documents collection is used. Keyword
+hits and meaning hits are fused with the same rank fusion the command
+palette uses, and they share the owner's scopes. A MariaDB store has no
+keyword leg; the vector storage screen says that search is by meaning only.
+
+```bash
+docker compose exec -T backend php bin/console app:rag:eval-rerank --hybrid --user=<id> --k=5
+```
+
+`--hybrid` prints recall@k for keyword plus meaning. It does not run the
+rerank on/off passes and does not change their stored record. Document
+cards are not generated: a card would need its own stored text, and there
+is no switch for a step that does not run.
+
 ---
 
 ## Sharing

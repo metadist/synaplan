@@ -369,6 +369,7 @@
     "intro": "Un aperçu de votre stockage vectoriel — combien de fichiers ont été indexés et combien de vecteurs (extraits) sont stockés pour la recherche sémantique.",
     "provider": "Magasin de vecteurs",
     "providerHint": "Le backend actif où vos vecteurs sont stockés.",
+    "providerMeaningOnly": "Ce stockage trouve des passages par le sens. Il ne cherche pas un mot ou un nombre exact.",
     "online": "En ligne",
     "offline": "Hors ligne",
     "myTitle": "Vos vecteurs",

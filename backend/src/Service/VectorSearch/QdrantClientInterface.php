@@ -135,6 +135,20 @@ interface QdrantClientInterface
     ): array;
 
     /**
+     * Keyword match on chunk text. Same owner filter as {@see searchDocuments()}.
+     * An empty list on MariaDB and on the mock.
+     *
+     * @return array<int, array{id: string, score: float, payload: array<string, mixed>}>
+     */
+    public function searchDocumentKeywords(
+        string $text,
+        int $userId,
+        ?string $groupKey = null,
+        int $limit = 10,
+        ?SearchQuery $query = null,
+    ): array;
+
+    /**
      * Get a specific document chunk by point ID.
      *
      * @return array|null Document data including vector, or null if not found

@@ -22,6 +22,7 @@ final readonly class GatherStage implements ResearchStage
         private StageCall $calls,
         private ResearchSearch $search,
         private GatherChoice $choice,
+        private ?ResearchFileSearch $files = null,
     ) {
     }
 
@@ -48,12 +49,20 @@ final readonly class GatherStage implements ResearchStage
         $view = StageBudget::view($ctx->state->budget);
         $ran = [];
         foreach ($ctx->state->ledger->queries() as $query) {
-            $ran[$query->pointId.'|'.$query->query] = true;
+            $prefix = 'files' === $query->scope ? $query->pointId.'|files|' : $query->pointId.'|';
+            $ran[$prefix.$query->query] = true;
         }
 
         $hits = [];
         foreach ($ctx->state->ledger->points() as $point) {
             foreach ($point->queries as $query) {
+                if ('web' !== $query['scope']) {
+                    $fileKey = $point->id.'|files|'.$query['q'];
+                    if (!isset($ran[$fileKey])) {
+                        $this->keepFiles($ctx, $point->id, $query['q']);
+                        $ran[$fileKey] = true;
+                    }
+                }
                 if ('files' === $query['scope'] || !$ctx->state->budget->canSearch()) {
                     continue;
                 }
@@ -85,6 +94,36 @@ final readonly class GatherStage implements ResearchStage
         }
 
         return $hits;
+    }
+
+    private function keepFiles(StageContext $ctx, string $pointId, string $query): void
+    {
+        if (null === $this->files) {
+            return;
+        }
+
+        $found = $this->files->find($ctx->state->ref->userId, $query, max(1, $ctx->state->budget->sourcesLeft()));
+        $ctx->state->ledger->addQuery($pointId, $query, 'files', count($found));
+        $ctx->events->append($ctx->state->ref->id, 'search', [
+            'point' => $pointId,
+            'query' => $query,
+            'scope' => 'files',
+            'results' => count($found),
+        ]);
+        foreach ($found as $row) {
+            if (!$ctx->state->budget->canRead()) {
+                break;
+            }
+            $before = count($ctx->state->ledger->sources());
+            $id = $ctx->state->ledger->addSource(Source::file($row['file_id'], $row['title']));
+            if (count($ctx->state->ledger->sources()) === $before) {
+                continue;
+            }
+            $source = $ctx->state->ledger->source($id);
+            if (null !== $source) {
+                $ctx->events->append($ctx->state->ref->id, 'source', $source->toEvent());
+            }
+        }
     }
 
     /**

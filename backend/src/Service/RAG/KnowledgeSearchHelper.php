@@ -13,12 +13,8 @@ use App\Service\Runtime\RuntimeProfile;
 
 /**
  * The one knowledge search the Messages gateway uses.
- *
- * The first-turn injection and the `knowledge_search` / `read_document` tools
- * both come through here, so a later keyword leg has one place to land.
- * {@see searchInjected()} keeps today's injection arguments and return value.
- * The tool methods refuse a folder the caller cannot use; they do not search
- * a wider set than the injection.
+ * Injection stays meaning-only. Tool search adds keywords on Qdrant,
+ * with the same owner scopes, and refuses a folder the caller cannot use.
  */
 final readonly class KnowledgeSearchHelper
 {
@@ -40,6 +36,8 @@ final readonly class KnowledgeSearchHelper
         private RagScopeResolver $scopes,
         private VectorStorageFacade $storage,
         private FileRepository $files,
+        private ?DocumentKeywordSearch $keywords = null,
+        private ?HybridKnowledgeSearch $hybrid = null,
     ) {
     }
 
@@ -89,14 +87,25 @@ final readonly class KnowledgeSearchHelper
 
         $explicit = $this->injectionScopes($userId, $ragGroupKey, $profile);
         $minScore = null !== $profile && null !== $profile->ragMinScore ? $profile->ragMinScore : self::MIN_SCORE;
+        $limit = max(1, min(self::MAX_LIMIT, $limit));
+        $groupKey = null === $explicit ? $ragGroupKey : null;
         $hits = $this->vectorSearch->semanticSearch(
             $query,
             $userId,
-            null === $explicit ? $ragGroupKey : null,
-            max(1, min(self::MAX_LIMIT, $limit)),
+            $groupKey,
+            $limit,
             $minScore,
             $explicit,
         );
+        if (null !== $this->keywords && null !== $this->hybrid) {
+            $scopes = $explicit ?? $this->scopes->resolve($userId, $groupKey);
+            $hits = $this->hybrid->merge(
+                $hits,
+                $this->keywords->find($userId, $query, $groupKey, $scopes, $limit),
+                $limit,
+                $query,
+            );
+        }
 
         return ['hits' => $hits, 'error' => null];
     }
