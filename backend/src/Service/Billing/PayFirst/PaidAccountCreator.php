@@ -84,6 +84,7 @@ final readonly class PaidAccountCreator
             // no half-made account that a retry would mistake for an old one.
             $subscription = $this->gateway->subscription((string) $checkout->subscriptionId);
             $invoice = $this->entitlement->latestInvoice($subscription);
+            $this->assertFulfillable($checkout, $subscription);
             $purchase = fn (User $user, bool $newAccount) => $this->recordPurchase($user, $checkout, $newAccount, $subscription, $invoice);
 
             $existing = $this->users->findOtherByNormalizedEmail($checkout->email, 0);
@@ -157,6 +158,27 @@ final readonly class PaidAccountCreator
         $this->logger->info('Pay-first plan added to an existing account', ['user_id' => $user->getId(), 'session_id' => $checkout->sessionId]);
 
         return PaidAccountOutcome::existing($user, $checkout->plan);
+    }
+
+    /**
+     * A price this install no longer sells would leave the buyer with an
+     * account but no plan, and the saved customer would stop any retry.
+     * Refuse before writing: the webhook answers 500 and Stripe retries
+     * until the operator restores the price.
+     */
+    private function assertFulfillable(PaidCheckout $checkout, StripeObject $subscription): void
+    {
+        $item = $subscription->items->data[0] ?? null;
+        $level = $this->entitlement->levelForPrice($item instanceof StripeObject ? ($item->price->id ?? null) : null);
+        if (in_array($level, StripeEntitlement::PAID_LEVELS, true)) {
+            return;
+        }
+        $this->logger->critical('Pay-first payment for a price this install does not sell; restore STRIPE_PRICE_* or refund it', [
+            'session_id' => $checkout->sessionId,
+            'subscription_id' => $checkout->subscriptionId,
+        ]);
+
+        throw PayFirstException::notFulfillable();
     }
 
     /**

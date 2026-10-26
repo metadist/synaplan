@@ -124,10 +124,11 @@ framework:
             cache_pool: 'cache.rate_limiter'
         # /welcome asks for the account a paid session made (PayFirstClaim);
         # a page polls a few times while Stripe confirms, so the limit only
-        # stops someone hammering Stripe lookups through it.
+        # stops someone hammering Stripe lookups through it
+        # (CHECKOUT_CLAIM_IP_LIMIT, default 60 per hour).
         checkout_claim_ip:
             policy: 'sliding_window'
-            limit: 60
+            limit: '%env(int:CHECKOUT_CLAIM_IP_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
         # Not a limit on anything a person does: counts paid tiers granted to

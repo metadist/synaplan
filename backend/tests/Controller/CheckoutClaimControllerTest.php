@@ -166,6 +166,19 @@ final class CheckoutClaimControllerTest extends WebTestCase
         self::assertEmailCount(0);
     }
 
+    public function testAPriceThisInstallDoesNotSellCreatesNothingAndSaysSo(): void
+    {
+        $this->gateway->priceId = 'price_not_sold_here';
+        $this->gateway->paidSession('cs_unknown_price', 'hal'.self::DOMAIN, 'nonce');
+
+        $this->claim('cs_unknown_price');
+
+        self::assertResponseStatusCodeSame(503);
+        self::assertSame('PAY_FIRST_NOT_FULFILLABLE', $this->json()['code']);
+        self::assertStringStartsWith('Your payment went through', $this->json()['error']);
+        self::assertSame(0, $this->countUsers('hal'.self::DOMAIN));
+    }
+
     public function testAnUnpaidSessionCreatesNothing(): void
     {
         $this->gateway->paidSession('cs_unpaid', 'dan'.self::DOMAIN, 'nonce', paid: false);

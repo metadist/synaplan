@@ -55,7 +55,7 @@ final class CheckoutClaimController extends AbstractController
             )),
             new OA\Response(response: 404, description: 'No pay-first session with this id, or billing is not configured (PAY_FIRST_SESSION_NOT_FOUND)'),
             new OA\Response(response: 429, description: 'Too many requests from this connection (PAY_FIRST_RATE_LIMITED)'),
-            new OA\Response(response: 502, description: 'Stripe could not be reached (PAY_FIRST_UNAVAILABLE)'),
+            new OA\Response(response: 503, description: 'The payment went through but the account could not be finished yet: Stripe could not be reached (PAY_FIRST_LOOKUP_FAILED), or the purchased price is not one this install sells (PAY_FIRST_NOT_FULFILLABLE)'),
         ]
     )]
     public function claim(Request $request): JsonResponse

@@ -29,6 +29,8 @@ final class CheckoutStartControllerTest extends WebTestCase
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private RecordingGateway $gateway;
+    /** @var array<string, string|null> */
+    private array $savedEnv = [];
 
     protected function setUp(): void
     {
@@ -38,11 +40,21 @@ final class CheckoutStartControllerTest extends WebTestCase
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
         $this->gateway = new RecordingGateway();
         static::getContainer()->set(CheckoutSessionGateway::class, $this->gateway);
+        // Pay first needs a mail transport; the null transport sends nothing.
+        $this->setEnv('MAILER_DSN', 'null://default');
+        $this->setEnv('SIGNUP_PAUSED', null);
     }
 
     protected function tearDown(): void
     {
         $this->em->getConnection()->executeStatement('DELETE FROM BCONFIG WHERE BOWNERID = 0 AND BGROUP = ? AND BSETTING = ?', [PayFirstConfig::CONFIG_GROUP, PayFirstConfig::KEY]);
+        foreach ($this->savedEnv as $name => $value) {
+            if (null === $value) {
+                unset($_ENV[$name]);
+            } else {
+                $_ENV[$name] = $value;
+            }
+        }
         parent::tearDown();
     }
 
@@ -52,6 +64,27 @@ final class CheckoutStartControllerTest extends WebTestCase
 
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
         self::assertSame('PAY_FIRST_OFF', $this->json()['code']);
+        self::assertSame([], $this->gateway->created);
+    }
+
+    public function testAbsentWithoutAMailTransport(): void
+    {
+        $this->setEnv('MAILER_DSN', 'null://null');
+        $this->switchOn();
+        $this->start(['email' => self::EMAIL, 'plan' => 'PRO']);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame([], $this->gateway->created);
+    }
+
+    public function testThePauseSwitchStopsNewCheckouts(): void
+    {
+        $this->setEnv('SIGNUP_PAUSED', 'true');
+        $this->switchOn();
+        $this->start(['email' => self::EMAIL, 'plan' => 'PRO']);
+
+        self::assertResponseStatusCodeSame(503);
+        self::assertSame('SIGNUP_PAUSED', $this->json()['code']);
         self::assertSame([], $this->gateway->created);
     }
 
@@ -110,6 +143,18 @@ final class CheckoutStartControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
         self::assertSame('PAY_FIRST_PLAN_INVALID', $this->json()['code']);
         self::assertSame([], $this->gateway->created);
+    }
+
+    private function setEnv(string $name, ?string $value): void
+    {
+        if (!array_key_exists($name, $this->savedEnv)) {
+            $this->savedEnv[$name] = $_ENV[$name] ?? null;
+        }
+        if (null === $value) {
+            unset($_ENV[$name]);
+        } else {
+            $_ENV[$name] = $value;
+        }
     }
 
     private function switchOn(): void

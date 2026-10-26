@@ -57,11 +57,14 @@ final class PaidAccountCreatorTest extends TestCase
             }
         });
 
+        $entitlement = $this->createMock(StripeEntitlement::class);
+        $entitlement->method('levelForPrice')->willReturn('PRO');
+
         $creator = new PaidAccountCreator(
             $gateway,
             $users,
             $lifecycle,
-            $this->createMock(StripeEntitlement::class),
+            $entitlement,
             $tokens,
             $mailer,
             $em,

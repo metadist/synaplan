@@ -42,7 +42,7 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
         } catch (\Stripe\Exception\ApiErrorException $e) {
             $this->logger->error('Pay-first checkout session could not be read', ['session_id' => $sessionId, 'stripe_error' => $e->getMessage()]);
 
-            throw PayFirstException::unavailable();
+            throw PayFirstException::lookupFailed();
         }
 
         $metadata = $session->metadata;
@@ -58,7 +58,9 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
             strtoupper((string) ($metadata['plan'] ?? '')),
             self::idOf($session->customer),
             self::idOf($session->subscription),
-            'complete' === $session->status && 'paid' === $session->payment_status,
+            // A 100% promotion code completes without a charge; the
+            // subscription and its invoice still decide the entitlement.
+            'complete' === $session->status && in_array($session->payment_status, ['paid', 'no_payment_required'], true),
             (string) ($metadata['start_nonce_hash'] ?? ''),
         );
     }
@@ -72,7 +74,7 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
         } catch (\Stripe\Exception\ApiErrorException $e) {
             $this->logger->error('Pay-first subscription could not be read', ['subscription_id' => $subscriptionId, 'stripe_error' => $e->getMessage()]);
 
-            throw PayFirstException::unavailable();
+            throw PayFirstException::lookupFailed();
         }
     }
 

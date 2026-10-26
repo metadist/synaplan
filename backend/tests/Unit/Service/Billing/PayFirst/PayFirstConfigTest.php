@@ -8,12 +8,14 @@ use App\Repository\ConfigRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Billing\BillingService;
 use App\Service\Billing\PayFirst\PayFirstConfig;
+use App\Service\Email\MailerConfig;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Pay first is off unless an operator turns it on, and never runs where
- * Stripe billing or self-sign-up is off — so self-hosters, OIDC-only installs
- * and partners without Stripe keep their own process.
+ * Stripe billing, self-sign-up or mail is off — so self-hosters, OIDC-only
+ * installs and partners without Stripe keep their own process, and nobody
+ * buys an account they could not sign back into.
  */
 final class PayFirstConfigTest extends TestCase
 {
@@ -50,6 +52,12 @@ final class PayFirstConfigTest extends TestCase
         self::assertFalse($this->config(stored: 'true', registration: false)->isActive());
     }
 
+    public function testNeverWithoutAMailTransport(): void
+    {
+        self::assertFalse($this->config(stored: 'true', mail: false)->isActive());
+        self::assertTrue($this->config(stored: 'true', mail: false)->canSettle(), 'A payment already taken still becomes an account.');
+    }
+
     public function testTheEnvironmentPinsTheSwitch(): void
     {
         $_ENV[PayFirstConfig::ENV_VAR] = 'false';
@@ -59,7 +67,7 @@ final class PayFirstConfigTest extends TestCase
         self::assertTrue($this->config(stored: null)->isActive());
     }
 
-    private function config(?string $stored, bool $billing = true, bool $registration = true): PayFirstConfig
+    private function config(?string $stored, bool $billing = true, bool $registration = true, bool $mail = true): PayFirstConfig
     {
         $repository = $this->createStub(ConfigRepository::class);
         $repository->method('getValue')->willReturnCallback(
@@ -70,6 +78,9 @@ final class PayFirstConfigTest extends TestCase
         $registrationConfig = $this->createStub(RegistrationConfig::class);
         $registrationConfig->method('isEnabled')->willReturn($registration);
 
-        return new PayFirstConfig($repository, $billingService, $registrationConfig);
+        $mailerConfig = $this->createStub(MailerConfig::class);
+        $mailerConfig->method('isConfigured')->willReturn($mail);
+
+        return new PayFirstConfig($repository, $billingService, $registrationConfig, $mailerConfig);
     }
 }

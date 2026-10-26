@@ -17,6 +17,8 @@ final class PayFirstException extends \RuntimeException
     public const PLAN_INVALID = 'PAY_FIRST_PLAN_INVALID';
     public const RATE_LIMITED = 'PAY_FIRST_RATE_LIMITED';
     public const UNAVAILABLE = 'PAY_FIRST_UNAVAILABLE';
+    public const LOOKUP_FAILED = 'PAY_FIRST_LOOKUP_FAILED';
+    public const NOT_FULFILLABLE = 'PAY_FIRST_NOT_FULFILLABLE';
 
     private function __construct(
         string $message,
@@ -45,6 +47,18 @@ final class PayFirstException extends \RuntimeException
     public static function unavailable(): self
     {
         return new self('The payment page could not be opened. Nothing was charged; please try again in a minute.', self::UNAVAILABLE, Response::HTTP_BAD_GATEWAY);
+    }
+
+    /** After the payment: Stripe could not be read; the caller tries again. */
+    public static function lookupFailed(): self
+    {
+        return new self('Your payment went through. We could not reach the payment service to finish your account; we will try again in a moment.', self::LOOKUP_FAILED, Response::HTTP_SERVICE_UNAVAILABLE);
+    }
+
+    /** After the payment: the purchased price is not one this install sells. */
+    public static function notFulfillable(): self
+    {
+        return new self('Your payment went through, but we could not add the plan automatically. We have been alerted and will email you once your account is ready.', self::NOT_FULFILLABLE, Response::HTTP_SERVICE_UNAVAILABLE);
     }
 
     public function getErrorCode(): string
