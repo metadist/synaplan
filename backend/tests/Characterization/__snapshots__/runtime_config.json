@@ -10,6 +10,7 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
+                "payFirst": "bool",
                 "registrationEnabled": "bool",
                 "registrationMode": "string"
             },
@@ -238,6 +239,7 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
+                "payFirst": "bool",
                 "registrationEnabled": "bool",
                 "registrationMode": "string"
             },
@@ -466,6 +468,7 @@
             "auth": {
                 "guestChatEnabled": "bool",
                 "mailerConfigured": "bool",
+                "payFirst": "bool",
                 "registrationEnabled": "bool",
                 "registrationMode": "string"
             },

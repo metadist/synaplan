@@ -107,7 +107,9 @@
     "apps": "Apps",
     "appsConnected": "Apps connectées",
     "appDetail": "App",
-    "adminUsage": "Tableau des coûts"
+    "adminUsage": "Tableau des coûts",
+    "start": "Commencer",
+    "welcome": "Bienvenue"
   },
   "welcome": "Bienvenue",
   "welcomeUser": "Bienvenue, {name}",

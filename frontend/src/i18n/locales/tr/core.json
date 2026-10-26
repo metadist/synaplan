@@ -106,7 +106,9 @@
     "apps": "Uygulamalar",
     "appsConnected": "Bağlı uygulamalar",
     "appDetail": "Uygulama",
-    "adminUsage": "Maliyet panosu"
+    "adminUsage": "Maliyet panosu",
+    "start": "Başla",
+    "welcome": "Hoş geldiniz"
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
