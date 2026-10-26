@@ -70,22 +70,24 @@ final readonly class PremiumFeatureGate
         if (!$user->isEmailVerified()) {
             throw ApiKeyPlanRequiredException::addressUnverified();
         }
-        $provenAt = $user->getMailboxProvenAt();
-        $issuedAt = $this->accessTokenIssuedAt();
-        if (null !== $provenAt && null !== $issuedAt && $issuedAt < $provenAt) {
+        $generation = $user->getMailboxGeneration();
+        $request = $this->requestStack?->getCurrentRequest();
+        if (null === $request || $generation < 1) {
+            return;
+        }
+        $tokenUser = $request->attributes->get('access_token_user_id');
+        $tokenUserId = is_int($tokenUser) || (is_string($tokenUser) && ctype_digit($tokenUser)) ? (int) $tokenUser : null;
+        // Only the token's own account. An administrator provisioning a key
+        // for someone else carries the administrator's generation, which says
+        // nothing about the target.
+        if (null === $tokenUserId || $tokenUserId !== (int) $user->getId()) {
+            return;
+        }
+        $carried = $request->attributes->get('access_token_mbg');
+        $carriedGen = is_int($carried) || (is_string($carried) && ctype_digit($carried)) ? (int) $carried : 0;
+        if ($carriedGen < $generation) {
             throw ApiKeyPlanRequiredException::sessionEnded();
         }
-    }
-
-    /**
-     * When the access cookie was issued, if this request has one. Absent for
-     * an administrator action or a key that is already a key.
-     */
-    private function accessTokenIssuedAt(): ?int
-    {
-        $at = $this->requestStack?->getCurrentRequest()?->attributes->get('access_token_iat');
-
-        return is_int($at) ? $at : (is_string($at) && ctype_digit($at) ? (int) $at : null);
     }
 
     /**

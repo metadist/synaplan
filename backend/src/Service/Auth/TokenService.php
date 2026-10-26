@@ -9,6 +9,7 @@ use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -47,16 +48,14 @@ final readonly class TokenService
     }
 
     /**
-     * Generate Access Token (short-lived, signed).
+     * Generate an access token (short-lived, signed).
      *
-     * The optional `$impersonatorId` argument embeds an `impersonator_id`
-     * claim into the token payload, signalling that this access token was
-     * minted as part of an admin impersonation session. The claim is the
-     * single source of truth for the impersonation banner and for the
-     * `/auth/refresh` impersonation-aware path — we never persist a separate
-     * refresh token for the impersonated user, so this stays the only marker.
+     * `$impersonatorId` embeds the admin behind an impersonation session.
+     * `$mailboxGeneration` null uses the account's current generation (a new
+     * sign-in). A derived token passes the generation it already had, so it
+     * cannot step past a mailbox proof.
      */
-    public function generateAccessToken(User $user, ?int $impersonatorId = null): string
+    public function generateAccessToken(User $user, ?int $impersonatorId = null, ?int $mailboxGeneration = null): string
     {
         $payload = [
             'user_id' => $user->getId(),
@@ -66,6 +65,7 @@ final readonly class TokenService
             'exp' => time() + self::ACCESS_TOKEN_TTL,
             'iat' => time(),
             'type' => self::TYPE_ACCESS,
+            'mbg' => $mailboxGeneration ?? $user->getMailboxGeneration(),
         ];
 
         if (null !== $impersonatorId) {
@@ -73,6 +73,26 @@ final readonly class TokenService
         }
 
         return $this->encodeToken($payload);
+    }
+
+    /**
+     * Remember which account this access token belongs to and which mailbox
+     * generation it was minted with. Cookie and query-string authentication
+     * both go through here, so neither path can skip the key-minting cutoff.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function noteAccessToken(Request $request, array $payload): void
+    {
+        $userId = $payload['user_id'] ?? null;
+        if (is_int($userId) || (is_string($userId) && ctype_digit($userId))) {
+            $request->attributes->set('access_token_user_id', (int) $userId);
+        }
+        $generation = $payload['mbg'] ?? 0;
+        $request->attributes->set(
+            'access_token_mbg',
+            is_int($generation) || (is_string($generation) && ctype_digit($generation)) ? (int) $generation : 0,
+        );
     }
 
     /**

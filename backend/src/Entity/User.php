@@ -204,11 +204,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Unix time of the latest mailbox proof (verification link, sign-in link
-     * or set-password link). An access token issued before this must not mint
-     * an API key: the person who proved the mailbox may not be the one who
-     * was signed in. Stored in BUSERDETAILS so this needs no schema change.
+     * How many times this mailbox has been proven. An access token carries the
+     * generation it was minted with. A token from before the latest proof has
+     * a lower one, including two tokens minted in the same second. Stored in
+     * BUSERDETAILS so this needs no schema change.
      */
+    public function getMailboxGeneration(): int
+    {
+        $gen = $this->userDetails['email_verified_gen'] ?? 0;
+
+        return is_int($gen) ? $gen : (is_string($gen) && ctype_digit($gen) ? (int) $gen : 0);
+    }
+
     public function getMailboxProvenAt(): ?int
     {
         $at = $this->userDetails['email_verified_at'] ?? null;
@@ -221,6 +228,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->emailVerified = true;
         $details = $this->getUserDetails();
         $details['email_verified_at'] = $at ?? time();
+        $details['email_verified_gen'] = $this->getMailboxGeneration() + 1;
         $this->userDetails = $details;
 
         return $this;
