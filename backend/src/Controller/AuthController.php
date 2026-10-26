@@ -980,6 +980,8 @@ class AuthController extends AbstractController
         }
 
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
+        // The link reached this mailbox, which proves the address.
+        $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
 

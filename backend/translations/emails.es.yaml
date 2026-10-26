@@ -43,3 +43,14 @@ email:
   workspace_expiry:
     subject: 'Tu espacio de trabajo se eliminará pronto'
     body: "Tu espacio de trabajo de Synaplan lleva tiempo sin usarse y se eliminará en %days% días, junto con los archivos que la IA creó para ti. Ábrelo antes para conservarlo:\n\n%url%\n\nSi no haces nada, los archivos se eliminarán sin posibilidad de recuperarlos."
+
+  paid_account:
+    or_copy: 'O copia este enlace en tu navegador:'
+    ready:
+      title: 'Tu cuenta de Synaplan está lista'
+      body: 'Tu plan %plan% está activo. Crea una contraseña para iniciar sesión en cualquier dispositivo. El enlace es válido durante 7 días; después, usa "¿Olvidaste tu contraseña?" en la página de inicio de sesión.'
+      button: 'Crear contraseña'
+    existing:
+      title: 'Tu plan %plan% está en tu cuenta de Synaplan'
+      body: 'Esta dirección de correo ya tenía una cuenta de Synaplan, así que el plan %plan% se añadió a ella. Inicia sesión como siempre para usarlo.'
+      button: 'Iniciar sesión'

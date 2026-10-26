@@ -43,3 +43,14 @@ email:
   workspace_expiry:
     subject: 'Dosya çalışma alanınız yakında silinecek'
     body: "Synaplan dosya çalışma alanınız bir süredir kullanılmadı ve %days% gün içinde, AI'ın sizin için oluşturduğu dosyalarla birlikte silinecek. Saklamak için o tarihten önce açın:\n\n%url%\n\nBir şey yapmazsanız dosyalar kalıcı olarak kaldırılır."
+
+  paid_account:
+    or_copy: 'Ya da bu bağlantıyı tarayıcınıza kopyalayın:'
+    ready:
+      title: 'Synaplan hesabınız hazır'
+      body: '%plan% planınız etkin. Her cihazda oturum açmak için bir parola belirleyin. Bağlantı 7 gün geçerlidir; sonrasında oturum açma sayfasındaki "Parolamı unuttum" seçeneğini kullanın.'
+      button: 'Parola belirle'
+    existing:
+      title: '%plan% planınız Synaplan hesabınızda'
+      body: 'Bu e-posta adresinin zaten bir Synaplan hesabı vardı, bu yüzden %plan% planı o hesaba eklendi. Kullanmak için her zamanki gibi oturum açın.'
+      button: 'Oturum aç'

@@ -48,6 +48,7 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
      */
     private const ANONYMOUS_PATHS = [
         '/api/v1/checkout/start',
+        '/api/v1/checkout/claim',
     ];
 
     private const ACCESS_COOKIE_AUTH_PATHS = [
