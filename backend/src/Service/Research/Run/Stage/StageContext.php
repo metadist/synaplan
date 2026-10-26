@@ -24,4 +24,10 @@ final class StageContext
         public string $sourcesOn = 'web',
     ) {
     }
+
+    /** The person switched files on as a source; otherwise a run never searches or reads them. */
+    public function filesOn(): bool
+    {
+        return in_array('files', preg_split('/[\s,]+/', strtolower($this->sourcesOn)) ?: [], true);
+    }
 }

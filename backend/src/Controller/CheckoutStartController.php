@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\SignupPauseSwitch;
 use App\Service\Auth\SignupProtection;
 use App\Service\Billing\PayFirst\PayFirstCheckout;
 use App\Service\Billing\PayFirst\PayFirstConfig;
@@ -32,6 +34,7 @@ final class CheckoutStartController extends AbstractController
         private readonly SignupProtection $signupProtection,
         private readonly ClientContextResolver $clientContextResolver,
         private readonly AuthCookieFactory $cookies,
+        private readonly SignupPauseSwitch $pause,
     ) {
     }
 
@@ -62,12 +65,18 @@ final class CheckoutStartController extends AbstractController
             new OA\Response(response: 404, description: 'Pay-first is not active on this installation'),
             new OA\Response(response: 429, description: 'Too many starts from this connection or for this address (PAY_FIRST_RATE_LIMITED)'),
             new OA\Response(response: 502, description: 'Stripe could not open the payment page (PAY_FIRST_UNAVAILABLE)'),
+            new OA\Response(response: 503, description: 'Sign-up is paused by the operator (SIGNUP_PAUSED)'),
         ]
     )]
     public function start(Request $request): JsonResponse
     {
         if (!$this->config->isActive()) {
             return $this->json(['success' => false, 'error' => 'Not found.', 'code' => 'PAY_FIRST_OFF'], Response::HTTP_NOT_FOUND);
+        }
+        if ($this->pause->isPaused()) {
+            $paused = SignupBlockedException::paused();
+
+            return $this->json(['success' => false, 'error' => $paused->getMessage(), 'code' => $paused->getReasonCode()], $paused->getHttpStatus());
         }
         if ($this->clientContextResolver->fromRequest($request)->isMobileApp) {
             return $this->json([

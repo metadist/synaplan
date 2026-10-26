@@ -688,6 +688,54 @@
         "deletedAccounts": "{count} Konto, das diesen Code genutzt hat, wurde inzwischen gelöscht. | {count} Konten, die diesen Code genutzt haben, wurden inzwischen gelöscht.",
         "loadFailed": "Die Liste konnte nicht geladen werden. Schließe sie und öffne sie erneut."
       }
+    },
+    "usageBoard": {
+      "title": "Nutzung & Kosten",
+      "subtitle": "Wer welche Modellkosten verursacht",
+      "intro": "Nutzer, sortiert nach den Anbieterkosten ihrer Modellanfragen. Eine Zeile öffnen zeigt die einzelnen Anfragen — Zeit, Art, Modell und Preis, niemals den Inhalt.",
+      "periodLabel": "Zeitraum",
+      "sortLabel": "Sortieren nach",
+      "period": {
+        "24h": "24 Stunden",
+        "7d": "7 Tage",
+        "30d": "30 Tage",
+        "all": "Gesamte Zeit"
+      },
+      "sort": {
+        "cost": "Höchste Kosten",
+        "requests": "Meiste Anfragen",
+        "tokens": "Meiste Tokens"
+      },
+      "loadFailed": "Die Kostenübersicht konnte nicht geladen werden. Bitte versuche es erneut.",
+      "empty": "Noch keine Modellnutzung in diesem Zeitraum.",
+      "showAllTime": "Gesamte Zeit anzeigen",
+      "usersCount": "{total} Nutzer mit Modellnutzung",
+      "requestsCount": "{total} Anfragen",
+      "requestsLoadFailed": "Diese Anfragen konnten nicht geladen werden. Bitte versuche es erneut.",
+      "requestsEmpty": "Keine Anfragen in diesem Zeitraum.",
+      "tokensUnit": "Tokens",
+      "agent": "Agent",
+      "chat": "Chat",
+      "colTime": "Zeit",
+      "colKind": "Art",
+      "colModel": "Modell",
+      "colTokens": "Tokens (ein / aus)",
+      "colLatency": "Dauer",
+      "colCost": "Kosten",
+      "kind": {
+        "chat": "Chat",
+        "video": "Video",
+        "image": "Bild",
+        "audio": "Audio",
+        "voice": "Sprache",
+        "transcription": "Transkription",
+        "embedding": "Embedding",
+        "agent": "Agent",
+        "compute": "Compute",
+        "file": "Dateien",
+        "internal": "Intern",
+        "other": "Sonstige"
+      }
     }
   },
   "statistics": {

@@ -33,6 +33,7 @@ final readonly class ReadStage implements ResearchStage
         private PassageSplitter $splitter,
         private AcceptedEvidence $accepted,
         private ResearchStateStore $store,
+        private ?ResearchFilePage $filePages = null,
     ) {
     }
 
@@ -62,7 +63,13 @@ final readonly class ReadStage implements ResearchStage
     private function nextUnread(StageContext $ctx, array $seen): ?Source
     {
         foreach ($ctx->state->ledger->unreadSources() as $source) {
-            if (Source::WEB === $source->kind && null !== $source->url && !isset($seen[$source->id])) {
+            if (isset($seen[$source->id])) {
+                continue;
+            }
+            if (Source::WEB === $source->kind && null !== $source->url) {
+                return $source;
+            }
+            if (Source::FILE === $source->kind && null !== $source->fileId && null !== $this->filePages) {
                 return $source;
             }
         }
@@ -123,9 +130,8 @@ final readonly class ReadStage implements ResearchStage
 
     private function readOne(StageContext $ctx, Source $source, ?string $question = null): ?StageResult
     {
-        $url = $source->url ?? '';
         $this->mark($ctx, $source->id, Source::READING);
-        $page = $this->pages->open($url);
+        $page = $this->pageFor($ctx, $source);
         if ($page->blocked || '' === trim($page->text)) {
             $this->mark($ctx, $source->id, Source::BLOCKED, '' !== $page->reason ? $page->reason : 'There was no text to read.');
 
@@ -177,6 +183,15 @@ final readonly class ReadStage implements ResearchStage
         $this->mark($ctx, $source->id, Source::READ);
 
         return null;
+    }
+
+    private function pageFor(StageContext $ctx, Source $source): ResearchPage
+    {
+        if (Source::FILE === $source->kind && null !== $this->filePages) {
+            return $this->filePages->open($ctx->state->ref->userId, $source->fileId);
+        }
+
+        return $this->pages->open($source->url ?? '');
     }
 
     private function mark(StageContext $ctx, string $sourceId, string $status, ?string $reason = null): void

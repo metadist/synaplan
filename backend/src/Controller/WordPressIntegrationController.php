@@ -140,8 +140,8 @@ class WordPressIntegrationController extends AbstractController
             $result = $callback();
 
             return $this->json($result);
-        } catch (ApiKeyPlanRequiredException) {
-            return $this->json(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
+        } catch (ApiKeyPlanRequiredException $refusal) {
+            return $this->json($refusal->body(), Response::HTTP_FORBIDDEN);
         } catch (\Throwable $e) {
             $this->logger->error('WordPress integration error', [
                 'error' => $e->getMessage(),

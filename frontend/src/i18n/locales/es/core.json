@@ -105,7 +105,8 @@
     "prompts": "Atajos",
     "apps": "Apps",
     "appsConnected": "Apps conectadas",
-    "appDetail": "App"
+    "appDetail": "App",
+    "adminUsage": "Panel de costes"
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
@@ -183,7 +184,8 @@
     "groupApps": "Apps",
     "apps": "Apps",
     "allApps": "Todas las apps",
-    "connectedApps": "Conectadas"
+    "connectedApps": "Conectadas",
+    "adminUsage": "Uso"
   },
   "common": {
     "ok": "OK",

@@ -14,7 +14,6 @@ import {
   PuzzlePieceIcon,
   ShieldCheckIcon,
   Squares2X2Icon,
-  UsersIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
@@ -29,6 +28,7 @@ import { idsReportedAsDown, servicesNeedingAttention } from '../utils/serviceRea
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
 import { capacityNavEntries } from './useCapacityNav'
+import { adminUserNavEntries } from './useAdminUserNav'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -366,12 +366,7 @@ export function useNavItems() {
           badge: badge(offlineModelsCount.value),
           alsoActiveOn: ['/admin/vectors'],
         },
-        {
-          key: 'admin-people',
-          path: '/admin/people',
-          label: t('nav.adminPeople'),
-          icon: UsersIcon,
-        },
+        ...adminUserNavEntries({ people: t('nav.adminPeople'), usage: t('nav.adminUsage') }),
         ...(partnersListed.value
           ? [
               {

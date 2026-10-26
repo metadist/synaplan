@@ -174,4 +174,9 @@ final class QdrantClientMockTest extends TestCase
         $this->expectNotToPerformAssertions();
         $this->client->deleteDigests(['dig_7_1', 'dig_7_2']);
     }
+
+    public function testSearchDocumentKeywordsReturnsEmpty(): void
+    {
+        $this->assertSame([], $this->client->searchDocumentKeywords('Art. 17', 1));
+    }
 }

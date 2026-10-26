@@ -7,6 +7,7 @@ namespace App\Service\Billing\PayFirst;
 use App\Repository\ConfigRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Billing\BillingService;
+use App\Service\Email\MailerConfig;
 
 /**
  * Pay first: a person without an account enters an email address, pays in
@@ -27,12 +28,28 @@ final readonly class PayFirstConfig
         private ConfigRepository $configRepository,
         private BillingService $billing,
         private RegistrationConfig $registration,
+        private MailerConfig $mailer,
     ) {
     }
 
+    /**
+     * Mail is a precondition: after the one sign-in in the paying browser,
+     * the set-password mail (and later the sign-in link) is the only way
+     * back into an account that has no password.
+     */
     public function isActive(): bool
     {
-        return $this->isSwitchedOn() && $this->billing->isEnabled() && $this->registration->isEnabled();
+        return $this->isSwitchedOn() && $this->billing->isEnabled() && $this->registration->isEnabled() && $this->mailer->isConfigured();
+    }
+
+    /**
+     * Whether a paid pay-first session can still become an account. Only
+     * billing matters: a payment taken before the switch went off keeps its
+     * account.
+     */
+    public function canSettle(): bool
+    {
+        return $this->billing->isEnabled();
     }
 
     public function isSwitchedOn(): bool

@@ -693,6 +693,7 @@
       "errorActivating": "API anahtarı etkinleştirilemedi",
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
+      "addressUnverified": "Önce e-posta adresinizi doğrulayın: size gönderdiğimiz bağlantıyı açın, ardından anahtarı oluşturun.",
       "planRequired": "API anahtarları ücretli bir plana dahildir.",
       "seePlans": "Planları gör",
       "scopes": {

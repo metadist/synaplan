@@ -106,7 +106,8 @@
     "prompts": "Raccourcis",
     "apps": "Apps",
     "appsConnected": "Apps connectées",
-    "appDetail": "App"
+    "appDetail": "App",
+    "adminUsage": "Tableau des coûts"
   },
   "welcome": "Bienvenue",
   "welcomeUser": "Bienvenue, {name}",
@@ -184,7 +185,8 @@
     "groupApps": "Apps",
     "apps": "Apps",
     "allApps": "Toutes les apps",
-    "connectedApps": "Connectées"
+    "connectedApps": "Connectées",
+    "adminUsage": "Utilisation"
   },
   "common": {
     "ok": "OK",

@@ -684,6 +684,54 @@
         "deletedAccounts": "{count} cuenta que usó este código se ha eliminado desde entonces. | {count} cuentas que usaron este código se han eliminado desde entonces.",
         "loadFailed": "No se pudo cargar la lista. Ciérrala y ábrela de nuevo."
       }
+    },
+    "usageBoard": {
+      "title": "Uso y costes",
+      "subtitle": "Quién produce cada coste de modelo",
+      "intro": "Usuarios ordenados por el coste del proveedor de sus solicitudes de modelo. Abre una fila para ver las solicitudes individuales: hora, tipo, modelo y precio, nunca el contenido.",
+      "periodLabel": "Periodo",
+      "sortLabel": "Ordenar por",
+      "period": {
+        "24h": "24 horas",
+        "7d": "7 días",
+        "30d": "30 días",
+        "all": "Todo el tiempo"
+      },
+      "sort": {
+        "cost": "Mayor coste",
+        "requests": "Más solicitudes",
+        "tokens": "Más tokens"
+      },
+      "loadFailed": "No se pudo cargar el panel de costes. Inténtalo de nuevo.",
+      "empty": "Aún no hay uso de modelos en este periodo.",
+      "showAllTime": "Mostrar todo el tiempo",
+      "usersCount": "{total} usuarios con uso de modelos",
+      "requestsCount": "{total} solicitudes",
+      "requestsLoadFailed": "No se pudieron cargar estas solicitudes. Inténtalo de nuevo.",
+      "requestsEmpty": "No hay solicitudes en este periodo.",
+      "tokensUnit": "tokens",
+      "agent": "Agente",
+      "chat": "Chat",
+      "colTime": "Hora",
+      "colKind": "Tipo",
+      "colModel": "Modelo",
+      "colTokens": "Tokens (entrada / salida)",
+      "colLatency": "Latencia",
+      "colCost": "Coste",
+      "kind": {
+        "chat": "Chat",
+        "video": "Video",
+        "image": "Imagen",
+        "audio": "Audio",
+        "voice": "Voz",
+        "transcription": "Transcripción",
+        "embedding": "Embedding",
+        "agent": "Agente",
+        "compute": "Cómputo",
+        "file": "Archivos",
+        "internal": "Interno",
+        "other": "Otro"
+      }
     }
   },
   "statistics": {

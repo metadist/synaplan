@@ -410,6 +410,7 @@
     "intro": "Ein Überblick über deinen Vektorspeicher — wie viele Dateien indexiert sind und wie viele Vektoren (Chunks) für die semantische Suche gespeichert werden.",
     "provider": "Vektorspeicher",
     "providerHint": "Das aktive Backend, in dem deine Vektoren gespeichert werden.",
+    "providerMeaningOnly": "Dieser Speicher findet Textstellen nach ihrer Bedeutung. Er sucht kein genaues Wort und keine genaue Zahl.",
     "online": "Online",
     "offline": "Offline",
     "myTitle": "Deine Vektoren",
