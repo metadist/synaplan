@@ -86,6 +86,56 @@ final class EmailLinkControllerTest extends WebTestCase
         self::assertSame('EMAIL_LINK_INVALID', $this->json()['code']);
     }
 
+    public function testAPlainTextPostCannotPlantASession(): void
+    {
+        $this->switchOn();
+        $user = $this->user('dora'.self::DOMAIN);
+        $secret = static::getContainer()->get(VerificationTokenRepository::class)->createHashedToken($user, EmailLinkSignIn::TOKEN_TYPE, 900);
+
+        // What a cross-site form can send without a preflight.
+        $this->client->request('POST', '/api/v1/auth/email-link/consume', [], [], ['CONTENT_TYPE' => 'text/plain', 'REMOTE_ADDR' => $this->ip], json_encode(['token' => $secret], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(415);
+        self::assertNotContains(TokenService::ACCESS_COOKIE, array_map(static fn ($c) => $c->getName(), $this->client->getResponse()->headers->getCookies()));
+    }
+
+    public function testALinkDoesNotSignInWhilePayFirstIsOff(): void
+    {
+        $user = $this->user('emil'.self::DOMAIN);
+        $secret = static::getContainer()->get(VerificationTokenRepository::class)->createHashedToken($user, EmailLinkSignIn::TOKEN_TYPE, 900);
+
+        $this->post('/api/v1/auth/email-link/consume', ['token' => $secret]);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame('EMAIL_LINK_OFF', $this->json()['code']);
+    }
+
+    public function testOffWithoutAMailTransport(): void
+    {
+        $this->switchOn();
+        $_ENV['MAILER_DSN'] = 'null://null';
+
+        $this->post('/api/v1/auth/email-link', ['email' => 'ada'.self::DOMAIN]);
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testALinkStopsWorkingWhenTheSignInEmailChanges(): void
+    {
+        $this->switchOn();
+        $user = $this->user('finn'.self::DOMAIN);
+        $this->post('/api/v1/auth/email-link', ['email' => 'finn'.self::DOMAIN]);
+        $secret = $this->secretFromMail();
+
+        $user = $this->em->getRepository(User::class)->find($user->getId());
+        self::assertInstanceOf(User::class, $user);
+        $user->setMail('finn-new'.self::DOMAIN);
+        $this->em->flush();
+
+        $this->post('/api/v1/auth/email-link/consume', ['token' => $secret]);
+        self::assertResponseStatusCodeSame(400);
+    }
+
     public function testAnUnknownAddressGetsTheSameAnswerAndNoMail(): void
     {
         $this->switchOn();
@@ -99,6 +149,7 @@ final class EmailLinkControllerTest extends WebTestCase
 
     public function testAnExpiredLinkDoesNotSignIn(): void
     {
+        $this->switchOn();
         $user = $this->user('bea'.self::DOMAIN);
         $secret = static::getContainer()->get(VerificationTokenRepository::class)->createHashedToken($user, EmailLinkSignIn::TOKEN_TYPE, -1);
 

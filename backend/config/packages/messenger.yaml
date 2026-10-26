@@ -117,6 +117,9 @@ framework:
             'App\Message\SearchIndexMessage': async_index
             'App\Message\SearchReindexUserMessage': async_index
             'App\Message\SearchReindexCatalogMessage': async_index
+            # One-time sign-in link: the lookup and the mail run here, off the
+            # request, so its timing cannot reveal which addresses have accounts.
+            'App\Message\SendLoginLinkMessage': async_index
             # Async media jobs (Release 4.0): each message advances one render by
             # a single non-blocking step then re-dispatches itself (DelayStamp)
             # for the next poll. Short hops, never a worker pinned for minutes.
@@ -181,3 +184,6 @@ when@test:
                 # The test stack has no messenger worker. A research unit runs
                 # inside the test that dispatched it.
                 'App\Message\RunResearchUnit': sync
+                # The test stack has no messenger worker; the sign-in link
+                # mail is sent inside the request that asked for it.
+                'App\Message\SendLoginLinkMessage': sync

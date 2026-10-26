@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace App\Service\Auth;
 
 use App\Entity\User;
+use App\Message\SendLoginLinkMessage;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
  * Sign in with a one-time link sent by mail (PF3).
  *
- * The request answers the same whether or not the address has an account, so
- * it cannot be used to test addresses. The link works once, for 15 minutes;
+ * The request answers the same, in the same time, whether or not the address
+ * has an account: it only queues {@see SendLoginLinkMessage}, and the lookup,
+ * token and mail happen in the worker. The link works once, for 15 minutes;
  * only its hash is stored. Opening it proves the person reads that mailbox,
  * so it also marks the address verified.
  */
@@ -35,6 +38,7 @@ final readonly class EmailLinkSignIn
         #[Autowire(service: 'limiter.email_link_address')]
         private RateLimiterFactoryInterface $addressLimiter,
         private LoggerInterface $logger,
+        private MessageBusInterface $bus,
     ) {
     }
 
@@ -47,7 +51,18 @@ final readonly class EmailLinkSignIn
         $this->limit($this->ipLimiter, null !== $clientIp && '' !== $clientIp ? $clientIp : 'unknown');
         $this->limit($this->addressLimiter, hash('sha256', $email));
 
-        $user = '' !== $email && false !== filter_var($email, \FILTER_VALIDATE_EMAIL) ? $this->users->findOtherByNormalizedEmail($email, 0) : null;
+        if ('' !== $email && false !== filter_var($email, \FILTER_VALIDATE_EMAIL)) {
+            $this->bus->dispatch(new SendLoginLinkMessage($email));
+        }
+    }
+
+    /**
+     * The worker's half: mail the link when the address has an account that
+     * may sign in this way; otherwise do nothing.
+     */
+    public function deliver(string $email): void
+    {
+        $user = $this->users->findOtherByNormalizedEmail($email, 0);
         if (!$user instanceof User || !$user->canSignIn() || $user->isManagedExternally()) {
             return;
         }

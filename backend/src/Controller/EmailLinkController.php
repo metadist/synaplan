@@ -43,14 +43,16 @@ final class EmailLinkController extends AbstractController
                 required: ['success'],
                 properties: [new OA\Property(property: 'success', type: 'boolean', example: true)]
             )),
-            new OA\Response(response: 404, description: 'Sign-in links are not active on this installation'),
+            new OA\Response(response: 404, description: 'Sign-in links are not active on this installation (EMAIL_LINK_OFF)'),
+            new OA\Response(response: 415, description: 'The body must be sent as application/json (EMAIL_LINK_JSON_REQUIRED)'),
             new OA\Response(response: 429, description: 'Too many requests from this connection or for this address (EMAIL_LINK_RATE_LIMITED)'),
         ]
     )]
     public function request(Request $request): JsonResponse
     {
-        if (!$this->payFirst->isActive()) {
-            return $this->json(['success' => false, 'error' => 'Not found.', 'code' => 'EMAIL_LINK_OFF'], Response::HTTP_NOT_FOUND);
+        $refused = $this->refuse($request);
+        if (null !== $refused) {
+            return $refused;
         }
         $body = json_decode($request->getContent(), true);
         try {
@@ -82,10 +84,16 @@ final class EmailLinkController extends AbstractController
                 properties: [new OA\Property(property: 'success', type: 'boolean', example: true)]
             )),
             new OA\Response(response: 400, description: 'The link is unknown, expired or already used (EMAIL_LINK_INVALID)'),
+            new OA\Response(response: 404, description: 'Sign-in links are not active on this installation (EMAIL_LINK_OFF)'),
+            new OA\Response(response: 415, description: 'The body must be sent as application/json (EMAIL_LINK_JSON_REQUIRED)'),
         ]
     )]
     public function consume(Request $request): JsonResponse
     {
+        $refused = $this->refuse($request);
+        if (null !== $refused) {
+            return $refused;
+        }
         $body = json_decode($request->getContent(), true);
         $user = $this->signIn->consume(is_array($body) && is_string($body['token'] ?? null) ? $body['token'] : '');
         if (null === $user) {
@@ -101,5 +109,22 @@ final class EmailLinkController extends AbstractController
         $this->impersonation->attachClearStashCookies($response);
 
         return $response;
+    }
+
+    /**
+     * Off unless pay first is active, for asking and for signing in alike.
+     * JSON only: a cross-site `text/plain` form could otherwise post a valid
+     * body and plant the sender's session in the visitor's browser.
+     */
+    private function refuse(Request $request): ?JsonResponse
+    {
+        if (!$this->payFirst->isActive()) {
+            return $this->json(['success' => false, 'error' => 'Not found.', 'code' => 'EMAIL_LINK_OFF'], Response::HTTP_NOT_FOUND);
+        }
+        if ('json' !== $request->getContentTypeFormat()) {
+            return $this->json(['success' => false, 'error' => 'Send the request as JSON.', 'code' => 'EMAIL_LINK_JSON_REQUIRED'], Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+        }
+
+        return null;
     }
 }
