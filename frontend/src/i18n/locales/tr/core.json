@@ -105,7 +105,8 @@
     "prompts": "Kısayollar",
     "apps": "Uygulamalar",
     "appsConnected": "Bağlı uygulamalar",
-    "appDetail": "Uygulama"
+    "appDetail": "Uygulama",
+    "adminUsage": "Maliyet panosu"
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
@@ -183,7 +184,8 @@
     "groupApps": "Uygulamalar",
     "apps": "Uygulamalar",
     "allApps": "Tüm uygulamalar",
-    "connectedApps": "Bağlı"
+    "connectedApps": "Bağlı",
+    "adminUsage": "Kullanım"
   },
   "common": {
     "ok": "Tamam",

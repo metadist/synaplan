@@ -43,7 +43,8 @@ import {
   savedTasksRouteGuard,
 } from '@/router/featureSurfaceGuards'
 import { appRouteGuard } from '@/router/appGuards'
-import { groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
+import { groupsRouteGuard } from '@/router/iamGuards'
+import { adminUsageRoute, peopleRoute } from '@/router/adminUserRoutes'
 import {
   adminDashboardRedirect,
   aiInfrastructureRedirect,
@@ -753,18 +754,8 @@ const router = createRouter({
         i18n: ['admin'],
       },
     },
-    {
-      path: '/admin/people',
-      name: 'admin-people',
-      component: () => import('@/views/PeopleView.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        titleKey: 'pageTitles.adminPeople',
-        i18n: ['admin', 'config'],
-      },
-      beforeEnter: peopleRouteGuard,
-    },
+    peopleRoute,
+    adminUsageRoute,
     {
       path: '/subscription',
       name: 'subscription',

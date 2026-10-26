@@ -688,6 +688,54 @@
         "deletedAccounts": "{count} compte qui a utilisé ce code a été supprimé depuis. | {count} comptes qui ont utilisé ce code ont été supprimés depuis.",
         "loadFailed": "La liste n'a pas pu être chargée. Fermez-la et rouvrez-la."
       }
+    },
+    "usageBoard": {
+      "title": "Utilisation et coûts",
+      "subtitle": "Qui produit quel coût de modèle",
+      "intro": "Utilisateurs classés selon le coût fournisseur de leurs demandes de modèle. Ouvrez une ligne pour voir les demandes individuelles : heure, type, modèle et prix, jamais le contenu.",
+      "periodLabel": "Période",
+      "sortLabel": "Trier par",
+      "period": {
+        "24h": "24 heures",
+        "7d": "7 jours",
+        "30d": "30 jours",
+        "all": "Tout le temps"
+      },
+      "sort": {
+        "cost": "Coût le plus élevé",
+        "requests": "Plus de demandes",
+        "tokens": "Plus de tokens"
+      },
+      "loadFailed": "Le tableau des coûts n’a pas pu être chargé. Veuillez réessayer.",
+      "empty": "Aucune utilisation de modèle dans cette période pour le moment.",
+      "showAllTime": "Afficher tout le temps",
+      "usersCount": "{total} utilisateurs avec utilisation de modèles",
+      "requestsCount": "{total} demandes",
+      "requestsLoadFailed": "Ces demandes n’ont pas pu être chargées. Veuillez réessayer.",
+      "requestsEmpty": "Aucune demande dans cette période.",
+      "tokensUnit": "tokens",
+      "agent": "Agent",
+      "chat": "Chat",
+      "colTime": "Heure",
+      "colKind": "Type",
+      "colModel": "Modèle",
+      "colTokens": "Tokens (entrée / sortie)",
+      "colLatency": "Latence",
+      "colCost": "Coût",
+      "kind": {
+        "chat": "Chat",
+        "video": "Vidéo",
+        "image": "Image",
+        "audio": "Audio",
+        "voice": "Voix",
+        "transcription": "Transcription",
+        "embedding": "Embedding",
+        "agent": "Agent",
+        "compute": "Calcul",
+        "file": "Fichiers",
+        "internal": "Interne",
+        "other": "Autre"
+      }
     }
   },
   "statistics": {

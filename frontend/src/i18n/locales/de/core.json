@@ -106,7 +106,8 @@
     "prompts": "Schnellbefehle",
     "apps": "Apps",
     "appsConnected": "Verbundene Apps",
-    "appDetail": "App"
+    "appDetail": "App",
+    "adminUsage": "Kostenübersicht"
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",
@@ -185,7 +186,8 @@
     "groupApps": "Apps",
     "apps": "Apps",
     "allApps": "Alle Apps",
-    "connectedApps": "Verbunden"
+    "connectedApps": "Verbunden",
+    "adminUsage": "Nutzung"
   },
   "unsavedChanges": {
     "title": "Du hast ungespeicherte Änderungen",

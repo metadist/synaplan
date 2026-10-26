@@ -140,6 +140,124 @@ class UseLogRepository extends ServiceEntityRepository
     }
 
     /**
+     * The cost board (AdminUsageService): users ranked by what they cost in
+     * a period, one page at a time, plus the user count for the pager.
+     * $sort is one of cost|requests|tokens (validated by the caller and
+     * mapped to a fixed column here — never user input in the ORDER BY).
+     *
+     * @return array{rows: list<array<string, mixed>>, totalUsers: int}
+     */
+    public function topUsersByUsage(int $since, string $sort, int $limit, int $offset): array
+    {
+        $orderBy = match ($sort) {
+            'requests' => 'requests',
+            'tokens' => 'tokens',
+            default => 'cost',
+        };
+        $conn = $this->getEntityManager()->getConnection();
+        $where = $since > 0 ? 'WHERE l.BUNIXTIMES >= :since' : '';
+        $params = $since > 0 ? ['since' => $since] : [];
+
+        $rows = $conn->fetchAllAssociative(
+            "SELECT u.BID AS user_id, u.BMAIL AS email, u.BUSERLEVEL AS level,
+                    u.BACCOUNTSTATUS AS account_status, u.BUSERDETAILS AS details,
+                    COUNT(*) AS requests,
+                    COALESCE(SUM(l.BTOKENS), 0) AS tokens,
+                    COALESCE(SUM(l.BPROMPT_TOKENS), 0) AS prompt_tokens,
+                    COALESCE(SUM(l.BCOMPLETION_TOKENS), 0) AS completion_tokens,
+                    COALESCE(SUM(l.BCOST), 0) AS cost,
+                    MAX(l.BUNIXTIMES) AS last_active
+             FROM BUSELOG l
+             INNER JOIN BUSER u ON u.BID = l.BUSERID
+             {$where}
+             GROUP BY u.BID, u.BMAIL, u.BUSERLEVEL, u.BACCOUNTSTATUS, u.BUSERDETAILS
+             ORDER BY {$orderBy} DESC, user_id ASC
+             LIMIT {$limit} OFFSET {$offset}",
+            $params,
+        );
+
+        $total = (int) $conn->fetchOne(
+            'SELECT COUNT(DISTINCT BUSERID) FROM BUSELOG '.($since > 0 ? 'WHERE BUNIXTIMES >= :since' : ''),
+            $params,
+        );
+
+        return ['rows' => $rows, 'totalUsers' => $total];
+    }
+
+    /**
+     * Per-action totals for a page of users, with the agent flag the kind
+     * mapping needs (an agent id or an agent-only channel in BMETADATA).
+     *
+     * @param list<int> $userIds
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function actionTotalsForUsers(array $userIds, int $since): array
+    {
+        if ([] === $userIds) {
+            return [];
+        }
+
+        $conn = $this->getEntityManager()->getConnection();
+        $params = ['ids' => $userIds];
+        $where = 'l.BUSERID IN (:ids)';
+        if ($since > 0) {
+            $where .= ' AND l.BUNIXTIMES >= :since';
+            $params['since'] = $since;
+        }
+
+        return $conn->fetchAllAssociative(
+            "SELECT l.BUSERID AS user_id, l.BACTION AS action,
+                    (JSON_EXTRACT(l.BMETADATA, '$.agentId') IS NOT NULL
+                     OR JSON_EXTRACT(l.BMETADATA, '$.agent_id') IS NOT NULL
+                     OR UPPER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(l.BMETADATA, '$.source')), '')) IN ('AGENT', 'SAVED_TASK', 'MULTITASK')) AS has_agent,
+                    COUNT(*) AS requests,
+                    COALESCE(SUM(l.BTOKENS), 0) AS tokens,
+                    COALESCE(SUM(l.BCOST), 0) AS cost
+             FROM BUSELOG l
+             WHERE {$where}
+             GROUP BY user_id, action, has_agent",
+            $params,
+            ['ids' => \Doctrine\DBAL\ArrayParameterType::INTEGER],
+        );
+    }
+
+    /**
+     * One page of a user's individual model requests, newest first — the
+     * drill-down behind a cost-board row. Metadata stays a string here;
+     * the caller decodes the few fields the board shows.
+     *
+     * @return array{rows: list<array<string, mixed>>, total: int}
+     */
+    public function requestsForUser(int $userId, int $since, int $limit, int $offset): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $where = 'BUSERID = :user_id';
+        $params = ['user_id' => $userId];
+        if ($since > 0) {
+            $where .= ' AND BUNIXTIMES >= :since';
+            $params['since'] = $since;
+        }
+
+        $rows = $conn->fetchAllAssociative(
+            "SELECT BID AS id, BUNIXTIMES AS ts, BACTION AS action, BPROVIDER AS provider,
+                    BMODEL AS model, BTOKENS AS tokens, BPROMPT_TOKENS AS prompt_tokens,
+                    BCOMPLETION_TOKENS AS completion_tokens, BCACHED_TOKENS AS cached_tokens,
+                    BCOST AS cost, BLATENCY AS latency, BSTATUS AS status,
+                    BESTIMATED AS estimated, BMETADATA AS metadata
+             FROM BUSELOG
+             WHERE {$where}
+             ORDER BY BUNIXTIMES DESC, BID DESC
+             LIMIT {$limit} OFFSET {$offset}",
+            $params,
+        );
+
+        $total = (int) $conn->fetchOne("SELECT COUNT(*) FROM BUSELOG WHERE {$where}", $params);
+
+        return ['rows' => $rows, 'total' => $total];
+    }
+
+    /**
      * Speichert einen UseLog.
      */
     public function save(UseLog $useLog, bool $flush = true): void

@@ -688,6 +688,54 @@
         "deletedAccounts": "{count} account that used this code has since been deleted. | {count} accounts that used this code have since been deleted.",
         "loadFailed": "The list could not be loaded. Close it and open it again."
       }
+    },
+    "usageBoard": {
+      "title": "Usage & costs",
+      "subtitle": "Who produces what model cost",
+      "intro": "Users ranked by the provider cost of their model requests. Open a row to see the individual requests — time, kind, model and price, never the content.",
+      "periodLabel": "Period",
+      "sortLabel": "Sort by",
+      "period": {
+        "24h": "24 hours",
+        "7d": "7 days",
+        "30d": "30 days",
+        "all": "All time"
+      },
+      "sort": {
+        "cost": "Highest cost",
+        "requests": "Most requests",
+        "tokens": "Most tokens"
+      },
+      "loadFailed": "The cost board could not be loaded. Please try again.",
+      "empty": "No model use in this period yet.",
+      "showAllTime": "Show all time",
+      "usersCount": "{total} users with model use",
+      "requestsCount": "{total} requests",
+      "requestsLoadFailed": "These requests could not be loaded. Please try again.",
+      "requestsEmpty": "No requests in this period.",
+      "tokensUnit": "tokens",
+      "agent": "Agent",
+      "chat": "Chat",
+      "colTime": "Time",
+      "colKind": "Kind",
+      "colModel": "Model",
+      "colTokens": "Tokens (in / out)",
+      "colLatency": "Latency",
+      "colCost": "Cost",
+      "kind": {
+        "chat": "Chat",
+        "video": "Video",
+        "image": "Image",
+        "audio": "Audio",
+        "voice": "Voice",
+        "transcription": "Transcription",
+        "embedding": "Embedding",
+        "agent": "Agent",
+        "compute": "Compute",
+        "file": "Files",
+        "internal": "Internal",
+        "other": "Other"
+      }
     }
   },
   "statistics": {
