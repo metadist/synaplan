@@ -96,4 +96,135 @@ final class WhisperClientTest extends PluginTestCase
             self::assertSame('stt_error', $e->errorCode);
         }
     }
+
+    public function testTheModelFieldIsSentWithTheDefaultName(): void
+    {
+        $sent = $this->recognize();
+
+        self::assertSame('POST', $sent['method']);
+        self::assertSame('http://stt.test/v1/audio/transcriptions', $sent['url']);
+        self::assertStringContainsString('name="model"'."\r\n\r\n".'whisper'."\r\n", $sent['body']);
+        self::assertStringContainsString('name="file"; filename="window.ogg"', $sent['body']);
+        self::assertStringContainsString('name="language"'."\r\n\r\n".'de'."\r\n", $sent['body']);
+        self::assertNotContains('Authorization', $this->headerNames($sent['headers']));
+    }
+
+    public function testTheConfiguredModelAndKeyGoOut(): void
+    {
+        $sent = $this->recognize(['stt_model' => 'openai/whisper-large-v3-turbo', 'stt_api_key' => 'k-123']);
+
+        self::assertStringContainsString('name="model"'."\r\n\r\n".'openai/whisper-large-v3-turbo'."\r\n", $sent['body']);
+        self::assertContains('Authorization: Bearer k-123', $sent['headers']);
+    }
+
+    public function testTheHealthCheckCarriesTheKey(): void
+    {
+        $sent = [];
+        $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$sent): MockResponse {
+            $sent = ['method' => $method, 'url' => $url, 'headers' => $options['headers']];
+
+            return new MockResponse('ok');
+        });
+
+        self::assertTrue((new WhisperClient($http, $this->settings(['stt_api_key' => 'k-123']), new NullLogger()))->healthy());
+        self::assertSame('http://stt.test/health', $sent['url']);
+        self::assertContains('Authorization: Bearer k-123', $sent['headers']);
+    }
+
+    public function testAModelNameThatIsNotOneIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('stt_model');
+
+        $this->settings()->update(['stt_model' => 'whisper large']);
+    }
+
+    public function testAnEmptyModelFallsBackToTheDefault(): void
+    {
+        $settings = $this->settings(['stt_model' => 'openai/whisper-large-v3-turbo']);
+        $settings->update(['stt_model' => '  ']);
+
+        self::assertSame('whisper', $settings->sttModel());
+    }
+
+    public function testAKeyWithALineBreakIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('stt_api_key');
+
+        $this->settings()->update(['stt_api_key' => "k-123\r\nX-Injected: 1"]);
+    }
+
+    public function testTheKeyIsTrimmed(): void
+    {
+        $settings = $this->settings();
+        $settings->update(['stt_api_key' => " k-123\n"]);
+
+        self::assertSame('k-123', $settings->sttApiKey());
+    }
+
+    public function testTheKeyIsASecretOnThePluginPage(): void
+    {
+        $view = $this->settings(['stt_api_key' => 'k-123'])->publicView();
+
+        self::assertTrue($view['stt_api_key']);
+        self::assertSame('whisper', $view['stt_model']);
+    }
+
+    /**
+     * @param array<string, string> $settings
+     *
+     * @return array{method: string, url: string, headers: list<string>, body: string}
+     */
+    private function recognize(array $settings = []): array
+    {
+        $sent = [];
+        $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$sent): MockResponse {
+            $sent = ['method' => $method, 'url' => $url, 'headers' => $options['headers'], 'body' => $this->drain($options['body'])];
+
+            return new MockResponse((string) json_encode(['text' => 'Guten Tag', 'segments' => [['text' => ' Guten Tag', 'end' => 1.2, 'no_speech_prob' => 0.0, 'avg_logprob' => -0.2]]]));
+        });
+        $result = (new WhisperClient($http, $this->settings($settings), new NullLogger()))->recognize('OggS', 'de');
+        self::assertSame('Guten Tag', $result['text']);
+
+        return $sent;
+    }
+
+    /**
+     * The multipart body reaches the client as chunks behind a closure.
+     */
+    private function drain(mixed $body): string
+    {
+        if (is_string($body)) {
+            return $body;
+        }
+        if (is_iterable($body)) {
+            $out = '';
+            foreach ($body as $chunk) {
+                $out .= $chunk;
+            }
+
+            return $out;
+        }
+        if (is_callable($body)) {
+            $out = '';
+            while ('' !== $chunk = (string) $body(16384)) {
+                $out .= $chunk;
+            }
+
+            return $out;
+        }
+
+        return '';
+    }
+
+    /**
+     * @param list<string> $headers
+     *
+     * @return list<string>
+     */
+    private function headerNames(array $headers): array
+    {
+        return array_map(static fn (string $line): string => explode(':', $line, 2)[0], $headers);
+    }
 }

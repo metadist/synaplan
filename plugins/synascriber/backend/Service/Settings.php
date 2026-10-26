@@ -23,6 +23,8 @@ final readonly class Settings
         'languages' => 'de,en',
         'default_folder' => 'Meetings',
         'stt_url' => '',
+        'stt_model' => 'whisper',
+        'stt_api_key' => '',
         'prosody_url' => '',
         'jitsi_url' => '',
         'prosody_secret' => '',
@@ -32,7 +34,7 @@ final readonly class Settings
         'captions' => '1',
     ];
 
-    private const SECRET_KEYS = ['prosody_secret', 'transcriber_secret'];
+    private const SECRET_KEYS = ['prosody_secret', 'transcriber_secret', 'stt_api_key'];
 
     public function __construct(private ConfigRepository $config)
     {
@@ -113,6 +115,24 @@ final readonly class Settings
     public function sttUrl(): string
     {
         return rtrim($this->get('stt_url'), '/');
+    }
+
+    /**
+     * The `model` field of the transcription request. whisper.cpp ignores it;
+     * the OpenAI API, vLLM and the cloud services require it.
+     */
+    public function sttModel(): string
+    {
+        return $this->get('stt_model');
+    }
+
+    /**
+     * Bearer token for the speech-to-text server, empty for a server on the
+     * cluster network such as whisper.cpp.
+     */
+    public function sttApiKey(): string
+    {
+        return $this->get('stt_api_key');
     }
 
     public function prosodyUrl(): string
@@ -201,7 +221,9 @@ final readonly class Settings
             'languages' => implode(',', array_map(fn ($l) => $this->language((string) $l), is_array($value) ? $value : explode(',', (string) $value))),
             'default_folder' => $this->sanitizeFolder((string) $value),
             'stt_url', 'prosody_url', 'jitsi_url' => $this->url((string) $value, $key),
+            'stt_model' => $this->model((string) $value),
             'prosody_secret', 'transcriber_secret' => $this->secret($value, $key),
+            'stt_api_key' => $this->bearerToken($value, $key),
             'timezone' => $this->zone((string) $value),
             default => throw new \InvalidArgumentException(sprintf('Unknown synascriber setting "%s".', $key)),
         };
@@ -225,6 +247,37 @@ final readonly class Settings
     {
         if (!is_string($value)) {
             throw new \InvalidArgumentException(sprintf('Setting "%s" must be a string.', $key));
+        }
+
+        return $value;
+    }
+
+    /**
+     * Goes out as `Authorization: Bearer`, so whitespace and control
+     * characters are refused here instead of failing every window later.
+     */
+    private function bearerToken(mixed $value, string $key): string
+    {
+        $value = trim($this->secret($value, $key));
+        if (preg_match('/[\s\x00-\x1F\x7F]/', $value)) {
+            throw new \InvalidArgumentException(sprintf('Setting "%s" must not contain spaces, line breaks or control characters.', $key));
+        }
+
+        return $value;
+    }
+
+    /**
+     * An empty field falls back to the default, so clearing it on the plugin
+     * page does not block saving the other settings.
+     */
+    private function model(string $value): string
+    {
+        $value = trim($value);
+        if ('' === $value) {
+            return self::DEFAULTS['stt_model'];
+        }
+        if (!preg_match('#^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$#', $value)) {
+            throw new \InvalidArgumentException('Setting "stt_model" must be a model name such as "whisper" or "openai/whisper-large-v3-turbo".');
         }
 
         return $value;

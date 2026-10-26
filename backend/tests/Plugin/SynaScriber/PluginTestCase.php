@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Plugin\SynaScriber;
 
+use App\Entity\Config;
 use App\Repository\ConfigRepository;
 use App\Service\PluginDataService;
 use PHPUnit\Framework\TestCase;
@@ -36,6 +37,13 @@ abstract class PluginTestCase extends TestCase
         $repository = $this->createStub(ConfigRepository::class);
         $repository->method('getValue')->willReturnCallback(
             fn (int $owner, string $group, string $setting): ?string => $this->config[$setting] ?? null,
+        );
+        $repository->method('setValue')->willReturnCallback(
+            function (int $owner, string $group, string $setting, string $value): Config {
+                $this->config[$setting] = $value;
+
+                return new Config();
+            },
         );
 
         return new Settings($repository);

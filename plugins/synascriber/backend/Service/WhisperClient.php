@@ -11,9 +11,10 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Speech-to-text on a whisper.cpp `whisper-server` (OpenAI-compatible), with
- * the filters of docs/05 §5. Replaced by Synaplan's own Whisper provider once
- * Synaplan has its server mode (MN-8a).
+ * Speech-to-text over the OpenAI transcription API: whisper.cpp's
+ * `whisper-server`, vLLM, or a cloud service, with filters against what
+ * Whisper invents on silence. Replaced by Synaplan's own Whisper provider
+ * once Synaplan has its server mode.
  */
 final readonly class WhisperClient
 {
@@ -62,6 +63,7 @@ final readonly class WhisperClient
 
         $fields = [
             'file' => new DataPart($audio, 'window.ogg', 'audio/ogg'),
+            'model' => $this->settings->sttModel(),
             'response_format' => 'verbose_json',
             'temperature' => '0',
         ];
@@ -73,7 +75,7 @@ final readonly class WhisperClient
         try {
             $response = $this->http->request('POST', $base.'/v1/audio/transcriptions', [
                 'timeout' => self::TIMEOUT_SECONDS,
-                'headers' => $form->getPreparedHeaders()->toArray(),
+                'headers' => [...$form->getPreparedHeaders()->toArray(), ...$this->authorization()],
                 'body' => $form->bodyToIterable(),
             ]);
             $body = $response->toArray(false);
@@ -96,10 +98,20 @@ final readonly class WhisperClient
             return false;
         }
         try {
-            return 200 === $this->http->request('GET', $base.'/health', ['timeout' => 5])->getStatusCode();
+            return 200 === $this->http->request('GET', $base.'/health', ['timeout' => 5, 'headers' => $this->authorization()])->getStatusCode();
         } catch (ExceptionInterface) {
             return false;
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function authorization(): array
+    {
+        $key = $this->settings->sttApiKey();
+
+        return '' === $key ? [] : ['Authorization: Bearer '.$key];
     }
 
     /**
