@@ -104,7 +104,7 @@ final class PassageText
         'janvier' => 1, 'février' => 2, 'fevrier' => 2, 'mars' => 3, 'avril' => 4, 'juin' => 6,
         'juillet' => 7, 'août' => 8, 'aout' => 8, 'septembre' => 9, 'octobre' => 10,
         'novembre' => 11, 'décembre' => 12, 'decembre' => 12,
-        'enero' => 1, 'febrero' => 2, 'marzo' => 3, 'mayo' => 5, 'junio' => 6, 'julio' => 7,
+        'enero' => 1, 'febrero' => 2, 'marzo' => 3, 'abril' => 4, 'mayo' => 5, 'junio' => 6, 'julio' => 7,
         'agosto' => 8, 'septiembre' => 9, 'octubre' => 10, 'noviembre' => 11, 'diciembre' => 12,
         'ocak' => 1, 'şubat' => 2, 'subat' => 2, 'mart' => 3, 'nisan' => 4, 'mayıs' => 5,
         'mayis' => 5, 'haziran' => 6, 'temmuz' => 7, 'ağustos' => 8, 'agustos' => 8,

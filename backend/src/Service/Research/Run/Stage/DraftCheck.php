@@ -15,6 +15,7 @@ use App\Service\Research\Run\Ledger\PassageText;
 final readonly class DraftCheck
 {
     private const MARKER = '/\[\s*e\d+(?:\s*,\s*e\d+)*\s*\]/i';
+    private const ABBREVIATION_END = '/(?:\b(?:Art|Abs|Buchst|Bst|Nr|Ziff|lit|Kap|Rn|Anh|bzw|ca|vgl|ggf|Mio|Mrd|etc|vs|No|Vol|Sec|Ch|pp|ff|Dr|Prof|St|Mr|Mrs|Ms|Mme|cf|al)|\b\p{L}|(?<![\d.])\d{1,2})\.$/u';
     private const SOURCES = '/^(?:#{1,6}\s*)?(?:sources?|references?|quellen|fuentes|r[ée]f[ée]rences)\b/iu';
 
     /** @var list<string> */
@@ -138,7 +139,7 @@ final readonly class DraftCheck
                 }
             }
         }
-        if (preg_match_all('/\b\p{Lu}\p{Ll}*\p{Lu}\p{L}*\b/u', $text, $rows) > 0) {
+        if (preg_match_all('/\b\p{Lu}\p{Ll}+\p{Lu}\p{L}*\b/u', $text, $rows) > 0) {
             foreach ($rows[0] as $name) {
                 $found[] = mb_strtolower($name);
             }
@@ -191,9 +192,11 @@ final readonly class DraftCheck
                 continue;
             }
             $parts = preg_split('/(?<=[.!?])\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $lineStart = count($out);
             foreach ($parts as $part) {
                 $markersOnly = '' === trim((string) preg_replace(self::MARKER, '', $part));
-                if ($markersOnly && [] !== $out) {
+                $afterAbbreviation = count($out) > $lineStart && 1 === preg_match(self::ABBREVIATION_END, $out[array_key_last($out)]);
+                if (($markersOnly || $afterAbbreviation) && [] !== $out) {
                     $out[array_key_last($out)] .= ' '.$part;
                     continue;
                 }
