@@ -14,8 +14,10 @@ const (
 	// report time. A server that stops reporting stays listed here, so the
 	// page can say "last report 3 minutes ago" after its snapshot expired.
 	SeenKey = "capacity:seen"
-	// SeenTTL drops a server that has not reported for a week.
-	SeenTTL = 7 * 24 * time.Hour
+	// SeenTTL drops a server that has not reported for an hour. A replaced
+	// container keeps its own id, so a longer window fills the page with
+	// servers that are already gone.
+	SeenTTL = time.Hour
 )
 
 // Pool is one PHP worker pool.
