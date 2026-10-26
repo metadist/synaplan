@@ -223,17 +223,118 @@ REPORT);
         self::assertStringContainsString('A model of the same provider did the fact-check.', (string) $ctx->state->ledger->report());
     }
 
+    public function testAThoroughRevisionKeepsTheSupportedPartOfAPartialStatement(): void
+    {
+        [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $this->card($ctx, 'The warranty is two years.');
+        $this->card($ctx, 'The shop is in Berlin.');
+        $this->card($ctx, 'The case is black.');
+        $ctx->state->ledger->setReport(<<<'REPORT'
+The price is 12.40 EUR. [e1]
+The warranty is five years. [e2]
+The shop is in Paris. [e3]
+The colour is blue. [e4]
+The fee is 50 EUR.
+REPORT);
+        $caller->script[] = $this->verdicts([
+            ['c1', 'supported'],
+            ['c2', 'contradicted'],
+            ['c3', 'partial', 'in Paris'],
+            ['c4', 'unsupported'],
+        ]);
+        $caller->script[] = new ResearchModelReply(true, true, null, <<<'REPORT'
+The price is 12.40 EUR. [e1]
+The shop is listed. [e3]
+
+## Not confirmed
+
+- The warranty is five years.
+- The colour is blue.
+- The fee is 50 EUR.
+REPORT, 'test:writer', null);
+
+        $this->stage($caller)->run($ctx);
+
+        $report = (string) $ctx->state->ledger->report();
+        $body = strstr($report, '## Not confirmed', true);
+        self::assertIsString($body);
+        self::assertStringContainsString('The price is 12.40 EUR.', $body);
+        self::assertStringContainsString('The shop is listed. [e3]', $body);
+        self::assertStringNotContainsString('in Paris', $body);
+        self::assertStringNotContainsString('five years', $body);
+        self::assertStringNotContainsString('[e2]', $report);
+        self::assertSame(['statements' => 5, 'supported' => 2, 'removed' => 3], $ctx->state->ledger->check());
+        self::assertSame(1, $this->checkEvent($ctx)['softened']);
+        self::assertSame(1, $this->checkEvent($ctx)['supported']);
+        self::assertCount(2, $caller->seen);
+        self::assertStringContainsString('Add no new facts', $caller->seen[1]['system']);
+        self::assertStringContainsString('unsupported part: in Paris', $caller->seen[1]['system']);
+    }
+
+    public function testARevisionThatAddsAFactIsRejectedAndTheRemovalStands(): void
+    {
+        [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $ctx->state->ledger->setReport("The price is 12.40 EUR. [e1]\nThe colour is blue. [e1]");
+        $caller->script[] = $this->verdicts([['c1', 'supported'], ['c2', 'unsupported']]);
+        $caller->script[] = new ResearchModelReply(true, true, null, "The price is 12.40 EUR. [e1]\nThe deposit is 99 EUR.", 'test:writer', null);
+
+        $this->stage($caller)->run($ctx);
+
+        $report = (string) $ctx->state->ledger->report();
+        self::assertStringNotContainsString('99 EUR', $report);
+        self::assertStringNotContainsString('blue', strstr($report, '## Not confirmed', true) ?: '');
+        self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
+        self::assertSame(0, $this->checkEvent($ctx)['softened']);
+    }
+
+    public function testAContradictedStatementKeptAsASecondVersionIsRejected(): void
+    {
+        [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);
+        $this->card($ctx, 'The warranty is two years.');
+        $ctx->state->ledger->setReport('The warranty is five years. [e1]');
+        $caller->script[] = $this->verdicts([['c1', 'contradicted']]);
+        $caller->script[] = new ResearchModelReply(true, true, null, <<<'REPORT'
+## Not confirmed
+
+- The warranty is five years. [e1]
+REPORT, 'test:writer', null);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertStringNotContainsString('[e1]', (string) $ctx->state->ledger->report());
+        self::assertSame(0, $this->checkEvent($ctx)['softened']);
+    }
+
+    public function testAThoroughRunWithNoCallLeftRemovesInsteadOfRevising(): void
+    {
+        [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);
+        $this->card($ctx, 'The shop is in Berlin.');
+        $ctx->state->ledger->setReport('The shop is in Paris. [e1]');
+        while ($ctx->state->budget->callsLeft() > 1) {
+            $ctx->state->budget->spend('calls');
+        }
+        $caller->script[] = $this->verdicts([['c1', 'partial', 'in Paris']]);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertCount(1, $caller->seen);
+        self::assertStringNotContainsString('in Paris', strstr((string) $ctx->state->ledger->report(), '## Not confirmed', true) ?: '');
+        self::assertSame(['statements' => 1, 'supported' => 0, 'removed' => 1], $ctx->state->ledger->check());
+    }
+
     /**
      * @return array{0: StageContext, 1: ReplayCaller}
      */
-    private function open(bool $sameProvider): array
+    private function open(bool $sameProvider, ResearchDepth $depth = ResearchDepth::Standard): array
     {
         $created = new \DateTimeImmutable('2026-10-26T09:00:00+00:00');
         $clock = new MockClock($created);
-        $budget = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $created);
+        $budget = ResearchBudget::for($depth, ResearchBudgetConfig::defaults($depth), $created);
         $budget->at($created);
         $state = ResearchRunState::open(
-            ResearchRunRef::start(7, ResearchDepth::Standard, 'What does one unit cost?', null, $created),
+            ResearchRunRef::start(7, $depth, 'What does one unit cost?', null, $created),
             $budget,
         );
         $caller = new ReplayCaller();
@@ -273,20 +374,34 @@ REPORT);
     }
 
     /**
-     * @param list<array{0: string, 1: string}> $rows
+     * @param list<array{0: string, 1: string, 2?: string}> $rows
      */
     private function verdicts(array $rows): ResearchModelReply
     {
         $verdicts = [];
-        foreach ($rows as [$id, $verdict]) {
+        foreach ($rows as $row) {
+            $verdict = $row[1];
             $verdicts[] = [
-                'statement' => $id,
+                'statement' => $row[0],
                 'verdict' => $verdict,
-                'unsupported_part' => 'partial' === $verdict ? 'the place' : null,
+                'unsupported_part' => $row[2] ?? ('partial' === $verdict ? 'the place' : null),
                 'note' => '',
             ];
         }
 
         return new ResearchModelReply(true, true, ['verdicts' => $verdicts], '{}', 'test:checker', null);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function checkEvent(StageContext $ctx): array
+    {
+        foreach ($ctx->events->replay($ctx->state->ref->id, 0) as $event) {
+            if ('check' === $event['event']) {
+                return $event['data'];
+            }
+        }
+        self::fail('The check event was not recorded.');
     }
 }

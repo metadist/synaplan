@@ -19,7 +19,7 @@ chat message.
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
-| RS8 | in progress | Free check plus the checker model. A cited statement that is not supported is removed and listed; the report ends with the count. Seeded draft still 6/6 and 0/6. Thorough revision is not built. Citation precision was not measured. Flag stays off |
+| RS8 | in progress | Free check, checker model, and one thorough revision. A partial statement keeps the supported part; a revision that adds a fact is rejected and the removal stands. A contradicted statement never stays cited. Seeded draft still 6/6 and 0/6. Citation precision was not measured. Flag stays off |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
@@ -37,6 +37,29 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-26 — RS8 thorough revision
+
+No live run. A thorough run, after the checker, makes one writer call
+(`tools:research_revise`). A `partial` statement keeps the part the source
+backs and counts as softened. `unsupported` and `contradicted` leave the
+factual text. A contradicted statement that stays cited, including under
+Not confirmed, is rejected. A revision that adds a fact the draft did not
+have is rejected, and the standard removal stands, so the run still
+delivers. Standard and quick do not revise. A thorough run with no model
+call left removes instead. `softened` stays 0 on that path.
+
+Command:
+
+```bash
+php bin/phpunit tests/Unit/Service/Research/Run/CheckStageTest.php
+```
+
+Citation precision was not measured. The RS7 reports were not saved with
+the passages they cite, so there is no before row to judge, and this
+change does not turn research on. This is not the RS8 exit.
 
 ---
 

@@ -654,7 +654,7 @@ final class ResearchStagesTest extends TestCase
     public function testResearchPromptsStayInternal(): void
     {
         $topics = array_column(PromptCatalog::all(), 'topic');
-        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_lead', 'tools:research_write', 'tools:research_check'] as $topic) {
+        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_lead', 'tools:research_write', 'tools:research_check', 'tools:research_revise'] as $topic) {
             self::assertContains($topic, $topics);
         }
         $read = null;

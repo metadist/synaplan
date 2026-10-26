@@ -87,6 +87,29 @@ final readonly class StageCall
         return $reply;
     }
 
+    /**
+     * One prose call. A model that answers nothing does not end the run:
+     * the caller keeps the text it already has. A stop or an exhausted
+     * budget still ends it.
+     */
+    public function prose(
+        StageContext $ctx,
+        string $role,
+        int $modelId,
+        string $system,
+        string $user,
+    ): ResearchModelReply|StageResult|null {
+        $reply = $this->attempt($ctx, $role, $modelId, $system, $user, null);
+        if ($reply instanceof StageResult) {
+            return $reply;
+        }
+        if (!$reply->ok || '' === trim($reply->text)) {
+            return null;
+        }
+
+        return $reply;
+    }
+
     private static function usable(ResearchModelReply $reply, ?StructuredOutputSchema $schema): bool
     {
         if (!$reply->ok) {

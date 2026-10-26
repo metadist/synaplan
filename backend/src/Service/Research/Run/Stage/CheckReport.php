@@ -9,8 +9,8 @@ namespace App\Service\Research\Run\Stage;
  * stays. The rest is listed under Not confirmed, and the report ends with
  * the count. The writer already keeps a Not confirmed section for gaps; the
  * removed statements join it instead of opening a second one. A thorough
- * revision, which would keep the supported part of a partial statement, is
- * a later step, so every depth uses this removal.
+ * run may replace this with one writer revision; every other depth uses
+ * this removal.
  */
 final class CheckReport
 {
@@ -96,7 +96,35 @@ final class CheckReport
         }
 
         $language = isset(self::HEADING[$language]) ? $language : 'en';
-        $report = self::list(self::tidy($report), $listed, $language);
+
+        return self::close(self::list(self::tidy($report), $listed, $language), $language, $counts, $sameProvider);
+    }
+
+    /**
+     * The Not confirmed section, heading included, or an empty string when
+     * the report has none.
+     */
+    public static function notConfirmedBody(string $report): string
+    {
+        $lines = self::lines($report);
+        $section = self::section($lines);
+        if (null === $section) {
+            return '';
+        }
+
+        return implode("\n", array_slice($lines, $section['start'], $section['end'] - $section['start']));
+    }
+
+    /**
+     * Appends the count, and the same-provider sentence when it applies.
+     * The report text itself is left as it is.
+     *
+     * @param array{statements: int, supported: int, removed: int} $counts
+     */
+    public static function close(string $report, string $language, array $counts, bool $sameProvider): string
+    {
+        $language = isset(self::HEADING[$language]) ? $language : 'en';
+        $report = trim($report);
         if ($counts['statements'] > 0) {
             $report .= "\n\n".sprintf(self::BACKED[$language], $counts['supported'], $counts['statements']);
             if ($counts['removed'] > 0) {

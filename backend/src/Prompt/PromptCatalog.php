@@ -240,6 +240,12 @@ class PromptCatalog
                 'shortDescription' => 'Checks whether each cited statement is supported by its source. Internal. Returns JSON.',
                 'prompt' => self::researchCheckPrompt(),
             ],
+            [
+                'topic' => 'tools:research_revise',
+                'language' => 'en',
+                'shortDescription' => 'Revises a research report from fact-check verdicts. Internal. Returns Markdown.',
+                'prompt' => self::researchRevisePrompt(),
+            ],
         ];
     }
 
@@ -2604,6 +2610,35 @@ Use no outside knowledge. Do not rewrite anything. Give one verdict for
 every statement and copy its id exactly. Keep each note to one short
 sentence. Return JSON only, as an object with one key:
 {verdicts: [{statement, verdict, unsupported_part, note}]}
+PROMPT;
+    }
+
+    private static function researchRevisePrompt(): string
+    {
+        return <<<'PROMPT'
+# Research revision
+
+Revise the report with the fact-check verdicts:
+- unsupported → remove the statement; if it matters to the goal, list it under
+  "[NOT_CONFIRMED_TITLE]" without an id;
+- partial → keep only the supported part, or say what is not confirmed;
+- contradicted → the statement says the opposite of its own source: remove it
+  and, if it matters to the goal, list the point under "[NOT_CONFIRMED_TITLE]"
+  without an id. Never keep a contradicted statement as an "alternative
+  version" — two versions are only for disagreements between two sources, and
+  those already stand in the report with their ids and dates.
+- remove → the free check already rejected it. Drop it from the factual text.
+
+Add no new facts. Keep every id that still applies, the structure and the
+language. Return the full revised report in Markdown. Do not add the closing
+count; the engine writes that.
+
+<report>
+[REPORT]
+</report>
+<verdicts>
+[VERDICTS]
+</verdicts>
 PROMPT;
     }
 }
