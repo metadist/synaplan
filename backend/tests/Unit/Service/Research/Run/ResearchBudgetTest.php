@@ -68,18 +68,58 @@ final class ResearchBudgetTest extends TestCase
     {
         $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
         $budget = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $start);
+        // Pin the clock like the tests above: the fixed start is in the past
+        // for every later run, and the export keeps the seconds worked.
+        $budget->at($start);
         $budget->spend('sources', 3);
         $budget->addCost(0.2);
         $budget->addCost(0.1);
 
         $restored = ResearchBudget::fromExport(ResearchDepth::Standard, $budget->export());
-        // Pin the clock like the tests above: canCall() reads the wall clock,
-        // and the fixed start above is in the past for every later run.
-        $restored->at($start);
 
         self::assertSame(3, $restored->toArray()['sources_read'][0]);
         self::assertEqualsWithDelta(0.3, $restored->toArray()['cost']['spent'], 0.000001);
         self::assertTrue($restored->canCall());
+    }
+
+    public function testASavedRunDoesNotSpendTimeWhileItWaits(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $budget = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $start);
+        $budget->at($start->modify('+100 seconds'));
+
+        $restored = ResearchBudget::fromExport(ResearchDepth::Standard, $budget->export());
+        $restored->at($start->modify('+2 hours'));
+
+        self::assertSame([100, 360], $restored->toArray()['seconds']);
+        self::assertSame(260, $restored->secondsLeft());
+        self::assertTrue($restored->canCall());
+    }
+
+    public function testTheNextStepStartsTheClockAgain(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $budget = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $start);
+        $budget->at($start->modify('+100 seconds'));
+        $restored = ResearchBudget::fromExport(ResearchDepth::Standard, $budget->export());
+
+        $step = $start->modify('+2 hours');
+        $restored->startStep($step);
+        $restored->at($step->modify('+260 seconds'));
+
+        self::assertSame([360, 360], $restored->toArray()['seconds']);
+        self::assertFalse($restored->canCall());
+    }
+
+    public function testABudgetSavedBeforeTheWorkedSecondsStartsAtZero(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $budget = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $start);
+        $budget->at($start);
+        $export = $budget->export();
+        unset($export['worked_seconds']);
+
+        self::assertSame(360, ResearchBudget::fromExport(ResearchDepth::Standard, $export)->secondsLeft());
     }
 
     private function callCap(ResearchBudget $budget): int

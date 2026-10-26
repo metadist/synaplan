@@ -8,6 +8,10 @@ namespace App\Service\Research\Run;
  * What one run may still spend. Money is kept in millionths of a dollar so
  * 0.10 plus 0.20 stays 0.30. `canCall()` is the hard stop: no calls left,
  * the cost cap is reached, or the wall clock is up.
+ *
+ * The wall clock counts only time a step works. A saved run stops the
+ * clock, and the next step starts it again, so waiting for a worker or for
+ * the person costs nothing.
  */
 final class ResearchBudget
 {
@@ -17,6 +21,8 @@ final class ResearchBudget
     private int $calls = 0;
     private int $spentMicro = 0;
     private int $estimateMicro;
+    private int $workedSeconds = 0;
+    private ?\DateTimeImmutable $runningSince;
     private ?\DateTimeImmutable $asOf = null;
 
     public function __construct(
@@ -25,6 +31,7 @@ final class ResearchBudget
         private readonly \DateTimeImmutable $startedAt,
     ) {
         $this->estimateMicro = self::micro($limits->costCap);
+        $this->runningSince = $startedAt;
     }
 
     public static function for(ResearchDepth $depth, ResearchBudgetConfig $config, ?\DateTimeImmutable $startedAt = null): self
@@ -96,6 +103,12 @@ final class ResearchBudget
         $this->asOf = $now;
     }
 
+    public function startStep(\DateTimeImmutable $now): void
+    {
+        $this->workedSeconds = $this->elapsed();
+        $this->runningSince = $now;
+    }
+
     public function secondsLeft(): int
     {
         return max(0, $this->limits->wallSeconds - $this->elapsed());
@@ -153,6 +166,7 @@ final class ResearchBudget
         return [
             'depth' => $this->depth->value,
             'started_at' => $this->startedAt->format(\DateTimeInterface::ATOM),
+            'worked_seconds' => $this->elapsed(),
             'searches' => $this->searches,
             'sources_read' => $this->sourcesRead,
             'rounds' => $this->rounds,
@@ -180,6 +194,8 @@ final class ResearchBudget
         }
         $startedAt = new \DateTimeImmutable($data['started_at']);
         $budget = new self($depth, ResearchBudgetConfig::fromExport($limits), $startedAt);
+        $budget->runningSince = null;
+        $budget->workedSeconds = self::nonNegative($data['worked_seconds'] ?? 0);
         $budget->searches = self::nonNegative($data['searches'] ?? 0);
         $budget->sourcesRead = self::nonNegative($data['sources_read'] ?? 0);
         $budget->rounds = self::nonNegative($data['rounds'] ?? 0);
@@ -192,9 +208,12 @@ final class ResearchBudget
 
     private function elapsed(): int
     {
+        if (null === $this->runningSince) {
+            return $this->workedSeconds;
+        }
         $now = $this->asOf ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
-        return max(0, $now->getTimestamp() - $this->startedAt->getTimestamp());
+        return $this->workedSeconds + max(0, $now->getTimestamp() - $this->runningSince->getTimestamp());
     }
 
     private static function micro(float $usd): int

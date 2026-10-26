@@ -55,7 +55,9 @@ can search again, up to the round limit of that depth. A quick run does not
 search again. The run goes to the report instead when the next round would
 have nothing new to search or read, or when the model calls left could not
 pay for another round and the report. A point the run calls answered
-without a finding stays open.
+without a finding stays open. The time limit of a depth counts only the
+time a step works: waiting for a worker or for the person's answer costs
+nothing.
 
 When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
 uses that same round to call search, read, ask or finish itself. The list is
