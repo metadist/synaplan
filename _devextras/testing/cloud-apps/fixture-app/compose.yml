@@ -7,7 +7,7 @@ name: synaplan-cloud-fixture
 
 services:
   cloud-fixture:
-    image: php:8.4-cli
+    image: php:8.5-cli@sha256:635a4b998025ab269194639a5549c6fdcd9b4f88ec8cd761b092de8653d40663
     container_name: cloud-fixture
     command: ["php", "-S", "0.0.0.0:8099", "/app/index.php"]
     environment:
