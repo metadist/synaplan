@@ -26,6 +26,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
     public function testExchangeNeverTouchesUsers(): void
     {
         $user = new User();
+        $user->setEmailVerified(true);
         $idRef = new \ReflectionProperty(User::class, 'id');
         $idRef->setValue($user, 7);
         $user->setMail('linked@example.com');

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 
 import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 const { listApiKeys, createApiKey, auth } = vi.hoisted(() => ({
   listApiKeys: vi.fn(),
@@ -23,6 +24,15 @@ vi.mock('@/composables/useDialog', () => ({
 
 vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => ({ features: { computeEnabled: false } }),
+  ApiError: class ApiError extends Error {
+    constructor(
+      public readonly status: number,
+      message: string,
+      public readonly code?: string
+    ) {
+      super(message)
+    }
+  },
 }))
 
 vi.mock('@/composables/useAuth', () => ({
@@ -148,6 +158,15 @@ describe('APIKeysConfiguration — one-time key dialog', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }))
 
     expect(document.activeElement).toBe(document.querySelector('[data-testid="btn-copy"]'))
+  })
+
+  it('says to confirm the email address when the server refuses an unverified one', async () => {
+    createApiKey.mockRejectedValue(new ApiError(403, 'server sentence', 'API_ADDRESS_UNVERIFIED'))
+    const page = await openDialog()
+
+    expect(dialog()).toBeNull()
+    expect(page.text()).toContain('Confirm your email address first')
+    expect(page.text()).not.toContain('server sentence')
   })
 
   it('offers plans instead of a key form on a free account', async () => {

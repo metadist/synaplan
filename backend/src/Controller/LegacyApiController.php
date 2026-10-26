@@ -345,8 +345,8 @@ class LegacyApiController extends AbstractController
             $result = $this->wordpressIntegrationService->step2CreateApiKey($userId);
 
             return new JsonResponse($result);
-        } catch (ApiKeyPlanRequiredException) {
-            return new JsonResponse(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
+        } catch (ApiKeyPlanRequiredException $refusal) {
+            return new JsonResponse($refusal->body(), Response::HTTP_FORBIDDEN);
         } catch (\Exception $e) {
             $this->logger->error('Legacy createApiKey failed', ['error' => $e->getMessage()]);
 
@@ -642,8 +642,8 @@ class LegacyApiController extends AbstractController
             $result = $callback();
 
             return new JsonResponse($result);
-        } catch (ApiKeyPlanRequiredException) {
-            return new JsonResponse(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
+        } catch (ApiKeyPlanRequiredException $refusal) {
+            return new JsonResponse($refusal->body(), Response::HTTP_FORBIDDEN);
         } catch (\Throwable $e) {
             $this->logger->error('Legacy WordPress wizard error', [
                 'error' => $e->getMessage(),

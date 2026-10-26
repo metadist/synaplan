@@ -32,6 +32,20 @@ final class WordPressApiKeyIssuerTest extends TestCase
         $this->issuer(billing: true)->issueFor(self::user(7, 'NEW'));
     }
 
+    public function testAnUnverifiedAddressIsRefusedEvenOnAPaidPlan(): void
+    {
+        $user = self::user(7, 'PRO');
+        $user->setEmailVerified(false);
+        $this->apiKeyRepository->expects(self::never())->method('save');
+
+        try {
+            $this->issuer(billing: true)->issueFor($user);
+            self::fail('An unverified address must not receive a key.');
+        } catch (ApiKeyPlanRequiredException $e) {
+            self::assertSame(ApiKeyPlanRequiredException::CODE_ADDRESS_UNVERIFIED, $e->body()['code']);
+        }
+    }
+
     public function testFreeAccountGetsAKeyWhenTheInstallHasNoBilling(): void
     {
         $this->apiKeyRepository->method('findBy')->willReturn([]);
@@ -68,6 +82,7 @@ final class WordPressApiKeyIssuerTest extends TestCase
     private static function user(int $id, string $level): User
     {
         $user = new User();
+        $user->setEmailVerified(true);
         (new \ReflectionProperty(User::class, 'id'))->setValue($user, $id);
         $user->setUserLevel($level);
 

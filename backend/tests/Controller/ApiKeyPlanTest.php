@@ -53,6 +53,27 @@ final class ApiKeyPlanTest extends WebTestCase
         self::assertStringStartsWith('sk_', (string) ($this->json()['api_key']['key'] ?? ''));
     }
 
+    public function testAnUnverifiedAddressGetsNoKeyUntilItIsConfirmed(): void
+    {
+        // A pay-first buyer is signed in once before anyone opened our mail;
+        // a key minted then would outlive the mailbox owner's takeover.
+        $user = $this->user('api-plan-unverified@synaplan.internal', 'PRO');
+        $user->setEmailVerified(false);
+        $this->em->flush();
+        $this->authenticateClient($this->client, $user);
+
+        $this->post('/api/v1/apikeys', ['name' => 'Bot']);
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertSame(ApiKeyPlanRequiredException::CODE_ADDRESS_UNVERIFIED, $this->json()['code']);
+        self::assertSame(ApiKeyPlanRequiredException::MESSAGE_ADDRESS_UNVERIFIED, $this->json()['error']);
+        self::assertSame([], $this->em->getRepository(ApiKey::class)->findBy(['ownerId' => $user->getId()]));
+
+        $user->setEmailVerified(true);
+        $this->em->flush();
+        $this->post('/api/v1/apikeys', ['name' => 'Bot']);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testFreeAccountKeyIsRejected(): void
     {
         $user = $this->user('api-plan-free-use@synaplan.internal', 'NEW');

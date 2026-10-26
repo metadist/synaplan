@@ -50,6 +50,7 @@ final class PairingServiceTest extends TestCase
     private static function userWithId(int $id): User
     {
         $user = new User();
+        $user->setEmailVerified(true);
         $ref = new \ReflectionProperty(User::class, 'id');
         $ref->setValue($user, $id);
 

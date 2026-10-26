@@ -161,7 +161,7 @@ class ApiKeyController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(
                 response: 403,
-                description: 'The account is not on a paid plan',
+                description: 'The account is not on a paid plan (API_PLAN_REQUIRED), or its email address is not verified yet (API_ADDRESS_UNVERIFIED)',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: false),
@@ -181,9 +181,8 @@ class ApiKeyController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->premiumFeatureGate->isUnlockedFor($user)) {
-            return $this->json(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
-        }
+        // A refusal (free plan, unverified address) becomes a 403 in ApiKeyPlanExceptionListener.
+        $this->premiumFeatureGate->assertApiKeysAllowed($user);
 
         $data = json_decode($request->getContent(), true);
 

@@ -65,6 +65,9 @@ final readonly class PremiumFeatureGate
         if (!$this->isUnlockedFor($user)) {
             throw new ApiKeyPlanRequiredException();
         }
+        if (!$user->isEmailVerified()) {
+            throw ApiKeyPlanRequiredException::addressUnverified();
+        }
     }
 
     /**

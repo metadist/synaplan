@@ -461,7 +461,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
-import { getConfigSync } from '@/services/api/httpClient'
+import { ApiError, getConfigSync } from '@/services/api/httpClient'
 import { useAuth } from '@/composables/useAuth'
 
 const { isPro } = useAuth()
@@ -580,7 +580,10 @@ const createAPIKey = async () => {
     success(t('config.apiKeys.keyCreatedSuccess'))
   } catch (err: unknown) {
     console.error('Failed to create API key:', err)
-    error.value = getErrorMessage(err) || t('config.apiKeys.errorCreating')
+    error.value =
+      err instanceof ApiError && err.code === 'API_ADDRESS_UNVERIFIED'
+        ? t('config.apiKeys.addressUnverified')
+        : getErrorMessage(err) || t('config.apiKeys.errorCreating')
     showError(error.value!)
   } finally {
     creating.value = false

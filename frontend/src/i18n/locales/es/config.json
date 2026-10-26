@@ -693,6 +693,7 @@
       "errorActivating": "Error al activar clave API",
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
+      "addressUnverified": "Confirma primero tu dirección de correo: abre el enlace que te enviamos y después crea la clave.",
       "planRequired": "Las claves API forman parte de un plan de pago.",
       "seePlans": "Ver planes",
       "scopes": {
