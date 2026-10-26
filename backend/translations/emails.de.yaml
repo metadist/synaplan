@@ -55,3 +55,10 @@ email:
       title: 'Dein %plan%-Tarif ist auf deinem Synaplan-Konto'
       body: 'Zu dieser E-Mail-Adresse gab es schon ein Synaplan-Konto, deshalb wurde der %plan%-Tarif dort hinzugefügt. Melde dich wie gewohnt an, um ihn zu nutzen.'
       button: 'Anmelden'
+
+  login_link:
+    title: 'Dein Anmeldelink für Synaplan'
+    body: 'Mit diesem Button meldest du dich an. Er funktioniert einmal, 15 Minuten lang.'
+    button: 'Anmelden'
+    or_copy: 'Oder kopiere diesen Link in deinen Browser:'
+    not_you: 'Wenn du das nicht angefordert hast, ignoriere diese Mail; ohne den Link kann sich niemand anmelden.'

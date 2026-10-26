@@ -54,3 +54,10 @@ email:
       title: '%plan% planınız Synaplan hesabınızda'
       body: 'Bu e-posta adresinin zaten bir Synaplan hesabı vardı, bu yüzden %plan% planı o hesaba eklendi. Kullanmak için her zamanki gibi oturum açın.'
       button: 'Oturum aç'
+
+  login_link:
+    title: 'Synaplan oturum açma bağlantınız'
+    body: 'Oturum açmak için bu düğmeyi kullanın. Bir kez, 15 dakika boyunca çalışır.'
+    button: 'Oturum aç'
+    or_copy: 'Ya da bu bağlantıyı tarayıcınıza kopyalayın:'
+    not_you: 'Bunu siz istemediyseniz bu e-postayı yok sayın; bağlantı olmadan kimse oturum açamaz.'
