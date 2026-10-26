@@ -91,11 +91,8 @@ final class CheckReport
 
     private static function cut(string $report, string $sentence): string
     {
-        $at = strpos($report, $sentence);
-        if (false === $at) {
-            return $report;
-        }
+        $pattern = '/(?<!\S)'.preg_quote($sentence, '/').'(?!\S)/u';
 
-        return substr_replace($report, '', $at, strlen($sentence));
+        return preg_replace($pattern, '', $report, 1) ?? $report;
     }
 }

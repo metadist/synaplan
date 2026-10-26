@@ -17,15 +17,15 @@ use App\Service\Research\Run\ResearchStatus;
 /**
  * Reads each found source once. Readers of one unit run one after another.
  * A page is wrapped as untrusted data, and a lead the page did not list is dropped.
- * The last model call of the budget is left to the writer, so what was read
- * always becomes a report.
+ * The last two model calls of the budget are left to the writer and the
+ * checker, so what was read always becomes a checked report.
  */
 final readonly class ReadStage implements ResearchStage
 {
     private const PASSAGE_CHARS = 600;
     private const PASSAGE_BUDGET = 12000;
     private const MAX_LINKS = 8;
-    private const WRITER_CALLS = 1;
+    private const WRITER_CALLS = 2;
 
     public function __construct(
         private StageCall $calls,

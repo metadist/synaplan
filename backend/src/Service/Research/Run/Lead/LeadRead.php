@@ -19,7 +19,7 @@ use App\Service\Research\Run\Stage\StageResult;
  */
 final readonly class LeadRead
 {
-    private const WRITER_CALL = 1;
+    private const WRITER_CALL = 2;
 
     public function __construct(private ReadStage $read)
     {

@@ -46,7 +46,7 @@ final readonly class LeadStage
         if ($blocked instanceof StageResult) {
             return $blocked;
         }
-        if (!$ctx->state->budget->canRound() || $ctx->state->budget->callsLeft() <= 1) {
+        if (!$ctx->state->budget->canRound() || $ctx->state->budget->callsLeft() <= 2) {
             return $this->toReport($ctx);
         }
 
@@ -150,7 +150,7 @@ final readonly class LeadStage
         if (0 !== $ctx->state->ledger->evidenceCount() || 0 !== $budget->toArray()['sources_read'][0]) {
             return false;
         }
-        if (!$budget->canRound() || $budget->sourcesLeft() < 1 || $budget->callsLeft() < 3) {
+        if (!$budget->canRound() || $budget->sourcesLeft() < 1 || $budget->callsLeft() < 4) {
             return false;
         }
         foreach ($ctx->state->ledger->sources() as $source) {
