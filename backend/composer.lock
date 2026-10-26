@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b5c9a793ca231dc138b91cf802e470f9",
+    "content-hash": "061249f62aade1bfcf17e621ce8dd1fa",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -99,16 +99,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v5.0.4",
+            "version": "v5.0.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "fbefe3b57b73ac174b37dfc51d0427d8fee2fe40"
+                "reference": "fcb8edc1917ac52c046b4fef6d17c694f08f1bc2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/fbefe3b57b73ac174b37dfc51d0427d8fee2fe40",
-                "reference": "fbefe3b57b73ac174b37dfc51d0427d8fee2fe40",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/fcb8edc1917ac52c046b4fef6d17c694f08f1bc2",
+                "reference": "fcb8edc1917ac52c046b4fef6d17c694f08f1bc2",
                 "shasum": ""
             },
             "require": {
@@ -182,9 +182,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.4"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.5"
             },
-            "time": "2026-10-16T11:51:26+00:00"
+            "time": "2026-10-22T13:40:12+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -961,16 +961,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v5.0.4",
+            "version": "v5.0.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "706a0f8f14f9218f2e606a3923b30e791548d911"
+                "reference": "d631c08d4c506b9a0f6fc462f1279252797c2950"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/706a0f8f14f9218f2e606a3923b30e791548d911",
-                "reference": "706a0f8f14f9218f2e606a3923b30e791548d911",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/d631c08d4c506b9a0f6fc462f1279252797c2950",
+                "reference": "d631c08d4c506b9a0f6fc462f1279252797c2950",
                 "shasum": ""
             },
             "require": {
@@ -994,6 +994,9 @@
                 "symfony/security-core": "^7.4 || ^8.0",
                 "symfony/serializer": "^7.4 || ^8.0",
                 "willdurand/negotiation": "^3.1"
+            },
+            "conflict": {
+                "symfony/framework-bundle": "<7.4"
             },
             "require-dev": {
                 "api-platform/doctrine-common": "^5.0",
@@ -1089,9 +1092,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v5.0.4"
+                "source": "https://github.com/api-platform/symfony/tree/v5.0.5"
             },
-            "time": "2026-10-16T11:51:42+00:00"
+            "time": "2026-10-22T08:45:57+00:00"
         },
         {
             "name": "api-platform/validator",
@@ -14070,7 +14073,7 @@
     "packages-dev": [
         {
             "name": "api-platform/test",
-            "version": "v5.0.4",
+            "version": "v5.0.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/test.git",
@@ -14141,7 +14144,7 @@
             ],
             "support": {
                 "issues": "https://github.com/api-platform/test/issues",
-                "source": "https://github.com/api-platform/test/tree/v5.0.4"
+                "source": "https://github.com/api-platform/test/tree/v5.0.5"
             },
             "time": "2026-09-22T14:19:04+00:00"
         },
