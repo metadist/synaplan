@@ -142,4 +142,20 @@ final readonly class UserLifecycleService
 
         return $user;
     }
+
+    /**
+     * Record that this person proved the mailbox. A local account created
+     * already verified never passes through the false-to-true change that
+     * queues its default plugins, so new accounts are created unverified
+     * and verified here.
+     */
+    public function markEmailVerified(User $user): void
+    {
+        if ($user->isEmailVerified()) {
+            return;
+        }
+
+        $user->setEmailVerified(true);
+        $this->em->flush();
+    }
 }
