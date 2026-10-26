@@ -135,6 +135,50 @@ describe('AdminUsageView', () => {
     )
   })
 
+  it('marks the selected period for screen readers', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="usage-period-30d"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-testid="usage-period-24h"]').attributes('aria-pressed')).toBe('false')
+  })
+
+  it('keeps the newest filter when an older load answers last', async () => {
+    let answerSlowLoad: (value: unknown) => void = () => {}
+    const slowLoad = new Promise((resolve) => {
+      answerSlowLoad = resolve
+    })
+    mockUsers.mockReturnValueOnce(slowLoad)
+    const wrapper = mountView()
+
+    mockUsers.mockResolvedValueOnce({
+      success: true,
+      users: [{ ...userRow, displayName: 'Newest Filter' }],
+      totalUsers: 1,
+      page: 1,
+      perPage: 20,
+      totalPages: 1,
+      period: '24h',
+      sort: 'cost',
+    })
+    await wrapper.get('[data-testid="usage-period-24h"]').trigger('click')
+    await flushPromises()
+    answerSlowLoad({
+      success: true,
+      users: [{ ...userRow, displayName: 'Stale Thirty Days' }],
+      totalUsers: 21,
+      page: 1,
+      perPage: 20,
+      totalPages: 2,
+      period: '30d',
+      sort: 'cost',
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Newest Filter')
+    expect(wrapper.text()).not.toContain('Stale Thirty Days')
+  })
+
   it('offers the all-time view from the empty state', async () => {
     mockUsers.mockResolvedValue({
       success: true,
@@ -177,5 +221,24 @@ describe('UsageRequestsPanel', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].text()).toContain('Chat')
     expect(rows[0].text()).toContain('900 ms')
+  })
+
+  it('shows a sub-cent request cost instead of $0.00', async () => {
+    mockRequests.mockResolvedValue({
+      success: true,
+      requests: [{ ...requestRow, cost: 0.004 }],
+      total: 1,
+      page: 1,
+      perPage: 20,
+      totalPages: 1,
+      period: '30d',
+    })
+    const wrapper = mount(UsageRequestsPanel, {
+      props: { userId: 42, period: '30d' },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="usage-request-row"]').text()).toContain('$0.004')
   })
 })

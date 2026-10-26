@@ -77,7 +77,7 @@
                 >
               </td>
               <td class="py-2 text-right whitespace-nowrap font-medium txt-primary">
-                {{ formatUsd(request.cost, locale) }}
+                {{ formatUsdPrecise(request.cost, locale) }}
               </td>
             </tr>
           </tbody>
@@ -118,7 +118,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminUsageApi, type UsagePeriod, type UsageRequest } from '@/services/api/adminUsageApi'
-import { formatTokens, formatUsd } from '@/utils/usageFormat'
+import { formatTokens, formatUsdPrecise } from '@/utils/usageFormat'
 
 const props = defineProps<{
   userId: number

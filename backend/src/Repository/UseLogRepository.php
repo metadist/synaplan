@@ -208,8 +208,8 @@ class UseLogRepository extends ServiceEntityRepository
 
         return $conn->fetchAllAssociative(
             "SELECT l.BUSERID AS user_id, l.BACTION AS action,
-                    (JSON_EXTRACT(l.BMETADATA, '$.agentId') IS NOT NULL
-                     OR JSON_EXTRACT(l.BMETADATA, '$.agent_id') IS NOT NULL
+                    (COALESCE(CAST(JSON_VALUE(l.BMETADATA, '$.agentId') AS SIGNED), 0) > 0
+                     OR COALESCE(CAST(JSON_VALUE(l.BMETADATA, '$.agent_id') AS SIGNED), 0) > 0
                      OR UPPER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(l.BMETADATA, '$.source')), '')) IN ('AGENT', 'SAVED_TASK', 'MULTITASK')) AS has_agent,
                     COUNT(*) AS requests,
                     COALESCE(SUM(l.BTOKENS), 0) AS tokens,

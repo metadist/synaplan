@@ -32,6 +32,7 @@
               type="button"
               class="px-3 py-1.5 text-sm rounded-full cursor-pointer"
               :class="period === option ? 'btn-primary' : 'txt-secondary'"
+              :aria-pressed="period === option"
               :data-testid="`usage-period-${option}`"
               @click="setPeriod(option)"
             >
@@ -153,7 +154,12 @@ const totalPages = ref(1)
 const loading = ref(true)
 const loadFailed = ref(false)
 
+// Period, sort and pager can fire loads that overlap; only the newest one
+// may touch the board, or an older answer overwrites the selected filter.
+let latestLoad = 0
+
 async function load() {
+  const generation = ++latestLoad
   loading.value = true
   loadFailed.value = false
   try {
@@ -163,13 +169,14 @@ async function load() {
       page: page.value,
       perPage,
     })
+    if (generation !== latestLoad) return
     users.value = result.users
     totalUsers.value = result.totalUsers
     totalPages.value = result.totalPages
   } catch {
-    loadFailed.value = true
+    if (generation === latestLoad) loadFailed.value = true
   } finally {
-    loading.value = false
+    if (generation === latestLoad) loading.value = false
   }
 }
 
