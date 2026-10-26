@@ -477,7 +477,7 @@ services:
     restart: unless-stopped
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.10.1@sha256:dc233a5bc45392c3717d9c5254b5c89c67e1871335c3ce55538429b9bf25b88b
+    image: centrifugo/centrifugo:v6.10.2@sha256:34b84f823515927266ce3abfb840fd9e0acabb58805e7e896f5de731217a627d
     container_name: synaplan_centrifugo
     entrypoint: ["/bin/sh", "-ec"]
     command:
