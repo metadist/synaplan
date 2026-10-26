@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Service\Auth\CodeSignup;
+use App\Service\Auth\CodeSignupExternallyManaged;
 use App\Service\Auth\CodeSignupRateLimited;
 use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\SignupBlockedException;
@@ -100,7 +101,7 @@ final class CodeSignupController extends AbstractController
                     ], type: 'object'),
                 ]
             )),
-            new OA\Response(response: 400, description: 'The link is unknown, expired or already used (CODE_SIGNUP_INVALID)'),
+            new OA\Response(response: 400, description: 'The link is unknown, expired or already used (CODE_SIGNUP_INVALID), or the address signs in through an organisation (CODE_SIGNUP_EXTERNAL)'),
             new OA\Response(response: 415, description: 'The body must be sent as application/json (CODE_SIGNUP_JSON_REQUIRED)'),
         ]
     )]
@@ -111,7 +112,15 @@ final class CodeSignupController extends AbstractController
             return $refused;
         }
         $body = json_decode($request->getContent(), true);
-        $outcome = $this->signup->consume(is_array($body) && is_string($body['token'] ?? null) ? $body['token'] : '');
+        try {
+            $outcome = $this->signup->consume(is_array($body) && is_string($body['token'] ?? null) ? $body['token'] : '');
+        } catch (CodeSignupExternallyManaged) {
+            return $this->json([
+                'success' => false,
+                'error' => 'This email is managed by your organisation. Sign in there. The invitation code was not used.',
+                'code' => 'CODE_SIGNUP_EXTERNAL',
+            ], Response::HTTP_BAD_REQUEST);
+        }
         if (null === $outcome) {
             return $this->json([
                 'success' => false,

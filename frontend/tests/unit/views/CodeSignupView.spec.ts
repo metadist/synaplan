@@ -6,10 +6,20 @@ import { ApiError } from '@/services/api/httpClient'
 
 const requestCodeSignup = vi.fn()
 const consumeCodeSignup = vi.fn()
+const resetPrincipalClientState = vi.fn()
+const getChallengeToken = vi.fn()
 
 vi.mock('@/services/api/codeSignupApi', () => ({
   requestCodeSignup: (...args: unknown[]) => requestCodeSignup(...args),
   consumeCodeSignup: (...args: unknown[]) => consumeCodeSignup(...args),
+}))
+
+vi.mock('@/services/resetPrincipalClientState', () => ({
+  resetPrincipalClientState: () => resetPrincipalClientState(),
+}))
+
+vi.mock('@/composables/useSignupChallenge', () => ({
+  useSignupChallenge: () => ({ getToken: getChallengeToken }),
 }))
 
 vi.mock('@/services/api/httpClient', async () => {
@@ -20,11 +30,11 @@ vi.mock('@/services/api/httpClient', async () => {
 })
 
 vi.mock('@/stores/config', () => ({
-  useConfigStore: () => ({ branding: { name: 'Synaplan' } }),
+  useConfigStore: () => ({ branding: { name: 'Synaplan' }, reload: vi.fn() }),
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ refreshUser: vi.fn() }),
+  useAuthStore: () => ({ refreshUser: vi.fn(), adoptCurrentSession: vi.fn() }),
 }))
 
 vi.mock('@/services/authService', () => ({
@@ -68,6 +78,9 @@ describe('CodeSignupView', () => {
     setActivePinia(createPinia())
     requestCodeSignup.mockReset()
     consumeCodeSignup.mockReset()
+    resetPrincipalClientState.mockReset()
+    getChallengeToken.mockReset()
+    getChallengeToken.mockResolvedValue('human-token')
   })
 
   it('says when the code cannot be used', async () => {
@@ -95,6 +108,7 @@ describe('CodeSignupView', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="text-sent"]').text()).toContain('ada@example.com')
+    expect(requestCodeSignup).toHaveBeenCalledWith('ada@example.com', 'ABCD2345EFGH', 'human-token')
   })
 
   it('signs in from the link and says whether the account is new', async () => {
@@ -108,5 +122,15 @@ describe('CodeSignupView', () => {
 
     expect(wrapper.get('[data-testid="text-ready"]').text()).toContain('Your account is ready.')
     expect(wrapper.get('[data-testid="link-chat"]').attributes('href')).toBe('/')
+    expect(resetPrincipalClientState).toHaveBeenCalledOnce()
+  })
+
+  it('does not claim nothing was created when the link request never returns', async () => {
+    consumeCodeSignup.mockRejectedValue(new Error('network'))
+    const wrapper = await mountView('/start/code?token=abc')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="text-error"]').text()).toContain('could not tell')
+    expect(wrapper.get('[data-testid="link-sign-in"]').attributes('href')).toBe('/login')
   })
 })

@@ -106,6 +106,14 @@
               {{ $t('codeSignup.createAccount') }}
             </router-link>
           </p>
+          <p
+            v-if="errorKey === 'codeSignup.uncertain' || errorKey === 'codeSignup.external'"
+            class="text-sm"
+          >
+            <router-link to="/login" class="txt-primary underline" data-testid="link-sign-in">
+              {{ $t('codeSignup.signIn') }}
+            </router-link>
+          </p>
           <button
             type="submit"
             class="btn-primary w-full px-4 py-2.5 text-sm font-medium"
@@ -127,10 +135,12 @@ import { useI18n } from 'vue-i18n'
 import { MoonIcon, SunIcon } from '@heroicons/vue/24/outline'
 import { cycleLocale } from '@/i18n'
 import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useSignupChallenge } from '@/composables/useSignupChallenge'
 import { useTheme } from '@/composables/useTheme'
 import { consumeCodeSignup, requestCodeSignup } from '@/services/api/codeSignupApi'
-import { ApiError, reloadConfig } from '@/services/api/httpClient'
+import { ApiError } from '@/services/api/httpClient'
 import { authService } from '@/services/authService'
+import { resetPrincipalClientState } from '@/services/resetPrincipalClientState'
 import { setSessionHint } from '@/services/sessionHint'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
@@ -139,6 +149,7 @@ const route = useRoute()
 const { locale } = useI18n()
 const themeStore = useTheme()
 const config = useConfigStore()
+const { getToken: getChallengeToken } = useSignupChallenge()
 const { logoSrc } = useBrandLogo(themeStore.isDark)
 
 const email = ref('')
@@ -156,12 +167,14 @@ const toggleTheme = () => themeStore.cycleTheme()
 
 function messageKey(error: unknown, forLink: boolean): string {
   if (!(error instanceof ApiError)) {
-    return 'codeSignup.unreachable'
+    // The account may already exist. Do not say that nothing was created.
+    return forLink ? 'codeSignup.uncertain' : 'codeSignup.unreachable'
   }
   if (error.code === 'SIGNUP_CODE_INVALID') return 'codeSignup.invalid'
   if (error.code === 'CODE_SIGNUP_RATE_LIMITED') return 'codeSignup.limited'
   if (error.code === 'CODE_SIGNUP_OFF') return 'codeSignup.off'
   if (error.code === 'SIGNUP_CHALLENGE_FAILED') return 'codeSignup.challenge'
+  if (error.code === 'CODE_SIGNUP_EXTERNAL') return 'codeSignup.external'
   if (forLink && error.code === 'CODE_SIGNUP_INVALID') return 'codeSignup.linkInvalid'
   return forLink ? 'codeSignup.linkInvalid' : 'codeSignup.unreachable'
 }
@@ -170,7 +183,8 @@ async function submit(): Promise<void> {
   errorKey.value = null
   submitting.value = true
   try {
-    await requestCodeSignup(email.value.trim(), code.value.trim())
+    const challengeToken = await getChallengeToken('code_signup')
+    await requestCodeSignup(email.value.trim(), code.value.trim(), challengeToken)
     phase.value = 'sent'
   } catch (error) {
     errorKey.value = messageKey(error, false)
@@ -193,9 +207,11 @@ onMounted(async () => {
       isAdmin: result.user.isAdmin,
       emailVerified: result.user.emailVerified,
     })
+    await resetPrincipalClientState()
+    useAuthStore().adoptCurrentSession()
     try {
       await useAuthStore().refreshUser()
-      await reloadConfig()
+      await useConfigStore().reload()
     } catch {
       // The cookies are already set. The next page load reads the session.
     }

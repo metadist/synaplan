@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\SignupCode;
 use App\Entity\User;
+use App\Message\ProvisionDefaultUserPluginsMessage;
 use App\Repository\ConfigRepository;
 use App\Repository\SignupCodeRepository;
 use App\Service\Auth\TokenService;
@@ -14,6 +15,7 @@ use App\Service\Iam\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Mime\Email;
 
 /**
@@ -92,6 +94,7 @@ final class CodeSignupControllerTest extends WebTestCase
         self::assertTrue($user->isEmailVerified());
         self::assertSame('', (string) $user->getPw(), 'The account has no password.');
         self::assertSame(1, $this->uses($codeId));
+        $this->assertDefaultPluginsQueued((int) $user->getId());
 
         $this->postConsume($secret);
         self::assertResponseStatusCodeSame(400);
@@ -114,6 +117,24 @@ final class CodeSignupControllerTest extends WebTestCase
         self::assertFalse($this->json()['created']);
         self::assertSame(0, $this->uses($codeId));
         self::assertSame(1, $this->countUsers($email));
+        $this->em->clear();
+        self::assertTrue($this->em->getRepository(User::class)->findOneBy(['mail' => $email])?->isEmailVerified());
+    }
+
+    public function testAnOrganisationAccountGetsNoLocalSessionAndTheCodeStays(): void
+    {
+        $this->switchOn();
+        [$plain, $codeId] = $this->code('PRO', 1);
+        $email = $this->address();
+        $this->user($email, 'keycloak');
+
+        $this->post(['email' => $email, 'code' => $plain]);
+        $this->postConsume($this->secretFromMail());
+
+        self::assertResponseStatusCodeSame(400);
+        self::assertSame('CODE_SIGNUP_EXTERNAL', $this->json()['code']);
+        self::assertNotContains(TokenService::ACCESS_COOKIE, array_map(static fn ($c) => $c->getName(), $this->client->getResponse()->headers->getCookies()));
+        self::assertSame(0, $this->uses($codeId));
     }
 
     public function testAnInvalidCodeIsRefusedAndSendsNothing(): void
@@ -207,12 +228,26 @@ final class CodeSignupControllerTest extends WebTestCase
         return [$plain, $id];
     }
 
-    private function user(string $email): void
+    private function user(string $email, string $providerId = 'local'): void
     {
-        $user = (new User())->setMail($email)->setType('WEB')->setProviderId('local')->setUserLevel('NEW');
+        $user = (new User())->setMail($email)->setType('WEB')->setProviderId($providerId)->setUserLevel('NEW');
         $user->setCreated(date('Y-m-d H:i:s'));
         $this->em->persist($user);
         $this->em->flush();
+    }
+
+    private function assertDefaultPluginsQueued(int $userId): void
+    {
+        $transport = static::getContainer()->get('messenger.transport.async_index');
+        self::assertInstanceOf(InMemoryTransport::class, $transport);
+        $matched = false;
+        foreach ($transport->getSent() as $envelope) {
+            $message = $envelope->getMessage();
+            $matched = $matched || ($message instanceof ProvisionDefaultUserPluginsMessage
+                && $message->getUserId() === $userId
+                && ProvisionDefaultUserPluginsMessage::REASON_EMAIL_VERIFIED === $message->getReason());
+        }
+        self::assertTrue($matched, 'A new local account is verified after insert, so its default plugins are queued.');
     }
 
     private function secretFromMail(): string

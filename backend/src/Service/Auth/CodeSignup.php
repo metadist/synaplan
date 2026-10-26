@@ -121,7 +121,16 @@ final readonly class CodeSignup
 
         $existing = $this->users->findOtherByNormalizedEmail($data['email'], 0);
         if ($existing instanceof User) {
-            return $existing->canSignIn() ? new CodeSignupOutcome($existing, false) : null;
+            if (!$existing->canSignIn()) {
+                return null;
+            }
+            // A local cookie would skip the identity provider's own checks.
+            if ($existing->isManagedExternally()) {
+                throw new CodeSignupExternallyManaged();
+            }
+            $this->lifecycle->markEmailVerified($existing);
+
+            return new CodeSignupOutcome($existing, false);
         }
 
         $code = $this->codes->find($codeId);
@@ -130,7 +139,10 @@ final readonly class CodeSignup
         }
 
         try {
-            $user = $this->lifecycle->createUser($data['email'], null, 'local', 'WEB', $code->getLevel(), true);
+            // Unverified first, then the false-to-true change, so the local
+            // account receives the same default plugins as any other signup.
+            $user = $this->lifecycle->createUser($data['email'], null, 'local', 'WEB', $code->getLevel(), false);
+            $this->lifecycle->markEmailVerified($user);
             $this->admission->commitCode($user, $code);
         } catch (SignupBlockedException|\InvalidArgumentException|UniqueConstraintViolationException) {
             return null;

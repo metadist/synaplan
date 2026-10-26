@@ -8,10 +8,14 @@ import { httpClient } from './httpClient'
 export type CodeSignupRequest = z.infer<typeof RequestCodeSignupResponseSchema>
 export type CodeSignupSession = z.infer<typeof ConsumeCodeSignupResponseSchema>
 
-export const requestCodeSignup = (email: string, code: string): Promise<CodeSignupRequest> =>
+export const requestCodeSignup = (
+  email: string,
+  code: string,
+  challengeToken = ''
+): Promise<CodeSignupRequest> =>
   httpClient('/api/v1/auth/code-signup', {
     method: 'POST',
-    body: JSON.stringify({ email, code }),
+    body: JSON.stringify({ email, code, challengeToken }),
     schema: RequestCodeSignupResponseSchema,
     skipAuth: true,
   })

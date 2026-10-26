@@ -58,6 +58,9 @@ final readonly class CodeSignupMailer
             $this->mailer->send($email);
         } catch (\Throwable $e) {
             $this->logger->error('Invitation-code mail could not be sent', ['error' => $e->getMessage()]);
+            // The worker must retry. Swallowing this acknowledges the message
+            // and the invitation is never delivered.
+            throw $e;
         }
     }
 }
