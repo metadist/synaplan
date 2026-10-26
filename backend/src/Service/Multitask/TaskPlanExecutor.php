@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\Entity\Message;
-use App\Entity\SavedTask;
-use App\Repository\PromptRepository;
-use App\Repository\SavedTaskRepository;
 use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Agent\Policy\SkillPolicy;
@@ -21,8 +18,6 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\PlanEligibility;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Runtime\RuntimeProfile;
-use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
-use App\Service\SavedTask\SavedTaskConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -120,10 +115,8 @@ final readonly class TaskPlanExecutor
         private ModelConfigService $modelConfigService,
         private MultitaskRoutingConfig $multitaskConfig,
         private LoggerInterface $logger,
-        private ?SavedTaskConfig $savedTaskConfig = null,
-        private ?SavedTaskRepository $savedTasks = null,
-        private ?PromptRepository $prompts = null,
-        private ?SavedTaskPlanFactory $savedTaskPlanFactory = null,
+        private ?AuthoredSavedTaskPlans $savedTaskPlans = null,
+        private ?ConnectedSystemMention $connectedSystems = null,
     ) {
     }
 
@@ -432,7 +425,7 @@ final readonly class TaskPlanExecutor
             return new TaskPlanResult($this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification)), fallback: false);
         }
 
-        $authored = $this->authoredSavedTaskPlan($message, $classification);
+        $authored = $this->savedTaskPlans?->plan($message, $classification);
         if (null !== $authored) {
             return $authored;
         }
@@ -508,101 +501,6 @@ final readonly class TaskPlanExecutor
     }
 
     /**
-     * Flag-gated short-circuit: an enabled Saved Task with an authored graph
-     * replaces the planner. No graph ⇒ identical to today (invariant C3).
-     *
-     * @param array<string, mixed> $classification
-     */
-    private function authoredSavedTaskPlan(Message $message, array $classification): ?TaskPlanResult
-    {
-        if (null === $this->savedTaskConfig || null === $this->savedTasks || null === $this->prompts || null === $this->savedTaskPlanFactory) {
-            return null;
-        }
-
-        try {
-            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        // Anonymous channels (e.g. WhatsApp senders without an account) have no
-        // per-user Saved Tasks; without this bail-out the null user id fatals in
-        // findByTopicAndUser() and 500s the whole webhook.
-        if (null === $userId) {
-            return null;
-        }
-
-        if (!$this->savedTaskConfig->isEnabled($userId)) {
-            return null;
-        }
-
-        $task = $this->savedTaskForClassification($classification, $userId);
-        if (null === $task || null === $task->getGraph()) {
-            return null;
-        }
-
-        try {
-            $plan = $this->savedTaskPlanFactory->fromTask($task, is_string($classification['language'] ?? null) ? $classification['language'] : 'en');
-        } catch (\Throwable $e) {
-            $this->logger->warning('TaskPlanExecutor: authored Saved Task graph rejected', [
-                'message_id' => $message->getId(),
-                'task_id' => $task->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
-
-        $this->logger->info('TaskPlanExecutor: using authored Saved Task steps', [
-            'message_id' => $message->getId(),
-            'task_id' => $task->getId(),
-            'task_name' => $task->getName(),
-        ]);
-
-        return new TaskPlanResult($plan, fallback: false, authored: true);
-    }
-
-    /**
-     * The Saved Task whose pinned steps this turn should replay, if any.
-     *
-     * A Saved Task RUN (manual "Run now", scheduler tick, inbound email) names
-     * its task directly via `saved_task_id` — the run goes through the AI
-     * sorter like a typed turn, so the classified topic (e.g. `general`) says
-     * nothing about the task. Legacy fixed-prompt runs (source=saved_task)
-     * and ordinary chat turns resolve through the prompt topic: a run picks
-     * the task's graph regardless of trigger type, a chat turn only pins the
-     * steps of a chat-trigger task (typing the matching instruction re-runs
-     * them).
-     *
-     * @param array<string, mixed> $classification
-     */
-    private function savedTaskForClassification(array $classification, int $userId): ?SavedTask
-    {
-        \assert(null !== $this->savedTasks && null !== $this->prompts);
-
-        $taskId = $classification['saved_task_id'] ?? null;
-        if (is_int($taskId) && $taskId > 0) {
-            $task = $this->savedTasks->findByIdAndOwner($taskId, $userId);
-
-            return null !== $task && $task->isEnabled() ? $task : null;
-        }
-
-        $topic = $classification['topic'] ?? null;
-        if (!is_string($topic) || '' === $topic) {
-            return null;
-        }
-
-        $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
-        if (null === $prompt || null === $prompt->getId()) {
-            return null;
-        }
-
-        return 'saved_task' === ($classification['source'] ?? null)
-            ? $this->savedTasks->findEnabledGraphTaskForPrompt($prompt->getId(), $userId)
-            : $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
-    }
-
-    /**
      * Whether the AI sorter already told us this turn is a single step, so the
      * planner round-trip can be skipped.
      *
@@ -621,7 +519,9 @@ final readonly class TaskPlanExecutor
      * Deliberately strict: only an explicit `false` skips planning. A missing
      * vote (`null` — older seeded prompt, a SORT model that dropped the field,
      * or a branch that never ran the sorter such as a file attachment) keeps the
-     * pre-vote behaviour and plans.
+     * pre-vote behaviour and plans. A message that names one of the user's
+     * connected systems is planned even on a false vote: skipping the planner
+     * would answer as if that system were not connected.
      *
      * @param array<string, mixed> $classification
      */
@@ -634,7 +534,8 @@ final readonly class TaskPlanExecutor
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
-            return $this->multitaskConfig->planOnlyMultiStep($userId);
+            return $this->multitaskConfig->planOnlyMultiStep($userId)
+                && !$this->namesConnectedSource($userId, $message, $classification);
         } catch (\Throwable $e) {
             // A config lookup glitch must never silently change routing —
             // fall back to planning, which is what we did before the vote.
@@ -645,6 +546,18 @@ final readonly class TaskPlanExecutor
 
             return false;
         }
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function namesConnectedSource(?int $userId, Message $message, array $classification): bool
+    {
+        if (null === $this->connectedSystems) {
+            return false;
+        }
+
+        return $this->connectedSystems->mentioned($userId, $message->getText(), $classification);
     }
 
     /**

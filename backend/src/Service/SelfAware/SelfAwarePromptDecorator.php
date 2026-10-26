@@ -8,6 +8,7 @@ use App\Entity\Model;
 use App\Repository\ModelRepository;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\ConnectedSystemMention;
 use App\Service\SelfAware\Docs\PlatformDocsHits;
 
 /**
@@ -26,6 +27,7 @@ final readonly class SelfAwarePromptDecorator
         private KnowledgeContextFormatter $knowledgeContextFormatter,
         private ModelRepository $modelRepository,
         private ModelConfigService $modelConfig,
+        private ?ConnectedSystemMention $connectedSystems = null,
     ) {
     }
 
@@ -60,6 +62,7 @@ final readonly class SelfAwarePromptDecorator
             $block = $this->renderer->render(
                 $this->inventory->build($userId),
                 $this->modelLine($modelId, $userId),
+                $this->connectedSourceNames($userId),
             );
             $prompt = str_replace(self::PLACEHOLDER_CAPABILITIES, $block, $prompt);
         } else {
@@ -90,6 +93,21 @@ final readonly class SelfAwarePromptDecorator
      * Omitted when neither resolves, so an install without a chat model
      * keeps the previous "ask your administrator" behaviour.
      */
+    /**
+     * Fresh on every turn. The capability report itself is cached, and a
+     * connection the user just added has to show up in the next answer.
+     *
+     * @return list<string>
+     */
+    private function connectedSourceNames(int $userId): array
+    {
+        if (null === $this->connectedSystems || $userId <= 0) {
+            return [];
+        }
+
+        return $this->connectedSystems->names($userId);
+    }
+
     private function modelLine(?int $modelId, int $userId): ?string
     {
         $replyId = (null !== $modelId && $modelId > 0) ? $modelId : null;

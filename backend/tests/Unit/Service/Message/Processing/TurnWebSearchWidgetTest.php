@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Service\Message\Processing;
 
 use App\Entity\Message;
 use App\Plug\WebSearch\WebSearchGateway;
+use App\Service\Mcp\NotionLinkedPageRead;
+use App\Service\Mcp\NotionLinkedPageReader;
 use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\Processing\LinkedContentReader;
 use App\Service\Message\Processing\TurnStatus;
@@ -62,6 +64,41 @@ final class TurnWebSearchWidgetTest extends TestCase
 
         self::assertIsArray($result['searchResults']);
         self::assertNotEmpty($result['searchResults']['results']);
+    }
+
+    public function testANotionPageReadThroughTheConnectionSkipsWebSearch(): void
+    {
+        $url = 'https://www.notion.so/Synaplan-abc';
+        $notion = $this->createStub(NotionLinkedPageReader::class);
+        $notion->method('read')->willReturn(new NotionLinkedPageRead([
+            ['url' => $url, 'success' => true, 'serverName' => 'Notion', 'text' => 'The Synaplan page.'],
+        ]));
+
+        $urls = $this->createStub(UrlContentService::class);
+        $urls->method('extractUrls')->willReturn([$url]);
+
+        $webSearch = $this->createMock(WebSearchGateway::class);
+        $webSearch->method('isEnabled')->willReturn(true);
+        $webSearch->expects(self::never())->method('search');
+
+        $turn = new TurnWebSearch(
+            $webSearch,
+            $this->createStub(SearchQueryGenerator::class),
+            $this->createStub(AttachmentSearchContextResolver::class),
+            new LinkedContentReader($urls, new NullLogger(), null, null, null, $notion),
+            new NullLogger(),
+        );
+
+        $result = $turn->run(
+            (new Message())->setUserId(1)->setText('Was steht auf '.$url.' zu den Preisen?'),
+            ['topic' => 'general', 'web_search' => true],
+            ['tool_mcp' => true],
+            [],
+            [],
+            new TurnStatus(null, new NullLogger()),
+        );
+
+        self::assertNull($result['searchResults']);
     }
 
     private function turn(

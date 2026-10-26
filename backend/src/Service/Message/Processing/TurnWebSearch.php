@@ -247,6 +247,9 @@ final readonly class TurnWebSearch
         if ($shouldSearch && !$userRequestedSearch && true === ($classification['jira_mcp_handled'] ?? false)) {
             return [false, 'jira_issue_read_via_connection'];
         }
+        if ($shouldSearch && !$userRequestedSearch && true === ($classification['notion_mcp_handled'] ?? false)) {
+            return [false, 'notion_page_read_via_connection'];
+        }
 
         return [$shouldSearch, $triggerReason];
     }
