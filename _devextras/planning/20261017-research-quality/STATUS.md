@@ -18,7 +18,7 @@ chat message.
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
-| RS7 | in progress | Both modes measured 2026-10-25 on the smoke set. Round-mode recall 0.67. Tool mode 0.28, then 0.78 after the lead must read before it finishes (both repeats). Sonnet conformance 20/20, gpt-oss-120b 12/20. RS6 corpus comparison not run; the spike is a different set. Flag stays off |
+| RS7 | in progress | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); done waits for the owner. Flag stays off |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
@@ -37,6 +37,59 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-26 — RS7 starter set in both modes
+
+The same 20 questions the spike was scored on, so the comparison with S-R
+and S-T is like for like. Local m4 stack, `main` at `972ee840e` (with the
+read-first rule of #2746). Research was pinned on with `RESEARCH_ENABLED=1`
+for the window and removed afterwards; the database row stays `0`,
+`LEAD_MODE` is back to `auto` and `TOOL_MODE_MODELS` is `[]`. User 1,
+`CHAT` and `SORT` `BMODELS` 379 (Claude Sonnet 5.5); the `SORT` pin was
+removed afterwards. Web search Brave, no knowledge source (RS9). Corpus
+sha256 `56c371a25e01520f6d601da376b3df4a11ff6d3c245f8a8eb532a99624c844fa`,
+all 20 items, standard depth, repeat 2, **two runs at a time** (three
+pushed queue time into the 360 s wall on 2026-10-25). Round mode is
+`LEAD_MODE=rounds`, tool mode `LEAD_MODE=tools`. Each run is
+`POST /api/v1/research`; the reports are scored by:
+
+```bash
+app:research:eval --corpus=full --arm=b1 --import=<reports>
+```
+
+"Across 16" leaves out the three document-only items and trap-01 (no match
+string), as the spike rows do. The scorer's own mean is across 19 and
+counts doc-01, doc-02 and doc-03 as 0.00.
+
+| Mode | Repeat 1 (16) | Repeat 2 (16) | Scorer mean (19) | Spike row | Traps |
+| ---- | ------------- | ------------- | ---------------- | --------- | ----- |
+| Rounds | 0.81 | 0.81 | 0.68, 0.68 | S-R 0.63 | both abstained twice; trap-02 recall 1.00 |
+| Tools | 0.88 | 0.88 | 0.74, 0.74 | S-T 0.81 (judged 0.78) | both abstained twice; trap-02 recall 1.00 |
+
+Round mode misses fact-01, mix-01 and mix-02 on both repeats; tool mode
+misses mix-01 and mix-02. The mix items need the knowledge source as well.
+Tool mode ended `failed_nothing_found` only on the six document-only runs
+and on trap-01 once. Round mode ended that way on doc-02, doc-03, fact-01
+and trap-01 once each.
+
+| Mode | Cost, 40 runs | Median per run | Wall p50 / p95 | Queue wait ≥ 20 s: steps, p50 / p95 |
+| ---- | ------------- | -------------- | -------------- | ----------------------------------- |
+| Rounds | 7.030820 USD | 0.159838 USD | 163.1 / 245.2 s | 34, 54.5 / 114.9 s |
+| Tools | 4.970934 USD | 0.109488 USD | 100.7 / 153.6 s | 18, 39.5 / 61.4 s |
+
+Percentiles are linear (rank `(n-1)*p`). Wall time is the driver's clock
+and includes the queue. The queue sample counts only steps whose
+`queued_since` reached 20 s while two runs shared one local worker; it is
+not a production queue. No run ended `stopped_limit`.
+
+Against the exit of 07 §RS7: both modes are above both spike rows, tool
+mode by 7 points and round mode by 18, the same on both repeats. Citation
+precision was not judged. Conformance and queue wait are recorded. The
+clause "above the RS6 row" cannot be measured: RS6 has no corpus row and
+the engine without reflect no longer exists. Whether RS7 is done is the
+owner's call.
 
 ---
 
