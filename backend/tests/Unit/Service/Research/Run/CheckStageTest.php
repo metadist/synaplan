@@ -272,6 +272,41 @@ REPORT, 'test:writer', null);
         self::assertStringContainsString('unsupported part: in Paris', $caller->seen[1]['system']);
     }
 
+    public function testARevisionMayListARejectedFactWithoutItsCitation(): void
+    {
+        [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);
+        $this->card($ctx, 'The warranty is 2 years from purchase.');
+        $this->card($ctx, 'The shop opened in 2019.');
+        $ctx->state->ledger->setReport("The warranty ends after 2 years. [e1]\nThe shop in Paris opened in 2019. [e2]");
+        $caller->script[] = $this->verdicts([['c1', 'contradicted'], ['c2', 'partial', 'in Paris']]);
+        $caller->script[] = new ResearchModelReply(true, true, null, <<<'REPORT'
+The shop opened in 2019. [e2]
+
+## Not confirmed
+
+- The warranty ends after 2 years.
+REPORT, 'test:writer', null);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertStringContainsString('The shop opened in 2019. [e2]', (string) $ctx->state->ledger->report());
+        self::assertSame(1, $this->checkEvent($ctx)['softened']);
+    }
+
+    public function testADroppedPartialIsNotSoftenedByACitationOnAnotherStatement(): void
+    {
+        [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $ctx->state->ledger->setReport("The price is 12.40 EUR. [e1]\nThe shop is in Paris. [e1]");
+        $caller->script[] = $this->verdicts([['c1', 'supported'], ['c2', 'partial', 'in Paris']]);
+        $caller->script[] = new ResearchModelReply(true, true, null, 'The price is 12.40 EUR. [e1]', 'test:writer', null);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
+        self::assertSame(0, $this->checkEvent($ctx)['softened']);
+    }
+
     public function testARevisionThatAddsAFactIsRejectedAndTheRemovalStands(): void
     {
         [$ctx, $caller] = $this->open(false, ResearchDepth::Thorough);

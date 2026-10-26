@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run\Stage;
 
+use App\Service\Research\Run\Ledger\PassageText;
+
 /**
  * Decides whether a thorough revision may replace the removal. The revision
  * may shorten or drop. It may not add a fact the draft did not have, leave a
@@ -24,11 +26,12 @@ final readonly class CheckRevision
     public function acceptable(string $before, string $after, array $passages, array $sorted, array $verdicts): bool
     {
         $after = trim($after);
-        if ('' === $after || $this->draft->revisionAddsIssue($before, $after, $passages)) {
+        $body = CheckReport::withoutNotConfirmed($after);
+        if ('' === $after || $this->draft->revisionAddsIssue(CheckReport::withoutNotConfirmed($before), $body, $passages)) {
             return false;
         }
-        $body = CheckReport::withoutNotConfirmed($after);
         $listed = CheckReport::notConfirmedBody($after);
+        $unchanged = $this->bareSentences(CheckReport::withoutNotConfirmed($before));
         foreach ($sorted['drop'] as $item) {
             if ($this->contains($body, $item['text'])) {
                 return false;
@@ -48,7 +51,7 @@ final readonly class CheckRevision
             if ('contradicted' === $verdict && $this->citedAgain($listed, $item['bare'], $item['sentence'])) {
                 return false;
             }
-            if ('partial' === $verdict && !$this->keepsPartial($body, $item, $verdicts[$item['id']]['part'] ?? '')) {
+            if ('partial' === $verdict && !$this->keepsPartial($body, $item, $verdicts[$item['id']]['part'] ?? '', $unchanged)) {
                 return false;
             }
         }
@@ -58,28 +61,66 @@ final readonly class CheckRevision
 
     /**
      * @param array{id: string, sentence: string, bare: string, passages: string} $item
+     * @param array<string, true>                                                $unchanged
      */
-    private function keepsPartial(string $body, array $item, string $unsupportedPart): bool
+    private function keepsPartial(string $body, array $item, string $unsupportedPart, array $unchanged): bool
     {
         $part = trim($unsupportedPart);
         if ('' !== $part && $this->contains($body, $part)) {
             return false;
         }
 
-        return $this->keepsCitation($body, $item['sentence']);
+        return $this->keepsCitation($body, $item['sentence'], $unchanged);
     }
 
-    private function keepsCitation(string $body, string $sentence): bool
+    /**
+     * The softened statement is a sentence of the revision that is not one
+     * of the draft's sentences and still cites the evidence of the partial.
+     *
+     * @param array<string, true> $unchanged
+     */
+    private function keepsCitation(string $body, string $sentence, array $unchanged): bool
     {
-        preg_match_all('/\[e\d+\]/i', $sentence, $ids);
-        $body = mb_strtolower($body);
-        foreach ($ids[0] as $id) {
-            if (str_contains($body, mb_strtolower($id))) {
+        $ids = $this->ids($sentence);
+        foreach (DraftSentences::split($body) as $revised) {
+            if (isset($unchanged[$this->bare($revised)])) {
+                continue;
+            }
+            if ([] !== array_intersect($ids, $this->ids($revised))) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function bareSentences(string $report): array
+    {
+        $out = [];
+        foreach (DraftSentences::split($report) as $sentence) {
+            $out[$this->bare($sentence)] = true;
+        }
+
+        return $out;
+    }
+
+    private function bare(string $sentence): string
+    {
+        return PassageText::normalise((string) preg_replace(DraftSentences::MARKER, '', $sentence));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function ids(string $sentence): array
+    {
+        preg_match_all(DraftSentences::MARKER, $sentence, $markers);
+        preg_match_all('/e\d+/i', implode(' ', $markers[0]), $ids);
+
+        return array_values(array_unique(array_map('strtolower', $ids[0])));
     }
 
     /** A contradicted statement listed with its citation is still a second version. */
