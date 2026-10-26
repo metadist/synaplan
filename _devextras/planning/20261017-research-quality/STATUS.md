@@ -18,7 +18,7 @@ chat message.
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
-| RS7 | in progress | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); done waits for the owner. Flag stays off |
+| RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
@@ -88,8 +88,9 @@ Against the exit of 07 §RS7: both modes are above both spike rows, tool
 mode by 7 points and round mode by 18, the same on both repeats. Citation
 precision was not judged. Conformance and queue wait are recorded. The
 clause "above the RS6 row" cannot be measured: RS6 has no corpus row and
-the engine without reflect no longer exists. Whether RS7 is done is the
-owner's call.
+the engine without reflect no longer exists. The owner waived that clause
+on 2026-10-26, and RS7 is done. Per-host politeness, named in the RS7
+goal, was not built.
 
 ---
 
