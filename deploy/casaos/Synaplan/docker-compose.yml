@@ -1,6 +1,6 @@
 name: synaplan
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:5.5.4
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.6.0
 
 x-app-command: &app-command
   - |
@@ -19,7 +19,7 @@ x-app-environment: &app-environment
   FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
   FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: selfhost
-  APP_VERSION: "5.5.4"
+  APP_VERSION: "5.6.0"
   APP_URL: ${SYNAPLAN_URL:-http://localhost:8300}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://localhost:8300}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://localhost:8300}
@@ -631,7 +631,7 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  version: "5.5.4"
+  version: "5.6.0"
   update_at: "2026-10-18"
   release_notes:
     en_US: "Synaplan 5.5.0"
