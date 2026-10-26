@@ -15,6 +15,19 @@ export function formatUsd(value: number, locale = 'en'): string {
   )
 }
 
+/**
+ * A single request's cost, which is often a fraction of a cent: keeps up to
+ * six decimals (the API's precision) so $0.004 does not read as free.
+ */
+export function formatUsdPrecise(value: number, locale = 'en'): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(Number.isFinite(value) ? value : 0)
+}
+
 /** @deprecated Use formatUsd. Kept so older call sites keep compiling. */
 export function formatEuro(value: number, locale = 'en'): string {
   return formatUsd(value, locale)

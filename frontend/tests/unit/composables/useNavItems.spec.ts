@@ -299,6 +299,7 @@ describe('useNavItems rail', () => {
       'admin-features',
       'admin-setup',
       'admin-people',
+      'admin-usage',
       'admin-config',
     ])
     expect(children.find((child) => child.key === 'admin-features')?.label).toBe('System status')

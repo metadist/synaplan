@@ -106,7 +106,8 @@
     "prompts": "Shortcuts",
     "apps": "Apps",
     "appsConnected": "Connected apps",
-    "appDetail": "App"
+    "appDetail": "App",
+    "adminUsage": "Cost board"
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",
@@ -184,7 +185,8 @@
     "groupApps": "Apps",
     "apps": "Apps",
     "allApps": "All apps",
-    "connectedApps": "Connected"
+    "connectedApps": "Connected",
+    "adminUsage": "Usage"
   },
   "common": {
     "ok": "OK",

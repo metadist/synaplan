@@ -684,6 +684,54 @@
         "deletedAccounts": "Bu kodu kullanan {count} hesap o zamandan beri silindi.",
         "loadFailed": "Liste yüklenemedi. Kapatıp yeniden açın."
       }
+    },
+    "usageBoard": {
+      "title": "Kullanım ve maliyetler",
+      "subtitle": "Kim hangi model maliyetini üretiyor",
+      "intro": "Kullanıcılar, model isteklerinin sağlayıcı maliyetine göre sıralanır. Bir satırı açmak tek tek istekleri gösterir: zaman, tür, model ve fiyat, asla içerik değil.",
+      "periodLabel": "Dönem",
+      "sortLabel": "Sırala",
+      "period": {
+        "24h": "24 saat",
+        "7d": "7 gün",
+        "30d": "30 gün",
+        "all": "Tüm zamanlar"
+      },
+      "sort": {
+        "cost": "En yüksek maliyet",
+        "requests": "En çok istek",
+        "tokens": "En çok token"
+      },
+      "loadFailed": "Maliyet panosu yüklenemedi. Lütfen tekrar deneyin.",
+      "empty": "Bu dönemde henüz model kullanımı yok.",
+      "showAllTime": "Tüm zamanları göster",
+      "usersCount": "Model kullanımı olan {total} kullanıcı",
+      "requestsCount": "{total} istek",
+      "requestsLoadFailed": "Bu istekler yüklenemedi. Lütfen tekrar deneyin.",
+      "requestsEmpty": "Bu dönemde istek yok.",
+      "tokensUnit": "token",
+      "agent": "Ajan",
+      "chat": "Sohbet",
+      "colTime": "Zaman",
+      "colKind": "Tür",
+      "colModel": "Model",
+      "colTokens": "Token (girdi / çıktı)",
+      "colLatency": "Süre",
+      "colCost": "Maliyet",
+      "kind": {
+        "chat": "Sohbet",
+        "video": "Video",
+        "image": "Görüntü",
+        "audio": "Ses",
+        "voice": "Sesli",
+        "transcription": "Transkripsiyon",
+        "embedding": "Embedding",
+        "agent": "Ajan",
+        "compute": "Hesaplama",
+        "file": "Dosyalar",
+        "internal": "Dahili",
+        "other": "Diğer"
+      }
     }
   },
   "statistics": {

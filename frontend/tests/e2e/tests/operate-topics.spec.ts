@@ -50,6 +50,7 @@ test.describe('@ci Operate topics', () => {
         'link-sidebar-v2-admin-features',
         'link-sidebar-v2-admin-setup',
         'link-sidebar-v2-admin-people',
+        'link-sidebar-v2-admin-usage',
         'link-sidebar-v2-admin-config',
       ])
       await flyout.locator(NAV.flyoutLinkAdminSetup).click()
