@@ -46,8 +46,12 @@ No live run. After the report, `CheckStage` runs the free check and then
 asks the checker model, in batches that fit its input budget, for a
 verdict on every cited statement that passed. `supported` stays.
 `partial`, `unsupported`, `contradicted` and a missing verdict are
-removed and listed under "Not confirmed". A free-check failure is removed
-the same way and is not sent to the model. The report ends with how many
+removed and listed under the writer's "Not confirmed" section, which is
+itself not checked again. A free-check failure is removed the same way and
+is not sent to the model. Only verdicts for the batch's own statements
+count; an unusable row counts as unsupported instead of failing the run.
+A batch holds at most 30 statements so the verdicts fit the output cap;
+statements left unchecked when the budget runs out count as not confirmed. The report ends with how many
 statements a source backs, and names the provider when the checker and
 the writer share a family. The run summary uses those counts. Every
 depth, including thorough, uses this removal; a revision that keeps the

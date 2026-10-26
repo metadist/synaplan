@@ -7,8 +7,10 @@ namespace App\Service\Research\Run\Stage;
 /**
  * Applies a standard fact-check to a report. Only a supported statement
  * stays. The rest is listed under Not confirmed, and the report ends with
- * the count. A thorough revision, which would keep the supported part of a
- * partial statement, is a later step, so every depth uses this removal.
+ * the count. The writer already keeps a Not confirmed section for gaps; the
+ * removed statements join it instead of opening a second one. A thorough
+ * revision, which would keep the supported part of a partial statement, is
+ * a later step, so every depth uses this removal.
  */
 final class CheckReport
 {
@@ -32,21 +34,45 @@ final class CheckReport
 
     /** @var array<string, string> */
     private const REMOVED = [
-        'de' => '%d wurden entfernt, weil keine Quelle sie bestätigt hat.',
-        'en' => '%d were removed because no source confirmed them.',
-        'es' => '%d se quitaron porque ninguna fuente las confirmó.',
-        'fr' => '%d ont été retirées, car aucune source ne les confirme.',
-        'tr' => '%d tanesi kaldırıldı, çünkü hiçbir kaynak onları doğrulamadı.',
+        'de' => '%d wurden entfernt, weil die Prüfung sie nicht in einer Quelle bestätigen konnte.',
+        'en' => '%d were removed because the check could not confirm them in a source.',
+        'es' => '%d se quitaron porque la revisión no pudo confirmarlas en una fuente.',
+        'fr' => '%d ont été retirées, car la vérification n\'a pas pu les confirmer dans une source.',
+        'tr' => '%d tanesi kaldırıldı, çünkü kontrol bunları bir kaynakta doğrulayamadı.',
     ];
 
     /** @var array<string, string> */
     private const SAME_PROVIDER = [
         'de' => 'Geprüft hat ein Modell desselben Anbieters. In diesem Projekt gibt es keinen zweiten Anbieter.',
-        'en' => 'Fact-check by a model of the same provider (no second provider in this project).',
+        'en' => 'A model of the same provider did the fact-check. This project has no second provider.',
         'es' => 'La revisión la hizo un modelo del mismo proveedor. Este proyecto no tiene un segundo proveedor.',
         'fr' => 'La vérification a été faite par un modèle du même fournisseur. Ce projet n\'a pas de second fournisseur.',
         'tr' => 'Kontrolü aynı sağlayıcının bir modeli yaptı. Bu projede ikinci bir sağlayıcı yok.',
     ];
+
+    private const EMPTY_LIST_ITEM = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s*$/u';
+    private const LIST_ITEM = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s+\S/u';
+
+    public static function notConfirmedTitle(string $language): string
+    {
+        return self::HEADING[$language] ?? self::HEADING['en'];
+    }
+
+    /**
+     * The report without the writer's own Not confirmed section. What the
+     * writer already marks as not confirmed is not checked again.
+     */
+    public static function withoutNotConfirmed(string $report): string
+    {
+        $lines = self::lines($report);
+        $section = self::section($lines);
+        if (null === $section) {
+            return $report;
+        }
+        array_splice($lines, $section['start'], $section['end'] - $section['start']);
+
+        return implode("\n", $lines);
+    }
 
     /**
      * @param list<array{sentence: string, text: string}>                               $dropped
@@ -69,21 +95,16 @@ final class CheckReport
             $listed[] = $item['bare'];
         }
 
-        $report = trim((string) preg_replace("/\n{3,}/u", "\n\n", $report));
         $language = isset(self::HEADING[$language]) ? $language : 'en';
-        if ([] !== $listed) {
-            $lines = ['', '## '.self::HEADING[$language], ''];
-            foreach ($listed as $text) {
-                $lines[] = '- '.$text;
+        $report = self::list(self::tidy($report), $listed, $language);
+        if ($counts['statements'] > 0) {
+            $report .= "\n\n".sprintf(self::BACKED[$language], $counts['supported'], $counts['statements']);
+            if ($counts['removed'] > 0) {
+                $report .= ' '.sprintf(self::REMOVED[$language], $counts['removed']);
             }
-            $report .= implode("\n", $lines);
-        }
-        $report .= "\n\n".sprintf(self::BACKED[$language], $counts['supported'], $counts['statements']);
-        if ($counts['removed'] > 0) {
-            $report .= ' '.sprintf(self::REMOVED[$language], $counts['removed']);
-        }
-        if ($sameProvider) {
-            $report .= "\n\n".self::SAME_PROVIDER[$language];
+            if ($sameProvider) {
+                $report .= "\n\n".self::SAME_PROVIDER[$language];
+            }
         }
 
         return trim($report);
@@ -94,5 +115,110 @@ final class CheckReport
         $pattern = '/(?<!\S)'.preg_quote($sentence, '/').'(?!\S)/u';
 
         return preg_replace($pattern, '', $report, 1) ?? $report;
+    }
+
+    /** Drops list markers and blank runs a removed sentence left behind. */
+    private static function tidy(string $report): string
+    {
+        $kept = [];
+        foreach (self::lines($report) as $line) {
+            $line = rtrim($line);
+            if (1 !== preg_match(self::EMPTY_LIST_ITEM, $line)) {
+                $kept[] = $line;
+            }
+        }
+
+        return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
+    }
+
+    /**
+     * @param list<string> $listed
+     */
+    private static function list(string $report, array $listed, string $language): string
+    {
+        if ([] === $listed) {
+            return $report;
+        }
+        $items = array_map(static fn (string $text): string => '- '.$text, $listed);
+        $lines = self::lines($report);
+        $section = self::section($lines);
+        if (null === $section) {
+            return $report."\n\n".implode("\n", ['## '.self::HEADING[$language], '', ...$items]);
+        }
+
+        $at = $section['end'];
+        while ($at > $section['start'] + 1 && '' === trim($lines[$at - 1])) {
+            --$at;
+        }
+        $insert = 1 === preg_match(self::LIST_ITEM, $lines[$at - 1]) ? $items : ['', ...$items];
+        if ($at < count($lines)) {
+            $insert[] = '';
+        }
+        array_splice($lines, $at, 0, $insert);
+
+        return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $lines)));
+    }
+
+    /**
+     * The line range of the writer's Not confirmed section, heading
+     * included. It ends at the next heading of the same or a higher level.
+     *
+     * @param list<string> $lines
+     *
+     * @return array{start: int, end: int}|null
+     */
+    private static function section(array $lines): ?array
+    {
+        foreach ($lines as $index => $line) {
+            $level = self::headingLevel($line);
+            if (null === $level) {
+                continue;
+            }
+            $end = count($lines);
+            for ($next = $index + 1; $next < count($lines); ++$next) {
+                if (1 === preg_match('/^\s*(#{1,6})\s/u', $lines[$next], $hashes) && strlen($hashes[1]) <= $level) {
+                    $end = $next;
+                    break;
+                }
+            }
+
+            return ['start' => $index, 'end' => $end];
+        }
+
+        return null;
+    }
+
+    /**
+     * The level of a Not confirmed heading in any of the five languages,
+     * or null. A bold line on its own counts as a heading below level six.
+     */
+    private static function headingLevel(string $line): ?int
+    {
+        $trimmed = trim($line);
+        if (1 === preg_match('/^(#{1,6})\s+(.*)$/u', $trimmed, $match)) {
+            $level = strlen($match[1]);
+            $text = $match[2];
+        } elseif (str_starts_with($trimmed, '**')) {
+            $level = 7;
+            $text = $trimmed;
+        } else {
+            return null;
+        }
+        $text = mb_strtolower(trim($text, " \t*_:"));
+        foreach (self::HEADING as $title) {
+            if (mb_strtolower($title) === $text) {
+                return $level;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function lines(string $text): array
+    {
+        return preg_split("/\r\n|\r|\n/u", $text) ?: [];
     }
 }

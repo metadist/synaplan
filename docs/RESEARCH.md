@@ -65,8 +65,12 @@ its numbers, dates and proper names must appear in that evidence. A
 sentence that states a fact and cites nothing is removed. A second model
 then reads each remaining cited statement with its passages and returns
 supported, partial, unsupported or contradicted. Only a supported
-statement stays in the report. The rest is listed under "Not confirmed",
-and the report ends with how many statements a source backs. When the
+statement stays in the report. The rest joins the writer's "Not
+confirmed" section (what the writer already lists there is not checked
+again), and the report ends with how many statements a source backs. A
+batch holds at most 30 statements; when the budget runs out after the
+first batch, the statements not yet checked count as not confirmed and
+the report is still delivered. When the
 checker and the writer are the same provider, the report says so. Every
 depth uses this removal until a thorough run can revise a statement
 without adding a fact. A revision that adds a problem the draft before it

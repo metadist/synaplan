@@ -110,6 +110,107 @@ REPORT);
         self::assertStringNotContainsString('were removed', (string) $ctx->state->ledger->report());
     }
 
+    public function testRemovedStatementsJoinTheWritersNotConfirmedSection(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $this->card($ctx, 'The warranty is two years.');
+        $ctx->state->ledger->setReport(<<<'REPORT'
+## Prices
+
+- The price is 12.40 EUR. [e1]
+- The warranty is five years. [e2]
+
+## Not confirmed
+
+The delivery time in Hamburg Altona is not published.
+REPORT);
+        $caller->script[] = $this->verdicts([['c1', 'supported'], ['c2', 'unsupported']]);
+
+        $this->stage($caller)->run($ctx);
+
+        $report = (string) $ctx->state->ledger->report();
+        self::assertSame(1, substr_count($report, 'Not confirmed'));
+        self::assertStringNotContainsString("\n-\n", $report);
+        self::assertStringContainsString("Hamburg Altona is not published.\n\n- The warranty is five years.", $report);
+        self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
+        self::assertStringNotContainsString('Hamburg', $caller->seen[0]['user']);
+    }
+
+    public function testAVerdictForAStatementOfAnotherBatchIsIgnored(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'Alpha is one.');
+        $this->card($ctx, 'Beta is two.');
+        $ctx->state->ledger->setReport("Alpha is one. [e1]\nBeta is two. [e2]");
+        $caller->script[] = $this->verdicts([['c1', 'supported'], ['c2', 'supported']]);
+        $caller->script[] = $this->verdicts([['c2', 'contradicted']]);
+
+        $this->stage($caller, 20)->run($ctx);
+
+        self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
+    }
+
+    public function testStatementsLeftWhenTheBudgetRunsOutAreNotConfirmedAndTheReportIsKept(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'Alpha is one.');
+        $this->card($ctx, 'Beta is two.');
+        $ctx->state->ledger->setReport("Alpha is one. [e1]\nBeta is two. [e2]");
+        while ($ctx->state->budget->callsLeft() > 1) {
+            $ctx->state->budget->spend('calls');
+        }
+        $caller->script[] = $this->verdicts([['c1', 'supported']]);
+
+        $result = $this->stage($caller, 20)->run($ctx);
+
+        self::assertSame('deliver', $result->next);
+        self::assertCount(1, $caller->seen);
+        self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
+        self::assertStringContainsString("## Not confirmed\n\n- Beta is two.", (string) $ctx->state->ledger->report());
+    }
+
+    public function testAnUnusableRowCountsAsUnsupportedWithoutEndingTheRun(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'Alpha is one.');
+        $this->card($ctx, 'Beta is two.');
+        $ctx->state->ledger->setReport("Alpha is one. [e1]\nBeta is two. [e2]");
+        $caller->script[] = new ResearchModelReply(true, true, ['verdicts' => [
+            ['statement' => 'c1', 'verdict' => 'supported', 'unsupported_part' => null, 'note' => ''],
+            ['statement' => 'c2', 'verdict' => 'maybe', 'unsupported_part' => null, 'note' => ''],
+        ]], '{}', 'test:checker', null);
+
+        $result = $this->stage($caller)->run($ctx);
+
+        self::assertSame('deliver', $result->next);
+        self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
+    }
+
+    public function testABatchHoldsAtMostTheStatementCap(): void
+    {
+        $items = [];
+        for ($i = 1; $i <= 7; ++$i) {
+            $items[] = ['id' => 'c'.$i, 'sentence' => 's', 'bare' => 's', 'passages' => 'p'];
+        }
+
+        $groups = (new CheckBatches())->groups($items, 100000, 3);
+
+        self::assertSame([3, 3, 1], array_map('count', $groups));
+    }
+
+    public function testAReportWithNothingToCheckGetsNoCountLine(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'Alpha is one.');
+        $ctx->state->ledger->setReport('This report gives an overview.');
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertSame('This report gives an overview.', $ctx->state->ledger->report());
+        self::assertCount(0, $caller->seen);
+    }
+
     public function testTheSameProviderIsNamed(): void
     {
         [$ctx, $caller] = $this->open(true);
@@ -119,7 +220,7 @@ REPORT);
 
         $this->stage($caller)->run($ctx);
 
-        self::assertStringContainsString('Fact-check by a model of the same provider', (string) $ctx->state->ledger->report());
+        self::assertStringContainsString('A model of the same provider did the fact-check.', (string) $ctx->state->ledger->report());
     }
 
     /**

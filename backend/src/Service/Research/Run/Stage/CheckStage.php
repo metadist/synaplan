@@ -13,7 +13,9 @@ use App\Service\Research\Run\ResearchStatus;
  * Checks the report. The free check runs first and costs nothing. The
  * checker model then judges every cited statement that passed it, in
  * batches that fit its input budget. A statement that is not supported is
- * removed and listed. The report ends with the count.
+ * removed and listed. The report ends with the count. When the budget runs
+ * out after the first batch, the statements not yet checked count as not
+ * confirmed, so the paid report is still delivered.
  */
 final readonly class CheckStage implements ResearchStage
 {
@@ -39,9 +41,12 @@ final readonly class CheckStage implements ResearchStage
         $ctx->events->append($ctx->state->ref->id, 'checking', []);
 
         $passages = $this->passages($ctx);
-        $sorted = $this->sort($report, $passages);
+        $sorted = $this->sort(CheckReport::withoutNotConfirmed($report), $passages);
         $verdicts = [];
-        foreach ($this->batches->groups($sorted['ask'], $this->chars()) as $group) {
+        foreach ($this->batches->groups($sorted['ask'], $this->chars()) as $index => $group) {
+            if ($index > 0 && !$ctx->state->budget->canCall() && !$ctx->stop->requested()) {
+                break;
+            }
             $called = $this->calls->once(
                 $ctx,
                 'checker',
@@ -53,7 +58,7 @@ final readonly class CheckStage implements ResearchStage
             if ($called->stop instanceof StageResult) {
                 return $called->stop;
             }
-            $parsed = $this->verdicts($called->reply?->data);
+            $parsed = $this->verdicts($called->reply?->data, $group);
             if (null === $parsed) {
                 return StageEnds::model($ctx, 'checker');
             }
@@ -143,22 +148,30 @@ final readonly class CheckStage implements ResearchStage
     }
 
     /**
-     * @return array<string, string>|null
+     * Only the statements of this batch count, each with its first verdict.
+     * A row that is not usable is skipped, so that statement stays without
+     * a verdict and is treated as unsupported.
+     *
+     * @param list<array{id: string, sentence: string, bare: string, passages: string}> $group
+     *
+     * @return array<string, string>|null null when the answer has no verdict list at all
      */
-    private function verdicts(mixed $data): ?array
+    private function verdicts(mixed $data, array $group): ?array
     {
         if (!is_array($data) || !is_array($data['verdicts'] ?? null)) {
             return null;
         }
+        $asked = array_fill_keys(array_column($group, 'id'), true);
         $out = [];
         foreach ($data['verdicts'] as $row) {
             if (!is_array($row) || !is_string($row['statement'] ?? null) || !is_string($row['verdict'] ?? null)) {
-                return null;
+                continue;
             }
-            if (!in_array($row['verdict'], self::VERDICTS, true)) {
-                return null;
+            $id = $row['statement'];
+            if (!isset($asked[$id]) || isset($out[$id]) || !in_array($row['verdict'], self::VERDICTS, true)) {
+                continue;
             }
-            $out[$row['statement']] = $row['verdict'];
+            $out[$id] = $row['verdict'];
         }
 
         return $out;
@@ -169,13 +182,15 @@ final readonly class CheckStage implements ResearchStage
      */
     private function user(array $group): string
     {
-        $lines = ['<statements>'];
+        $lines = [];
         foreach ($group as $item) {
-            $lines[] = $item['id'];
-            $lines[] = ResearchPrompts::data($item['bare']);
+            $lines[] = '<statement id="'.$item['id'].'">';
+            $lines[] = '<text>'.ResearchPrompts::data($item['bare']).'</text>';
+            $lines[] = '<passages>';
             $lines[] = ResearchPrompts::data($item['passages']);
+            $lines[] = '</passages>';
+            $lines[] = '</statement>';
         }
-        $lines[] = '</statements>';
 
         return implode("\n", $lines);
     }

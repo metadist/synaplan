@@ -13,15 +13,6 @@ use App\Service\Research\Run\ResearchStatus;
  */
 final readonly class WriteStage implements ResearchStage
 {
-    /** @var array<string, string> */
-    private const NOT_CONFIRMED = [
-        'de' => 'Nicht bestätigt',
-        'en' => 'Not confirmed',
-        'es' => 'Sin confirmar',
-        'fr' => 'Non confirmé',
-        'tr' => 'Doğrulanmadı',
-    ];
-
     public function __construct(private StageCall $calls)
     {
     }
@@ -38,7 +29,7 @@ final readonly class WriteStage implements ResearchStage
             'OUTPUT' => null !== $brief ? $brief->output : 'report',
             'LANGUAGE' => $language,
             'AUDIENCE' => null !== $brief && null !== $brief->audience ? $brief->audience : 'the person asking',
-            'NOT_CONFIRMED_TITLE' => self::NOT_CONFIRMED[$language] ?? self::NOT_CONFIRMED['en'],
+            'NOT_CONFIRMED_TITLE' => CheckReport::notConfirmedTitle($language),
             'MAX_WORDS' => (string) $view['words'],
             'BRIEF' => null !== $brief ? $brief->goal : $ctx->state->ref->question,
             'OUTLINE' => implode("\n", $ctx->state->ledger->outline()),

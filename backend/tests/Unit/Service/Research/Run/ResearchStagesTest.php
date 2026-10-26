@@ -19,6 +19,7 @@ use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
+use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchRoles;
 use App\Service\Research\Run\ResearchRunRef;
@@ -27,7 +28,9 @@ use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\Stage\AcceptedEvidence;
 use App\Service\Research\Run\Stage\BriefStage;
+use App\Service\Research\Run\Stage\CheckStage;
 use App\Service\Research\Run\Stage\DeliverStage;
+use App\Service\Research\Run\Stage\DraftCheck;
 use App\Service\Research\Run\Stage\GatherChoice;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
@@ -524,7 +527,7 @@ final class ResearchStagesTest extends TestCase
         }
     }
 
-    public function testAQuickRunLeavesItsLastCallToTheWriter(): void
+    public function testAQuickRunLeavesItsLastTwoCallsToTheWriterAndTheChecker(): void
     {
         [$ctx, $caller] = $this->open();
         $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
@@ -556,18 +559,20 @@ final class ResearchStagesTest extends TestCase
         ];
         $caller->script = [
             $this->json($finding),
-            $this->json($finding),
             new ResearchModelReply(true, true, null, 'The unit price is 12.40 EUR [e1].', 'test:replay', null),
+            $this->json(['verdicts' => [['statement' => 'c1', 'verdict' => 'supported', 'unsupported_part' => null, 'note' => '']]]),
         ];
         $calls = new StageCall($caller);
 
         self::assertSame('write', (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx)->next);
         self::assertSame('check', (new WriteStage($calls))->run($ctx)->next);
+        self::assertSame('deliver', (new CheckStage($calls, new DraftCheck(), new ResearchInputBudget()))->run($ctx)->next);
         (new DeliverStage())->run($ctx);
 
         self::assertCount(3, $caller->seen);
         self::assertSame(ResearchOutcome::COMPLETE, $ctx->state->outcome?->code);
-        self::assertSame('The unit price is 12.40 EUR [e1].', $ctx->state->ledger->report());
+        self::assertSame(['statements' => 1, 'supported' => 1, 'removed' => 0], $ctx->state->ledger->check());
+        self::assertStringStartsWith('The unit price is 12.40 EUR [e1].', (string) $ctx->state->ledger->report());
     }
 
     public function testAModelThatCannotBeResolvedIsNotRetriedAndSaysSo(): void
