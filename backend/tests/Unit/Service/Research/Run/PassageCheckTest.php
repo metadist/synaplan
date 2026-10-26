@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Service\Research\Run\Ledger\PassageSplitter as RunSplitter;
+use App\Service\Research\Run\Ledger\PassageText;
 use App\Service\Research\Run\Ledger\PassageVerifier;
 use App\Service\Research\Spike\PassageSplitter as SpikeSplitter;
 use PHPUnit\Framework\TestCase;
@@ -46,5 +47,17 @@ final class PassageCheckTest extends TestCase
         self::assertTrue($verifier->numbersSupported('They sold 1.234,5 units.', ['sold 1,234.5 units']));
         self::assertFalse($verifier->numbersSupported('The price is 99 EUR.', ['The price is 12.40 EUR.']));
         self::assertTrue($verifier->numbersSupported('No numbers here.', ['Anything.']));
+    }
+
+    public function testDatesCompareEqualAcrossWritings(): void
+    {
+        self::assertSame(['2024-03-12'], PassageText::datesIn('12 March 2024'));
+        self::assertSame(['2024-03-12'], PassageText::datesIn('12.03.2024'));
+        self::assertSame(['2024-03-12'], PassageText::datesIn('12. März 2024'));
+        self::assertSame(['2024-03-12'], PassageText::datesIn('12 mars 2024'));
+        self::assertSame(['2024-03-12'], PassageText::datesIn('12 marzo 2024'));
+        self::assertSame(['2024-03-12'], PassageText::datesIn('12 Mart 2024'));
+        self::assertSame([], PassageText::datesIn('Regulation (EU) 2024/1689'));
+        self::assertSame(['12.40'], PassageText::numbersIn(PassageText::withoutDates('The price is 12.40 EUR on 12 March 2024.')));
     }
 }

@@ -19,7 +19,7 @@ chat message.
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
-| RS8 | planned | Fact-check — §0 #11 |
+| RS8 | in progress | Free check only, not applied to a run. Seeded draft in `DraftCheckTest`: 6 of 6 planted errors caught, 0 of 6 supported statements flagged. Checker model, removal and revision are not built. Flag stays off |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
@@ -37,6 +37,31 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-26 — RS8 free check, seeded draft
+
+No model and no live run. `DraftCheck` compares a draft with the text of
+the evidence it cites: an unknown id, a number, a date or a proper name
+the evidence does not contain, and a factual sentence with no citation.
+Dates compare equal as ISO (`12.03.2024`, `12 March 2024`, `12. März 2024`,
+`12 mars 2024`, `12 marzo 2024`, `12 Mart 2024`). A dotted date is
+day.month.year. `2024/1689` is not a date. A proper name is two
+capitalised words, or a word with an internal capital; a single
+capitalised word is not one, because German writes every noun that way.
+A revision that adds an uncited fact is rejected.
+
+The seeded draft is the report in `DraftCheckTest`, six planted errors
+and six supported statements. Command:
+
+```bash
+php bin/phpunit tests/Unit/Service/Research/Run/DraftCheckTest.php
+```
+
+Detection **6/6**. False alarms **0/6**. This is not the RS8 exit: the
+checker model is not built, a run does not apply the check, and citation
+precision was not measured.
 
 ---
 

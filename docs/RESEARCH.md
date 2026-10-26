@@ -59,6 +59,13 @@ without a finding stays open. The time limit of a depth counts only the
 time a step works: waiting for a worker or for the person's answer costs
 nothing.
 
+A draft can be checked for free, without a model. A cited statement must
+name evidence that exists, and its numbers, dates and proper names must
+appear in that evidence. A sentence that states a fact and cites nothing
+is flagged, and a revision that adds such a sentence is rejected. A run
+does not apply this yet: the checker model, and removing or rewriting
+what it rejects, come later.
+
 When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
 uses that same round to call search, read, ask or finish itself. The list is
 empty until a model passes the conformance suite, so a run keeps judging
