@@ -21,6 +21,8 @@ use App\Service\Multitask\Plan\TaskNode;
  *   - "$nX.text"           → upstream node X text
  *   - "$nX.file"           → upstream node X first file descriptor
  *   - "$nX.files"          → upstream node X all file descriptors
+ *   - "$nX.<field>"        → that field of node X's JSON output, or of its
+ *                            first result row ({@see StructuredField})
  *   - anything else        → literal value (passed through unchanged)
  *   - a list of the above   → resolved element-wise
  *
@@ -267,6 +269,13 @@ final class NodeContext
                 '$message.files' === $value => $this->messageFiles(),
                 default => $this->resolveNodeRef($value),
             };
+        }
+
+        // Named field of an upstream JSON result (`$n1.page_id`, `$n1.url`).
+        // Only when that node ran, so a literal like "$5.00" stays as it is.
+        if (1 === preg_match('/^\$(?<id>[A-Za-z0-9_]+)\.(?<field>[A-Za-z_][A-Za-z0-9_]*)$/', $value, $m)
+            && isset($this->results[$m['id']])) {
+            return StructuredField::from($this->results[$m['id']]->text, $m['field']) ?? $value;
         }
 
         // Prose interpolation: the planner may embed a reference token inside a

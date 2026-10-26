@@ -18,6 +18,7 @@ use App\Service\Mcp\Notion\NotionPageWrite;
 use App\Service\Mcp\Notion\NotionToolHints;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StructuredField;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
@@ -140,7 +141,9 @@ final readonly class McpActionRunner implements TaskRunner
                 $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
                 $sourceText,
             );
-        $refusal = NotionPageWrite::refusal($server->getUrl(), $tool, $arguments);
+        $refusal = StructuredField::hasUnresolved($arguments)
+            ? sprintf('The earlier step did not say which item to change, so nothing was sent to %s and nothing was changed.', $server->getName())
+            : NotionPageWrite::refusal($server->getUrl(), $tool, $arguments);
         if (null !== $refusal) {
             return NodeResult::reportableFailure($refusal, $this->callMetadata($serverId, $server->getName(), $tool));
         }
