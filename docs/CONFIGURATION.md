@@ -23,6 +23,7 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
 | `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
 | `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `REGISTRATION_MODE` | `open` | `open`: anyone may sign up. `admission`: a new account needs a paid plan or an invitation code ([details](ADMIN.md#who-may-create-an-account-open-or-admission)) |
 | `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
 | `FEATURE_<GROUP>_<SETTING>` | *unset* | Pins one wave feature flag (`FEATURE_IAM_SHARING_ENABLED=false`, `FEATURE_DESKTOP_AGENT_ENABLED=false`, …); **overrides** the toggle on Admin → System Configuration → Features. All flags default **on**. Full list: [FEATURE_FLAGS.md](FEATURE_FLAGS.md) |
 | `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
@@ -149,6 +150,28 @@ provider becomes unavailable, see
 
 ---
 
+## Worker pools
+
+Production worker mode (`APP_ENV=prod`) runs two PHP pools. `streams` serves
+the long AI routes. `api` serves everything else, so a server full of
+streams still answers a short request. Dev and the test stack do not use
+worker mode.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `FRANKENPHP_WORKER_NUM` | `16` | Workers in the `api` pool |
+| `FRANKENPHP_STREAM_WORKER_NUM` | the api pool's count | Workers in the `streams` pool |
+| `FRANKENPHP_MAX_WAIT_TIME` | `15s` | How long a request waits for a free worker before a 503 |
+| `FRANKENPHP_NUM_THREADS` | unset | Total FrankenPHP threads. Leave unset unless you need to cap them |
+| `FRANKENPHP_MAX_THREADS` | unset | Upper bound for threads. Leave unset unless you set it |
+
+A 503 on a long route carries `Retry-After: 5` and a `server_busy` body. The
+chat page's own sentence for that wait is a later step.
+
+Before raising the stream pool on the web nodes, check that Galera
+`max_connections` can take one more connection per stream worker, and change
+one node first.
+
 ## Access Policy
 
 Self-registration and guest chat are switches in **Admin → System
@@ -164,6 +187,11 @@ where nobody may ever register locally.
 
 Both accept `true`/`false`. Unsetting the variable and restarting hands control
 back to the database value.
+
+`REGISTRATION_MODE` follows the same rule and decides *how* a visitor gets an
+account while registration is on: `open` (default) or `admission`, where a new
+account needs a paid plan or an invitation code. See
+[Who may create an account](ADMIN.md#who-may-create-an-account-open-or-admission).
 
 ---
 
@@ -494,6 +522,17 @@ Pin a Task Prompt and run it on demand or on a schedule. Configured via
 |-------------|---------|-------------|
 | `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs, AI Instructions chrome, and the Connections page. Widget chat never runs Saved Tasks. When the flag is off, `app:saved-tasks:tick` is a no-op. |
 
+## Research (BCONFIG)
+
+Long research runs. Off until an administrator turns them on. `RESEARCH_ENABLED=1`
+pins the switch on and `RESEARCH_ENABLED=0` pins it off. See `docs/RESEARCH.md`.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `RESEARCH / ENABLED` | `0` | Master switch. Off means a new run cannot start. An existing run can still be read, stopped and deleted. |
+| `RESEARCH / MAX_ACTIVE_RUNS` | `5` | How many of one person's runs may be going at once. |
+| `RESEARCH / MAX_ACTIVE_THOROUGH_PER_USER` | `1` | How many thorough runs one person may have going at once. |
+
 ---
 
 ## Microsoft 365 connector (BCONFIG)
@@ -779,6 +818,19 @@ outside this list never consult `BGROUPCONFIG`. See
 [Group policies and locked defaults](ADMIN.md#group-policies-and-locked-defaults).
 
 See [Users and groups](ADMIN.md#users-and-groups) in the admin guide.
+
+---
+
+## Research model slots
+
+`DEFAULTMODEL.READ` (reading sources) and `DEFAULTMODEL.VERIFY` (fact-checking)
+are chat slots. **They are bound by the research bake-off.** Until that
+bake-off writes a default, neither slot has a model: reading sources uses the
+sorting model, then the analysis model, then the chat model. Fact-checking
+uses the analysis model, then the chat model, and prefers a model from a
+different lab than the one that writes the report. If no allowed model can
+fill a role, the run stops and names the job. The slots do not appear on the
+AI Models page yet.
 
 ---
 

@@ -104,6 +104,10 @@ final readonly class DefaultModelConfigSeeder implements SeederInterface
         // so PHPUnit doesn't need real Groq access for memory extraction.
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'MEM',        'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'value' => '-1'],
+        // Unbound in production until RQ3. Test installs still need a row so
+        // code that walks every capability tag does not miss one.
+        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'READ',      'value' => '-1'],
+        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VERIFY',    'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',         'value' => '-2'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',          'value' => '-3'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'value' => '-4'],

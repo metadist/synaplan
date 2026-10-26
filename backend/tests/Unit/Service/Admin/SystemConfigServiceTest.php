@@ -68,6 +68,47 @@ final class SystemConfigServiceTest extends TestCase
         }
     }
 
+    public function testRegistrationModeIsReportedAsPinnedByTheEnvironment(): void
+    {
+        $envWasSet = \array_key_exists('REGISTRATION_MODE', $_ENV);
+        $original = $envWasSet ? $_ENV['REGISTRATION_MODE'] : null;
+        $_ENV['REGISTRATION_MODE'] = 'admission';
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertTrue($values['REGISTRATION_MODE']['envOverride']);
+            $this->assertSame('admission', $values['REGISTRATION_MODE']['effectiveValue']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['REGISTRATION_MODE'] = $original;
+            } else {
+                unset($_ENV['REGISTRATION_MODE']);
+            }
+        }
+    }
+
+    public function testAnUnknownRegistrationModeIsRefusedAndLeavesTheRowAlone(): void
+    {
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $result = $this->service->setValue('REGISTRATION_MODE', 'admision');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('Choose one of: open, admission.', $result['message']);
+    }
+
+    public function testAKnownRegistrationModeIsStored(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, 'ACCESS', 'REGISTRATION_MODE', 'admission');
+
+        $result = $this->service->setValue('REGISTRATION_MODE', 'admission');
+
+        $this->assertTrue($result['success']);
+    }
+
     public function testAccessFlagWithoutAnEnvironmentVariableIsNotMarked(): void
     {
         $envWasSet = \array_key_exists('GUEST_CHAT_ENABLED', $_ENV);

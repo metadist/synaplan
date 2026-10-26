@@ -19,7 +19,7 @@ final class SeedAllCommandOrderTest extends KernelTestCase
         'models', 'model-retirements', 'prompts', 'defaults', 'rate-limits',
         'subscriptions', 'multitask', 'mcp', 'media-jobs', 'branding', 'mobile',
         'marketing-news', 'usage-taximeter', 'progress-narration', 'updates',
-        'messages-gateway', 'saved-tasks', 'file-context', 'desktop-agent', 'iam',
+        'messages-gateway', 'saved-tasks', 'research', 'file-context', 'desktop-agent', 'iam',
         'agents', 'bundle', 'platform-links', 'self-aware', 'structured-output',
         'embedding-router', 'native-tool-routing', 'document-tools', 'smart-search',
         'plugs', 'tools', 'workflows', 'compute', 'module-gates', 'demo-widget',

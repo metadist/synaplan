@@ -41,7 +41,10 @@ const APP_BUNDLE_ID = 'com.synaplan.app'
 /** iOS ASAuthorization "canceled" error code — a silent user dismissal. */
 const APPLE_CANCELED_CODE = '1001'
 
-export async function startNativeAppleSignIn(): Promise<NativeOAuthResult> {
+export async function startNativeAppleSignIn(admission?: {
+  plan?: string
+  code?: string
+}): Promise<NativeOAuthResult> {
   const options: SignInWithAppleOptions = {
     // clientId/redirectURI are ignored by the iOS native flow (it uses the app's
     // own bundle id), but the plugin's type contract requires them.
@@ -87,6 +90,8 @@ export async function startNativeAppleSignIn(): Promise<NativeOAuthResult> {
         lastName: familyName,
         email,
         language: String((await import('@/i18n')).i18n.global.locale.value),
+        plan: admission?.plan,
+        code: admission?.code,
       }),
     })
     if (!res.ok) {

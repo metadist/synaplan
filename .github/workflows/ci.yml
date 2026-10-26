@@ -44,6 +44,7 @@ jobs:
       app-version: ${{ steps.version.outputs.version }}
       source_run_id: ${{ steps.classify.outputs.source_run_id }}
       compute: ${{ steps.classify.outputs.compute }}
+      watchdog: ${{ steps.classify.outputs.watchdog }}
       transcriber: ${{ steps.classify.outputs.transcriber }}
       voice: ${{ steps.classify.outputs.voice }}
     permissions:
@@ -68,6 +69,7 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          TRANSCRIBER_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
         run: |
           set -euo pipefail
           files=""
@@ -84,11 +86,15 @@ jobs:
             if [ -n "$source_run_id" ]; then
               amd64="${REGISTRY_IMAGE}:ci-${SHA}-amd64"
               arm64="${REGISTRY_IMAGE}:ci-${SHA}-arm64"
+              transcriber_amd64="${TRANSCRIBER_IMAGE}:ci-${SHA}-amd64"
+              transcriber_arm64="${TRANSCRIBER_IMAGE}:ci-${SHA}-arm64"
               if docker manifest inspect "$amd64" >/dev/null 2>&1 \
-                && docker manifest inspect "$arm64" >/dev/null 2>&1; then
+                && docker manifest inspect "$arm64" >/dev/null 2>&1 \
+                && docker manifest inspect "$transcriber_amd64" >/dev/null 2>&1 \
+                && docker manifest inspect "$transcriber_arm64" >/dev/null 2>&1; then
                 can_promote=true
               else
-                echo "Main CI ${source_run_id} is green but ${amd64} / ${arm64} are not in the registry yet; this run will rebuild."
+                echo "Main CI ${source_run_id} is green but the app or transcriber ci-${SHA} tags are not in the registry yet; this run will rebuild."
               fi
             fi
           elif [ "$EVENT_NAME" = pull_request ]; then
@@ -147,16 +153,18 @@ jobs:
           mode="$(printf '%s\n' "$result" | sed -n 's/^mode=//p' | head -n1)"
           reason="$(printf '%s\n' "$result" | sed -n 's/^reason=//p' | head -n1)"
           compute="$(printf '%s\n' "$result" | sed -n 's/^compute=//p' | head -n1)"
+          watchdog="$(printf '%s\n' "$result" | sed -n 's/^watchdog=//p' | head -n1)"
           transcriber="$(printf '%s\n' "$result" | sed -n 's/^transcriber=//p' | head -n1)"
           voice="$(printf '%s\n' "$result" | sed -n 's/^voice=//p' | head -n1)"
           echo "mode=${mode}" >> "$GITHUB_OUTPUT"
           echo "reason=${reason}" >> "$GITHUB_OUTPUT"
           echo "compute=${compute}" >> "$GITHUB_OUTPUT"
+          echo "watchdog=${watchdog}" >> "$GITHUB_OUTPUT"
           echo "transcriber=${transcriber}" >> "$GITHUB_OUTPUT"
           echo "voice=${voice}" >> "$GITHUB_OUTPUT"
           echo "source_run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
           echo "CI change scope: ${mode} — ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Sidecar tests: compute=${compute} transcriber=${transcriber} voice=${voice}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Sidecar tests: compute=${compute} watchdog=${watchdog} transcriber=${transcriber} voice=${voice}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve application version
         id: version
@@ -255,7 +263,7 @@ jobs:
       - name: Install Packer
         uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
         with:
-          version: 1.16.1
+          version: 1.16.2
 
       - name: Check the Packer template
         run: |
@@ -315,53 +323,226 @@ jobs:
           go build ./...
           make lint test
 
+  watchdog-sidecar:
+    name: Watchdog Sidecar (Go)
+    runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.watchdog == 'true'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: sidecars/synaplan-watchdog/go.mod
+          cache-dependency-path: sidecars/synaplan-watchdog/go.sum
+
+      - name: Build, vet, and test
+        working-directory: sidecars/synaplan-watchdog
+        run: |
+          set -euo pipefail
+          go build ./...
+          make test
+
   transcriber-sidecar:
     name: Transcriber Sidecar (Node)
     runs-on: ubuntu-latest
     needs: [change-scope]
-    if: needs.change-scope.outputs.transcriber == 'true'
-    timeout-minutes: 10
+    if: needs.change-scope.outputs.mode == 'heavy'
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # The tests run inside the built image, not on the runner's .nvmrc Node,
-      # so a base-image bump in the Dockerfile is what they exercise.
+      # so a base-image bump in the Dockerfile is what they exercise. The tar
+      # is that same image: publish loads it instead of building again.
       - name: Build the image and run the tests in it
         working-directory: sidecars/synaplan-transcriber
         run: |
           set -euo pipefail
           docker build -t synaplan-transcriber:ci .
           docker run --rm -v "$PWD/test:/app/test:ro" synaplan-transcriber:ci node --test
+          docker save synaplan-transcriber:ci -o /tmp/transcriber-image.tar
 
-  # ghcr.io/metadist/synaplan-transcriber, for synaplan-charts (meeting notes
-  # deployed with Synaplan). Built and pushed from main and develop after the
-  # sidecar's tests, from the same Dockerfile they ran in. A promote tag does
-  # not rebuild: it moves the version tags onto the image the main run
-  # already published under its short commit, the same rule as docker-manifest
-  # applies to the app image. Only a missing short-commit tag falls back to a
-  # build on the tag. Promote skips the test job, so this condition uses
-  # !cancelled(). Without that, GitHub treats the skip as a failed dependency
-  # and never moves the release tags.
-  transcriber-publish:
-    name: Publish Transcriber Image
+      - name: Upload the tested image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: transcriber-image
+          path: /tmp/transcriber-image.tar
+          retention-days: 1
+
+  transcriber-push-amd64:
+    name: Publish Transcriber amd64 Image
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [change-scope, transcriber-sidecar]
     if: >-
+      always() &&
       !cancelled() &&
       github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
+      needs.change-scope.outputs.mode != 'thin' &&
       (
-        (
-          needs.change-scope.outputs.mode == 'promote' &&
-          (needs.transcriber-sidecar.result == 'success' || needs.transcriber-sidecar.result == 'skipped')
-        ) ||
-        (
-          needs.change-scope.outputs.mode == 'heavy' &&
-          needs.transcriber-sidecar.result == 'success'
-        )
+        needs.change-scope.outputs.mode == 'promote' ||
+        needs.transcriber-sidecar.result == 'success'
+      )
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      ref: ${{ steps.amd64.outputs.ref || steps.amd64-promote.outputs.ref }}
+      digest: ${{ steps.amd64.outputs.digest || steps.amd64-promote.outputs.digest }}
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reuse the already-tested amd64 image
+        if: needs.change-scope.outputs.mode == 'promote'
+        id: amd64-promote
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+        run: |
+          set -euo pipefail
+          temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-amd64"
+          digest="$(docker buildx imagetools inspect "$temporary_tag" --format '{{ .Manifest.Digest }}')"
+          [ -n "$digest" ] || { echo "::error::${temporary_tag} has no digest"; exit 1; }
+          echo "ref=${temporary_tag}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Download the tested image
+        if: needs.change-scope.outputs.mode != 'promote'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: transcriber-image
+          path: /tmp
+
+      - name: Push the tested amd64 image
+        if: needs.change-scope.outputs.mode != 'promote'
+        id: amd64
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+        run: |
+          set -euo pipefail
+          docker load -i /tmp/transcriber-image.tar
+          temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-amd64"
+          docker tag synaplan-transcriber:ci "$temporary_tag"
+          attempt=1
+          max_attempts=3
+          while true; do
+            if docker push "$temporary_tag"; then
+              break
+            fi
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::docker push of ${temporary_tag} failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "docker push failed (attempt ${attempt}/${max_attempts}), retrying..."
+            sleep $((attempt * 10))
+            attempt=$((attempt + 1))
+          done
+          digest="$(docker buildx imagetools inspect "$temporary_tag" --format '{{ .Manifest.Digest }}')"
+          echo "ref=${temporary_tag}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+  transcriber-push-arm64:
+    name: Publish Transcriber arm64 Image
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 20
+    needs: [change-scope, transcriber-sidecar]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
+      needs.change-scope.result == 'success' &&
+      needs.change-scope.outputs.mode != 'thin' &&
+      (
+        needs.change-scope.outputs.mode == 'promote' ||
+        needs.transcriber-sidecar.result == 'success'
+      )
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.arm64.outputs.digest || steps.arm64-promote.outputs.digest }}
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reuse the already-built arm64 image
+        if: needs.change-scope.outputs.mode == 'promote'
+        id: arm64-promote
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+        run: |
+          set -euo pipefail
+          tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-arm64"
+          digest="$(docker buildx imagetools inspect "$tag" --format '{{ .Manifest.Digest }}')"
+          [ -n "$digest" ] || { echo "::error::${tag} has no digest"; exit 1; }
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: needs.change-scope.outputs.mode != 'promote'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Build, test, and push the arm64 image
+        if: needs.change-scope.outputs.mode != 'promote'
+        id: arm64
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+        run: |
+          set -euo pipefail
+          # Native arm64, named as linux/arm64 so the release manifest cannot
+          # pick up an amd64 image from the default builder.
+          docker buildx build --platform linux/arm64 --load \
+            -t synaplan-transcriber:ci sidecars/synaplan-transcriber
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD/sidecars/synaplan-transcriber/test:/app/test:ro" \
+            synaplan-transcriber:ci node --test
+          temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-arm64"
+          docker tag synaplan-transcriber:ci "$temporary_tag"
+          docker push "$temporary_tag"
+          digest="$(docker buildx imagetools inspect "$temporary_tag" --format '{{ .Manifest.Digest }}')"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+  transcriber-manifest:
+    name: Publish Transcriber Manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [change-scope, transcriber-sidecar, transcriber-push-amd64, transcriber-push-arm64]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
+      needs.change-scope.result == 'success' &&
+      needs.transcriber-push-amd64.result == 'success' &&
+      needs.transcriber-push-arm64.result == 'success' &&
+      (
+        needs.change-scope.outputs.mode == 'promote' ||
+        needs.transcriber-sidecar.result == 'success'
       )
     permissions:
       contents: read
@@ -374,14 +555,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels)
+      - name: Extract release metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
@@ -391,50 +565,30 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,format=short
+            type=semver,pattern={{major}}
 
-      - name: Reuse the image main already published
-        id: reuse
-        if: needs.change-scope.outputs.mode == 'promote'
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the multi-arch manifest
         env:
-          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
+          AMD64_REF: ${{ needs.transcriber-push-amd64.outputs.ref }}
+          ARM64_DIGEST: ${{ needs.transcriber-push-arm64.outputs.digest }}
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/synaplan-transcriber
         run: |
           set -euo pipefail
-          source="${REGISTRY_IMAGE}:${GITHUB_SHA::7}"
-          if ! docker buildx imagetools inspect "$source" >/dev/null 2>&1; then
-            echo "::notice::${source} was not published by the main run; building on the tag instead"
-            echo "reused=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          args=()
+          amd64_digest="${AMD64_REF##*@}"
+          arm64_ref="${REGISTRY_IMAGE}@${ARM64_DIGEST}"
           while IFS= read -r image; do
             [ -n "$image" ] || continue
-            [ "$image" != "$source" ] || continue
-            args+=(--tag "$image")
+            docker buildx imagetools create --tag "$image" "$AMD64_REF" "$arm64_ref"
+            scripts/resolve-manifest-digest.sh "$image" "$amd64_digest" "$ARM64_DIGEST" >/dev/null
           done <<< "$IMAGE_TAGS"
-          docker buildx imagetools create "${args[@]}" "$source"
-          expected="$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' "$source")"
-          while IFS= read -r image; do
-            [ -n "$image" ] || continue
-            [ "$image" != "$source" ] || continue
-            actual="$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' "$image")"
-            if [ "$actual" != "$expected" ]; then
-              echo "::error::${image} resolves to ${actual}, expected ${expected}"
-              exit 1
-            fi
-          done <<< "$IMAGE_TAGS"
-          echo "reused=true" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push
-        if: steps.reuse.outputs.reused != 'true'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: sidecars/synaplan-transcriber
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
 
   voice-sidecar:
     name: Voice Sidecar (Node)
@@ -1235,6 +1389,18 @@ jobs:
             npm_script: "test:e2e:ollama"
             grep_filter: "@ci"
             shard: ""
+          # AU3: the test image with the production worker snippet, one stream
+          # worker and a one-second wait. Own overlay so the other jobs stay
+          # in classic mode.
+          - browser: chromium
+            variant: "Busy"
+            auth_method: password
+            compose_profiles: ""
+            compose_overlay: "-f docker-compose.busy.yml"
+            playwright_project: "chromium-busy"
+            npm_script: ""
+            grep_filter: "@busy"
+            shard: ""
           # Intermezzo S4 — core stack, every optional module emptied.
           # Own overlay + project so the sharded chromium jobs keep today's
           # Tika / WhatsApp / Stripe configuration.
@@ -1699,7 +1865,7 @@ jobs:
     # On a promote tag the tar is already in GHCR as ci-<sha>-amd64 from the
     # main run; this job only inspects it. `always()` is required so a skipped
     # docker-build on that path does not skip the inspect.
-    needs: [change-scope, lint, mobile-tooling, compute-sidecar, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
+    needs: [change-scope, lint, mobile-tooling, compute-sidecar, watchdog-sidecar, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
     if: >-
       always() &&
       !cancelled() &&
@@ -1709,6 +1875,10 @@ jobs:
       (
         (needs.change-scope.outputs.compute == 'true' && needs.compute-sidecar.result == 'success') ||
         (needs.change-scope.outputs.compute != 'true' && (needs.compute-sidecar.result == 'success' || needs.compute-sidecar.result == 'skipped'))
+      ) &&
+      (
+        (needs.change-scope.outputs.watchdog == 'true' && needs.watchdog-sidecar.result == 'success') ||
+        (needs.change-scope.outputs.watchdog != 'true' && (needs.watchdog-sidecar.result == 'success' || needs.watchdog-sidecar.result == 'skipped'))
       ) &&
       needs.change-scope.outputs.mode != 'thin' &&
       (
@@ -1948,7 +2118,7 @@ jobs:
     # Waits for E2E even though arm64 started next to it: a failed test must
     # not move latest or a version tag. `always()` lets promote run when
     # docker-build / e2e were skipped.
-    needs: [change-scope, docker-build, docker-push-amd64, docker-push-arm64, lint, mobile-tooling, compute-sidecar, backend, frontend-checks, e2e, e2e-visual]
+    needs: [change-scope, docker-build, docker-push-amd64, docker-push-arm64, lint, mobile-tooling, compute-sidecar, watchdog-sidecar, backend, frontend-checks, e2e, e2e-visual]
     if: >-
       always() &&
       !cancelled() &&
@@ -1958,6 +2128,10 @@ jobs:
       (
         (needs.change-scope.outputs.compute == 'true' && needs.compute-sidecar.result == 'success') ||
         (needs.change-scope.outputs.compute != 'true' && (needs.compute-sidecar.result == 'success' || needs.compute-sidecar.result == 'skipped'))
+      ) &&
+      (
+        (needs.change-scope.outputs.watchdog == 'true' && needs.watchdog-sidecar.result == 'success') ||
+        (needs.change-scope.outputs.watchdog != 'true' && (needs.watchdog-sidecar.result == 'success' || needs.watchdog-sidecar.result == 'skipped'))
       ) &&
       needs.docker-push-amd64.result == 'success' &&
       needs.docker-push-arm64.result == 'success' &&
@@ -2567,7 +2741,7 @@ jobs:
     name: All Checks Passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, voice-sidecar, transcriber-publish, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, watchdog-sidecar, transcriber-sidecar, voice-sidecar, transcriber-push-amd64, transcriber-push-arm64, transcriber-manifest, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Checkout the gate rules
@@ -2585,9 +2759,13 @@ jobs:
           MOBILE: ${{ needs.mobile-tooling.result }}
           COMPUTE: ${{ needs.compute-sidecar.result }}
           COMPUTE_NEEDED: ${{ needs.change-scope.outputs.compute }}
+          WATCHDOG: ${{ needs.watchdog-sidecar.result }}
+          WATCHDOG_NEEDED: ${{ needs.change-scope.outputs.watchdog }}
           TRANSCRIBER: ${{ needs.transcriber-sidecar.result }}
           TRANSCRIBER_NEEDED: ${{ needs.change-scope.outputs.transcriber }}
-          TRANSCRIBER_PUBLISH: ${{ needs.transcriber-publish.result }}
+          TRANSCRIBER_PUSH_AMD64: ${{ needs.transcriber-push-amd64.result }}
+          TRANSCRIBER_PUSH_ARM64: ${{ needs.transcriber-push-arm64.result }}
+          TRANSCRIBER_MANIFEST: ${{ needs.transcriber-manifest.result }}
           VOICE: ${{ needs.voice-sidecar.result }}
           VOICE_NEEDED: ${{ needs.change-scope.outputs.voice }}
           BACKEND: ${{ needs.backend.result }}
@@ -2624,6 +2802,7 @@ jobs:
             import { sidecarResultOk } from "./scripts/ci-change-scope.mjs"
             const rows = [
               ["Compute Sidecar (Go)", process.env.COMPUTE_NEEDED, process.env.COMPUTE],
+              ["Watchdog Sidecar (Go)", process.env.WATCHDOG_NEEDED, process.env.WATCHDOG],
               ["Transcriber Sidecar (Node)", process.env.TRANSCRIBER_NEEDED, process.env.TRANSCRIBER],
               ["Voice Sidecar (Node)", process.env.VOICE_NEEDED, process.env.VOICE],
             ]
@@ -2651,11 +2830,14 @@ jobs:
           allow_skip "Update the Default Release Version" "$REL_PIN"
           allow_skip "Deploy Cloudflare Worker" "$CF_DEPLOY"
           allow_skip "Cloudflare Worker Check" "$CF_CHECK"
-          allow_skip "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
+          allow_skip "Publish Transcriber amd64 Image" "$TRANSCRIBER_PUSH_AMD64"
+          allow_skip "Publish Transcriber arm64 Image" "$TRANSCRIBER_PUSH_ARM64"
+          allow_skip "Publish Transcriber Manifest" "$TRANSCRIBER_MANIFEST"
           allow_skip "Carry OpenAPI Spec Forward" "$OPENAPI"
 
           case "$MODE" in
             heavy)
+              require "Transcriber Sidecar (Node)" "$TRANSCRIBER"
               require "Backend (PHP/Symfony)" "$BACKEND"
               require "Backend (minimal)" "$BACKEND_MINIMAL"
               require "OpenAPI identical (full vs minimal)" "$OPENAPI_IDENTICAL"
@@ -2668,10 +2850,10 @@ jobs:
                 require "Publish amd64 Image" "$PUSH_AMD64"
                 require "Publish arm64 Image" "$PUSH_ARM64"
                 require "Publish Multi-Arch Manifest" "$MANIFEST"
+                require "Publish Transcriber amd64 Image" "$TRANSCRIBER_PUSH_AMD64"
+                require "Publish Transcriber arm64 Image" "$TRANSCRIBER_PUSH_ARM64"
+                require "Publish Transcriber Manifest" "$TRANSCRIBER_MANIFEST"
                 require "Deploy Cloudflare Worker" "$CF_DEPLOY"
-                if [ "$TRANSCRIBER_NEEDED" = true ]; then
-                  require "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
-                fi
               fi
               if [ "$EVENT" = pull_request ]; then
                 require "Cloudflare Worker Check" "$CF_CHECK"
@@ -2681,7 +2863,9 @@ jobs:
             thin)
               ;;
             promote)
-              require "Publish Transcriber Image" "$TRANSCRIBER_PUBLISH"
+              require "Publish Transcriber amd64 Image" "$TRANSCRIBER_PUSH_AMD64"
+              require "Publish Transcriber arm64 Image" "$TRANSCRIBER_PUSH_ARM64"
+              require "Publish Transcriber Manifest" "$TRANSCRIBER_MANIFEST"
               require "Publish amd64 Image" "$PUSH_AMD64"
               require "Publish arm64 Image" "$PUSH_ARM64"
               require "Publish Multi-Arch Manifest" "$MANIFEST"

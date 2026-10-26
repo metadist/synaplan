@@ -22,8 +22,8 @@ final class UserErasureCoverageTest extends KernelTestCase
         'UsageLogEraser', 'WidgetEraser', 'ShareEraser', 'AgentEraser',
         'ApprovalEraser', 'SavedTaskEraser', 'UrlWatchEraser', 'ConversationEraser',
         'VoiceSessionEraser', 'FileEraser', 'ComputeEraser', 'InboxEraser',
-        'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
-        'IdentityEraser', 'CredentialEraser',
+        'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'SignupCodeUseEraser',
+        'MemoryEraser', 'IdentityEraser', 'CredentialEraser', 'ResearchEraser',
     ];
 
     public function testErasersRunInTheEstablishedOrder(): void

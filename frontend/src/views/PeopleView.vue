@@ -37,6 +37,7 @@
         <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />
         <AdminModerationPanel v-else-if="activeTab === 'moderation'" />
         <AuditTab v-else-if="activeTab === 'audit'" />
+        <SignupCodesTab v-else-if="activeTab === 'signup-codes'" />
       </div>
     </div>
   </MainLayout>
@@ -54,8 +55,10 @@ import GroupsTab from '@/components/people/GroupsTab.vue'
 import PoliciesTab from '@/components/people/PoliciesTab.vue'
 import AuditTab from '@/components/people/AuditTab.vue'
 import PlatformInstancesTab from '@/components/people/PlatformInstancesTab.vue'
+import SignupCodesTab from '@/components/people/SignupCodesTab.vue'
 import { isIamGroupsEnabled, isIamPoliciesEnabled } from '@/composables/useIamFeature'
 import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
+import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 
 const AdminModerationPanel = defineAsyncComponent(
@@ -65,8 +68,10 @@ const AdminModerationPanel = defineAsyncComponent(
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const configStore = useConfigStore()
 
-type PeopleTab = 'users' | 'groups' | 'policies' | 'linked-platforms' | 'moderation' | 'audit'
+type PeopleTab =
+  'users' | 'groups' | 'policies' | 'linked-platforms' | 'moderation' | 'audit' | 'signup-codes'
 
 function isPeopleTab(id: string): id is PeopleTab {
   return (
@@ -75,12 +80,20 @@ function isPeopleTab(id: string): id is PeopleTab {
     id === 'policies' ||
     id === 'linked-platforms' ||
     id === 'moderation' ||
-    id === 'audit'
+    id === 'audit' ||
+    id === 'signup-codes'
   )
 }
 
 /** One sentence per tab; Platform instances carries its own intro. */
-const PEOPLE_INTRO_TABS = new Set(['users', 'groups', 'policies', 'moderation', 'audit'])
+const PEOPLE_INTRO_TABS = new Set([
+  'users',
+  'groups',
+  'policies',
+  'moderation',
+  'audit',
+  'signup-codes',
+])
 const peopleIntro = computed(() =>
   PEOPLE_INTRO_TABS.has(activeTab.value) ? t(`people.intro.${activeTab.value}`) : ''
 )
@@ -116,6 +129,14 @@ const tabNavItems = computed<TabNavItem[]>(() => {
       label: t('people.tabs.linkedPlatforms'),
       icon: 'mdi:link-variant',
       testid: 'tab-linked-platforms',
+    })
+  }
+  if (configStore.auth.registrationEnabled) {
+    tabs.push({
+      id: 'signup-codes',
+      label: t('people.tabs.signupCodes'),
+      icon: 'heroicons:ticket',
+      testid: 'tab-signup-codes',
     })
   }
   tabs.push({

@@ -1,0 +1,24 @@
+{
+  "ThreadDebugStates": [
+    {
+      "Index": 0,
+      "Name": "Regular PHP Thread",
+      "State": "ready",
+      "IsWaiting": true,
+      "IsBusy": false,
+      "CurrentURI": "",
+      "CurrentMethod": "",
+      "RequestCount": 10
+    },
+    {
+      "Index": 1,
+      "Name": "Regular PHP Thread",
+      "State": "running",
+      "IsWaiting": false,
+      "IsBusy": true,
+      "CurrentURI": "/api/v1/chats/42/stream",
+      "CurrentMethod": "POST",
+      "RequestCount": 1
+    }
+  ]
+}

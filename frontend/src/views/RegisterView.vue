@@ -80,7 +80,13 @@
             {{ $t('auth.getStarted') }}
           </h1>
           <p class="text-sm txt-secondary mt-1.5 auth-subtitle-enter">
-            {{ $t('auth.registerSubtitle') }}
+            {{
+              admissionMode && !admissionChoice
+                ? $t('auth.admission.subtitle')
+                : admissionMode
+                  ? $t('auth.admission.identitySubtitle')
+                  : $t('auth.registerSubtitle')
+            }}
           </p>
         </div>
 
@@ -121,9 +127,34 @@
 
           <!-- Registration Form -->
           <template v-if="!registrationSuccess">
+            <RegisterAdmissionStep
+              v-if="admissionMode && !admissionChoice"
+              :plans="admissionPlans"
+              :native="isNativeApp()"
+              :initial-plan="initialPlan"
+              @continue="onAdmissionContinue"
+            />
+
+            <div
+              v-if="admissionChoice"
+              class="mb-6 flex items-center justify-between gap-3 rounded-xl surface-chip px-3.5 py-2.5 ring-1 ring-black/[0.06] dark:ring-white/[0.06]"
+              data-testid="admission-chip"
+            >
+              <span class="min-w-0 truncate text-sm font-medium txt-primary">{{
+                admissionChoiceLabel
+              }}</span>
+              <button
+                type="button"
+                class="shrink-0 text-sm font-medium txt-brand"
+                data-testid="btn-admission-change"
+                @click="admissionChoice = null"
+              >
+                {{ $t('auth.admission.change') }}
+              </button>
+            </div>
             <!-- Social login -->
             <div
-              v-if="socialProviders.length > 0"
+              v-if="showIdentity && socialProviders.length > 0"
               class="space-y-2.5 mb-6"
               data-testid="section-social-login"
             >
@@ -185,7 +216,7 @@
             </div>
 
             <!-- Divider -->
-            <div v-if="socialProviders.length > 0" class="relative my-6">
+            <div v-if="showIdentity && socialProviders.length > 0" class="relative my-6">
               <div class="absolute inset-0 flex items-center">
                 <div class="w-full border-t border-gray-200/60 dark:border-gray-700/40"></div>
               </div>
@@ -200,7 +231,12 @@
             </div>
 
             <!-- Form -->
-            <form class="space-y-3" data-testid="form-register" @submit.prevent="handleRegister">
+            <form
+              v-if="showIdentity"
+              class="space-y-3"
+              data-testid="form-register"
+              @submit.prevent="handleRegister"
+            >
               <div class="relative" data-testid="field-full-name">
                 <Icon
                   icon="mdi:account-outline"
@@ -437,19 +473,22 @@ import {
 } from '@/services/api/nativeServer'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
-import { useRecaptcha } from '../composables/useRecaptcha'
+import { useSignupChallenge } from '../composables/useSignupChallenge'
+import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { useSocialAuth } from '@/composables/useSocialAuth'
 import { consumePendingRedirect, isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
+import RegisterAdmissionStep from '@/components/auth/RegisterAdmissionStep.vue'
+import { useRegisterAdmission } from '@/composables/useRegisterAdmission'
 
 const router = useRouter()
 const route = useRoute()
 const { locale, t } = useI18n()
 const themeStore = useTheme()
-const { getToken: getReCaptchaToken } = useRecaptcha()
+const { getToken: getChallengeToken } = useSignupChallenge()
 const config = useConfigStore()
 
 const isDark = themeStore.isDark
@@ -482,11 +521,21 @@ const goBack = () => {
   }
 }
 
-const { register, error: authError, loading, clearError } = useAuth()
+const { register, error: authError, errorCode: authErrorCode, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
 const registrationNeedsAdmin = ref(false)
+const {
+  admissionMode,
+  admissionChoice,
+  admissionPlans,
+  showIdentity,
+  initialPlan,
+  admissionChoiceLabel,
+  onAdmissionContinue,
+  loadAdmissionPlans,
+} = useRegisterAdmission()
 // Native OAuth errors surface through the same banner as registration errors.
 // Provider catalogue + the provider round trip live in the shared composable.
 const {
@@ -495,7 +544,9 @@ const {
   signInWith,
   error: socialError,
 } = useSocialAuth()
-const error = computed(() => socialError.value || authError.value)
+const error = computed(
+  () => socialError.value || signupBlockedText(t, authErrorCode.value, authError.value)
+)
 
 const onEmailBlur = () => {
   focusedField.value = null
@@ -504,6 +555,7 @@ const onEmailBlur = () => {
 
 onMounted(() => {
   loadSocialProviders()
+  void loadAdmissionPlans()
 })
 
 const handleRegister = async () => {
@@ -524,8 +576,11 @@ const handleRegister = async () => {
 
   if (password.value !== confirmPassword.value) return
 
-  const recaptchaToken = await getReCaptchaToken('register')
-  const result = await register(email.value, password.value, recaptchaToken, String(locale.value))
+  const challengeToken = await getChallengeToken('register')
+  const result = await register(email.value, password.value, challengeToken, String(locale.value), {
+    plan: admissionChoice.value?.plan || undefined,
+    code: admissionChoice.value?.code || undefined,
+  })
   if (result.success) {
     registrationNeedsAdmin.value = !result.mailDelivered
     registrationSuccess.value = true
@@ -537,7 +592,12 @@ const handleSocialLogin = async (provider: string) => {
   // (system browser / native Apple sheet + token handoff). `true` means the
   // session is established in place — apply the deep-link intent and enter.
   const redirect = route.query.redirect as string | undefined
-  if (await signInWith(provider, redirect)) {
+  if (
+    await signInWith(provider, redirect, {
+      plan: admissionChoice.value?.plan || undefined,
+      code: admissionChoice.value?.code || undefined,
+    })
+  ) {
     const queryPath = isSafeRedirectPath(redirect) ? redirect : null
     router.push(queryPath ?? consumePendingRedirect() ?? '/')
   }

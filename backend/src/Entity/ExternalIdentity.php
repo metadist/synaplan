@@ -19,6 +19,18 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_extid_user')]
 class ExternalIdentity
 {
+    public const MODE_SSO = 'sso';
+
+    public const MODE_LINK = 'link';
+
+    public const MODE_PROVISION = 'provision';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_PAUSED = 'paused';
+
+    public const STATUS_REVOKED = 'revoked';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -38,6 +50,16 @@ class ExternalIdentity
 
     #[ORM\Column(name: 'BAPIKEYID', type: 'bigint', nullable: true)]
     private ?int $apiKeyId = null;
+
+    /** sso, link, provision — or null for an oidc: login row. */
+    #[ORM\Column(name: 'BMODE', length: 16, nullable: true)]
+    private ?string $mode = null;
+
+    #[ORM\Column(name: 'BSTATUS', length: 16, options: ['default' => 'active'])]
+    private string $status = self::STATUS_ACTIVE;
+
+    #[ORM\Column(name: 'BREVOKEDAT', type: 'bigint', nullable: true)]
+    private ?int $revokedAt = null;
 
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
@@ -141,6 +163,50 @@ class ExternalIdentity
         $this->lastSeen = time();
 
         return $this;
+    }
+
+    public function getMode(): ?string
+    {
+        return $this->mode;
+    }
+
+    public function setMode(?string $mode): self
+    {
+        $this->mode = $mode;
+
+        return $this;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): self
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function getRevokedAt(): ?int
+    {
+        return $this->revokedAt;
+    }
+
+    public function setRevokedAt(?int $revokedAt): self
+    {
+        $this->revokedAt = $revokedAt;
+
+        return $this;
+    }
+
+    /**
+     * Paused or revoked: bearer calls from this cloud are refused.
+     */
+    public function isOff(): bool
+    {
+        return self::STATUS_PAUSED === $this->status || self::STATUS_REVOKED === $this->status;
     }
 
     /**

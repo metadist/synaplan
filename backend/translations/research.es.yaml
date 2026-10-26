@@ -1,0 +1,23 @@
+research:
+  outcome:
+    complete: 'Listo: %statements% afirmaciones, %supported% respaldadas por una fuente.'
+    complete_partial: 'Listo con huecos: %open% de %points% puntos no se pudieron confirmar. Aparecen en «No confirmado».'
+    complete_snippets_only: 'No se pudo abrir ninguna página, así que este informe se basa solo en resúmenes de búsqueda. Lo indica donde importa.'
+    stopped_by_user: 'Detenido. No se inició ningún trabajo nuevo después de pulsar Detener; un paso que ya estaba en curso aún puede contar. Lo encontrado hasta ahora se conserva.'
+    stopped_budget: 'Detenido porque se agotó tu presupuesto mensual de IA. El informe cubre %covered% de %points% puntos.'
+    stopped_limit: 'Detenido porque esta investigación alcanzó su límite para esta profundidad. Lo encontrado cubre %covered% de %points% puntos.'
+    stopped_waiting: 'Detenido porque el plan no se confirmó en un día. Vuelve a iniciarla cuando estés listo.'
+    stopped_by_admin: 'La investigación se desactivó en tu espacio de trabajo de Synaplan. Lo encontrado hasta ahora se conserva.'
+    failed_no_sources: 'No había nada que investigar: activa la web o añade archivos a este proyecto.'
+    failed_nothing_found: 'Las fuentes consultadas no contenían nada que responda a esta pregunta. Prueba a reformularla o añade archivos a este proyecto.'
+    failed_role_unavailable: 'El modelo de %role% de este proyecto no está disponible y ningún otro modelo del proyecto puede sustituirlo. No se cobró nada.'
+    failed_model_error: 'El modelo de %role% dejó de responder. No se cobró nada más; inténtalo de nuevo o elige otro modelo.'
+    failed_interrupted: 'La investigación se interrumpió en el servidor. Vuelve a iniciarla: las fuentes encontradas hasta ahora se conservan aquí.'
+    unknown: 'La investigación se detuvo. Vuelve a iniciarla si aún necesitas la respuesta.'
+  role:
+    reading: 'lectura'
+    sorting: 'clasificación'
+    planning: 'planificación'
+    writing: 'redacción'
+    fact-checking: 'verificación'
+    selected: 'la tarea seleccionada'

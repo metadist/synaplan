@@ -1,26 +1,21 @@
 # =============================================================================
 # synaplan :: FrankenPHP worker-mode Caddy snippet (PROD)
 # -----------------------------------------------------------------------------
-# This file overrides the synaplan-base-php template at
-#   /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
-# at app build time (see _docker/backend/Dockerfile). The base image's
-# synaplan-php-configure shim still handles the dev/prod toggle and
-# materializes the active file at /etc/caddy/synaplan-worker-mode.Caddyfile.
+# Imported from the global options of _docker/backend/Caddyfile. The base
+# image's shim copies this file into place for APP_ENV=prod and writes a
+# classic-mode stub otherwise.
 #
-# Only one line differs from the upstream template: APP_RUNTIME points at the
-# inlined App\Runtime\FrankenPhpRuntime class (see backend/src/Runtime/) instead
-# of Runtime\FrankenPhpSymfony\Runtime, because the upstream Composer package
-# does not yet support Symfony 8 (the synaplan stack is on symfony/* 8.0.*).
-# Revert this file once the upstream package widens its constraints.
+# The pools themselves are not here. `match` is only legal inside a
+# php_server worker, and two global workers cannot share one filename, so
+# synaplan-php-workers.Caddyfile is imported from the site's php_server.
+# This block only sets how long a request waits for a free worker.
+#
+# Nested Caddy defaults do not parse, and an empty num_threads is a parse
+# error. docker-entrypoint.sh exports FRANKENPHP_STREAM_WORKER_NUM from
+# FRANKENPHP_WORKER_NUM when it is unset, and inserts num_threads /
+# max_threads only when those variables are set.
 # =============================================================================
 
 frankenphp {
-	worker {
-		# The Symfony app's standard public/index.php IS the worker entrypoint.
-		# Worker behavior is selected via APP_RUNTIME below — no separate
-		# worker.php needed.
-		file "/var/www/backend/public/index.php"
-		num  {$FRANKENPHP_WORKER_NUM:16}
-		env  APP_RUNTIME App\Runtime\FrankenPhpRuntime
-	}
+	max_wait_time {$FRANKENPHP_MAX_WAIT_TIME:15s}
 }

@@ -205,6 +205,20 @@ class CloudPickup
         return array_values(array_filter($decoded, 'is_array'));
     }
 
+    /**
+     * Files the listing left out, recorded as Synaplan answers it, so a run can
+     * count and name them before the cloud reports its result.
+     *
+     * @param list<array{id: string, name: string, reason: string}> $rows
+     */
+    public function addSkipped(array $rows): void
+    {
+        if ([] === $rows) {
+            return;
+        }
+        $this->skipped = json_encode([...$this->skipped(), ...$rows], JSON_THROW_ON_ERROR);
+    }
+
     public function rememberFile(int $fileId): void
     {
         $ids = $this->fileIds();

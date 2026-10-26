@@ -22,7 +22,7 @@ final class TranscriptRenderer
     ];
 
     /**
-     * @param array<string, mixed>                                  $session
+     * @param array<string, mixed>                                $session
      * @param list<array{at: int, speaker: string, text: string}> $segments
      */
     public function render(array $session, array $segments, \DateTimeZone $zone): string
@@ -80,7 +80,7 @@ final class TranscriptRenderer
 
     /**
      * @param list<array{at: int, speaker: string, text: string}> $segments
-     * @param array<string, string>                                 $roster
+     * @param array<string, string>                               $roster
      *
      * @return array<string, string> speaker tag => label
      */

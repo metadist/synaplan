@@ -79,6 +79,8 @@ export interface AuthUser {
   mustChangePassword?: boolean
   /** Account language, or null when the account has none yet. Absent on older payloads. */
   language?: string | null
+  /** active, pending_payment, suspended, or banned. Absent on older servers. */
+  accountStatus?: string
 }
 
 /**
@@ -107,15 +109,16 @@ export const authService = {
   async login(
     email: string,
     password: string,
-    recaptchaToken?: string
-  ): Promise<{ success: boolean; error?: string }> {
+    challengeToken?: string
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
     try {
       const response = await authFetch(
         '/api/v1/auth/login',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, recaptchaToken }),
+          // `recaptchaToken` is the legacy name a not-yet-updated server reads.
+          body: JSON.stringify({ email, password, challengeToken, recaptchaToken: challengeToken }),
         },
         { bearer: false }
       )
@@ -123,7 +126,7 @@ export const authService = {
       const data = await response.json()
 
       if (!response.ok) {
-        return { success: false, error: data.error || 'Login failed' }
+        return { success: false, error: data.error || 'Login failed', code: data.code }
       }
 
       // Store user info only in memory (not localStorage for security)
@@ -157,16 +160,26 @@ export const authService = {
   async register(
     email: string,
     password: string,
-    recaptchaToken?: string,
-    language?: string
-  ): Promise<{ success: boolean; error?: string; mailDelivered?: boolean }> {
+    challengeToken?: string,
+    language?: string,
+    admission?: { plan?: string; code?: string }
+  ): Promise<{ success: boolean; error?: string; code?: string; mailDelivered?: boolean }> {
     try {
       const response = await authFetch(
         '/api/v1/auth/register',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, recaptchaToken, language }),
+          // `recaptchaToken` is the legacy name a not-yet-updated server reads.
+          body: JSON.stringify({
+            email,
+            password,
+            challengeToken,
+            recaptchaToken: challengeToken,
+            language,
+            plan: admission?.plan,
+            code: admission?.code,
+          }),
         },
         { bearer: false }
       )
@@ -174,7 +187,7 @@ export const authService = {
       const data = await response.json()
 
       if (!response.ok) {
-        return { success: false, error: data.error || 'Registration failed' }
+        return { success: false, error: data.error || 'Registration failed', code: data.code }
       }
 
       return { success: true, mailDelivered: data.mailDelivered !== false }

@@ -6,9 +6,9 @@ use App\Entity\User;
 use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
 use App\Service\Auth\OAuthLoginResponder;
-use App\Service\ModelConfigService;
+use App\Service\Auth\OAuthSignupGate;
+use App\Service\Auth\SignupBlockedException;
 use App\Service\OAuth\OAuthStateService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,10 +28,9 @@ class GitHubAuthController extends AbstractController
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
-        private EntityManagerInterface $em,
         private OAuthStateService $oauthStateService,
         private OAuthLoginResponder $oauthLoginResponder,
-        private ModelConfigService $modelConfigService,
+        private OAuthSignupGate $signupGate,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
@@ -57,9 +56,10 @@ class GitHubAuthController extends AbstractController
         // result via a deep link — remember that intent in the signed state.
         $native = $request->query->getBoolean('native');
 
-        // Generate signed state token (no session required)
+        // Signed state (no session required); also records the passed human
+        // check the callback requires before creating a NEW account.
         $state = $this->oauthStateService->generateState('github', AccountLanguage::withSignupLanguage(
-            $native ? ['native' => true] : [],
+            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'github'),
             $request->query->get('language'),
         ));
 
@@ -166,18 +166,14 @@ class GitHubAuthController extends AbstractController
                 }
             }
 
-            $this->logger->info('GitHub user info retrieved', [
-                'login' => $userInfo['login'] ?? 'unknown',
-                'email' => $email ?? 'no_email',
-                'id' => $userInfo['id'] ?? 'unknown',
-            ]);
-
-            // Find or create user
+            // A new account needs the human check from the start of the flow
+            // and a free signup slot; an existing account signs in as before.
+            $this->signupGate->assertGithubSignup($email, $userInfo['id'] ?? null, $statePayload, $request->getClientIp());
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $email,
                 $githubAccessToken,
-                AccountLanguage::normalize($statePayload['language'] ?? null),
+                AccountLanguage::normalize($statePayload['language'] ?? null), $statePayload,
             );
 
             $this->logger->info('GitHub OAuth successful', [
@@ -188,17 +184,16 @@ class GitHubAuthController extends AbstractController
 
             // Web → cookies + SPA redirect; native → deep-link handoff token.
             return $this->oauthLoginResponder->success($user, $request, 'github', $native);
+        } catch (SignupBlockedException $e) {
+            return $this->oauthLoginResponder->error('github', $e->getMessage(), $native, ['error_code' => $e->getErrorCodeParam()]);
         } catch (\Exception $e) {
-            $this->logger->error('GitHub OAuth callback error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            $this->logger->error('GitHub OAuth callback error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 
             return $this->oauthLoginResponder->error('github', 'Failed to authenticate with GitHub', $native);
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null): User
+    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $githubId = $userInfo['id'] ?? null;
         $githubLogin = $userInfo['login'] ?? null;
@@ -213,16 +208,8 @@ class GitHubAuthController extends AbstractController
             $user = $this->userRepository->findOneBy(['mail' => $email]);
         }
 
-        if (!$user) {
-            // Try to find by GitHub ID in userDetails
-            $users = $this->userRepository->findAll();
-            foreach ($users as $existingUser) {
-                $details = $existingUser->getUserDetails() ?? [];
-                if (isset($details['github_id']) && $details['github_id'] == $githubId) {
-                    $user = $existingUser;
-                    break;
-                }
-            }
+        if (!$user && (is_int($githubId) || is_string($githubId))) {
+            $user = $this->userRepository->findByGithubId($githubId);
         }
 
         $isNewUser = false;
@@ -298,12 +285,7 @@ class GitHubAuthController extends AbstractController
             $user->setEmailVerified(true);
         }
 
-        $this->em->persist($user);
-        $this->em->flush();
-
-        if ($isNewUser) {
-            $this->modelConfigService->initializeNewUserDefaults($user->getId());
-        }
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
     }

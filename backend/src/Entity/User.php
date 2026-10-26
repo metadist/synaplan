@@ -43,6 +43,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public const ACCOUNT_STATUS_ACTIVE = 'active';
     public const ACCOUNT_STATUS_SUSPENDED = 'suspended';
     public const ACCOUNT_STATUS_BANNED = 'banned';
+    /**
+     * A sign-up that chose a paid plan and has not paid yet (admission mode).
+     * The person may sign in to reach the checkout; nothing else works until
+     * {@see \App\Service\Billing\StripeEntitlement} grants the tier and sets
+     * the account active. Reaped after seven days without a subscription.
+     */
+    public const ACCOUNT_STATUS_PENDING_PAYMENT = 'pending_payment';
 
     #[ORM\Column(name: 'BACCOUNTSTATUS', length: 16, options: ['default' => 'active'])]
     private string $accountStatus = self::ACCOUNT_STATUS_ACTIVE;
@@ -160,12 +167,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Whether the account may authenticate and use the platform. A suspended or
-     * banned account is rejected by the security UserChecker and password login.
+     * Whether the account may use the platform. A suspended, banned or
+     * pending-payment account is not active; the first two cannot sign in at
+     * all, the third only to pay ({@see canSignIn()}).
      */
     public function isActive(): bool
     {
         return self::ACCOUNT_STATUS_ACTIVE === $this->accountStatus;
+    }
+
+    /**
+     * Whether the account may authenticate. Wider than {@see isActive()} by
+     * exactly one state: a pending-payment account signs in to reach the
+     * checkout and nothing else.
+     */
+    public function canSignIn(): bool
+    {
+        return $this->isActive() || self::ACCOUNT_STATUS_PENDING_PAYMENT === $this->accountStatus;
+    }
+
+    public function isPendingPayment(): bool
+    {
+        return self::ACCOUNT_STATUS_PENDING_PAYMENT === $this->accountStatus;
     }
 
     public function isEmailVerified(): bool

@@ -41,9 +41,10 @@ import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { createLoadGate, pluginTranslator, readPluginLocale } from '@/services/pluginLocale'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const pluginContainer = ref<HTMLElement | null>(null)
@@ -51,6 +52,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 const pluginName = computed(() => route.params.pluginName as string)
+const loadGate = createLoadGate()
 
 const plugin = computed(() => {
   return configStore.plugins.find((p) => p.name === pluginName.value)
@@ -61,12 +63,14 @@ const plugin = computed(() => {
  * We look for an 'index.js' ES module in the plugin's assets.
  */
 async function loadPlugin() {
+  const generation = loadGate.begin()
   if (!pluginContainer.value) return
 
   // Ensure runtime config (which lists the user's installed plugins) is
   // available before deciding the plugin is missing — otherwise a slow config
   // load would be misread as "not installed".
   await configStore.init()
+  if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
 
   // Plugin exists in the repo but is not installed for this user: surface a
   // clear message instead of hanging on "Loading plugin…" forever (#1154).
@@ -91,20 +95,32 @@ async function loadPlugin() {
 
     // 2. Import the plugin's ES module
     const module = await import(/* @vite-ignore */ entryUrl)
+    if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
 
     if (module.default && typeof module.default.mount === 'function') {
-      // 3. Mount the plugin
+      const active = String(locale.value).slice(0, 2)
+      const english = await readPluginLocale(pluginBaseUrl, 'en')
+      if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
+      const local = active === 'en' ? english : await readPluginLocale(pluginBaseUrl, active)
+      if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
+      if (!english && !local) {
+        console.warn(
+          `Plugin ${pluginName.value} has no locale file; labels stay as the plugin wrote them.`
+        )
+      }
       module.default.mount(pluginContainer.value, {
         userId: authStore.user.id,
         apiBaseUrl: configStore.apiBaseUrl,
         pluginBaseUrl: pluginBaseUrl,
         config: activePlugin,
-        // Pass shared services if needed
+        locale: active,
+        t: pluginTranslator(local, english),
       })
     } else {
       throw new Error('Plugin does not export a default object with a mount() function')
     }
   } catch (err: unknown) {
+    if (!loadGate.isCurrent(generation)) return
     console.error(`Failed to load plugin ${pluginName.value}:`, err)
     error.value = `Failed to load plugin: ${getErrorMessage(err) || 'Unknown error'}`
 
@@ -112,8 +128,9 @@ async function loadPlugin() {
     try {
       const htmlUrl = `${pluginBaseUrl}/index.html`
       const response = await fetch(htmlUrl)
-      if (response.ok) {
+      if (response.ok && loadGate.isCurrent(generation) && pluginContainer.value) {
         const html = await response.text()
+        if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
         pluginContainer.value.innerHTML = html
         error.value = null // Clear error if we found index.html
       }
@@ -121,11 +138,12 @@ async function loadPlugin() {
       // Ignore html error if JS failed
     }
   } finally {
-    loading.value = false
+    if (loadGate.isCurrent(generation)) loading.value = false
   }
 }
 
 function unloadPlugin() {
+  loadGate.cancel()
   if (pluginContainer.value) {
     pluginContainer.value.innerHTML = ''
   }
@@ -141,6 +159,11 @@ onUnmounted(() => {
 
 // Watch for plugin name changes to switch plugins
 watch(pluginName, () => {
+  loadPlugin()
+})
+
+watch(locale, () => {
+  unloadPlugin()
   loadPlugin()
 })
 </script>

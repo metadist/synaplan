@@ -9,10 +9,12 @@ use App\AI\Credential\ProviderKeyStore;
 use App\Module\Channel\TelegramModule;
 use App\Module\Channel\WhatsappModule;
 use App\Module\Chat\ChatArtifactsModule;
+use App\Module\Chat\ResearchModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Federation\FederationModule;
+use App\Module\Observability\CapacityModule;
 use App\Module\Provider\FreeApiModule;
 use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
@@ -37,7 +39,12 @@ use App\Service\FreeApi\FreeApiState;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
+use App\Service\Observability\CapacityService;
+use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\ResearchQueueWait;
+use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Security\EncryptionService;
+use Symfony\Component\Clock\MockClock;
 
 /**
  * Builds every v1 feature-module descriptor with stub collaborators, in the
@@ -85,7 +92,14 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
+            new ResearchModule(
+                $this->disabledResearch(),
+                $researchStore = $this->createStub(ResearchStateStore::class),
+                new ResearchQueueWait($researchStore, new MockClock()),
+            ),
             $this->disabledFreeApi(),
+            // '0' is the one value that turns the watchdog off; unset means on.
+            new CapacityModule($this->createStub(CapacityService::class), '0'),
         ];
 
         $byId = [];
@@ -104,6 +118,11 @@ trait BuildsAllModules
             new FreeApiConfig($config, new FeatureFlagEnv([]), '', 'test', false, '', ''),
             new FreeApiState($config, $this->createStub(EncryptionService::class)),
         );
+    }
+
+    private function disabledResearch(): ResearchConfig
+    {
+        return new ResearchConfig($this->createStub(ConfigRepository::class), '');
     }
 
     private function disabledArtifacts(): ChatArtifactsConfig

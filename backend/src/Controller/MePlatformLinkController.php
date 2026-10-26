@@ -56,6 +56,17 @@ final class MePlatformLinkController extends AbstractController
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'last_seen', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'can_copy', type: 'boolean', example: true),
+                                    new OA\Property(property: 'can_read', type: 'boolean', example: true, description: 'The cloud app hands files to a run when asked'),
+                                    new OA\Property(
+                                        property: 'read_scope',
+                                        description: 'What this person lets Synaplan read, as the cloud last reported it',
+                                        required: ['mode', 'folders'],
+                                        properties: [
+                                            new OA\Property(property: 'mode', type: 'string', enum: ['watched', 'allowed', 'all'], example: 'allowed'),
+                                            new OA\Property(property: 'folders', type: 'array', items: new OA\Items(type: 'string'), example: ['Invoices/2026', 'Specs']),
+                                        ],
+                                        type: 'object',
+                                    ),
                                 ]
                             )
                         ),

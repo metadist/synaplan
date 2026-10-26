@@ -134,7 +134,7 @@ test('a docs-only diff tests no sidecar', () => {
       files: ['_devextras/planning/AGENTS.md'],
       mode: 'heavy',
     }),
-    { compute: false, transcriber: false, voice: false }
+    { compute: false, watchdog: false, transcriber: false, voice: false }
   )
 })
 
@@ -166,13 +166,21 @@ test('each sidecar runs only for its own paths', () => {
     }).voice,
     true
   )
+  const watchdog = sidecarsForChange({
+    eventName: 'pull_request',
+    ref: 'refs/pull/1/merge',
+    files: ['sidecars/synaplan-watchdog/cmd/synaplan-watchdog/main.go'],
+    mode: 'heavy',
+  })
+  assert.equal(watchdog.watchdog, true)
+  assert.equal(watchdog.compute, false)
 })
 
 test('an unknown diff or a CI rule change tests every sidecar', () => {
   for (const files of [[], ['__unknown__'], ['.github/workflows/ci.yml']]) {
     assert.deepEqual(
       sidecarsForChange({ eventName: 'pull_request', ref: 'refs/pull/1/merge', files, mode: 'heavy' }),
-      { compute: true, transcriber: true, voice: true },
+      { compute: true, watchdog: true, transcriber: true, voice: true },
       files.join(',') || '(empty)'
     )
   }
@@ -246,7 +254,7 @@ test('a required sidecar must succeed; a skipped one is only ok when it was not 
 test('thin and promote skip sidecars; a rebuild tag does not', () => {
   assert.deepEqual(
     sidecarsForChange({ eventName: 'push', ref: 'refs/heads/main', files: ['frontend/src/App.vue'], mode: 'thin' }),
-    { compute: false, transcriber: false, voice: false }
+    { compute: false, watchdog: false, transcriber: false, voice: false }
   )
   assert.equal(
     sidecarsForChange({ eventName: 'push', ref: 'refs/tags/v4.7.1', mode: 'promote' }).compute,

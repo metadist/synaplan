@@ -84,6 +84,10 @@ const config = {
     get registrationEnabled(): boolean {
       return getConfigSync().auth?.registrationEnabled ?? true
     },
+    /** open = anyone may sign up. admission = a paid plan or an invitation code. */
+    get registrationMode(): 'open' | 'admission' {
+      return getConfigSync().auth?.registrationMode === 'admission' ? 'admission' : 'open'
+    },
     /**
      * False when the operator disabled the anonymous guest trial
      * (GUEST_CHAT_ENABLED=false, issue #1517): guest-allowed routes then
@@ -106,6 +110,19 @@ const config = {
     },
     get siteKey(): string {
       return getConfigSync().recaptcha?.siteKey ?? ''
+    },
+  },
+
+  /**
+   * Cloudflare Turnstile human check. When enabled it replaces reCAPTCHA in
+   * front of sign-up, sign-in and every OAuth start (see useSignupChallenge).
+   */
+  turnstile: {
+    get enabled(): boolean {
+      return getConfigSync().turnstile?.enabled ?? false
+    },
+    get siteKey(): string {
+      return getConfigSync().turnstile?.siteKey ?? ''
     },
   },
 

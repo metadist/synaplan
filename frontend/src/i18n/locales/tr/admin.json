@@ -546,6 +546,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Açık — herkes kaydolabilir",
+          "admission": "Kabul — bir plan veya bir davet kodu"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Standart (düz Docker)",
           "gvisor": "Güçlü yalıtım (gVisor)",
@@ -592,6 +596,94 @@
       },
       "serviceDown": "{name} erişilemiyor. {effect}",
       "serviceFailed": "{name} başlatmayı tamamlamadı. {effect}"
+    },
+    "signupCodes": {
+      "title": "Davet kodları",
+      "empty": "Henüz davet kodu yok. Birini ödeme yapmadan içeri almak için bir kod oluşturun.",
+      "create": "Kod oluştur",
+      "openModeNote": "Bu sunucuda kayıt açık, bu yüzden henüz kimsenin koda ihtiyacı yok. Burada oluşturduğunuz kodlar, kayıt ayarları ücretli bir plan veya davet kodu istediği anda geçerli olur.",
+      "openSettings": "Kayıt ayarlarını aç",
+      "loadFailed": "Davet kodları yüklenemedi. Hiçbir şey değişmedi; tekrar deneyin.",
+      "show": "Kodu göster",
+      "hide": "Kodu gizle",
+      "showAria": "{prefix} ile başlayan kodu göster",
+      "notStored": "Bu kod, kodlar saklanmaya başlamadan önce oluşturuldu; tekrar gösterilemez. Paylaşmanız gerekiyorsa iptal edip yeni bir kod oluşturun.",
+      "showFailed": "Kod yüklenemedi. Tekrar deneyin.",
+      "shownOnce": "Kodu kopyalayıp kişiye gönderin. Listede üzerine tıklayarak istediğiniz zaman tekrar gösterebilirsiniz.",
+      "copy": "Kodu kopyala",
+      "copied": "Kod kopyalandı.",
+      "copyFailed": "Kopyalama çalışmadı. Kodu seçip elle kopyalayın.",
+      "done": "Tamam",
+      "levels": {
+        "NEW": "Üye",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Süresiz",
+        "week": "7 gün",
+        "fiveMonths": "5 ay"
+      },
+      "state": {
+        "active": "Kullanılabilir",
+        "expired": "Süresi doldu",
+        "used_up": "Tükendi",
+        "revoked": "İptal edildi"
+      },
+      "facts": {
+        "grants": "{level} seviyesinde bir hesap açar",
+        "validUntil": "{date} tarihine kadar geçerli",
+        "noEnd": "bitiş tarihi yok",
+        "usesOf": "{uses}/{max} kullanım",
+        "usesUnlimited": "{uses} kullanım, sınır yok",
+        "createdBy": "{email} tarafından {date} tarihinde oluşturuldu",
+        "createdByGone": "{date} tarihinde artık var olmayan bir hesap tarafından oluşturuldu"
+      },
+      "actions": {
+        "uses": "Kimler kullandı",
+        "edit": "Düzenle",
+        "revoke": "İptal et",
+        "restore": "Geri getir"
+      },
+      "revokeTitle": "Bu kod iptal edilsin mi?",
+      "revokeBody": "Bu kodu artık kimse kullanamaz. Henüz kimse kullanmadı. | Bu kodu artık kimse kullanamaz. Kodu kullanan kişi hesabını korur. | Bu kodu artık kimse kullanamaz. Kodu kullanan {count} kişi hesaplarını korur.",
+      "revoked": "Kod iptal edildi. Geri getir ile yeniden geçerli olur.",
+      "revokeFailed": "Kod iptal edilmedi ve çalışmaya devam ediyor. Tekrar deneyin.",
+      "restored": "Kod yeniden çalışıyor.",
+      "restoredExpired": "Kod artık iptal edilmiş değil, ancak bitiş tarihi geçti. Kullanılabilmesi için Düzenle'de daha ileri bir tarih belirleyin.",
+      "restoredUsedUp": "Kod artık iptal edilmiş değil, ancak tüm kullanımları doldu. Daha fazla kişinin kullanabilmesi için Düzenle'de sınırı artırın.",
+      "restoreFailed": "Kod geri getirilmedi ve kullanılamıyor. Tekrar deneyin.",
+      "changeUnconfirmed": "Değişikliği doğrulayamadık. Liste artık kodun güncel durumunu gösteriyor.",
+      "form": {
+        "titleCreate": "Davet kodu oluştur",
+        "titleEdit": "Davet kodunu düzenle",
+        "titleCreated": "Yeni davet kodunuz",
+        "label": "Etiket",
+        "labelPlaceholder": "Örneğin: pilot müşteriler",
+        "labelHint": "Etiketi yalnızca yöneticiler görür.",
+        "level": "Yeni hesabın seviyesi",
+        "validity": "Geçerlilik",
+        "validUntil": "Geçerlilik bitişi",
+        "noEnd": "Bitiş tarihi yok",
+        "maxUses": "Kaç kişi kullanabilir",
+        "unlimited": "Sınır yok",
+        "labelRequired": "Koda bir etiket verin.",
+        "maxUsesInvalid": "1 veya daha büyük bir tam sayı girin ya da Sınır yok seçin.",
+        "dateRequired": "Bir tarih seçin ya da Bitiş tarihi yok seçin.",
+        "createFailed": "Kod oluşturulmadı. Hiçbir şey kaydedilmedi; tekrar deneyin.",
+        "createUnconfirmed": "Kodun oluşturulup oluşturulmadığını doğrulayamadık. Listeye bakın: bu etiketle bir kod görünürse göstermek için üzerine tıklayın.",
+        "saveFailed": "Değişiklikler kaydedilmedi. Kod eskisi gibi çalışıyor.",
+        "saveUnconfirmed": "Değişikliklerin kaydedilip kaydedilmediğini doğrulayamadık. Liste artık kodun güncel durumunu gösteriyor.",
+        "saved": "Değişiklikler kaydedildi."
+      },
+      "uses": {
+        "title": "Bu kodla kimler kaydoldu",
+        "empty": "Bu kodu henüz kimse kullanmadı.",
+        "deleted": "Hesap silindi",
+        "deletedAccounts": "Bu kodu kullanan {count} hesap o zamandan beri silindi.",
+        "loadFailed": "Liste yüklenemedi. Kapatıp yeniden açın."
+      }
     }
   },
   "statistics": {
@@ -884,7 +976,8 @@
       "policies": "Kurallar",
       "linkedPlatforms": "Platform örnekleri",
       "moderation": "Moderasyon",
-      "audit": "Kayıt"
+      "audit": "Kayıt",
+      "signupCodes": "Davet kodları"
     },
     "openPeople": "Kullanıcılar’ı aç",
     "backToOperate": "İşlet’e dön",
@@ -1044,6 +1137,17 @@
       "status": "Durum",
       "actions": "İşlemler",
       "approve": "Onayla",
+      "approveHost": "Ana bilgisayarı onayla",
+      "hostPlaceholder": "Teslim ana bilgisayar adı, örn. files.example.lan",
+      "approveHostSentence": "{host} özel bir ağda ({address}). Synaplan kopyaları ve istekleri iletmek için bu adresi çağıracak. Yalnızca kendi işlettiğiniz bulutları onaylayın.",
+      "approveHostTitle": "Bu adres onaylansın mı?",
+      "canReach": "Synaplan bu buluta ulaşabilir.",
+      "cannotReach": "Synaplan bu buluta ulaşamıyor.",
+      "reachNotChecked": "Synaplan’ın bu buluta ulaşıp ulaşamadığı henüz denetlenmedi.",
+      "removeHost": "{host} kaldır",
+      "hostApproved": "{host} onaylandı.",
+      "hostRemoved": "{host} kaldırıldı.",
+      "hostError": "Ana bilgisayar adı değiştirilemedi.",
       "revoke": "İptal et",
       "approved": "Platform onaylandı.",
       "revoked": "Platform iptal edildi.",
@@ -1131,7 +1235,8 @@
       "groups": "Gruplar kullanıcıları bir araya getirir; asistanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
       "policies": "Politikalar bir grubun neleri kullanabileceğini belirler, örneğin hangi özellikleri veya modelleri.",
       "moderation": "Kullanıcıların bildirdiği içerikler. İnceleyin, sonra tutun veya kaldırın.",
-      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce."
+      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce.",
+      "signup-codes": "Birinin ödeme yapmadan kaydolmasını sağlayan kodlar. Yeni hesabın seviyesini, kodun ne kadar geçerli olacağını ve kaç kişinin kullanabileceğini siz belirlersiniz."
     }
   },
   "iam": {
@@ -1361,8 +1466,14 @@
     "chat_artifacts": {
       "label": "HTML ve SVG önizlemesi"
     },
+    "research": {
+      "label": "Araştırma"
+    },
     "freeapi": {
       "label": "Synaplan Demo"
+    },
+    "capacity": {
+      "label": "Sunucu kapasitesi"
     }
   },
   "partners": {
@@ -1427,6 +1538,80 @@
       "not_partner": "Bu bağlantı bulunamadı.",
       "bad_url": "Bu adres genel bir https sunucusu değil.",
       "replay": "Bu istek zaten kullanıldı."
+    }
+  },
+  "capacity": {
+    "title": "Kapasite",
+    "subtitle": "Bu kurulumdaki her sunucunun ne kadar yüklü olduğu ve birinin yardıma ihtiyacı olup olmadığı.",
+    "loading": "Sunucular okunuyor…",
+    "unavailable": "Paylaşılan önbellek yanıt vermediği için kapasite şu anda okunamıyor. Sunucular çalışmaya devam ediyor.",
+    "failed": "Sunucular okunamadı. Birazdan tekrar deneyin.",
+    "empty": "Henüz hiçbir sunucu rapor vermedi — sunucular başladıktan sonraki bir dakika içinde rapor verir.",
+    "checkAgain": "Tekrar kontrol et",
+    "footer": "Bu sayfayı yalnızca yöneticiler görür. Buradaki hiçbir şey bir sunucuyu değiştirmez.",
+    "servers": {
+      "title": "Sunucular",
+      "summary": "{count} sunucu · {seconds} sn önce güncellendi",
+      "connectedTo": "{server} sunucusuna bağlısınız",
+      "owner": "Bu kurulumdaki her sunucu burada rapor verir.",
+      "source": "Her sunucu kendini 5 saniyede bir ölçer ve 24 saat saklar."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Arka plan işi",
+      "scheduler": "Zamanlanmış görevler"
+    },
+    "card": {
+      "connectedHere": "Bu sunucuya bağlısınız.",
+      "reporting": "Rapor veriyor",
+      "silentSeconds": "Son rapor {count} sn önce",
+      "silentMinutes": "Son rapor {count} dk önce — sunucu kapalı veya yeniden başlıyor olabilir",
+      "silentUnknown": "Rapor vermeyi bıraktı",
+      "aiAnswers": "AI yanıtları",
+      "otherRequests": "Diğer istekler",
+      "memory": "Bellek",
+      "processor": "İşlemci",
+      "ofAtOnce": "aynı anda {used} / {total}",
+      "noPools": "ayrı havuz yok",
+      "peakToday": "bugünkü zirve {count} ({time})",
+      "memoryOf": "{used} / {total}",
+      "memoryUnlimited": "{used} · sınır yok",
+      "processorOf": "{cores} çekirdeğin % {percent}",
+      "processorMeasuring": "ölçülüyor · {cores} çekirdek",
+      "processorShort": "% {percent}",
+      "sizingHint": "{server} bugünkü zirvesinde aynı anda tutabileceği {total} AI isteğinin {peak} tanesini yanıtladı. Bir sunucu ekleyin veya AI yanıt yuvalarını artırın — boyutlandırma kılavuzu nasıl yapılacağını gösterir.",
+      "technical": "Teknik ayrıntılar",
+      "runsOn": "Çalıştığı yer",
+      "workers": "PHP",
+      "logs": "Günlükler",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} AI yanıt yuvası + {api} istek yuvası",
+      "poolsSingle": "{count} iş parçacıklı tek havuz",
+      "logsStderr": "sürecin hata çıktısı",
+      "howToStop": "Watchdog kapatıldığında (SYNAPLAN_WATCHDOG=0) sunucu rapor vermeyi bırakır.",
+      "helperSilent": "rapor vermeyi bıraktı",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Doğrudan makinede"
+      },
+      "place": {
+        "machine": "makine {name}",
+        "address": "adres {address}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "bellek sınırı {value}",
+        "cpuRequest": "istenen işlemci {value}"
+      }
+    },
+    "events": {
+      "open": "Son olayları göster",
+      "hide": "Son olayları gizle",
+      "loading": "Olaylar okunuyor…",
+      "failed": "Olaylar okunamadı.",
+      "empty": "Son bir saatte bu sunucudan uyarı yok.",
+      "window": "Son bir saatin uyarı ve hataları, en yenisi önce, en fazla 20."
     }
   }
 }

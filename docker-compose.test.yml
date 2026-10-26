@@ -46,6 +46,10 @@ services:
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
       RECAPTCHA_ENABLED: "false"
+      # The E2E suites register many users from one address.
+      SIGNUP_IP_LIMIT: "100000"
+      SIGNUP_GLOBAL_LIMIT: "100000"
+      CHECKOUT_IP_LIMIT: "100000"
       TOKEN_SECRET: "test_token_secret"
       # OIDC defaults match the Keycloak setup script (_docker/keycloak/setup.sh)
       # These work with --profile oidc; without it, Keycloak is not running but the provider shows as enabled (harmless)
@@ -118,7 +122,7 @@ services:
   # collections (the backend auto-creates them on first use). Not published
   # to a host port; only app_test talks to it.
   qdrant_test:
-    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
     container_name: synaplan-qdrant-test
     restart: "no"
     networks:
@@ -126,7 +130,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:5c6707fcf2e1a30cffe2ecb7e315584fc87747c389327e4bc711c4959aa1eecc
+    image: ollama/ollama:latest@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -142,7 +146,7 @@ services:
 
   # Apache Tika Test (Optional - Integration Profile)
   tika_test:
-    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
     container_name: synaplan-tika-test
     command: -h 0.0.0.0 -p 9998
     ports:
@@ -156,7 +160,7 @@ services:
   # Ollama API stub (deterministic responses for OllamaProvider integration tests).
   # Same pattern as whatsapp-stub: pinned node:22-alpine + bind mount so CI `docker compose pull` retries cover it.
   ollama-stub:
-    image: node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
     container_name: synaplan-ollama-stub
     user: node
     working_dir: /app
@@ -176,7 +180,7 @@ services:
   # Uses node:22-alpine directly instead of a Dockerfile build so that
   # `docker compose pull` (with retry) covers this image too.
   whatsapp-stub:
-    image: node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
     container_name: synaplan-whatsapp-stub
     user: node
     working_dir: /app
@@ -194,7 +198,7 @@ services:
       - synaplan-test-network
 
   telegram-stub:
-    image: node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
     container_name: synaplan-telegram-stub-test
     user: node
     working_dir: /app

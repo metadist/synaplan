@@ -16,7 +16,8 @@
     { "method": "POST", "path": "/api/v1/files/check-stale", "scopes": ["files"] },
     { "method": "GET", "path": "/api/v1/files/{id}/content", "scopes": ["files"] },
     { "method": "DELETE", "path": "/api/v1/files/{id}", "scopes": ["files"] },
-    { "method": "GET", "path": "/api/v1/files/uploads/{path}", "scopes": ["files"] }
+    { "method": "GET", "path": "/api/v1/files/uploads/{path}", "scopes": ["files"] },
+    { "method": "POST", "path": "/api/v1/platform-links/identities/adopt", "scopes": ["chat", "files", "rag"] }
   ],
   "anyKey": [
     { "method": "GET", "path": "/api/health" }

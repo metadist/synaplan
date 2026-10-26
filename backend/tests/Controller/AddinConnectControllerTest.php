@@ -160,6 +160,9 @@ final class AddinConnectControllerTest extends WebTestCase
     {
         $existing = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
         if ($existing instanceof User) {
+            $existing->setUserLevel('PRO');
+            $this->em->flush();
+
             return $existing;
         }
 
@@ -167,7 +170,7 @@ final class AddinConnectControllerTest extends WebTestCase
             ->setMail($email)
             ->setType('WEB')
             ->setProviderId('addin-connect-'.uniqid())
-            ->setUserLevel('NEW');
+            ->setUserLevel('PRO');
         $user->setCreated(date('YmdHis'));
         $user->setEmailVerified(true);
         $this->em->persist($user);

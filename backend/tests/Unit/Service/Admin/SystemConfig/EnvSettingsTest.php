@@ -41,6 +41,29 @@ final class EnvSettingsTest extends TestCase
         self::assertNotSame([], $env->backups(), 'Every write backs the file up first.');
     }
 
+    /**
+     * Production mounts .env as a single-file bind mount, where the atomic
+     * rename over it fails with "Device or resource busy" (seen live on
+     * web100, 2026-10-26: every captcha toggle ended in the generic save
+     * toast). Blocking the temp path makes the rename route unavailable
+     * the same way; the write must then land in place, in the same file.
+     */
+    public function testAWriteLandsInPlaceWhenTheRenameRouteIsUnavailable(): void
+    {
+        $inode = fileinode($this->projectDir.'/.env');
+        mkdir($this->projectDir.'/.env.tmp');
+
+        try {
+            self::assertSame(['success' => true, 'requiresRestart' => true], $this->settings()->write('APP_ENV', 'dev'));
+        } finally {
+            rmdir($this->projectDir.'/.env.tmp');
+        }
+
+        self::assertSame("APP_ENV=dev\nOLLAMA_BASE_URL=http://ollama:11434\n", $this->envFile());
+        clearstatcache(true, $this->projectDir.'/.env');
+        self::assertSame($inode, fileinode($this->projectDir.'/.env'), 'The mounted file keeps its identity.');
+    }
+
     public function testRemovingALineNeedsARestartAndAnAbsentKeyIsAlreadyClear(): void
     {
         $env = $this->settings();

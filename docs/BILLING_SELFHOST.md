@@ -103,6 +103,22 @@ from the dashboard before going live.
 configuration is valid. From then on the subscription UI appears, tier limits
 apply, and the plans from `BSUBSCRIPTIONS` are sold at your Stripe prices.
 
+## Unpaid sign-ups
+
+With `REGISTRATION_MODE=admission`, a visitor who signs up with a plan gets an
+account in the state `pending_payment`. The Stripe webhook activates it when the
+first invoice is paid. An account that is still pending **7 days** after sign-up
+is deleted by `app:signup:reap-pending`, which the scheduler runs every hour.
+It deletes through the regular account erasure, keeps any account that has a
+subscription on record, and logs how many accounts it removed. To see what a
+run would remove without deleting anything:
+
+```bash
+docker compose exec backend php bin/console app:signup:reap-pending --dry-run
+```
+
+In open mode no account is ever pending, so the command does nothing.
+
 ## Adjusting plans
 
 Prices, monthly cost budgets and quotas are editable in **Admin → Subscriptions**

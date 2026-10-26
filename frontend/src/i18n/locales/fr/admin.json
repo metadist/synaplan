@@ -550,6 +550,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "Aide IA dans la palette de recherche (Ctrl/Cmd+K) : pour une question en langage courant, le modèle d’outils choisit le résultat le plus pertinent et l’explique en une phrase. Il ne modifie jamais rien de lui-même. Chaque utilisation est un court appel à l’IA. Désactivé : la recherche par mots-clés et par sens reste disponible."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Ouverte — tout le monde peut s'inscrire",
+          "admission": "Admission — un forfait ou un code d'invitation"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Standard (Docker simple)",
           "gvisor": "Isolation forte (gVisor)",
@@ -596,6 +600,94 @@
       },
       "serviceDown": "{name} est injoignable. {effect}",
       "serviceFailed": "{name} n’a pas fini de démarrer. {effect}"
+    },
+    "signupCodes": {
+      "title": "Codes d'invitation",
+      "empty": "Aucun code d'invitation pour l'instant. Créez-en un pour laisser entrer quelqu'un sans paiement.",
+      "create": "Créer un code",
+      "openModeNote": "L'inscription est ouverte sur ce serveur, personne n'a donc encore besoin d'un code. Les codes créés ici comptent dès que les réglages d'inscription demandent un forfait payant ou un code d'invitation.",
+      "openSettings": "Ouvrir les réglages d'inscription",
+      "loadFailed": "Les codes d'invitation n'ont pas pu être chargés. Rien n'a changé ; réessayez.",
+      "show": "Afficher le code",
+      "hide": "Masquer le code",
+      "showAria": "Afficher le code commençant par {prefix}",
+      "notStored": "Ce code a été créé avant que les codes soient conservés ; il ne peut plus être affiché. Révoquez-le et créez-en un nouveau si vous devez le partager.",
+      "showFailed": "Le code n'a pas pu être chargé. Réessayez.",
+      "shownOnce": "Copiez le code et envoyez-le à la personne. Vous pouvez l'afficher de nouveau à tout moment en cliquant dessus dans la liste.",
+      "copy": "Copier le code",
+      "copied": "Code copié.",
+      "copyFailed": "La copie n'a pas fonctionné. Sélectionnez le code et copiez-le à la main.",
+      "done": "Terminé",
+      "levels": {
+        "NEW": "Membre",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Sans limite de durée",
+        "week": "7 jours",
+        "fiveMonths": "5 mois"
+      },
+      "state": {
+        "active": "Utilisable",
+        "expired": "Expiré",
+        "used_up": "Épuisé",
+        "revoked": "Révoqué"
+      },
+      "facts": {
+        "grants": "Ouvre un compte de niveau {level}",
+        "validUntil": "valable jusqu'au {date}",
+        "noEnd": "sans date de fin",
+        "usesOf": "{uses} utilisations sur {max}",
+        "usesUnlimited": "{uses} utilisation, sans limite | {uses} utilisations, sans limite",
+        "createdBy": "Créé par {email} le {date}",
+        "createdByGone": "Créé le {date} par un compte qui n'existe plus"
+      },
+      "actions": {
+        "uses": "Qui l'a utilisé",
+        "edit": "Modifier",
+        "revoke": "Révoquer",
+        "restore": "Rétablir"
+      },
+      "revokeTitle": "Révoquer ce code ?",
+      "revokeBody": "Plus personne ne pourra utiliser ce code. Personne ne l'a encore utilisé. | Plus personne ne pourra utiliser ce code. La personne qui l'a utilisé garde son compte. | Plus personne ne pourra utiliser ce code. Les {count} personnes qui l'ont utilisé gardent leur compte.",
+      "revoked": "Le code est révoqué. Rétablir le réactive.",
+      "revokeFailed": "Le code n'a pas été révoqué et fonctionne toujours. Réessayez.",
+      "restored": "Le code fonctionne de nouveau.",
+      "restoredExpired": "Le code n'est plus révoqué, mais sa date de fin est passée. Choisissez une date plus tardive dans Modifier pour qu'il soit utilisable.",
+      "restoredUsedUp": "Le code n'est plus révoqué, mais toutes ses utilisations sont épuisées. Augmentez la limite dans Modifier pour que d'autres personnes puissent l'utiliser.",
+      "restoreFailed": "Le code n'a pas été rétabli et reste inutilisable. Réessayez.",
+      "changeUnconfirmed": "Nous n'avons pas pu confirmer la modification. La liste affiche maintenant l'état actuel du code.",
+      "form": {
+        "titleCreate": "Créer un code d'invitation",
+        "titleEdit": "Modifier le code d'invitation",
+        "titleCreated": "Votre nouveau code d'invitation",
+        "label": "Libellé",
+        "labelPlaceholder": "Par exemple : clients pilotes",
+        "labelHint": "Seuls les administrateurs voient le libellé.",
+        "level": "Niveau du nouveau compte",
+        "validity": "Validité",
+        "validUntil": "Valable jusqu'au",
+        "noEnd": "Sans date de fin",
+        "maxUses": "Nombre de personnes qui peuvent l'utiliser",
+        "unlimited": "Sans limite",
+        "labelRequired": "Donnez un libellé au code.",
+        "maxUsesInvalid": "Saisissez un nombre entier d'au moins 1, ou choisissez Sans limite.",
+        "dateRequired": "Choisissez une date, ou Sans date de fin.",
+        "createFailed": "Le code n'a pas été créé. Rien n'a été enregistré ; réessayez.",
+        "createUnconfirmed": "Nous n'avons pas pu confirmer la création du code. Vérifiez la liste : si un code avec ce libellé apparaît, cliquez dessus pour l'afficher.",
+        "saveFailed": "Les modifications n'ont pas été enregistrées. Le code fonctionne comme avant.",
+        "saveUnconfirmed": "Nous n'avons pas pu confirmer l'enregistrement des modifications. La liste affiche maintenant l'état actuel du code.",
+        "saved": "Modifications enregistrées."
+      },
+      "uses": {
+        "title": "Qui s'est inscrit avec ce code",
+        "empty": "Personne n'a encore utilisé ce code.",
+        "deleted": "Compte supprimé",
+        "deletedAccounts": "{count} compte qui a utilisé ce code a été supprimé depuis. | {count} comptes qui ont utilisé ce code ont été supprimés depuis.",
+        "loadFailed": "La liste n'a pas pu être chargée. Fermez-la et rouvrez-la."
+      }
     }
   },
   "statistics": {
@@ -888,7 +980,8 @@
       "policies": "Règles",
       "linkedPlatforms": "Instances de plateforme",
       "moderation": "Modération",
-      "audit": "Journal"
+      "audit": "Journal",
+      "signupCodes": "Codes d'invitation"
     },
     "openPeople": "Ouvrir Utilisateurs",
     "backToOperate": "Retour à Exploitation",
@@ -1048,6 +1141,17 @@
       "status": "Statut",
       "actions": "Actions",
       "approve": "Approuver",
+      "approveHost": "Approuver l’hôte",
+      "hostPlaceholder": "Nom d’hôte de livraison, par ex. files.example.lan",
+      "approveHostSentence": "{host} se trouve sur un réseau privé ({address}). Synaplan appellera cette adresse pour livrer des copies et des demandes. N’approuvez que des clouds que vous gérez.",
+      "approveHostTitle": "Approuver cette adresse ?",
+      "canReach": "Synaplan peut atteindre ce cloud.",
+      "cannotReach": "Synaplan ne peut pas atteindre ce cloud.",
+      "reachNotChecked": "Pas encore vérifié si Synaplan peut atteindre ce cloud.",
+      "removeHost": "Retirer {host}",
+      "hostApproved": "{host} approuvé.",
+      "hostRemoved": "{host} retiré.",
+      "hostError": "Le nom d’hôte n’a pas pu être modifié.",
       "revoke": "Révoquer",
       "approved": "Plateforme approuvée.",
       "revoked": "Plateforme révoquée.",
@@ -1135,7 +1239,8 @@
       "groups": "Les groupes réunissent des utilisateurs pour partager des assistants et fixer des règles une seule fois pour tous.",
       "policies": "Les règles décident de ce qu’un groupe peut utiliser, par exemple quelles fonctions ou quels modèles.",
       "moderation": "Contenus signalés par des utilisateurs. Examinez-les, puis conservez-les ou supprimez-les.",
-      "audit": "Un journal de qui a modifié quoi sur ce serveur, les plus récents d’abord."
+      "audit": "Un journal de qui a modifié quoi sur ce serveur, les plus récents d’abord.",
+      "signup-codes": "Des codes qui permettent de s'inscrire sans payer. Vous choisissez le niveau du nouveau compte, la durée de validité d'un code et le nombre de personnes qui peuvent l'utiliser."
     }
   },
   "iam": {
@@ -1365,8 +1470,14 @@
     "chat_artifacts": {
       "label": "Aperçu HTML et SVG"
     },
+    "research": {
+      "label": "Recherche"
+    },
     "freeapi": {
       "label": "Démo Synaplan"
+    },
+    "capacity": {
+      "label": "Capacité des serveurs"
     }
   },
   "partners": {
@@ -1431,6 +1542,80 @@
       "not_partner": "Cette connexion est introuvable.",
       "bad_url": "Cette adresse n’est pas un serveur https public.",
       "replay": "Cette demande a déjà été utilisée."
+    }
+  },
+  "capacity": {
+    "title": "Capacité",
+    "subtitle": "La charge de chaque serveur de cette installation, et si l’un d’eux a besoin d’aide.",
+    "loading": "Lecture des serveurs…",
+    "unavailable": "La capacité ne peut pas être lue pour le moment, car le cache partagé ne répond pas. Les serveurs continuent de fonctionner.",
+    "failed": "Les serveurs n’ont pas pu être lus. Réessayez dans un instant.",
+    "empty": "Aucun serveur n’a encore fait de rapport — les serveurs le font dans la minute qui suit leur démarrage.",
+    "checkAgain": "Vérifier à nouveau",
+    "footer": "Seuls les administrateurs voient cette page. Rien ici ne modifie un serveur.",
+    "servers": {
+      "title": "Serveurs",
+      "summary": "{count} serveur · mis à jour il y a {seconds} s | {count} serveurs · mis à jour il y a {seconds} s",
+      "connectedTo": "Vous êtes connecté à {server}",
+      "owner": "Chaque serveur de cette installation fait son rapport ici.",
+      "source": "Chaque serveur se mesure lui-même toutes les 5 secondes et conserve 24 heures."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Travail en arrière-plan",
+      "scheduler": "Tâches planifiées"
+    },
+    "card": {
+      "connectedHere": "Vous êtes connecté à ce serveur.",
+      "reporting": "En rapport",
+      "silentSeconds": "Dernier rapport il y a {count} s",
+      "silentMinutes": "Dernier rapport il y a {count} min — le serveur est peut-être arrêté ou en redémarrage",
+      "silentUnknown": "Ne fait plus de rapport",
+      "aiAnswers": "Réponses IA",
+      "otherRequests": "Autres requêtes",
+      "memory": "Mémoire",
+      "processor": "Processeur",
+      "ofAtOnce": "{used} sur {total} à la fois",
+      "noPools": "pas de pools séparés",
+      "peakToday": "pic du jour {count} ({time})",
+      "memoryOf": "{used} sur {total}",
+      "memoryUnlimited": "{used} · sans limite",
+      "processorOf": "{percent} % de {cores} cœurs",
+      "processorMeasuring": "mesure en cours · {cores} cœurs",
+      "processorShort": "{percent} %",
+      "sizingHint": "À son pic du jour, {server} a répondu à {peak} des {total} requêtes IA qu’il peut tenir à la fois. Ajoutez un serveur ou augmentez ses places de réponse IA — le guide de dimensionnement explique comment.",
+      "technical": "Détails techniques",
+      "runsOn": "S’exécute sur",
+      "workers": "PHP",
+      "logs": "Journaux",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} places de réponse IA + {api} places de requête",
+      "poolsSingle": "un pool de {count} threads",
+      "logsStderr": "la sortie d’erreur du processus",
+      "howToStop": "Un serveur cesse de faire son rapport quand son watchdog est désactivé (SYNAPLAN_WATCHDOG=0).",
+      "helperSilent": "ne fait plus de rapport",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Directement sur la machine"
+      },
+      "place": {
+        "machine": "machine {name}",
+        "address": "adresse {address}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "limite mémoire {value}",
+        "cpuRequest": "processeur demandé {value}"
+      }
+    },
+    "events": {
+      "open": "Afficher les événements récents",
+      "hide": "Masquer les événements récents",
+      "loading": "Lecture des événements…",
+      "failed": "Les événements n’ont pas pu être lus.",
+      "empty": "Aucun avertissement de ce serveur depuis une heure.",
+      "window": "Avertissements et erreurs de la dernière heure, du plus récent au plus ancien, 20 au plus."
     }
   }
 }

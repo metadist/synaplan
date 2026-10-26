@@ -97,6 +97,7 @@
       "descriptionHeader": "DESCRIPTION",
       "admin": {
         "catalogSubtitle": "Search and edit the system model catalog.",
+        "withdrawn": "No longer offered by {provider}. It is still here until you remove it.",
         "bulkImportSubtitle": "Generate and apply SQL from provider docs (advanced).",
         "addModels": "Bulk import (SQL)",
         "urlsLabel": "URLs (one per line)",
@@ -157,6 +158,11 @@
         "modelCreated": "Model created",
         "modelSaved": "Model saved",
         "modelDeleted": "Model deleted",
+        "deletedMoved": "Removed. {job} now uses {model}.",
+        "deletedMovedMany": "Removed. The jobs that used this model now use another available one.",
+        "deletedCleared": "Removed. {job} has no model until you pick one on this page. Nothing else was changed.",
+        "deletedMovedAndCleared": "Removed. Some jobs now use another model. {job} has no model until you pick one on this page.",
+        "someJobs": "Some jobs",
         "appliedStatements": "Applied {count} statement(s)",
         "failedGenerate": "Failed to generate SQL",
         "failedApply": "Failed to apply SQL",
@@ -934,6 +940,8 @@
       "errorActivating": "Failed to activate API key",
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
+      "planRequired": "API keys are part of a paid plan.",
+      "seePlans": "See plans",
       "scopes": {
         "hint": "Leave unchecked for full access. Checking Users limits this key to Users. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
         "iamRead": "Users — view groups",

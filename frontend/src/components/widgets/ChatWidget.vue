@@ -654,6 +654,13 @@ import {
   attachWidgetStream,
   WidgetUnavailableError,
 } from '@/services/api/widgetsApi'
+import {
+  endBusy,
+  isBusyError,
+  markWidgetBusy,
+  recoverWidgetSend,
+  settleWidgetBubble,
+} from './widgetBusy'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
@@ -1624,6 +1631,8 @@ const sendMessage = async () => {
       externalUserId: props.externalUserId,
       apiUrl: props.apiUrl,
       headers: testModeHeaders.value,
+      onStatus: (payload) =>
+        markWidgetBusy(messages.value, assistantMessageId, payload.status, t('widget.busy')),
       onChunk: async (chunk: string) => {
         if (!chunk || !assistantMessageId) return
         if (isTyping.value) {
@@ -1665,16 +1674,19 @@ const sendMessage = async () => {
 
     const lastMessage = messages.value[messages.value.length - 1]
     if (lastMessage && lastMessage.id === assistantMessageId) {
-      if (!lastMessage.content || lastMessage.content.length === 0) {
-        if (result.text && result.text.length > 0) {
-          lastMessage.content = result.text
-        } else if (!props.isPreview) {
+      const needsHistory = settleWidgetBubble(
+        messages.value,
+        assistantMessageId,
+        t('widget.busy'),
+        result.text
+      )
+      if (needsHistory) {
+        if (!props.isPreview) {
           await loadConversationHistory(true)
           await scrollToBottom()
           return
-        } else {
-          lastMessage.content = t('widget.defaultAssistantReply')
         }
+        lastMessage.content = t('widget.defaultAssistantReply')
       }
       await scrollToBottom()
     }
@@ -1693,7 +1705,17 @@ const sendMessage = async () => {
       messageCount.value = Math.max(0, messageCount.value - 1)
     }
 
-    if (error instanceof WidgetUnavailableError) {
+    if (isBusyError(error)) {
+      endBusy(
+        messages.value,
+        assistantMessageId,
+        userMessage,
+        inputMessage.value,
+        (text) => (inputMessage.value = text),
+        { restored: t('widget.busyNotSent'), kept: t('widget.busyKeptDraft') },
+        addBotMessage
+      )
+    } else if (error instanceof WidgetUnavailableError) {
       const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
       if (idx !== -1) {
         messages.value.splice(idx, 1)
@@ -1701,41 +1723,16 @@ const sendMessage = async () => {
       handleWidgetUnavailable()
     } else {
       console.error('Failed to send message:', error)
-
-      const lastMessage = messages.value.find((m) => m.id === assistantMessageId)
-      let recovered = false
-
-      if (!props.isPreview) {
-        try {
-          await loadConversationHistory(true)
-          const latestMessage = messages.value[messages.value.length - 1]
-          if (
-            latestMessage &&
-            latestMessage.role === 'assistant' &&
-            latestMessage.content.trim().length > 0
-          ) {
-            recovered = true
-          }
-        } catch (historyError) {
-          if (!(historyError instanceof WidgetUnavailableError)) {
-            console.error('Failed to recover conversation history:', historyError)
-          }
-        }
-      }
-
-      if (!recovered) {
-        if (lastMessage && lastMessage.content.trim().length > 0) {
-          isTyping.value = false
-        } else {
-          const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
-          if (idx !== -1) {
-            messages.value.splice(idx, 1)
-          }
-          addBotMessage(t('widget.sendFailed'))
-        }
-      } else {
-        await scrollToBottom()
-      }
+      await recoverWidgetSend(
+        () => messages.value,
+        assistantMessageId,
+        t('widget.busy'),
+        props.isPreview,
+        () => loadConversationHistory(true),
+        t('widget.sendFailed'),
+        addBotMessage,
+        scrollToBottom
+      )
     }
   } finally {
     replySmoother.cancel()

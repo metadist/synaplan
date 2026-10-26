@@ -1,6 +1,6 @@
 import type { ConnectionItem } from '@/services/api/connectionsApi'
 
-export const CLOUD_FOLDER_KINDS = ['nextcloud', 'opencloud'] as const
+export const CLOUD_FOLDER_KINDS = ['nextcloud', 'opencloud', 'owncloud'] as const
 export type CloudFolderKind = (typeof CLOUD_FOLDER_KINDS)[number]
 
 export type CloudFolderTargetItem = {
@@ -38,7 +38,7 @@ function storedChannel(connection: ConnectionItem): string {
 
 /** Planner unique() stores nextcloud-2 / opencloud-x for a second folder. */
 export function kindFromChannel(channel: string): CloudFolderKind | null {
-  const match = /^(nextcloud|opencloud)(?:-(?:\d+|x))?$/.exec(channel)
+  const match = /^(nextcloud|opencloud|owncloud)(?:-(?:\d+|x))?$/.exec(channel)
   return match ? (match[1] as CloudFolderKind) : null
 }
 
@@ -108,7 +108,7 @@ export function platformCopyTargets(links: CopyLink[]): CloudFolderTargetItem[] 
   const out: CloudFolderTargetItem[] = []
   for (const link of links) {
     if (link.can_copy !== true || link.id <= 0 || link.host.trim() === '') continue
-    const kind = kindFromChannel(link.client) ?? (link.client === 'owncloud' ? 'nextcloud' : null)
+    const kind = kindFromChannel(link.client)
     if (kind === null) continue
     out.push({
       id: link.id,

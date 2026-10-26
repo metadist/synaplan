@@ -49,6 +49,8 @@ final class AdminController extends AbstractController
         new OA\Property(property: 'default_language', type: 'string'),
         new OA\Property(property: 'default_folder', type: 'string'),
         new OA\Property(property: 'stt_url', type: 'string'),
+        new OA\Property(property: 'stt_model', type: 'string'),
+        new OA\Property(property: 'stt_api_key', type: 'string'),
         new OA\Property(property: 'prosody_url', type: 'string'),
         new OA\Property(property: 'jitsi_url', type: 'string'),
         new OA\Property(property: 'prosody_secret', type: 'string'),

@@ -1,0 +1,23 @@
+research:
+  outcome:
+    complete: 'Terminé : %statements% affirmations, dont %supported% appuyées par une source.'
+    complete_partial: 'Terminé avec des lacunes : %open% points sur %points% n’ont pas pu être confirmés. Ils figurent sous « Non confirmé ».'
+    complete_snippets_only: 'Aucune page n’a pu être ouverte, ce rapport repose donc uniquement sur des résumés de recherche. Il le précise là où c’est important.'
+    stopped_by_user: 'Arrêté. Aucun nouveau travail n’a été lancé après votre clic sur Arrêter ; une étape déjà en cours peut encore compter. Ce qui a été trouvé est conservé.'
+    stopped_budget: 'Arrêté parce que votre budget IA mensuel est épuisé. Le rapport couvre %covered% points sur %points%.'
+    stopped_limit: 'Arrêté parce que cette recherche a atteint sa limite pour cette profondeur. Ce qui a été trouvé couvre %covered% points sur %points%.'
+    stopped_waiting: 'Arrêté parce que le plan n’a pas été confirmé dans la journée. Relancez-la quand vous serez prêt.'
+    stopped_by_admin: 'La recherche a été désactivée dans votre espace Synaplan. Ce qui a été trouvé est conservé.'
+    failed_no_sources: 'Il n’y avait rien à rechercher : activez le web ou ajoutez des fichiers à ce projet.'
+    failed_nothing_found: 'Les sources consultées ne contenaient rien qui réponde à cette question. Reformulez-la ou ajoutez des fichiers à ce projet.'
+    failed_role_unavailable: 'Le modèle de %role% de ce projet n’est pas disponible et aucun autre modèle du projet ne peut le remplacer. Rien n’a été facturé.'
+    failed_model_error: 'Le modèle de %role% a cessé de répondre. Rien d’autre n’a été facturé ; réessayez ou choisissez un autre modèle.'
+    failed_interrupted: 'La recherche a été interrompue sur le serveur. Relancez-la : les sources trouvées jusqu’ici sont conservées.'
+    unknown: 'La recherche s’est arrêtée. Relancez-la si vous avez encore besoin de la réponse.'
+  role:
+    reading: 'lecture'
+    sorting: 'tri'
+    planning: 'planification'
+    writing: 'rédaction'
+    fact-checking: 'vérification des faits'
+    selected: 'la tâche choisie'

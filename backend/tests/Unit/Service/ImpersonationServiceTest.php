@@ -881,6 +881,8 @@ final class ImpersonationServiceTest extends TestCase
         $user->method('getUserLevel')->willReturn($level);
         $user->method('isAdmin')->willReturn('ADMIN' === $level);
         $user->method('isActive')->willReturn($active);
+        // A suspended mock may not sign in either; pending_payment is not modelled here.
+        $user->method('canSignIn')->willReturn($active);
 
         return $user;
     }

@@ -1,0 +1,22 @@
+# Overlay for the AU3 busy-server proof.
+#
+# Applied on top of docker-compose.test.yml (+ docker-compose.test.ci.yml in CI):
+#   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml \
+#     -f docker-compose.busy.yml up -d
+#
+# APP_ENV stays test, so the demo user is still loaded. FRANKENPHP_BUSY_PROFILE
+# makes the entrypoint install the production worker snippet anyway: one stream
+# worker and a one-second wait, so a second slow stream is refused at once
+# while /api/health still answers on the api pool.
+
+services:
+  app_test:
+    environment:
+      FRANKENPHP_BUSY_PROFILE: "1"
+      FRANKENPHP_WORKER_NUM: "2"
+      FRANKENPHP_STREAM_WORKER_NUM: "1"
+      FRANKENPHP_NUM_THREADS: "4"
+      FRANKENPHP_MAX_WAIT_TIME: "1s"
+      # One slow stream (~32 s) must outlast a full busy-retry window
+      # (~21 s), or a retry lands in the seam between two held streams.
+      SYNAPLAN_TEST_PROVIDER_CHUNK_MS: "1200"

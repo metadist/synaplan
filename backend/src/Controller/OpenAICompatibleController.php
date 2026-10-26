@@ -92,6 +92,7 @@ class OpenAICompatibleController extends AbstractController
                 new OA\Property(property: 'temperature', type: 'number', example: 0.7),
                 new OA\Property(property: 'max_tokens', type: 'integer', example: 4096),
                 new OA\Property(property: 'stream', type: 'boolean', example: false),
+                new OA\Property(property: 'incognito', type: 'boolean', example: false, description: 'Process this call and store nothing. When true, no session chat, message, or digest row is created.'),
                 new OA\Property(
                     property: 'tools',
                     type: 'array',
@@ -343,17 +344,17 @@ class OpenAICompatibleController extends AbstractController
         $dbModelId = $resolvedModel['model_id'];
 
         if ($parsed->stream) {
-            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId, $parsed->flags->incognito);
         }
 
-        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId, $parsed->flags->incognito);
     }
 
     /**
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
      */
-    private function handleNonStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): JsonResponse
+    private function handleNonStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId, bool $incognito = false): JsonResponse
     {
         try {
             $result = !empty($options['server_tool_loop'])
@@ -380,7 +381,7 @@ class OpenAICompatibleController extends AbstractController
                 'source' => 'OPENAI_API',
             ]);
 
-            $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText);
+            $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText, false, $incognito);
 
             return new JsonResponse($payload);
         } catch (\Throwable $e) {
@@ -462,7 +463,7 @@ class OpenAICompatibleController extends AbstractController
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
      */
-    private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): StreamedResponse
+    private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId, bool $incognito = false): StreamedResponse
     {
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
@@ -470,7 +471,7 @@ class OpenAICompatibleController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messages, $options, $completionId, $created, $displayModel, $dbModelId) {
+        $response->setCallback(function () use ($user, $messages, $options, $completionId, $created, $displayModel, $dbModelId, $incognito) {
             // Real HTTP (FrankenPHP / php-fpm) must drop leftover output
             // buffers or SSE never reaches the client. PHPUnit captures via
             // its own buffer and PHP_SAPI is cli — leave those alone, and
@@ -595,7 +596,7 @@ class OpenAICompatibleController extends AbstractController
                     'response_text' => $responseText,
                 ]);
 
-                $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText, $clientGone);
+                $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText, $clientGone, $incognito);
             } catch (\Throwable $e) {
                 ['status' => $status, 'type' => $type, 'code' => $code] = $this->describeFailure($e);
                 if (!connection_aborted()) {
@@ -633,9 +634,9 @@ class OpenAICompatibleController extends AbstractController
      *
      * @param list<array<string, mixed>> $messages
      */
-    private function dispatchSessionSummary(User $user, array $messages, string $displayModel, string $responseText, bool $interrupted = false): void
+    private function dispatchSessionSummary(User $user, array $messages, string $displayModel, string $responseText, bool $interrupted = false, bool $incognito = false): void
     {
-        if (!$this->messagesGatewayConfig->isSessionSummaryEnabled($user->getId())) {
+        if ($incognito || !$this->messagesGatewayConfig->isSessionSummaryEnabled($user->getId())) {
             return;
         }
 

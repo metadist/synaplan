@@ -26,6 +26,7 @@ final class ScheduledJobs
             'app:cloud-deliveries:sweep',
             'app:media:reap-jobs',
             'app:chat:reap-stuck',
+            'app:research:reap',
             'app:desktop:reap-jobs',
             'app:voice:reap-sessions',
             'app:process-mail-handlers',
@@ -39,6 +40,7 @@ final class ScheduledJobs
             'app:approvals:expire',
             'app:models:discover',
             'app:freeapi:maintain',
+            'app:signup:reap-pending',
         ],
         self::LANE_DAILY => [
             'app:updates:check',

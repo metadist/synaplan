@@ -1,0 +1,36 @@
+# The reference client of the cloud file sharing plan (E-9), next to the dev
+# stack. Synaplan calls it on the Docker network as http://cloud-fixture:8099;
+# the host port is for scripts and the browser, on 127.0.0.1 only.
+#
+#   docker compose -f _devextras/testing/cloud-apps/fixture-app/compose.yml up -d
+name: synaplan-cloud-fixture
+
+services:
+  cloud-fixture:
+    image: php:8.4-cli
+    container_name: cloud-fixture
+    command: ["php", "-S", "0.0.0.0:8099", "/app/index.php"]
+    environment:
+      # Several workers, so /control answers while a notification is handled.
+      PHP_CLI_SERVER_WORKERS: "4"
+      FIXTURE_DATA: /data
+      SYNAPLAN_URL: http://backend
+      SYNAPLAN_PUBLIC_URL: http://localhost:5173
+      FIXTURE_PUBLIC_URL: http://localhost:8099
+      FIXTURE_INBOUND_URL: http://cloud-fixture:8099/inbound
+    volumes:
+      - ./:/app:ro
+      - cloud-fixture-data:/data
+    ports:
+      - "127.0.0.1:8099:8099"
+    networks:
+      - synaplan
+    restart: unless-stopped
+
+networks:
+  synaplan:
+    name: synaplan_synaplan-network
+    external: true
+
+volumes:
+  cloud-fixture-data:

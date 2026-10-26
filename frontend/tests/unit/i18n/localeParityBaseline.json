@@ -967,9 +967,7 @@
       "widgets.testChat",
       "widgets.viewSessions"
     ],
-    "notInEnglish": [
-      "widget.continueFailed"
-    ]
+    "notInEnglish": ["widget.continueFailed"]
   },
   "fr": {
     "missingFromLocale": [],
@@ -1802,8 +1800,6 @@
       "widgets.testChat",
       "widgets.viewSessions"
     ],
-    "notInEnglish": [
-      "widget.continueFailed"
-    ]
+    "notInEnglish": ["widget.continueFailed"]
   }
 }

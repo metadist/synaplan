@@ -665,6 +665,7 @@ run_scheduler_tick_lane() {
 
     run_scheduler_job 300 bin/console --env="$env" app:media:reap-jobs --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:chat:reap-stuck --no-interaction
+    run_scheduler_job 300 bin/console --env="$env" app:research:reap --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:desktop:reap-jobs --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:voice:reap-sessions --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:process-mail-handlers --no-interaction
@@ -705,6 +706,11 @@ run_scheduler_hourly_lane() {
     # Synaplan Demo: delivers a key revoke the server missed when the admin
     # left. A no-op (no network call) unless a revoke is pending.
     run_scheduler_job 900 bin/console --env="$env" app:freeapi:maintain --no-interaction
+
+    # Sign-ups that chose a plan and are still unpaid after 7 days are
+    # deleted through the regular erasure path. A no-op unless admission
+    # mode created pending accounts.
+    run_scheduler_job 900 bin/console --env="$env" app:signup:reap-pending --no-interaction
 }
 
 # shellcheck disable=SC2317
@@ -835,4 +841,37 @@ run_scheduler_role() {
     fi
 
     runtime_log "Scheduler stopped."
+}
+
+# Every role starts the capacity watchdog beside its main process and restarts
+# it when it exits: the web role reports its PHP pools, a worker or the
+# scheduler reports its place, memory and processor. SYNAPLAN_WATCHDOG=0
+# leaves it off. A missing binary (an image from before this process was
+# built) does not stop the role.
+start_watchdog() {
+    case "${SYNAPLAN_WATCHDOG:-1}" in
+        0|false|no|off)
+            runtime_log "Watchdog is off."
+            return 0
+            ;;
+    esac
+
+    local bin="${SYNAPLAN_WATCHDOG_BIN:-/usr/local/bin/synaplan-watchdog}"
+    if [ ! -x "$bin" ]; then
+        runtime_log "Watchdog binary is not in this image; this role starts without it."
+        return 0
+    fi
+
+    local runtime_dir="${SYNAPLAN_RUNTIME_DIR:-/tmp}"
+    local delay="${WATCHDOG_RESTART_DELAY:-1}"
+    mkdir -p "$runtime_dir"
+    (
+        trap 'exit 0' TERM INT
+        while true; do
+            "$bin" || true
+            sleep "$delay" || exit 0
+        done
+    ) &
+    echo $! > "${runtime_dir}/watchdog.supervisor.pid"
+    runtime_log "Watchdog supervisor started."
 }

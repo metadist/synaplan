@@ -78,7 +78,9 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(expectedIds).toContain('federation')
     expect(expectedIds).toContain('live_voice')
     expect(expectedIds).toContain('freeapi')
-    expect(expectedIds).toHaveLength(19)
+    expect(expectedIds).toContain('research')
+    expect(expectedIds).toContain('capacity')
+    expect(expectedIds).toHaveLength(21)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -127,6 +129,30 @@ test.describe('@minimal @ci Minimal stack', () => {
     await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
   })
 
+  test('Capacity is absent when the watchdog is off: no nav entry, 404 on the route', async ({
+    page,
+    request,
+  }) => {
+    await login(page, CREDENTIALS.getAdminCredentials())
+    const res = await request.get(`${getApiUrl()}/api/v1/admin/capacity/servers`)
+    expect(res.status()).toBe(404)
+    expect(await res.json()).toEqual({
+      error: 'feature_not_configured',
+      module: 'capacity',
+      docs: 'modules/capacity',
+    })
+
+    await page.goto('/admin/features')
+    await page.locator(selectors.pages.featureStatus).waitFor({
+      state: 'visible',
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.capacity.navLink)).toHaveCount(0)
+    await page.goto('/admin/capacity')
+    await expect(page.locator(selectors.pages.capacity)).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Capacity')
+  })
+
   test('WhatsApp webhook answers the uniform 404', async ({ request }) => {
     const res = await request.post(`${getApiUrl()}/api/v1/webhooks/whatsapp`, {
       data: { entry: [] },
@@ -163,7 +189,9 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(ids).toContain('federation')
     expect(ids).toContain('live_voice')
     expect(ids).toContain('freeapi')
-    expect(ids).toHaveLength(19)
+    expect(ids).toContain('research')
+    expect(ids).toContain('capacity')
+    expect(ids).toHaveLength(21)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
@@ -171,6 +199,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(modules.compute?.configured).toBe(false)
     expect(modules.federation?.configured).toBe(false)
     expect(modules.live_voice?.configured).toBe(false)
+    expect(modules.research?.configured).toBe(false)
     for (const id of ids) {
       expect(modules[id]?.configured, `${id} configured`).toBe(false)
       expect(modules[id]?.gated, `${id} gated`).toBe(true)

@@ -18,6 +18,7 @@ import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { useSignupChallenge } from './useSignupChallenge'
 
 export interface SocialProvider {
   id: string
@@ -32,7 +33,8 @@ export interface SocialProvider {
 export function useSocialAuth() {
   const config = useConfigStore()
   const authStore = useAuthStore()
-  const { locale } = useI18n()
+  const { locale, t } = useI18n()
+  const { getToken: getChallengeToken, isEnabled: challengeEnabled } = useSignupChallenge()
 
   const providers = ref<SocialProvider[]>([])
   /** Provider-flow error, cleared on the next attempt. Empty = no error. */
@@ -59,7 +61,11 @@ export function useSocialAuth() {
    * flow); a user-dismissed sheet/browser returns `false` without setting
    * `error`. On the web this navigates away and never returns `true`.
    */
-  async function signInWith(provider: string, redirect?: string): Promise<boolean> {
+  async function signInWith(
+    provider: string,
+    redirect?: string,
+    admission?: { plan?: string; code?: string }
+  ): Promise<boolean> {
     // OAuth round-trip strips the SPA's URL state, so stash the intent
     // for OAuthCallback to pick up. setPendingRedirect validates internally.
     if (redirect) setPendingRedirect(redirect)
@@ -68,13 +74,25 @@ export function useSocialAuth() {
       error.value = ''
       busy.value = true
       try {
-        // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8);
-        // every other provider (and Apple on Android) uses the system-browser
-        // OAuth flow.
-        const result =
-          'apple' === provider && 'ios' === getNativePlatform()
-            ? await startNativeAppleSignIn()
-            : await startNativeOAuth(provider)
+        // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8).
+        // That request already carries an Apple-signed identity token, so it
+        // is the one path without a human-check token. Every other provider,
+        // including Apple on Android, solves the check here and passes the
+        // token on the system-browser start URL.
+        const appleSheet = 'apple' === provider && 'ios' === getNativePlatform()
+        let challenge = ''
+        if (!appleSheet) {
+          challenge = await getChallengeToken('signup')
+          if (challengeEnabled && '' === challenge) {
+            error.value = t('auth.signupBlocked.challengeFailed')
+            return false
+          }
+        }
+        const result = appleSheet
+          ? await startNativeAppleSignIn(admission)
+          : admission
+            ? await startNativeOAuth(provider, challenge, admission)
+            : await startNativeOAuth(provider, challenge)
         if (!result.success) {
           // A user-dismissed browser is a silent cancellation, not an error.
           if (!result.cancelled) {
@@ -95,7 +113,13 @@ export function useSocialAuth() {
       }
     }
 
+    // The human check runs before the redirect; the server records it in the
+    // signed OAuth state and refuses a NEW account on the callback without it.
     const params = new URLSearchParams({ language: String(locale.value) })
+    const challenge = await getChallengeToken('signup')
+    if (challenge) params.set('challenge', challenge)
+    if (admission?.plan) params.set('plan', admission.plan)
+    if (admission?.code) params.set('code', admission.code)
     window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
     return false
   }

@@ -240,6 +240,8 @@
     "title": "Abonnements",
     "subtitle": "Schalte mehr Funktionen und höhere Limits frei",
     "chooseYourPlan": "Wähle deinen Plan",
+    "pendingTitle": "Zahlung noch offen",
+    "pendingBody": "Wähle unten einen Tarif, um fertig zu werden. Das Konto bleibt eingeschränkt, bis die Zahlung abgeschlossen ist. Ohne Zahlung wird es 7 Tage nach der Registrierung gelöscht.",
     "currentPlan": "Aktueller Plan",
     "yourPlan": "Dein Plan",
     "noActiveSubscription": "Kein aktives Abonnement",

@@ -160,6 +160,23 @@ describe('platform copy targets', () => {
     ])
   })
 
+  it('maps an ownCloud platform link to kind owncloud, not Nextcloud', () => {
+    expect(
+      platformCopyTargets([
+        { id: 7, client: 'owncloud', host: 'cloud.example.org', can_copy: true },
+      ])
+    ).toEqual([
+      {
+        id: 7,
+        name: 'cloud.example.org',
+        kind: 'owncloud',
+        folder: 'Synaplan/Documents',
+        source: 'platform',
+        host: 'cloud.example.org',
+      },
+    ])
+  })
+
   it('picks the kind folder from the file name', () => {
     expect(landingFolder('chart.png')).toBe('Synaplan/Images')
     expect(landingFolder('notes.txt')).toBe('Synaplan/Documents')

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 
@@ -46,14 +46,29 @@ function previewResponse() {
   }
 }
 
+let wrapper: VueWrapper | undefined
+
 function mountDialog() {
-  return mount(ModelImportDialog, {
+  wrapper?.unmount()
+  wrapper = mount(ModelImportDialog, {
     props: { source: 'openai_compatible:vllm', label: 'vLLM lab' },
-    global: { stubs: { Icon: true } },
+    attachTo: document.body,
+    global: {
+      stubs: {
+        Icon: true,
+        Teleport: { template: '<div><slot /></div>' },
+      },
+    },
   })
+  return wrapper
 }
 
 describe('ModelImportDialog', () => {
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = undefined
+  })
+
   beforeEach(() => {
     setActivePinia(createPinia())
     importEndpointPreview.mockReset()
@@ -104,6 +119,37 @@ describe('ModelImportDialog', () => {
     ])
     expect(wrapper.emitted('applied')).toBeTruthy()
     expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('keeps Import outside the scrolling list', async () => {
+    const base = previewResponse()
+    importEndpointPreview.mockResolvedValue({
+      ...base,
+      rows: Array.from({ length: 40 }, (_, index) => ({
+        providerId: `model-${index}`,
+        name: `Model ${index}`,
+        guessedTags: ['chat'],
+        exists: false,
+        sizeBytes: null,
+        family: null,
+        probe: null,
+      })),
+    })
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    const overlay = wrapper.get('[data-testid="model-import-dialog"]')
+    const panel = wrapper.get('[data-testid="model-import-panel"]')
+    const scroll = wrapper.get('[data-testid="model-import-scroll"]')
+    const apply = wrapper.get('[data-testid="model-import-apply"]')
+
+    expect(overlay.classes()).toContain('modal-overlay')
+    expect(panel.classes()).toEqual(
+      expect.arrayContaining(['modal-panel', 'min-h-0', 'max-h-full', 'overflow-hidden'])
+    )
+    expect(scroll.classes()).toEqual(expect.arrayContaining(['min-h-0', 'overflow-y-auto']))
+    expect(scroll.element.contains(apply.element)).toBe(false)
+    expect(panel.element.contains(apply.element)).toBe(true)
   })
 
   it('shows an unreachable state when the endpoint did not answer', async () => {

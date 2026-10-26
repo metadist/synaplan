@@ -25,6 +25,59 @@ and the product mapping that powers it. It is the human-readable companion to
   endpoint (HTTP 409 `IAP_OWNERSHIP_CONFLICT`). The UI explains where to manage the existing
   subscription.
 
+## Stripe payment methods — SEPA is off
+
+`STRIPE_PAYMENT_METHODS` (default `card,link,klarna`) is the allow-list forwarded to
+Stripe Checkout for subscriptions and top-ups. `sepa_debit` is **not** in it.
+
+A SEPA Direct Debit mandate is accepted by Stripe before any money moves. The first
+debit settles in 1–14 working days and can still be returned afterwards, yet
+`customer.subscription.created` fires immediately and the subscription is `active` from
+that moment. Until 2026-10-24 the tier was granted on that event — so an account was
+unlocked on an unverified IBAN. That day the window was used to open several hundred
+BUSINESS/TEAM accounts within minutes with fake mandates. The response on the live
+cluster was: `sepa_debit` removed from the NFS `.env`, backend recreated node by node,
+the burst cohort's passwords replaced with random values, their login tokens deleted,
+their API keys removed and the cohort set back to the free tier.
+
+What is in place since then (so SEPA *can* come back once the operator decides to):
+
+1. **A paid tier is granted only for a settled payment** (`App\Service\Billing\StripeEntitlement`):
+   the subscription must be `active` *and* its latest invoice `paid` (a trial counts as
+   the operator's decision). `customer.subscription.created` / `updated` record the
+   subscription and the pending plan (`BPAYMENTDETAILS.subscription.plan`,
+   `settled: false`) but leave the tier alone; `invoice.payment_succeeded` is the event
+   that grants it — for a card within the same second, for SEPA when the bank confirms.
+   `POST /api/v1/subscription/sync` applies the same rule and answers
+   `status: payment_pending` for an unsettled subscription. The entitlement never lowers
+   a tier (that stays with `subscription.deleted` / "no active subscription") and never
+   touches an ADMIN account.
+2. **Account-creation limits and a kill switch** (`App\Service\Auth\SignupGuard`): per client
+   IP (`SIGNUP_IP_LIMIT`, default 5 per hour), installation-wide (`SIGNUP_GLOBAL_LIMIT`,
+   default 20 per 10 minutes), Stripe checkouts per IP (`CHECKOUT_IP_LIMIT`, default 10 per
+   hour), and **Pause sign-up** under Admin → Configuration → Authentication (BCONFIG
+   `SIGNUP.PAUSED`, or `SIGNUP_PAUSED` in the environment), effective without a restart.
+   The limits cover the email form and every Google/GitHub/Apple callback that would
+   create an account; existing accounts are never throttled.
+3. **A human check on every sign-up path** (`App\Service\Auth\SignupChallenge`): Cloudflare
+   Turnstile when `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` are set, otherwise
+   reCAPTCHA v3, both failing closed. The browser obtains the token before the OAuth
+   redirect too; the provider's `/login` start records a passed check in the signed OAuth
+   state and the callback refuses a *new* account without it (`OAuthSignupGate`). 84 % of
+   the fake accounts came through "Sign in with Google", which had no check before.
+4. **An operator alert** (`App\Service\Auth\SignupAnomalyAlert`) to `APP_ADMIN_EMAIL` (fallback
+   `APP_SENDER_EMAIL`), once per hour per signal, when the installation-wide limit trips or
+   more than `PAID_SIGNUP_ALERT_LIMIT` accounts younger than a day receive a paid tier
+   within an hour. Every signal is also logged at `critical`.
+
+Still open before re-enabling SEPA: the subscription page should say "your plan starts
+when your bank confirms the payment" for a `settled: false` subscription (today no
+asynchronous method is offered, so the state cannot occur), and Stripe Radar rules for
+new customers are a dashboard setting outside this repository.
+
+The test `SubscriptionControllerStripeOutboundTest` fails if `sepa_debit` reappears in
+the outbound Checkout call, so re-enabling it is an explicit, reviewed change.
+
 ## `source` field (migration-free)
 
 The owning channel lives in `BPAYMENTDETAILS.subscription.source` (`stripe` | `apple` | `google`).

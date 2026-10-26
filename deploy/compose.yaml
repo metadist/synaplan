@@ -52,6 +52,15 @@ x-app-command: &app-command
 x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
+  # Two PHP worker pools. The stream pool defaults to the api pool, so an
+  # install that only set FRANKENPHP_WORKER_NUM keeps today's stream capacity
+  # and gains a separate pool for short requests. Empty thread values stay
+  # unset: Caddy rejects an empty num_threads.
+  FRANKENPHP_WORKER_NUM: ${FRANKENPHP_WORKER_NUM:-16}
+  FRANKENPHP_STREAM_WORKER_NUM: ${FRANKENPHP_STREAM_WORKER_NUM:-}
+  FRANKENPHP_NUM_THREADS: ${FRANKENPHP_NUM_THREADS:-}
+  FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
+  FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   # Deployment hint for the release notice: it decides which manual-update guide
   # the admin UI links to. Optional — an unset or unknown value means the
   # self-hosted guide, so nothing breaks when a deployment never sets it.
@@ -77,6 +86,9 @@ x-app-environment: &app-environment
   # install reachable from the open internet that nobody watches wants
   # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
+  # "open" (default) or "admission": pay for a plan or hold an invitation code.
+  # Empty keeps the application default / the value set in the admin UI.
+  REGISTRATION_MODE: "${REGISTRATION_MODE:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   # Feature-flag pins (docs/FEATURE_FLAGS.md). Every flag is ON by default and
   # managed under Operate > System configuration > Features; an empty value here
@@ -165,6 +177,18 @@ x-app-environment: &app-environment
   STRIPE_PRICE_BUSINESS: "${STRIPE_PRICE_BUSINESS:-}"
   STRIPE_PAYMENT_METHODS: "${STRIPE_PAYMENT_METHODS:-}"
   STRIPE_AUTOMATIC_TAX: "${STRIPE_AUTOMATIC_TAX:-false}"
+  # Human check in front of sign-up (optional; reCAPTCHA is the fallback) and
+  # the account-creation limits (always on; empty keeps the shipped defaults).
+  TURNSTILE_SITE_KEY: "${TURNSTILE_SITE_KEY:-}"
+  TURNSTILE_SECRET_KEY: "${TURNSTILE_SECRET_KEY:-}"
+  SIGNUP_IP_LIMIT: "${SIGNUP_IP_LIMIT:-5}"
+  SIGNUP_GLOBAL_LIMIT: "${SIGNUP_GLOBAL_LIMIT:-20}"
+  CHECKOUT_IP_LIMIT: "${CHECKOUT_IP_LIMIT:-10}"
+  PAID_SIGNUP_ALERT_LIMIT: "${PAID_SIGNUP_ALERT_LIMIT:-10}"
+  # Empty default on purpose: a set value would pin the switch and the admin
+  # toggle (BCONFIG SIGNUP.PAUSED) would no longer take effect.
+  SIGNUP_PAUSED: "${SIGNUP_PAUSED:-}"
+  APP_ADMIN_EMAIL: "${APP_ADMIN_EMAIL:-}"
   # Per-plan spending ceiling for AI usage. Only ever enforced together with
   # Stripe, because the budget is denominated in the plan a user pays for.
   COST_BUDGET_GATE_ENABLED: "${COST_BUDGET_GATE_ENABLED:-false}"
@@ -575,7 +599,7 @@ services:
     networks: [internal]
 
   redis:
-    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./data/redis:/data
@@ -589,7 +613,7 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.10.0@sha256:58f9a182705faf353d9bbeb7986b629e5335cc3e821d0a2ca3ebd00a8f3387cc
+    image: centrifugo/centrifugo:v6.10.2@sha256:34b84f823515927266ce3abfb840fd9e0acabb58805e7e896f5de731217a627d
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
@@ -636,7 +660,7 @@ services:
     networks: [internal]
 
   tika:
-    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
     command: -h 0.0.0.0 -p 9998
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
@@ -648,7 +672,7 @@ services:
     networks: [internal]
 
   qdrant:
-    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
@@ -683,7 +707,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:5c6707fcf2e1a30cffe2ecb7e315584fc87747c389327e4bc711c4959aa1eecc
+    image: ollama/ollama:latest@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

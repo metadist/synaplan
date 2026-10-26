@@ -1,5 +1,7 @@
 # synascriber: meeting notes for Jitsi in openDesk
 
+How it works, who talks to whom, what is stored where: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 Jitsi's bridge streams each speaker's audio to the transcriber
 ([sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/)); the
 transcriber sends short audio windows to this plugin; the plugin gets the
@@ -46,6 +48,27 @@ the installation, not to a user.
 
    The older address with a user id (`/api/v1/user/<id>/plugins/synascriber/assets/…`)
    still works.
+
+### Speech-to-text server
+
+`stt_url` is any server with the OpenAI transcription API
+(`POST /v1/audio/transcriptions`, `response_format=verbose_json`) and a
+`GET /health`:
+
+| Server | `stt_url` | `stt_model` | `stt_api_key` |
+|--------|-----------|-------------|---------------|
+| whisper.cpp `whisper-server`, the `stt` chart of synaplan-charts | the service | ignored (default `whisper`) | none |
+| a self-run `whisper-server` | its address; start it with `--inference-path /v1/audio/transcriptions --convert`, or `/health` is green and every transcription fails | ignored | none |
+| vLLM | the address of `vllm serve <model>` | the `--served-model-name`, or the model name | its `--api-key`, if set |
+| a cloud service | its base URL | its model name | its key |
+
+`stt_model` goes out as the `model` field, which the OpenAI API requires and
+vLLM rejects a request without. `stt_api_key` goes out as `Authorization:
+Bearer` on the transcription and the health check; it is a secret (set it
+with `synascriber:settings` or `PUT admin/settings`, the plugin page only
+shows whether it is set). vLLM's `verbose_json` carries no `no_speech_prob`,
+so the no-speech filter never triggers there and silence yields more
+invented lines than with whisper.cpp.
 
 ### Secrets
 

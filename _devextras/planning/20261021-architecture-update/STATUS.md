@@ -11,7 +11,13 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
 | 2026-10-21 | AU2 | [#2626](https://github.com/metadist/synaplan/pull/2626) | merged 2026-10-22 (`3d4aeddd5`) | probe cache and `/api/health/ready` |
-| 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | in review | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
+| 2026-10-23 | AU5 | [#2661](https://github.com/metadist/synaplan/pull/2661) | merged (`e6b511122`) | a waiting chat stream and an idle stream worker hold no database connection; 8 streams: 8 held while streaming → 0 |
+| 2026-10-24 | AU3 | [#2687](https://github.com/metadist/synaplan/pull/2687) | merged (`87d37ca38`) | two worker pools; a full stream pool answers with `server_busy` while the api pool stays fast. Platform pools set in `synaplan-platform` [#29](https://github.com/metadist/synaplan-platform/pull/29): 16 streams + 8 api |
+| 2026-10-24 | AU4 | [#2696](https://github.com/metadist/synaplan/pull/2696) | merged (`121da85ad`) | the chat and the widget say busy, retry three times, then give the text back with a Try again |
+| 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | merged (`5e7a4ebdd`) | watchdog on `:8098`; `capacity:server:{id}` every 5 s with place and log source. No relay. Not rolled out |
+| 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | merged (`3b0c6f627`) | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
+| 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | merged (`33f498065`) | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
+| 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
 
 ## Baselines
 
@@ -24,6 +30,288 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-25 — AU8: probes follow PHP capacity, metrics are scraped
+
+In `synaplan-charts`, [#90](https://github.com/metadist/synaplan-charts/pull/90).
+
+**Off by default, on purpose.** No Synaplan release contains the watchdog
+yet: the chart pins 5.4.1, the latest release is 5.5.4 (2026-10-23), and
+AU6 merged on 2026-10-24. `/api/health/ready` is in 5.5.3 and later. Probes
+on `:8098` by default would restart every pod on today's image, so
+`watchdog.enabled` defaults to off and a complete semver tag below 5.6.0
+fails the render (5.6.0 is the next automatic release: #2724 is a `feat`).
+The `appVersion` bump to 5.6.0 turns it on. Off keeps the `/` probes and
+sets `SYNAPLAN_WATCHDOG=0`, so Admin › Capacity is absent.
+
+**What it does when on.** Liveness `GET /live` and readiness `GET /ready`
+on the `watchdog` port 8098, startup `GET /api/health/ready` on `http`
+(120 × 5 s for the first boot's migrations). Every role gets the port and
+the place: namespace and node from the Downward API, deployment and
+container names, and the declared processor request and memory limit *as
+written* (`500m`, `3Gi`; `resourceFieldRef` gives unitless numbers, or node
+allocatable when nothing is declared). `SYNAPLAN_SERVER_ID` stays unset:
+the pod name is the id, and an explicit id would give a worker a doubled
+`-worker` suffix. `frankenphp.*` sets the pools and `max_wait_time`.
+`metrics.podMonitor`, `metrics.serviceMonitor` (headless `-metrics`
+Service) and `metrics.dashboard` (`dashboards/synaplan-capacity.json` for
+the Grafana sidecar) each refuse to render without the watchdog. Resource
+starting values are documented, not defaulted.
+
+**Observed on a cluster** (local k3d, `e2e/run.sh standalone up`, image
+`ghcr.io/metadist/synaplan:latest` = `main` at `3dae716`, 2 stream + 2 api
+workers, `maxWaitTime: 3s`; workers held by slow form bodies, which PHP
+reads before the script runs):
+
+| Phase | Pod Ready | Restarts | Watchdog `/ready` | Gauges | Probes |
+| ----- | --------- | -------- | ----------------- | ------ | ------ |
+| streams pool full, 35 s | True throughout | 0 | 200 | `streams` 2/2, ratio 1 | third `POST /v1/chat/completions` → 503 `server_busy` after 3.0 s, `Retry-After: 5`; `GET /api/health/ready` 200 in 10 ms |
+| api pool full, 40 s | False after ≈ 16 s | 0 | 503 | `api` 2/2 | PHP's own readiness request → `server_busy` after 3 s |
+| after the api hold | True again ≈ 10 s later | 0 | 200 | 0/2, 0/2 | — |
+
+The Redis snapshot carried `runtime kubernetes`, the k3d node as host, the
+namespace, `deployment synaplan`, `container synaplan`, `cpu_request 500m`,
+`memory_limit 3Gi`, `collector kubernetes`; worker and scheduler reported
+with their own deployment and container. Exit criterion 2 holds on that
+cluster. FrankenPHP 1.13 labels the pools `worker="streams"`/`"api"` (1.12
+used `m#streams`); the dashboard matches both.
+
+**Not done.** M6 on the `vultr-cluster` load-test namespace: that cluster
+also hosts the VS-AP openDesk installation, so the run waits for the
+owner. Exit criterion 3 stays open until then.
+
+**Gate.** `make all` (helm-docs, lint, kubeconform, package) and
+`make check` (helm-unittest 50/50, 25 new; kubeconform on every Helmfile
+environment) green; default render differs from `main` by
+`SYNAPLAN_WATCHDOG=0` only; `ci/synaplan/lint-values-watchdog.yaml` makes
+CI render and validate the on-path. Copilot: round 1 — 503 panel lost
+methods (fixed `27509db`); round 2 — server count stuck when none reports
+(fixed `3a56f2e`); round 3 — `<fullname>-metrics` could pass 63 characters
+(fixed `91ea2dc`, unit test 51/51). The three-round cap is reached; a
+further review is the owner's call.
+
+---
+
+## 2026-10-24 — AU7: capacity of every server on the system status page
+
+**Where it is.** Admin › Capacity, one click from System status in the
+Operate list (U2, U6). `GET /api/v1/admin/capacity/servers` reads the
+seen-list and every snapshot from Redis in one request; `served_by` names
+the answering server, the same value every response now carries in the
+`X-Synaplan-Server` header beside `X-Request-Id`. The `capacity` feature
+module is configured while `SYNAPLAN_WATCHDOG` is not `0`: off ⇒ no nav
+entry, the route is the not-found page, the API answers the module gate's
+404 (U11). The minimal lane sets it to `0`.
+
+**The card.** AI answers and other requests as "n of m at once" with
+today's peak and its time (from the watchdog's day peak), memory and
+processor against their limits, a sizing sentence once the peak reached
+80 % of the slots, and under Technical details: where the server runs
+(Docker on synweb100 · pod · deployment · namespace · declared resources),
+the PHP pools, the version, and the log row with the one command built from
+the watchdog's facts (`docker logs <hostname>`, `kubectl logs -n <ns> <pod>
+-c <container>`) plus **Open recent events**, which opens the event ring
+filtered by the server's `event_ring_host` and read through the authenticated client, so the native app's Bearer session works like a cookie; the ring's own page stays with AU33. Workers and
+the scheduler attach to the web server of their machine (same `place.host`,
+or the `-worker` / `-bulk` / `-scheduler` id the platform compose gives
+them) as compact rows; one with no web server of its own is a card with a
+role chip and no AI bars. A silent server keeps its card, greyed, with
+"Last report n min ago — the server may be down or restarting". An id whose
+last report has expired (a week) is not a card: there is nothing to show.
+The owner's first look on 2026-10-25 found two of my seeded walk entries
+drawn as zeroed web cards; the seeds are removed and the rule is the fix.
+
+**Walked (J-AU-2)** on the dev stack as `admin@synaplan.com`, with two
+seeded reports beside the real one (a silent `web2`, a `web1-worker`, a
+day peak of 14 of 16): the Operate entry appeared next to System status;
+the real server's card said "You are connected to this server." and
+"Reporting"; the seeded peak produced the sizing sentence; Technical
+details read "Docker" and `docker logs 965a483f0450`; the worker rendered
+as a role card without AI bars; `web2` greyed with its last report. Light
+and dark read; at 320 px the page has no horizontal overflow
+(`scrollWidth` 320) and every reading wraps. The light-mode walk found the
+peak note overflowing its column and a worker rendered as a web card; both
+fixed before the spec was written.
+
+**Gate.** PHPStan, deptrac, php-cs-fixer clean; module tests, the
+capacity service, the identity and the event-ring host filter are unit
+tested; the frontend ratchet made the route and the nav entry modules of
+their own (`router/capacityRoute.ts`, `composables/useCapacityNav.ts`);
+`capacityFacts.spec.ts` covers the log command, grouping and the hint;
+`capacity.spec.ts` (@ci) walks the real endpoint and the header, a mocked
+three-server cluster, and the 503 state; `minimal-stack.spec.ts` asserts
+the absent state. Five locales (`capacity.*`, `modules.capacity.label`,
+`nav.adminCapacity`, `pageTitles.adminCapacity`).
+
+**Carried.** "Busy answers today" (Caddy's 503 count) and the 24-hour
+sparkline stay with AU33's request timeline, which also gives the event ring its page.
+
+---
+
+## 2026-10-24 — AU6: a watchdog on every server reports its capacity
+
+`sidecars/synaplan-watchdog` is one static binary in the backend image. The
+web role starts it beside FrankenPHP and starts it again when it exits.
+`SYNAPLAN_WATCHDOG=0` does not start it. `:8098` is not published.
+
+Every 5 s it reads `http://127.0.0.1:2019/metrics` and `/frankenphp/threads`,
+the cgroup (`memory.max`, `memory.current`, `cpu.max`, `cpu.stat`) and
+`/proc` when the cgroup has no usage. Thread request paths are counted and
+not stored. It writes `capacity:server:{id}` (TTL 20 s) and
+`capacity:agg:{id}:{minute}` (TTL 24 h). Redis is `REDIS_URL`, or `REDIS_DSN`
+when that is unset.
+
+`GET :8098/live` is 200 while the process runs. `GET :8098/ready` is 200
+when PHP's `/api/health/ready` answered within 2 s in the last 10 s and
+Redis answers. `GET :8098/metrics` passes FrankenPHP's metrics through and
+adds `synaplan_server_info`, `synaplan_stream_slots_total`,
+`synaplan_stream_slots_busy` and `synaplan_stream_slots_busy_ratio`.
+
+There is no relay and no drain endpoint. Kubernetes pod facts are read when
+`KUBERNETES_SERVICE_HOST` is set; they are not acted on until AU8.
+
+**Place and logs (added after the owner's check on 2026-10-24).** The first
+cut named a server only by `server_id` and `runtime`; a card could not say
+which machine or pod it was, or where its log lines go. The snapshot now
+carries `hostname`, `role`, `place` (`host`, `pod`, `namespace`,
+`deployment`, `container`, declared resources) and `logs` (`collector`,
+`event_ring_host`), and `synaplan_server_info` gains a `role` label. The
+identity rule shared with PHP, the Downward API variables for the chart,
+and the "You are connected to" header for AU7 are written in `03` §6.1 and
+`04` §4.1, §5.2, §6. On the dev stack the snapshot read
+`"hostname":"<container id>","role":"web","place":{},"logs":{"collector":"docker","event_ring_host":"<container id>"}`.
+**Redis namespace (same day).** PHP's `RedisService` prefixes every key with `synaplan:<APP_ENV>:`; the watchdog now writes under that prefix (`APP_ENV` from the container, `prod` when unset), so the capacity page reads the snapshots and a dev stack next to a test stack does not see the other's servers. The seen-list `capacity:seen` (hash, 7 days) keeps a silent server on the page with its last report time.
+
+**Every role (same day).** The worker and scheduler roles start the same
+watchdog. Without FrankenPHP it skips the admin API and the PHP probe: its
+report is place, memory and processor, `/ready` is Redis alone, `/metrics`
+answers 200 with `synaplan_server_info{role="worker"}` and no slot gauges.
+On compose, roles on one machine need distinct ids; the platform compose
+derives `web1-worker`, `web1-bulk` and `web1-scheduler` from the exported
+`SYNAPLAN_SERVER_ID`, and `updatewebN.sh` exports it with
+`SYNAPLAN_HOST_NAME` next to `SYNDBHOST` ([synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33)). Kubernetes pod names are distinct on their own. The
+Downward API variables are AU8's, in `synaplan-charts`.
+
+**Dev stack, 2026-10-24.** Rebuilt `backend` (classic mode, no worker pools).
+`:8098` is not published. `/live` 200. `/ready` 200 once
+`/api/health/ready` answered. `/metrics` served `synaplan_server_info` with
+`runtime="compose"`. Redis `capacity:server:{hostname}` held the snapshot:
+`admin_ok` true, 20 threads, memory about 491 MB, 10 cores, CPU ratio about
+0.006. Stream and API slot gauges stayed 0 because classic mode does not
+publish `frankenphp_total_workers{worker="streams"|"api"}`; the pool parser
+is covered by the spike fixture. Killing the process brought a new one back
+within 2 s and `/live` stayed 200.
+
+**Gate.** `make -C sidecars/synaplan-watchdog test` (vet, gofmt, 1,138 lines
+against the 2,000-line budget, `go test -race`). The container-runtime bash
+test covers off, a missing binary, and a restart after exit. The scheduler
+assertions that fail in that script on this Mac also fail on `main`.
+
+---
+
+## 2026-10-24 — AU4: a busy server says so and retries
+
+Copy (all five locales, `chatError.busy*`, `processing.busy`, `widget.busy*`):
+"Synaplan is busy — your answer starts in a moment." while the transport
+retries; then "Synaplan is busy right now. Your message was not sent — it is
+back in the input box." with **Try again**. The widget shows the same two
+sentences in its bubble and composer.
+
+**Walked (J-AU-1)** on the busy test stack (1 stream worker, 1 s wait,
+`docker-compose.busy.yml`): `busy-server.spec.ts` holds the worker with
+chained API streams, sends in the chat UI, sees the busy line in the answer
+area, the not-sent sentence, the prompt back in the composer, and Try again
+resending it (composer clears, prompt bubble back, no duplicate stored).
+2 of 2 busy tests pass locally; the same job runs in CI.
+
+**How it works.** `busyRetry.ts` is the one retry place: only 503 +
+`server_busy` (all three body shapes), `Retry-After` else 5 s, plus jitter,
+max 3 retries. The chat transport reports `busy` while waiting and a
+`server_busy` code at the end; `memberError` then removes both bubbles,
+restores the composer (ChatInput keeps it as the chat draft, not in
+incognito) and offers Try again. Other refusals carry one code per class
+(auth, limit, server) and the handler shows one localized sentence — no
+status code anywhere. The widget retries through `postJsonWithBusyRetry`,
+paints the busy sentence in the placeholder bubble, and on a final refusal
+drops both bubbles and restores its composer.
+
+**Tests.** `busyRetry.spec.ts` (schedule: `Retry-After`, then 5 s, max 3;
+no retry on 500 or a non-busy 503), `memberErrorHandler.spec.ts` (busy
+ending, one sentence per class), locale parity, size ratchet (the busy code
+lives in `busyRetry.ts`, `widgetBusy.ts` and `useBusyRetryOffer.ts` because
+`chatApi.ts`, `widgetsApi.ts`, `ChatView.vue` and `ChatWidget.vue` are
+frozen), 3,154 Vitest tests, vue-tsc, ESLint, Prettier.
+
+**Gate.** Frontend lint, vue-tsc, 3,154 Vitest tests, busy job 2 of 2 on
+the busy stack, layout 16 of 17 (the login overflow is the documented
+local-only demo-card failure). `make test-e2e` on the dev stack: the
+remaining failures are the known-local set (guest 429 limit, subscription,
+Telegram, WhatsApp, workspace tab, the two local-only chat/voice specs).
+The widget/memory/task-prompt failures in the first run were a stale
+`dist-widget` bind mount after a failed stack build on this machine; after
+a backend restart all 15 pass.
+
+**Review round 1 (Copilot, 9 findings).** Fixed: the Try again resend is
+bound to its own chat and mode (the toast outlives a chat switch); a newer
+draft typed during the retries is never overwritten (kept-draft sentence);
+a stored prompt (Again) keeps its row and gets no resend; a send with
+files or a tool keeps its row and files and is never resent as plain text;
+widget history recovery re-reads the refreshed transcript and never counts
+the busy sentence as an answer; a widget send with files or a newer draft
+keeps its bubble. Not changed: the widget's Try again is its restored
+composer with the Send button — the widget has no toast system, and
+`ChatWidget.vue` is frozen in the size ratchet; the sentence sits in the
+bubble directly above the composer.
+
+**Review round 2 (Copilot, 2 findings).** Fixed: the resend guard now
+binds to the incognito session itself (new `sessionId` in the incognito
+store; a later session rejects), and a draft typed during the toast's
+lifetime goes back into the composer after the resend, so Try again never
+eats it.
+
+**As delivered, different from the brief.** The guest stream also retries
+and shows the busy line, but a final guest refusal keeps today's ending
+(finish the empty bubble); the composer restore and Try again are the
+signed-in turn's, as in J-AU-1. The 401 sentence the brief mentions never
+reached the bubble — the handler already replaced transport strings with a
+localized sentence; AU4 gives each refusal class its own sentence instead.
+
+---
+
+## 2026-10-24 — AU3: AI streams get their own PHP pool
+
+`frankenphp validate` accepts the site Caddyfile and the two-pool snippet.
+`match` is legal only inside `php_server`, and two global workers cannot
+share a filename, so the pools are imported there. FrankenPHP writes its
+own 503 (`maximum request handling time exceeded`) and does not return a
+Caddy error, so `handle_errors` never sees it. Worker mode proxies PHP to
+`127.0.0.1:9080` and replaces only status 503. Dev stays on `php_server`.
+
+Measured with `_devextras/perf/runtime/pool-isolation.sh` on the dev stack:
+2 stream workers, 2 api workers, `max_wait_time` 2s, `test-model` at 400 ms
+per chunk, 8 parallel chat streams.
+
+| | Result |
+| - | --- |
+| Streams admitted / refused | 2 / 6 |
+| Refused body | `{"error":"server_busy","retryAfter":5}`, `Retry-After: 5` |
+| `/v1/chat/completions` while the pool was full | 503, OpenAI-shaped `server_busy` |
+| `/api/health` during the streams, 20 requests | 20 of 20, p95 5.6 ms (budget 50 ms) |
+| Metrics | `frankenphp_total_workers{worker="streams"}` and `{worker="api"}` |
+
+A dictation session create with the demo cookie answered 401, so that route
+was not held. TTS answered 200 in 0.01 s and did not occupy a worker. The
+OpenAI-shaped body, which is the dictation stream's body, was measured on
+`/v1/chat/completions`.
+
+**As delivered, different from the brief.** Nested Caddy defaults do not
+parse, and an empty `num_threads` is a parse error. The entrypoint exports
+the stream pool from the api pool when it is unset, and inserts
+`num_threads` / `max_threads` only when those variables are set. The pools
+sit inside `php_server`, not in the global `frankenphp` block the brief
+drew.
 
 ---
 

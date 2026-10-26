@@ -1,0 +1,10 @@
+{
+  "title": "¡Plugin Hola mundo!",
+  "body": "Este plugin se ejecuta en la interfaz de Synaplan, sin iframe.",
+  "context": "Datos de contexto",
+  "userId": "ID de usuario",
+  "apiBase": "Base de la API",
+  "pluginBase": "Base del plugin",
+  "button": "Púlsame",
+  "clicked": "Se pulsó el botón. No ocurrió nada más."
+}

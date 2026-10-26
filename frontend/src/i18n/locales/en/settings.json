@@ -89,6 +89,8 @@
     "title": "Subscription Plans",
     "subtitle": "Unlock more features and higher limits",
     "chooseYourPlan": "Choose Your Plan",
+    "pendingTitle": "Payment still due",
+    "pendingBody": "Choose a plan below to finish. The account stays limited until the payment is complete. Without a payment it is deleted 7 days after sign-up.",
     "currentPlan": "Current Plan",
     "yourPlan": "Your Plan",
     "noActiveSubscription": "No active subscription",

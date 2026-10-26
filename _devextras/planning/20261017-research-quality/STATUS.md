@@ -16,10 +16,10 @@ chat message.
 | RS4 | in progress | Document reader behind `WEB_SEARCH.READ_DOCUMENTS` (web search reads locally, no vision). Smoke reg-01, reg-02, sci-01 scored 1.00 with the flag off and on (2026-10-23), but no run opened a document: the only PDF was outside the 3-page cap. Done needs one smoke item whose top 3 results include a PDF, measured flag off and on. The flag stays off. |
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
-| RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
-| RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
-| RS7 | planned | Tool mode and round mode, conformance suite, questions, plan review, resume — §0 #2, #10 |
-| RS8 | planned | Fact-check — §0 #11 |
+| RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
+| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
+| RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
+| RS8 | in progress | Free check plus the checker model. A cited statement that is not supported is removed and listed; the report ends with the count. Seeded draft still 6/6 and 0/6. Thorough revision is not built. Citation precision was not measured. Flag stays off |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
@@ -37,6 +37,335 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-26 — RS8 checker model, standard removal
+
+No live run. After the report, `CheckStage` runs the free check and then
+asks the checker model, in batches that fit its input budget, for a
+verdict on every cited statement that passed. `supported` stays.
+`partial`, `unsupported`, `contradicted` and a missing verdict are
+removed and listed under the writer's "Not confirmed" section, which is
+itself not checked again. A free-check failure is removed the same way and
+is not sent to the model. Only verdicts for the batch's own statements
+count; an unusable row counts as unsupported instead of failing the run.
+A batch holds at most 30 statements so the verdicts fit the output cap;
+statements left unchecked when the budget runs out count as not confirmed. The report ends with how many
+statements a source backs, and names the provider when the checker and
+the writer share a family. The run summary uses those counts. Every
+depth, including thorough, uses this removal; a revision that keeps the
+supported part is not built. `softened` in the check event is 0.
+
+Command:
+
+```bash
+php bin/phpunit tests/Unit/Service/Research/Run/CheckStageTest.php
+```
+
+Citation precision was not measured. This is not the RS8 exit.
+
+---
+
+## 2026-10-26 — RS8 free check, seeded draft
+
+No model and no live run. `DraftCheck` compares a draft with the text of
+the evidence it cites: an unknown id, a number, a date or a proper name
+the evidence does not contain, and a factual sentence with no citation.
+Dates compare equal as ISO (`12.03.2024`, `12 March 2024`, `12. März 2024`,
+`12 mars 2024`, `12 marzo 2024`, `12 Mart 2024`). A dotted date is
+day.month.year. `2024/1689` is not a date. A proper name is two
+capitalised words, or a word with an internal capital; a single
+capitalised word is not one, because German writes every noun that way,
+and a word such as "Im" or "Today" that opens the run is not part of the
+name. List markers, table headers and the dot in `12. März` do not split
+or create a statement. A revision that adds a new problem (an uncited
+fact, or a cited one its evidence does not back) is rejected.
+
+The seeded draft is the report in `DraftCheckTest`, six planted errors
+and six supported statements. Command:
+
+```bash
+php bin/phpunit tests/Unit/Service/Research/Run/DraftCheckTest.php
+```
+
+Detection **6/6**. False alarms **0/6**. This is not the RS8 exit: the
+checker model is not built, a run does not apply the check, and citation
+precision was not measured.
+
+---
+
+## 2026-10-26 — RS7 starter set in both modes
+
+The same 20 questions the spike was scored on, so the comparison with S-R
+and S-T is like for like. Local m4 stack, `main` at `972ee840e` (with the
+read-first rule of #2746). Research was pinned on with `RESEARCH_ENABLED=1`
+for the window and removed afterwards; the database row stays `0`,
+`LEAD_MODE` is back to `auto` and `TOOL_MODE_MODELS` is `[]`. User 1,
+`CHAT` and `SORT` `BMODELS` 379 (Claude Sonnet 5.5); the `SORT` pin was
+removed afterwards. Web search Brave, no knowledge source (RS9). Corpus
+sha256 `56c371a25e01520f6d601da376b3df4a11ff6d3c245f8a8eb532a99624c844fa`,
+all 20 items, standard depth, repeat 2, **two runs at a time** (three
+pushed queue time into the 360 s wall on 2026-10-25). Round mode is
+`LEAD_MODE=rounds`, tool mode `LEAD_MODE=tools`. Each run is
+`POST /api/v1/research`; the reports are scored by:
+
+```bash
+app:research:eval --corpus=full --arm=b1 --import=<reports>
+```
+
+"Across 16" leaves out the three document-only items and trap-01 (no match
+string), as the spike rows do. The scorer's own mean is across 19 and
+counts doc-01, doc-02 and doc-03 as 0.00.
+
+| Mode | Repeat 1 (16) | Repeat 2 (16) | Scorer mean (19) | Spike row | Traps |
+| ---- | ------------- | ------------- | ---------------- | --------- | ----- |
+| Rounds | 0.81 | 0.81 | 0.68, 0.68 | S-R 0.63 | both abstained twice; trap-02 recall 1.00 |
+| Tools | 0.88 | 0.88 | 0.74, 0.74 | S-T 0.81 (judged 0.78) | both abstained twice; trap-02 recall 1.00 |
+
+Round mode misses fact-01, mix-01 and mix-02 on both repeats; tool mode
+misses mix-01 and mix-02. The mix items need the knowledge source as well.
+Tool mode ended `failed_nothing_found` only on the six document-only runs
+and on trap-01 once. Round mode ended that way on doc-02, doc-03, fact-01
+and trap-01 once each.
+
+| Mode | Cost, 40 runs | Median per run | Wall p50 / p95 | Queue wait ≥ 20 s: steps, p50 / p95 |
+| ---- | ------------- | -------------- | -------------- | ----------------------------------- |
+| Rounds | 7.030820 USD | 0.159838 USD | 163.1 / 245.2 s | 34, 54.5 / 114.9 s |
+| Tools | 4.970934 USD | 0.109488 USD | 100.7 / 153.6 s | 18, 39.5 / 61.4 s |
+
+Percentiles are linear (rank `(n-1)*p`). Wall time is the driver's clock
+and includes the queue. The queue sample counts only steps whose
+`queued_since` reached 20 s while two runs shared one local worker; it is
+not a production queue. No run ended `stopped_limit`.
+
+Against the exit of 07 §RS7: both modes are above both spike rows, tool
+mode by 7 points and round mode by 18, the same on both repeats. Citation
+precision was not judged. Conformance and queue wait are recorded. The
+clause "above the RS6 row" cannot be measured: RS6 has no corpus row and
+the engine without reflect no longer exists. The owner waived that clause
+on 2026-10-26, and RS7 is done. Per-host politeness, named in the RS7
+goal, was not built.
+
+---
+
+## 2026-10-25 — RS7 tool mode reads before it finishes
+
+Cause of the tool-mode row below: in all 14 runs that ended
+`failed_nothing_found`, the lead searched in its first turn and called
+`finish` in its second, with no `read_sources` ("the snippets already
+settle it"). All 6 complete runs had searched, read and then finished. The
+report cites only evidence cards, so a finish before any read leaves it
+nothing. Read from the run state in Redis (`conversation.turns`).
+
+The fix: a `finish` while nothing was read, a found source is unread and
+another turn plus a read still fit the budget, is refused once with
+`read_first`. The other calls of that turn run. After any read, even one
+that found nothing, `finish` is accepted. The lead prompt now says that
+search results are not evidence.
+
+Same stack, user, model (`BMODELS` 379), Brave, corpus sha256, width 3 and
+driver as the entry below, `LEAD_MODE=tools`, scored with
+`app:research:eval --corpus=smoke --arm=b1 --import=<reports>`:
+
+| Run | fact recall (9) | web only (7) | trap-01 |
+| --- | --------------- | ------------ | ------- |
+| Repeat 1 | 0.78 | 1.00 | abstained |
+| Repeat 2 | 0.78 | 1.00 | abstained |
+
+No run ended `failed_nothing_found` except trap-01 on repeat 2. doc-01 and
+mix-01 stay 0.00 (no knowledge source, RS9). The 20 runs spent
+**2.762702 USD** (median 0.116368, against 0.040058 before). Wall time p50
+**174.6 s**, p95 **292.7 s**. Queue sample: 29 steps at or above 20 s,
+p50 **38.0 s**, p95 **130.2 s** (linear rank).
+
+Tool mode now reaches 0.78 against round mode's 0.67 on this set, and is
+3 points under the spike's S-T 0.81, which is a different corpus (starter
+20, 16 scored). The RS6 corpus row was still not run. RS7 stays in progress
+until the owner decides on the exit. Research was pinned on for the window
+and removed afterwards; `LEAD_MODE` is `auto` and `TOOL_MODE_MODELS` is `[]`.
+
+---
+
+## 2026-10-25 — RS7 smoke, conformance and queue wait
+
+Local m4 stack, branch `feat/research-rs7-wait`
+([#2741](https://github.com/metadist/synaplan/pull/2741)), measured after
+`12421b548` with the year fix below already in the worker. Research was
+pinned on with `RESEARCH_ENABLED=1` for the window and removed afterwards.
+The database row stays `0`. After the window, `LEAD_MODE` is `auto`,
+`TOOL_MODE_MODELS` is `[]`, and a start returns `404 feature_not_configured`.
+User 1, `CHAT` and `SORT` both `BMODELS` 379 (Claude Sonnet 5.5,
+`anthropic:claude-sonnet-5-5`). The `SORT` pin was removed afterwards.
+Web search was the keyed Brave provider. `knowledge_available` is false
+(RS9), `read_documents` is false. Corpus
+`backend/tests/Eval/research/corpus.json`, sha256
+`56c371a25e01520f6d601da376b3df4a11ff6d3c245f8a8eb532a99624c844fa`,
+`--corpus=smoke` (10 items, all standard depth). No question was opened
+and no plan waited.
+
+There is no engine arm in `app:research:eval`. Each run is
+`POST /api/v1/research` (depth `standard`, three at a time, repeat 2).
+The text is scored by:
+
+```bash
+app:research:eval --corpus=smoke --arm=b1 --import=<reports>
+```
+
+The `ms` column of that command is 0. Times below are the driver's wall
+clock. A percentile is linear: rank `(n-1)*p`.
+
+Round mode is `LEAD_MODE=auto` with an empty tool list. Repeat 1 scored
+**0.67 across 9**. Repeat 2 under the three-wide queue scored **0.33**:
+reg-01, reg-02 and tech-01 ended `stopped_limit` (the 360 s wall includes
+queue time). Those three, rerun one at a time, all finished `complete`
+with recall 1.00 (extra 1.004018 USD). Repeat 2 with those three texts
+replaced scored **0.67 across 9**. fact-01 is 0.00 on both repeats.
+doc-01 and mix-01 are 0.00 on both (no knowledge source). trap-01
+abstained on both. Dropping doc-01 and mix-01, the web-only mean is
+**0.86 across 7**. The 20 loaded runs spent **4.149274 USD** (median
+0.200263). Wall time p50 **251.0 s**, p95 **380.0 s** (the first six times
+are `updated_at - created_at`, because that driver hung before it wrote
+them). Queue sample is only steps whose `queued_since` reached 20 s: 24
+steps, p50 **65.0 s**, p95 **234.5 s**. The first six runs were not polled.
+
+Tool mode is `LEAD_MODE=tools`, worker restarted before the pass, same
+user, model, corpus and width. Repeat 1 scored **0.22 across 9**, repeat 2
+**0.33 across 9**. The per-item mean is **0.28**. Hits are reg-02 and
+tech-01 on both repeats, and sci-01 on repeat 2. trap-01 abstained on
+both. The 20 runs spent **1.416622 USD** (median 0.040058). Wall time p50
+**90.3 s**, p95 **162.2 s**. Queue sample: 13 steps, p50 **39.0 s**, p95
+**70.8 s**.
+
+Both loaded passes together: 37 steps at or above 20 s, p50 **54.0 s**,
+p95 **176.0 s**. One local worker, three runs at a time. A step picked up
+before 20 s is not in the sample. This is not a production queue.
+
+Conformance, same day, `app:research:conformance <key> --user=1`:
+
+| Key | Result |
+| --- | ------ |
+| `anthropic:claude-sonnet-5-5:chat` | 20/20 |
+| `anthropic:claude-sonnet-5:chat` | 20/20 |
+| `groq:openai/gpt-oss-120b:chat` | 12/20 |
+
+None of them was added to `TOOL_MODE_MODELS`.
+
+RS6 has no corpus recall (the 2026-10-24 row is one Eiffel Tower
+question), so "above the RS6 row" was not run. The spike on 2026-10-23 is
+the starter set of 20 (16 scored), not this smoke set: S-R 0.63, S-T 0.81.
+Round mode at 0.67 sits above S-R and 14 points below S-T. Tool mode at
+0.28 sits below both, past the 3-point smoke noise band. The exit bar is
+not met. RS7 stays in progress. Citation precision was not judged.
+
+The first fact-01 pilot (`rr_5e918f332bb61e77`) stuck in gathering:
+`str_contains()` rejected the year `2024`, which PHP stores as an int
+array key. That run was cancelled and is not in the scores. `PassageFocus`
+now casts terms to strings, and the scored runs include that fix.
+
+---
+
+## 2026-10-24 — RS6 engine v1 smoke and fairness
+
+Local dev stack. Research was pinned on with
+`RESEARCH_ENABLED=1` in `backend/.env` for the measurement and removed
+afterwards. The database row stays `0`. `CHAT` and `SORT` were set to
+`BMODELS` 379 (Claude Sonnet 5.5, `anthropic:claude-sonnet-5-5`) and put
+back to `-1` afterwards. Web search was the keyed Brave provider.
+`GET /api/v1/research/capabilities` then reported `enabled: true`,
+`web_search_available: true`, `knowledge_available: false`,
+`read_documents: false`.
+
+A standard run before the sorter fix (`rr_5ddfe637190fb426`) searched and
+finished `failed_nothing_found`. The `tools:research_triage` prompt asked
+for "one entry per result id" without naming the `results` list or the
+`id` field, so the sorter returned one verdict per hit id, the code only
+read a `results` list, and nothing was opened. The prompt now spells out
+the schema shape, and gather also reads a verdict map keyed by hit id.
+With that shape accepted, standard run `rr_124552ec9cecc1a8` in chat 389
+finished `complete` in about 72 seconds: 26 statements, 26 backed by a
+source, spent 0.135306 USD (estimate 1 USD). The report is the assistant
+message in that chat. Question: "In which year was the Eiffel Tower
+completed, and who designed it?"
+
+Fairness, same stack. A `.md` upload is vectorized inside the request
+(`Ready` is status `vectorized`). Idle file 53: 67 ms. During the standard
+run, file 54: 23 ms. During thorough run `rr_f0307ef95d034790` (then
+cancelled, `stopped_by_user`), file 56: 69 ms. All three came back
+vectorized.
+
+P-MIN (`09` §4) was walked later the same day, see the next entry.
+
+## 2026-10-24 — triage prompt re-smoke and P-MIN walk
+
+Same local stack, flag pin and `CHAT`/`SORT` = 379 as above, all put back
+afterwards (`RESEARCH_ENABLED` removed, `CHAT`/`SORT` = `-1`, backend and
+worker recreated). The corrected `tools:research_triage` prompt was seeded
+with `app:seed`.
+
+Triage with the corrected prompt: a temporary log in gather (removed
+afterwards) showed the sorter reply as `{"results": [...]}`, a list with
+16 rows for 16 hits, so the map fallback was not needed. Standard run
+`rr_f299b0890ee318cb` (chat 391, same Eiffel Tower question) finished
+`complete` in 64 seconds: 8 sources, 19 evidence cards, spent 0.125782 USD.
+
+Quick run `rr_28f8aaeec5ac496b` ("What is the boiling point of water at
+the summit of Mount Everest?") ended `failed_nothing_found` after reading
+two pages. Both pages start with navigation (menus, product lists); the
+reader gets the first 12 000 characters, the answer on the Everest page
+starts after character 8 000, and the reader rightly answered
+`useful: false`. Fixed below.
+
+Read stage fix, same day. A source longer than the passage budget now
+sends the passages that share words with the goal, the points and their
+queries (short menu items need two shared words), each with the passage
+before and after it, in page order; ids stay those of the full text, so
+the passage check is unchanged. Gather also keeps twice as many picks as
+the read budget, because blocked and empty pages do not use it. Before,
+quick run `rr_38b67d48ae217908` ended `failed_nothing_found` with all four
+picks blocked (bot block, 404, no text).
+
+| Run | Depth | Outcome | Cards | Sources read / blocked | Spent USD |
+| --- | ----- | ------- | ----- | ---------------------- | --------- |
+| `rr_a972d5bf40b3f852` | quick | `complete` | 10 | 2 / 2 | 0.066772 |
+| `rr_fbea2902da45484d` | quick | `complete_partial` (1 of 4 points) | 5 | 2 / 1 | 0.046024 |
+| `rr_6e814c0797a336e9` | quick | `complete_partial` (1 of 4 points) | 7 | 2 / 2 | 0.050036 |
+| `rr_b3b2767cd2dfa527` | standard, Eiffel Tower | `complete` | 39 | 6 / 4 | 0.170230 |
+
+The Everest page (766 passages) now sends 38 passages and gives 3–7
+cards per run, quoting "at the top of Everest the boiling temperature of
+the water is 70°C" from §736. Before the fix the quick question failed in
+three of four runs; after it, none of three failed.
+
+P-MIN. `docker-compose.minimal.yml` overlays `app_test` on the test stack
+with the `TestProvider` only, so it cannot run a real model. The walk used
+a temporary overlay outside the repository that puts the same blank
+variables on the dev `backend` and `worker`, plus an empty Brave key
+(P-MIN has no web search). The Anthropic key stayed.
+
+| Step | Result |
+| ---- | ------ |
+| Minimal as shipped (`RESEARCH_ENABLED` empty, gate on) | capabilities and start answer 404 `feature_not_configured`; no research surface |
+| Research pinned on, before the fix | capabilities said `web_search_available: true` (`brave` is the default provider name, no key). Run `rr_103b1a0f7d0a482f` paid for brief and plan (0.010098 USD), sent 4 searches to no provider and ended "The sources that were searched held nothing…" — wrong, nothing could be searched |
+| Research pinned on, after the fix | capabilities `web_search_available: false`, `web_search_provider: null`, `knowledge_available: false`. Run `rr_070d4819880ca7c6` ended in 5 seconds with `failed_no_sources`, "There was nothing to research: turn on the web or add files to this project.", 0 USD, posted into chat 396 |
+| Web PDF without Tika | `ResearchSourceReader` on `w3.org/…/dummy.pdf`: blocked, reason `unreadable`. Same URL with Tika on the full stack: read, "Dummy PDF file" |
+| Files-only run with a cloud embedding | Not possible in engine v1: gather skips `files` queries and capabilities reports `knowledge_available: false` by design. Comes with the knowledge source (RS9) |
+
+The fix: `ResearchSearch::available()` answers from the web search
+gateway's health. Capabilities use it, and the pipeline ends a run with
+`failed_no_sources` before the brief when nothing can be searched.
+
+## 2026-10-23 — run storage and run kernel shared with agent handling (row 25)
+
+The owner approved, in the agent-handling decision session
+([`../20261023-agent-handling/00_master_plan.md`](../20261023-agent-handling/00_master_plan.md)
+§0 #5 and #9), one table **`BRUNS`** for assistant runs and research runs
+(column `BKIND` = `assistant` · `research`). It replaces the `BRESEARCHRUNS`
+alternative of §0 #7 here; §0 #7's default (Redis only in v1) is not changed
+by this entry — whether RS6 writes `BRUNS` rows is decided when RS6 starts.
+The run machinery (units, claims, checkpoints, event log, reaper, delivery)
+is shared as `App\Service\Run\*`: whichever of RS6 and AH8 is built first
+creates it, and the other adopts it. Nothing in RS1–RS4, RD1 or RQ2b changes.
 
 ---
 

@@ -17,7 +17,7 @@ not a chat message.
 | E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | **in progress** | `env-check.sh` merged ([#2566](https://github.com/metadist/synaplan/pull/2566)); fixtures, `lib.sh`, cloud helpers and `use-test-provider.sh` open. The Nextcloud e2e (CF1.3b part 3) runs on the plain test stack plus Redis meanwhile |
 | E-7 Developer docs | all | any | planned | after the stack it documents is green |
 | E-8 Refresh policy | STATUS | — | recurring | monthly or on `max-version` change |
-| E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | planned | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); extended by every core brief |
+| E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | **in review** · [#2674](https://github.com/metadist/synaplan/pull/2674) · issue [#2669](https://github.com/metadist/synaplan/issues/2669) | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); plays copies (CF3.1), pickups (CF3.6) and linking; extended by every core brief |
 | CF-S1 OpenCloud web extension points | `synaplan-opencloud` | P1 (before CF3.1) | planned | timebox 2 days |
 | CF-S2 Nextcloud organisation login (`user_oidc`) | `synaplan-nextcloud` | P1 (start) | planned | decides CF2.6; records the `azp` Nextcloud would send |
 | CF-S3 OpenCloud unattended access | `synaplan-opencloud` | P1 (before CF3.1) | planned | Includes the watch index at the cap (row 41) |
@@ -29,7 +29,7 @@ not a chat message.
 | CF0.3 Cloud uploads that name a knowledge folder skip Incoming (D3) | `synaplan` | P1 | **merged** 2026-10-19 [#2572](https://github.com/metadist/synaplan/pull/2572) | automatic rule, no new request field (decision 2026-10-14) |
 | CF0.4 `check-stale` returns `vector_state` | `synaplan` | P1 | **merged** 2026-10-19 [#2573](https://github.com/metadist/synaplan/pull/2573) |  |
 | CF0.5 Docs truth (D10, D11) | `synaplan-docs`, `synaplan-nextcloud` | P1 | **in review** · Nextcloud hosting guide [synaplan-nextcloud#63](https://github.com/metadist/synaplan-nextcloud/pull/63), OpenCloud docs [synaplan-docs#32](https://github.com/metadist/synaplan-docs/pull/32) | the guide describes 1.7.0, so it merges after #59, #60 and #65 |
-| CF0.6 STATUS hygiene (D14) | `synaplan` | P1 | planned | rows 1–36 agreed; can start |
+| CF0.6 STATUS hygiene (D14) | `synaplan` | P1 | **done** 2026-10-24 | More-Nextcloud archived; S2 recorded as merged (#34); S3 absorbed here; pairing-code fallback (NC18, NC19) named and not scheduled |
 | CF0.7 First walks + compatibility check | all (walk) | P1 | planned | Nextcloud J-NC-1…3; current OpenCloud and ownCloud.online releases |
 | CF0.8 Translation mode for documents (D25) | `synaplan` | P1 | **merged** 2026-10-19 [#2582](https://github.com/metadist/synaplan/pull/2582) | `summaryType: translation`; a translation the model cut off is refused |
 | CF0.9 The connect page names the signed-in account (D28) | `synaplan` | P1 | **merged** 2026-10-19 [#2581](https://github.com/metadist/synaplan/pull/2581) | follow-up: the card follows the theme ([#2584](https://github.com/metadist/synaplan/pull/2584)) |
@@ -45,8 +45,8 @@ not a chat message.
 | CF1.4-oc Five locales, core words — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF1.4-oco Five locales, core words — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.5 OpenCloud chat, media, binary save | `synaplan-opencloud` | P2 | planned | needs CF2.2 (D18); may run during P1 (row 34) |
-| CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | planned | Schema ask recorded; rows 6 and 43 |
-| CF2.2 Canonical identity rows, SSO bind, attribution, bearer on chat | `synaplan` | P1 | planned | D8, D15, D18; adoption of provisioned rows (row 39) |
+| CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | **merged** 2026-10-24 [#2694](https://github.com/metadist/synaplan/pull/2694) | Walk 2026-10-24 below |
+| CF2.2 Canonical identity rows, SSO bind, attribution, bearer on chat | `synaplan` | P1 | **in review** | D8, D15, D18; adoption of provisioned rows (row 39). Controller tests cover bind, adoption and bearer-on-chat; the Keycloak block of `cf2-identity.sh` waits on the live exchange |
 | CF2.3 Background key, `cloud:watch`, scope map | `synaplan` | P1 | planned |  |
 | CF2.4 Lifecycle endpoint | `synaplan` | P1 | planned | D16; never deletes an account still in use (row 38, C18) |
 | CF2.5 Apps cards: status, turn off, disconnect that keeps the row | `synaplan` | P1 | planned | D9, D19; no OpenCloud card (CF2.11) |
@@ -56,14 +56,14 @@ not a chat message.
 | CF2.9 Files remember their cloud | `synaplan` | P1 | planned | D17; schema ask recorded (`BFILES.BSOURCEINSTANCE`, row 40); after CF2.2 |
 | CF2.10 Nextcloud identity basics | `synaplan-nextcloud` | P1 | planned | whatever CF-S2 answers: adoption job, lifecycle calls, four-mode admin screen |
 | CF2.11 OpenCloud Apps card | `synaplan` | P2 | planned |  |
-| CF3.1 Copy protocol, ledger, notify key, `identity_revoked` | `synaplan` | P1 | planned | Schema ask recorded; signed notifications (row 37, C20) |
-| CF3.2 Copy-to-cloud menu, toast, Sent to | `synaplan` | P1 | planned | lists only clouds whose app reports `deliveries` (C21) |
-| CF3.3 Nextcloud inbound, From Synaplan | `synaplan-nextcloud` | P1 | planned |  |
+| CF3.1 Copy protocol, ledger, notify key, `identity_revoked` | `synaplan` | P1 | **merged** 2026-10-20 [#2609](https://github.com/metadist/synaplan/pull/2609) | released in 5.5.3; delivery origin narrowed to the registered host or a dev host until CF2.1 |
+| CF3.2 Copy-to-cloud menu, toast, Sent to | `synaplan` | P1 | **merged** 2026-10-20 [#2613](https://github.com/metadist/synaplan/pull/2613) | released in 5.5.3; lists only clouds whose app reports `deliveries` (C21) |
+| CF3.3 Nextcloud inbound, From Synaplan | `synaplan-nextcloud` | P1 | **merged** 2026-10-24 [synaplan-nextcloud#67](https://github.com/metadist/synaplan-nextcloud/pull/67) |  |
 | CF3.4 ownCloud.online inbound, From Synaplan | `synaplan-owncloud-online` | P3 | planned |  |
 | CF3.5 OpenCloud inbound, binary save, From Synaplan | `synaplan-opencloud` | P2 | planned |  |
-| CF3.6 Pickup protocol, `folder_fetch`, read-scope mirror, WebDAV list/get | `synaplan` | P1 | planned | Schema ask recorded (`BCLOUDPICKUPS`); `BREADSCOPE` comes with CF2.2 |
-| CF3.7 "Read N files" run card, refusal sentence, read scope on Apps card | `synaplan` | P1 | planned |  |
-| CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | P1 | planned | After CF-S5 |
+| CF3.6 Pickup protocol, `folder_fetch`, read-scope mirror, WebDAV list/get | `synaplan` | P1 | **merged** 2026-10-23 [#2650](https://github.com/metadist/synaplan/pull/2650) | released in 5.5.4; `BREADSCOPE` added here, since CF2.2 has not landed |
+| CF3.7 "Read N files" run card, refusal sentence, read scope on Apps card | `synaplan` | P1 | **in review** · [#2666](https://github.com/metadist/synaplan/pull/2666) · issue [#2662](https://github.com/metadist/synaplan/issues/2662) | the WebDAV path walked with a real planner; the linked-cloud path waits for the reference client (E-9) |
+| CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | P1 | **in review** · [synaplan-nextcloud#75](https://github.com/metadist/synaplan-nextcloud/pull/75) | Walk 2026-10-24 below |
 | CF3.9 ownCloud.online pickup handler, read setting | `synaplan-owncloud-online` | P3 | planned | After CF-S4 |
 | CF3.10 OpenCloud pickup handler, read setting | `synaplan-opencloud` | P2 | planned | After CF-S1, CF-S3 |
 | CF4.1 Status, file detail, source events, re-upload | `synaplan` | P1 | planned | `BKEEPSYNCED`, `reupload` answer |
@@ -104,6 +104,7 @@ not a chat message.
 | 2026-10-14 | Product owner, in a click-through of the open rows: rows 37 (signed notifications), 38 (deleting a person in one cloud), 39 (provisioned identities), 40 (files remember their cloud), 43 (apps report their features), 44 (contract v1 at the end of P1), 45 (reference client) and 46 (switch `cloud_files` on after P1) agreed as proposed; row 41 agreed with **lower caps — 20 active watches per person, 1 000 per instance** (instead of 50 / 5 000); the adjustments of rows 33–35 to the Nextcloud-first order confirmed. All 46 rows are agreed. Row 46 replaces row 22's timing; row 11's signing clause is in force. Caps updated in `04` §B.7 / §B.8, CF5.1, the spikes and `cf5-index.sh`. |
 | 2026-10-19 | Product owner: reach Nextcloud releasability first and pause there; follow the code standard of `synaplan-opencloud` and the deployment approach of `synaplan-charts`. Recorded as rows 48 (break after P1) and 49 (standard), both agreed. P1 finalized in [`11`](./11_nextcloud_release.md): four milestone releases (M1–M4), the Nextcloud release at M4, then the break. CF1.3 split into CF1.3a–d; the disabled / re-enabled listener moved to CF2.10. Row 47 agreed in the same session: the P1 releases support Nextcloud 33–35; installations on 30–32 keep 1.6.0. |
 | 2026-10-20 | Product owner, on the open M1 decisions: D29 is fixed in the core now ([#2600](https://github.com/metadist/synaplan/pull/2600)) and ships in the Synaplan release Nextcloud 1.7.0 waits for; D30 is fixed in the app for 1.7.0 ([synaplan-nextcloud#65](https://github.com/metadist/synaplan-nextcloud/pull/65)); `synaplan-nextcloud` `main` is protected like `synaplan-desktop` (rulesets BaseRules and RequiredWorkflows: pull requests only, no force-push, **All Checks Passed** on an up-to-date branch, owner and organisation admins may bypass); 1.7.0 goes out as a release candidate first (`v1.7.0-rc.1`); CF0.5's docs half now ([synaplan-docs#32](https://github.com/metadist/synaplan-docs/pull/32)). The owner merges the PRs and cuts the Synaplan release. |
+| 2026-10-23 | CF3.7, three choices the plan did not make. (1) A folder with more than 50 matching files, or more than 200 MB, is read up to the limit and the card names what was left out ("past the limit for one run"), instead of refusing the whole read as `07` §10 "Too many files" says: the listing protocol already answers `over_limit` per file, and a partial read with its sentence is honest (U8). (2) **Open in …** on a folder card is built by Synaplan from the instance's registered host for Nextcloud and ownCloud (`/index.php/apps/files/?dir=`), because a refused read never reaches the app; OpenCloud and WebDAV folders get no link until their apps name one. (3) A pickup the run stopped waiting for is failed at once and its ticket deleted, and the existing `app:cloud-deliveries:sweep` also fails pickups still open after 20 minutes (R6). Both endings, and the app's result, only close a pickup that is still open, so whichever lands first is what the run and the app both see. |
 
 ## Review log
 
@@ -595,3 +596,124 @@ Findings:
 
    A link made with 1.6.x surviving the upgrade was checked on the dev stack
    when CF1.3c was built.
+
+**2026-10-23 (E-9, the reference client).** `cloud-fixture` started next to
+the dev stack. `env-check.sh` group fixture: PASS (an unsigned notification
+from `backend` gets `401`), and the five notify vectors pass. Registered as
+an `owncloud` instance (pending, then approved by `admin@synaplan.com`),
+announced `http://cloud-fixture:8099/inbound` with `deliveries` and
+`pickups`, and read the notify key. In the browser as `demo@synaplan.com`:
+"Connect ownCloud at localhost:8099 as ada?", then **Connect ownCloud**,
+then "ada is linked to demo@synaplan.com." ada's read scope was set to
+`Invoices` and three invoices were put there.
+
+- Copy to cloud from Library → Generated: "Copied to
+  /Synaplan/invoice_summary.csv on Nextcloud. The file is still here." The
+  fixture wrote the file and Synaplan recorded it as delivered. A second copy,
+  after the fixture learned the kind folders, landed in
+  `Synaplan/Documents/`.
+- Folder read, prompt "Please take the invoice files in my ownCloud folder
+  Invoices, …": the pickup was claimed and listed, but nothing was uploaded
+  ("No files in owncloud › Invoices matched. Nothing was read."). Cause: the
+  core answered the listing with numeric file ids as JSON numbers
+  (`array_keys()` turns `"1027191588"` into an integer). Fixed in the same PR.
+  After the fix: "Read 3 files from owncloud › Invoices.", all three sent.
+  The next step could not read their text (#2665, fixed in #2668).
+- On `main` a refused or empty folder read still falls back to a chat answer
+  that invents a table (fixed in #2666; see also #2667).
+- Found, not fixed here: the copy menu and toast call an ownCloud link
+  "Nextcloud", and the Sent to line says "owncloud"
+  ([#2671](https://github.com/metadist/synaplan/issues/2671)).
+
+**2026-10-23 (#2665, files read from a folder reach the next step).** Account
+`demo@synaplan.com` with the WebDAV connection "nextcloud folder (ada)" to the
+dev Nextcloud, folder `Invoices` with three `.txt` invoices. Prompt: "Please
+take the invoice files in my Nextcloud folder Invoices, read every one of
+them, and then give me one table with the vendor, the invoice date and the
+total amount of each invoice, sorted by date. …" Planner Claude Sonnet 5
+(switched from `gpt-oss-120b` for the walk and back), answers Groq
+`gpt-oss-120b`, each confirmed in `BUSELOG`.
+
+- Before (chat 2919): the folder was read, `extract_text` failed with "no
+  extractable text found in attachments", the document step was skipped
+  ("dependency 'n2' did not complete"), and the answer only named the files.
+- Chat 3039: the plan wired only `$n1.file` into file analysis, so the
+  table had one row and no word about the other two. A step after a folder
+  read now gets every file of it.
+- Chat 3042: the document step got all three files but not their text and
+  wrote a CSV with only the header row. Document generation now attaches
+  them with their text, like uploads.
+- Chat 3043: folder read, then the document. `invoices.xlsx` holds exactly
+  the three rows, sorted by date (Nordwind GmbH 2026-10-02 1,240.00 EUR;
+  Ostsee Logistik 2026-10-09 386.50 EUR; Nordwind GmbH 2026-10-17
+  2,015.75 EUR), and the run looks the same after a reload.
+- Chat 3035: folder read, then file work. File work cannot run on this
+  machine: the local Compute sidecar answers `docker_unavailable`. The run
+  did receive the three files (927 bytes in: the script and three 76-byte
+  files). Its answer said only "Read 3 files …"; it now adds "I could not
+  finish the answer. File work could not finish. Nothing new was saved."
+  (unit test on the same plan, not re-walked).
+
+Found, not fixed here: in five of nine runs the planner sent a single chat
+step and the chat model claimed to read the folder, twice with an invented
+table "exactly as they appear in the invoice files" —
+[#2667](https://github.com/metadist/synaplan/issues/2667).
+
+**2026-10-24 (CF3.8, Nextcloud pickup handler and read setting).** Built in
+[synaplan-nextcloud#75](https://github.com/metadist/synaplan-nextcloud/pull/75)
+on the merged CF3.6 / CF3.7. Ada (Nextcloud, linked to `demo@synaplan.com`)
+chose *Also folders I allow* in her personal settings and named `Invoices`;
+the setting and Synaplan's copy of it both read
+`{"mode":"allowed","folders":[{"id":"","path":"Invoices"}]}`. An admin save
+announced `["deliveries","pickups","read_scope"]` for the instance. Planner
+and answers Claude Sonnet 5 for the walk (the chat model is back to
+`gpt-oss-120b` after).
+
+- "Please take the invoice files from the linked cloud nextcloud at
+  localhost:8081, folder Invoices, … Do not use a WebDAV folder for this." —
+  the card says "Read 3 files from Nextcloud › Invoices" with **Open in
+  Nextcloud**; Synaplan's pickup 6 is `done`, 3 listed, 3 sent. The follow-up
+  file-work step failed on this machine (`docker_unavailable`, as in the
+  2026-10-23 walk), which is the local Compute sidecar, not the read.
+- Folder HR, same wording: "Synaplan may not read HR in your Nextcloud.
+  Nothing was read." plus "Open the folder in Nextcloud and choose **Let
+  Synaplan read this folder**." No pickup was opened; the refusal used the
+  reported setting.
+- That menu entry exists on folders: choosing it on HR added
+  `{"id":"110","path":"HR"}` on both sides; Ada removed it again in her
+  settings, so her setting ends as `Invoices` only.
+
+Found and fixed in the same PR: the settings folder picker had no Choose
+button and could never finish, and the preferences save read the request
+body only when `copy_folder` was missing — the framework hands that one
+over as a parameter, so the read setting silently never saved.
+
+**2026-10-24 (CF2.1, instance columns, capabilities both ways, delivery
+origin).** In review. `BPLATFORMINSTANCES` gains `BREACHABLE`,
+`BOIDCCLIENTID`, `BAPPVERSION`, `BAPPROVEDHOSTS` and `BSERVERID` (raw
+`ADD COLUMN IF NOT EXISTS`); `PATCH instances/self` also takes
+`oidc_client_id`, `app_version` and `server_id`, filters reported
+capabilities to the names of `02` §8.1, and probes the saved delivery
+address (one unsigned ping, any HTTP answer counts) into `BREACHABLE`.
+`GET instances/self` returns the stored `app_capabilities` and
+`reachable`. The delivery-origin rule gains the approved-hostnames rule
+(private addresses allowed, loopback and link-local never). The admin
+Platform instances tab shows the app version and "Synaplan can reach this
+cloud", and approves a delivery hostname from the row.
+
+Walk (dev stacks, 2026-10-24): a save in the Nextcloud admin settings
+re-announced `http://nextcloud/…/api/v1/inbound`; the probe stored
+`BREACHABLE = 1` for the live Nextcloud instance. As
+`admin@synaplan.com` under Admin → Users → Platform instances, that row
+reads "Synaplan can reach this cloud."; **Approve host** asked
+"nextcloud is on a private network (172.19.0.19). Synaplan will call it
+to deliver copies and requests. Approve only clouds you run.", and
+confirming stored `BAPPROVEDHOSTS = ["nextcloud"]` and showed the chip.
+Removing it from the chip stored `NULL` again.
+
+Local gate: lint, PHPStan, deptrac, frontend lint, `vue-tsc` and the
+frontend tests green. The backend suite keeps five failures that also
+occur without this change (three `LongRouteListTest` entrypoint checks,
+one search, one research-budget test — none of their files differ from
+`main`); the migration was applied to the local test database first, as
+CI does on a fresh one.

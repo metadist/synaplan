@@ -89,6 +89,11 @@ final readonly class SystemConfigWriter
                 : $this->clearEnvValue($key);
         }
 
+        $invalidChoice = $this->invalidChoice($value, $field);
+        if (null !== $invalidChoice) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => $invalidChoice];
+        }
+
         // Database-backed fields: write to BCONFIG, no restart needed
         if ($field->isStoredInDatabase()) {
             return $this->computeGuard->refusal($key, $value)
@@ -163,6 +168,23 @@ final readonly class SystemConfigWriter
 
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
         }
+    }
+
+    /**
+     * Why a select refuses $value, or null when it is one of the options.
+     * An unknown mode must not be stored: readers treat it as unset and
+     * fall back to open, so the write would look successful and do nothing.
+     */
+    private function invalidChoice(string $value, FieldDefinition $field): ?string
+    {
+        if ('select' !== $field->type || null === $field->options) {
+            return null;
+        }
+        if (\in_array($value, $field->options, true)) {
+            return null;
+        }
+
+        return 'Choose one of: '.implode(', ', $field->options).'.';
     }
 
     /**

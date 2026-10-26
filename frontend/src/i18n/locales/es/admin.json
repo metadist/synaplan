@@ -546,6 +546,10 @@
         "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
       },
       "fieldOptions": {
+        "REGISTRATION_MODE": {
+          "open": "Abierta — cualquiera puede registrarse",
+          "admission": "Admisión — un plan o un código de invitación"
+        },
         "COMPUTE_REQUIRE_TIER": {
           "docker": "Estándar (Docker normal)",
           "gvisor": "Aislamiento fuerte (gVisor)",
@@ -592,6 +596,94 @@
       },
       "serviceDown": "{name} no es accesible. {effect}",
       "serviceFailed": "{name} no terminó de iniciarse. {effect}"
+    },
+    "signupCodes": {
+      "title": "Códigos de invitación",
+      "empty": "Aún no hay códigos de invitación. Crea uno para dejar entrar a alguien sin pago.",
+      "create": "Crear código",
+      "openModeNote": "El registro está abierto en este servidor, así que nadie necesita un código todavía. Los códigos que crees aquí cuentan en cuanto los ajustes de registro pidan un plan de pago o un código de invitación.",
+      "openSettings": "Abrir ajustes de registro",
+      "loadFailed": "No se pudieron cargar los códigos de invitación. No ha cambiado nada; inténtalo de nuevo.",
+      "show": "Mostrar código",
+      "hide": "Ocultar código",
+      "showAria": "Mostrar el código que empieza por {prefix}",
+      "notStored": "Este código se creó antes de que se guardaran los códigos, así que no se puede volver a mostrar. Revócalo y crea uno nuevo si necesitas compartirlo.",
+      "showFailed": "No se pudo cargar el código. Inténtalo de nuevo.",
+      "shownOnce": "Copia el código y envíaselo a la persona. Puedes volver a mostrarlo cuando quieras haciendo clic en él en la lista.",
+      "copy": "Copiar código",
+      "copied": "Código copiado.",
+      "copyFailed": "No se pudo copiar. Selecciona el código y cópialo a mano.",
+      "done": "Listo",
+      "levels": {
+        "NEW": "Miembro",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business"
+      },
+      "validity": {
+        "forever": "Para siempre",
+        "week": "7 días",
+        "fiveMonths": "5 meses"
+      },
+      "state": {
+        "active": "Utilizable",
+        "expired": "Caducado",
+        "used_up": "Agotado",
+        "revoked": "Revocado"
+      },
+      "facts": {
+        "grants": "Abre una cuenta de nivel {level}",
+        "validUntil": "válido hasta el {date}",
+        "noEnd": "sin fecha de fin",
+        "usesOf": "{uses} de {max} usos",
+        "usesUnlimited": "{uses} uso, sin límite | {uses} usos, sin límite",
+        "createdBy": "Creado por {email} el {date}",
+        "createdByGone": "Creado el {date} por una cuenta que ya no existe"
+      },
+      "actions": {
+        "uses": "Quién lo usó",
+        "edit": "Editar",
+        "revoke": "Revocar",
+        "restore": "Restaurar"
+      },
+      "revokeTitle": "¿Revocar este código?",
+      "revokeBody": "Nadie podrá usar este código. Todavía no lo ha usado nadie. | Nadie podrá usar este código. La persona que lo usó conserva su cuenta. | Nadie podrá usar este código. Las {count} personas que lo usaron conservan sus cuentas.",
+      "revoked": "El código está revocado. Restaurar lo vuelve a activar.",
+      "revokeFailed": "El código no se revocó y sigue funcionando. Inténtalo de nuevo.",
+      "restored": "El código vuelve a funcionar.",
+      "restoredExpired": "El código ya no está revocado, pero su fecha de fin ya pasó. Pon una fecha posterior en Editar para que se pueda usar.",
+      "restoredUsedUp": "El código ya no está revocado, pero todos sus usos están agotados. Sube el límite en Editar para que más personas puedan usarlo.",
+      "restoreFailed": "El código no se restauró y sigue sin poder usarse. Inténtalo de nuevo.",
+      "changeUnconfirmed": "No pudimos confirmar el cambio. La lista muestra ahora el estado actual del código.",
+      "form": {
+        "titleCreate": "Crear un código de invitación",
+        "titleEdit": "Editar código de invitación",
+        "titleCreated": "Tu nuevo código de invitación",
+        "label": "Etiqueta",
+        "labelPlaceholder": "Por ejemplo: clientes piloto",
+        "labelHint": "Solo los administradores ven la etiqueta.",
+        "level": "Nivel de la nueva cuenta",
+        "validity": "Válido",
+        "validUntil": "Válido hasta",
+        "noEnd": "Sin fecha de fin",
+        "maxUses": "Cuántas personas pueden usarlo",
+        "unlimited": "Sin límite",
+        "labelRequired": "Ponle una etiqueta al código.",
+        "maxUsesInvalid": "Escribe un número entero de 1 o más, o elige Sin límite.",
+        "dateRequired": "Elige una fecha o Sin fecha de fin.",
+        "createFailed": "El código no se creó. No se guardó nada; inténtalo de nuevo.",
+        "createUnconfirmed": "No pudimos confirmar si se creó el código. Revisa la lista: si aparece un código con esta etiqueta, haz clic en él para mostrarlo.",
+        "saveFailed": "Los cambios no se guardaron. El código funciona como antes.",
+        "saveUnconfirmed": "No pudimos confirmar si se guardaron los cambios. La lista muestra ahora el estado actual del código.",
+        "saved": "Cambios guardados."
+      },
+      "uses": {
+        "title": "Quién se registró con este código",
+        "empty": "Nadie ha usado este código todavía.",
+        "deleted": "Cuenta eliminada",
+        "deletedAccounts": "{count} cuenta que usó este código se ha eliminado desde entonces. | {count} cuentas que usaron este código se han eliminado desde entonces.",
+        "loadFailed": "No se pudo cargar la lista. Ciérrala y ábrela de nuevo."
+      }
     }
   },
   "statistics": {
@@ -884,7 +976,8 @@
       "policies": "Políticas",
       "linkedPlatforms": "Instancias de plataforma",
       "moderation": "Moderación",
-      "audit": "Auditoría"
+      "audit": "Auditoría",
+      "signupCodes": "Códigos de invitación"
     },
     "openPeople": "Abrir Usuarios",
     "backToOperate": "Volver a Operar",
@@ -1044,6 +1137,17 @@
       "status": "Estado",
       "actions": "Acciones",
       "approve": "Aprobar",
+      "approveHost": "Aprobar host",
+      "hostPlaceholder": "Nombre de host de entrega, p. ej. files.example.lan",
+      "approveHostSentence": "{host} está en una red privada ({address}). Synaplan llamará a esta dirección para entregar copias y solicitudes. Aprueba solo las nubes que gestionas tú.",
+      "approveHostTitle": "¿Aprobar esta dirección?",
+      "canReach": "Synaplan puede alcanzar esta nube.",
+      "cannotReach": "Synaplan no puede alcanzar esta nube.",
+      "reachNotChecked": "Aún no se ha comprobado si Synaplan puede alcanzar esta nube.",
+      "removeHost": "Quitar {host}",
+      "hostApproved": "{host} aprobado.",
+      "hostRemoved": "{host} eliminado.",
+      "hostError": "No se pudo cambiar el nombre de host.",
       "revoke": "Revocar",
       "approved": "Plataforma aprobada.",
       "revoked": "Plataforma revocada.",
@@ -1131,7 +1235,8 @@
       "groups": "Los grupos reúnen usuarios para compartir asistentes y fijar reglas una sola vez para todas.",
       "policies": "Las políticas deciden qué puede usar un grupo, por ejemplo qué funciones o modelos.",
       "moderation": "Contenido que los usuarios han denunciado. Revísalo y consérvalo o elimínalo.",
-      "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero."
+      "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero.",
+      "signup-codes": "Códigos que permiten registrarse sin pagar. Tú decides el nivel de la nueva cuenta, cuánto tiempo vale un código y cuántas personas pueden usarlo."
     }
   },
   "iam": {
@@ -1361,8 +1466,14 @@
     "chat_artifacts": {
       "label": "Vista previa de HTML y SVG"
     },
+    "research": {
+      "label": "Investigación"
+    },
     "freeapi": {
       "label": "Demo de Synaplan"
+    },
+    "capacity": {
+      "label": "Capacidad de los servidores"
     }
   },
   "partners": {
@@ -1427,6 +1538,80 @@
       "not_partner": "No se encontró esa conexión.",
       "bad_url": "Esa dirección no es un servidor https público.",
       "replay": "Esta solicitud ya se usó."
+    }
+  },
+  "capacity": {
+    "title": "Capacidad",
+    "subtitle": "Qué tan cargado está cada servidor de esta instalación y si alguno necesita ayuda.",
+    "loading": "Leyendo los servidores…",
+    "unavailable": "La capacidad no se puede leer ahora porque la caché compartida no responde. Los servidores siguen funcionando.",
+    "failed": "No se pudieron leer los servidores. Inténtelo de nuevo en un momento.",
+    "empty": "Ningún servidor ha informado todavía — los servidores informan en el primer minuto tras arrancar.",
+    "checkAgain": "Comprobar de nuevo",
+    "footer": "Solo los administradores ven esta página. Nada aquí cambia un servidor.",
+    "servers": {
+      "title": "Servidores",
+      "summary": "{count} servidor · actualizado hace {seconds} s | {count} servidores · actualizado hace {seconds} s",
+      "connectedTo": "Está conectado a {server}",
+      "owner": "Cada servidor de esta instalación informa aquí.",
+      "source": "Cada servidor se mide a sí mismo cada 5 segundos y conserva 24 horas."
+    },
+    "role": {
+      "web": "Web",
+      "worker": "Trabajo en segundo plano",
+      "scheduler": "Tareas programadas"
+    },
+    "card": {
+      "connectedHere": "Está conectado a este servidor.",
+      "reporting": "Informando",
+      "silentSeconds": "Último informe hace {count} s",
+      "silentMinutes": "Último informe hace {count} min — el servidor puede estar apagado o reiniciándose",
+      "silentUnknown": "Dejó de informar",
+      "aiAnswers": "Respuestas de IA",
+      "otherRequests": "Otras solicitudes",
+      "memory": "Memoria",
+      "processor": "Procesador",
+      "ofAtOnce": "{used} de {total} a la vez",
+      "noPools": "sin grupos separados",
+      "peakToday": "pico de hoy {count} ({time})",
+      "memoryOf": "{used} de {total}",
+      "memoryUnlimited": "{used} · sin límite",
+      "processorOf": "{percent} % de {cores} núcleos",
+      "processorMeasuring": "midiendo · {cores} núcleos",
+      "processorShort": "{percent} %",
+      "sizingHint": "En su pico de hoy, {server} respondió {peak} de las {total} solicitudes de IA que puede atender a la vez. Añada un servidor o aumente sus plazas de respuesta de IA — la guía de dimensionado muestra cómo.",
+      "technical": "Detalles técnicos",
+      "runsOn": "Se ejecuta en",
+      "workers": "PHP",
+      "logs": "Registros",
+      "version": "Synaplan {version} · watchdog {watchdog}",
+      "pools": "{streams} plazas de respuesta de IA + {api} plazas de solicitud",
+      "poolsSingle": "un grupo de {count} hilos",
+      "logsStderr": "la salida de error del proceso",
+      "howToStop": "Un servidor deja de informar cuando su watchdog está apagado (SYNAPLAN_WATCHDOG=0).",
+      "helperSilent": "dejó de informar",
+      "runtime": {
+        "kubernetes": "Kubernetes",
+        "docker": "Docker",
+        "host": "Directamente en la máquina"
+      },
+      "place": {
+        "machine": "máquina {name}",
+        "address": "dirección {address}",
+        "pod": "pod {name}",
+        "deployment": "deployment {name}",
+        "namespace": "namespace {name}",
+        "memoryLimit": "límite de memoria {value}",
+        "cpuRequest": "procesador solicitado {value}"
+      }
+    },
+    "events": {
+      "open": "Mostrar eventos recientes",
+      "hide": "Ocultar eventos recientes",
+      "loading": "Leyendo eventos…",
+      "failed": "No se pudieron leer los eventos.",
+      "empty": "Sin avisos de este servidor en la última hora.",
+      "window": "Avisos y errores de la última hora, los más recientes primero, como máximo 20."
     }
   }
 }

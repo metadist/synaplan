@@ -369,6 +369,12 @@
       },
       "admin": {
         "catalogSubtitle": "Sistem model kataloğunu arayın ve düzenleyin.",
+        "withdrawn": "{provider} artık sunmuyor. Siz kaldırana kadar burada kalır.",
+        "deletedMoved": "Kaldırıldı. {job} artık {model} kullanıyor.",
+        "deletedMovedMany": "Kaldırıldı. Bu modeli kullanan yerler artık başka bir uygun model kullanıyor.",
+        "deletedCleared": "Kaldırıldı. Bu sayfada bir model seçene kadar {job} için model yok. Başka bir şey değişmedi.",
+        "deletedMovedAndCleared": "Kaldırıldı. Bir kısmı artık başka bir model kullanıyor. Bu sayfada bir model seçene kadar {job} için model yok.",
+        "someJobs": "Bir kısmı",
         "availability": {
           "providerUnavailable": "Sağlayıcı yapılandırılmamış",
           "providerUnavailableTooltip": "Bu yapay zeka sağlayıcısı için bu kurulumda API anahtarı veya sunucu URL'si yok. Sağlayıcı yapılandırılana kadar kullanıcılar bu modeli görmez.",
@@ -687,6 +693,8 @@
       "errorActivating": "API anahtarı etkinleştirilemedi",
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
+      "planRequired": "API anahtarları ücretli bir plana dahildir.",
+      "seePlans": "Planları gör",
       "scopes": {
         "hint": "Tam erişim için işaretlemeyin. Kullanıcılar kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
         "iamRead": "Kullanıcılar — grupları görüntüle",

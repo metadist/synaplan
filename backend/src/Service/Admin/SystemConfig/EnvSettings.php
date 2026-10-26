@@ -11,7 +11,10 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * The environment settings of the instance: the value the running process
  * sees ($_ENV, then getenv()) and edits to the .env file the next start
  * reads. Every edit backs the file up first (the five newest backups stay)
- * and replaces it in one rename.
+ * and replaces it in one rename — or, when the file cannot be renamed over
+ * (production mounts .env as a single-file bind mount, and renaming over a
+ * mounted file answers "Device or resource busy"), writes it in place so
+ * the mounted file keeps its identity.
  */
 final readonly class EnvSettings
 {
@@ -157,17 +160,42 @@ final readonly class EnvSettings
     private function replace(string $envFile, string $content): array
     {
         $tempFile = $envFile.'.tmp';
-        if (false === file_put_contents($tempFile, $content)) {
-            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to write temp file'];
+        if (false !== $this->attempt(static fn () => file_put_contents($tempFile, $content))
+            && true === $this->attempt(static fn () => rename($tempFile, $envFile))) {
+            return ['success' => true, 'requiresRestart' => true];
         }
+        $this->attempt(static fn () => unlink($tempFile));
 
-        if (!rename($tempFile, $envFile)) {
-            @unlink($tempFile);
-
+        // The atomic rename is unavailable: production mounts .env as a
+        // single file (synaplan-platform binds the NFS .env into the
+        // container), and renaming over a mounted file fails with EBUSY.
+        // The backup taken before every edit is the safety net, so write
+        // the new content into the existing file instead — the mounted
+        // file, its inode and its permissions stay as they are.
+        $this->logger->info('EnvSettings: rename route unavailable for .env, writing in place');
+        if (false === $this->attempt(static fn () => file_put_contents($envFile, $content))) {
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save .env file'];
         }
 
         return ['success' => true, 'requiresRestart' => true];
+    }
+
+    /**
+     * Runs one filesystem step and answers its result, or false when the
+     * step failed. A failed step here is an expected route (the rename
+     * over a mounted file), not an error worth a log line or a crashed
+     * request, so its warning is swallowed and the caller falls back.
+     */
+    private function attempt(callable $operation): mixed
+    {
+        set_error_handler(static fn () => true);
+        try {
+            return $operation();
+        } catch (\Throwable) {
+            return false;
+        } finally {
+            restore_error_handler();
+        }
     }
 
     /**

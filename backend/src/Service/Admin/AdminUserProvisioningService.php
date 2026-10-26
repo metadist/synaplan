@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Entity\ApiKey;
+use App\Entity\ExternalIdentity;
+use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -22,9 +25,10 @@ use Psr\Log\LoggerInterface;
  * external_id="<instance-id>:<nc-uid>". Provisioning is idempotent on that
  * pair: calling it twice for the same identity returns the same Synaplan user.
  *
- * The external identity is stored inside the User's userDetails JSON (the same
- * place the OIDC "sub" lives), so this needs NO schema migration and is safe on
- * the production Galera cluster.
+ * With the instance credential the row is canonical: (client, platform
+ * instance, bare uid), mode provision, and the minted key is bound to it.
+ * Without the credential the legacy shape is unchanged. An adopted person
+ * is found through their user details and is not given a second row.
  */
 final class AdminUserProvisioningService
 {
@@ -40,6 +44,7 @@ final class AdminUserProvisioningService
         private readonly UserLifecycleService $userLifecycleService,
         private readonly LoggerInterface $logger,
         private readonly ExternalIdentityRepository $externalIdentityRepository,
+        private readonly PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -91,6 +96,7 @@ final class AdminUserProvisioningService
         ?string $displayName = null,
         string $level = 'NEW',
         ?string $plainPassword = null,
+        ?PlatformInstance $instance = null,
     ): array {
         $source = trim($source);
         $externalId = trim($externalId);
@@ -109,11 +115,16 @@ final class AdminUserProvisioningService
         if (null !== $plainPassword && strlen($plainPassword) < 8) {
             throw new \InvalidArgumentException('password must be at least 8 characters');
         }
+        if (null !== $instance && $source !== $instance->getClient()) {
+            throw new \InvalidArgumentException('source does not match this cloud.');
+        }
 
-        $existing = $this->findByExternalIdentity($source, $externalId);
+        $existing = null !== $instance
+            ? $this->findForInstance($instance, $externalId)
+            : $this->findByExternalIdentity($source, $externalId);
         if (null !== $existing) {
             $this->syncDetails($existing, $email, $displayName);
-            $this->upsertIdentity((int) $existing->getId(), $source, $externalId);
+            $this->rememberIdentity($existing, $source, $externalId, $instance);
             $this->em->flush();
 
             return ['user' => $existing, 'created' => false];
@@ -140,7 +151,7 @@ final class AdminUserProvisioningService
             ],
         );
 
-        $this->upsertIdentity((int) $user->getId(), $source, $externalId);
+        $this->rememberIdentity($user, $source, $externalId, $instance);
 
         $this->logger->info('Provisioned external user', [
             'user_id' => $user->getId(),
@@ -151,9 +162,123 @@ final class AdminUserProvisioningService
         return ['user' => $user, 'created' => true];
     }
 
-    private function upsertIdentity(int $userId, string $source, string $externalId): void
+    /**
+     * Canonical row when the call carries the instance credential. Otherwise
+     * the legacy row, unless this person was already adopted.
+     */
+    private function rememberIdentity(User $user, string $source, string $externalId, ?PlatformInstance $instance): void
     {
-        $this->externalIdentityRepository->upsert($userId, $source, $externalId);
+        $userId = (int) $user->getId();
+        if (null !== $instance) {
+            $this->writeCanonical($userId, $instance, $externalId);
+
+            return;
+        }
+
+        if (null !== $this->externalIdentityRepository->findCanonicalForUserSource($userId, $source)) {
+            return;
+        }
+
+        $this->externalIdentityRepository->upsert(
+            $userId,
+            $source,
+            $externalId,
+            '',
+            null,
+            ExternalIdentity::MODE_PROVISION,
+        );
+    }
+
+    private function writeCanonical(int $userId, PlatformInstance $instance, string $uid): void
+    {
+        $source = $instance->getClient();
+        $instanceId = $instance->getInstanceId();
+        $canonical = $this->externalIdentityRepository->findOneByTriple($source, $instanceId, $uid);
+        if ($canonical instanceof ExternalIdentity) {
+            if ($canonical->getUserId() !== $userId) {
+                throw new UserProvisioningConflictException('This person already has a Synaplan account on this cloud.');
+            }
+            if (null === $canonical->getMode()) {
+                $canonical->setMode(ExternalIdentity::MODE_PROVISION);
+            }
+
+            return;
+        }
+
+        foreach ($this->legacyIds($instance, $uid) as $legacyId) {
+            $legacy = $this->externalIdentityRepository->findOneByTriple($source, '', $legacyId);
+            if ($legacy instanceof ExternalIdentity && $legacy->getUserId() === $userId) {
+                $legacy->setInstanceId($instanceId);
+                $legacy->setExternalId($uid);
+                $legacy->setMode(ExternalIdentity::MODE_PROVISION);
+
+                return;
+            }
+        }
+
+        $this->externalIdentityRepository->upsert(
+            $userId,
+            $source,
+            $uid,
+            $instanceId,
+            null,
+            ExternalIdentity::MODE_PROVISION,
+        );
+    }
+
+    private function findForInstance(PlatformInstance $instance, string $uid): ?User
+    {
+        $source = $instance->getClient();
+        $canonical = $this->externalIdentityRepository->findOneByTriple($source, $instance->getInstanceId(), $uid);
+        if ($canonical instanceof ExternalIdentity) {
+            return $this->userOf($canonical->getUserId());
+        }
+
+        foreach ($this->legacyIds($instance, $uid) as $legacyId) {
+            $legacy = $this->externalIdentityRepository->findOneByTriple($source, '', $legacyId);
+            if ($legacy instanceof ExternalIdentity) {
+                $user = $this->userOf($legacy->getUserId());
+                if ($user instanceof User) {
+                    return $user;
+                }
+            }
+
+            if ($this->isServerScopedLegacyId($legacyId)) {
+                $byDetails = $this->findByExternalIdentity($source, $legacyId);
+                if ($byDetails instanceof User) {
+                    return $byDetails;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function isServerScopedLegacyId(string $legacyId): bool
+    {
+        return str_contains($legacyId, ':');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function legacyIds(PlatformInstance $instance, string $uid): array
+    {
+        $ids = [];
+        $serverId = trim((string) ($instance->getServerId() ?? ''));
+        if ('' !== $serverId) {
+            $ids[] = $serverId.':'.$uid;
+        }
+        $ids[] = $uid;
+
+        return $ids;
+    }
+
+    private function userOf(int $userId): ?User
+    {
+        $user = $this->userRepository->find($userId);
+
+        return $user instanceof User ? $user : null;
     }
 
     /**
@@ -165,7 +290,7 @@ final class AdminUserProvisioningService
      *
      * @return array{entity: ApiKey, plainKey: string}
      */
-    public function mintApiKeyForUser(User $user, string $name, array $scopes): array
+    public function mintApiKeyForUser(User $user, string $name, array $scopes, ?PlatformInstance $instance = null): array
     {
         $plainKey = 'sk_'.bin2hex(random_bytes(29));
 
@@ -176,7 +301,20 @@ final class AdminUserProvisioningService
         $apiKey->setStatus('active');
         $apiKey->setScopes([] !== $scopes ? array_values($scopes) : ['*']);
 
-        $this->apiKeyRepository->save($apiKey);
+        if (null !== $instance) {
+            $this->requireIdentityOnInstance($user, $instance);
+        }
+
+        $this->premiumFeatureGate->assertApiKeysAllowed($user);
+
+        $this->em->wrapInTransaction(function () use ($apiKey, $user, $instance): void {
+            $this->apiKeyRepository->save($apiKey, false);
+            $this->em->flush();
+            if (null !== $instance) {
+                $this->bindMintedKey($user, $apiKey, $instance, false);
+            }
+            $this->em->flush();
+        });
 
         $this->logger->info('Minted API key on behalf of user', [
             'user_id' => $user->getId(),
@@ -185,6 +323,44 @@ final class AdminUserProvisioningService
         ]);
 
         return ['entity' => $apiKey, 'plainKey' => $plainKey];
+    }
+
+    private function requireIdentityOnInstance(User $user, PlatformInstance $instance): void
+    {
+        $rows = $this->externalIdentityRepository->findForUserOnInstance(
+            (int) $user->getId(),
+            $instance->getClient(),
+            $instance->getInstanceId(),
+        );
+        if (!($rows[0] ?? null) instanceof ExternalIdentity) {
+            throw new \InvalidArgumentException('This user has no identity on this cloud.');
+        }
+    }
+
+    private function bindMintedKey(User $user, ApiKey $apiKey, PlatformInstance $instance, bool $flush = true): void
+    {
+        $keyId = $apiKey->getId();
+        if (null === $keyId) {
+            throw new \LogicException('Minted key has no id.');
+        }
+
+        $rows = $this->externalIdentityRepository->findForUserOnInstance(
+            (int) $user->getId(),
+            $instance->getClient(),
+            $instance->getInstanceId(),
+        );
+        $row = $rows[0] ?? null;
+        if (!$row instanceof ExternalIdentity) {
+            throw new \InvalidArgumentException('This user has no identity on this cloud.');
+        }
+
+        $row->setApiKeyId($keyId);
+        if (null === $row->getMode()) {
+            $row->setMode(ExternalIdentity::MODE_PROVISION);
+        }
+        if ($flush) {
+            $this->em->flush();
+        }
     }
 
     /**

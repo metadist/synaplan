@@ -4,17 +4,24 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\ApiKey;
+use App\Entity\PlatformInstance;
 use App\Entity\User;
+use App\Repository\ApiKeyRepository;
+use App\Security\OidcBearerAuthenticator;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
 use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
 use App\Service\PlatformLink\Exception\PlatformLinkCodeException;
 use App\Service\PlatformLink\Exception\PlatformLinkLimitException;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
+use App\Service\PlatformLink\Exception\PlatformSsoException;
+use App\Service\PlatformLink\InstanceCredential;
 use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinkExchangeService;
 use App\Service\PlatformLink\PlatformLinkRateLimiter;
 use App\Service\PlatformLink\PlatformLinksConfig;
+use App\Service\PlatformLink\PlatformSsoService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,6 +43,9 @@ final class PlatformLinkController extends AbstractController
         private readonly PlatformInstanceService $instanceService,
         private readonly PlatformLinkExchangeService $exchangeService,
         private readonly PlatformLinkRateLimiter $rateLimiter,
+        private readonly PlatformSsoService $sso,
+        private readonly InstanceCredential $instanceCredential,
+        private readonly ApiKeyRepository $apiKeys,
     ) {
     }
 
@@ -195,6 +205,222 @@ final class PlatformLinkController extends AbstractController
         }
 
         return $this->json($result);
+    }
+
+    #[Route('/sso/status', name: 'sso_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/platform-links/sso/status',
+        operationId: 'platformSsoStatus',
+        summary: 'Whether this person is bound to the cloud',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'external_id', in: 'query', required: true, schema: new OA\Schema(type: 'string'), description: 'The platform user id.'),
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Bound or not',
+                content: new OA\JsonContent(
+                    required: ['bound'],
+                    properties: [
+                        new OA\Property(property: 'bound', type: 'boolean', example: false),
+                        new OA\Property(property: 'mode', type: 'string', nullable: true, example: 'sso'),
+                        new OA\Property(property: 'status', type: 'string', nullable: true, example: 'active'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Bearer token or instance credential missing'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function ssoStatus(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user?->getId());
+        if (!$user instanceof User) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $status = $this->sso->status($user, $this->credential($request), (string) $request->query->get('external_id', ''));
+        } catch (PlatformSsoException $e) {
+            return $this->ssoError($e);
+        }
+
+        return $this->json($status);
+    }
+
+    #[Route('/sso/bind', name: 'sso_bind', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/platform-links/sso/bind',
+        operationId: 'platformSsoBind',
+        summary: 'Bind this person to the cloud through organisation login',
+        description: 'Requires the person\'s live bearer token and the instance credential. The token\'s azp must be the client registered for the instance. A second call answers 200.',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['external_id'],
+                properties: [
+                    new OA\Property(property: 'external_id', type: 'string', example: 'ada', description: 'The platform user id.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Identity row written',
+                content: new OA\JsonContent(
+                    required: ['success', 'bound', 'mode', 'status'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'bound', type: 'boolean', example: true),
+                        new OA\Property(property: 'mode', type: 'string', example: 'sso'),
+                        new OA\Property(property: 'status', type: 'string', example: 'active'),
+                        new OA\Property(property: 'link_id', type: 'integer'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Bearer token or instance credential missing'),
+            new OA\Response(response: 403, description: 'azp does not match, or the connection is turned off'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function ssoBind(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user?->getId());
+        if (!$user instanceof User) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $body = $this->jsonBody($request);
+
+        try {
+            $result = $this->sso->bind(
+                $user,
+                $this->azp($request),
+                $this->credential($request),
+                is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
+                $request->getClientIp() ?? '',
+            );
+        } catch (PlatformSsoException $e) {
+            return $this->ssoError($e);
+        }
+
+        return $this->json($result);
+    }
+
+    #[Route('/identities/adopt', name: 'identities_adopt', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/platform-links/identities/adopt',
+        operationId: 'platformIdentityAdopt',
+        summary: 'Bring a provisioned person\'s identity row into the canonical shape',
+        description: 'The person\'s own key plus the instance credential. The legacy row is (client, empty instance, server id + uid). A repeated call answers 200.',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['external_id'],
+                properties: [
+                    new OA\Property(property: 'external_id', type: 'string', example: 'p2', description: 'The bare platform user id.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Canonical row, key bound'),
+            new OA\Response(response: 401, description: 'Key or instance credential missing'),
+            new OA\Response(response: 403, description: 'Someone else\'s key, or the server id does not match'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function adopt(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user?->getId());
+        if (!$user instanceof User) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $key = $this->presentedKey($request, $user);
+        if (!$key instanceof ApiKey) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized', 'message' => 'The person\'s key is required.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $body = $this->jsonBody($request);
+
+        try {
+            $result = $this->sso->adopt(
+                $user,
+                $key,
+                $this->credential($request),
+                is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
+            );
+        } catch (PlatformSsoException $e) {
+            return $this->ssoError($e);
+        }
+
+        return $this->json($result);
+    }
+
+    private function credential(Request $request): PlatformInstance
+    {
+        try {
+            return $this->instanceCredential->require(
+                (string) $request->headers->get('X-Instance-Id', ''),
+                (string) $request->headers->get('X-Instance-Secret', ''),
+            );
+        } catch (PlatformInstanceNotFoundException|PlatformInstanceSecretException) {
+            throw new PlatformSsoException(Response::HTTP_UNAUTHORIZED, 'unauthorized', 'Invalid instance credentials.');
+        } catch (PlatformInstanceNotActiveException) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'instance_pending', 'This platform is waiting for approval by the Synaplan administrator.');
+        }
+    }
+
+    private function azp(Request $request): string
+    {
+        $claims = $request->attributes->get(OidcBearerAuthenticator::CLAIMS_ATTRIBUTE);
+        if (!is_array($claims)) {
+            return '';
+        }
+        $azp = $claims['azp'] ?? '';
+
+        return is_string($azp) ? $azp : '';
+    }
+
+    private function presentedKey(Request $request, User $user): ?ApiKey
+    {
+        $plain = trim((string) $request->headers->get('X-API-Key', ''));
+        if ('' === $plain) {
+            $authorization = (string) $request->headers->get('Authorization', '');
+            if (str_starts_with($authorization, 'Bearer sk_')) {
+                $plain = substr($authorization, 7);
+            }
+        }
+        if ('' === $plain) {
+            return null;
+        }
+
+        $key = $this->apiKeys->findActiveByKey($plain);
+
+        return $key instanceof ApiKey && $key->getOwnerId() === (int) $user->getId() ? $key : null;
+    }
+
+    private function ssoError(PlatformSsoException $e): JsonResponse
+    {
+        return $this->json([
+            'success' => false,
+            'error' => $e->errorCode,
+            'message' => $e->getMessage(),
+            'code' => $e->errorCode,
+        ], $e->status);
     }
 
     private function guard(?int $userId): void

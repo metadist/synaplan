@@ -50,7 +50,7 @@ final class ContextCondenser
      *
      * @var array<string, true>
      */
-    private const EXTRACT_STOP_WORDS = [
+    public const EXTRACT_STOP_WORDS = [
         'the' => true, 'and' => true, 'for' => true, 'are' => true, 'was' => true, 'were' => true,
         'this' => true, 'that' => true, 'with' => true, 'from' => true, 'about' => true, 'what' => true,
         'which' => true, 'when' => true, 'where' => true, 'how' => true, 'why' => true, 'who' => true,

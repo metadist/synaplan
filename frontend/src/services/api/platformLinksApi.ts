@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { httpClient } from './httpClient'
 import {
+  ApprovePlatformInstanceHostResponseSchema,
   ApprovePlatformInstanceResponseSchema,
   ConnectOutlookAddinResponseSchema,
   CreatePlatformLinkCodeResponseSchema,
@@ -8,6 +9,7 @@ import {
   GetPlatformInstancePublicResponseSchema,
   ListAdminPlatformInstancesResponseSchema,
   ListMyPlatformLinksResponseSchema,
+  RemovePlatformInstanceHostResponseSchema,
   RevokePlatformInstanceResponseSchema,
 } from '@/generated/api-schemas'
 
@@ -107,6 +109,22 @@ export const platformLinksApi = {
     await httpClient(`/api/v1/admin/platform-links/instances/${instanceId}`, {
       method: 'DELETE',
       schema: RevokePlatformInstanceResponseSchema,
+    })
+  },
+
+  async approveHost(instanceId: string, hostname: string): Promise<void> {
+    await httpClient(`/api/v1/admin/platform-links/instances/${instanceId}/approved-hosts`, {
+      method: 'POST',
+      body: JSON.stringify({ hostname }),
+      schema: ApprovePlatformInstanceHostResponseSchema,
+    })
+  },
+
+  async removeApprovedHost(instanceId: string, hostname: string): Promise<void> {
+    await httpClient(`/api/v1/admin/platform-links/instances/${instanceId}/approved-hosts`, {
+      method: 'DELETE',
+      body: JSON.stringify({ hostname }),
+      schema: RemovePlatformInstanceHostResponseSchema,
     })
   },
 }

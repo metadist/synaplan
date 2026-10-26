@@ -171,6 +171,8 @@ final class ShareControllerTest extends WebTestCase
     {
         $this->enableSharing();
         $owner = $this->createUser('share-legacy-key@synaplan.internal');
+        $owner->setUserLevel('PRO');
+        $this->em->flush();
         $chat = $this->createChat((int) $owner->getId(), 'Key chat');
         $key = $this->createApiKey($owner, []);
 
@@ -187,6 +189,8 @@ final class ShareControllerTest extends WebTestCase
     {
         $this->enableSharing();
         $owner = $this->createUser('share-read-key@synaplan.internal');
+        $owner->setUserLevel('PRO');
+        $this->em->flush();
         $chat = $this->createChat((int) $owner->getId(), 'Scoped');
         $key = $this->createApiKey($owner, [ApiKeyScope::IAM_READ]);
 

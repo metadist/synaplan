@@ -119,6 +119,19 @@ final class InboundEmailIntakeTest extends TestCase
         self::assertSame([['discord', 'user_creation'], ['mail', 'ada@metadist.onmicrosoft.com', 'Too many requests.']], $this->steps);
     }
 
+    public function testAPendingPaymentSenderIsToldToFinishCheckout(): void
+    {
+        $sender = $this->createStub(User::class);
+        $sender->method('isActive')->willReturn(false);
+        $sender->method('isPendingPayment')->willReturn(true);
+
+        self::assertSame(
+            [429, ['success' => false, 'error' => 'This account is waiting for payment. Finish checkout to use Synaplan.']],
+            $this->answered($this->intake(account: ['user' => $sender, 'is_anonymous' => false]), $this->mail()),
+        );
+        self::assertSame([['mail', 'ada@example.com', 'This account is waiting for payment. Finish checkout to use Synaplan.']], $this->steps);
+    }
+
     public function testASpentLimitIsToldByMailWithItsReset(): void
     {
         $limit = ['allowed' => false, 'limit' => 10, 'used' => 10, 'reset_at' => 'tomorrow'];
@@ -174,6 +187,7 @@ final class InboundEmailIntakeTest extends TestCase
     {
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(4);
+        $user->method('isActive')->willReturn(true);
 
         return $user;
     }

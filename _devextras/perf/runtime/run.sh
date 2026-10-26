@@ -8,20 +8,38 @@ ROOT=$(cd "$DIR/../../.." && pwd)
 cd "$ROOT"
 
 WITH_PROVIDERS=0
-for arg in "$@"; do
-  case "$arg" in
-    --with-providers) WITH_PROVIDERS=1 ;;
+CASE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --with-providers) WITH_PROVIDERS=1; shift ;;
+    --case)
+      CASE="${2:-}"
+      shift 2
+      ;;
+    --case=*)
+      CASE="${1#--case=}"
+      shift
+      ;;
     -h|--help)
-      echo "Usage: make perf-runtime    or    $0 [--with-providers]"
+      echo "Usage: make perf-runtime    or    $0 [--with-providers] [--case pool-isolation]"
       echo "Paid providers stay unused unless --with-providers is set."
+      echo "--case pool-isolation holds slow streams on the streams pool and times the api pool."
       exit 0
       ;;
     *)
-      echo "Unknown argument: $arg" >&2
+      echo "Unknown argument: $1" >&2
       exit 2
       ;;
   esac
 done
+
+if [[ "$CASE" == "pool-isolation" ]]; then
+  exec "$DIR/pool-isolation.sh"
+fi
+if [[ -n "$CASE" ]]; then
+  echo "Unknown case: $CASE" >&2
+  exit 2
+fi
 
 if ! docker inspect synaplan-backend >/dev/null 2>&1; then
   echo "synaplan-backend is not running. Start the dev stack with: make up" >&2

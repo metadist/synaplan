@@ -1,3 +1,8 @@
+# The PHP base image must stay the first build stage of this file, and no
+# comment above the real stage line may contain the stage keyword followed by
+# a space: CI resolves the base image from the first such line to pull protoc
+# and to run the contract tests. Helper build stages go below it.
+#
 # synaplan-base-php 1.2.0 ships fully-tuned PHP ini files under
 # /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
 # 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
@@ -19,7 +24,20 @@
 # digest would hard-lock every build — including Apple Silicon dev machines,
 # which now run the backend natively instead of under emulation — to that one
 # architecture.
-FROM ghcr.io/metadist/synaplan-base-php:1.2.1@sha256:e10e74c5047cd9218ad8337b8e36af928871702df4711add15669747988f8ce4 AS dev
+FROM ghcr.io/metadist/synaplan-base-php:1.2.1@sha256:e10e74c5047cd9218ad8337b8e36af928871702df4711add15669747988f8ce4 AS base
+
+# The capacity watchdog is a static binary built in its own stage and copied
+# into `dev` below, so the dev and prod images both carry it. A stage has to
+# be declared before COPY --from can name it, which is why it sits here and
+# not at the top.
+FROM golang:1.27-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 AS watchdog
+WORKDIR /src
+COPY sidecars/synaplan-watchdog/go.mod sidecars/synaplan-watchdog/go.sum ./
+RUN go mod download
+COPY sidecars/synaplan-watchdog/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /synaplan-watchdog ./cmd/synaplan-watchdog
+
+FROM base AS dev
 
 ARG APP_VERSION=dev
 
@@ -84,6 +102,7 @@ COPY _docker/backend/container-healthcheck.sh /usr/local/bin/container-healthche
 COPY _docker/backend/lib/ /usr/local/bin/lib/
 COPY _docker/backend/synaplan /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/container-healthcheck /usr/local/bin/synaplan
+COPY --from=watchdog /synaplan-watchdog /usr/local/bin/synaplan-watchdog
 
 EXPOSE 80
 
@@ -176,5 +195,9 @@ COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 # Required because runtime/frankenphp-symfony does not yet support Symfony 8.
 COPY _docker/backend/synaplan-worker-mode.Caddyfile \
     /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
+# Pools are imported from the site php_server. Without this file the
+# entrypoint leaves that listener in classic mode (worker_threads 0).
+COPY _docker/backend/synaplan-php-workers.Caddyfile \
+    /usr/local/etc/php/templates/synaplan-php-workers.Caddyfile
 
 # EXPOSE 80 and ENTRYPOINT ["docker-entrypoint.sh"] are inherited from the `dev` stage.

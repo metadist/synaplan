@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { postJsonWithBusyRetry } from './busyRetry'
 import { httpClient, getApiBaseUrl } from './httpClient'
 import { useConfigStore } from '@/stores/config'
 import type { RagSourceRef } from '@/stores/history'
@@ -289,14 +290,13 @@ export async function sendWidgetMessage(
   const isDashboardMode =
     extraHeaders?.['X-Widget-Test-Mode'] === 'true' ||
     extraHeaders?.['X-Widget-Internal-Mode'] === 'true'
-
-  const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
-    method: 'POST',
+  const response = await postJsonWithBusyRetry(
+    `${apiUrl}/api/v1/widget/${widgetId}/message`,
     headers,
-    body: JSON.stringify(payload),
-    credentials: isDashboardMode ? 'include' : 'omit',
-  })
-
+    payload,
+    isDashboardMode ? 'include' : 'omit',
+    options.onStatus
+  )
   if (!response.ok) {
     if (response.status === 404 || response.status === 503) {
       throw new WidgetUnavailableError(response.status)

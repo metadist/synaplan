@@ -76,7 +76,10 @@ final class FreeApiActivatorTest extends KernelTestCase
         $chatModel = $this->demoModel('free-chat', 'chat');
         $this->assertSame(1, $chatModel->getActive());
         $this->assertSame((string) $chatModel->getId(), $this->config->getValue(0, 'DEFAULTMODEL', 'CHAT'));
-        $this->assertSame((string) $this->demoModel('free-sort', 'chat')->getId(), $this->config->getValue(0, 'DEFAULTMODEL', 'MEM'));
+        $memory = $this->demoModel('free-sort', 'mem');
+        $this->assertSame(1, $memory->getSelectable());
+        $this->assertSame((string) $memory->getId(), $this->config->getValue(0, 'DEFAULTMODEL', 'MEM'));
+        $this->assertSame((string) $this->demoModel('free-sort', 'chat')->getId(), $this->config->getValue(0, 'DEFAULTMODEL', 'SORT'));
         $this->assertContains('CHAT', $activation->boundCapabilities);
         $this->assertNotContains('SOUND2TEXT', $activation->boundCapabilities);
         $this->assertSame($activation->vectorizeKept, !\in_array('VECTORIZE', $activation->boundCapabilities, true));
@@ -153,6 +156,21 @@ final class FreeApiActivatorTest extends KernelTestCase
 
         $this->activator(chatReady: true)->activate(force: true);
         $this->assertTrue($this->state->isActive());
+    }
+
+    public function testMaintainMovesALegacyMemoryBindingOntoTheMemRow(): void
+    {
+        $activator = $this->activator();
+        $activator->activate();
+        $sorter = $this->demoModel('free-sort', 'chat');
+        $this->config->setValue(0, 'DEFAULTMODEL', 'MEM', (string) $sorter->getId());
+
+        $activator->maintain();
+
+        $this->assertSame((string) $this->demoModel('free-sort', 'mem')->getId(), $this->config->getValue(0, 'DEFAULTMODEL', 'MEM'));
+        $this->assertSame((string) $sorter->getId(), $this->config->getValue(0, 'DEFAULTMODEL', 'SORT'));
+
+        $activator->leave();
     }
 
     public function testAPendingRevokeNeverKillsTheReissuedKey(): void

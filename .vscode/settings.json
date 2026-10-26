@@ -1,5 +1,10 @@
 {
-    // PHP Version for Intelephense (must match Docker container PHP 8.4)
+    // PHP version for Intelephense: analyse at the supported language floor
+    // (composer requires PHP >=8.4 and CI tests PHP 8.4), so PHP 8.5-only
+    // syntax and functions are flagged here instead of failing CI later.
+    // The Docker image itself runs PHP >=8.5.12 (CVE-2026-109618 /
+    // CVE-2026-109619) - the runtime version and the language floor are
+    // different things, and only the floor belongs in this setting.
     // Note: Reload Cursor window after changing this setting
     "intelephense.environment.phpVersion": "8.4.0",
 

@@ -114,6 +114,7 @@ export function describeStep(
   const done = step.state === 'done'
   const meta = step.metadata
   const showModels = options.showModels
+  if (step.key === 'busy') return { title: t('processing.busy') }
 
   switch (step.key) {
     case 'preprocessing':
@@ -123,7 +124,6 @@ export function describeStep(
           : t('processing.preprocessingTitle'),
         detail: done ? undefined : t('processing.preprocessingDesc'),
       }
-
     case 'understand': {
       if (done) {
         return {

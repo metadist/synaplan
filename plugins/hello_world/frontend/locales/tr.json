@@ -1,0 +1,10 @@
+{
+  "title": "Merhaba Dünya eklentisi!",
+  "body": "Bu eklenti Synaplan arayüzünde, iframe olmadan çalışır.",
+  "context": "Bağlam verisi",
+  "userId": "Kullanıcı kimliği",
+  "apiBase": "API tabanı",
+  "pluginBase": "Eklenti tabanı",
+  "button": "Bana tıkla",
+  "clicked": "Düğmeye tıklandı. Başka bir şey olmadı."
+}

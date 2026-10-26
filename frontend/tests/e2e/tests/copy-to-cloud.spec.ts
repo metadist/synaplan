@@ -124,4 +124,82 @@ test.describe('@ci Copy to cloud', () => {
     await expect(page.getByText('chart (2).png')).toBeVisible()
     await expect(page.getByTestId('file-sent-to')).toContainText('files.example.org')
   })
+
+  test('an ownCloud link is labeled ownCloud in the menu, toast, and Sent to line', async ({
+    page,
+  }) => {
+    await openApp(page)
+    const history = await mockCopyMenu(page)
+    await page.route('**/api/v1/me/platform-links', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      await route.fulfill({
+        json: {
+          success: true,
+          links: [
+            {
+              id: 4,
+              client: 'nextcloud',
+              host: 'files.example.org',
+              external_id: 'ada',
+              key_id: 1,
+              key_label: 'Nextcloud',
+              created: 1,
+              last_seen: 1,
+              can_copy: true,
+            },
+            {
+              id: 6,
+              client: 'owncloud',
+              host: 'cloud.example.org',
+              external_id: 'ada',
+              key_id: 3,
+              key_label: 'ownCloud',
+              created: 1,
+              last_seen: 1,
+              can_copy: true,
+            },
+          ],
+        },
+      })
+    })
+    await page.goto('/files/generated')
+    await page.getByTestId('btn-file-push').click()
+    const menu = page.getByTestId('file-push-menu-panel')
+    await expect(menu).toContainText('ownCloud')
+    await expect(menu).toContainText('cloud.example.org')
+    await expect(menu).not.toContainText('Nextcloud · cloud.example.org')
+
+    await page.route('**/api/v1/files/42/send', (route) => {
+      history.copies = [
+        {
+          id: 10,
+          file_id: 42,
+          state: 'delivered',
+          remote_path: 'Synaplan/Images/chart (2).png',
+          open_url: 'https://cloud.example.org/f/1',
+          error_code: '',
+          created: 1_700_000_100,
+          client: 'owncloud',
+          host: 'cloud.example.org',
+        },
+      ]
+      return route.fulfill({
+        status: 200,
+        json: {
+          success: true,
+          destination: 'platform',
+          reference: 'Synaplan/Images/chart (2).png',
+          context: {
+            delivery_id: '10',
+            state: 'delivered',
+            open_url: 'https://cloud.example.org/f/1',
+          },
+        },
+      })
+    })
+    await page.getByTestId('btn-file-push-target-6').click()
+    await expect(page.getByTestId('btn-notification-action')).toHaveText('Open in ownCloud')
+    await expect(page.getByTestId('file-sent-to')).toContainText('ownCloud · cloud.example.org')
+    await expect(page.getByTestId('file-sent-to')).not.toContainText('Nextcloud')
+  })
 })

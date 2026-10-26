@@ -12,10 +12,10 @@ use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\NativeAuthHandoffService;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcTokenService;
-use App\Service\Auth\RecaptchaService;
 use App\Service\Auth\RegistrationConfig;
+use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\SignupProtection;
 use App\Service\Auth\TokenService;
-use App\Service\Chat\GuestSessionService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\MailerConfig;
@@ -49,7 +49,7 @@ class AuthController extends AbstractController
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
         private InternalEmailService $internalEmailService,
-        private RecaptchaService $recaptchaService,
+        private SignupProtection $signupProtection,
         private ValidatorInterface $validator,
         private LoggerInterface $logger,
         private ImpersonationService $impersonationService,
@@ -177,6 +177,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
             ],
             'tokens' => $this->nativeTokenPayload($accessToken, $refreshToken),
@@ -198,6 +199,9 @@ class AuthController extends AbstractController
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
                 new OA\Property(property: 'language', type: 'string', nullable: true, description: 'UI language used during signup (de, en, es, fr, tr). Stored before the verification email is sent.', example: 'de'),
+                new OA\Property(property: 'challengeToken', type: 'string', nullable: true, description: 'Human-check token (Cloudflare Turnstile, or reCAPTCHA v3 as `recaptchaToken`). Required when the instance has a provider configured.'),
+                new OA\Property(property: 'plan', type: 'string', nullable: true, description: 'Paid plan when registration mode is admission: PRO, TEAM or BUSINESS.', example: 'TEAM'),
+                new OA\Property(property: 'code', type: 'string', nullable: true, description: 'Invitation code when registration mode is admission.'),
             ]
         )
     )]
@@ -216,13 +220,13 @@ class AuthController extends AbstractController
     #[OA\Response(response: 409, description: 'Email already registered')]
     #[OA\Response(response: 400, description: 'Validation error')]
     #[OA\Response(response: 403, description: 'Registration is disabled on this instance (e.g. OIDC-only)')]
+    #[OA\Response(response: 429, description: 'Too many sign-ups from this connection (SIGNUP_RATE_LIMITED); Retry-After is set')]
+    #[OA\Response(response: 503, description: 'Sign-up is paused by the operator and the request has no valid invitation code (SIGNUP_PAUSED)')]
     public function register(
         #[MapRequestPayload] RegisterRequest $dto,
         Request $request,
     ): JsonResponse {
-        // #462: refuse local sign-up when the operator runs an SSO-/OIDC-only
-        // instance (REGISTRATION_ENABLED=false). Enforced server-side so hiding
-        // the frontend link/route is not the only line of defence.
+        // #462: SSO-/OIDC-only instances refuse local sign-up server-side.
         if (!$this->registrationConfig->isEnabled()) {
             return $this->json([
                 'error' => 'Registration is disabled on this instance.',
@@ -230,43 +234,32 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Verify reCAPTCHA
-        $recaptchaToken = $request->request->get('recaptchaToken') ?? $request->toArray()['recaptchaToken'] ?? '';
-        if (!$this->recaptchaService->verify($recaptchaToken, 'register', $request->getClientIp())) {
-            return $this->json([
-                'error' => 'reCAPTCHA verification failed. Please try again.',
-            ], Response::HTTP_BAD_REQUEST);
+        // Human check (Turnstile or reCAPTCHA), then the signup limits and the
+        // operator's pause switch. Both answer with a stable code the UI maps.
+        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($request->toArray()), 'register', $request->getClientIp())) {
+            return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
+        }
+        try {
+            $this->signupProtection->assertSignupAllowed($request->getClientIp(), $dto->code);
+        } catch (SignupBlockedException $e) {
+            return $this->signupBlocked($e);
         }
 
-        if (GuestSessionService::isReservedProcessorEmail($dto->email)) {
-            $this->logger->warning('Registration attempt with reserved guest-processor email', [
-                'ip' => $request->getClientIp(),
-            ]);
-
+        try {
+            $user = $this->userLifecycleService->createSignup(
+                $dto->email,
+                $dto->password,
+                null !== $dto->language ? ['language' => $dto->language] : [],
+                $dto->plan,
+                $dto->code,
+                $request->getClientIp(),
+            );
+        } catch (SignupBlockedException $e) {
+            return $this->signupBlocked($e);
+        }
+        if (!$user instanceof User) {
             return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
-
-        // Check if user exists
-        $existingUser = $this->userRepository->findOneBy(['mail' => $dto->email]);
-
-        if ($existingUser) {
-            // Security: Don't reveal that email is already registered
-            $this->logger->warning('Registration attempt with existing email', [
-                'email' => $dto->email,
-                'ip' => $request->getClientIp(),
-            ]);
-
-            // Hash the password anyway to prevent timing attacks
-            $this->passwordHasher->hashPassword($existingUser, $dto->password);
-
-            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
-        }
-
-        $user = $this->userLifecycleService->createUser(
-            email: $dto->email,
-            plainPassword: $dto->password,
-            userDetails: null !== $dto->language ? ['language' => $dto->language] : [],
-        );
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
@@ -290,10 +283,16 @@ class AuthController extends AbstractController
         return $this->json($this->registrationAccepted(), Response::HTTP_OK);
     }
 
+    private function signupBlocked(SignupBlockedException $e): JsonResponse
+    {
+        $headers = $e->getRetryAfterSeconds() > 0 ? ['Retry-After' => (string) $e->getRetryAfterSeconds()] : [];
+
+        return $this->json(['error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus(), $headers);
+    }
+
     /**
-     * Same shape for a new account, an address that already exists, and a
-     * send that failed. `mailDelivered` follows only whether this install
-     * can send mail, so a delivery error cannot reveal that the address was new.
+     * Same shape for a new account, an existing address and a failed send:
+     * `mailDelivered` only says whether this install can send mail at all.
      *
      * @return array{success: true, message: string, mailDelivered: bool}
      */
@@ -302,8 +301,7 @@ class AuthController extends AbstractController
         $mailDelivered = $this->mailerConfig->isConfigured();
 
         return [
-            'success' => true,
-            'mailDelivered' => $mailDelivered,
+            'success' => true, 'mailDelivered' => $mailDelivered,
             'message' => $mailDelivered
                 ? 'If this email is not already registered, you will receive a verification email shortly.'
                 : 'No verification email was sent. An administrator has to confirm the account before sign-in.',
@@ -324,7 +322,7 @@ class AuthController extends AbstractController
             properties: [
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
-                new OA\Property(property: 'recaptchaToken', type: 'string', description: 'Google reCAPTCHA v3 token', example: '03AGdBq27...'),
+                new OA\Property(property: 'challengeToken', type: 'string', nullable: true, description: 'Human-check token (Turnstile, or reCAPTCHA v3 as `recaptchaToken`).'),
             ]
         )
     )]
@@ -354,13 +352,9 @@ class AuthController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $email = $data['email'] ?? '';
         $password = $data['password'] ?? '';
-        $recaptchaToken = $data['recaptchaToken'] ?? '';
 
-        // Verify reCAPTCHA
-        if (!$this->recaptchaService->verify($recaptchaToken, 'login', $request->getClientIp())) {
-            return $this->json([
-                'error' => 'reCAPTCHA verification failed. Please try again.',
-            ], Response::HTTP_BAD_REQUEST);
+        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload(is_array($data) ? $data : []), 'login', $request->getClientIp())) {
+            return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
         }
 
         if (empty($email) || empty($password)) {
@@ -401,8 +395,9 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Suspended/banned accounts cannot sign in (Apple Guideline 1.2).
-        if (!$user->isActive()) {
+        // Suspended/banned accounts cannot sign in (Apple Guideline 1.2). A
+        // pending-payment account may: it has to reach the checkout.
+        if (!$user->canSignIn()) {
             return $this->accountSuspendedResponse($user, 'Login');
         }
 
@@ -422,6 +417,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
                 'language' => $user->getPreferredLanguage(),
@@ -513,7 +509,7 @@ class AuthController extends AbstractController
 
         $existingRefresh = $this->tokenService->validateRefreshToken($refreshTokenString);
         $refreshOwner = $existingRefresh?->getUser();
-        if ($refreshOwner instanceof User && !$refreshOwner->isActive()) {
+        if ($refreshOwner instanceof User && !$refreshOwner->canSignIn()) {
             return $this->tokenService->clearAuthCookies(
                 $this->accountSuspendedResponse($refreshOwner, 'Refresh')
             );
@@ -686,7 +682,7 @@ class AuthController extends AbstractController
             } catch (OidcAccessDeniedException) {
                 return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
             }
-            if ($knownUser instanceof User && !$knownUser->isActive()) {
+            if ($knownUser instanceof User && !$knownUser->canSignIn()) {
                 $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
                 $this->tokenService->clearAuthCookies($response);
                 $this->oidcTokenService->clearOidcCookies($response);
@@ -698,7 +694,6 @@ class AuthController extends AbstractController
         $newTokens = $this->oidcTokenService->refreshOidcTokens($oidcRefreshToken, $provider);
 
         if (!$newTokens) {
-            // Keycloak rejected the refresh - user was logged out from Keycloak
             $this->logger->info('OIDC refresh rejected - user logged out from provider', [
                 'provider' => $provider,
             ]);
@@ -735,7 +730,7 @@ class AuthController extends AbstractController
             return $response;
         }
 
-        if (!$user->isActive()) {
+        if (!$user->canSignIn()) {
             $response = $this->accountSuspendedResponse($user, 'OIDC refresh');
             $this->tokenService->clearAuthCookies($response);
             $this->oidcTokenService->clearOidcCookies($response);
@@ -757,6 +752,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
             ],
         ]);
@@ -1163,6 +1159,7 @@ class AuthController extends AbstractController
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
                 'language' => $user->getPreferredLanguage(),

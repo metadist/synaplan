@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 class OpenAICompatibleControllerTest extends TestCase
@@ -426,6 +427,123 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->assertSame('cerebras', $capturedOptions['provider']);
         $this->assertSame('qwen-3.8-27b', $capturedOptions['model']);
         $this->assertSame(383, $meteredModelId);
+    }
+
+    public function testIncognitoCompletionDoesNotEnqueueSessionSummary(): void
+    {
+        $user = $this->createMockUser();
+        $this->allowChat();
+        $this->messagesGatewayConfig->method('isSessionSummaryEnabled')->willReturn(true);
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $response = $this->controller->chatCompletions($this->completionRequest([
+            'model' => 'echo',
+            'incognito' => true,
+            'messages' => [['role' => 'user', 'content' => 'third party record']],
+        ]), $user);
+
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    public function testCompletionWithoutIncognitoStillEnqueuesSessionSummary(): void
+    {
+        $user = $this->createMockUser();
+        $this->allowChat();
+        $this->messagesGatewayConfig->method('isSessionSummaryEnabled')->willReturn(true);
+        $this->messageBus->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isInstanceOf(\App\Message\SummarizeApiSessionCommand::class));
+
+        $response = $this->controller->chatCompletions($this->completionRequest([
+            'model' => 'echo',
+            'messages' => [['role' => 'user', 'content' => 'remember this session']],
+        ]), $user);
+
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    public function testIncognitoStreamDoesNotEnqueueSessionSummary(): void
+    {
+        $user = $this->createMockUser();
+        $this->allowStreamingChat();
+        $this->messagesGatewayConfig->method('isSessionSummaryEnabled')->willReturn(true);
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $response = $this->controller->chatCompletions($this->completionRequest([
+            'model' => 'echo',
+            'stream' => true,
+            'incognito' => true,
+            'messages' => [['role' => 'user', 'content' => 'third party record']],
+        ]), $user);
+
+        $this->assertInstanceOf(StreamedResponse::class, $response);
+        $this->sendStream($response);
+    }
+
+    public function testStreamWithoutIncognitoStillEnqueuesSessionSummary(): void
+    {
+        $user = $this->createMockUser();
+        $this->allowStreamingChat();
+        $this->messagesGatewayConfig->method('isSessionSummaryEnabled')->willReturn(true);
+        $this->messageBus->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isInstanceOf(\App\Message\SummarizeApiSessionCommand::class));
+
+        $response = $this->controller->chatCompletions($this->completionRequest([
+            'model' => 'echo',
+            'stream' => true,
+            'messages' => [['role' => 'user', 'content' => 'remember this session']],
+        ]), $user);
+
+        $this->assertInstanceOf(StreamedResponse::class, $response);
+        $this->sendStream($response);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function completionRequest(array $body): Request
+    {
+        $request = Request::create('/v1/chat/completions', 'POST', [], [], [], [], (string) json_encode($body));
+        $request->headers->set('Content-Type', 'application/json');
+
+        return $request;
+    }
+
+    private function allowChat(): void
+    {
+        $model = $this->modelStub(9, 'echo', 'chat', 'Test');
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
+        $this->modelRepository->method('findActiveByTagAndIdentity')->willReturn($model);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'ok',
+            'provider' => 'test',
+            'model' => 'echo',
+            'usage' => [],
+        ]);
+    }
+
+    private function allowStreamingChat(): void
+    {
+        $this->allowChat();
+        $this->aiFacade->method('chatStream')->willReturnCallback(
+            static function (array|string $messages, callable $onChunk): array {
+                $onChunk('ok');
+
+                return ['provider' => 'test', 'model' => 'echo', 'usage' => []];
+            }
+        );
+    }
+
+    private function sendStream(StreamedResponse $response): void
+    {
+        ob_start();
+        try {
+            $response->sendContent();
+        } finally {
+            ob_end_clean();
+        }
     }
 
     private function modelStub(int $id, string $providerId, string $tag, string $service): Model&MockObject

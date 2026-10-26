@@ -106,11 +106,12 @@ final class HealthMonitorControllerTest extends WebTestCase
             $user->setCreated(date('YmdHis'));
             $user->setType('WEB');
             $user->setProviderId('health-monitor-test');
-            $user->setUserLevel('NEW');
+            $user->setUserLevel('PRO');
             $user->setEmailVerified(true);
             $this->em->persist($user);
             $this->em->flush();
         } else {
+            $user->setUserLevel('PRO');
             $user->setEmailVerified(true);
             $this->em->flush();
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\ApiKey;
+use App\Entity\ExternalIdentity;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Security\ApiKeyScope;
@@ -100,6 +101,15 @@ final class PlatformLinkControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/admin/platform-links/instances');
         self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $this->client->request('GET', '/api/v1/platform-links/sso/status?external_id=ada');
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $this->postJson('/api/v1/platform-links/sso/bind', ['external_id' => 'ada']);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $this->postJson('/api/v1/platform-links/identities/adopt', ['external_id' => 'ada']);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testAdminRegisterIsActiveAndAnonymousIsPending(): void
@@ -139,7 +149,7 @@ final class PlatformLinkControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createUser('pl-ex-admin@synaplan.internal', 'ADMIN');
-        $user = $this->createUser('pl-ex-user@synaplan.internal');
+        $user = $this->createUser('pl-ex-user@synaplan.internal', 'PRO');
 
         $this->authenticateClient($this->client, $admin);
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('example.com'));
@@ -183,6 +193,12 @@ final class PlatformLinkControllerTest extends WebTestCase
         self::assertSame((int) $user->getId(), $exchanged['user']['id']);
 
         $this->em->clear();
+        $linked = $this->em->getRepository(ExternalIdentity::class)->findOneBy([
+            'instanceId' => $instanceA['instance_id'],
+            'externalId' => 'jdoe',
+        ]);
+        self::assertInstanceOf(ExternalIdentity::class, $linked);
+        self::assertSame(ExternalIdentity::MODE_LINK, $linked->getMode());
         $reloaded = $this->em->getRepository(User::class)->find($user->getId());
         self::assertInstanceOf(User::class, $reloaded);
         self::assertSame($countBefore, $this->em->getRepository(User::class)->count([]));
@@ -279,8 +295,8 @@ final class PlatformLinkControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createUser('pl-move-admin@synaplan.internal', 'ADMIN');
-        $first = $this->createUser('pl-move-first@synaplan.internal');
-        $second = $this->createUser('pl-move-second@synaplan.internal');
+        $first = $this->createUser('pl-move-first@synaplan.internal', 'PRO');
+        $second = $this->createUser('pl-move-second@synaplan.internal', 'PRO');
 
         $this->authenticateClient($this->client, $admin);
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));
@@ -322,7 +338,7 @@ final class PlatformLinkControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createUser('pl-revoke-admin@synaplan.internal', 'ADMIN');
-        $person = $this->createUser('pl-revoke-person@synaplan.internal');
+        $person = $this->createUser('pl-revoke-person@synaplan.internal', 'PRO');
 
         $this->authenticateClient($this->client, $admin);
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));

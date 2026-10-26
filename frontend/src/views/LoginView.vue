@@ -421,7 +421,8 @@ import {
 } from '@/services/api/nativeServer'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
-import { useRecaptcha } from '../composables/useRecaptcha'
+import { useSignupChallenge } from '../composables/useSignupChallenge'
+import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -443,7 +444,7 @@ const router = useRouter()
 const route = useRoute()
 const { locale, t } = useI18n()
 const themeStore = useTheme()
-const { getToken: getReCaptchaToken } = useRecaptcha()
+const { getToken: getChallengeToken } = useSignupChallenge()
 const config = useConfigStore()
 const authStore = useAuthStore()
 
@@ -475,11 +476,12 @@ const goBack = () => {
   }
 }
 
-const { login, error: authError, loading, clearError } = useAuth()
+const { login, error: authError, errorCode: authErrorCode, loading, clearError } = useAuth()
 const emailError = ref('')
 // Native OAuth errors surface through the same banner as password-login errors.
 const socialError = ref('')
-const error = computed(() => socialError.value || authError.value)
+const error = computed(() => socialError.value || blockedOrAuthError())
+const blockedOrAuthError = () => signupBlockedText(t, authErrorCode.value, authError.value)
 
 const onEmailBlur = () => {
   focusedField.value = null
@@ -603,8 +605,8 @@ const handleLogin = async () => {
   }
   if (!password.value) return
 
-  const recaptchaToken = await getReCaptchaToken('login')
-  const success = await login(email.value, password.value, recaptchaToken)
+  const challengeToken = await getChallengeToken('login')
+  const success = await login(email.value, password.value, challengeToken)
   if (success) {
     loginSuccess.value = true
     // Short delay so the success checkmark animation can play before nav.
@@ -652,6 +654,7 @@ const handleSocialLogin = async (provider: string) => {
   }
 
   const params = new URLSearchParams({ language: String(locale.value) })
+  params.set('challenge', await getChallengeToken('signup'))
   window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
 }
 </script>
