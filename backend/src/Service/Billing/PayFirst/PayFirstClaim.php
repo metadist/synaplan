@@ -69,7 +69,9 @@ final readonly class PayFirstClaim
         try {
             $this->em->refresh($user);
             $details = $user->getPaymentDetails();
-            if (isset($details[self::SIGNED_IN_KEY])) {
+            // A verified address means the mailbox owner has taken the
+            // account over through our link; the buyer's nonce no longer counts.
+            if (isset($details[self::SIGNED_IN_KEY]) || $user->isEmailVerified()) {
                 return false;
             }
             $details[self::SIGNED_IN_KEY] = time();

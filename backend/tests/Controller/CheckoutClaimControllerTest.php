@@ -33,6 +33,7 @@ final class CheckoutClaimControllerTest extends WebTestCase
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private RecordingGateway $gateway;
+    private string $ip;
 
     protected function setUp(): void
     {
@@ -40,6 +41,7 @@ final class CheckoutClaimControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->client->disableReboot();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
+        $this->ip = '10.'.random_int(0, 255).'.'.random_int(0, 255).'.'.random_int(1, 254);
         $this->gateway = new RecordingGateway();
         $this->gateway->priceId = static::getContainer()->get(StripeEntitlement::class)->prices()['PRO'];
         static::getContainer()->set(CheckoutSessionGateway::class, $this->gateway);
@@ -78,6 +80,7 @@ final class CheckoutClaimControllerTest extends WebTestCase
     {
         $this->gateway->paidSession('cs_password', 'gus'.self::DOMAIN, 'nonce');
         $this->claim('cs_password');
+        self::assertFalse($this->json()['signedIn'], 'No nonce cookie in this browser yet.');
         self::assertSame('ready', $this->json()['status']);
 
         $mail = self::getMailerMessage();
@@ -89,6 +92,14 @@ final class CheckoutClaimControllerTest extends WebTestCase
         $this->post('/api/v1/auth/login', ['email' => 'gus'.self::DOMAIN, 'password' => 'Fresh-Pass-2026']);
         self::assertResponseIsSuccessful();
         self::assertTrue($this->user('gus'.self::DOMAIN)->isEmailVerified());
+
+        // The mailbox owner has taken the account over; the buyer's unused
+        // nonce from the checkout must not sign anyone in any more.
+        $this->client->getCookieJar()->clear();
+        $this->client->getCookieJar()->set(new Cookie(PayFirstCheckout::NONCE_COOKIE, 'nonce'));
+        $this->claim('cs_password');
+        self::assertFalse($this->json()['signedIn']);
+        self::assertNotContains(TokenService::ACCESS_COOKIE, array_map(static fn ($c) => $c->getName(), $this->client->getResponse()->headers->getCookies()));
     }
 
     public function testAnotherBrowserSeesTheAccountButIsNotSignedIn(): void
@@ -190,7 +201,7 @@ final class CheckoutClaimControllerTest extends WebTestCase
      */
     private function post(string $path, array $body): void
     {
-        $this->client->request('POST', $path, [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($body, JSON_THROW_ON_ERROR));
+        $this->client->request('POST', $path, [], [], ['CONTENT_TYPE' => 'application/json', 'REMOTE_ADDR' => $this->ip], json_encode($body, JSON_THROW_ON_ERROR));
     }
 
     /**
