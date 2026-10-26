@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Lead;
 
 use App\AI\ToolCalling\ToolCall;
+use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
@@ -18,7 +19,8 @@ use App\Service\Research\Run\Stage\StageResult;
 /**
  * One lead turn and the tool calls it made. The next round is another turn.
  * A turn with no tool call gets one reminder, and the turn after that goes
- * to the report. Finish ignores every other call in the same turn.
+ * to the report. Finish ignores every other call in the same turn, unless
+ * nothing was read yet: then finish is refused and the other calls run.
  */
 final readonly class LeadStage
 {
@@ -93,7 +95,7 @@ final readonly class LeadStage
                 $rest[] = $call;
             }
         }
-        if ($finish instanceof ToolCall) {
+        if ($finish instanceof ToolCall && !$this->mustRead($ctx)) {
             $this->points->apply($ctx, $finish->arguments['points'] ?? null);
             $this->remember($ctx, $turn, [$this->wire($finish, 0)], [[
                 'id' => $this->callId($finish, 0),
@@ -105,13 +107,15 @@ final readonly class LeadStage
             return $this->toReport($ctx);
         }
 
+        $calls = $finish instanceof ToolCall ? $turn->calls : $rest;
         $wires = [];
         $results = [];
         $cap = $ctx->state->budget->extras()->maxActions;
-        foreach ($rest as $index => $call) {
+        foreach ($calls as $index => $call) {
             $wires[] = $this->wire($call, $index);
-            if ($index >= $cap) {
-                $results[] = $this->result($call, $index, LeadToolReply::error('not_allowed', $ctx->state->budget));
+            if ('finish' === $call->name || $index >= $cap) {
+                $code = 'finish' === $call->name ? 'read_first' : 'not_allowed';
+                $results[] = $this->result($call, $index, LeadToolReply::error($code, $ctx->state->budget));
                 continue;
             }
             $outcome = $this->tools->execute(new ToolCall($this->callId($call, $index), $call->name, $call->arguments), $ctx);
@@ -120,7 +124,7 @@ final readonly class LeadStage
             }
             $results[] = $this->result($call, $index, $outcome->json);
             if ($outcome->stop instanceof StageResult) {
-                $this->closeTurn($ctx, $turn, $rest, $wires, $results, $index);
+                $this->closeTurn($ctx, $turn, $calls, $wires, $results, $index);
 
                 return $outcome->stop;
             }
@@ -133,6 +137,29 @@ final readonly class LeadStage
         }
 
         return $this->again($ctx);
+    }
+
+    /**
+     * Search results are not evidence, so the report would have nothing to
+     * cite. Finish is refused once while a found source can still be read;
+     * after a read, even one that found nothing, finish is accepted.
+     */
+    private function mustRead(StageContext $ctx): bool
+    {
+        $budget = $ctx->state->budget;
+        if (0 !== $ctx->state->ledger->evidenceCount() || 0 !== $budget->toArray()['sources_read'][0]) {
+            return false;
+        }
+        if (!$budget->canRound() || $budget->sourcesLeft() < 1 || $budget->callsLeft() < 3) {
+            return false;
+        }
+        foreach ($ctx->state->ledger->sources() as $source) {
+            if (Source::WEB === $source->kind && Source::FOUND === $source->status && null !== $source->url) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function again(StageContext $ctx): StageResult

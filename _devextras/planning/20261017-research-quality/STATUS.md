@@ -18,7 +18,7 @@ chat message.
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
-| RS7 | in progress | Both modes measured 2026-10-25 on the smoke set. Round-mode recall 0.67, tool-mode 0.28. Sonnet conformance 20/20, gpt-oss-120b 12/20. Tool mode is below the spike, so the exit bar is not met. Flag stays off |
+| RS7 | in progress | Both modes measured 2026-10-25 on the smoke set. Round-mode recall 0.67. Tool mode 0.28, then 0.78 after the lead must read before it finishes (both repeats). Sonnet conformance 20/20, gpt-oss-120b 12/20. RS6 corpus comparison not run; the spike is a different set. Flag stays off |
 | RS8 | planned | Fact-check — §0 #11 |
 | RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
 | RS10 | planned | Follow-ups and revisions |
@@ -37,6 +37,44 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-25 — RS7 tool mode reads before it finishes
+
+Cause of the tool-mode row below: in all 14 runs that ended
+`failed_nothing_found`, the lead searched in its first turn and called
+`finish` in its second, with no `read_sources` ("the snippets already
+settle it"). All 6 complete runs had searched, read and then finished. The
+report cites only evidence cards, so a finish before any read leaves it
+nothing. Read from the run state in Redis (`conversation.turns`).
+
+The fix: a `finish` while nothing was read, a found source is unread and
+another turn plus a read still fit the budget, is refused once with
+`read_first`. The other calls of that turn run. After any read, even one
+that found nothing, `finish` is accepted. The lead prompt now says that
+search results are not evidence.
+
+Same stack, user, model (`BMODELS` 379), Brave, corpus sha256, width 3 and
+driver as the entry below, `LEAD_MODE=tools`, scored with
+`app:research:eval --corpus=smoke --arm=b1 --import=<reports>`:
+
+| Run | fact recall (9) | web only (7) | trap-01 |
+| --- | --------------- | ------------ | ------- |
+| Repeat 1 | 0.78 | 1.00 | abstained |
+| Repeat 2 | 0.78 | 1.00 | abstained |
+
+No run ended `failed_nothing_found` except trap-01 on repeat 2. doc-01 and
+mix-01 stay 0.00 (no knowledge source, RS9). The 20 runs spent
+**2.762702 USD** (median 0.116368, against 0.040058 before). Wall time p50
+**174.6 s**, p95 **292.7 s**. Queue sample: 29 steps at or above 20 s,
+p50 **38.0 s**, p95 **130.2 s** (linear rank).
+
+Tool mode now reaches 0.78 against round mode's 0.67 on this set, and is
+3 points under the spike's S-T 0.81, which is a different corpus (starter
+20, 16 scored). The RS6 corpus row was still not run. RS7 stays in progress
+until the owner decides on the exit. Research was pinned on for the window
+and removed afterwards; `LEAD_MODE` is `auto` and `TOOL_MODE_MODELS` is `[]`.
 
 ---
 

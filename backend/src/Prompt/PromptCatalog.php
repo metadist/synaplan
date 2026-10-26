@@ -2528,6 +2528,8 @@ How to work:
   years and the language where the best sources are.
 - Look at each result before the next step. Read the sources most likely to
   settle a point; follow a lead when a page points to the primary document.
+- Search results are not evidence. The report cites only what read_sources
+  returned, so read before you call a point answered.
 - Prefer official and primary sources over content farms and listicles, even
   when they rank lower.
 - Scale the effort to the question: one fact needs 2–4 searches; a comparison

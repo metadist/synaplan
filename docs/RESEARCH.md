@@ -61,7 +61,8 @@ When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
 uses that same round to call search, read, ask or finish itself. The list is
 empty until a model passes the conformance suite, so a run keeps judging
 the round. Each tool stops at the budget and returns a short result, never
-the page. A question, and a thorough plan, wait with no worker. The run's
+the page. Search results are not evidence: a finish before any source was
+read is refused once while a found source can still be read. A question, and a thorough plan, wait with no worker. The run's
 state lists the open questions, so a client that reloads can still answer
 them. An open question is skipped after roughly 10 minutes (the reaper runs
 every 5 minutes) and the run continues. A plan that is not confirmed within
