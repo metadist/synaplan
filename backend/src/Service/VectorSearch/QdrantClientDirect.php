@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\VectorSearch;
 
+use App\Service\RAG\VectorStorage\DocumentScope;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -932,18 +933,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         ?\App\Service\RAG\VectorStorage\DTO\SearchQuery $query = null,
     ): array {
         try {
-            if (null !== $query && !$query->isLegacyOwnFilter()) {
-                $filter = \App\Service\RAG\VectorStorage\RagScopeFilter::qdrant($query);
-            } else {
-                $must = [
-                    ['key' => 'user_id', 'match' => ['value' => $userId]],
-                ];
-
-                if (null !== $groupKey) {
-                    $must[] = ['key' => 'group_key', 'match' => ['value' => $groupKey]];
-                }
-                $filter = ['must' => $must];
-            }
+            $filter = DocumentScope::filter($userId, $groupKey, $query);
 
             $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/query", [
                 'query' => $vector,
@@ -968,6 +958,25 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
+
+            return [];
+        }
+    }
+
+    public function searchDocumentKeywords(
+        string $text,
+        int $userId,
+        ?string $groupKey = null,
+        int $limit = 10,
+        ?\App\Service\RAG\VectorStorage\DTO\SearchQuery $query = null,
+    ): array {
+        try {
+            $this->ensureDocumentsCollection();
+            $post = fn (string $endpoint, array $body): array => $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/{$endpoint}", $body);
+
+            return QdrantTextSearch::search($text, DocumentScope::filter($userId, $groupKey, $query), $limit, $post);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to search documents by keyword', ['user_id' => $userId, 'error' => $e->getMessage()]);
 
             return [];
         }
@@ -1701,13 +1710,12 @@ final class QdrantClientDirect implements QdrantClientInterface
 
         try {
             $this->qdrantRequest('GET', "/collections/{$collection}");
-            // See ensureMemoriesCollection() — idempotent payload-index
-            // backfill for long-lived pre-existing collections.
             $this->ensurePayloadIndexes($collection, [
                 'user_id' => 'integer',
                 'file_id' => 'integer',
                 'group_key' => 'keyword',
                 '_point_id' => 'keyword',
+                'text' => QdrantTextSearch::SCHEMA,
             ]);
             $this->ensuredCollections[$collection] = true;
 
@@ -1732,6 +1740,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             $this->createPayloadIndex($collection, 'file_id', 'integer');
             $this->createPayloadIndex($collection, 'group_key', 'keyword');
             $this->createPayloadIndex($collection, '_point_id', 'keyword');
+            $this->createPayloadIndex($collection, 'text', QdrantTextSearch::SCHEMA);
 
             $this->ensuredCollections[$collection] = true;
 
@@ -1747,7 +1756,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
-    private function createPayloadIndex(string $collection, string $field, string $type): void
+    private function createPayloadIndex(string $collection, string $field, string|array $type): void
     {
         $this->qdrantRequest('PUT', "/collections/{$collection}/index", [
             'field_name' => $field,
@@ -1755,16 +1764,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         ]);
     }
 
-    /**
-     * Idempotently ensure a set of payload indexes exist on a collection.
-     *
-     * Qdrant's PUT /collections/{c}/index succeeds even when the index
-     * already exists, so this is safe to call on every startup. Individual
-     * failures are logged but do not abort the loop — one missing index
-     * should not block the others from being created.
-     *
-     * @param array<string, string> $fields Map of field name => Qdrant schema type
-     */
+    /** @param array<string, string|array<string, mixed>> $fields */
     private function ensurePayloadIndexes(string $collection, array $fields): void
     {
         foreach ($fields as $field => $type) {

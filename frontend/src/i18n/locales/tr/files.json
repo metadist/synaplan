@@ -423,6 +423,7 @@
     "intro": "Vektör deponuza genel bir bakış — kaç dosyanın dizinlendiği ve anlamsal arama için kaç vektörün (parça) saklandığı.",
     "provider": "Vektör deposu",
     "providerHint": "Vektörlerinizin saklandığı etkin arka uç.",
+    "providerMeaningOnly": "Bu depo parçaları anlama göre bulur. Tam bir kelime veya sayı aramaz.",
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı",
     "myTitle": "Vektörleriniz",

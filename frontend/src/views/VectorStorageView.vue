@@ -42,7 +42,13 @@
                   <p class="text-sm font-medium txt-primary">
                     {{ $t('vectorStorage.provider') }}: {{ providerLabel }}
                   </p>
-                  <p class="text-xs txt-secondary">{{ $t('vectorStorage.providerHint') }}</p>
+                  <p class="text-xs txt-secondary">
+                    {{
+                      mine?.provider === 'mariadb'
+                        ? $t('vectorStorage.providerMeaningOnly')
+                        : $t('vectorStorage.providerHint')
+                    }}
+                  </p>
                 </div>
               </div>
               <span

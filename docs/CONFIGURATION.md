@@ -739,6 +739,8 @@ It powers AI memories (user profiling) and RAG document vector search.
 
 Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `backend/.env`.
 
+The documents collection gets a full-text index on each chunk's text the first time it is used. Knowledge search on Qdrant then matches keywords and meaning, with the same owner scopes. A MariaDB vector store stays meaning-only; the vector storage screen says so.
+
 **This is optional** — Synaplan works fully without it (memories and vector search will be disabled).
 
 ---

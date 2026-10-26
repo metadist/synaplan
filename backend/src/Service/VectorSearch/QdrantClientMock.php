@@ -173,6 +173,18 @@ final class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
+    public function searchDocumentKeywords(
+        string $text,
+        int $userId,
+        ?string $groupKey = null,
+        int $limit = 10,
+        ?\App\Service\RAG\VectorStorage\DTO\SearchQuery $query = null,
+    ): array {
+        $this->logger->info('QdrantClientMock: searchDocumentKeywords', ['user_id' => $userId]);
+
+        return [];
+    }
+
     public function getDocument(string $pointId): ?array
     {
         $this->logger->info('QdrantClientMock: getDocument', ['point_id' => $pointId]);

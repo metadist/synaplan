@@ -7,6 +7,9 @@ namespace App\Command;
 use App\Plug\PlugConfigService;
 use App\Plug\Rerank\RagRerankEvalCorpus;
 use App\Plug\Rerank\RerankRegistry;
+use App\Service\RAG\DocumentKeywordSearch;
+use App\Service\RAG\HybridKnowledgeSearch;
+use App\Service\RAG\RagScopeResolver;
 use App\Service\RAG\VectorSearchService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -20,6 +23,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * Compare RAG recall with rerank off vs on. Not part of `make test`.
  *
  *   php bin/console app:rag:eval-rerank --user=2 --k=5 --report=var/rerank-eval.md
+ *   php bin/console app:rag:eval-rerank --hybrid --user=2 --k=5
  */
 #[AsCommand(
     name: 'app:rag:eval-rerank',
@@ -33,6 +37,9 @@ final class RagRerankEvalCommand extends Command
         private readonly VectorSearchService $vectorSearch,
         private readonly PlugConfigService $plugConfig,
         private readonly RerankRegistry $registry,
+        private readonly DocumentKeywordSearch $keywords,
+        private readonly HybridKnowledgeSearch $hybrid,
+        private readonly RagScopeResolver $scopes,
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
     ) {
@@ -45,7 +52,8 @@ final class RagRerankEvalCommand extends Command
             ->addOption('corpus', null, InputOption::VALUE_REQUIRED, 'Path to the corpus JSON', self::DEFAULT_CORPUS)
             ->addOption('user', null, InputOption::VALUE_REQUIRED, 'User id whose vector store to search', '2')
             ->addOption('k', null, InputOption::VALUE_REQUIRED, 'Recall@k', '5')
-            ->addOption('report', null, InputOption::VALUE_REQUIRED, 'Markdown report path');
+            ->addOption('report', null, InputOption::VALUE_REQUIRED, 'Markdown report path')
+            ->addOption('hybrid', null, InputOption::VALUE_NONE, 'Score keyword plus meaning and skip the rerank on/off passes');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -66,6 +74,12 @@ final class RagRerankEvalCommand extends Command
 
         $userId = (int) $input->getOption('user');
         $k = max(1, (int) $input->getOption('k'));
+        if ($input->getOption('hybrid')) {
+            $hybrid = $this->runHybrid($corpus['questions'], $userId, $k);
+            $io->writeln($this->renderHybrid($corpus['corpusId'], $k, $hybrid));
+
+            return Command::SUCCESS;
+        }
         $off = $this->runPass($corpus['questions'], $userId, $k);
         $wasEnabled = $this->plugConfig->isRerankEnabled();
         $this->plugConfig->setRerank(
@@ -157,6 +171,43 @@ final class RagRerankEvalCommand extends Command
     }
 
     /**
+     * @param list<array{id: string, question: string, expected: array{file: string, mustContain: string}}> $questions
+     *
+     * @return array{recall: float, mrr: float, p50: float, p95: float, hits: int, questions: int}
+     */
+    private function runHybrid(array $questions, int $userId, int $k): array
+    {
+        $hits = 0;
+        $rr = 0.0;
+        $latencies = [];
+        $n = count($questions);
+        $scopes = $this->scopes->resolve($userId, null);
+        foreach ($questions as $row) {
+            $started = hrtime(true);
+            $meaning = $this->vectorSearch->semanticSearch($row['question'], $userId, null, $k, 0.0);
+            $keyword = $this->keywords->find($userId, $row['question'], null, $scopes, $k);
+            $results = $this->hybrid->merge($meaning, $keyword, $k, $row['question']);
+            $latencies[] = (int) ((hrtime(true) - $started) / 1_000_000);
+            $rank = $this->firstMatchRank($results, $row['expected']['mustContain']);
+            if (null !== $rank && $rank <= $k) {
+                ++$hits;
+                $rr += 1 / $rank;
+            }
+        }
+
+        sort($latencies);
+
+        return [
+            'recall' => $n > 0 ? $hits / $n : 0.0,
+            'mrr' => $n > 0 ? $rr / $n : 0.0,
+            'p50' => $this->percentile($latencies, 0.50),
+            'p95' => $this->percentile($latencies, 0.95),
+            'hits' => $hits,
+            'questions' => $n,
+        ];
+    }
+
+    /**
      * @param list<array<string, mixed>> $results
      */
     private function firstMatchRank(array $results, string $needle): ?int
@@ -210,6 +261,31 @@ Corpus: `{$corpusId}` · k={$k}
 | p95 ms | {$off['p95']} | {$on['p95']} |
 
 Decision: {$flip}.
+MD;
+    }
+
+    /**
+     * @param array{recall: float, mrr: float, p50: float, p95: float, hits: int, questions: int} $hybrid
+     */
+    private function renderHybrid(string $corpusId, int $k, array $hybrid): string
+    {
+        $budget = $this->plugConfig->rerankLatencyBudgetMs();
+        $inside = $hybrid['p95'] <= $budget ? 'inside' : 'outside';
+
+        return <<<MD
+# RAG hybrid eval
+
+Corpus: `{$corpusId}` · k={$k} · keyword plus meaning
+
+| | Hybrid |
+| --- | ---: |
+| recall@{$k} | {$hybrid['recall']} |
+| hits | {$hybrid['hits']} / {$hybrid['questions']} |
+| MRR | {$hybrid['mrr']} |
+| p50 ms | {$hybrid['p50']} |
+| p95 ms | {$hybrid['p95']} |
+
+p95 is {$inside} the rerank budget ({$budget} ms). This pass does not change the rerank on/off record.
 MD;
     }
 }

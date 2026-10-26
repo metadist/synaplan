@@ -423,6 +423,7 @@
     "intro": "Un resumen de tu almacenamiento vectorial: cuántos archivos se han indexado y cuántos vectores (fragmentos) se guardan para la búsqueda semántica.",
     "provider": "Almacén vectorial",
     "providerHint": "El backend activo donde se guardan tus vectores.",
+    "providerMeaningOnly": "Este almacén encuentra fragmentos por su significado. No busca una palabra o un número exactos.",
     "online": "En línea",
     "offline": "Sin conexión",
     "myTitle": "Tus vectores",

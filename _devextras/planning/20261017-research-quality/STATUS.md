@@ -19,8 +19,8 @@ chat message.
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
 | RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
-| RS8 | in progress | Free check, checker model, and one thorough revision. Seeded draft 6/6 caught, 0/6 false alarms. Smoke 2026-10-26, tool mode: citation precision 79.8 % without the check (RS7 reports) and 96.0 % with it; fact recall unchanged at 0.78 across 9. Exit met on these numbers, judges not calibrated. Waits for the owner to accept. Flag stays off |
-| RS9 | planned | Keyword + meaning search, document cards — §0 #14 |
+| RS8 | done | Free check, checker model, and one thorough revision. Seeded draft 6/6 caught, 0/6 false alarms. Smoke 2026-10-26, tool mode: citation precision 79.8 % without the check (RS7 reports) and 96.0 % with it; fact recall unchanged at 0.78 across 9. Exit met on these numbers, judges not calibrated. Owner merged the exit in #2790. Flag stays off |
+| RS9 | in progress | Keyword plus meaning on Qdrant, same owner scopes, palette fusion unchanged. Keyword words weighted by idf and ranked server-side. Research uses files only when files are a switched-on source (today: never). Document cards are not generated. MariaDB stays meaning-only and the vector storage screen says so. Hybrid recall@5 not measured: the fixture corpus is not in the store. Flag stays off |
 | RS10 | planned | Follow-ups and revisions |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
 | RD2 | planned | `ChatView.vue` split (synaplan-desktop) |
@@ -111,8 +111,29 @@ rejections there include wrong article numbers, dates a passage does not
 hold, and list fragments.
 
 Exit (`07` RS8): rates in STATUS, and smoke citation precision above the
-RS7 row (96.0 % against 79.8 %). RS8 stays in progress until the owner
-accepts this.
+RS7 row (96.0 % against 79.8 %). The owner merged this exit in #2790.
+
+---
+
+## 2026-10-26 — RS9 keyword plus meaning
+
+Qdrant document chunks get a full-text index on `text` the first time the
+collection is used (word tokenizer, lowercase, token length 2–40). Keyword
+hits use the same owner filter as the vector leg and are fused with
+`RankFusion`, the class the command palette already uses. A query number
+wins a tie, so a chunk that only the keyword leg found is not dropped.
+MariaDB has no keyword leg. The vector storage screen says that store
+finds passages by meaning. Document cards are not generated: a card would
+need its own stored text, and there is no switch for a step that does not
+run.
+
+`app:rag:eval-rerank --hybrid --user=2 --k=5` on 2026-10-26, corpus
+`golden-extraction-s1`: 0 of 20, p50 52 ms, p95 57 ms, inside the rerank
+budget of 800 ms. User 2 has 4 chunks in `user_documents`. A count for the
+text "Golden corpus" is 0, and `sample.md` / `sample.csv` / `sample.html`
+are not files of that user. This is not a recall measurement. recall@5
+for named items: not measured. The text index is present on the live
+collection (1333 points). RS9 stays in progress. Research stays off.
 
 ---
 
