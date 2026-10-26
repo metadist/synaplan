@@ -150,6 +150,9 @@ parameters:
     # One-time sign-in links: per client IP and per address, per hour.
     env(EMAIL_LINK_IP_LIMIT): '10'
     env(EMAIL_LINK_ADDRESS_LIMIT): '5'
+    # Invitation codes without a password: per client IP and per address, per hour.
+    env(CODE_SIGNUP_IP_LIMIT): '10'
+    env(CODE_SIGNUP_ADDRESS_LIMIT): '5'
     env(PAID_SIGNUP_ALERT_LIMIT): '10'
     env(GOOGLE_CLIENT_SECRET): ''
     env(GITHUB_CLIENT_SECRET): ''

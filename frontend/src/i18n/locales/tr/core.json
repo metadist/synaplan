@@ -46,6 +46,7 @@
     "login": "Giriş",
     "register": "Kayıt Ol",
     "forgotPassword": "Şifremi Unuttum",
+    "codeSignup": "Davet kodu",
     "resetPassword": "Şifre Sıfırla",
     "changePassword": "Şifre Değiştir",
     "verifyEmail": "E-posta Doğrula",

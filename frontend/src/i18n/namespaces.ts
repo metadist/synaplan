@@ -73,6 +73,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'adminSetup',
     'auth',
     'biometricLock',
+    'codeSignup',
     'forcedPasswordChange',
     'freeApi',
     'guest',

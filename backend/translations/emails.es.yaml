@@ -61,3 +61,10 @@ email:
     button: 'Iniciar sesión'
     or_copy: 'O copia este enlace en tu navegador:'
     not_you: 'Si no lo has pedido, ignora este correo; nadie puede iniciar sesión sin el enlace.'
+
+  code_signup:
+    title: 'Tu invitación a Synaplan'
+    body: 'Usa este botón para continuar. Funciona una vez, durante 15 minutos. Tu cuenta se crea al abrirlo, salvo que esta dirección ya tenga una.'
+    button: 'Continuar'
+    or_copy: 'O copia este enlace en tu navegador:'
+    not_you: 'Si no lo has pedido, ignora este correo; nadie puede abrir una cuenta sin el enlace.'
