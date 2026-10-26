@@ -19,12 +19,13 @@ final class ApiKeyPlanExceptionListener
 {
     public function __invoke(ExceptionEvent $event): void
     {
-        if (!$event->getThrowable() instanceof ApiKeyPlanRequiredException) {
+        $refusal = $event->getThrowable();
+        if (!$refusal instanceof ApiKeyPlanRequiredException) {
             return;
         }
 
         $event->setResponse(new JsonResponse(
-            ApiKeyPlanRequiredException::responseBody(),
+            $refusal->body(),
             Response::HTTP_FORBIDDEN,
         ));
     }

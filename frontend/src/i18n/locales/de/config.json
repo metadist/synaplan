@@ -912,6 +912,7 @@
       "errorActivating": "Fehler beim Aktivieren des API-Schlüssels",
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
+      "addressUnverified": "Bestätige zuerst deine E-Mail-Adresse: Öffne den Link, den wir dir geschickt haben, und erstelle dann den Schlüssel.",
       "planRequired": "API-Schlüssel gehören zu einem bezahlten Tarif.",
       "seePlans": "Tarife ansehen",
       "scopes": {
