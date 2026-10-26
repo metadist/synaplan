@@ -970,16 +970,16 @@ final class QdrantClientDirect implements QdrantClientInterface
         int $limit = 10,
         ?\App\Service\RAG\VectorStorage\DTO\SearchQuery $query = null,
     ): array {
-        return QdrantTextSearch::collect($text, $limit, function () use ($text, $userId, $groupKey, $limit, $query): array {
+        try {
             $this->ensureDocumentsCollection();
-            $body = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll", [
-                'filter' => QdrantTextSearch::withText(DocumentScope::filter($userId, $groupKey, $query), $text),
-                'limit' => min(64, $limit * 3),
-                'with_payload' => true,
-            ]);
+            $post = fn (string $endpoint, array $body): array => $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/{$endpoint}", $body);
 
-            return is_array($body['result']['points'] ?? null) ? $body['result']['points'] : [];
-        }, $this->logger, $userId);
+            return QdrantTextSearch::search($text, DocumentScope::filter($userId, $groupKey, $query), $limit, $post);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to search documents by keyword', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+            return [];
+        }
     }
 
     /**

@@ -131,7 +131,7 @@ final readonly class ReadStage implements ResearchStage
     private function readOne(StageContext $ctx, Source $source, ?string $question = null): ?StageResult
     {
         $this->mark($ctx, $source->id, Source::READING);
-        $page = $this->pageFor($source);
+        $page = $this->pageFor($ctx, $source);
         if ($page->blocked || '' === trim($page->text)) {
             $this->mark($ctx, $source->id, Source::BLOCKED, '' !== $page->reason ? $page->reason : 'There was no text to read.');
 
@@ -185,10 +185,10 @@ final readonly class ReadStage implements ResearchStage
         return null;
     }
 
-    private function pageFor(Source $source): ResearchPage
+    private function pageFor(StageContext $ctx, Source $source): ResearchPage
     {
         if (Source::FILE === $source->kind && null !== $this->filePages) {
-            return $this->filePages->open($source->fileId);
+            return $this->filePages->open($ctx->state->ref->userId, $source->fileId);
         }
 
         return $this->pages->open($source->url ?? '');

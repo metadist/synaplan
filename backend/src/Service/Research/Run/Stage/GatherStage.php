@@ -98,7 +98,7 @@ final readonly class GatherStage implements ResearchStage
 
     private function keepFiles(StageContext $ctx, string $pointId, string $query): void
     {
-        if (null === $this->files) {
+        if (null === $this->files || !$ctx->filesOn()) {
             return;
         }
 

@@ -14,6 +14,8 @@ use App\AI\StructuredOutput\Schema\ResearchTriageSchema;
 use App\Entity\File;
 use App\Prompt\PromptCatalog;
 use App\Repository\FileRepository;
+use App\Service\RAG\RagScopeResolver;
+use App\Service\RAG\VectorStorage\DTO\RagScope;
 use App\Service\Research\Run\Ledger\PassageSplitter;
 use App\Service\Research\Run\Ledger\PassageVerifier;
 use App\Service\Research\Run\Ledger\ResearchBrief;
@@ -337,14 +339,45 @@ final class ResearchStagesTest extends TestCase
         ];
     }
 
+    public function testFilesStayClosedWhileOnlyTheWebIsSwitchedOn(): void
+    {
+        [$ctx] = $this->open();
+        $ctx->state->ledger->addPoint('Article', 'Needed.', [['q' => 'Art. 17', 'language' => 'en', 'scope' => 'files']]);
+        $files = $this->createMock(ResearchFileSearch::class);
+        $files->expects($this->never())->method('find');
+
+        (new GatherStage(new StageCall(new ReplayCaller()), new ReplaySearch(), new GatherChoice(), $files))->run($ctx);
+
+        self::assertSame([], $ctx->state->ledger->sources());
+    }
+
+    public function testTheReaderRefusesAFileThatIsNotShared(): void
+    {
+        $file = $this->createMock(File::class);
+        $file->method('getUserId')->willReturn(99);
+        $file->method('getGroupKey')->willReturn('private');
+        $file->method('getFileText')->willReturn('Secret text.');
+        $repo = $this->createMock(FileRepository::class);
+        $repo->method('find')->willReturn($file);
+        $scopes = $this->createMock(RagScopeResolver::class);
+        $scopes->method('resolve')->willReturn([new RagScope(7, null), new RagScope(99, 'shared')]);
+
+        $page = (new ResearchFilePage($repo, $scopes))->open(7, 5);
+
+        self::assertTrue($page->blocked);
+        self::assertSame('', $page->text);
+        self::assertSame(ResearchFilePage::NOT_ALLOWED, $page->reason);
+    }
+
     public function testAFilesQueryKeepsTheFileAndTheReaderOpensItsText(): void
     {
-        [$ctx, $caller] = $this->open();
+        [$ctx, $caller] = $this->open(sourcesOn: 'web, files');
         $ctx->state->ledger->addPoint('Article', 'Needed.', [['q' => 'Art. 17', 'language' => 'en', 'scope' => 'files']]);
         $search = new ReplaySearch();
         $files = $this->createMock(ResearchFileSearch::class);
         $files->method('find')->willReturn([['file_id' => 17, 'title' => 'GDPR']]);
         $file = $this->createMock(File::class);
+        $file->method('getUserId')->willReturn(7);
         $file->method('getFileText')->willReturn('Article 17 gives a right to erasure.');
         $repo = $this->createMock(FileRepository::class);
         $repo->expects($this->once())->method('find')->with(17)->willReturn($file);
@@ -359,7 +392,7 @@ final class ResearchStagesTest extends TestCase
         ]);
 
         (new GatherStage(new StageCall($caller), $search, new GatherChoice(), $files))->run($ctx);
-        (new ReadStage(new StageCall($caller), new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store(), new ResearchFilePage($repo)))->run($ctx);
+        (new ReadStage(new StageCall($caller), new ReplayPages(), new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store(), new ResearchFilePage($repo, $this->createMock(RagScopeResolver::class))))->run($ctx);
 
         $sources = $ctx->state->ledger->sources();
         self::assertSame([], $search->queries);
@@ -372,7 +405,7 @@ final class ResearchStagesTest extends TestCase
 
     public function testABothQuerySearchesTheWebAndKeepsTheFile(): void
     {
-        [$ctx, $caller] = $this->open();
+        [$ctx, $caller] = $this->open(sourcesOn: 'web, files');
         $ctx->state->ledger->setBrief(new ResearchBrief('Find the article', 'en', 'answer'));
         $ctx->state->ledger->addPoint('Article', 'Needed.', [['q' => 'Art. 17', 'language' => 'en', 'scope' => 'both']]);
         $search = new ReplaySearch();
@@ -749,7 +782,7 @@ final class ResearchStagesTest extends TestCase
     /**
      * @return array{0: StageContext, 1: ReplayCaller}
      */
-    private function open(ResearchDepth $depth = ResearchDepth::Quick): array
+    private function open(ResearchDepth $depth = ResearchDepth::Quick, string $sourcesOn = 'web'): array
     {
         $created = new \DateTimeImmutable('2026-10-24T09:00:00+00:00');
         $clock = new MockClock($created);
@@ -770,6 +803,7 @@ final class ResearchStagesTest extends TestCase
             new ResearchEventLog($keys),
             $created,
             new ResearchStop(),
+            sourcesOn: $sourcesOn,
         );
 
         return [$context, $caller];

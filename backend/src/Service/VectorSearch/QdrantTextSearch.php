@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Service\VectorSearch;
 
-use Psr\Log\LoggerInterface;
-
 /**
  * Full-text payload index and keyword ranking for document chunks.
  *
- * Qdrant scroll does not rank by relevance, so a match is ordered here:
- * more of the query's words first, then an exact phrase.
+ * Each query word is weighted by how rare it is inside the caller's scope
+ * (BM25 idf from exact Qdrant counts), so "Art. 17" outranks "what does it
+ * say"; a word in more than half the chunks is dropped while a rarer one is
+ * left. The rarest words pick the candidates; Qdrant scores them by the summed
+ * weight of the words a chunk contains. Scores are 0..1: the share of the
+ * query's weight a chunk matched.
  */
 final class QdrantTextSearch
 {
@@ -20,24 +22,87 @@ final class QdrantTextSearch
     public const SCHEMA = [
         'type' => 'text',
         'tokenizer' => 'word',
-        'min_token_len' => 2,
-        'max_token_len' => 40,
+        'min_token_len' => self::MIN_TOKEN_LEN,
+        'max_token_len' => self::MAX_TOKEN_LEN,
         'lowercase' => true,
     ];
 
+    private const MIN_TOKEN_LEN = 2;
+    private const MAX_TOKEN_LEN = 40;
+    /** Bounds the count requests one query makes. */
+    private const MAX_TOKENS = 16;
+    /** Chunks Qdrant scores per query. */
+    private const CANDIDATES = 512;
+
     /**
+     * @param array<string, mixed>                                         $scope the owner filter the vector leg uses
+     * @param callable(string, array<string, mixed>): array<string, mixed> $post  one POST to `points/{endpoint}`
+     *
+     * @return list<array{id: string, score: float, payload: array<string, mixed>}>
+     */
+    public static function search(string $query, array $scope, int $limit, callable $post): array
+    {
+        $tokens = self::tokens($query);
+        if ([] === $tokens || $limit < 1) {
+            return [];
+        }
+        $total = self::count($post, $scope);
+        if ($total < 1) {
+            return [];
+        }
+
+        $frequency = [];
+        foreach ($tokens as $token) {
+            $found = self::count($post, self::withText($scope, [$token]));
+            if ($found > 0) {
+                $frequency[$token] = $found;
+            }
+        }
+        $distinctive = array_filter($frequency, static fn (int $found): bool => $found <= $total / 2);
+        if ([] !== $distinctive) {
+            $frequency = $distinctive;
+        }
+        if ([] === $frequency) {
+            return [];
+        }
+        asort($frequency);
+
+        $weights = [];
+        foreach ($frequency as $token => $found) {
+            $weights[$token] = log(1 + ($total - $found + 0.5) / ($found + 0.5));
+        }
+        $selective = array_keys(array_filter($frequency, static fn (int $found): bool => $found <= self::CANDIDATES));
+        if ([] === $selective) {
+            $selective = [array_key_first($frequency)];
+        }
+
+        $body = $post('query', [
+            'prefetch' => ['filter' => self::withText($scope, $selective), 'limit' => self::CANDIDATES],
+            'query' => ['formula' => ['sum' => array_map(
+                static fn (string $token, float $weight): array => ['mult' => [round($weight, 4), self::condition($token)]],
+                array_keys($weights),
+                array_values($weights),
+            )]],
+            'limit' => $limit,
+            'with_payload' => true,
+        ]);
+        $points = is_array($body['result']['points'] ?? null) ? $body['result']['points'] : [];
+
+        return self::rows($points, array_sum($weights));
+    }
+
+    /**
+     * The scope filter, narrowed to chunks that contain any of the words.
+     * A multi-owner scope gets the words inside each owner branch.
+     *
      * @param array<string, mixed> $filter
+     * @param list<string>         $tokens
      *
      * @return array<string, mixed>
      */
-    public static function withText(array $filter, string $query): array
+    public static function withText(array $filter, array $tokens): array
     {
-        // `match.text` requires every token, so match any single query word and let rank() order them.
-        $any = array_map(
-            static fn (string $token): array => ['key' => self::FIELD, 'match' => ['text' => $token]],
-            self::tokens($query) ?: [$query],
-        );
-        $text = ['should' => $any];
+        $text = ['should' => array_map(self::condition(...), $tokens)];
         if (isset($filter['should']) && is_array($filter['should'])) {
             foreach ($filter['should'] as $i => $branch) {
                 if (!is_array($branch)) {
@@ -60,83 +125,63 @@ final class QdrantTextSearch
     }
 
     /**
-     * @param callable(): list<array<string, mixed>> $scroll
+     * Words as the index stores them: lowercase, split on anything that is
+     * not a letter or digit, inside the index token length.
      *
-     * @return list<array{id: string, score: float, payload: array<string, mixed>}>
+     * @return list<string>
      */
-    public static function collect(string $text, int $limit, callable $scroll, LoggerInterface $logger, int $userId): array
-    {
-        $text = trim($text);
-        if ('' === $text || $limit < 1) {
-            return [];
-        }
-
-        try {
-            return self::rank($scroll(), $text, $limit);
-        } catch (\Throwable $e) {
-            $logger->error('Failed to search documents by keyword', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [];
-        }
-    }
-
-    /**
-     * @param list<array<string, mixed>> $points
-     *
-     * @return list<array{id: string, score: float, payload: array<string, mixed>}>
-     */
-    public static function rank(array $points, string $query, int $limit): array
-    {
-        $tokens = self::tokens($query);
-        $ranked = [];
-        foreach ($points as $point) {
-            $payload = is_array($point['payload'] ?? null) ? $point['payload'] : [];
-            $body = mb_strtolower((string) ($payload['text'] ?? ''));
-            $hits = 0;
-            foreach ($tokens as $token) {
-                if (str_contains($body, $token)) {
-                    ++$hits;
-                }
-            }
-            $id = (string) ($payload['_point_id'] ?? $point['id'] ?? '');
-            if ('' === $id) {
-                continue;
-            }
-            $ranked[] = ['id' => $id, 'score' => (float) $hits, 'payload' => $payload, 'text' => $body];
-        }
-
-        $phrase = mb_strtolower($query);
-        usort($ranked, static function (array $a, array $b) use ($phrase): int {
-            $byScore = $b['score'] <=> $a['score'];
-            if (0 !== $byScore) {
-                return $byScore;
-            }
-
-            return str_contains($b['text'], $phrase) <=> str_contains($a['text'], $phrase);
-        });
-
-        $out = [];
-        foreach (array_slice($ranked, 0, max(0, $limit)) as $row) {
-            $out[] = ['id' => $row['id'], 'score' => $row['score'], 'payload' => $row['payload']];
-        }
-
-        return $out;
-    }
-
-    /** @return list<string> */
-    private static function tokens(string $query): array
+    public static function tokens(string $query): array
     {
         $parts = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($query)) ?: [];
         $tokens = [];
         foreach ($parts as $part) {
-            if (strlen($part) >= 2) {
+            $length = mb_strlen($part);
+            if ($length >= self::MIN_TOKEN_LEN && $length <= self::MAX_TOKEN_LEN) {
                 $tokens[$part] = $part;
             }
         }
 
-        return array_values($tokens);
+        return array_slice(array_values($tokens), 0, self::MAX_TOKENS);
+    }
+
+    /** @return array{key: string, match: array{text: string}} */
+    private static function condition(string $token): array
+    {
+        return ['key' => self::FIELD, 'match' => ['text' => $token]];
+    }
+
+    /**
+     * @param callable(string, array<string, mixed>): array<string, mixed> $post
+     * @param array<string, mixed>                                         $filter
+     */
+    private static function count(callable $post, array $filter): int
+    {
+        $body = $post('count', ['filter' => $filter, 'exact' => true]);
+
+        return (int) ($body['result']['count'] ?? 0);
+    }
+
+    /**
+     * @param array<mixed> $points
+     *
+     * @return list<array{id: string, score: float, payload: array<string, mixed>}>
+     */
+    private static function rows(array $points, float $weight): array
+    {
+        $out = [];
+        foreach ($points as $point) {
+            if (!is_array($point)) {
+                continue;
+            }
+            $payload = is_array($point['payload'] ?? null) ? $point['payload'] : [];
+            $id = (string) ($payload['_point_id'] ?? $point['id'] ?? '');
+            if ('' === $id) {
+                continue;
+            }
+            $score = $weight > 0 ? (float) ($point['score'] ?? 0) / $weight : 0.0;
+            $out[] = ['id' => $id, 'score' => round(min(1.0, $score), 4), 'payload' => $payload];
+        }
+
+        return $out;
     }
 }

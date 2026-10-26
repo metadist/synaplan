@@ -108,10 +108,18 @@ instead of recording an "on" run that equals "off". It temporarily sets
 value afterwards — on a busy instance, run it off-peak.
 
 On Qdrant, knowledge search also matches the words in a chunk. The text
-index is created the first time the documents collection is used. Keyword
-hits and meaning hits are fused with the same rank fusion the command
-palette uses, and they share the owner's scopes. A MariaDB store has no
-keyword leg; the vector storage screen says that search is by meaning only.
+index is created the first time the documents collection is used. Each
+query word is weighted by how rare it is in the searcher's scope (BM25 idf
+from exact Qdrant counts), so an article number or product code outranks
+filler words; a word found in more than half the chunks is ignored while a
+rarer one is left. Qdrant ranks the candidates server-side by that weight.
+Keyword hits and meaning hits are fused with the same rank fusion the
+command palette uses, and they share the owner's scopes. A MariaDB store has
+no keyword leg; the vector storage screen says that search is by meaning only.
+
+A research run searches and reads files only when files are switched on as
+a source for that run; the reader checks the share again before it opens a
+file and keeps at most the same character budget as a web page.
 
 ```bash
 docker compose exec -T backend php bin/console app:rag:eval-rerank --hybrid --user=<id> --k=5

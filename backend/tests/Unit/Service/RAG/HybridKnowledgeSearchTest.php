@@ -98,7 +98,7 @@ final class HybridKnowledgeSearchTest extends TestCase
             ['must' => [['key' => 'user_id', 'match' => ['value' => 9]]]],
         ]];
 
-        $with = QdrantTextSearch::withText($filter, 'Art. 17');
+        $with = QdrantTextSearch::withText($filter, QdrantTextSearch::tokens('Art. 17'));
 
         $words = static fn (array $branch): array => array_map(
             static fn (array $condition): string => $condition['match']['text'],
@@ -107,16 +107,6 @@ final class HybridKnowledgeSearchTest extends TestCase
         self::assertSame(['art', '17'], $words($with['should'][0]));
         self::assertSame(['art', '17'], $words($with['should'][1]));
         self::assertArrayNotHasKey('must', array_diff_key($with, ['should' => true]));
-    }
-
-    public function testKeywordRankPutsTheArticleNumberFirst(): void
-    {
-        $ranked = QdrantTextSearch::rank([
-            ['id' => 'a', 'payload' => ['text' => 'privacy in general', '_point_id' => 'a']],
-            ['id' => 'b', 'payload' => ['text' => 'Art. 17 gives a right', '_point_id' => 'b']],
-        ], 'Art. 17', 2);
-
-        self::assertSame('b', $ranked[0]['id']);
     }
 
     public function testMariaDbSkipsTheKeywordLeg(): void
@@ -136,21 +126,36 @@ final class HybridKnowledgeSearchTest extends TestCase
         $client->method('searchDocumentKeywords')->willReturn([[
             'id' => 'p1',
             'score' => 2.0,
-            'payload' => ['file_id' => 17, 'text' => 'Art. 17 gives a right to erasure.'],
+            'payload' => ['file_id' => 17, 'user_id' => 9, 'group_key' => 'law', 'text' => 'Art. 17 gives a right to erasure.'],
         ]]);
         $storage = $this->createMock(VectorStorageFacade::class);
         $storage->method('getProviderName')->willReturn('qdrant');
         $file = $this->createMock(File::class);
+        $file->method('getId')->willReturn(17);
         $file->method('getFileName')->willReturn('gdpr.md');
         $files = $this->createMock(FileRepository::class);
-        $files->expects($this->once())->method('find')->with(17)->willReturn($file);
+        $files->expects($this->once())->method('findBy')->with(['id' => [17]])->willReturn([$file]);
         $search = new DocumentKeywordSearch($client, $storage, $files);
 
-        $hits = $search->find(4, 'Art. 17', null, [new RagScope(4, null)], 5);
+        $hits = $search->find(4, 'Art. 17', null, [new RagScope(4, null), new RagScope(9, 'law')], 5);
 
         self::assertSame('p1', $hits[0]['chunk_id']);
         self::assertSame(17, $hits[0]['file_id']);
         self::assertSame('gdpr.md', $hits[0]['file_name']);
         self::assertStringContainsString('Art. 17', $hits[0]['chunk_text']);
+        self::assertSame(9, $hits[0]['owner_id']);
+        self::assertTrue($hits[0]['shared']);
+        self::assertSame('law', $hits[0]['group_key']);
+    }
+
+    public function testNoScopesSearchesNothing(): void
+    {
+        $client = $this->createMock(QdrantClientInterface::class);
+        $client->expects($this->never())->method('searchDocumentKeywords');
+        $storage = $this->createMock(VectorStorageFacade::class);
+        $storage->method('getProviderName')->willReturn('qdrant');
+        $search = new DocumentKeywordSearch($client, $storage, $this->createMock(FileRepository::class));
+
+        self::assertSame([], $search->find(4, 'Art. 17', null, [], 5));
     }
 }
