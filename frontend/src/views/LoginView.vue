@@ -303,15 +303,7 @@
                 </button>
               </div>
 
-              <div class="flex justify-end">
-                <router-link
-                  to="/forgot-password"
-                  class="text-xs font-medium text-brand hover:underline underline-offset-2"
-                  data-testid="link-forgot"
-                >
-                  {{ $t('auth.forgotPassword') }}
-                </router-link>
-              </div>
+              <LoginEmailLink :email="email" />
 
               <Transition name="error-slide">
                 <div
@@ -429,6 +421,7 @@ import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
+import LoginEmailLink from '@/components/auth/LoginEmailLink.vue'
 import RegistrationClosedHint from '@/components/auth/RegistrationClosedHint.vue'
 import { FIRST_RUN_ADMIN_EMAIL, FIRST_RUN_ADMIN_PASSWORD } from '@/constants/firstRunAdmin'
 import { firstRunLandingPath } from '@/composables/useFirstRunSetup'

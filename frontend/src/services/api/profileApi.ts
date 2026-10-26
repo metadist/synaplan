@@ -62,6 +62,13 @@ export const profileApi = {
     })
   },
 
+  async setInitialPassword(newPassword: string): Promise<unknown> {
+    return httpClient('/api/v1/profile/password/initial', {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    })
+  },
+
   async changePassword(currentPassword: string, newPassword: string): Promise<unknown> {
     return httpClient('/api/v1/profile/password', {
       method: 'PUT',
