@@ -22,7 +22,7 @@
   // Renovate on npm 11. 11.18+ still accepts the --before flag that
   // minimumReleaseAge passes through.
   "constraints": {
-    "npm": ">=11.18.0 <12"
+    "npm": "<13"
   },
   "prHourlyLimit": 2,
   // Make the implicit Renovate default (10) explicit. Grouping already collapses
