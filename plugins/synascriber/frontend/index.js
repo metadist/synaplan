@@ -143,6 +143,12 @@ function adminCard(base, status, onSaved) {
     value: s.stt_url,
     placeholder: 'http://stt.example.svc.cluster.local:8080',
   })
+  const sttModel = h('input', {
+    class: FIELD,
+    id: 'syn-stt-model',
+    value: s.stt_model,
+    placeholder: 'whisper',
+  })
   const prosody = h('input', {
     class: FIELD,
     id: 'syn-prosody',
@@ -182,6 +188,12 @@ function adminCard(base, status, onSaved) {
     jitsi,
     h('label', { class: 'txt-secondary text-sm', for: 'syn-stt', text: t('stt_url') }),
     stt,
+    h('label', { class: 'txt-secondary text-sm', for: 'syn-stt-model', text: t('stt_model') }),
+    sttModel,
+    h('p', {
+      class: 'txt-secondary text-sm',
+      text: `${t('stt_api_key')}: ${s.stt_api_key ? t('secret_set') : t('secret_none')}`,
+    }),
     h('label', { class: 'txt-secondary text-sm', for: 'syn-prosody', text: t('prosody_url') }),
     prosody,
     h('p', {
@@ -217,6 +229,7 @@ function adminCard(base, status, onSaved) {
       default_folder: folder.value,
       jitsi_url: jitsi.value,
       stt_url: stt.value,
+      stt_model: sttModel.value,
       prosody_url: prosody.value,
     }
     const res = await call(base, 'PUT', '/admin/settings', body)

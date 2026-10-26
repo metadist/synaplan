@@ -2,7 +2,7 @@
   "id": "synascriber",
   "name": "synascriber",
   "namespace": "Plugin\\SynaScriber",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "displayName": "Meeting notes",
   "description": "Written notes of Jitsi meetings in openDesk. Speech becomes text on your organisation's servers; audio is not kept.",
   "author": "metadist",
