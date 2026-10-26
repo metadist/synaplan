@@ -30,8 +30,28 @@ vi.mock('@/services/api/checkoutApi', () => ({
   checkoutApi: { start, claim },
 }))
 
+const native = { app: false }
+vi.mock('@/services/api/nativeRuntime', () => ({
+  isNativeApp: () => native.app,
+}))
+
+vi.mock('@/services/authService', () => ({
+  authService: { getCurrentUser: vi.fn().mockResolvedValue({ id: 1 }) },
+}))
+
+vi.mock('@/services/sessionHint', () => ({ setSessionHint: vi.fn() }))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ refreshUser: vi.fn().mockResolvedValue(undefined) }),
+}))
+
+vi.mock('@/stores/config', () => ({
+  useConfigStore: () => ({ reload: vi.fn().mockResolvedValue(undefined) }),
+}))
+
 import StartView from '@/views/StartView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
+import { payFirstStartGuard } from '@/router/payFirstRoutes'
 
 describe('Start page', () => {
   beforeEach(() => {
@@ -58,6 +78,14 @@ describe('Start page', () => {
     expect(start).toHaveBeenCalledWith('ada@example.com', 'PRO', 'challenge')
     expect(assign).toHaveBeenCalledWith('https://checkout.stripe.test/s/1')
     vi.unstubAllGlobals()
+  })
+
+  it('does not offer the payment page inside the native app', () => {
+    native.app = true
+    const next = vi.fn()
+    payFirstStartGuard({} as never, {} as never, next)
+    expect(next).toHaveBeenCalledWith('/register')
+    native.app = false
   })
 })
 
@@ -88,6 +116,27 @@ describe('Welcome page', () => {
     await flushPromises()
     expect(page.get('[data-testid="welcome-status"]').text()).toContain('Your Pro plan is active.')
     expect(page.find('[data-testid="welcome-to-chat"]').exists()).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('does not claim the payment went through while it is still unconfirmed', async () => {
+    vi.useFakeTimers()
+    claim.mockResolvedValue({
+      status: 'pending',
+      plan: 'PRO',
+      email: 'ada@example.com',
+      signedIn: false,
+      success: true,
+    })
+    const page = mount(WelcomeView)
+    for (let i = 0; i < 6; i++) {
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(2000)
+    }
+    await flushPromises()
+    const text = page.get('[data-testid="welcome-status"]').text()
+    expect(text).toContain('not had confirmation')
+    expect(text).not.toContain('went through')
     vi.useRealTimers()
   })
 })

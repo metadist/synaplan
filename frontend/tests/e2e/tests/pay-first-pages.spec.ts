@@ -16,8 +16,8 @@ test.describe('@ci Pay first pages', () => {
     await expect(page.getByTestId('start-email')).toHaveCount(0)
   })
 
-  test('an unknown payment says it could not be found', async ({ page }) => {
-    await page.goto('/welcome?session_id=cs_does_not_exist')
+  test('a welcome page without a payment says it could not be found', async ({ page }) => {
+    await page.goto('/welcome')
     await expect(page.getByTestId('welcome-status')).toContainText('could not find this payment')
   })
 })
