@@ -139,6 +139,30 @@ final class WhisperClientTest extends PluginTestCase
         $this->settings()->update(['stt_model' => 'whisper large']);
     }
 
+    public function testAnEmptyModelFallsBackToTheDefault(): void
+    {
+        $settings = $this->settings(['stt_model' => 'openai/whisper-large-v3-turbo']);
+        $settings->update(['stt_model' => '  ']);
+
+        self::assertSame('whisper', $settings->sttModel());
+    }
+
+    public function testAKeyWithALineBreakIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('stt_api_key');
+
+        $this->settings()->update(['stt_api_key' => "k-123\r\nX-Injected: 1"]);
+    }
+
+    public function testTheKeyIsTrimmed(): void
+    {
+        $settings = $this->settings();
+        $settings->update(['stt_api_key' => " k-123\n"]);
+
+        self::assertSame('k-123', $settings->sttApiKey());
+    }
+
     public function testTheKeyIsASecretOnThePluginPage(): void
     {
         $view = $this->settings(['stt_api_key' => 'k-123'])->publicView();

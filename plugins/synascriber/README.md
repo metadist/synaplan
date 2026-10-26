@@ -57,7 +57,7 @@ the installation, not to a user.
 |--------|-----------|-------------|---------------|
 | whisper.cpp `whisper-server`, the `stt` chart of synaplan-charts | the service | ignored (default `whisper`) | none |
 | a self-run `whisper-server` | its address; start it with `--inference-path /v1/audio/transcriptions --convert`, or `/health` is green and every transcription fails | ignored | none |
-| vLLM | `vllm serve <model>` | the `--served-model-name`, or the model name | its `--api-key`, if set |
+| vLLM | the address of `vllm serve <model>` | the `--served-model-name`, or the model name | its `--api-key`, if set |
 | a cloud service | its base URL | its model name | its key |
 
 `stt_model` goes out as the `model` field, which the OpenAI API requires and
