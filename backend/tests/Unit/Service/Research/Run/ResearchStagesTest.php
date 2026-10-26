@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\AI\StructuredOutput\Schema\ResearchBriefSchema;
+use App\AI\StructuredOutput\Schema\ResearchCheckSchema;
 use App\AI\StructuredOutput\Schema\ResearchDecisionSchema;
 use App\AI\StructuredOutput\Schema\ResearchEvidenceSchema;
 use App\AI\StructuredOutput\Schema\ResearchFinishSchema;
@@ -18,6 +19,7 @@ use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
+use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchRoles;
 use App\Service\Research\Run\ResearchRunRef;
@@ -26,7 +28,9 @@ use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\Stage\AcceptedEvidence;
 use App\Service\Research\Run\Stage\BriefStage;
+use App\Service\Research\Run\Stage\CheckStage;
 use App\Service\Research\Run\Stage\DeliverStage;
+use App\Service\Research\Run\Stage\DraftCheck;
 use App\Service\Research\Run\Stage\GatherChoice;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
@@ -436,7 +440,7 @@ final class ResearchStagesTest extends TestCase
         $write = new WriteStage(new StageCall($caller));
 
         self::assertSame('write', $read->run($ctx)->next);
-        self::assertSame('deliver', $write->run($ctx)->next);
+        self::assertSame('check', $write->run($ctx)->next);
 
         $facts = [];
         foreach ($ctx->state->ledger->evidenceForWriter()['p1'] ?? [] as $card) {
@@ -510,7 +514,7 @@ final class ResearchStagesTest extends TestCase
         self::assertSame('gather', (new PlanStage($calls))->run($ctx)->next);
         self::assertSame('read', (new GatherStage($calls, $search, new GatherChoice()))->run($ctx)->next);
         self::assertSame('write', (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $store))->run($ctx)->next);
-        self::assertSame('deliver', (new WriteStage($calls))->run($ctx)->next);
+        self::assertSame('check', (new WriteStage($calls))->run($ctx)->next);
         $done = (new DeliverStage())->run($ctx);
 
         self::assertSame('done', $done->next);
@@ -523,7 +527,7 @@ final class ResearchStagesTest extends TestCase
         }
     }
 
-    public function testAQuickRunLeavesItsLastCallToTheWriter(): void
+    public function testAQuickRunLeavesItsLastTwoCallsToTheWriterAndTheChecker(): void
     {
         [$ctx, $caller] = $this->open();
         $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
@@ -555,18 +559,20 @@ final class ResearchStagesTest extends TestCase
         ];
         $caller->script = [
             $this->json($finding),
-            $this->json($finding),
             new ResearchModelReply(true, true, null, 'The unit price is 12.40 EUR [e1].', 'test:replay', null),
+            $this->json(['verdicts' => [['statement' => 'c1', 'verdict' => 'supported', 'unsupported_part' => null, 'note' => '']]]),
         ];
         $calls = new StageCall($caller);
 
         self::assertSame('write', (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx)->next);
-        self::assertSame('deliver', (new WriteStage($calls))->run($ctx)->next);
+        self::assertSame('check', (new WriteStage($calls))->run($ctx)->next);
+        self::assertSame('deliver', (new CheckStage($calls, new DraftCheck(), new ResearchInputBudget()))->run($ctx)->next);
         (new DeliverStage())->run($ctx);
 
         self::assertCount(3, $caller->seen);
         self::assertSame(ResearchOutcome::COMPLETE, $ctx->state->outcome?->code);
-        self::assertSame('The unit price is 12.40 EUR [e1].', $ctx->state->ledger->report());
+        self::assertSame(['statements' => 1, 'supported' => 1, 'removed' => 0], $ctx->state->ledger->check());
+        self::assertStringStartsWith('The unit price is 12.40 EUR [e1].', (string) $ctx->state->ledger->report());
     }
 
     public function testAModelThatCannotBeResolvedIsNotRetriedAndSaysSo(): void
@@ -648,7 +654,7 @@ final class ResearchStagesTest extends TestCase
     public function testResearchPromptsStayInternal(): void
     {
         $topics = array_column(PromptCatalog::all(), 'topic');
-        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_lead', 'tools:research_write'] as $topic) {
+        foreach (['tools:research_brief', 'tools:research_plan', 'tools:research_triage', 'tools:research_read', 'tools:research_reflect', 'tools:research_lead', 'tools:research_write', 'tools:research_check'] as $topic) {
             self::assertContains($topic, $topics);
         }
         $read = null;
@@ -673,6 +679,7 @@ final class ResearchStagesTest extends TestCase
             ['class' => ResearchEvidenceSchema::class],
             ['class' => ResearchDecisionSchema::class],
             ['class' => ResearchFinishSchema::class],
+            ['class' => ResearchCheckSchema::class],
         ];
     }
 

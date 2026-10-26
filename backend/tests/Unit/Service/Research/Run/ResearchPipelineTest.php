@@ -30,7 +30,9 @@ use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchUnitPlan;
 use App\Service\Research\Run\Stage\AcceptedEvidence;
 use App\Service\Research\Run\Stage\BriefStage;
+use App\Service\Research\Run\Stage\CheckStage;
 use App\Service\Research\Run\Stage\DeliverStage;
+use App\Service\Research\Run\Stage\DraftCheck;
 use App\Service\Research\Run\Stage\GatherChoice;
 use App\Service\Research\Run\Stage\GatherStage;
 use App\Service\Research\Run\Stage\PlanStage;
@@ -350,6 +352,7 @@ final class ResearchPipelineTest extends TestCase
                 new ResearchInputBudget(),
             ),
             new WriteStage($calls),
+            new CheckStage($calls, new DraftCheck(), new ResearchInputBudget()),
             new DeliverStage(),
             $search,
         );

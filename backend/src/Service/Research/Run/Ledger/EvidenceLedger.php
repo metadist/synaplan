@@ -41,6 +41,9 @@ final class EvidenceLedger
 
     private ?string $report = null;
 
+    /** @var array{statements: int, supported: int, removed: int}|null */
+    private ?array $check = null;
+
     private int $nextSource = 1;
 
     private int $nextEvidence = 1;
@@ -122,6 +125,23 @@ final class EvidenceLedger
     {
         $text = trim($markdown);
         $this->report = '' === $text ? null : $text;
+    }
+
+    public function setCheck(int $statements, int $supported, int $removed): void
+    {
+        $this->check = [
+            'statements' => max(0, $statements),
+            'supported' => max(0, $supported),
+            'removed' => max(0, $removed),
+        ];
+    }
+
+    /**
+     * @return array{statements: int, supported: int, removed: int}|null
+     */
+    public function check(): ?array
+    {
+        return $this->check;
     }
 
     /**
@@ -413,6 +433,7 @@ final class EvidenceLedger
             'queries' => array_map(static fn (SearchQuery $query): array => $query->toArray(), $this->queries),
             'models' => $this->models,
             'report' => $this->report,
+            'check' => $this->check,
             'next' => [
                 'source' => $this->nextSource,
                 'evidence' => $this->nextEvidence,
@@ -439,6 +460,13 @@ final class EvidenceLedger
         $ledger->restoreCounters($data['next'] ?? []);
         if (is_string($data['report'] ?? null) && '' !== trim($data['report'])) {
             $ledger->report = trim($data['report']);
+        }
+        if (is_array($data['check'] ?? null)) {
+            $ledger->setCheck(
+                (int) ($data['check']['statements'] ?? 0),
+                (int) ($data['check']['supported'] ?? 0),
+                (int) ($data['check']['removed'] ?? 0),
+            );
         }
 
         return $ledger;

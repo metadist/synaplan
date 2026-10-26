@@ -59,14 +59,22 @@ without a finding stays open. The time limit of a depth counts only the
 time a step works: waiting for a worker or for the person's answer costs
 nothing.
 
-A draft can be checked for free, without a model. A cited statement must
-name evidence that exists, and its numbers, dates and proper names must
-appear in that evidence. A sentence that states a fact and cites nothing
-is flagged. A revision that adds a problem the draft before it did not
-have — an uncited fact, or a number, date or name its evidence does not
-hold — is rejected. A run
-does not apply this yet: the checker model, and removing or rewriting
-what it rejects, come later.
+After the report is written, the run checks it. The free check runs first
+and costs nothing: a cited statement must name evidence that exists, and
+its numbers, dates and proper names must appear in that evidence. A
+sentence that states a fact and cites nothing is removed. A second model
+then reads each remaining cited statement with its passages and returns
+supported, partial, unsupported or contradicted. Only a supported
+statement stays in the report. The rest joins the writer's "Not
+confirmed" section (what the writer already lists there is not checked
+again), and the report ends with how many statements a source backs. A
+batch holds at most 30 statements; when the budget runs out after the
+first batch, the statements not yet checked count as not confirmed and
+the report is still delivered. When the
+checker and the writer are the same provider, the report says so. Every
+depth uses this removal until a thorough run can revise a statement
+without adding a fact. A revision that adds a problem the draft before it
+did not have is already rejected.
 
 When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
 uses that same round to call search, read, ask or finish itself. The list is

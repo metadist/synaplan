@@ -51,7 +51,18 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'version', type: 'integer', example: 1),
             ],
         ),
-        new OA\Property(property: 'check', type: 'object', nullable: true),
+        new OA\Property(
+            property: 'check',
+            description: 'Fact-check counts once the report was checked; null before that.',
+            type: 'object',
+            nullable: true,
+            required: ['statements', 'supported', 'removed'],
+            properties: [
+                new OA\Property(property: 'statements', type: 'integer', example: 12),
+                new OA\Property(property: 'supported', type: 'integer', example: 10),
+                new OA\Property(property: 'removed', type: 'integer', example: 2),
+            ],
+        ),
         new OA\Property(
             property: 'outcome',
             type: 'object',

@@ -25,8 +25,8 @@ use App\Service\Research\Run\ResearchUnitPlan;
  */
 final readonly class ReflectStage implements ResearchStage
 {
-    /** This call and its one retry, a triage and a read next round, then the writer. */
-    private const CALLS_FOR_ANOTHER_ROUND = 5;
+    /** This call and its one retry, a triage and a read next round, then the writer and the checker. */
+    private const CALLS_FOR_ANOTHER_ROUND = 6;
 
     /** @var list<string> */
     private const LEAD_STATUSES = [PlanPoint::ANSWERED, PlanPoint::THIN, PlanPoint::CONFLICTING, PlanPoint::OPEN];
