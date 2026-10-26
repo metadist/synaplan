@@ -941,6 +941,7 @@
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
       "addressUnverified": "Confirm your email address first: open the link we sent you, then create the key.",
+      "sessionEnded": "This sign-in ended when the email address was confirmed. Sign in again, then create the key.",
       "planRequired": "API keys are part of a paid plan.",
       "seePlans": "See plans",
       "scopes": {

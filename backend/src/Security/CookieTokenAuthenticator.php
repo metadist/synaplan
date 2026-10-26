@@ -178,6 +178,8 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('Invalid token payload');
         }
 
+        $this->tokenService->noteAccessToken($request, $payload);
+
         return new SelfValidatingPassport(
             new UserBadge((string) $userId, function (string $userIdentifier) {
                 $user = $this->userRepository->find((int) $userIdentifier);

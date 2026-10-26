@@ -879,9 +879,8 @@ class AuthController extends AbstractController
         }
 
         $user = $token->getUser();
-        $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
-        $this->em->flush();
+        $this->userLifecycleService->markEmailVerified($user);
 
         // Send welcome email
         try {
@@ -980,13 +979,9 @@ class AuthController extends AbstractController
         }
 
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
-        // The link reached this mailbox, which proves the address.
-        $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
-        $this->em->flush();
-
-        // Revoke all existing refresh tokens (force re-login)
-        $this->tokenService->revokeAllUserTokens($user);
+        // The link reached this mailbox. This also drops every refresh token.
+        $this->userLifecycleService->markEmailVerified($user);
 
         $this->logger->info('Password reset', ['user_id' => $user->getId()]);
 
@@ -1206,7 +1201,16 @@ class AuthController extends AbstractController
             $impersonatorId = $admin?->getId();
         }
 
-        $accessToken = $this->tokenService->generateAccessToken($user, $impersonatorId);
+        // Keep the generation this session already had. Minting "now" would
+        // let a token from before the mailbox proof trade itself for a fresh
+        // one and then create an API key.
+        $carried = $request->attributes->get('access_token_mbg');
+        $generation = is_int($carried) || (is_string($carried) && ctype_digit($carried)) ? (int) $carried : 0;
+        $accessToken = $this->tokenService->generateAccessToken(
+            $user,
+            $impersonatorId,
+            $request->attributes->has('access_token_mbg') ? $generation : null,
+        );
 
         return $this->json([
             'token' => $accessToken,

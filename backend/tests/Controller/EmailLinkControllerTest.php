@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
 use App\Repository\ConfigRepository;
@@ -84,6 +85,23 @@ final class EmailLinkControllerTest extends WebTestCase
         $this->post('/api/v1/auth/email-link/consume', ['token' => $secret]);
         self::assertResponseStatusCodeSame(400);
         self::assertSame('EMAIL_LINK_INVALID', $this->json()['code']);
+    }
+
+    public function testOpeningTheLinkEndsRefreshTokensFromBeforeIt(): void
+    {
+        $this->switchOn();
+        $user = $this->user('gina'.self::DOMAIN);
+        $refresh = static::getContainer()->get(TokenService::class)->generateRefreshToken($user);
+        $this->post('/api/v1/auth/email-link', ['email' => 'gina'.self::DOMAIN]);
+
+        $this->post('/api/v1/auth/email-link/consume', ['token' => $this->secretFromMail()]);
+
+        self::assertResponseIsSuccessful();
+        $this->em->clear();
+        $stored = $this->em->getRepository(Token::class)->findOneBy(['token' => $refresh]);
+        self::assertInstanceOf(Token::class, $stored);
+        self::assertTrue($stored->isUsed());
+        self::assertNotNull($this->em->getRepository(User::class)->findOneBy(['mail' => 'gina'.self::DOMAIN])?->getMailboxProvenAt());
     }
 
     public function testAPlainTextPostCannotPlantASession(): void

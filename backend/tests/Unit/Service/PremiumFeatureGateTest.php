@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * The gate has two jobs: keep the hosted SaaS behaviour byte-for-byte, and open
@@ -68,6 +71,41 @@ final class PremiumFeatureGateTest extends TestCase
         self::assertFalse($this->gate(billingEnabled: false, gateFlag: true)->isCostBudgetEnforced());
     }
 
+    public function testAnAdministratorsSessionDoesNotEndSomeoneElsesAccount(): void
+    {
+        $target = $this->user('PRO');
+        $target->setEmailVerified(true);
+        $target->recordMailboxProof();
+        $this->setId($target, 7);
+        $request = Request::create('/api/v1/apikeys');
+        $request->attributes->set('access_token_user_id', 3);
+        $request->attributes->set('access_token_mbg', 0);
+        $stack = new RequestStack();
+        $stack->push($request);
+
+        $gate = new PremiumFeatureGate(new BillingService('sk_live_test', 'price_1RealPro'), false, $stack);
+
+        $gate->assertApiKeysAllowed($target);
+        self::assertSame(1, $target->getMailboxGeneration());
+    }
+
+    public function testATokenFromBeforeTheProofIsRefusedInTheSameSecond(): void
+    {
+        $owner = $this->user('PRO');
+        $owner->setEmailVerified(true);
+        $owner->recordMailboxProof();
+        $this->setId($owner, 4);
+        $request = Request::create('/api/v1/apikeys');
+        $request->attributes->set('access_token_user_id', 4);
+        $request->attributes->set('access_token_mbg', 0);
+        $stack = new RequestStack();
+        $stack->push($request);
+        $gate = new PremiumFeatureGate(new BillingService('sk_live_test', 'price_1RealPro'), false, $stack);
+
+        $this->expectException(ApiKeyPlanRequiredException::class);
+        $gate->assertApiKeysAllowed($owner);
+    }
+
     public function testIsPaidLevelIgnoresCasingAndBillingState(): void
     {
         $gate = $this->gate(billingEnabled: false);
@@ -84,6 +122,12 @@ final class PremiumFeatureGateTest extends TestCase
                 : new BillingService('', ''),
             $gateFlag,
         );
+    }
+
+    private function setId(User $user, int $id): void
+    {
+        $idProperty = new \ReflectionProperty(User::class, 'id');
+        $idProperty->setValue($user, $id);
     }
 
     private function user(string $level): User

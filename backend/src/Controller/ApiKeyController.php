@@ -161,7 +161,7 @@ class ApiKeyController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(
                 response: 403,
-                description: 'The account is not on a paid plan (API_PLAN_REQUIRED), or its email address is not verified yet (API_ADDRESS_UNVERIFIED)',
+                description: 'The account is not on a paid plan (API_PLAN_REQUIRED), its email address is not verified yet (API_ADDRESS_UNVERIFIED), or this sign-in started before the address was confirmed (API_SESSION_ENDED)',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: false),
