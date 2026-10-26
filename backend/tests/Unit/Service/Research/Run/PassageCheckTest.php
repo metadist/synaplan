@@ -57,6 +57,7 @@ final class PassageCheckTest extends TestCase
         self::assertSame(['2024-03-12'], PassageText::datesIn('12 mars 2024'));
         self::assertSame(['2024-03-12'], PassageText::datesIn('12 marzo 2024'));
         self::assertSame(['2024-03-12'], PassageText::datesIn('12 Mart 2024'));
+        self::assertSame(['2024-03-12'], PassageText::datesIn('Mar. 12, 2024'));
         self::assertSame([], PassageText::datesIn('Regulation (EU) 2024/1689'));
         self::assertSame(['12.40'], PassageText::numbersIn(PassageText::withoutDates('The price is 12.40 EUR on 12 March 2024.')));
     }

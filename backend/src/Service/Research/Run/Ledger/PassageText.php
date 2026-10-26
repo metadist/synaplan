@@ -54,12 +54,12 @@ final class PassageText
             }
         }
         $months = self::monthPattern();
-        if (preg_match_all('/\b(\d{1,2})\.?\s+('.$months.')\s+(\d{4})\b/u', $lower, $rows, PREG_SET_ORDER) > 0) {
+        if (preg_match_all('/\b(\d{1,2})\.?\s+('.$months.')\.?\s+(\d{4})\b/u', $lower, $rows, PREG_SET_ORDER) > 0) {
             foreach ($rows as $row) {
                 self::keepDate($found, (int) $row[3], self::MONTHS[$row[2]], (int) $row[1]);
             }
         }
-        if (preg_match_all('/\b('.$months.')\s+(\d{1,2}),?\s+(\d{4})\b/u', $lower, $rows, PREG_SET_ORDER) > 0) {
+        if (preg_match_all('/\b('.$months.')\.?\s+(\d{1,2}),?\s+(\d{4})\b/u', $lower, $rows, PREG_SET_ORDER) > 0) {
             foreach ($rows as $row) {
                 self::keepDate($found, (int) $row[3], self::MONTHS[$row[1]], (int) $row[2]);
             }
@@ -76,10 +76,16 @@ final class PassageText
         $months = self::monthPattern();
         $text = preg_replace('/\b\d{4}-\d{2}-\d{2}\b/u', ' ', $text) ?? $text;
         $text = preg_replace('/\b\d{1,2}\.\d{1,2}\.\d{4}\b/u', ' ', $text) ?? $text;
-        $text = preg_replace('/\b\d{1,2}\.?\s+(?:'.$months.')\s+\d{4}\b/ui', ' ', $text) ?? $text;
-        $text = preg_replace('/\b(?:'.$months.')\s+\d{1,2},?\s+\d{4}\b/ui', ' ', $text) ?? $text;
+        $text = preg_replace('/\b\d{1,2}\.?\s+(?:'.$months.')\.?\s+\d{4}\b/ui', ' ', $text) ?? $text;
+        $text = preg_replace('/\b(?:'.$months.')\.?\s+\d{1,2},?\s+\d{4}\b/ui', ' ', $text) ?? $text;
 
         return $text;
+    }
+
+    /** A month name or its short form, in any of the five languages of the app. */
+    public static function isMonth(string $word): bool
+    {
+        return isset(self::MONTHS[mb_strtolower($word)]);
     }
 
     /**

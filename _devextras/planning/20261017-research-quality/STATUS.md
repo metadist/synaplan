@@ -49,8 +49,11 @@ Dates compare equal as ISO (`12.03.2024`, `12 March 2024`, `12. März 2024`,
 `12 mars 2024`, `12 marzo 2024`, `12 Mart 2024`). A dotted date is
 day.month.year. `2024/1689` is not a date. A proper name is two
 capitalised words, or a word with an internal capital; a single
-capitalised word is not one, because German writes every noun that way.
-A revision that adds an uncited fact is rejected.
+capitalised word is not one, because German writes every noun that way,
+and a word such as "Im" or "Today" that opens the run is not part of the
+name. List markers, table headers and the dot in `12. März` do not split
+or create a statement. A revision that adds a new problem (an uncited
+fact, or a cited one its evidence does not back) is rejected.
 
 The seeded draft is the report in `DraftCheckTest`, six planted errors
 and six supported statements. Command:

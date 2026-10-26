@@ -62,7 +62,9 @@ nothing.
 A draft can be checked for free, without a model. A cited statement must
 name evidence that exists, and its numbers, dates and proper names must
 appear in that evidence. A sentence that states a fact and cites nothing
-is flagged, and a revision that adds such a sentence is rejected. A run
+is flagged. A revision that adds a problem the draft before it did not
+have — an uncited fact, or a number, date or name its evidence does not
+hold — is rejected. A run
 does not apply this yet: the checker model, and removing or rewriting
 what it rejects, come later.
 

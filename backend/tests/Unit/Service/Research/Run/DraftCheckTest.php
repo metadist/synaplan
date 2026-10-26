@@ -9,41 +9,71 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * A seeded draft: six statements the sources support, six that should be
- * caught. Detection is caught / planted. A false alarm is a supported
- * statement that was flagged.
+ * caught. Every planted error must be flagged with its reason, and no
+ * supported statement may be flagged.
  */
 final class DraftCheckTest extends TestCase
 {
-    private const PLANTED = 6;
-
-    private const SUPPORTED = 6;
-
     public function testPlantedErrorsAreCaughtAndSupportedStatementsAreNot(): void
     {
         $issues = (new DraftCheck())->check($this->report(), $this->passages());
-        $reasons = array_column($issues, 'reason');
 
-        self::assertSame(['number', 'date', 'name', 'unknown_id', 'uncited', 'uncited'], $reasons);
-        self::assertEqualsWithDelta(1.0, count($issues) / self::PLANTED, 0.001);
-        self::assertEqualsWithDelta(0.0, (count($issues) - self::PLANTED) / self::SUPPORTED, 0.001);
+        self::assertSame([
+            ['statement' => 'The price is 99 EUR.', 'reason' => DraftCheck::NUMBER],
+            ['statement' => 'The rule was published on 1 January 2019.', 'reason' => DraftCheck::DATE],
+            ['statement' => 'Brave Search is the engine.', 'reason' => DraftCheck::NAME],
+            ['statement' => 'The price is 12.40 EUR.', 'reason' => DraftCheck::UNKNOWN_ID],
+            ['statement' => 'The fee is 50 EUR.', 'reason' => DraftCheck::UNCITED],
+            ['statement' => 'Brave Search costs nothing.', 'reason' => DraftCheck::UNCITED],
+        ], $issues);
     }
 
-    public function testARevisionThatAddsAnUncitedFactIsRejected(): void
+    public function testARevisionThatAddsAnIssueIsRejected(): void
     {
         $check = new DraftCheck();
-        $before = 'SearXNG is a metasearch engine. [e1]';
-        $added = $before.' The fee is 99 EUR.';
-        $shortened = 'SearXNG is a metasearch engine. [e1]';
+        $before = 'SearXNG is a metasearch engine. [e1] The price is 12.40 EUR. [e1]';
 
-        self::assertTrue($check->revisionAddsFact($before, $added, $this->passages()));
-        self::assertFalse($check->revisionAddsFact($before.' The fee is 99 EUR.', $shortened, $this->passages()));
+        self::assertTrue($check->revisionAddsIssue($before, $before.' The fee is 99 EUR.', $this->passages()));
+        self::assertTrue($check->revisionAddsIssue($before, 'SearXNG is a metasearch engine. [e1] The price is 99 EUR. [e1]', $this->passages()));
+        self::assertFalse($check->revisionAddsIssue($before.' The fee is 99 EUR.', 'SearXNG is a metasearch engine. [e1]', $this->passages()));
     }
 
     public function testAGermanNounWithoutACitationIsNotAName(): void
     {
-        $issues = (new DraftCheck())->check('Die Gebühr steht im Gesetz.', $this->passages());
+        $check = new DraftCheck();
 
-        self::assertSame([], $issues);
+        self::assertSame([], $check->check('Die Gebühr steht im Gesetz.', $this->passages()));
+        self::assertSame([], $check->check('Im Jahr danach gab es Streit.', $this->passages()));
+    }
+
+    public function testDatesAndListsDoNotBreakAStatement(): void
+    {
+        $draft = <<<'DRAFT'
+1. Die Regel erschien am 12. März 2024. [e3]
+2. The rule was published on Mar. 12, 2024. [e3]
+- The rule is from 2024. [e3]
+- Die Regel gilt z. B. seit 2024. [e3]
+DRAFT;
+
+        self::assertSame([], (new DraftCheck())->check($draft, $this->passages()));
+    }
+
+    public function testAWordThatOpensTheSentenceIsNotPartOfTheName(): void
+    {
+        $passages = ['e1' => 'In a statement, Google said the index grew.'];
+
+        self::assertSame([], (new DraftCheck())->check('Today Google said the index grew. [e1]', $passages));
+    }
+
+    public function testATableHeaderAndRuleAreNotStatements(): void
+    {
+        $draft = <<<'DRAFT'
+| Brave Search | SearXNG |
+| --- | --- |
+| 12.40 EUR | free [e1] |
+DRAFT;
+
+        self::assertSame([], (new DraftCheck())->check($draft, $this->passages()));
     }
 
     /**

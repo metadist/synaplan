@@ -14,12 +14,31 @@ use App\Service\Research\Run\Ledger\PassageText;
  */
 final readonly class DraftCheck
 {
-    private const MARKER = '/\[\s*e\d+(?:\s*,\s*e\d+)*\s*\]/i';
-    private const ABBREVIATION_END = '/(?:\b(?:Art|Abs|Buchst|Bst|Nr|Ziff|lit|Kap|Rn|Anh|bzw|ca|vgl|ggf|Mio|Mrd|etc|vs|No|Vol|Sec|Ch|pp|ff|Dr|Prof|St|Mr|Mrs|Ms|Mme|cf|al)|\b\p{L}|(?<![\d.])\d{1,2})\.$/u';
-    private const SOURCES = '/^(?:#{1,6}\s*)?(?:sources?|references?|quellen|fuentes|r[ée]f[ée]rences)\b/iu';
+    public const UNKNOWN_ID = 'unknown_id';
+    public const NUMBER = 'number';
+    public const DATE = 'date';
+    public const NAME = 'name';
+    public const UNCITED = 'uncited';
 
-    /** @var list<string> */
-    private const ARTICLES = ['the', 'a', 'an', 'der', 'die', 'das', 'ein', 'eine', 'le', 'la', 'les', 'el', 'los', 'las', 'un', 'une'];
+    /**
+     * Words that open a capitalised run without being part of the name:
+     * articles, and the prepositions and pronouns that start a sentence,
+     * in the five languages of the app.
+     *
+     * @var list<string>
+     */
+    private const LEADING_WORDS = [
+        'the', 'a', 'an', 'this', 'that', 'these', 'those', 'in', 'on', 'at', 'since', 'after', 'before',
+        'by', 'for', 'from', 'with', 'of', 'to', 'today', 'according',
+        'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einen', 'einem', 'einer', 'im', 'am',
+        'auf', 'aus', 'bei', 'mit', 'nach', 'seit', 'von', 'vor', 'zu', 'zum', 'zur', 'für', 'über',
+        'unter', 'laut', 'gemäß', 'heute', 'dieser', 'diese', 'dieses', 'diesen',
+        'le', 'la', 'les', 'un', 'une', 'du', 'de', 'dans', 'en', 'à', 'au', 'aux', 'depuis',
+        'selon', 'pour', 'avec', 'sur', 'ce', 'cette', 'ces',
+        'el', 'los', 'las', 'una', 'unos', 'unas', 'del', 'desde', 'según', 'para', 'con', 'por',
+        'sobre', 'este', 'esta', 'estos', 'estas',
+        'bu', 'şu', 'bir', 've', 'ile', 'göre',
+    ];
 
     /**
      * @param array<string, string> $passages evidence id to the text it rests on
@@ -29,16 +48,12 @@ final readonly class DraftCheck
     public function check(string $report, array $passages): array
     {
         $issues = [];
-        foreach ($this->sentences($report) as $sentence) {
+        foreach (DraftSentences::split($report) as $sentence) {
             $ids = $this->ids($sentence);
             $bare = $this->bare($sentence);
-            if ([] === $ids) {
-                if ($this->statesFact($bare)) {
-                    $issues[] = ['statement' => $bare, 'reason' => 'uncited'];
-                }
-                continue;
-            }
-            $reason = $this->reason($bare, $ids, $passages);
+            $reason = [] === $ids
+                ? ($this->statesFact($bare) ? self::UNCITED : null)
+                : $this->reason($bare, $ids, $passages);
             if (null !== $reason) {
                 $issues[] = ['statement' => $bare, 'reason' => $reason];
             }
@@ -48,25 +63,33 @@ final readonly class DraftCheck
     }
 
     /**
-     * A revision may drop or shorten. It may not add a fact that cites nothing.
+     * A revision may drop or shorten. It may not add a problem the draft
+     * before it did not have: an uncited fact, or a cited one the evidence
+     * does not back.
      *
      * @param array<string, string> $passages
      */
-    public function revisionAddsFact(string $before, string $after, array $passages): bool
+    public function revisionAddsIssue(string $before, string $after, array $passages): bool
     {
         $had = [];
         foreach ($this->check($before, $passages) as $issue) {
-            if ('uncited' === $issue['reason']) {
-                $had[PassageText::normalise($issue['statement'])] = true;
-            }
+            $had[$this->issueKey($issue)] = true;
         }
         foreach ($this->check($after, $passages) as $issue) {
-            if ('uncited' === $issue['reason'] && !isset($had[PassageText::normalise($issue['statement'])])) {
+            if (!isset($had[$this->issueKey($issue)])) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @param array{statement: string, reason: string} $issue
+     */
+    private function issueKey(array $issue): string
+    {
+        return $issue['reason'].':'.PassageText::normalise($issue['statement']);
     }
 
     /**
@@ -78,19 +101,22 @@ final readonly class DraftCheck
         $texts = [];
         foreach ($ids as $id) {
             if (!isset($passages[$id]) || '' === trim($passages[$id])) {
-                return 'unknown_id';
+                return self::UNKNOWN_ID;
             }
             $texts[] = $passages[$id];
         }
         $support = implode("\n", $texts);
-        if (!$this->covered(PassageText::numbersIn(PassageText::withoutDates($statement)), PassageText::numbersIn(PassageText::withoutDates($support)))) {
-            return 'number';
+        if (!$this->covered(PassageText::numbersIn(PassageText::withoutDates($statement)), PassageText::numbersIn($support))) {
+            return self::NUMBER;
         }
         if (!$this->covered(PassageText::datesIn($statement), PassageText::datesIn($support))) {
-            return 'date';
+            return self::DATE;
         }
-        if (!$this->covered($this->names($statement), $this->names($support))) {
-            return 'name';
+        $haystack = PassageText::normalise($support);
+        foreach ($this->names($statement) as $name) {
+            if (1 !== preg_match('/(?<![\p{L}\p{N}])'.preg_quote($name, '/').'(?![\p{L}\p{N}])/u', $haystack)) {
+                return self::NAME;
+            }
         }
 
         return null;
@@ -102,13 +128,7 @@ final readonly class DraftCheck
      */
     private function covered(array $wanted, array $have): bool
     {
-        foreach ($wanted as $item) {
-            if (!in_array($item, $have, true)) {
-                return false;
-            }
-        }
-
-        return true;
+        return [] === array_diff($wanted, $have);
     }
 
     private function statesFact(string $sentence): bool
@@ -120,32 +140,44 @@ final readonly class DraftCheck
 
     /**
      * A proper name is two capitalised words, or one word with an internal
-     * capital. A single capitalised word is not one: German writes every
-     * noun that way.
+     * capital such as SearXNG. A single capitalised word is not one: German
+     * writes every noun that way. An all-caps acronym such as EUR is not one
+     * either. Names come back normalised, as PassageText writes them.
      *
      * @return list<string>
      */
     private function names(string $text): array
     {
+        $text = PassageText::withoutDates($text);
         $found = [];
         if (preg_match_all('/\b\p{Lu}\p{L}*(?:\s+\p{Lu}\p{L}*)+\b/u', $text, $rows) > 0) {
             foreach ($rows[0] as $name) {
                 $words = preg_split('/\s+/u', $name) ?: [];
-                while (count($words) > 1 && in_array(mb_strtolower($words[0]), self::ARTICLES, true)) {
+                while (count($words) > 1 && $this->isLeadingWord($words[0])) {
                     array_shift($words);
                 }
+                while (count($words) > 1 && PassageText::isMonth($words[count($words) - 1])) {
+                    array_pop($words);
+                }
                 if (count($words) > 1) {
-                    $found[] = mb_strtolower(implode(' ', $words));
+                    $found[] = PassageText::normalise(implode(' ', $words));
                 }
             }
         }
         if (preg_match_all('/\b\p{Lu}\p{Ll}+\p{Lu}\p{L}*\b/u', $text, $rows) > 0) {
             foreach ($rows[0] as $name) {
-                $found[] = mb_strtolower($name);
+                $found[] = PassageText::normalise($name);
             }
         }
 
         return array_values(array_unique($found));
+    }
+
+    private function isLeadingWord(string $word): bool
+    {
+        $word = mb_strtolower($word);
+
+        return in_array($word, self::LEADING_WORDS, true) || PassageText::isMonth($word);
     }
 
     /**
@@ -153,57 +185,16 @@ final readonly class DraftCheck
      */
     private function ids(string $sentence): array
     {
-        preg_match_all('/e\d+/i', implode(' ', $this->markers($sentence)), $ids);
+        preg_match_all(DraftSentences::MARKER, $sentence, $markers);
+        preg_match_all('/e\d+/i', implode(' ', $markers[0]), $ids);
 
         return array_values(array_unique(array_map('strtolower', $ids[0])));
     }
 
-    /**
-     * @return list<string>
-     */
-    private function markers(string $sentence): array
-    {
-        preg_match_all(self::MARKER, $sentence, $markers);
-
-        return $markers[0];
-    }
-
     private function bare(string $sentence): string
     {
-        $bare = preg_replace(self::MARKER, '', $sentence) ?? $sentence;
+        $bare = preg_replace(DraftSentences::MARKER, '', $sentence) ?? $sentence;
 
         return trim((string) preg_replace('/\s+/u', ' ', $bare));
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function sentences(string $report): array
-    {
-        $out = [];
-        $inSources = false;
-        foreach (preg_split("/\r\n|\r|\n/u", $report) ?: [] as $line) {
-            $trimmed = trim($line);
-            if (str_starts_with($trimmed, '#')) {
-                $inSources = 1 === preg_match(self::SOURCES, $trimmed);
-                continue;
-            }
-            if ($inSources || '' === $trimmed) {
-                continue;
-            }
-            $parts = preg_split('/(?<=[.!?])\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $lineStart = count($out);
-            foreach ($parts as $part) {
-                $markersOnly = '' === trim((string) preg_replace(self::MARKER, '', $part));
-                $afterAbbreviation = count($out) > $lineStart && 1 === preg_match(self::ABBREVIATION_END, $out[array_key_last($out)]);
-                if (($markersOnly || $afterAbbreviation) && [] !== $out) {
-                    $out[array_key_last($out)] .= ' '.$part;
-                    continue;
-                }
-                $out[] = $part;
-            }
-        }
-
-        return $out;
     }
 }
