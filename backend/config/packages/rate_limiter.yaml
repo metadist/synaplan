@@ -146,6 +146,20 @@ framework:
             limit: '%env(int:EMAIL_LINK_ADDRESS_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
+        # Invitation codes without a password (CodeSignup): per client IP and
+        # per address, so a valid code cannot be used to flood a mailbox.
+        # (CODE_SIGNUP_IP_LIMIT, default 10 per hour; CODE_SIGNUP_ADDRESS_LIMIT,
+        # default 5 per hour).
+        code_signup_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:CODE_SIGNUP_IP_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        code_signup_address:
+            policy: 'sliding_window'
+            limit: '%env(int:CODE_SIGNUP_ADDRESS_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
         # Not a limit on anything a person does: counts paid tiers granted to
         # accounts younger than a day; when more than PAID_SIGNUP_ALERT_LIMIT
         # (default 10) land in an hour, SignupAnomalyAlert mails the operator.

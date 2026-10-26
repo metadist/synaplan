@@ -62,3 +62,10 @@ email:
     button: 'Sign in'
     or_copy: 'Or copy this link into your browser:'
     not_you: 'If you did not ask for this, ignore this mail; nobody can sign in without the link.'
+
+  code_signup:
+    title: 'Your invitation to Synaplan'
+    body: 'Use this button to continue. It works once, for 15 minutes. Your account is created when you open it, unless this address already has one.'
+    button: 'Continue'
+    or_copy: 'Or copy this link into your browser:'
+    not_you: 'If you did not ask for this, ignore this mail; nobody can open an account without the link.'

@@ -46,6 +46,7 @@
     "login": "Anmelden",
     "register": "Registrieren",
     "forgotPassword": "Passwort vergessen",
+    "codeSignup": "Einladungscode",
     "resetPassword": "Passwort zurücksetzen",
     "changePassword": "Passwort ändern",
     "verifyEmail": "E-Mail bestätigen",
