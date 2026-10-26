@@ -42,14 +42,18 @@ chat message.
 
 ## 2026-10-26 — RS8 thorough revision
 
-No live run. A thorough run, after the checker, makes one writer call
-(`tools:research_revise`). A `partial` statement keeps the part the source
-backs and counts as softened. `unsupported` and `contradicted` leave the
-factual text. A contradicted statement that stays cited, including under
-Not confirmed, is rejected. A revision that adds a fact the draft did not
-have is rejected, and the standard removal stands, so the run still
-delivers. Standard and quick do not revise. A thorough run with no model
-call left removes instead. `softened` stays 0 on that path.
+No live run. When the checker returns a `partial` verdict, a thorough run
+makes one writer call (`tools:research_revise`). Without a partial there is
+nothing a revision could keep, so no call is made. A `partial` statement
+keeps the part the source backs, counts as softened, and the closing count
+names it. Every cited sentence of the revision must be a supported
+statement verbatim or a shortened partial that keeps its id; a reworded
+`unsupported` or `contradicted` statement that stays cited is rejected, and
+the Not confirmed section may not gain a citation (`[e1, e2]` markers
+included). A revision that adds a fact the draft did not have is rejected,
+and the standard removal stands, so the run still delivers. Standard and
+quick do not revise. A thorough run with no model call left removes
+instead. `softened` stays 0 on that path.
 
 Command:
 

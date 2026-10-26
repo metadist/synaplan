@@ -14,9 +14,11 @@ use App\Service\Research\Run\ResearchStatus;
  * Checks the report. The free check runs first and costs nothing. The
  * checker model then judges every cited statement that passed it, in
  * batches that fit its input budget. A statement that is not supported is
- * removed and listed. A thorough run then tries one revision that keeps
- * the supported part of a partial statement; if that revision adds a fact
- * or keeps a rejected statement, the removal stands. The report ends with
+ * removed and listed. When a thorough run has a partial statement, it
+ * tries one revision that keeps the supported part; if that revision adds
+ * a fact or keeps a rejected statement, the removal stands. Without a
+ * partial statement a revision could only remove, so no call is made. The
+ * report ends with
  * the count. When the budget runs out after the first batch, the
  * statements not yet checked count as not confirmed, so the paid report
  * is still delivered.
@@ -88,7 +90,7 @@ final readonly class CheckStage implements ResearchStage
                 'supported' => $tally['supported'] + $tally['softened'],
                 'removed' => $tally['removed'],
             ];
-            $report = CheckReport::close($revised, $language, $counts, $sameProvider);
+            $report = CheckReport::close($revised, $language, $counts, $sameProvider, $tally['softened']);
             $this->record($ctx, $counts, $tally['supported'], $tally['softened']);
             $ctx->state->ledger->setReport($report);
 
@@ -139,7 +141,7 @@ final readonly class CheckStage implements ResearchStage
 
     /**
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, array{verdict: string, part: string}>                                                                                     $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      *
      * @return array{statements: int, supported: int, removed: int}
      */
@@ -210,7 +212,7 @@ final readonly class CheckStage implements ResearchStage
 
     /**
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, array{verdict: string, part: string}>                                                                                     $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      *
      * @return array{statements: int, supported: int, softened: int, removed: int}
      */
@@ -255,7 +257,7 @@ final readonly class CheckStage implements ResearchStage
     /**
      * @param array<string, string>                                                                                                                    $passages
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, array{verdict: string, part: string}>                                                                                     $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      */
     private function revise(StageContext $ctx, string $original, array $passages, array $sorted, array $verdicts, string $language, string $fallback): string|StageResult|null
     {
@@ -286,18 +288,15 @@ final readonly class CheckStage implements ResearchStage
 
     /**
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, array{verdict: string, part: string}>                                                                                     $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      */
     private function wantsRevision(StageContext $ctx, array $sorted, array $verdicts): bool
     {
         if (ResearchDepth::Thorough !== $ctx->state->ref->depth || !$ctx->state->budget->canCall() || $ctx->stop->requested()) {
             return false;
         }
-        if ([] !== $sorted['drop']) {
-            return true;
-        }
         foreach ($sorted['ask'] as $item) {
-            if ('supported' !== ($verdicts[$item['id']]['verdict'] ?? 'unsupported')) {
+            if ('partial' === ($verdicts[$item['id']]['verdict'] ?? 'unsupported')) {
                 return true;
             }
         }
@@ -307,7 +306,7 @@ final readonly class CheckStage implements ResearchStage
 
     /**
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, array{verdict: string, part: string}>                                                                                     $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      */
     private function verdictBlock(array $sorted, array $verdicts): string
     {

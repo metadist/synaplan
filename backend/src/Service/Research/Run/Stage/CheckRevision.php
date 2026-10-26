@@ -7,10 +7,13 @@ namespace App\Service\Research\Run\Stage;
 use App\Service\Research\Run\Ledger\PassageText;
 
 /**
- * Decides whether a thorough revision may replace the removal. The revision
- * may shorten or drop. It may not add a fact the draft did not have, leave a
- * rejected statement in the factual text, or keep a contradicted statement
- * cited as a second version.
+ * Decides whether a thorough revision may replace the removal. Every cited
+ * sentence of the revised text must be a supported statement as it stood,
+ * or a shortened partial statement that keeps its citation and drops the
+ * unsupported part. Anything else that cites a source is rejected, so a
+ * reworded unsupported or contradicted statement cannot stay cited. The
+ * revision may not add a fact the draft did not have, and the Not confirmed
+ * section may not gain a citation.
  */
 final readonly class CheckRevision
 {
@@ -19,129 +22,130 @@ final readonly class CheckRevision
     }
 
     /**
-     * @param array<string, string>                                                                          $passages
+     * @param array<string, string>                                                                                                                    $passages
      * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
-     * @param array<string, array{verdict: string, part: string}>                                            $verdicts
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
      */
     public function acceptable(string $before, string $after, array $passages, array $sorted, array $verdicts): bool
     {
-        $after = trim($after);
-        $body = CheckReport::withoutNotConfirmed($after);
-        if ('' === $after || $this->draft->revisionAddsIssue(CheckReport::withoutNotConfirmed($before), $body, $passages)) {
+        $body = CheckReport::withoutNotConfirmed(trim($after));
+        if ('' === trim($body)
+            || $this->draft->revisionAddsIssue(CheckReport::withoutNotConfirmed($before), $body, $passages)
+            || $this->listsNewCitation(CheckReport::notConfirmedBody($before), CheckReport::notConfirmedBody($after))) {
             return false;
         }
-        $listed = CheckReport::notConfirmedBody($after);
-        $unchanged = $this->bareSentences(CheckReport::withoutNotConfirmed($before));
-        foreach ($sorted['drop'] as $item) {
-            if ($this->contains($body, $item['text'])) {
-                return false;
-            }
-        }
+
+        $kept = [];
+        $keptIds = [];
+        $rejected = array_map(static fn (array $item): string => PassageText::normalise($item['text']), $sorted['drop']);
+        $partials = [];
         foreach ($sorted['ask'] as $item) {
             $verdict = $verdicts[$item['id']]['verdict'] ?? 'unsupported';
+            $bare = PassageText::normalise($item['bare']);
             if ('supported' === $verdict) {
-                if (!$this->contains($body, $item['bare'])) {
-                    return false;
-                }
+                $kept[$bare] = true;
+                $keptIds = [...$keptIds, ...self::ids($item['sentence'])];
                 continue;
             }
-            if ($this->contains($body, $item['bare'])) {
+            $rejected[] = $bare;
+            if ('partial' === $verdict) {
+                $partials[$item['id']] = [
+                    'ids' => self::ids($item['sentence']),
+                    'part' => PassageText::normalise($verdicts[$item['id']]['part'] ?? ''),
+                ];
+            }
+        }
+
+        $text = PassageText::normalise((string) preg_replace(DraftSentences::MARKER, '', $body));
+        foreach (array_keys($kept) as $bare) {
+            if (!str_contains($text, $bare)) {
                 return false;
             }
-            if ('contradicted' === $verdict && $this->citedAgain($listed, $item['bare'], $item['sentence'])) {
-                return false;
-            }
-            if ('partial' === $verdict && !$this->keepsPartial($body, $item, $verdicts[$item['id']]['part'] ?? '', $unchanged)) {
+        }
+        foreach ($rejected as $bare) {
+            if ('' !== $bare && str_contains($text, $bare)) {
                 return false;
             }
         }
 
-        return true;
+        $softened = $this->softened($body, $kept, $keptIds, $partials);
+
+        return null !== $softened && count($softened) === count($partials);
     }
 
     /**
-     * @param array{id: string, sentence: string, bare: string, passages: string} $item
-     * @param array<string, true>                                                $unchanged
-     */
-    private function keepsPartial(string $body, array $item, string $unsupportedPart, array $unchanged): bool
-    {
-        $part = trim($unsupportedPart);
-        if ('' !== $part && $this->contains($body, $part)) {
-            return false;
-        }
-
-        return $this->keepsCitation($body, $item['sentence'], $unchanged);
-    }
-
-    /**
-     * The softened statement is a sentence of the revision that is not one
-     * of the draft's sentences and still cites the evidence of the partial.
+     * The partial statements the revised body keeps in shortened form, or
+     * null when a cited sentence is neither kept nor a shortened partial.
      *
-     * @param array<string, true> $unchanged
+     * @param array<string, true>                                   $kept
+     * @param list<string>                                          $keptIds
+     * @param array<string, array{ids: list<string>, part: string}> $partials
+     *
+     * @return array<string, true>|null
      */
-    private function keepsCitation(string $body, string $sentence, array $unchanged): bool
+    private function softened(string $body, array $kept, array $keptIds, array $partials): ?array
     {
-        $ids = $this->ids($sentence);
-        foreach (DraftSentences::split($body) as $revised) {
-            if (isset($unchanged[$this->bare($revised)])) {
+        $partialIds = [];
+        foreach ($partials as $partial) {
+            $partialIds = [...$partialIds, ...$partial['ids']];
+        }
+        $allowed = array_unique([...$keptIds, ...$partialIds]);
+
+        $softened = [];
+        foreach (DraftSentences::split($body) as $sentence) {
+            $ids = self::ids($sentence);
+            $bare = PassageText::normalise((string) preg_replace(DraftSentences::MARKER, '', $sentence));
+            if ([] === $ids || isset($kept[$bare])) {
                 continue;
             }
-            if ([] !== array_intersect($ids, $this->ids($revised))) {
+            if ([] !== array_diff($ids, $allowed)) {
+                return null;
+            }
+            $covers = false;
+            foreach ($partials as $id => $partial) {
+                if ([] === array_intersect($ids, $partial['ids'])) {
+                    continue;
+                }
+                if ('' !== $partial['part'] && str_contains($bare, $partial['part'])) {
+                    return null;
+                }
+                $softened[$id] = true;
+                $covers = true;
+            }
+            if (!$covers) {
+                return null;
+            }
+        }
+
+        return $softened;
+    }
+
+    /** A statement moved to Not confirmed is listed without its citation. */
+    private function listsNewCitation(string $before, string $after): bool
+    {
+        $had = [];
+        foreach (DraftSentences::split($before) as $sentence) {
+            if ([] !== self::ids($sentence)) {
+                $had[PassageText::normalise($sentence)] = true;
+            }
+        }
+        foreach (DraftSentences::split($after) as $sentence) {
+            if ([] !== self::ids($sentence) && !isset($had[PassageText::normalise($sentence)])) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * @return array<string, true>
-     */
-    private function bareSentences(string $report): array
-    {
-        $out = [];
-        foreach (DraftSentences::split($report) as $sentence) {
-            $out[$this->bare($sentence)] = true;
-        }
-
-        return $out;
-    }
-
-    private function bare(string $sentence): string
-    {
-        return PassageText::normalise((string) preg_replace(DraftSentences::MARKER, '', $sentence));
     }
 
     /**
      * @return list<string>
      */
-    private function ids(string $sentence): array
+    private static function ids(string $sentence): array
     {
         preg_match_all(DraftSentences::MARKER, $sentence, $markers);
         preg_match_all('/e\d+/i', implode(' ', $markers[0]), $ids);
 
         return array_values(array_unique(array_map('strtolower', $ids[0])));
-    }
-
-    /** A contradicted statement listed with its citation is still a second version. */
-    private function citedAgain(string $listed, string $bare, string $sentence): bool
-    {
-        if (!$this->contains($listed, $bare)) {
-            return false;
-        }
-        preg_match_all('/\[e\d+\]/i', $sentence, $ids);
-        $listed = mb_strtolower($listed);
-        foreach ($ids[0] as $id) {
-            if (str_contains($listed, mb_strtolower($id))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function contains(string $text, string $needle): bool
-    {
-        return '' !== $needle && str_contains($text, $needle);
     }
 }

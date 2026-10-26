@@ -2621,7 +2621,8 @@ PROMPT;
 Revise the report with the fact-check verdicts:
 - unsupported → remove the statement; if it matters to the goal, list it under
   "[NOT_CONFIRMED_TITLE]" without an id;
-- partial → keep only the supported part, or say what is not confirmed;
+- partial → keep only the supported part, with its id; the unsupported part
+  may be listed under "[NOT_CONFIRMED_TITLE]" without an id;
 - contradicted → the statement says the opposite of its own source: remove it
   and, if it matters to the goal, list the point under "[NOT_CONFIRMED_TITLE]"
   without an id. Never keep a contradicted statement as an "alternative
@@ -2629,8 +2630,10 @@ Revise the report with the fact-check verdicts:
   those already stand in the report with their ids and dates.
 - remove → the free check already rejected it. Drop it from the factual text.
 
-Add no new facts. Keep every id that still applies, the structure and the
-language. Return the full revised report in Markdown. Do not add the closing
+The labels c1, c2 … only name the statements in the verdicts; never write
+them into the report. Keep supported statements word for word. Add no new
+facts and no new ids. Keep every id that still applies, the structure and
+the language. Return the full revised report in Markdown. Do not add the closing
 count; the engine writes that.
 
 <report>

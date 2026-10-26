@@ -33,6 +33,15 @@ final class CheckReport
     ];
 
     /** @var array<string, string> */
+    private const SOFTENED = [
+        'de' => '%d wurden auf den Teil gekürzt, den eine Quelle belegt.',
+        'en' => '%d were shortened to the part a source backs.',
+        'es' => '%d se acortaron a la parte que respalda una fuente.',
+        'fr' => '%d ont été réduites à la partie qu\'une source confirme.',
+        'tr' => '%d tanesi bir kaynağın desteklediği kısma kısaltıldı.',
+    ];
+
+    /** @var array<string, string> */
     private const REMOVED = [
         'de' => '%d wurden entfernt, weil die Prüfung sie nicht in einer Quelle bestätigen konnte.',
         'en' => '%d were removed because the check could not confirm them in a source.',
@@ -117,16 +126,21 @@ final class CheckReport
 
     /**
      * Appends the count, and the same-provider sentence when it applies.
-     * The report text itself is left as it is.
+     * The report text itself is left as it is. Softened statements are
+     * part of the supported count and are named so the reader knows the
+     * text was shortened.
      *
      * @param array{statements: int, supported: int, removed: int} $counts
      */
-    public static function close(string $report, string $language, array $counts, bool $sameProvider): string
+    public static function close(string $report, string $language, array $counts, bool $sameProvider, int $softened = 0): string
     {
         $language = isset(self::HEADING[$language]) ? $language : 'en';
         $report = trim($report);
         if ($counts['statements'] > 0) {
             $report .= "\n\n".sprintf(self::BACKED[$language], $counts['supported'], $counts['statements']);
+            if ($softened > 0) {
+                $report .= ' '.sprintf(self::SOFTENED[$language], $softened);
+            }
             if ($counts['removed'] > 0) {
                 $report .= ' '.sprintf(self::REMOVED[$language], $counts['removed']);
             }

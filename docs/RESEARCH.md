@@ -72,11 +72,14 @@ batch holds at most 30 statements; when the budget runs out after the
 first batch, the statements not yet checked count as not confirmed and
 the report is still delivered. When the
 checker and the writer are the same provider, the report says so. Standard
-and quick remove every statement that is not supported. A thorough run
-tries one revision first: a partial statement keeps the part a source
-backs, and a contradicted statement is never left as a second version.
-If that revision adds a fact, or leaves a rejected statement in the
-factual text, the removal stands and the person still gets the report.
+and quick remove every statement that is not supported. When the checker
+marks a statement partial, a thorough run tries one revision first: the
+partial statement keeps the part a source backs, and the closing count
+says how many were shortened. Every cited sentence of the revision must be
+a supported statement or such a shortened one; a reworded unsupported or
+contradicted statement cannot stay cited, and nothing under Not confirmed
+gains a citation. If the revision breaks one of these rules or adds a
+fact, the removal stands and the person still gets the report.
 
 When `RESEARCH.LEAD_MODE` is `auto`, a model on `RESEARCH.TOOL_MODE_MODELS`
 uses that same round to call search, read, ask or finish itself. The list is
