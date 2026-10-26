@@ -678,6 +678,9 @@
     "stop": "Detener",
     "rendering": "Renderizando…",
     "searchSummary": "Búsqueda web · {count} fuente | Búsqueda web · {count} fuentes",
+    "searchedInstead": "Nada para «{original}». Se buscó «{matched}» en su lugar.",
+    "searchedNothing": "Buscado: {queries} — no se encontró nada.",
+    "searchingAgain": "Buscando de nuevo…",
     "retryWith": "Reintentar con {model}",
     "state": {
       "pending": "En cola",

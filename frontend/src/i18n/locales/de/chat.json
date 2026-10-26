@@ -668,6 +668,9 @@
     "stop": "Stopp",
     "rendering": "Wird gerendert…",
     "searchSummary": "Web durchsucht · {count} Quelle | Web durchsucht · {count} Quellen",
+    "searchedInstead": "Nichts zu „{original}“ – stattdessen „{matched}“ gesucht.",
+    "searchedNothing": "Gesucht: {queries} – nichts gefunden.",
+    "searchingAgain": "Suche nochmal…",
     "retryWith": "Nochmal mit {model}",
     "state": {
       "pending": "Wartet",

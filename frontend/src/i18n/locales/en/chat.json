@@ -670,6 +670,9 @@
     "stop": "Stop",
     "rendering": "Rendering…",
     "searchSummary": "Searched the web · {count} source | Searched the web · {count} sources",
+    "searchedInstead": "Nothing for “{original}” — searched “{matched}” instead.",
+    "searchedNothing": "Searched: {queries} — nothing found.",
+    "searchingAgain": "Searching again…",
     "retryWith": "Retry with {model}",
     "state": {
       "pending": "Queued",

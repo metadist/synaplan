@@ -181,6 +181,47 @@ describe('task handlers', () => {
     })
   })
 
+  it('keeps a widened search on the card and clears it when the step settles', () => {
+    const turn = planned()
+
+    taskHandlers.task_update(
+      {
+        status: 'task_update',
+        metadata: { node_id: 'n1', state: 'running', retrying: true, query: 'Metadist' },
+      },
+      turn
+    )
+    expect(turn.message()?.taskPlan?.cards[0]).toMatchObject({
+      state: 'running',
+      retrying: true,
+      query: 'Metadist',
+    })
+
+    taskHandlers.task_update(
+      {
+        status: 'task_update',
+        metadata: {
+          node_id: 'n1',
+          state: 'done',
+          recovery: {
+            attempts: [
+              { query: 'Metadsit', hits: 0 },
+              { query: 'Metadist', hits: 1 },
+            ],
+            matched_query: 'Metadist',
+            empty: false,
+          },
+        },
+      },
+      turn
+    )
+    expect(turn.message()?.taskPlan?.cards[0]).toMatchObject({
+      state: 'done',
+      recovery: { matchedQuery: 'Metadist' },
+    })
+    expect(turn.message()?.taskPlan?.cards[0]?.retrying).toBeUndefined()
+  })
+
   it('leaves a message without a plan alone', () => {
     const message = assistantMessage()
     const turn = fakeTurn(message)

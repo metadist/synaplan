@@ -670,6 +670,9 @@
     "stop": "Arrêter",
     "rendering": "Rendu…",
     "searchSummary": "Recherche sur le Web · {count} source | Recherche sur le Web · {count} sources",
+    "searchedInstead": "Rien pour « {original} ». Recherche de « {matched} » à la place.",
+    "searchedNothing": "Recherché : {queries} — rien trouvé.",
+    "searchingAgain": "Nouvelle recherche…",
     "retryWith": "Réessayer avec {model}",
     "state": {
       "pending": "En file",

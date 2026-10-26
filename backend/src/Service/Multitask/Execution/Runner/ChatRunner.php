@@ -134,7 +134,7 @@ final readonly class ChatRunner implements TaskRunner
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => $text.UpstreamHandover::render($handover)],
+            ['role' => 'user', 'content' => $text.UpstreamHandover::render($handover, $node, $context, $text)],
         ];
 
         // Stream tokens into the node's card (task_chunk) while accumulating the

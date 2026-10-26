@@ -91,7 +91,24 @@ final class UpstreamHandover
     /**
      * @param array<string, string> $missing
      */
-    public static function render(array $missing): string
+    public static function render(array $missing, ?TaskNode $node = null, ?NodeContext $context = null, string $resolvedText = ''): string
+    {
+        $rendered = self::renderData($missing);
+        $note = self::recoveryNote($node, $context, $resolvedText.$rendered);
+        if ('' === $note) {
+            return $rendered;
+        }
+        if ('' === $rendered) {
+            return "\n\n---\n".$note;
+        }
+
+        return $rendered."\n".$note;
+    }
+
+    /**
+     * @param array<string, string> $missing
+     */
+    private static function renderData(array $missing): string
     {
         $blocks = self::renderBlocks($missing);
         if ('' === $blocks) {
@@ -117,6 +134,70 @@ final class UpstreamHandover
             ."\nUse it as the source of truth for your answer and never claim it was not provided."
             .$failureLine
             .$blocks;
+    }
+
+    /**
+     * What a widened read actually matched, even when `$nX.text` is already
+     * in the prompt. Empty stays empty: one sentence, one next step.
+     */
+    private static function recoveryNote(?TaskNode $node, ?NodeContext $context, string $already): string
+    {
+        if (null === $node || null === $context) {
+            return '';
+        }
+
+        $notes = [];
+        foreach ($node->dependsOn as $dep) {
+            $result = $context->getResult($dep);
+            if (null === $result) {
+                continue;
+            }
+            $note = self::noteFor($result);
+            if ('' === $note || str_contains($already, $note)) {
+                continue;
+            }
+            $notes[] = $note;
+        }
+
+        return implode("\n", $notes);
+    }
+
+    private static function noteFor(NodeResult $result): string
+    {
+        $recovery = $result->metadata['recovery'] ?? null;
+        if (!is_array($recovery) || !is_array($recovery['attempts'] ?? null)) {
+            return '';
+        }
+
+        $queries = [];
+        foreach ($recovery['attempts'] as $attempt) {
+            if (!is_array($attempt)) {
+                continue;
+            }
+            $query = $attempt['query'] ?? null;
+            if (is_string($query) && '' !== trim($query)) {
+                $queries[] = trim($query);
+            }
+        }
+        $matched = $recovery['matched_query'] ?? null;
+        $first = $queries[0] ?? '';
+        if (is_string($matched) && '' !== trim($matched) && trim($matched) !== $first) {
+            return sprintf(
+                "Search for '%s' found nothing; results below are for '%s'. Tell the user which title you matched.",
+                $first,
+                trim($matched),
+            );
+        }
+        if (true === ($recovery['empty'] ?? false)) {
+            $list = [] === $queries ? 'the requested item' : implode(', ', $queries);
+
+            return sprintf(
+                'Searches for %s found nothing. Say that in one sentence and offer one concrete next step, such as checking the spelling or whether this connection can see that page. Do not guess other causes.',
+                $list,
+            );
+        }
+
+        return '';
     }
 
     /**

@@ -60,7 +60,9 @@ const taskUpdate: StreamStatusHandler<StreamTurn> = (data, turn) => {
   if (!card || card.state === 'cancelled' || !isTaskCardState(data.metadata?.state)) return
 
   card.state = data.metadata.state
+  if (data.metadata.state !== 'running') delete card.retrying
   applyStepTrace(card, data.metadata)
+  if (data.metadata.retrying === true) card.retrying = true
 }
 
 const taskChunk: StreamStatusHandler<StreamTurn> = (data, turn) => {

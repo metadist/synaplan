@@ -36,6 +36,7 @@ class PromptCatalog
      *    - tools:sort          ← AI classifier (DYNAMICLIST template)
      *    - tools:enhance       ← message rewriter
      *    - tools:search        ← search query optimizer
+     *    - tools:query_relax   ← widen a search that came back empty
      *    - tools:mailhandler   ← email routing
      *    - tools:widget-*      ← widget setup
      *    - tools:memory_*      ← memory extraction/parsing
@@ -125,6 +126,12 @@ class PromptCatalog
                 'language' => 'en',
                 'shortDescription' => 'Generates optimized search queries from user questions for web search APIs.',
                 'prompt' => self::searchQueryPrompt(),
+            ],
+            [
+                'topic' => 'tools:query_relax',
+                'language' => 'en',
+                'shortDescription' => 'Widens a search that returned nothing: a spelling correction or a shorter core term. Answers only in JSON.',
+                'prompt' => self::queryRelaxPrompt(),
             ],
             [
                 'topic' => 'tools:mailhandler',
@@ -1007,7 +1014,11 @@ Allowed topic keys: [KEYLIST]
    `inputs.arguments`; feed `$nX.text` into the answering node. NEVER
    invent a server_id or tool name, and NEVER emit `mcp_fetch` when it is
    not in the capability list or no listed tool fits — use `chat` or
-   `web_search` instead.
+   `web_search` instead. A search argument is only the distinctive name
+   or title the user gave — no extra filter, date or word they did not
+   say. Do NOT add a second search node to retry an empty result: a read
+   that comes back empty is broadened on its own (at most two further
+   tries) and the answer names which wording matched.
 9d. The user explicitly asks about their OWN emails/mailbox ("search my
    emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?") AND
    the capability list above shows `email_search` with a connected mailbox
@@ -1026,7 +1037,9 @@ Allowed topic keys: [KEYLIST]
    Confluence"), generate it in a prior `chat` node and reference `$nX.text`
    inside `inputs.arguments`. NEVER invent a server_id or tool name, NEVER
    emit `mcp_action` for read-only questions (use `mcp_fetch`), and NEVER
-   emit it when it is not in the capability list.
+   emit it when it is not in the capability list. Do NOT add a second
+   read to hunt for a better match before the write — the read step
+   broadens an empty result itself.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed. A question about Synaplan itself
    (what it can do, how a feature works, what is new, who/what it is) is
@@ -1308,6 +1321,8 @@ User: "Look up the customer Acme GmbH in our CRM and summarize their last order.
 `params.server_id` and `params.tool` come EXACTLY from the listed connections
 (never invented), the tool arguments ride in `inputs.arguments`, and the
 answering node consumes `$n1.text` — the reply is grounded in the pulled data.
+The search argument is the core name only ("Acme GmbH"), not a sentence.
+Do not add a second `mcp_fetch` to retry a miss.
 
 ### Create something in a connected system (mcp_action)
 User: "Write a short summary of our launch plan and create a Confluence page for it."
@@ -1856,6 +1871,19 @@ Question: "I expect you to find the text yourself"
 Search Query: The Narrative AI Advantage field experiment full text
 
 Now generate the search query for the following user question:
+PROMPT;
+    }
+
+    private static function queryRelaxPrompt(): string
+    {
+        return <<<'PROMPT'
+You widen a search that returned nothing. Reply with JSON only, no markdown.
+
+The user message names the question, the tool, the arguments already tried, and their keys.
+
+Return {"arguments": { ... }} using those same keys. For a name, change at most two letters so it is still the same name (Metadsit → Metadist). Do not swap it for a different word that only starts the same way (Metadsit → Metadata is wrong). Otherwise use a shorter core term. Drop a filter only when the user did not ask for it.
+
+Return {"give_up": true} when you cannot name a different search. Never repeat an attempt. Never add a key. Never invent a filter.
 PROMPT;
     }
 

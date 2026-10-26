@@ -379,6 +379,14 @@ final class McpFetchRunnerTest extends TestCase
         self::assertSame('39797ad6-0eb3-806d-b59e-ef7653838664', $this->lastCallArguments['id'] ?? null);
     }
 
+    public function testEmptyJsonIsASuccessfulResult(): void
+    {
+        $result = $this->runner(callToolResultText: '{"results":[],"type":"workspace_search"}')->run($this->node(), $this->context());
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('"results":[]', (string) $result->text);
+    }
+
     public function testEmptyContentStillReachesTheAnswer(): void
     {
         $result = $this->runner(callToolResultText: '   ')->run($this->node(), $this->context());

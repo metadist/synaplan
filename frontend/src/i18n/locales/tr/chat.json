@@ -678,6 +678,9 @@
     "stop": "Durdur",
     "rendering": "Oluşturuluyor…",
     "searchSummary": "Web arandı · {count} kaynak",
+    "searchedInstead": "“{original}” için sonuç yok. Bunun yerine “{matched}” arandı.",
+    "searchedNothing": "Aranan: {queries} — hiçbir şey bulunamadı.",
+    "searchingAgain": "Yeniden aranıyor…",
     "retryWith": "{model} ile yeniden dene",
     "state": {
       "pending": "Sırada",
