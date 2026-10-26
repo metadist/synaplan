@@ -630,7 +630,7 @@ services:
   # Optional Collabora CODE — LibreOffice convert-to over HTTP.
   #   docker compose -f docker-compose-minimal.yml --profile office up -d
   collabora:
-    image: collabora/code:26.04.5.1.1@sha256:bb8f3c9c5c9016045f25fccb5f0649be94469ebc7c7cc379f3576e470cccf33d
+    image: collabora/code:26.04.5.2.1@sha256:c7415b963e32eb0986a562583f154d36d3d7a461e1ddfb660a95e87094328acb
     container_name: synaplan-collabora
     depends_on:
       backend:
