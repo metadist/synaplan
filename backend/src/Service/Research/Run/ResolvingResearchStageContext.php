@@ -12,8 +12,9 @@ use App\Service\Research\Run\Stage\StageContext;
 use Psr\Clock\ClockInterface;
 
 /**
- * Builds what one step can see. The hosted world is the default until a run
- * stores the providers it is allowed to use.
+ * Builds what one step can see and starts the run's wall clock for it. The
+ * hosted world is the default until a run stores the providers it is
+ * allowed to use.
  */
 final readonly class ResolvingResearchStageContext implements ResearchStageContextFactory
 {
@@ -33,12 +34,14 @@ final readonly class ResolvingResearchStageContext implements ResearchStageConte
             throw new RoleUnavailable('lead');
         }
         $runId = $state->ref->id;
+        $now = $this->clock->now();
+        $state->budget->startStep($now);
 
         return new StageContext(
             $state,
             $this->roles->resolve($user, $state->ref->depth, new ResearchWorld(false), new ResearchModelHints(), null),
             $this->events,
-            $this->clock->now(),
+            $now,
             new ResearchStop(false, fn (): bool => $this->store->stopRequested($runId)),
             new ResearchWriteNow(false, fn (): bool => $this->store->writeNowRequested($runId)),
         );
