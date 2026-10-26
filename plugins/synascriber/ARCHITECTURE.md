@@ -99,7 +99,7 @@ under user id 0), not to a person.
 | plugin, Prosody | `GET /synascriber/health`, `/state`, `POST /synascriber/start`, `/stop` on :5280 | `Authorization: Bearer` with the Prosody secret |
 | bridge, transcriber | WebSocket `:8095/transcribe?…&notes=<ref>` | the transcriber token (`TRANSCRIBER_AUTH_TOKEN`) |
 | transcriber, plugin | `GET …/public/transcriber/sessions/{ref}`, `POST …/audio`, `/preview`, `/events` | header `X-Transcriber-Secret` |
-| plugin, speech-to-text | `POST /v1/audio/transcriptions`, `GET /health` | none, or `Authorization: Bearer` with `stt_api_key` |
+| plugin, speech-to-text | `POST /v1/audio/transcriptions`, `GET /health` | none, or `Authorization: Bearer` with `stt_api_key` (plugin 0.4.1 and later) |
 | plugin page, plugin | `GET …/me/sessions`, `GET …/admin/status`, `PUT …/admin/settings` | Synaplan session |
 
 The browser only ever talks to Synaplan and Keycloak. Prosody's API and the
