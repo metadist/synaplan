@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Billing\PayFirst;
 
 use App\Entity\User;
+use App\Entity\VerificationToken;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\Billing\StripeEntitlement;
@@ -26,6 +27,8 @@ use Symfony\Component\Lock\LockFactory;
 final readonly class PaidAccountCreator
 {
     public const SESSION_KEY = 'pay_first_session';
+    /** One sign-in for the browser that paid; its own row, used up atomically. */
+    public const SIGN_IN_GRANT = 'pay_first_sign_in';
     public const PASSWORD_LINK_TTL_SECONDS = 7 * 86400;
     private const LOCK_TTL_SECONDS = 60.0;
     /** Stripe subscription states that can no longer charge anyone. */
@@ -96,6 +99,11 @@ final readonly class PaidAccountCreator
         return 'pay-first-account-'.hash('sha256', mb_strtolower(trim($email)));
     }
 
+    public static function signInGrantKey(PaidCheckout $checkout): string
+    {
+        return hash('sha256', self::SIGN_IN_GRANT.':'.$checkout->sessionId);
+    }
+
     public static function madeFrom(User $user, PaidCheckout $checkout): bool
     {
         return ($user->getPaymentDetails()[self::SESSION_KEY] ?? null) === $checkout->sessionId;
@@ -111,6 +119,13 @@ final readonly class PaidAccountCreator
         [$user, $token] = $this->em->wrapInTransaction(function () use ($checkout, $purchase): array {
             $user = $this->lifecycle->createUser($checkout->email, bin2hex(random_bytes(32)));
             $purchase($user, true);
+
+            $grant = (new VerificationToken())
+                ->setUser($user)
+                ->setType(self::SIGN_IN_GRANT)
+                ->setToken(self::signInGrantKey($checkout))
+                ->setExpires(time() + PayFirstCheckout::NONCE_TTL_SECONDS);
+            $this->em->persist($grant);
 
             return [$user, $this->tokens->createToken($user, 'password_reset', self::PASSWORD_LINK_TTL_SECONDS)];
         });

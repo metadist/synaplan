@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Billing\PayFirst;
 
 use App\Entity\User;
+use App\Repository\VerificationTokenRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Lock\LockFactory;
 
 /**
  * `/welcome` asks for the account a paid session made (PF2, D3).
@@ -19,13 +19,11 @@ use Symfony\Component\Lock\LockFactory;
  */
 final readonly class PayFirstClaim
 {
-    public const SIGNED_IN_KEY = 'pay_first_signed_in';
-
     public function __construct(
         private CheckoutSessionGateway $gateway,
         private PaidAccountCreator $creator,
+        private VerificationTokenRepository $tokens,
         private EntityManagerInterface $em,
-        private LockFactory $lockFactory,
     ) {
     }
 
@@ -62,25 +60,18 @@ final readonly class PayFirstClaim
             return false;
         }
 
-        // Two claims with the same nonce may arrive together; the grant is
-        // decided on a fresh read under a lock, so only the first one wins.
-        $lock = $this->lockFactory->createLock('pay-first-sign-in-'.$checkout->sessionId, 30.0);
-        $lock->acquire(true);
-        try {
-            $this->em->refresh($user);
-            $details = $user->getPaymentDetails();
-            // A verified address means the mailbox owner has taken the
-            // account over through our link; the buyer's nonce no longer counts.
-            if (isset($details[self::SIGNED_IN_KEY]) || $user->isEmailVerified()) {
-                return false;
-            }
-            $details[self::SIGNED_IN_KEY] = time();
-            $user->setPaymentDetails($details);
-            $this->em->flush();
-
-            return true;
-        } finally {
-            $lock->release();
+        // A verified address means the mailbox owner has taken the account
+        // over through our link; the buyer's nonce no longer counts.
+        $this->em->refresh($user);
+        if ($user->isEmailVerified()) {
+            return false;
         }
+
+        // The grant is its own row, used up by one atomic update: two claims
+        // at once, or a billing write with an older snapshot, cannot hand
+        // out a second sign-in.
+        $grant = $this->tokens->findValidToken(PaidAccountCreator::signInGrantKey($checkout), PaidAccountCreator::SIGN_IN_GRANT);
+
+        return null !== $grant && $this->tokens->claimUnused($grant);
     }
 }

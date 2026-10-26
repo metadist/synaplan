@@ -36,7 +36,9 @@ final class PaidAccountCreatorTest extends TestCase
         $users->method('findOtherByNormalizedEmail')->willReturn(null);
 
         $lifecycle = $this->createMock(UserLifecycleService::class);
-        $lifecycle->expects(self::once())->method('createUser')->willReturn(new User());
+        $created = new User();
+        (new \ReflectionProperty(User::class, 'id'))->setValue($created, 42);
+        $lifecycle->expects(self::once())->method('createUser')->willReturn($created);
 
         $tokens = $this->createMock(VerificationTokenRepository::class);
         $tokens->method('createToken')->willThrowException(new \RuntimeException('Deadlock found'));

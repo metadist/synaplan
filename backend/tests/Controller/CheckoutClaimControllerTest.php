@@ -70,9 +70,14 @@ final class CheckoutClaimControllerTest extends WebTestCase
         self::assertFalse($user->isEmailVerified(), 'Stripe does not prove the address; only our own link does.');
         self::assertEmailCount(1);
 
+        // A subscription webhook that loaded the account before the claim
+        // writes its older billing snapshot back afterwards.
+        $snapshot = $user->getPaymentDetails();
+        $this->em->getConnection()->executeStatement('UPDATE BUSER SET BPAYMENTDETAILS = ? WHERE BID = ?', [json_encode($snapshot), $user->getId()]);
+
         $this->client->getCookieJar()->set(new Cookie(PayFirstCheckout::NONCE_COOKIE, 'browser-nonce'));
         $this->claim('cs_new');
-        self::assertFalse($this->json()['signedIn'], 'The sign-in is single use.');
+        self::assertFalse($this->json()['signedIn'], 'The sign-in is single use, whatever the billing data says.');
         self::assertSame(1, $this->countUsers('ada'.self::DOMAIN));
     }
 
