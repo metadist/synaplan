@@ -203,6 +203,29 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /**
+     * Unix time of the latest mailbox proof (verification link, sign-in link
+     * or set-password link). An access token issued before this must not mint
+     * an API key: the person who proved the mailbox may not be the one who
+     * was signed in. Stored in BUSERDETAILS so this needs no schema change.
+     */
+    public function getMailboxProvenAt(): ?int
+    {
+        $at = $this->userDetails['email_verified_at'] ?? null;
+
+        return is_int($at) ? $at : (is_string($at) && ctype_digit($at) ? (int) $at : null);
+    }
+
+    public function recordMailboxProof(?int $at = null): self
+    {
+        $this->emailVerified = true;
+        $details = $this->getUserDetails();
+        $details['email_verified_at'] = $at ?? time();
+        $this->userDetails = $details;
+
+        return $this;
+    }
+
     public function mustChangePassword(): bool
     {
         return $this->mustChangePassword;

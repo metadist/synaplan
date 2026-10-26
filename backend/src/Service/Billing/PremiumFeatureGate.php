@@ -9,6 +9,7 @@ use App\Exception\ApiKeyPlanRequiredException;
 use App\Service\RateLimitService;
 use App\Service\Usage\StorageQuotaService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Single decision point for "is this paid-tier feature available to the user?".
@@ -34,6 +35,7 @@ final readonly class PremiumFeatureGate
         private BillingService $billingService,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
+        private ?RequestStack $requestStack = null,
     ) {
     }
 
@@ -68,6 +70,22 @@ final readonly class PremiumFeatureGate
         if (!$user->isEmailVerified()) {
             throw ApiKeyPlanRequiredException::addressUnverified();
         }
+        $provenAt = $user->getMailboxProvenAt();
+        $issuedAt = $this->accessTokenIssuedAt();
+        if (null !== $provenAt && null !== $issuedAt && $issuedAt < $provenAt) {
+            throw ApiKeyPlanRequiredException::sessionEnded();
+        }
+    }
+
+    /**
+     * When the access cookie was issued, if this request has one. Absent for
+     * an administrator action or a key that is already a key.
+     */
+    private function accessTokenIssuedAt(): ?int
+    {
+        $at = $this->requestStack?->getCurrentRequest()?->attributes->get('access_token_iat');
+
+        return is_int($at) ? $at : (is_string($at) && ctype_digit($at) ? (int) $at : null);
     }
 
     /**

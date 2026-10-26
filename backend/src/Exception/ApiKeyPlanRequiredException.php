@@ -20,6 +20,10 @@ final class ApiKeyPlanRequiredException extends \RuntimeException
 
     public const MESSAGE_ADDRESS_UNVERIFIED = 'Confirm your email address first: open the link we sent you, then create the key.';
 
+    public const CODE_SESSION_ENDED = 'API_SESSION_ENDED';
+
+    public const MESSAGE_SESSION_ENDED = 'This sign-in ended when the email address was confirmed. Sign in again, then create the key.';
+
     public function __construct(
         private readonly string $reasonCode = self::CODE,
         string $message = self::MESSAGE,
@@ -30,6 +34,11 @@ final class ApiKeyPlanRequiredException extends \RuntimeException
     public static function addressUnverified(): self
     {
         return new self(self::CODE_ADDRESS_UNVERIFIED, self::MESSAGE_ADDRESS_UNVERIFIED);
+    }
+
+    public static function sessionEnded(): self
+    {
+        return new self(self::CODE_SESSION_ENDED, self::MESSAGE_SESSION_ENDED);
     }
 
     /**

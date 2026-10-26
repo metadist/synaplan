@@ -178,6 +178,11 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('Invalid token payload');
         }
 
+        $issuedAt = $payload['iat'] ?? null;
+        if (is_int($issuedAt) || (is_string($issuedAt) && ctype_digit($issuedAt))) {
+            $request->attributes->set('access_token_iat', (int) $issuedAt);
+        }
+
         return new SelfValidatingPassport(
             new UserBadge((string) $userId, function (string $userIdentifier) {
                 $user = $this->userRepository->find((int) $userIdentifier);

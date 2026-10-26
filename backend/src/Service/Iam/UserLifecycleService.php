@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\TokenService;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Email\EmailChatService;
 use App\Service\ModelConfigService;
@@ -38,6 +39,7 @@ final readonly class UserLifecycleService
         private LoggerInterface $logger,
         private SignupAdmission $signupAdmission,
         private UserRepository $users,
+        private TokenService $tokenService,
     ) {
     }
 
@@ -149,13 +151,15 @@ final readonly class UserLifecycleService
      * queues its default plugins, so new accounts are created unverified
      * and verified here.
      */
+    /**
+     * The mailbox was just proven. Refresh the cutoff, drop every refresh
+     * token, and leave the access token that was already issued to be refused
+     * by the key gate until it expires.
+     */
     public function markEmailVerified(User $user): void
     {
-        if ($user->isEmailVerified()) {
-            return;
-        }
-
-        $user->setEmailVerified(true);
+        $user->recordMailboxProof();
         $this->em->flush();
+        $this->tokenService->revokeAllUserTokens($user);
     }
 }

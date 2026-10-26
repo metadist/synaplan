@@ -879,9 +879,8 @@ class AuthController extends AbstractController
         }
 
         $user = $token->getUser();
-        $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
-        $this->em->flush();
+        $this->userLifecycleService->markEmailVerified($user);
 
         // Send welcome email
         try {
@@ -980,13 +979,9 @@ class AuthController extends AbstractController
         }
 
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
-        // The link reached this mailbox, which proves the address.
-        $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
-        $this->em->flush();
-
-        // Revoke all existing refresh tokens (force re-login)
-        $this->tokenService->revokeAllUserTokens($user);
+        // The link reached this mailbox. This also drops every refresh token.
+        $this->userLifecycleService->markEmailVerified($user);
 
         $this->logger->info('Password reset', ['user_id' => $user->getId()]);
 
