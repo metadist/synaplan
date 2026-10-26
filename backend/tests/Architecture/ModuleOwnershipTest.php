@@ -169,6 +169,8 @@ final class ModuleOwnershipTest extends TestCase
             'CHECKOUT_START_IP_LIMIT',
             'CHECKOUT_START_EMAIL_LIMIT',
             'CHECKOUT_CLAIM_IP_LIMIT',
+            'EMAIL_LINK_IP_LIMIT',
+            'EMAIL_LINK_ADDRESS_LIMIT',
             'PAID_SIGNUP_ALERT_LIMIT',
         ],
         // Native app shell identity (deep links, Sign in with Apple audience).

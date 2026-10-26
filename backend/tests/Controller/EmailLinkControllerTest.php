@@ -29,6 +29,7 @@ final class EmailLinkControllerTest extends WebTestCase
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private string $ip;
+    private ?string $previousMailerDsn = null;
 
     protected function setUp(): void
     {
@@ -37,12 +38,20 @@ final class EmailLinkControllerTest extends WebTestCase
         $this->client->disableReboot();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
         $this->ip = '10.'.random_int(0, 255).'.'.random_int(0, 255).'.'.random_int(1, 254);
+        // Pay first needs a mail transport; the null transport sends nothing.
+        $this->previousMailerDsn = $_ENV['MAILER_DSN'] ?? null;
+        $_ENV['MAILER_DSN'] = 'null://default';
         $this->removeTestUsers();
     }
 
     protected function tearDown(): void
     {
         $this->removeTestUsers();
+        if (null === $this->previousMailerDsn) {
+            unset($_ENV['MAILER_DSN']);
+        } else {
+            $_ENV['MAILER_DSN'] = $this->previousMailerDsn;
+        }
         $this->em->getConnection()->executeStatement('DELETE FROM BCONFIG WHERE BOWNERID = 0 AND BGROUP = ? AND BSETTING = ?', [PayFirstConfig::CONFIG_GROUP, PayFirstConfig::KEY]);
         parent::tearDown();
     }
