@@ -201,7 +201,7 @@ Jobs run in five lanes, so a slow job never holds up the others:
 |------|------|------|
 | Every minute | each tick | unconfirmed copy clean-up, media reaper, stuck chats, desktop jobs, inbound mail handlers |
 | Saved Tasks | each tick | `app:saved-tasks:tick` |
-| Hourly | once an hour | expired temporary files, expired approvals, new-model discovery |
+| Hourly | once an hour | expired temporary files, expired approvals, new-model discovery, Synaplan Demo maintenance, unpaid sign-ups older than 7 days |
 | Daily | once a day at `SYNAPLAN_SCHEDULER_DAILY_AT` (UTC, default `03:30`) | update check, model availability, message digest, documentation sync, approval digest |
 | Model health | every 15 minutes | `app:model:health-check` |
 
@@ -414,7 +414,7 @@ never throttled; only *new* accounts are.
 | New accounts installation-wide per 10 minutes | `SIGNUP_GLOBAL_LIMIT` | 20 (tripping it mails the operator) |
 | Stripe checkouts per client IP per hour | `CHECKOUT_IP_LIMIT` | 10 |
 | Paid tiers for day-old accounts per hour before an alert | `PAID_SIGNUP_ALERT_LIMIT` | 10 |
-| **Pause sign-up** | Admin → Configuration → Authentication (or `SIGNUP_PAUSED=true`) | off |
+| **Pause sign-up** | Admin → System configuration → Sign-in & registration (or `SIGNUP_PAUSED=true`) | off |
 | Human check | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (Cloudflare Turnstile), else `RECAPTCHA_*` | none |
 | Alert inbox | `APP_ADMIN_EMAIL` (fallback `APP_SENDER_EMAIL`) | — |
 
@@ -449,6 +449,27 @@ The alert mail (`[INCIDENT][Synaplan] Unusual account creation`) is sent once
 per hour per signal and always logged at `critical`, so a log-based pager works
 on an install without mail. Why this exists: `docs/PAYMENTS_CHANNELS.md`,
 section "Stripe payment methods".
+
+### Who may create an account: open or admission
+
+`REGISTRATION_MODE` (or Admin → System configuration → Sign-in & registration) decides how a
+visitor gets an account while self-registration is on:
+
+| Mode | A new account needs |
+| ---- | ------------------- |
+| `open` (default) | nothing — anyone may sign up; a self-hosted install keeps this |
+| `admission` | a paid plan or an invitation code; the hosted platform runs this |
+
+In admission mode the register page offers the plans and an invitation-code
+field. Create codes under **People → Invitation codes**: a label, the tier the
+account gets, how long the code is valid and how often it may be used. The
+list shows each code again on click, so you can copy it any time, and the
+usage list shows who signed up with it.
+
+A sign-up with a plan waits as `pending_payment` until the first invoice is
+paid; one that never pays is deleted 7 days after sign-up by the hourly job
+`app:signup:reap-pending` ([details](BILLING_SELFHOST.md#unpaid-sign-ups)).
+Existing accounts are never affected by the mode.
 
 ---
 

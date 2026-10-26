@@ -23,6 +23,7 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
 | `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
 | `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `REGISTRATION_MODE` | `open` | `open`: anyone may sign up. `admission`: a new account needs a paid plan or an invitation code ([details](ADMIN.md#who-may-create-an-account-open-or-admission)) |
 | `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
 | `FEATURE_<GROUP>_<SETTING>` | *unset* | Pins one wave feature flag (`FEATURE_IAM_SHARING_ENABLED=false`, `FEATURE_DESKTOP_AGENT_ENABLED=false`, …); **overrides** the toggle on Admin → System Configuration → Features. All flags default **on**. Full list: [FEATURE_FLAGS.md](FEATURE_FLAGS.md) |
 | `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
@@ -186,6 +187,11 @@ where nobody may ever register locally.
 
 Both accept `true`/`false`. Unsetting the variable and restarting hands control
 back to the database value.
+
+`REGISTRATION_MODE` follows the same rule and decides *how* a visitor gets an
+account while registration is on: `open` (default) or `admission`, where a new
+account needs a paid plan or an invitation code. See
+[Who may create an account](ADMIN.md#who-may-create-an-account-open-or-admission).
 
 ---
 
