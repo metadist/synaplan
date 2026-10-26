@@ -108,7 +108,9 @@
     "apps": "Apps",
     "appsConnected": "Verbundene Apps",
     "appDetail": "App",
-    "adminUsage": "Kostenübersicht"
+    "adminUsage": "Kostenübersicht",
+    "start": "Start",
+    "welcome": "Willkommen"
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",

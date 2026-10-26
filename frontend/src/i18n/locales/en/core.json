@@ -108,7 +108,9 @@
     "apps": "Apps",
     "appsConnected": "Connected apps",
     "appDetail": "App",
-    "adminUsage": "Cost board"
+    "adminUsage": "Cost board",
+    "start": "Start",
+    "welcome": "Welcome"
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",

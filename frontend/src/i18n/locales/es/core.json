@@ -107,7 +107,9 @@
     "apps": "Apps",
     "appsConnected": "Apps conectadas",
     "appDetail": "App",
-    "adminUsage": "Panel de costes"
+    "adminUsage": "Panel de costes",
+    "start": "Empezar",
+    "welcome": "Bienvenida"
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",

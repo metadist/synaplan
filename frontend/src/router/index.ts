@@ -46,6 +46,7 @@ import {
 import { appRouteGuard } from '@/router/appGuards'
 import { groupsRouteGuard } from '@/router/iamGuards'
 import { adminUsageRoute, peopleRoute } from '@/router/adminUserRoutes'
+import { payFirstRoutes } from '@/router/payFirstRoutes'
 import {
   adminDashboardRedirect,
   aiInfrastructureRedirect,
@@ -122,6 +123,7 @@ const router = createRouter({
       beforeEnter: guardRegistration,
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register', i18n: ['auth'] },
     },
+    ...payFirstRoutes,
     ...codeSignupRoutes,
     {
       path: '/forgot-password',
