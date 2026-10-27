@@ -107,6 +107,7 @@ final readonly class EmailAnswerStore
         $charged = FacadeMeteredChat::chargedCost($metadata);
         if (null !== $charged) {
             $outgoing->setMeta('ai_chat_cost', $charged);
+            FacadeMeteredChat::applyPriceKnown($outgoing, $metadata);
         } else {
             $usage->attachChatCost($outgoing);
         }

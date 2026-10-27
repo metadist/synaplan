@@ -36,6 +36,7 @@ final class FacadeMeteredChat
 
         $metadata['facade_metered'] = true;
         $metadata['facade_charged_cost'] = $response['facade_charged_cost'] ?? null;
+        $metadata['facade_price_known'] = false !== ($response['facade_price_known'] ?? true);
 
         return $metadata;
     }
@@ -52,7 +53,7 @@ final class FacadeMeteredChat
      */
     public static function messages(array $metadata, string $source, string $input, string $answer, array $extra = []): array
     {
-        return self::logMetadata($extra + [
+        $row = [
             'provider' => $metadata['provider'] ?? 'unknown',
             'model' => $metadata['model'] ?? 'unknown',
             'usage' => $metadata['usage'] ?? [],
@@ -60,9 +61,16 @@ final class FacadeMeteredChat
             'source' => $source,
             'input_text' => $input,
             'response_text' => $answer,
-            'facade_metered' => $metadata['facade_metered'] ?? false,
-            'facade_charged_cost' => $metadata['facade_charged_cost'] ?? null,
-        ]);
+        ];
+        if (self::isMetered($metadata)) {
+            $row['facade_metered'] = true;
+            $row['facade_charged_cost'] = $metadata['facade_charged_cost'] ?? null;
+            if (array_key_exists('facade_price_known', $metadata)) {
+                $row['facade_price_known'] = false !== $metadata['facade_price_known'];
+            }
+        }
+
+        return self::logMetadata($extra + $row);
     }
 
     public static function logMetadata(array $metadata): array
@@ -94,18 +102,31 @@ final class FacadeMeteredChat
     /**
      * The chat bubble shows what the provider charged. When the facade already
      * wrote that cost, the turn's own row is only the message allowance.
+     * An unknown catalog price stays unknown: a real zero and "no price" are
+     * different things on the bubble.
      *
      * @param array<string, mixed> $source
      */
-    public static function attach(Message $message, RecordedUsage $recorded, array $source): void
+    public static function attach(Message $message, ?RecordedUsage $recorded, array $source): void
     {
         $charged = self::chargedCost($source);
         if (null !== $charged) {
             $message->setMeta('ai_chat_cost', $charged);
+            self::applyPriceKnown($message, $source);
 
             return;
         }
 
-        $recorded->attachChatCost($message);
+        $recorded?->attachChatCost($message);
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     */
+    public static function applyPriceKnown(Message $message, array $source): void
+    {
+        if (false === ($source['facade_price_known'] ?? true)) {
+            $message->setMeta('ai_chat_price_known', '0');
+        }
     }
 }

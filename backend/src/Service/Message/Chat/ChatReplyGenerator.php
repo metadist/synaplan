@@ -63,7 +63,7 @@ final readonly class ChatReplyGenerator
 
             return new ChatReply(
                 content: $documentEdit->content,
-                metadata: self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost),
+                metadata: self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost, $documentEdit->facadePriceKnown),
                 documentEdit: $documentEdit,
             );
         }
@@ -161,7 +161,7 @@ final readonly class ChatReplyGenerator
         }
         $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $message, $aiOptions, $progressCallback, $incognito);
         if (null !== $documentEdit) {
-            $metadata = self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost);
+            $metadata = self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost, $documentEdit->facadePriceKnown);
             $this->documents->applyEditResult($documentEdit, $message, $metadata);
             $answer($documentEdit->content);
         } else {
@@ -299,7 +299,7 @@ final readonly class ChatReplyGenerator
      *
      * @return array<string, mixed>
      */
-    private static function chosenModelMetadata(ChatModelChoice $model, array $usage, bool $facadeMetered = false, ?string $facadeChargedCost = null): array
+    private static function chosenModelMetadata(ChatModelChoice $model, array $usage, bool $facadeMetered = false, ?string $facadeChargedCost = null, bool $facadePriceKnown = true): array
     {
         $metadata = [
             'provider' => $model->provider ?? 'unknown',
@@ -310,6 +310,7 @@ final readonly class ChatReplyGenerator
         if ($facadeMetered) {
             $metadata['facade_metered'] = true;
             $metadata['facade_charged_cost'] = $facadeChargedCost;
+            $metadata['facade_price_known'] = $facadePriceKnown;
         }
 
         return $metadata;

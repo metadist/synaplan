@@ -142,6 +142,7 @@ final readonly class StreamUsageRecorder
         $charged = FacadeMeteredChat::chargedCost($metadata);
         if (null !== $charged) {
             $message->setMeta('ai_chat_cost', $charged);
+            FacadeMeteredChat::applyPriceKnown($message, $metadata);
         }
 
         if ($recorded->totalTokens <= 0 && (float) $recorded->chargedCost <= 0.0 && null === $charged) {
@@ -153,12 +154,37 @@ final readonly class StreamUsageRecorder
         }
 
         $payload = $recorded->toMessageUsage(self::label($metadata['provider'] ?? null), self::label($metadata['model'] ?? null), 'LLM');
-        if (null === $charged) {
-            return $payload;
+        $payload = self::withDisplayedTokens($payload, $metadata, $charged);
+        if (null !== $charged) {
+            $payload['cost'] = $charged;
+        }
+        if (array_key_exists('facade_price_known', $metadata)) {
+            $payload['priceKnown'] = false !== $metadata['facade_price_known'];
         }
 
-        $usage = is_array($metadata['usage'] ?? null) ? $metadata['usage'] : [];
-        $payload['cost'] = $charged;
+        return $payload;
+    }
+
+    /**
+     * Token counts the person sees. A multitask plan keeps every node's
+     * tokens on display_usage even when the turn no longer bills them.
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
+     */
+    private static function withDisplayedTokens(array $payload, array $metadata, ?string $charged): array
+    {
+        $usage = is_array($metadata['display_usage'] ?? null) && [] !== $metadata['display_usage']
+            ? $metadata['display_usage']
+            : null;
+        if (null === $usage && null !== $charged && is_array($metadata['usage'] ?? null)) {
+            $usage = $metadata['usage'];
+        }
+        if (!is_array($usage) || [] === $usage) {
+            return $payload;
+        }
         $payload['promptTokens'] = (int) ($usage['prompt_tokens'] ?? 0);
         $payload['completionTokens'] = (int) ($usage['completion_tokens'] ?? 0);
         $payload['totalTokens'] = (int) ($usage['total_tokens'] ?? ($payload['promptTokens'] + $payload['completionTokens']));

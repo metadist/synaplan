@@ -9,9 +9,10 @@ use App\Service\Multitask\Plan\TaskPlan;
 /**
  * One usage figure for a whole task, from the nodes that ran.
  *
- * A node the facade already billed does not add its tokens again. Its cost is
- * kept so the chat can show what the provider charged. Nodes the facade did
- * not see are still summed, and that sum is what the turn's own row bills.
+ * A node the facade already billed does not add its tokens to the figure the
+ * turn still has to bill. Those tokens stay on `display_usage` so the chat
+ * can show them next to the cost. Nodes the facade did not see are summed
+ * into `usage`, and that sum is what the turn's own row bills.
  */
 final class NodeUsageFold
 {
@@ -22,44 +23,60 @@ final class NodeUsageFold
      */
     public static function into(TaskPlan $plan, NodeContext $context, array $metadata): array
     {
-        $promptTokens = 0;
-        $completionTokens = 0;
-        $totalTokens = 0;
+        $billedPrompt = 0;
+        $billedCompletion = 0;
+        $billedTotal = 0;
+        $shownPrompt = 0;
+        $shownCompletion = 0;
+        $shownTotal = 0;
         $charged = 0.0;
         $meteredNodes = 0;
+        $priceKnown = true;
         foreach ($plan->nodes as $usageNode) {
-            $usageNodeResult = $context->getResult($usageNode->id);
-            if (null === $usageNodeResult || !$usageNodeResult->isSuccessful()) {
+            $result = $context->getResult($usageNode->id);
+            if (null === $result || !$result->isSuccessful()) {
                 continue;
             }
-            if (true === ($usageNodeResult->metadata['facade_metered'] ?? false)) {
+            $nodeUsage = is_array($result->metadata['usage'] ?? null) ? $result->metadata['usage'] : [];
+            $nodePrompt = (int) ($nodeUsage['prompt_tokens'] ?? 0);
+            $nodeCompletion = (int) ($nodeUsage['completion_tokens'] ?? 0);
+            $nodeTotal = (int) ($nodeUsage['total_tokens'] ?? ($nodePrompt + $nodeCompletion));
+            $shownPrompt += $nodePrompt;
+            $shownCompletion += $nodeCompletion;
+            $shownTotal += $nodeTotal;
+            if (true === ($result->metadata['facade_metered'] ?? false)) {
                 ++$meteredNodes;
-                $cost = $usageNodeResult->metadata['facade_charged_cost'] ?? null;
+                $cost = $result->metadata['facade_charged_cost'] ?? null;
                 if (is_string($cost) && is_numeric($cost)) {
                     $charged += (float) $cost;
                 }
+                if (false === ($result->metadata['facade_price_known'] ?? true)) {
+                    $priceKnown = false;
+                }
                 continue;
             }
-            $nodeUsage = $usageNodeResult->metadata['usage'] ?? null;
-            if (!is_array($nodeUsage) || [] === $nodeUsage) {
-                continue;
-            }
-            $nodePrompt = (int) ($nodeUsage['prompt_tokens'] ?? 0);
-            $nodeCompletion = (int) ($nodeUsage['completion_tokens'] ?? 0);
-            $promptTokens += $nodePrompt;
-            $completionTokens += $nodeCompletion;
-            $totalTokens += (int) ($nodeUsage['total_tokens'] ?? ($nodePrompt + $nodeCompletion));
+            $billedPrompt += $nodePrompt;
+            $billedCompletion += $nodeCompletion;
+            $billedTotal += $nodeTotal;
         }
-        if ($totalTokens > 0) {
+        if ($billedTotal > 0) {
             $metadata['usage'] = [
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $totalTokens,
+                'prompt_tokens' => $billedPrompt,
+                'completion_tokens' => $billedCompletion,
+                'total_tokens' => $billedTotal,
             ];
         }
-        if ($meteredNodes > 0 && 0 === $totalTokens) {
+        if ($shownTotal > 0) {
+            $metadata['display_usage'] = [
+                'prompt_tokens' => $shownPrompt,
+                'completion_tokens' => $shownCompletion,
+                'total_tokens' => $shownTotal,
+            ];
+        }
+        if ($meteredNodes > 0 && 0 === $billedTotal) {
             $metadata['facade_metered'] = true;
             $metadata['facade_charged_cost'] = number_format($charged, 6, '.', '');
+            $metadata['facade_price_known'] = $priceKnown;
         }
 
         return $metadata;

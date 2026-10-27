@@ -12,6 +12,7 @@ final class UsageKindTest extends TestCase
     public function testRawActionsMapToBoardKinds(): void
     {
         self::assertSame(UsageKind::CHAT, UsageKind::fromAction('MESSAGES'));
+        self::assertSame(UsageKind::CHAT, UsageKind::fromAction('AI_CALL'));
         self::assertSame(UsageKind::VIDEO, UsageKind::fromAction('VIDEOS'));
         self::assertSame(UsageKind::VIDEO, UsageKind::fromAction('video_generation'));
         self::assertSame(UsageKind::IMAGE, UsageKind::fromAction('IMAGES'));

@@ -13,6 +13,7 @@ use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Provider\GoogleProvider;
+use App\AI\Stream\StreamTextCapture;
 use App\AI\StructuredOutput\StructuredOutputRecovery;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\Email\InternalEmailService;
@@ -145,6 +146,7 @@ class AiFacade
         }
 
         $messages = Utf8MessageSanitizer::apply($messages);
+        $billTo = AiChatUsageMeter::claim($options);
 
         $this->logger->info('AI chat request', [
             'provider' => $provider->getName(),
@@ -202,7 +204,7 @@ class AiFacade
             $out['finish_reason'] = $response['finish_reason'];
         }
 
-        return $this->withUsage($out, $messages, $options, $userId);
+        return $this->withUsage($out, $messages, $options, $userId, $billTo);
     }
 
     /**
@@ -339,6 +341,8 @@ class AiFacade
         }
 
         $messages = Utf8MessageSanitizer::apply($messages);
+        $billTo = AiChatUsageMeter::claim($options);
+        $answer = StreamTextCapture::wrap($streamCallback);
 
         $this->logger->info('🔵 AiFacade: Starting chat stream', [
             'provider' => $provider->getName(),
@@ -351,9 +355,9 @@ class AiFacade
         $streamResult = null;
         try {
             $this->executeWithHealth(
-                callback: function () use ($provider, $messages, $streamCallback, $options, &$streamResult) {
+                callback: function () use ($provider, $messages, $answer, $options, &$streamResult) {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
-                    $streamResult = $provider->chatStream($messages, $streamCallback, $options);
+                    $streamResult = $provider->chatStream($messages, $answer, $options);
                     $this->logger->info('🔵 AiFacade: Provider chatStream completed');
 
                     return null;
@@ -380,6 +384,7 @@ class AiFacade
         $streamed = $this->withUsage([
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
+            'content' => $answer->text(),
             'usage' => $streamResult['usage'] ?? [],
             'response_id' => $streamResult['response_id'] ?? null,
             // See chat(): tool calls reassembled from the stream fragments by
@@ -388,7 +393,7 @@ class AiFacade
             // never see a routing hand-off as if it were answer text.
             'tool_calls' => $streamResult['tool_calls'] ?? [],
             'finish_reason' => is_string($streamResult['finish_reason'] ?? null) ? $streamResult['finish_reason'] : null,
-        ], $messages, $options, $userId);
+        ], $messages, $options, $userId, $billTo);
 
         return $streamed;
     }
@@ -397,15 +402,17 @@ class AiFacade
      * @param array<string, mixed> $response
      * @param list<mixed>          $messages
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $context
      *
      * @return array<string, mixed>
      */
-    private function withUsage(array $response, array $messages, array $options, ?int $userId): array
+    private function withUsage(array $response, array $messages, array $options, ?int $userId, array $context = []): array
     {
-        $recorded = $this->usageMeter?->record($userId, $response, $messages, $options);
+        $recorded = $this->usageMeter?->record($userId, $response, $messages, $options, $context);
         if ($recorded instanceof RecordedUsage) {
             $response['facade_metered'] = true;
             $response['facade_charged_cost'] = $recorded->chargedCost;
+            $response['facade_price_known'] = $recorded->priceKnown;
         }
 
         return $response;

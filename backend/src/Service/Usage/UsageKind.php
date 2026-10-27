@@ -31,6 +31,7 @@ final class UsageKind
     /** @var array<string, string> raw BACTION => kind, agent rows aside */
     private const BY_ACTION = [
         'MESSAGES' => self::CHAT,
+        'AI_CALL' => self::CHAT,
         'VIDEOS' => self::VIDEO,
         'video_generation' => self::VIDEO,
         'IMAGES' => self::IMAGE,

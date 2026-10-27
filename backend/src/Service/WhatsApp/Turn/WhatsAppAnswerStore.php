@@ -129,6 +129,7 @@ final readonly class WhatsAppAnswerStore
         $charged = FacadeMeteredChat::chargedCost($aiMetadata ?? []);
         if (null !== $charged) {
             $outgoingMessage->setMeta('ai_chat_cost', $charged);
+            FacadeMeteredChat::applyPriceKnown($outgoingMessage, $aiMetadata ?? []);
         } else {
             $recordedChatUsage = $aiMetadata['recorded_chat_usage'] ?? null;
             if ($recordedChatUsage instanceof RecordedUsage) {

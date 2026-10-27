@@ -28,6 +28,15 @@ final readonly class AiChatUsageMeter
 
     public const CALLER_METERS = 'caller_meters';
 
+    /** Pulled off the provider options before the call. See {@see claim()}. */
+    public const USAGE_SOURCE = 'usage_source';
+
+    public const USAGE_CHAT_ID = 'usage_chat_id';
+
+    public const USAGE_AGENT_ID = 'usage_agent_id';
+
+    public const USAGE_AGENT_VERSION_ID = 'usage_agent_version_id';
+
     public function __construct(
         private RateLimitService $rateLimitService,
         private UserRepository $users,
@@ -40,10 +49,11 @@ final readonly class AiChatUsageMeter
      * @param array<string, mixed> $response provider, model, usage, content
      * @param list<mixed>          $messages
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $context  attribution from {@see claim()}, already off the provider options
      */
-    public function record(?int $userId, array $response, array $messages, array $options): ?RecordedUsage
+    public function record(?int $userId, array $response, array $messages, array $options, array $context = []): ?RecordedUsage
     {
-        if (true === ($options[self::CALLER_METERS] ?? false)) {
+        if (true === ($options[self::CALLER_METERS] ?? false) || true === ($context[self::CALLER_METERS] ?? false)) {
             return null;
         }
 
@@ -66,16 +76,23 @@ final readonly class AiChatUsageMeter
         $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
         $modelId = $this->modelId($provider, $model, $options);
 
+        $metadata = [
+            'provider' => $provider,
+            'model' => $model,
+            'model_id' => $modelId,
+            'usage' => $usage,
+            'source' => self::sourceOf($context),
+            'input_text' => self::textOf($messages),
+            'response_text' => is_string($response['content'] ?? null) ? $response['content'] : '',
+        ];
+        foreach (['chat_id', 'agentId', 'agentVersionId'] as $key) {
+            if (isset($context[$key])) {
+                $metadata[$key] = $context[$key];
+            }
+        }
+
         try {
-            return $this->rateLimitService->recordUsage($user, self::ACTION, [
-                'provider' => $provider,
-                'model' => $model,
-                'model_id' => $modelId,
-                'usage' => $usage,
-                'source' => 'ai_facade',
-                'input_text' => self::textOf($messages),
-                'response_text' => is_string($response['content'] ?? null) ? $response['content'] : '',
-            ]);
+            return $this->rateLimitService->recordUsage($user, self::ACTION, $metadata);
         } catch (\Throwable $e) {
             $this->logger->warning('AiChatUsageMeter: failed to record chat usage', [
                 'user_id' => $userId,
@@ -86,6 +103,53 @@ final readonly class AiChatUsageMeter
 
             return null;
         }
+    }
+
+    /**
+     * Take chat, agent and channel off the options the provider is about to
+     * receive. A provider that echoes unknown keys must not see them.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    public static function claim(array &$options): array
+    {
+        $context = [];
+        $source = $options[self::USAGE_SOURCE] ?? null;
+        if (is_string($source) && '' !== trim($source)) {
+            $context['source'] = trim($source);
+        }
+        unset($options[self::USAGE_SOURCE]);
+
+        foreach ([
+            self::USAGE_CHAT_ID => 'chat_id',
+            self::USAGE_AGENT_ID => 'agentId',
+            self::USAGE_AGENT_VERSION_ID => 'agentVersionId',
+        ] as $from => $to) {
+            $value = $options[$from] ?? null;
+            if (is_numeric($value) && (int) $value > 0) {
+                $context[$to] = (int) $value;
+            }
+            unset($options[$from]);
+        }
+
+        if (true === ($options[self::CALLER_METERS] ?? false)) {
+            $context[self::CALLER_METERS] = true;
+        }
+        unset($options[self::CALLER_METERS]);
+
+        return $context;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private static function sourceOf(array $context): string
+    {
+        $source = $context['source'] ?? null;
+
+        return is_string($source) && '' !== trim($source) ? trim($source) : 'ai_facade';
     }
 
     /**

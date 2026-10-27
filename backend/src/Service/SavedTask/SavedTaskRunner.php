@@ -21,6 +21,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
+use App\Service\Usage\AiChatUsageMeter;
 use App\Service\Usage\FacadeMeteredChat;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -243,6 +244,7 @@ final readonly class SavedTaskRunner
             'saved_task' => true,
             'saved_task_id' => (int) $task->getId(),
             'saved_task_name' => $task->getName(),
+            AiChatUsageMeter::USAGE_SOURCE => 'SAVED_TASK',
         ];
         if ([] !== $triggerPayload) {
             $options['trigger_payload'] = $triggerPayload;

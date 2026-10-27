@@ -78,6 +78,7 @@ final readonly class ChatToolLoop
         $ops = 0;
         $facadeMetered = false;
         $charged = 0.0;
+        $priceKnown = true;
 
         for ($i = 0; $i < $maxIter; ++$i) {
             if ((time() - $started) >= self::WALL_CLOCK_SECONDS) {
@@ -85,7 +86,7 @@ final readonly class ChatToolLoop
             }
             $this->transcripts?->record($messages);
             $response = $this->aiFacade->chat($messages, $userId, $options);
-            [$usage, $facadeMetered, $charged] = $this->foldRound($usage, $facadeMetered, $charged, $response);
+            [$usage, $facadeMetered, $charged, $priceKnown] = $this->foldRound($usage, $facadeMetered, $charged, $priceKnown, $response);
             $content = (string) ($response['content'] ?? '');
             $calls = $response['tool_calls'] ?? [];
             if (!is_array($calls) || [] === $calls) {
@@ -140,16 +141,16 @@ final readonly class ChatToolLoop
             }
         }
 
-        return new ChatToolLoopResult($content, $session, $usage, $facadeMetered, $facadeMetered ? number_format($charged, 6, '.', '') : null);
+        return new ChatToolLoopResult($content, $session, $usage, $facadeMetered, $facadeMetered ? number_format($charged, 6, '.', '') : null, $priceKnown);
     }
 
     /**
      * @param array<string, mixed> $usage
      * @param array<string, mixed> $response
      *
-     * @return array{0: array<string, mixed>, 1: bool, 2: float}
+     * @return array{0: array<string, mixed>, 1: bool, 2: float, 3: bool}
      */
-    private function foldRound(array $usage, bool $metered, float $charged, array $response): array
+    private function foldRound(array $usage, bool $metered, float $charged, bool $priceKnown, array $response): array
     {
         $usage = $this->mergeUsage($usage, is_array($response['usage'] ?? null) ? $response['usage'] : []);
         if (true === ($response['facade_metered'] ?? false)) {
@@ -158,9 +159,12 @@ final readonly class ChatToolLoop
             if (is_string($roundCost) && is_numeric($roundCost)) {
                 $charged += (float) $roundCost;
             }
+            if (false === ($response['facade_price_known'] ?? true)) {
+                $priceKnown = false;
+            }
         }
 
-        return [$usage, $metered, $charged];
+        return [$usage, $metered, $charged, $priceKnown];
     }
 
     /**

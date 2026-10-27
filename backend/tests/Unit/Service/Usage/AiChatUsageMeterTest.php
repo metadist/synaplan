@@ -20,7 +20,7 @@ final class AiChatUsageMeterTest extends TestCase
         $limits = $this->createMock(RateLimitService::class);
         $limits->expects($this->never())->method('recordUsage');
 
-        $meter = $this->meter($limits, $this->createMock(UserRepository::class), $this->createMock(ModelRepository::class));
+        $meter = $this->meter($limits, $this->createStub(UserRepository::class), $this->createStub(ModelRepository::class));
 
         $this->assertNull($meter->record(4, ['provider' => 'anthropic', 'model' => 'claude-fable-5-1'], [], [
             AiChatUsageMeter::CALLER_METERS => true,
@@ -36,8 +36,8 @@ final class AiChatUsageMeterTest extends TestCase
 
         $meter = new AiChatUsageMeter(
             $limits,
-            $this->createMock(UserRepository::class),
-            $this->createMock(ModelRepository::class),
+            $this->createStub(UserRepository::class),
+            $this->createStub(ModelRepository::class),
             $logger,
         );
 
@@ -46,12 +46,12 @@ final class AiChatUsageMeterTest extends TestCase
 
     public function testProviderTokensAreWrittenAgainstTheCatalogRow(): void
     {
-        $user = $this->createMock(User::class);
+        $user = $this->createStub(User::class);
         $users = $this->createMock(UserRepository::class);
-        $users->method('find')->with(7)->willReturn($user);
+        $users->expects($this->once())->method('find')->with(7)->willReturn($user);
 
         $models = $this->createMock(ModelRepository::class);
-        $models->method('findChatIdByProvider')->with('anthropic', 'claude-fable-5-1')->willReturn(338);
+        $models->expects($this->once())->method('findChatIdByProvider')->with('anthropic', 'claude-fable-5-1')->willReturn(338);
 
         $limits = $this->createMock(RateLimitService::class);
         $limits->expects($this->once())->method('recordUsage')->with(
@@ -77,12 +77,61 @@ final class AiChatUsageMeterTest extends TestCase
         $this->assertSame('0.010000', $recorded->chargedCost);
     }
 
+    public function testAttributionIsOnTheRowAndOffTheProviderOptions(): void
+    {
+        $options = [
+            'model' => 'claude-fable-5-1',
+            AiChatUsageMeter::USAGE_SOURCE => 'whatsapp',
+            AiChatUsageMeter::USAGE_CHAT_ID => '15',
+            AiChatUsageMeter::USAGE_AGENT_ID => 4,
+            AiChatUsageMeter::USAGE_AGENT_VERSION_ID => 8,
+            AiChatUsageMeter::CALLER_METERS => true,
+        ];
+        $context = AiChatUsageMeter::claim($options);
+        $this->assertSame(['model' => 'claude-fable-5-1'], $options);
+        $this->assertTrue($context[AiChatUsageMeter::CALLER_METERS]);
+
+        $limits = $this->createMock(RateLimitService::class);
+        $limits->expects($this->never())->method('recordUsage');
+        $meter = $this->meter($limits, $this->createStub(UserRepository::class), $this->createStub(ModelRepository::class));
+        $this->assertNull($meter->record(7, ['provider' => 'anthropic', 'model' => 'claude-fable-5-1'], [], $options, $context));
+
+        unset($context[AiChatUsageMeter::CALLER_METERS]);
+        $user = $this->createStub(User::class);
+        $users = $this->createMock(UserRepository::class);
+        $users->expects($this->once())->method('find')->with(7)->willReturn($user);
+        $models = $this->createMock(ModelRepository::class);
+        $models->expects($this->never())->method('findChatIdByProvider');
+        $limits = $this->createMock(RateLimitService::class);
+        $limits->expects($this->once())->method('recordUsage')->with(
+            $user,
+            AiChatUsageMeter::ACTION,
+            $this->callback(static function (array $metadata): bool {
+                return 'whatsapp' === $metadata['source']
+                    && 15 === $metadata['chat_id']
+                    && 4 === $metadata['agentId']
+                    && 8 === $metadata['agentVersionId']
+                    && 338 === $metadata['model_id'];
+            }),
+        )->willReturn(new RecordedUsage('0.010000', '0.009000', 1, 1, 2, false));
+
+        $recorded = $this->meter($limits, $users, $models)->record(7, [
+            'provider' => 'anthropic',
+            'model' => 'claude-fable-5-1',
+            'content' => 'done',
+            'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+        ], [], ['model_id' => 338], $context);
+
+        $this->assertNotNull($recorded);
+        $this->assertFalse($recorded->priceKnown);
+    }
+
     public function testMissingProviderTokensFallThroughToTheText(): void
     {
-        $user = $this->createMock(User::class);
-        $users = $this->createMock(UserRepository::class);
+        $user = $this->createStub(User::class);
+        $users = $this->createStub(UserRepository::class);
         $users->method('find')->willReturn($user);
-        $models = $this->createMock(ModelRepository::class);
+        $models = $this->createStub(ModelRepository::class);
         $models->method('findChatIdByProvider')->willReturn(249);
 
         $limits = $this->createMock(RateLimitService::class);
@@ -107,6 +156,6 @@ final class AiChatUsageMeterTest extends TestCase
 
     private function meter(RateLimitService $limits, UserRepository $users, ModelRepository $models): AiChatUsageMeter
     {
-        return new AiChatUsageMeter($limits, $users, $models, $this->createMock(LoggerInterface::class));
+        return new AiChatUsageMeter($limits, $users, $models, $this->createStub(LoggerInterface::class));
     }
 }

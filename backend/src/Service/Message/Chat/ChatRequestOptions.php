@@ -162,7 +162,52 @@ final readonly class ChatRequestOptions
             $aiOptions[AiChatUsageMeter::CALLER_METERS] = true;
         }
 
+        return $this->withUsageContext($aiOptions, $turn);
+    }
+
+    /**
+     * Channel, chat and assistant for the usage row. The facade strips these
+     * before the provider sees the options.
+     *
+     * @param array<string, mixed> $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function withUsageContext(array $aiOptions, ChatTurn $turn): array
+    {
+        $aiOptions[AiChatUsageMeter::USAGE_SOURCE] = $this->usageSource($turn);
+        $chatId = $turn->message->getChatId();
+        if (null !== $chatId && $chatId > 0) {
+            $aiOptions[AiChatUsageMeter::USAGE_CHAT_ID] = $chatId;
+        }
+        if (is_numeric($turn->options['agentId'] ?? null) && (int) $turn->options['agentId'] > 0) {
+            $aiOptions[AiChatUsageMeter::USAGE_AGENT_ID] = (int) $turn->options['agentId'];
+        }
+        if (is_numeric($turn->options['agentVersionId'] ?? null) && (int) $turn->options['agentVersionId'] > 0) {
+            $aiOptions[AiChatUsageMeter::USAGE_AGENT_VERSION_ID] = (int) $turn->options['agentVersionId'];
+        }
+
         return $aiOptions;
+    }
+
+    private function usageSource(ChatTurn $turn): string
+    {
+        $pinned = $turn->options[AiChatUsageMeter::USAGE_SOURCE] ?? null;
+        if (is_string($pinned) && '' !== trim($pinned)) {
+            return trim($pinned);
+        }
+        foreach (['source', 'channel'] as $key) {
+            $value = $turn->options[$key] ?? null;
+            if (is_string($value) && '' !== trim($value)) {
+                return trim($value);
+            }
+        }
+        $channel = $turn->message->getMeta('channel');
+        if (is_string($channel) && '' !== trim($channel)) {
+            return trim($channel);
+        }
+
+        return 'WEB';
     }
 
     /**
