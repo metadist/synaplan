@@ -28,13 +28,24 @@ final readonly class ResearchConfig
     ) {
     }
 
-    public function isEnabled(): bool
+    /** True or false when the environment pins the switch. Null when the stored row decides. */
+    public function envForces(): ?bool
     {
         if ($this->isOn($this->envValue)) {
             return true;
         }
         if ($this->isOff($this->envValue)) {
             return false;
+        }
+
+        return null;
+    }
+
+    public function isEnabled(): bool
+    {
+        $forced = $this->envForces();
+        if (null !== $forced) {
+            return $forced;
         }
         $stored = $this->configRepository->getValue(0, self::GROUP, self::ENABLED);
 

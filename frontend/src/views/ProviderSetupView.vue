@@ -121,6 +121,8 @@
         </div>
 
         <CodingGatewayAdminTab v-if="activeTab === 'gateway'" />
+
+        <ResearchAdminTab v-else-if="activeTab === 'research'" />
       </div>
     </div>
   </MainLayout>
@@ -156,6 +158,9 @@ const AIModelsConfiguration = defineAsyncComponent(
 const loadRouting = () => import('@/components/config/SortingPromptConfiguration.vue')
 const CodingGatewayAdminTab = defineAsyncComponent(
   () => import('@/components/admin/CodingGatewayAdminTab.vue')
+)
+const ResearchAdminTab = defineAsyncComponent(
+  () => import('@/components/admin/research/ResearchAdminTab.vue')
 )
 
 const DEFAULT_TAB: AiTabId = 'providers'
@@ -227,6 +232,12 @@ const tabs = computed<TabNavItem[]>(() => [
     label: t('adminSetup.tabs.gateway'),
     icon: 'heroicons:command-line',
     testid: 'admin-setup-tab-gateway',
+  },
+  {
+    id: 'research',
+    label: t('adminSetup.tabs.research'),
+    icon: 'mdi:book-search-outline',
+    testid: 'admin-setup-tab-research',
   },
 ])
 
