@@ -45,6 +45,18 @@ final class ResultAssembler
     ];
 
     /**
+     * A research step is still working. Closing the window does not stop it,
+     * and nothing is waiting for a decision.
+     */
+    private const RESEARCH_WAITING = [
+        'en' => 'Research is still running. You can close this window. The report appears in this chat, and the next step runs when it is ready.',
+        'de' => 'Die Recherche läuft noch. Du kannst dieses Fenster schließen. Der Bericht erscheint in diesem Chat, und der nächste Schritt startet, wenn er fertig ist.',
+        'es' => 'La investigación sigue en curso. Puedes cerrar esta ventana. El informe aparece en este chat, y el siguiente paso empieza cuando está listo.',
+        'fr' => 'La recherche est encore en cours. Vous pouvez fermer cette fenêtre. Le rapport apparaît dans ce chat, et l’étape suivante démarre quand il est prêt.',
+        'tr' => 'Araştırma sürüyor. Bu pencereyi kapatabilirsin. Rapor bu sohbette görünür ve hazır olunca sonraki adım çalışır.',
+    ];
+
+    /**
      * Appended by {@see bestEffort()} when the only text left is material a
      * later step was to work with (a folder read, extracted text): the answer
      * itself was not made, and the reply must say so.
@@ -340,6 +352,18 @@ final class ResultAssembler
      * compose_reply that wraps the card text in a connector sentence still
      * marks the card redundant.
      */
+    private function waitingSentence(TaskPlan $plan, NodeContext $context, string $language): string
+    {
+        foreach ($plan->nodes as $node) {
+            $result = $context->getResult($node->id);
+            if (null !== $result && $result->isWaitingApproval() && Capability::Research === $node->capability) {
+                return self::RESEARCH_WAITING[$language] ?? self::RESEARCH_WAITING['en'];
+            }
+        }
+
+        return self::WAITING_TEXT[$language] ?? self::WAITING_TEXT['en'];
+    }
+
     private function isWaitingForApproval(TaskPlan $plan, NodeContext $context): bool
     {
         foreach ($plan->nodes as $node) {
@@ -394,7 +418,7 @@ final class ResultAssembler
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');
         if ('' === $text && $this->isWaitingForApproval($plan, $context)) {
-            $text = self::WAITING_TEXT[$language] ?? self::WAITING_TEXT['en'];
+            $text = $this->waitingSentence($plan, $context, $language);
 
             return [$text, $files, $metadata];
         }

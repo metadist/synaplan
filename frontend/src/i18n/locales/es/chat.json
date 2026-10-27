@@ -686,7 +686,8 @@
       "failed": "Fallido",
       "skipped": "Omitido",
       "cancelled": "Detenido",
-      "waiting_approval": "Esperando aprobación"
+      "waiting_approval": "Esperando aprobación",
+      "researchRunning": "La investigación está en curso"
     },
     "kind": {
       "text": "Texto",
@@ -721,7 +722,8 @@
       "email_me": "Envío por correo",
       "save_to_folder": "Guardar en carpeta",
       "code_run": "Trabajando con su archivo",
-      "folder_fetch": "Lectura de archivos"
+      "folder_fetch": "Lectura de archivos",
+      "research": "Investigación"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",
@@ -733,6 +735,7 @@
     "askSubmit": "Enviar",
     "askSkip": "Omitir",
     "askNeedAnswer": "Elige una opción o escribe una respuesta.",
+    "researchContinues": "Puedes cerrar esta ventana. La investigación sigue, y el informe aparece en este chat. El siguiente paso empieza cuando el informe está listo.",
     "askFailed": "La ejecución no pudo continuar. Envía un mensaje nuevo.",
     "askReadOnly": "Solo quien lo creó puede responder. Aun así puede leer la pregunta.",
     "folderRead": {

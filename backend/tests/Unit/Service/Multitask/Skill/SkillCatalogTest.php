@@ -87,6 +87,7 @@ final class SkillCatalogTest extends TestCase
         // save_to_folder and folder_fetch (also dynamic: no connected folder
         // means no note) are missing. document_export and document_combine
         // are engine/service-gated: without constructors they are omitted too.
+        // research is default-off, so the planner does not see it.
         $default = SkillCatalogFactory::real()->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $default);
         self::assertStringNotContainsString('"mcp_fetch"', $default);
@@ -100,7 +101,8 @@ final class SkillCatalogTest extends TestCase
         self::assertStringNotContainsString('"outbound_webhook"', $default);
         self::assertStringNotContainsString('"condition"', $default);
         self::assertStringNotContainsString('"code_run"', $default);
-        self::assertCount(count(Capability::cases()) - 11, explode("\n", $default));
+        self::assertStringNotContainsString('"research"', $default);
+        self::assertCount(count(Capability::cases()) - 12, explode("\n", $default));
 
         // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
         // block from the planner again.

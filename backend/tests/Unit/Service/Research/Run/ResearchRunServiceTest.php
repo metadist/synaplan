@@ -286,6 +286,28 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         $runs->start($this->user, ['question' => 'A second question about prices?', 'depth' => 'standard', 'chat_id' => 11], true, 'other-key');
     }
 
+    public function testASavedTaskStartDoesNotAskAndRemembersTheStep(): void
+    {
+        $first = $this->runs->startForSavedTask($this->user, 'When do the ferries run?', 'standard', 11, 4, 'n1');
+        $again = $this->runs->startForSavedTask($this->user, 'When do the ferries run?', 'standard', 11, 4, 'n1');
+
+        self::assertSame($first->ref->id, $again->ref->id);
+        self::assertSame(0, $first->budget->extras()->questions);
+        self::assertSame(4, $first->savedTaskRunId);
+        self::assertSame('n1', $first->savedTaskNodeId);
+        self::assertCount(1, $this->bus->sent);
+        $stored = $this->store->load($first->ref->id);
+        self::assertInstanceOf(ResearchRunState::class, $stored);
+        self::assertSame(4, $stored->savedTaskRunId);
+        self::assertSame('n1', $stored->savedTaskNodeId);
+    }
+
+    public function testASavedTaskCannotStartAThoroughResearch(): void
+    {
+        $this->expectException(ResearchRejected::class);
+        $this->runs->startForSavedTask($this->user, 'When do the ferries run?', 'thorough', 11, 4, 'n1');
+    }
+
     /**
      * @return array{question: string, depth: string, chat_id: int}
      */

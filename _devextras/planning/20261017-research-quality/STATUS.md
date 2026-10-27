@@ -31,9 +31,9 @@ chat message.
 | RD7 | planned | Add a folder; J-RQ-3 |
 | RD8 | planned | Research team in Models; J-RQ-7 |
 | RD9 | planned | Window closed, notification; J-RQ-4 |
-| RW1 | in progress | Research in the web chat; J-RQ-8. Composer, card and events handler are in the branch. The `@ci` journey uses request stubs, not a live model run. Flag stays off |
+| RW1 | done | Research in the web chat; J-RQ-8. Merged in #2835. The `@ci` journey uses request stubs, not a live model run. Flag stays off |
 | RW2 | planned | Admin research settings; J-RQ-10 |
-| RW3 | planned | Research as a Saved Task step |
+| RW3 | in progress | Research as a waiting saved-task step. The runner pauses the task; the deliver unit continues it with the report or fails the step with the outcome sentence. Quick and standard only, no questions. `MULTITASK.RESEARCH_ENABLED` stays off, so the planner does not see the step. A live "weekly brief → email me" run was not started: it would call a paid model. The proof is the runner and resume tests. |
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |

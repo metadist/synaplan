@@ -53,6 +53,7 @@ final readonly class MultitaskRoutingConfig
     public const KEY_MCP_FETCH_ENABLED = 'MCP_FETCH_ENABLED';
     public const KEY_MCP_ACTION_ENABLED = 'MCP_ACTION_ENABLED';
     public const KEY_EMAIL_SEARCH_ENABLED = 'EMAIL_SEARCH_ENABLED';
+    public const KEY_RESEARCH_ENABLED = 'RESEARCH_ENABLED';
 
     private const DEFAULT_ROUTING_ENABLED = true;
     private const DEFAULT_SHADOW_MODE = false;

@@ -43,6 +43,37 @@ final readonly class ResearchRunService
         return $this->open($user, $request, $this->idempotencyKey($idempotencyKey), null, null);
     }
 
+    /**
+     * A saved-task step. Quick or standard only, no questions, and the same
+     * step always returns the run it already started.
+     */
+    public function startForSavedTask(
+        User $user,
+        string $question,
+        string $depth,
+        int $chatId,
+        int $taskRunId,
+        string $nodeId,
+    ): ResearchRunState {
+        if (!$this->config->isEnabled()) {
+            throw new ResearchRejected(404, 'feature_not_configured', null, 'Research is turned off, so this step did not start.');
+        }
+        if (!in_array($depth, [ResearchDepth::Quick->value, ResearchDepth::Standard->value], true)) {
+            throw new ResearchRejected(400, 'invalid', 'depth', 'A saved task can only run a quick or a standard research.');
+        }
+        if ($taskRunId < 1 || '' === $nodeId) {
+            throw new ResearchRejected(400, 'invalid', null, 'This step runs inside a saved task. Research did not start.');
+        }
+        $request = ResearchRequest::fromBody([
+            'question' => $question,
+            'depth' => $depth,
+            'chat_id' => $chatId,
+        ], true, $user, $this->chats);
+        $key = 'task-'.$taskRunId.'-'.substr(hash('sha256', $nodeId), 0, 16);
+
+        return $this->open($user, $request, $key, null, null, new ResearchTaskLink($taskRunId, $nodeId));
+    }
+
     public function state(User $user, string $runId): ResearchRunState
     {
         return $this->owned($user, $runId);
@@ -192,7 +223,7 @@ final readonly class ResearchRunService
         return $saved;
     }
 
-    private function open(User $user, ResearchRequest $request, ?string $idempotencyKey, ?string $parent, ?ResearchFollowUp $plan): ResearchRunState
+    private function open(User $user, ResearchRequest $request, ?string $idempotencyKey, ?string $parent, ?ResearchFollowUp $plan, ?ResearchTaskLink $task = null): ResearchRunState
     {
         $userId = $user->getId() ?? 0;
         if (null !== $idempotencyKey) {
@@ -207,6 +238,9 @@ final readonly class ResearchRunService
         if (null !== $plan?->searchCap) {
             $limits = $limits->withSearches($plan->searchCap);
         }
+        if (null !== $task) {
+            $limits = $limits->withoutQuestions();
+        }
         $budget = ResearchBudget::for($request->depth, $limits, $now);
         $budget->at($now);
         $state = ResearchRunState::open(
@@ -216,6 +250,10 @@ final readonly class ResearchRunService
         );
         $state->parent = $parent;
         $state->idempotencyKey = $idempotencyKey;
+        if (null !== $task) {
+            $state->savedTaskRunId = $task->runId;
+            $state->savedTaskNodeId = $task->nodeId;
+        }
         $unit = ResearchUnitPlan::BRIEF_PLAN;
         if (null !== $plan) {
             $state->followUp = $plan->kind;

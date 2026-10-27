@@ -67,6 +67,9 @@ final readonly class MultitaskConfigSeeder implements SeederInterface
             // the differences" works out of the box. Explicit row so the toggle
             // under System configuration → Features has something to show.
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED, 'value' => '1'],
+            // Research as a saved-task step stays off until an operator turns it
+            // on. Insert-if-missing, so that choice survives the next deploy.
+            ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_RESEARCH_ENABLED, 'value' => '0'],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'multitask_config', $rows);

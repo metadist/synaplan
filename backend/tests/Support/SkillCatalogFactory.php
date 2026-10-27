@@ -22,6 +22,7 @@ use App\Service\Multitask\Execution\Runner\McpActionRunner;
 use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\OutboundWebhookRunner;
+use App\Service\Multitask\Execution\Runner\ResearchRunner;
 use App\Service\Multitask\Execution\Runner\SaveToFolderRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\ToolCallRunner;
@@ -70,6 +71,7 @@ final class SkillCatalogFactory
         OutboundWebhookRunner::class,
         ConditionRunner::class,
         CodeRunRunner::class,
+        ResearchRunner::class,
     ];
 
     public static function real(): SkillCatalog

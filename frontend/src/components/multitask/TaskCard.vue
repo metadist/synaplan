@@ -43,6 +43,7 @@ function submitAsk(): void {
 const aiConfigStore = useAiConfigStore()
 
 const iconForKind = computed(() => {
+  if (props.card.capability === 'research') return 'heroicons:document-magnifying-glass'
   if (props.card.capability === 'folder_fetch') return 'heroicons:folder'
   switch (props.card.kind) {
     case 'image':
@@ -326,7 +327,11 @@ const outputShown = computed(() =>
           class="w-4 h-4 txt-muted"
         />
         <Icon v-else icon="mdi:clock-outline" class="w-4 h-4 txt-muted" />
-        <span class="txt-muted">{{ $t(`taskPlan.state.${card.state}`) }}</span>
+        <span class="txt-muted">{{
+          card.capability === 'research' && card.state === 'waiting_approval'
+            ? $t('taskPlan.state.researchRunning')
+            : $t(`taskPlan.state.${card.state}`)
+        }}</span>
       </span>
     </div>
 
@@ -374,6 +379,14 @@ const outputShown = computed(() =>
     <div v-else-if="card.state === 'skipped' && card.error" class="text-sm txt-muted break-words">
       {{ card.error }}
     </div>
+
+    <p
+      v-else-if="card.capability === 'research' && card.state === 'waiting_approval'"
+      class="text-sm txt-secondary"
+      data-testid="task-card-research"
+    >
+      {{ $t('taskPlan.researchContinues') }}
+    </p>
 
     <form
       v-if="card.askUser && card.state === 'waiting_approval'"

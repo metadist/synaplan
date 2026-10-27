@@ -686,7 +686,8 @@
       "failed": "Başarısız",
       "skipped": "Atlandı",
       "cancelled": "Durduruldu",
-      "waiting_approval": "Onay bekleniyor"
+      "waiting_approval": "Onay bekleniyor",
+      "researchRunning": "Araştırma sürüyor"
     },
     "kind": {
       "text": "Metin",
@@ -721,7 +722,8 @@
       "email_me": "E-posta gönderimi",
       "save_to_folder": "Klasöre kaydet",
       "code_run": "Dosyanızla çalışılıyor",
-      "folder_fetch": "Dosya okuma"
+      "folder_fetch": "Dosya okuma",
+      "research": "Araştırma"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",
@@ -733,6 +735,7 @@
     "askSubmit": "Gönder",
     "askSkip": "Atla",
     "askNeedAnswer": "Bir seçenek seçin veya bir yanıt yazın.",
+    "researchContinues": "Bu pencereyi kapatabilirsin. Araştırma devam eder ve rapor bu sohbette görünür. Rapor hazır olunca sonraki adım çalışır.",
     "askFailed": "Çalışma devam edemedi. Yeni bir mesaj gönderin.",
     "askReadOnly": "Yalnızca sahibi yanıtlayabilir. Soruyu yine de okuyabilirsiniz.",
     "folderRead": {
