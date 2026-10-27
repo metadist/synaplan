@@ -3,9 +3,8 @@
 namespace App\Controller;
 
 use App\DTO\RegisterRequest;
-use App\Entity\EmailVerificationAttempt;
 use App\Entity\User;
-use App\Repository\EmailVerificationAttemptRepository;
+use App\Model\VerificationResendStatus;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\Auth\ImpersonationService;
@@ -16,11 +15,11 @@ use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
 use App\Service\Auth\TokenService;
+use App\Service\Auth\VerificationResendService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\MailerConfig;
 use App\Service\Iam\UserLifecycleService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,14 +36,9 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[OA\Tag(name: 'Authentication')]
 class AuthController extends AbstractController
 {
-    private int $resendCooldownMinutes;
-    private int $maxResendAttempts;
-
     public function __construct(
         private UserRepository $userRepository,
         private VerificationTokenRepository $tokenRepository,
-        private EmailVerificationAttemptRepository $attemptRepository,
-        private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
@@ -58,9 +52,8 @@ class AuthController extends AbstractController
         private UserLifecycleService $userLifecycleService,
         private RegistrationConfig $registrationConfig,
         private MailerConfig $mailerConfig,
+        private VerificationResendService $verificationResend,
     ) {
-        $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
-        $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
     }
 
     /**
@@ -993,102 +986,97 @@ class AuthController extends AbstractController
 
     #[Route('/resend-verification', name: 'resend_verification', methods: ['POST'])]
     #[OA\Post(path: '/api/v1/auth/resend-verification', summary: 'Send the email verification message again', tags: ['Authentication'])]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['email'],
+            properties: [
+                new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Accepted, sent, or not sent because mail is not configured. When mail works, an unknown address gets the same success body, so the response does not reveal whether the address exists.',
+        content: new OA\JsonContent(
+            required: ['success', 'message', 'mailDelivered', 'remainingAttempts', 'cooldownMinutes'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'mailDelivered', type: 'boolean', description: 'False when this install cannot send mail. Does not reveal whether the address exists.'),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'remainingAttempts', type: 'integer', nullable: true),
+                new OA\Property(property: 'cooldownMinutes', type: 'integer', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Email missing')]
+    #[OA\Response(
+        response: 429,
+        description: 'Cooldown or the resend allowance is used up',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string'),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'maxAttemptsReached', type: 'boolean'),
+                new OA\Property(property: 'waitSeconds', type: 'integer'),
+                new OA\Property(property: 'remainingAttempts', type: 'integer'),
+                new OA\Property(property: 'nextAvailableAt', type: 'string', format: 'date-time'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 500, description: 'The message could not be sent')]
     public function resendVerification(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-        $email = $data['email'] ?? '';
-
-        if (empty($email)) {
+        $email = is_array($data) && is_string($data['email'] ?? null) ? trim($data['email']) : '';
+        if ('' === $email) {
             return $this->json(['error' => 'Email required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Check rate limiting
-        $attempt = $this->attemptRepository->findByEmail($email);
+        $result = $this->verificationResend->resend($email, $request->getClientIp());
 
-        if (!$attempt) {
-            $attempt = new EmailVerificationAttempt();
-            $attempt->setEmail($email);
-            $attempt->setIpAddress($request->getClientIp());
-            $this->em->persist($attempt);
-        } else {
-            if (!$attempt->canResend($this->resendCooldownMinutes, $this->maxResendAttempts)) {
-                $remainingAttempts = $attempt->getRemainingAttempts($this->maxResendAttempts);
-
-                if ($remainingAttempts <= 0) {
-                    $this->logger->warning('Max resend attempts reached', [
-                        'email' => $email,
-                        'ip' => $request->getClientIp(),
-                    ]);
-
-                    return $this->json([
+        return match ($result->status) {
+            VerificationResendStatus::Unconfigured => $this->json([
+                'success' => false,
+                'mailDelivered' => false,
+                'message' => 'No verification email was sent. Email is not set up on this server. An administrator has to confirm the account.',
+                'remainingAttempts' => null,
+                'cooldownMinutes' => null,
+            ]),
+            VerificationResendStatus::Failed => $this->json([
+                'error' => 'Technical error',
+                'message' => 'An error occurred while sending the verification email. Please try again later.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR),
+            VerificationResendStatus::RateLimited => $this->json(
+                $result->maxAttemptsReached()
+                    ? [
                         'error' => 'Maximum verification attempts reached',
                         'message' => 'You have reached the maximum number of verification email requests. Please contact support.',
                         'maxAttemptsReached' => true,
-                    ], Response::HTTP_TOO_MANY_REQUESTS);
-                }
-
-                $nextAvailable = $attempt->getNextAvailableAt($this->resendCooldownMinutes);
-                $waitSeconds = $nextAvailable->getTimestamp() - (new \DateTime())->getTimestamp();
-
-                return $this->json([
-                    'error' => 'Please wait before requesting another verification email',
-                    'waitSeconds' => max(0, $waitSeconds),
-                    'remainingAttempts' => $remainingAttempts,
-                    'nextAvailableAt' => $nextAvailable->format('c'),
-                ], Response::HTTP_TOO_MANY_REQUESTS);
-            }
-
-            $attempt->incrementAttempts();
-        }
-
-        $user = $this->userRepository->findOneBy(['mail' => $email]);
-
-        if (!$user || $user->isEmailVerified()) {
-            try {
-                $this->em->flush();
-            } catch (\Exception $e) {
-                $this->logger->error('Failed to save rate limit attempt', ['error' => $e->getMessage()]);
-            }
-
-            return $this->json([
+                    ]
+                    : [
+                        'error' => 'Please wait before requesting another verification email',
+                        'waitSeconds' => $result->waitSeconds,
+                        'remainingAttempts' => $result->remainingAttempts,
+                        'nextAvailableAt' => $result->nextAvailableAt,
+                    ],
+                Response::HTTP_TOO_MANY_REQUESTS,
+            ),
+            VerificationResendStatus::Accepted => $this->json([
                 'success' => true,
+                'mailDelivered' => true,
                 'message' => 'If your email is registered and unverified, you will receive a verification email.',
-            ]);
-        }
-
-        try {
-            $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
-            $this->internalEmailService->sendVerificationEmail(
-                $user->getMail(),
-                $token->getToken(),
-                $user->getLocale()
-            );
-
-            $this->em->flush();
-
-            $this->logger->info('Verification email sent successfully', [
-                'user_id' => $user->getId(),
-                'attempt' => $attempt->getAttempts(),
-            ]);
-
-            return $this->json([
+                'remainingAttempts' => null,
+                'cooldownMinutes' => null,
+            ]),
+            VerificationResendStatus::Sent => $this->json([
                 'success' => true,
+                'mailDelivered' => true,
                 'message' => 'Verification email sent successfully',
-                'remainingAttempts' => $attempt->getRemainingAttempts($this->maxResendAttempts),
-                'cooldownMinutes' => $this->resendCooldownMinutes,
-            ]);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to send verification email', [
-                'user_id' => $user->getId(),
-                'email' => $email,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->json([
-                'error' => 'Technical error',
-                'message' => 'An error occurred while sending the verification email. Please try again later.',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+                'remainingAttempts' => $result->remainingAttempts,
+                'cooldownMinutes' => $result->cooldownMinutes,
+            ]),
+        };
     }
 
     #[Route('/me', name: 'me', methods: ['GET'])]

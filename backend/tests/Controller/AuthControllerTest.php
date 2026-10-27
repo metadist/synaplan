@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\EmailVerificationAttempt;
 use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
@@ -30,7 +31,20 @@ class AuthControllerTest extends WebTestCase
     protected function tearDown(): void
     {
         // Cleanup test users
-        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'logintest3@test.com', 'unverified@test.com', 'existing@test.com', 'languser@test.com', 'meuser@test.com'];
+        $testEmails = [
+            'newuser@test.com',
+            'logintest@test.com',
+            'logintest2@test.com',
+            'logintest3@test.com',
+            'unverified@test.com',
+            'existing@test.com',
+            'languser@test.com',
+            'meuser@test.com',
+            'resend-unconfigured@test.com',
+            'resend-failed@test.com',
+            'resend-unknown@test.com',
+            'resend-sent@test.com',
+        ];
         foreach ($testEmails as $email) {
             $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
             if ($user) {
@@ -49,6 +63,11 @@ class AuthControllerTest extends WebTestCase
                 }
 
                 $this->em->remove($user);
+            }
+
+            $attempt = $this->em->getRepository(EmailVerificationAttempt::class)->findOneBy(['email' => $email]);
+            if ($attempt) {
+                $this->em->remove($attempt);
             }
         }
         $this->em->flush();
@@ -460,6 +479,156 @@ class AuthControllerTest extends WebTestCase
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public function testResendWithoutMailDoesNotReportSuccessOrSpendTheAllowance(): void
+    {
+        $this->createUnverifiedUser('resend-unconfigured@test.com');
+
+        for ($i = 0; $i < 6; ++$i) {
+            $this->client->request(
+                'POST',
+                '/api/v1/auth/resend-verification',
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['email' => 'resend-unconfigured@test.com'])
+            );
+
+            $this->assertResponseIsSuccessful();
+            $body = json_decode($this->client->getResponse()->getContent(), true);
+            $this->assertFalse($body['success']);
+            $this->assertFalse($body['mailDelivered']);
+            $this->assertStringContainsString('No verification email was sent', $body['message']);
+        }
+
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/resend-verification',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['email' => 'resend-unknown@test.com'])
+        );
+        $this->assertResponseIsSuccessful();
+        $unknown = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertFalse($unknown['mailDelivered']);
+
+        $user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'resend-unconfigured@test.com']);
+        $this->assertSame([], $this->em->getRepository(VerificationToken::class)->findBy(['userId' => $user->getId()]));
+        $this->assertNull($this->em->getRepository(EmailVerificationAttempt::class)->findOneBy(['email' => 'resend-unconfigured@test.com']));
+        $this->assertNull($this->em->getRepository(EmailVerificationAttempt::class)->findOneBy(['email' => 'resend-unknown@test.com']));
+    }
+
+    public function testResendWithMailReportsDeliveryAndThenWaits(): void
+    {
+        $previous = $_ENV['MAILER_DSN'] ?? null;
+        $previousMax = $_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? null;
+        $previousCooldown = $_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? null;
+        $_ENV['MAILER_DSN'] = 'smtp://127.0.0.1:1025';
+        $_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] = '5';
+        $_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] = '2';
+        $this->client->disableReboot();
+        $mail = $this->createMock(InternalEmailService::class);
+        $mail->expects($this->once())->method('sendVerificationEmail')->willReturn(true);
+        static::getContainer()->set(InternalEmailService::class, $mail);
+
+        try {
+            $this->createUnverifiedUser('resend-sent@test.com');
+
+            $this->client->request(
+                'POST',
+                '/api/v1/auth/resend-verification',
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['email' => 'resend-sent@test.com'])
+            );
+
+            $this->assertResponseIsSuccessful();
+            $sent = json_decode($this->client->getResponse()->getContent(), true);
+            $this->assertTrue($sent['success']);
+            $this->assertTrue($sent['mailDelivered']);
+            $this->assertSame(4, $sent['remainingAttempts']);
+            $this->assertSame(2, $sent['cooldownMinutes']);
+
+            $this->client->request(
+                'POST',
+                '/api/v1/auth/resend-verification',
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['email' => 'resend-sent@test.com'])
+            );
+
+            $this->assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+            $limited = json_decode($this->client->getResponse()->getContent(), true);
+            $this->assertSame(4, $limited['remainingAttempts']);
+            $this->assertGreaterThan(0, $limited['waitSeconds']);
+
+            $attempt = $this->em->getRepository(EmailVerificationAttempt::class)->findOneBy(['email' => 'resend-sent@test.com']);
+            $this->assertNotNull($attempt);
+            $this->assertSame(1, $attempt->getAttempts());
+        } finally {
+            $this->restoreEnv('MAILER_DSN', $previous);
+            $this->restoreEnv('EMAIL_VERIFICATION_MAX_ATTEMPTS', $previousMax);
+            $this->restoreEnv('EMAIL_VERIFICATION_COOLDOWN_MINUTES', $previousCooldown);
+        }
+    }
+
+    public function testResendFailureDoesNotSpendTheAllowance(): void
+    {
+        $previous = $_ENV['MAILER_DSN'] ?? null;
+        $_ENV['MAILER_DSN'] = 'smtp://127.0.0.1:1025';
+        $this->client->disableReboot();
+        $mail = $this->createStub(InternalEmailService::class);
+        $mail->method('sendVerificationEmail')->willThrowException(new \RuntimeException('smtp down'));
+        static::getContainer()->set(InternalEmailService::class, $mail);
+
+        try {
+            $this->createUnverifiedUser('resend-failed@test.com');
+
+            for ($i = 0; $i < 2; ++$i) {
+                $this->client->request(
+                    'POST',
+                    '/api/v1/auth/resend-verification',
+                    [],
+                    [],
+                    ['CONTENT_TYPE' => 'application/json'],
+                    json_encode(['email' => 'resend-failed@test.com'])
+                );
+
+                $this->assertResponseStatusCodeSame(Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $this->assertNull($this->em->getRepository(EmailVerificationAttempt::class)->findOneBy(['email' => 'resend-failed@test.com']));
+        } finally {
+            $this->restoreEnv('MAILER_DSN', $previous);
+        }
+    }
+
+    private function restoreEnv(string $name, ?string $value): void
+    {
+        if (null === $value) {
+            unset($_ENV[$name]);
+        } else {
+            $_ENV[$name] = $value;
+        }
+    }
+
+    private function createUnverifiedUser(string $email): User
+    {
+        $user = new User();
+        $user->setMail($email);
+        $user->setPw(password_hash('SecurePass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('NEW');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(false);
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $user;
     }
 
     private function cookieNamed(string $name): ?Cookie
