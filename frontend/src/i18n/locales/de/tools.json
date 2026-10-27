@@ -38,6 +38,13 @@
       "actions": "Aktionen"
     },
     "disconnect": "Trennen",
+    "turnOff": "Ausschalten",
+    "turnOffTitle": "Synaplan für diese Cloud ausschalten?",
+    "turnOffConfirm": "Synaplan für {host} ausschalten? Die Cloud kann dein Konto nicht nutzen, bis du es wieder einschaltest.",
+    "turnedOff": "Synaplan ist für diese Cloud ausgeschaltet.",
+    "resume": "Wieder einschalten",
+    "resumed": "Synaplan ist für diese Cloud wieder an.",
+    "managed": "Eine Administratorin oder ein Administrator hat diese Verbindung angelegt. Bitte dort ausschalten lassen.",
     "disconnectTitle": "Diese Plattform trennen?",
     "disconnectConfirm": "{host} trennen? Diese Plattform kann das Konto dann nicht mehr nutzen.",
     "disconnected": "Plattform getrennt.",

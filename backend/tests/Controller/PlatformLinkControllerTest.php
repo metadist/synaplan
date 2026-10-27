@@ -359,6 +359,38 @@ final class PlatformLinkControllerTest extends WebTestCase
         self::assertSame([], $this->json()['links']);
     }
 
+    public function testDisconnectKeepsTheRowAndConnectingAgainResumesIt(): void
+    {
+        $this->enableFlag();
+        $admin = $this->createUser('pl-keep-admin@synaplan.internal', 'ADMIN');
+        $person = $this->createUser('pl-keep-person@synaplan.internal', 'PRO');
+
+        $this->authenticateClient($this->client, $admin);
+        $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));
+        $instance = $this->json();
+        $link = $this->link($instance, $person, 'ada', 'nonce-keep-1');
+
+        $this->authenticateClient($this->client, $person);
+        $this->client->request('DELETE', '/api/v1/me/platform-links/'.$link['link_id']);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $this->em->clear();
+        $row = $this->em->find(ExternalIdentity::class, $link['link_id']);
+        self::assertInstanceOf(ExternalIdentity::class, $row);
+        self::assertSame(ExternalIdentity::STATUS_REVOKED, $row->getStatus());
+        self::assertInstanceOf(User::class, $this->em->find(User::class, $person->getId()));
+
+        $this->link($instance, $person, 'ada', 'nonce-keep-2');
+        $this->em->clear();
+        $again = $this->em->find(ExternalIdentity::class, $link['link_id']);
+        self::assertInstanceOf(ExternalIdentity::class, $again);
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $again->getStatus());
+        $this->authenticateClient($this->client, $person);
+        $this->client->request('GET', '/api/v1/me/platform-links');
+        self::assertCount(1, $this->json()['links']);
+        self::assertSame('link', $this->json()['links'][0]['mode']);
+        self::assertSame('active', $this->json()['links'][0]['status']);
+    }
+
     /**
      * Issues a link code as $user and exchanges it as the instance.
      *

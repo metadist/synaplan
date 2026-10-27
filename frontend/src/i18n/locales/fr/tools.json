@@ -38,6 +38,13 @@
       "actions": "Actions"
     },
     "disconnect": "Déconnecter",
+    "turnOff": "Désactiver",
+    "turnOffTitle": "Désactiver Synaplan pour ce cloud ?",
+    "turnOffConfirm": "Désactiver Synaplan pour {host} ? Le cloud ne pourra plus utiliser votre compte tant que vous ne le réactivez pas.",
+    "turnedOff": "Synaplan est désactivé pour ce cloud.",
+    "resume": "Réactiver",
+    "resumed": "Synaplan est de nouveau actif pour ce cloud.",
+    "managed": "Un administrateur a créé cette connexion. Demandez-lui de la désactiver.",
     "disconnectTitle": "Déconnecter cette plateforme ?",
     "disconnectConfirm": "Déconnecter {host} ? Cette plateforme ne pourra plus utiliser ce compte.",
     "disconnected": "Plateforme déconnectée.",

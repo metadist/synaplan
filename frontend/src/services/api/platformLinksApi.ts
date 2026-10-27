@@ -90,6 +90,20 @@ export const platformLinksApi = {
     })
   },
 
+  async turnOff(id: number): Promise<void> {
+    await httpClient(`/api/v1/me/platform-links/${id}/turn-off`, {
+      method: 'POST',
+      schema: DisconnectMyPlatformLinkResponseSchema,
+    })
+  },
+
+  async resume(id: number): Promise<void> {
+    await httpClient(`/api/v1/me/platform-links/${id}/resume`, {
+      method: 'POST',
+      schema: DisconnectMyPlatformLinkResponseSchema,
+    })
+  },
+
   async listAdminInstances(): Promise<AdminPlatformInstance[]> {
     const data = await httpClient('/api/v1/admin/platform-links/instances', {
       method: 'GET',
