@@ -40,7 +40,7 @@ final readonly class ResearchRunService
     {
         $request = ResearchRequest::fromBody($body, $session, $user, $this->chats);
 
-        return $this->open($user, $request, $this->idempotencyKey($idempotencyKey), null);
+        return $this->open($user, $request, $this->idempotencyKey($idempotencyKey), null, null);
     }
 
     public function state(User $user, string $runId): ResearchRunState
@@ -131,27 +131,39 @@ final readonly class ResearchRunService
     /**
      * @param array<string, mixed> $body
      */
-    public function followUp(User $user, string $runId, array $body): ResearchRunState
+    public function followUp(User $user, string $runId, array $body, ?string $idempotencyKey = null): ResearchRunState
     {
         $state = $this->owned($user, $runId);
         $type = is_string($body['type'] ?? null) ? $body['type'] : '';
-        if (!in_array($type, ['question', 'revise', 'deeper', 'refresh'], true)) {
+        if (!in_array($type, ResearchFollowUp::KINDS, true)) {
             throw new ResearchRejected(400, 'invalid', 'type', 'Choose a follow-up: a question, a revision, a deeper look, or a refresh.');
         }
         $text = trim(is_string($body['text'] ?? null) ? $body['text'] : '');
-        if ('refresh' !== $type && '' === $text) {
+        if (ResearchFollowUp::QUESTION === $type && '' === $text) {
+            throw new ResearchRejected(400, 'invalid', 'text', 'Write your question.');
+        }
+        if (ResearchFollowUp::REVISE === $type && '' === $text) {
             throw new ResearchRejected(400, 'invalid', 'text', 'Write what should change.');
         }
-        $question = 'refresh' === $type ? $state->ref->question : $text;
-        if (mb_strlen($question) > ResearchRequest::MAX_QUESTION) {
+        if (mb_strlen($text) > ResearchRequest::MAX_QUESTION) {
             throw new ResearchRejected(400, 'invalid', 'text', 'That follow-up needs 4000 characters or fewer.');
         }
+        if (!$state->status->isTerminal()) {
+            throw new ResearchRejected(409, 'conflict', 'type', 'Wait until this research finishes. Then you can ask a follow-up.');
+        }
+        if (ResearchFollowUp::REVISE === $type && null === $state->ledger->report()) {
+            throw new ResearchRejected(409, 'conflict', 'type', 'This research has no report to revise. Ask a question or look deeper instead.');
+        }
+        $key = $this->idempotencyKey($idempotencyKey);
+        $plan = ResearchFollowUp::prepare($state, $type, $text);
+        $question = ResearchFollowUp::QUESTION === $type ? $text : $state->ref->question;
 
         return $this->open(
             $user,
-            new ResearchRequest($question, $state->ref->depth, $state->ref->chatId),
-            null,
+            new ResearchRequest($question, $plan->depth, $state->ref->chatId),
+            $key,
             $state->ref->id,
+            $plan,
         );
     }
 
@@ -180,7 +192,7 @@ final readonly class ResearchRunService
         return $saved;
     }
 
-    private function open(User $user, ResearchRequest $request, ?string $idempotencyKey, ?string $parent): ResearchRunState
+    private function open(User $user, ResearchRequest $request, ?string $idempotencyKey, ?string $parent, ?ResearchFollowUp $plan): ResearchRunState
     {
         $userId = $user->getId() ?? 0;
         if (null !== $idempotencyKey) {
@@ -191,14 +203,29 @@ final readonly class ResearchRunService
         }
         $this->guardLimits($userId, $request->depth);
         $now = $this->clock->now();
-        $budget = ResearchBudget::for($request->depth, ResearchBudgetConfig::defaults($request->depth), $now);
+        $limits = ResearchBudgetConfig::defaults($request->depth);
+        if (null !== $plan?->searchCap) {
+            $limits = $limits->withSearches($plan->searchCap);
+        }
+        $budget = ResearchBudget::for($request->depth, $limits, $now);
         $budget->at($now);
         $state = ResearchRunState::open(
             ResearchRunRef::start($userId, $request->depth, $request->question, $request->chatId, $now),
             $budget,
+            $plan?->ledger,
         );
         $state->parent = $parent;
         $state->idempotencyKey = $idempotencyKey;
+        $unit = ResearchUnitPlan::BRIEF_PLAN;
+        if (null !== $plan) {
+            $state->followUp = $plan->kind;
+            $state->instruction = $plan->instruction;
+            $state->priorReport = $plan->priorReport;
+            $unit = $plan->unit;
+            if (ResearchStatus::Briefing !== $plan->status) {
+                $state->advance($plan->status);
+            }
+        }
         $this->store->save($state);
         if (null !== $idempotencyKey) {
             $winner = $this->store->claimIdempotency($userId, $idempotencyKey, $state->ref->id);
@@ -215,7 +242,7 @@ final readonly class ResearchRunService
             'depth' => $request->depth->value,
             'research_protocol' => ResearchCapabilities::PROTOCOL,
         ]);
-        $this->bus->dispatch($state->ref->id, ResearchUnitPlan::BRIEF_PLAN, $state->expectedSeq, 0);
+        $this->bus->dispatch($state->ref->id, $unit, $state->expectedSeq, 0);
 
         return $state;
     }

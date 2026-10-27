@@ -21,7 +21,7 @@ chat message.
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
 | RS8 | done | Free check, checker model, and one thorough revision. Seeded draft 6/6 caught, 0/6 false alarms. Smoke 2026-10-26, tool mode: citation precision 79.8 % without the check (RS7 reports) and 96.0 % with it; fact recall unchanged at 0.78 across 9. Exit met on these numbers, judges not calibrated. Owner merged the exit in #2790. Flag stays off |
 | RS9 | in progress | Keyword plus meaning on Qdrant, same owner scopes, palette fusion unchanged. Keyword words weighted by idf and ranked server-side. Research uses files only when files are a switched-on source (today: never). Document cards are not generated. MariaDB stays meaning-only and the vector storage screen says so. Hybrid recall@5 not measured: the fixture corpus is not in the store. Flag stays off |
-| RS10 | planned | Follow-ups and revisions |
+| RS10 | done | Follow-ups reuse the parent sources and continue source, evidence and point numbers. The parent report is kept as the prior report, not copied into the new run. A question is quick and searches once when the findings and the report do not cover it. A revision checks only sentences whose words or citations changed. Deeper is thorough and adds a point per Not confirmed item (up to eight). Refresh reopens sources dated before the time frame. A follow-up on a run that is still going is refused with 409 and a sentence; `Idempotency-Key` works as on start. `stopped_by_admin` keeps the report written so far. Five follow-up rows (`fu-q`, `fu-r`, `fu-d`, `fu-f`, `fu-t`) are in `backend/tests/Eval/research/corpus.json` and are excluded from the fresh-question harness. Scored live 2026-10-27 (`5c10bd764`, Claude Sonnet 5 + gpt-oss-120b): fact recall 1.00 on all five, all `complete`, ids continue. Flag stays off |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
 | RD2 | planned | `ChatView.vue` split (synaplan-desktop) |
 | RD3 | planned | Research mode, progress, result card; J-RQ-2, J-RQ-6 |
@@ -37,6 +37,55 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-27 — RS10 follow-ups scored live
+
+Commit `5c10bd764`. Writer Claude Sonnet 5, sorter and triage gpt-oss-120b (Groq),
+lead mode auto, one local worker. Research was switched on in `BCONFIG` for the run
+and switched off again afterwards. Each parent ran at standard depth through
+`POST /api/v1/research`, then the follow-up through `POST …/followups`. The five
+reports were scored as plain questions:
+
+```bash
+php bin/console app:research:eval --corpus=/tmp/rs10_corpus.json --arm=b1 --import=/tmp/rs10_import.json
+```
+
+`/tmp/rs10_corpus.json` holds the five `fu-*` rows without `follow_up` and `parent`
+(sha256 `9b71522c6c6fa8b5f18ac4afb335b8a511d947b7979c04018b0a73a7e066e6ac`).
+
+| Row | Kind | Parent | Recall | Depth | Searches | Statements backed | Wall s | Cost $ | Sources | New points |
+| --- | ---- | ------ | ------ | ----- | -------- | ----------------- | ------ | ------ | ------- | ---------- |
+| fu-q | question | fact-01 | 1.00 | quick | 0 | 2 / 2 | 184 | 0.0081 | 7 → 7 | 0 |
+| fu-r | revise | reg-01 | 1.00 | standard | 0 | 2 / 2 | 0.1* | 0.0259 | 19 → 19 | 0 |
+| fu-d | deeper | cmp-01 | 1.00 | thorough | 30 | 24 / 32 | 291 | 0.3292 | 6 → 49 | 9 |
+| fu-f | refresh | tech-01 | 1.00 | standard | 6 | 3 / 7 | 226 | 0.0469 | 25 → 26 | 0 |
+| fu-t | revise | reg-02 | 1.00 | standard | 0 | 10 / 14 | 31 | 0.0569 | 15 → 15 | 0 |
+
+\* resumed run; the driver saw it already finished. fu-q's wall time is mostly queue
+wait behind fu-d on the single worker.
+
+Fact recall **1.00** on all five (n = 1 each). Every follow-up ended `complete` with
+an outcome sentence, linked its parent, kept every parent source id and point id,
+and numbered new ones after them. fu-q found its answer in the notes and searched
+nothing. Follow-up costs $0.467 in total, the parents $0.435. `can_add_to_report`
+is true only for fu-q: the others are revise, deeper or refresh, where the new
+report replaces the old one.
+
+Found while reading the reports, fixed in the same PR (`CheckReportTest`):
+
+- fu-f: after the check removed a sentence, a quote fragment (`,"  "It confirms…`)
+  stayed in the report. The split broke after "..." inside a quote; a part that
+  starts with a comma or a small letter now continues the sentence. Not confirmed
+  items lost the space a removed citation left before a comma (`June 2014 ,`).
+- fu-t: the check removed the translated first sentence, and the report started
+  with a space. A removal now takes the space after it, a statement that fills a
+  line takes the line, and a table left with no row is dropped. Translated
+  sentences count as changed and are checked again, which is correct; four of
+  fourteen fell out.
+
+RS10 exit met: tests green, the follow-up rows scored here.
 
 ---
 

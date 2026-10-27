@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Eval;
 
+use App\Service\Research\Run\ResearchFollowUp;
+
 /**
  * Reads the research corpus. A bad row fails the load; it is never skipped.
  */
@@ -26,6 +28,32 @@ final readonly class CorpusLoader
      */
     public function load(string $path, bool $smokeOnly): array
     {
+        $items = [];
+        foreach ($this->split($path)['questions'] as $item) {
+            if ($smokeOnly && !$item->smoke) {
+                continue;
+            }
+            $items[] = $item;
+        }
+
+        return $items;
+    }
+
+    /**
+     * Follow-ups are scored on a finished parent, not as fresh questions.
+     *
+     * @return list<FollowUpCorpusRow>
+     */
+    public function followUps(string $path): array
+    {
+        return $this->split($path)['followUps'];
+    }
+
+    /**
+     * @return array{questions: list<CorpusItem>, followUps: list<FollowUpCorpusRow>}
+     */
+    private function split(string $path): array
+    {
         if (!is_file($path)) {
             throw new \RuntimeException('Corpus file not found: '.$path);
         }
@@ -39,7 +67,8 @@ final readonly class CorpusLoader
             throw new \RuntimeException('Corpus file is not a JSON array.');
         }
 
-        $items = [];
+        $questions = [];
+        $followUps = [];
         $seen = [];
         foreach ($decoded as $row) {
             if (!\is_array($row)) {
@@ -50,13 +79,25 @@ final readonly class CorpusLoader
                 throw new \RuntimeException('Duplicate corpus id: '.$item->id);
             }
             $seen[$item->id] = true;
-            if ($smokeOnly && !$item->smoke) {
+            $kind = $this->followUp($item->id, $row);
+            if (null === $kind) {
+                $questions[] = $item;
                 continue;
             }
-            $items[] = $item;
+            $parent = $row['parent'] ?? null;
+            if (!\is_string($parent) || '' === $parent) {
+                throw new \RuntimeException($item->id.' is a follow-up without a parent.');
+            }
+            $followUps[] = new FollowUpCorpusRow($item->id, $kind, $item->question, $parent, $item->facts);
+        }
+        $parents = array_map(static fn (CorpusItem $item): string => $item->id, $questions);
+        foreach ($followUps as $followUp) {
+            if (!\in_array($followUp->parent, $parents, true)) {
+                throw new \RuntimeException($followUp->id.' continues '.$followUp->parent.', which is not a question in this corpus.');
+            }
         }
 
-        return $items;
+        return ['questions' => $questions, 'followUps' => $followUps];
     }
 
     /**
@@ -157,6 +198,22 @@ final readonly class CorpusLoader
         }
 
         return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function followUp(string $id, array $row): ?string
+    {
+        if (!\array_key_exists('follow_up', $row) || null === $row['follow_up']) {
+            return null;
+        }
+        $kind = $row['follow_up'];
+        if (!\is_string($kind) || !\in_array($kind, ResearchFollowUp::KINDS, true)) {
+            throw new \RuntimeException($id.' has an unknown follow-up.');
+        }
+
+        return $kind;
     }
 
     /**

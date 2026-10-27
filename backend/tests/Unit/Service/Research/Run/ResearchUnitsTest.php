@@ -240,7 +240,33 @@ final class ResearchUnitsTest extends ResearchUnitCase
         self::assertSame(['write'], $units->units);
         self::assertInstanceOf(ResearchOutcome::class, $loaded->outcome);
         self::assertSame(ResearchOutcome::STOPPED_BY_ADMIN, $loaded->outcome->code);
+        self::assertSame('Research was turned off on your Synaplan workspace. What was found so far is kept.', $loaded->outcome->text());
         self::assertSame([], $this->bus->sent);
+    }
+
+    public function testARunStoppedByAnAdminKeepsTheReportWrittenSoFar(): void
+    {
+        $state = $this->openRun();
+        $units = new ScriptedResearchUnits(new StageResult('deliver'), static function (StageContext $ctx): void {
+            $ctx->state->ledger->setReport('The price is 12.');
+        });
+        $worker = new ResearchUnitWorker(
+            $this->store,
+            $units,
+            new FixedResearchContext($this->events, $this->clock->now()),
+            $this->bus,
+            $this->events,
+            $this->researchConfig(false),
+            new SilentResearchReport(),
+        );
+
+        $worker->handle($state->ref->id, 'brief_plan', 1);
+
+        $loaded = $this->store->load($state->ref->id);
+        self::assertInstanceOf(ResearchRunState::class, $loaded);
+        self::assertSame('The price is 12.', $loaded->ledger->report());
+        self::assertNotNull($loaded->outcome);
+        self::assertSame(ResearchOutcome::STOPPED_BY_ADMIN, $loaded->outcome->code);
     }
 
     public function testAFinishedWebRunPostsItsReport(): void
