@@ -31,6 +31,7 @@ final class ScheduledJobs
             'app:voice:reap-sessions',
             'app:process-mail-handlers',
             'app:process-emails',
+            'app:cloud-watches:sweep',
         ],
         self::LANE_TASKS => [
             'app:saved-tasks:tick',

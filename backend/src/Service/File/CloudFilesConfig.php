@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\File;
 
 use App\Repository\ConfigRepository;
+use App\Service\CloudWatch\WatchLimits;
 
 /**
  * Searchable-file state is off until an administrator turns it on.
@@ -16,6 +17,8 @@ final readonly class CloudFilesConfig
 {
     public const GROUP = 'CLOUD_FILES';
     public const ENABLED = 'ENABLED';
+    public const WATCHES_PER_PERSON = 'WATCHES_PER_PERSON';
+    public const WATCHES_PER_INSTANCE = 'WATCHES_PER_INSTANCE';
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -23,6 +26,16 @@ final readonly class CloudFilesConfig
         private string $birdGlyph = '',
         private string $eyesGlyph = '',
     ) {
+    }
+
+    public function watchesPerPerson(): int
+    {
+        return $this->positive(self::WATCHES_PER_PERSON, WatchLimits::DEFAULT_PER_PERSON);
+    }
+
+    public function watchesPerInstance(): int
+    {
+        return $this->positive(self::WATCHES_PER_INSTANCE, WatchLimits::DEFAULT_PER_INSTANCE);
     }
 
     /**
@@ -52,6 +65,17 @@ final readonly class CloudFilesConfig
     private function isOff(string $value): bool
     {
         return in_array(strtolower(trim($value)), ['0', 'false', 'off', 'disabled', 'no'], true);
+    }
+
+    private function positive(string $key, int $default): int
+    {
+        $stored = $this->configRepository->getValue(0, self::GROUP, $key);
+        if (!is_string($stored) || !ctype_digit(trim($stored))) {
+            return $default;
+        }
+        $value = (int) trim($stored);
+
+        return $value > 0 ? $value : $default;
     }
 
     private function isOn(string $value): bool

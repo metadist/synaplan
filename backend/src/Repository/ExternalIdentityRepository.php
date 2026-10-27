@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Entity\ExternalIdentity;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -16,6 +17,27 @@ class ExternalIdentityRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, ExternalIdentity::class);
+    }
+
+    /**
+     * @param callable(ExternalIdentity): void $change
+     */
+    public function modify(int $id, callable $change): ?ExternalIdentity
+    {
+        /** @var ExternalIdentity|null $identity */
+        $identity = $this->getEntityManager()->wrapInTransaction(function () use ($id, $change): ?ExternalIdentity {
+            $identity = $this->find($id, LockMode::PESSIMISTIC_WRITE);
+            if (!$identity instanceof ExternalIdentity) {
+                return null;
+            }
+            $this->getEntityManager()->refresh($identity);
+            $change($identity);
+            $this->getEntityManager()->flush();
+
+            return $identity;
+        });
+
+        return $identity;
     }
 
     public function save(ExternalIdentity $identity, bool $flush = true): void

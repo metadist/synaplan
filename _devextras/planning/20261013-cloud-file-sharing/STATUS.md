@@ -71,7 +71,7 @@ not a chat message.
 | CF4.3 Nextcloud bird, sidebar | `synaplan-nextcloud` | P1 | planned |  |
 | CF4.4 ownCloud.online bird, sidebar | `synaplan-owncloud-online` | P3 | planned |  |
 | CF4.5 OpenCloud sidebar, upstream request | `synaplan-opencloud` | P2 | planned |  |
-| CF5.1 Watch model, ledger, `file_event` | `synaplan` | P1 | planned | Schema ask recorded; folder and file targets; paginated watch index and caps of 20 / 1 000 (row 41); `BEXPIRESAT` (D20) |
+| CF5.1 Watch model, ledger, `file_event` | `synaplan` | P1 | **in review** · [#2825](https://github.com/metadist/synaplan/pull/2825) stacked on #2824 | Folder and file targets; paginated watch index; caps 20 / 1 000; `BEXPIRESAT`; lifecycle pause and stop. Presets beyond keep-searchable and an existing task are CF5.2 |
 | CF5.2 Presets | `synaplan` | P1 | planned |  |
 | CF5.3 Tasks → Watched folders | `synaplan` | P1 | planned |  |
 | CF5.4 Nextcloud watches | `synaplan-nextcloud` | P1 | planned |  |

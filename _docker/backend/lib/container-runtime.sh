@@ -672,6 +672,7 @@ run_scheduler_tick_lane() {
     if [ "$smart_mailbox" = "1" ]; then
         run_scheduler_job 300 bin/console --env="$env" app:process-emails --no-interaction
     fi
+    run_scheduler_job 300 bin/console --env="$env" app:cloud-watches:sweep --no-interaction
 }
 
 # shellcheck disable=SC2317

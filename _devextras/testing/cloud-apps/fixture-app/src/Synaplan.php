@@ -69,7 +69,7 @@ final class Synaplan
      *
      * @return array{status: int, body: array<mixed>}
      */
-    public function upload(string $path, array $fields, string $bytes, string $name, string $mime): array
+    public function upload(string $path, array $fields, string $bytes, string $name, string $mime, array $headers = []): array
     {
         $temp = tempnam(sys_get_temp_dir(), 'fixture');
         if (false === $temp) {
@@ -79,7 +79,7 @@ final class Synaplan
         try {
             [$status, $raw] = $this->send($path, [
                 CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => $this->headers(['Accept: application/json'], []),
+                CURLOPT_HTTPHEADER => $this->headers(['Accept: application/json'], $headers),
                 CURLOPT_POSTFIELDS => $fields + ['file' => new \CURLFile($temp, $mime, $name)],
             ]);
         } finally {

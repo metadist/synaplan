@@ -11,7 +11,7 @@ namespace CloudFixture;
  */
 final class Control
 {
-    private const CAPABILITIES = ['deliveries', 'pickups'];
+    private const CAPABILITIES = ['deliveries', 'pickups', 'watches'];
     private const SCOPE_MODES = ['watched', 'allowed', 'all'];
 
     public function __construct(private readonly Store $store)
@@ -36,6 +36,9 @@ final class Control
             'POST' === $method && 'sso-status' === $route => $this->ssoStatus($body),
             'POST' === $method && 'bind' === $route => $this->bind($body),
             'POST' === $method && 'adopt' === $route => $this->adopt($body),
+            'POST' === $method && 'watch-index' === $route => $this->watchIndex($body),
+            'POST' === $method && 'watch-file' === $route => $this->watchFile($body),
+            'POST' === $method && 'watch-reconcile' === $route => $this->watchReconcile($body),
             'GET' === $method && 'written' === $route => Response::json(200, ['written' => $this->store->written()]),
             'GET' === $method && 'log' === $route => Response::json(200, ['log' => $this->store->logEntries()]),
             'files' === $segments[0] && count($segments) >= 2 => $this->files($method, $segments[1], implode('/', array_slice($segments, 2)), $raw),
@@ -312,5 +315,58 @@ final class Control
             'version' => Profile::version($profile, $raw),
             'size' => strlen($raw),
         ]);
+    }
+
+    /** @param array<mixed> $body */
+    private function watchIndex(array $body): Response
+    {
+        $answer = (new Watches(Synaplan::from($this->store->state())))->index(
+            is_string($body['cursor'] ?? null) ? $body['cursor'] : null,
+            is_string($body['since'] ?? null) ? $body['since'] : null,
+        );
+
+        return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
+    }
+
+    /** @param array<mixed> $body */
+    private function watchFile(array $body): Response
+    {
+        $apiKey = $body['api_key'] ?? null;
+        $watchId = $body['watch_id'] ?? null;
+        $id = $body['id'] ?? null;
+        $version = $body['version'] ?? null;
+        if (!is_string($apiKey) || !is_int($watchId) || !is_string($id) || !is_string($version)) {
+            throw new FixtureException(422, 'bad_watch_file', 'api_key, watch_id, id and version are required.');
+        }
+        $name = is_string($body['name'] ?? null) ? $body['name'] : 'file.bin';
+        $bytes = is_string($body['content'] ?? null) ? $body['content'] : '';
+        $answer = (new Watches(Synaplan::from($this->store->state())))->upload($apiKey, $watchId, [
+            'id' => $id,
+            'version' => $version,
+            'name' => $name,
+            'event' => is_string($body['event'] ?? null) ? $body['event'] : 'created',
+        ], $bytes, $name);
+
+        return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
+    }
+
+    /** @param array<mixed> $body */
+    private function watchReconcile(array $body): Response
+    {
+        $apiKey = $body['api_key'] ?? null;
+        $watchId = $body['watch_id'] ?? null;
+        $items = $body['items'] ?? null;
+        if (!is_string($apiKey) || !is_int($watchId) || !is_array($items)) {
+            throw new FixtureException(422, 'bad_watch_reconcile', 'api_key, watch_id and items are required.');
+        }
+        $rows = [];
+        foreach ($items as $item) {
+            if (is_array($item) && is_string($item['id'] ?? null) && is_string($item['version'] ?? null)) {
+                $rows[] = ['id' => $item['id'], 'version' => $item['version']];
+            }
+        }
+        $answer = (new Watches(Synaplan::from($this->store->state())))->reconcile($apiKey, $watchId, $rows);
+
+        return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
     }
 }

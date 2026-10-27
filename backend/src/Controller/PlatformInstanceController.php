@@ -146,7 +146,7 @@ final class PlatformInstanceController extends AbstractController
         try {
             $result = $this->instanceService->describeSelf($instanceId, $secret);
             if ($this->cloudFiles->isEnabled()) {
-                $result['capabilities'] = [...$result['capabilities'], 'cloud_status', 'source_events'];
+                $result['capabilities'] = [...$result['capabilities'], 'cloud_status', 'source_events', 'watches'];
             }
         } catch (PlatformInstanceNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);

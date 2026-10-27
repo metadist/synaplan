@@ -612,9 +612,8 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
-     * Ephemeral (incognito-session) files older than the given cutoff — the
-     * reaper deletes them from disk and DB as a safety net for sessions the
-     * frontend could not clean up (tab crash, network loss).
+     * Ephemeral files past their deadline. A row with an expiry is removed at
+     * that moment; every other ephemeral file uses the cutoff.
      *
      * @return File[]
      */
@@ -622,7 +621,8 @@ class FileRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('f')
             ->where('f.ephemeral = true')
-            ->andWhere('f.createdAt < :cutoff')
+            ->andWhere('(f.expiresAt IS NOT NULL AND f.expiresAt <= :now) OR (f.expiresAt IS NULL AND f.createdAt < :cutoff)')
+            ->setParameter('now', time())
             ->setParameter('cutoff', $cutoffTimestamp)
             ->orderBy('f.createdAt', 'ASC')
             ->setMaxResults($limit)

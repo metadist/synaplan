@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\FileRepository;
 use App\Repository\UserRepository;
+use App\Service\CloudWatch\WatchTargetFollow;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ final readonly class CloudSourceEvents
         private CloudFileIndexGuard $indexGuard,
         private AuditLogWriter $audit,
         private EntityManagerInterface $entityManager,
+        private WatchTargetFollow $targets,
     ) {
     }
 
@@ -51,7 +53,9 @@ final readonly class CloudSourceEvents
                     $this->files->findCopiesOfRemotes($instance->getClient(), [$event['id']], $instance->getInstanceId()),
                     fn (File $file): bool => $this->belongsTo($file, $instance),
                 ));
-                if ([] === $copies || !$this->applyOne($instance, $event, $copies, $reupload)) {
+                $followed = $this->targets->apply($instance, $event['event'], $event['id'], time());
+                $copiesChanged = [] !== $copies && $this->applyOne($instance, $event, $copies, $reupload);
+                if (!$followed && !$copiesChanged) {
                     ++$ignored;
                     continue;
                 }

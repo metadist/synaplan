@@ -18,6 +18,7 @@ class SavedTask
     public const TRIGGER_SCHEDULE = 'schedule';
     public const TRIGGER_INBOUND_EMAIL = 'inbound_email';
     public const TRIGGER_WEBHOOK = 'webhook';
+    public const TRIGGER_FILE_EVENT = 'file_event';
 
     public const TRIGGER_TYPES = [
         self::TRIGGER_MANUAL,
@@ -25,6 +26,7 @@ class SavedTask
         self::TRIGGER_SCHEDULE,
         self::TRIGGER_INBOUND_EMAIL,
         self::TRIGGER_WEBHOOK,
+        self::TRIGGER_FILE_EVENT,
     ];
 
     public const AUTO_PAUSE_AFTER = 3;

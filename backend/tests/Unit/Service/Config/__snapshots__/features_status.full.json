@@ -253,7 +253,8 @@
                 "plugs": []
             },
             "capabilities": [
-                "cloud_status"
+                "cloud_status",
+                "watches"
             ],
             "docs_anchor": "modules/cloud-files",
             "mobile_class": "backend-only"
