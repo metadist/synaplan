@@ -66,8 +66,8 @@ not a chat message.
 | CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | P1 | **in review** · [synaplan-nextcloud#75](https://github.com/metadist/synaplan-nextcloud/pull/75) | Walk 2026-10-24 below |
 | CF3.9 ownCloud.online pickup handler, read setting | `synaplan-owncloud-online` | P3 | planned | After CF-S4 |
 | CF3.10 OpenCloud pickup handler, read setting | `synaplan-opencloud` | P2 | planned | After CF-S1, CF-S3 |
-| CF4.1 Status, file detail, source events, re-upload | `synaplan` | P1 | **in review** | Stacked on #2817. `cloud_files` default off; `BSOURCEDELETEDAT`, `BKEEPSYNCED`; status, detail, source events, 7-day reaper |
-| CF4.2 Glyph kit | `synaplan` | P1 | planned | drafted by the agent, approved by the product owner |
+| CF4.1 Status, file detail, source events, re-upload | `synaplan` | P1 | **in review** · [#2820](https://github.com/metadist/synaplan/pull/2820) | Stacked on main after #2817 merged. `cloud_files` default off; `BSOURCEDELETEDAT`, `BKEEPSYNCED`; status, detail, source events, 7-day reaper |
+| CF4.2 Glyph kit | `synaplan` | P1 | **in review** · stacked on #2820 | Bird, bird with eyes, five badges. Library pill uses them. `cloud_files.glyphs` override when the module is on. Product owner approves the shapes in the PR |
 | CF4.3 Nextcloud bird, sidebar | `synaplan-nextcloud` | P1 | planned |  |
 | CF4.4 ownCloud.online bird, sidebar | `synaplan-owncloud-online` | P3 | planned |  |
 | CF4.5 OpenCloud sidebar, upstream request | `synaplan-opencloud` | P2 | planned |  |

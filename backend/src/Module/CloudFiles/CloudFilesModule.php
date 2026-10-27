@@ -38,7 +38,7 @@ final class CloudFilesModule implements FeatureModuleInterface
     public function configuredBy(): ConfiguredBy
     {
         return new ConfiguredBy(
-            envKeys: ['CLOUD_FILES_ENABLED'],
+            envKeys: ['CLOUD_FILES_ENABLED', 'CLOUD_FILES_GLYPH_BIRD', 'CLOUD_FILES_GLYPH_EYES'],
             bconfigKeys: [CloudFilesConfig::GROUP.'.'.CloudFilesConfig::ENABLED],
         );
     }

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Module;
 
 use App\Bundle\BundleConfig;
+use App\Module\CloudFiles\CloudFilesModule;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Config\Runtime\RuntimeConfigContext;
 use App\Service\Config\Runtime\RuntimeConfigContributorInterface;
+use App\Service\File\CloudFilesConfig;
 use App\Service\Plugin\PluginManager;
 
 /**
@@ -27,6 +29,7 @@ final readonly class ModulesRuntimeConfig implements RuntimeConfigContributorInt
         private PluginManager $pluginManager,
         private ?ComputeConfig $computeConfig = null,
         private ?BundleConfig $bundleConfig = null,
+        private ?CloudFilesConfig $cloudFiles = null,
     ) {
     }
 
@@ -47,8 +50,7 @@ final readonly class ModulesRuntimeConfig implements RuntimeConfigContributorInt
         }
 
         $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
-
-        return [
+        $payload = [
             'voiceLive' => [
                 'enabled' => $this->modules->get(LiveVoiceModule::ID)->isConfigured(),
             ],
@@ -71,11 +73,26 @@ final readonly class ModulesRuntimeConfig implements RuntimeConfigContributorInt
                 'computeWorkspacesEnabled' => null !== $this->computeConfig && $this->computeConfig->workspacesEnabled($user?->getId()),
             ],
         ];
+        $cloudFiles = $this->cloudFilesBlock();
+        if (null !== $cloudFiles) {
+            $payload['cloud_files'] = $cloudFiles;
+        }
+
+        return $payload;
     }
 
     /**
-     * @return array<string, array{configured: bool, gated: bool}>
+     * @return array{glyphs: array{bird: string|null, bird_eyes: string|null}}|null
      */
+    private function cloudFilesBlock(): ?array
+    {
+        if (!$this->modules->get(CloudFilesModule::ID)->isConfigured() || null === $this->cloudFiles) {
+            return null;
+        }
+
+        return ['glyphs' => $this->cloudFiles->glyphs()];
+    }
+
     private function moduleStates(): array
     {
         $states = [];

@@ -214,6 +214,8 @@ parameters:
     env(RESEARCH_ENABLED): ''
     # Searchable state for cloud files. Empty = off. Set to 1 to pin it on.
     env(CLOUD_FILES_ENABLED): ''
+    env(CLOUD_FILES_GLYPH_BIRD): ''
+    env(CLOUD_FILES_GLYPH_EYES): ''
     # Synaplan Demo server. Empty = module absent; the switch is FREEAPI.ENABLED.
     env(FREEAPI_BASE_URL): ''
     # Set by CI runners; keeps automated runs away from real third-party servers.
@@ -1347,6 +1349,8 @@ services:
     App\Service\File\CloudFilesConfig:
         arguments:
             $envValue: '%env(CLOUD_FILES_ENABLED)%'
+            $birdGlyph: '%env(CLOUD_FILES_GLYPH_BIRD)%'
+            $eyesGlyph: '%env(CLOUD_FILES_GLYPH_EYES)%'
 
     App\Service\FreeApi\FreeApiConfig:
         arguments:
