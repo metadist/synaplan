@@ -119,7 +119,7 @@
         <p v-if="sampleSentence" class="text-sm txt-primary mt-3" data-testid="research-admin-sample-result">{{ sampleSentence }}</p>
         <label class="mt-4 flex items-start gap-2 text-sm txt-secondary">
           <input v-model="sampleReady" type="checkbox" data-testid="research-admin-sample-confirm" />
-          <span>{{ t('adminSetup.research.sampleConfirm', { amount: form.budgets.quick.costCap }) }}</span>
+          <span>{{ t('adminSetup.research.sampleConfirm', { amount: storedQuickCap }) }}</span>
         </label>
         <button
           type="button"
@@ -145,6 +145,7 @@ import {
   startResearchSample,
   type ResearchAdmin,
 } from '@/services/api/researchAdminApi'
+import { ApiError } from '@/services/api/httpClient'
 
 const { t } = useI18n()
 const depths = ['quick', 'standard', 'thorough'] as const
@@ -159,6 +160,15 @@ const sampleSentence = ref('')
 const form = ref<ResearchAdmin | null>(null)
 const reading = ref('')
 const checking = ref('')
+const storedQuickCap = ref(0)
+
+function errorSentence(error: unknown): string {
+  const nested = error instanceof ApiError ? error.details?.error : undefined
+  if (nested && typeof nested === 'object' && 'message' in nested && typeof nested.message === 'string') {
+    return nested.message
+  }
+  return error instanceof Error ? error.message : t('adminSetup.research.saveFailed')
+}
 
 function modelLabel(model: ResearchAdmin['models'][number]): string {
   if (model.available) return model.name
@@ -171,6 +181,7 @@ function modelLabel(model: ResearchAdmin['models'][number]): string {
 
 function apply(next: ResearchAdmin): void {
   form.value = next
+  storedQuickCap.value = next.budgets.quick.costCap
   reading.value = next.readingModelId ? String(next.readingModelId) : ''
   checking.value = next.checkingModelId ? String(next.checkingModelId) : ''
   sampleSentence.value = next.sample?.sentence ?? sampleSentence.value
@@ -193,7 +204,7 @@ async function setEnabled(enabled: boolean): Promise<void> {
   try {
     apply(await saveResearchAdmin({ enabled }))
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('adminSetup.research.saveFailed')
+    saveError.value = errorSentence(error)
   }
 }
 
@@ -213,7 +224,7 @@ async function save(): Promise<void> {
     )
     saved.value = true
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('adminSetup.research.saveFailed')
+    saveError.value = errorSentence(error)
   } finally {
     saving.value = false
   }
@@ -227,7 +238,7 @@ async function sample(): Promise<void> {
     sampleSentence.value = started.sentence
     sampleReady.value = false
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('adminSetup.research.saveFailed')
+    saveError.value = errorSentence(error)
   } finally {
     sampling.value = false
   }
