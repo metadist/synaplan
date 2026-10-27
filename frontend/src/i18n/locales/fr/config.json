@@ -939,6 +939,7 @@
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "addressUnverified": "Confirmez d’abord votre adresse e-mail : ouvrez le lien que nous vous avons envoyé, puis créez la clé.",
+      "sessionEnded": "Cette connexion s’est terminée lorsque l’adresse e-mail a été confirmée. Reconnectez-vous, puis créez la clé.",
       "planRequired": "Les clés API font partie d'une offre payante.",
       "seePlans": "Voir les offres",
       "scopes": {

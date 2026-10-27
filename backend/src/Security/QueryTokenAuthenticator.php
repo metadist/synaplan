@@ -52,6 +52,8 @@ class QueryTokenAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('Token missing user ID');
         }
 
+        $this->tokenService->noteAccessToken($request, $payload);
+
         return new SelfValidatingPassport(
             new UserBadge((string) $payload['user_id'], function (string $userIdentifier) {
                 $user = $this->userRepository->find((int) $userIdentifier);

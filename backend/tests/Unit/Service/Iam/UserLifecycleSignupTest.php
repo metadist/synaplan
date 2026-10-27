@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\TokenService;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -47,6 +48,7 @@ final class UserLifecycleSignupTest extends TestCase
             new NullLogger(),
             $admission,
             $users,
+            $this->createStub(TokenService::class),
         );
 
         self::assertNull($service->createSignup('known@example.com', 'secret', [], 'PRO', null, '203.0.113.9'));
@@ -61,6 +63,7 @@ final class UserLifecycleSignupTest extends TestCase
             new NullLogger(),
             $admission,
             $users,
+            $this->createStub(TokenService::class),
         );
     }
 }

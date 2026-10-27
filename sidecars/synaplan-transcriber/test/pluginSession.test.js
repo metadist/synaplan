@@ -668,3 +668,32 @@ test('while a cut waits for a busy speech server, further packets do not queue m
   assert.deepEqual(plugin.calls.windows.map((call) => [call.seq, call.cut]), [[1, 'hard'], [2, 'hard']])
   assert.ok(plugin.calls.windows.every((call) => call.ms >= 500), 'no tiny windows from queued cuts')
 })
+
+test('a slow speech server does not merge the waiting audio into a window past 30 s', async () => {
+  const time = clock()
+  const plugin = fakePlugin()
+  let releaseFirst
+  const first = new Promise((resolve) => { releaseFirst = resolve })
+  let calls = 0
+  plugin.window = async (ref, fields) => {
+    plugin.calls.windows.push({ seq: fields.seq, ms: fields.t1Ms - fields.t0Ms, cut: fields.cut })
+    calls += 1
+    if (calls === 1) {
+      await first
+    }
+    return { ended: false, text: 'Synaplan', dropped: null }
+  }
+  const session = liveSession(plugin, time, { commitAfterMs: 8000, previewEveryMs: 0 })
+
+  await talk(session, 'ada-1', 35, time, () => {})
+  releaseFirst()
+  await session.settle()
+  await session.finish(() => {})
+
+  const windows = plugin.calls.windows
+  assert.ok(windows.length >= 4, `expected several windows, got ${windows.length}`)
+  assert.ok(windows.every((call) => call.ms <= 8000), `a window was longer than the commit: ${windows.map((call) => call.ms).join(',')}`)
+  assert.ok(windows.every((call) => call.ms <= 30_000))
+  const covered = windows.reduce((sum, call) => sum + call.ms, 0)
+  assert.ok(covered >= 34_000, `only ${covered} ms of 35 s was sent`)
+})

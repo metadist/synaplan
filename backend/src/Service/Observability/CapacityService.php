@@ -10,8 +10,8 @@ use App\Service\Infrastructure\RedisService;
 /**
  * Reads what every server's watchdog wrote to Redis (architecture update,
  * contracts §6 and §6.1): the live snapshot `capacity:server:{id}` and the
- * seen-list `capacity:seen`, which keeps a server on the page after its
- * snapshot expired. No request reads another server; Redis is the only
+ * seen-list `capacity:seen`, which keeps a server on the page for an hour
+ * after its snapshot expired. No request reads another server; Redis is the only
  * source, and one short request builds the whole report.
  *
  * @phpstan-type Pool array{total: int, busy: int}
@@ -36,6 +36,13 @@ final readonly class CapacityService
 
     /** A server whose last report is older than this is listed as not reporting. */
     private const REPORTING_WINDOW_SECONDS = 20;
+
+    /**
+     * A silent server stays on the page this long, then drops off. Matches
+     * the watchdog's SeenTTL. The page applies it itself so a report written
+     * under an older, longer TTL still disappears after an hour.
+     */
+    private const LISTED_WINDOW_SECONDS = 3600;
 
     public function __construct(
         private RedisService $redis,
@@ -74,17 +81,17 @@ final readonly class CapacityService
     }
 
     /**
-     * Null when neither the live snapshot nor the last report exists: the
-     * seen-list field outlived its report (the hash is refreshed by every
-     * server, a dead server's report expires after a week), so the id alone
-     * would be a card with nothing on it.
+     * Null when neither the live snapshot nor the last report exists, or the
+     * last report is older than an hour. The seen-list hash is refreshed by
+     * every live server, so a dead server's field outlives its report and
+     * the id alone would be a card with nothing on it.
      *
      * @return Server|null
      */
     private function server(string $id, string $lastSeenAt, \DateTimeImmutable $now): ?array
     {
         // The live snapshot expires after 20 seconds; the last report keeps a
-        // silent server's role, machine and log source for a week.
+        // silent server's role, machine and log source for an hour.
         $live = $this->redis->get(self::SNAPSHOT_PREFIX.$id);
         $raw = $live ?? $this->redis->get(self::LAST_PREFIX.$id);
         if (null === $raw) {
@@ -92,6 +99,9 @@ final readonly class CapacityService
         }
         $snapshot = $this->decode($raw);
         $updatedAt = $this->str($snapshot['updated_at'] ?? null) ?? $lastSeenAt;
+        if (null === $live && !$this->reportedWithin($lastSeenAt, $now) && !$this->reportedWithin($updatedAt, $now)) {
+            return null;
+        }
         $reporting = null !== $live && $this->isFresh($updatedAt, $now);
 
         return [
@@ -179,13 +189,27 @@ final readonly class CapacityService
 
     private function isFresh(string $updatedAt, \DateTimeImmutable $now): bool
     {
+        $age = $this->ageSeconds($updatedAt, $now);
+
+        return null !== $age && $age <= self::REPORTING_WINDOW_SECONDS;
+    }
+
+    private function reportedWithin(string $at, \DateTimeImmutable $now): bool
+    {
+        $age = $this->ageSeconds($at, $now);
+
+        return null !== $age && $age <= self::LISTED_WINDOW_SECONDS;
+    }
+
+    private function ageSeconds(string $at, \DateTimeImmutable $now): ?int
+    {
         try {
-            $at = new \DateTimeImmutable($updatedAt);
+            $then = new \DateTimeImmutable($at);
         } catch (\Exception) {
-            return false;
+            return null;
         }
 
-        return $now->getTimestamp() - $at->getTimestamp() <= self::REPORTING_WINDOW_SECONDS;
+        return $now->getTimestamp() - $then->getTimestamp();
     }
 
     /**

@@ -35,15 +35,16 @@ final class CapacityServiceTest extends TestCase
     public function testALiveSnapshotAndASilentServerAreBothListed(): void
     {
         $fresh = (new \DateTimeImmutable())->format('Y-m-d\TH:i:s\Z');
+        $silentAt = $this->minutesAgo(10);
         $redis = $this->createStub(RedisService::class);
         $redis->method('hGetAll')->willReturn([
             'web2' => $fresh,
-            'web1' => '2026-10-24T18:00:00Z',
+            'web1' => $silentAt,
         ]);
         $today = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Ymd');
         $redis->method('get')->willReturnCallback(static fn (string $key): ?string => match ($key) {
             'capacity:peak:web2:'.$today => json_encode(['day' => $today, 'streams_busy_max' => 14, 'streams_total' => 16, 'at' => '2026-10-24T11:40:05Z'], JSON_THROW_ON_ERROR),
-            'capacity:last:web1' => json_encode(['server_id' => 'web1', 'role' => 'web', 'updated_at' => '2026-10-24T18:00:00Z'], JSON_THROW_ON_ERROR),
+            'capacity:last:web1' => json_encode(['server_id' => 'web1', 'role' => 'web', 'updated_at' => $silentAt], JSON_THROW_ON_ERROR),
             'capacity:server:web2' => json_encode([
                 'server_id' => 'web2',
                 'hostname' => '79e4f90bc8c6',
@@ -75,8 +76,8 @@ final class CapacityServiceTest extends TestCase
 
         $silent = $report['servers'][0];
         self::assertFalse($silent['reporting']);
-        self::assertSame('2026-10-24T18:00:00Z', $silent['last_seen_at']);
-        self::assertSame('2026-10-24T18:00:00Z', $silent['updated_at']);
+        self::assertSame($silentAt, $silent['last_seen_at']);
+        self::assertSame($silentAt, $silent['updated_at']);
         self::assertSame(['total' => 0, 'busy' => 0], $silent['streams']);
 
         $live = $report['servers'][1];
@@ -111,11 +112,12 @@ final class CapacityServiceTest extends TestCase
 
     public function testASilentServerKeepsItsIdentityFromTheLastReport(): void
     {
+        $silentAt = $this->minutesAgo(10);
         $redis = $this->createStub(RedisService::class);
-        $redis->method('hGetAll')->willReturn(['web1-worker' => '2026-10-24T18:00:00Z']);
+        $redis->method('hGetAll')->willReturn(['web1-worker' => $silentAt]);
         $redis->method('get')->willReturnCallback(static fn (string $key): ?string => match ($key) {
             'capacity:last:web1-worker' => json_encode([
-                'updated_at' => '2026-10-24T18:00:00Z',
+                'updated_at' => $silentAt,
                 'role' => 'worker',
                 'hostname' => 'a1b2c3',
                 'place' => ['host' => 'synweb100'],
@@ -134,10 +136,11 @@ final class CapacityServiceTest extends TestCase
 
     public function testANumericServerIdStaysAString(): void
     {
+        $silentAt = $this->minutesAgo(10);
         $redis = $this->createStub(RedisService::class);
-        $redis->method('hGetAll')->willReturn(['42' => '2026-10-24T18:00:00Z']);
+        $redis->method('hGetAll')->willReturn(['42' => $silentAt]);
         $redis->method('get')->willReturnCallback(static fn (string $key): ?string => 'capacity:last:42' === $key
-            ? json_encode(['server_id' => '42', 'updated_at' => '2026-10-24T18:00:00Z'], JSON_THROW_ON_ERROR)
+            ? json_encode(['server_id' => '42', 'updated_at' => $silentAt], JSON_THROW_ON_ERROR)
             : null);
 
         $report = (new CapacityService($redis, new ServerIdentity('42')))->report();
@@ -157,5 +160,26 @@ final class CapacityServiceTest extends TestCase
         $report = (new CapacityService($redis, new ServerIdentity('web1')))->report();
 
         self::assertSame(['web1'], array_column($report['servers'], 'id'), 'an id whose report expired is not a card');
+    }
+
+    public function testAServerSilentForMoreThanAnHourIsNotListed(): void
+    {
+        $recent = $this->minutesAgo(10);
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('hGetAll')->willReturn(['gone' => '2026-10-24T18:00:00Z', 'web1' => $recent]);
+        $redis->method('get')->willReturnCallback(static fn (string $key): ?string => match ($key) {
+            'capacity:last:gone' => json_encode(['server_id' => 'gone', 'role' => 'web', 'updated_at' => '2026-10-24T18:00:00Z'], JSON_THROW_ON_ERROR),
+            'capacity:last:web1' => json_encode(['server_id' => 'web1', 'role' => 'web', 'updated_at' => $recent], JSON_THROW_ON_ERROR),
+            default => null,
+        });
+
+        $report = (new CapacityService($redis, new ServerIdentity('web1')))->report();
+
+        self::assertSame(['web1'], array_column($report['servers'], 'id'));
+    }
+
+    private function minutesAgo(int $minutes): string
+    {
+        return (new \DateTimeImmutable('-'.$minutes.' minutes', new \DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
     }
 }

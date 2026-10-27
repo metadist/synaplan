@@ -51,6 +51,8 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         '/api/v1/checkout/claim',
         '/api/v1/auth/email-link',
         '/api/v1/auth/email-link/consume',
+        '/api/v1/auth/code-signup',
+        '/api/v1/auth/code-signup/consume',
     ];
 
     private const ACCESS_COOKIE_AUTH_PATHS = [
@@ -175,6 +177,8 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         if (!$userId) {
             throw new CustomUserMessageAuthenticationException('Invalid token payload');
         }
+
+        $this->tokenService->noteAccessToken($request, $payload);
 
         return new SelfValidatingPassport(
             new UserBadge((string) $userId, function (string $userIdentifier) {

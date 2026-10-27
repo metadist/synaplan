@@ -583,7 +583,9 @@ const createAPIKey = async () => {
     error.value =
       err instanceof ApiError && err.code === 'API_ADDRESS_UNVERIFIED'
         ? t('config.apiKeys.addressUnverified')
-        : getErrorMessage(err) || t('config.apiKeys.errorCreating')
+        : err instanceof ApiError && err.code === 'API_SESSION_ENDED'
+          ? t('config.apiKeys.sessionEnded')
+          : getErrorMessage(err) || t('config.apiKeys.errorCreating')
     showError(error.value!)
   } finally {
     creating.value = false

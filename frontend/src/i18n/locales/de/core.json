@@ -46,6 +46,8 @@
     "login": "Anmelden",
     "register": "Registrieren",
     "forgotPassword": "Passwort vergessen",
+    "codeSignup": "Einladungscode",
+    "loginLink": "Anmelden",
     "resetPassword": "Passwort zurücksetzen",
     "changePassword": "Passwort ändern",
     "verifyEmail": "E-Mail bestätigen",
@@ -107,7 +109,9 @@
     "apps": "Apps",
     "appsConnected": "Verbundene Apps",
     "appDetail": "App",
-    "adminUsage": "Kostenübersicht"
+    "adminUsage": "Kostenübersicht",
+    "start": "Start",
+    "welcome": "Willkommen"
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",

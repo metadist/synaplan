@@ -74,6 +74,68 @@ final class ApiKeyPlanTest extends WebTestCase
         self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testATokenIssuedBeforeTheMailboxProofCannotCreateAKey(): void
+    {
+        $user = $this->user('api-plan-stale-token@synaplan.internal', 'PRO');
+        $this->authenticateClient($this->client, $user);
+        $user->recordMailboxProof(time() + 30);
+        $this->em->flush();
+
+        $this->post('/api/v1/apikeys', ['name' => 'Bot']);
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertSame(ApiKeyPlanRequiredException::CODE_SESSION_ENDED, $this->json()['code']);
+        self::assertSame([], $this->em->getRepository(ApiKey::class)->findBy(['ownerId' => $user->getId()]));
+
+        $user->recordMailboxProof(time() - 5);
+        $this->em->flush();
+        $this->authenticateClient($this->client, $user);
+        $this->post('/api/v1/apikeys', ['name' => 'Bot']);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testAQueryTokenFromBeforeTheProofCannotCreateAKey(): void
+    {
+        $user = $this->user('api-plan-query-token@synaplan.internal', 'PRO');
+        $token = $this->authenticateClient($this->client, $user);
+        $user->recordMailboxProof();
+        $this->em->flush();
+        $this->client->getCookieJar()->clear();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/apikeys?token='.rawurlencode($token),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: (string) json_encode(['name' => 'Bot']),
+        );
+
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertSame(ApiKeyPlanRequiredException::CODE_SESSION_ENDED, $this->json()['code']);
+    }
+
+    public function testExchangingTheTokenDoesNotStepPastTheProof(): void
+    {
+        $user = $this->user('api-plan-exchange@synaplan.internal', 'PRO');
+        $this->authenticateClient($this->client, $user);
+        $user->recordMailboxProof();
+        $this->em->flush();
+
+        $this->client->request('GET', '/api/v1/auth/token');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $exchanged = $this->json()['token'] ?? '';
+        self::assertIsString($exchanged);
+        $this->client->getCookieJar()->clear();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/apikeys?token='.rawurlencode($exchanged),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: (string) json_encode(['name' => 'Bot']),
+        );
+
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertSame(ApiKeyPlanRequiredException::CODE_SESSION_ENDED, $this->json()['code']);
+    }
+
     public function testFreeAccountKeyIsRejected(): void
     {
         $user = $this->user('api-plan-free-use@synaplan.internal', 'NEW');

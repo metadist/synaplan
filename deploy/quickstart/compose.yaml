@@ -9,7 +9,7 @@
 # Local AI, office documents, file work, local-network TLS and scripted backups
 # use deploy/compose.yaml instead.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.5.4}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.6.0}
 
 x-app-command: &app-command
   - |
@@ -28,7 +28,7 @@ x-app-environment: &app-environment
   FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
   FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: selfhost
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.5.4}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.6.0}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   # Space-separated. Without SYNAPLAN_URL both local spellings keep live chat
@@ -73,7 +73,7 @@ services:
   # existing set is never rewritten. It exits when done, so Dockge lists the
   # stack as "exited" while everything else runs.
   secrets-init:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     restart: "no"
     environment:
       APP_SECRET: ${APP_SECRET:-}

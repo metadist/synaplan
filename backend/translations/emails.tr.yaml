@@ -61,3 +61,10 @@ email:
     button: 'Oturum aç'
     or_copy: 'Ya da bu bağlantıyı tarayıcınıza kopyalayın:'
     not_you: 'Bunu siz istemediyseniz bu e-postayı yok sayın; bağlantı olmadan kimse oturum açamaz.'
+
+  code_signup:
+    title: 'Synaplan davetiniz'
+    body: 'Devam etmek için bu düğmeyi kullanın. Bir kez, 15 dakika boyunca çalışır. Hesabınız bağlantıyı açtığınızda oluşur; bu adresin zaten bir hesabı varsa o hesaba girersiniz.'
+    button: 'Devam'
+    or_copy: 'Ya da bu bağlantıyı tarayıcınıza kopyalayın:'
+    not_you: 'Bunu siz istemediyseniz bu e-postayı yok sayın; bağlantı olmadan kimse hesap açamaz.'

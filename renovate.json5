@@ -17,6 +17,13 @@
   ],
   "enabled": true,
   "timezone": "Europe/Berlin",
+  // npm 12 refuses the Tailwind oxide wasm tarball during --package-lock-only
+  // (npm/cli#9800), so lock file maintenance fails renovate/artifacts. Keep
+  // Renovate on npm 11. 11.18+ still accepts the --before flag that
+  // minimumReleaseAge passes through.
+  "constraints": {
+    "npm": "<13"
+  },
   "prHourlyLimit": 2,
   // Make the implicit Renovate default (10) explicit. Grouping already collapses
   // minor/patch into ~6 buckets plus one for Docker digests, so this is a backlog

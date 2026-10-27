@@ -120,6 +120,10 @@ framework:
             # One-time sign-in link: the lookup and the mail run here, off the
             # request, so its timing cannot reveal which addresses have accounts.
             'App\Message\SendLoginLinkMessage': async_index
+            # Invitation-code link: same reason as the sign-in link — the mail
+            # leaves the request so its timing cannot reveal which addresses
+            # already have accounts.
+            'App\Message\SendCodeSignupMessage': async_index
             # Async media jobs (Release 4.0): each message advances one render by
             # a single non-blocking step then re-dispatches itself (DelayStamp)
             # for the next poll. Short hops, never a worker pinned for minutes.
@@ -187,3 +191,4 @@ when@test:
                 # The test stack has no messenger worker; the sign-in link
                 # mail is sent inside the request that asked for it.
                 'App\Message\SendLoginLinkMessage': sync
+                'App\Message\SendCodeSignupMessage': sync

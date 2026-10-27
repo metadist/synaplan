@@ -64,7 +64,7 @@ services:
   # which then finishes in seconds because the stack is already healthy.
   # ----------------------------------------------------------------------------
   startup-notes:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     container_name: synaplan-startup-notes
     command:
       - sh
@@ -1096,7 +1096,7 @@ services:
 
   # Whisper Models Download (runs once)
   whisper-models:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     container_name: synaplan-whisper-models
     depends_on:
       backend:
@@ -1179,7 +1179,7 @@ services:
 
   # Generates a self-signed TLS certificate for Keycloak HTTPS (runs once)
   keycloak_certs:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     container_name: synaplan-keycloak-certs
     depends_on:
       backend:
@@ -1254,7 +1254,7 @@ services:
   # Docs: docs/DEVELOPMENT.md ("Office conversion")
   # No published port: the backend talks to collabora:9980 on the compose network.
   collabora:
-    image: collabora/code:26.04.5.1.1@sha256:bb8f3c9c5c9016045f25fccb5f0649be94469ebc7c7cc379f3576e470cccf33d
+    image: collabora/code:26.04.5.2.1@sha256:c7415b963e32eb0986a562583f154d36d3d7a461e1ddfb660a95e87094328acb
     container_name: synaplan-collabora
     depends_on:
       backend:

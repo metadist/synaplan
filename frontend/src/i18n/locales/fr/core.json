@@ -46,6 +46,8 @@
     "login": "Connexion",
     "register": "Inscription",
     "forgotPassword": "Mot de passe oublié",
+    "codeSignup": "Code d'invitation",
+    "loginLink": "Connexion",
     "resetPassword": "Réinitialiser le mot de passe",
     "changePassword": "Changer le mot de passe",
     "verifyEmail": "Vérifier l’e-mail",
@@ -107,7 +109,9 @@
     "apps": "Apps",
     "appsConnected": "Apps connectées",
     "appDetail": "App",
-    "adminUsage": "Tableau des coûts"
+    "adminUsage": "Tableau des coûts",
+    "start": "Commencer",
+    "welcome": "Bienvenue"
   },
   "welcome": "Bienvenue",
   "welcomeUser": "Bienvenue, {name}",

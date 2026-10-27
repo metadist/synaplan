@@ -8,7 +8,7 @@ use App\Entity\User;
 use App\Message\SendLoginLinkMessage;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Iam\UserLifecycleService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -32,13 +32,13 @@ final readonly class EmailLinkSignIn
         private UserRepository $users,
         private VerificationTokenRepository $tokens,
         private LoginLinkMailer $mailer,
-        private EntityManagerInterface $em,
         #[Autowire(service: 'limiter.email_link_ip')]
         private RateLimiterFactoryInterface $ipLimiter,
         #[Autowire(service: 'limiter.email_link_address')]
         private RateLimiterFactoryInterface $addressLimiter,
         private LoggerInterface $logger,
         private MessageBusInterface $bus,
+        private UserLifecycleService $lifecycle,
     ) {
     }
 
@@ -87,10 +87,9 @@ final readonly class EmailLinkSignIn
         if (!$user->canSignIn()) {
             return null;
         }
-        if (!$user->isEmailVerified()) {
-            $user->setEmailVerified(true);
-            $this->em->flush();
-        }
+        // Opening the link proves the mailbox, including when the address
+        // was already marked verified. Refresh tokens from before this die.
+        $this->lifecycle->markEmailVerified($user);
         $this->logger->info('Signed in with an email link', ['user_id' => $user->getId()]);
 
         return $user;

@@ -203,6 +203,37 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /**
+     * How many times this mailbox has been proven. An access token carries the
+     * generation it was minted with. A token from before the latest proof has
+     * a lower one, including two tokens minted in the same second. Stored in
+     * BUSERDETAILS so this needs no schema change.
+     */
+    public function getMailboxGeneration(): int
+    {
+        $gen = $this->userDetails['email_verified_gen'] ?? 0;
+
+        return is_int($gen) ? $gen : (is_string($gen) && ctype_digit($gen) ? (int) $gen : 0);
+    }
+
+    public function getMailboxProvenAt(): ?int
+    {
+        $at = $this->userDetails['email_verified_at'] ?? null;
+
+        return is_int($at) ? $at : (is_string($at) && ctype_digit($at) ? (int) $at : null);
+    }
+
+    public function recordMailboxProof(?int $at = null): self
+    {
+        $this->emailVerified = true;
+        $details = $this->getUserDetails();
+        $details['email_verified_at'] = $at ?? time();
+        $details['email_verified_gen'] = $this->getMailboxGeneration() + 1;
+        $this->userDetails = $details;
+
+        return $this;
+    }
+
     public function mustChangePassword(): bool
     {
         return $this->mustChangePassword;

@@ -9,6 +9,7 @@ use App\Exception\ApiKeyPlanRequiredException;
 use App\Service\RateLimitService;
 use App\Service\Usage\StorageQuotaService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Single decision point for "is this paid-tier feature available to the user?".
@@ -34,6 +35,7 @@ final readonly class PremiumFeatureGate
         private BillingService $billingService,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
+        private ?RequestStack $requestStack = null,
     ) {
     }
 
@@ -67,6 +69,24 @@ final readonly class PremiumFeatureGate
         }
         if (!$user->isEmailVerified()) {
             throw ApiKeyPlanRequiredException::addressUnverified();
+        }
+        $generation = $user->getMailboxGeneration();
+        $request = $this->requestStack?->getCurrentRequest();
+        if (null === $request || $generation < 1) {
+            return;
+        }
+        $tokenUser = $request->attributes->get('access_token_user_id');
+        $tokenUserId = is_int($tokenUser) || (is_string($tokenUser) && ctype_digit($tokenUser)) ? (int) $tokenUser : null;
+        // Only the token's own account. An administrator provisioning a key
+        // for someone else carries the administrator's generation, which says
+        // nothing about the target.
+        if (null === $tokenUserId || $tokenUserId !== (int) $user->getId()) {
+            return;
+        }
+        $carried = $request->attributes->get('access_token_mbg');
+        $carriedGen = is_int($carried) || (is_string($carried) && ctype_digit($carried)) ? (int) $carried : 0;
+        if ($carriedGen < $generation) {
+            throw ApiKeyPlanRequiredException::sessionEnded();
         }
     }
 

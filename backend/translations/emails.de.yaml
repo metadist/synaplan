@@ -62,3 +62,10 @@ email:
     button: 'Anmelden'
     or_copy: 'Oder kopiere diesen Link in deinen Browser:'
     not_you: 'Wenn du das nicht angefordert hast, ignoriere diese Mail; ohne den Link kann sich niemand anmelden.'
+
+  code_signup:
+    title: 'Deine Einladung zu Synaplan'
+    body: 'Mit diesem Button geht es weiter. Er funktioniert einmal, 15 Minuten lang. Dein Konto entsteht, wenn du ihn öffnest — außer diese Adresse hat schon eines.'
+    button: 'Weiter'
+    or_copy: 'Oder kopiere diesen Link in deinen Browser:'
+    not_you: 'Wenn du das nicht angefordert hast, ignoriere diese Mail; ohne den Link kann niemand ein Konto öffnen.'

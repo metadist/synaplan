@@ -16,6 +16,8 @@ import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
 import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
+import { codeSignupRoutes } from '@/router/codeSignupRoutes'
+import { loginLinkRoutes } from '@/router/loginLinkRoutes'
 import { resolveRegistrationRedirect } from '@/router/registrationGate'
 import {
   ensureWizardRequired,
@@ -45,6 +47,7 @@ import {
 import { appRouteGuard } from '@/router/appGuards'
 import { groupsRouteGuard } from '@/router/iamGuards'
 import { adminUsageRoute, peopleRoute } from '@/router/adminUserRoutes'
+import { payFirstRoutes } from '@/router/payFirstRoutes'
 import {
   adminDashboardRedirect,
   aiInfrastructureRedirect,
@@ -121,6 +124,9 @@ const router = createRouter({
       beforeEnter: guardRegistration,
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register', i18n: ['auth'] },
     },
+    ...payFirstRoutes,
+    ...codeSignupRoutes,
+    ...loginLinkRoutes,
     {
       path: '/forgot-password',
       name: 'forgot-password',

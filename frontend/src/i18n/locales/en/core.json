@@ -45,6 +45,8 @@
     "login": "Login",
     "register": "Register",
     "forgotPassword": "Forgot Password",
+    "codeSignup": "Invitation code",
+    "loginLink": "Sign in",
     "resetPassword": "Reset Password",
     "changePassword": "Change Password",
     "verifyEmail": "Verify Email",
@@ -107,7 +109,9 @@
     "apps": "Apps",
     "appsConnected": "Connected apps",
     "appDetail": "App",
-    "adminUsage": "Cost board"
+    "adminUsage": "Cost board",
+    "start": "Start",
+    "welcome": "Welcome"
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",

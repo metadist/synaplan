@@ -46,6 +46,8 @@
     "login": "Iniciar sesión",
     "register": "Registrarse",
     "forgotPassword": "Olvidé mi contraseña",
+    "codeSignup": "Código de invitación",
+    "loginLink": "Iniciar sesión",
     "resetPassword": "Restablecer contraseña",
     "changePassword": "Cambiar contraseña",
     "verifyEmail": "Verificar correo",
@@ -106,7 +108,9 @@
     "apps": "Apps",
     "appsConnected": "Apps conectadas",
     "appDetail": "App",
-    "adminUsage": "Panel de costes"
+    "adminUsage": "Panel de costes",
+    "start": "Empezar",
+    "welcome": "Bienvenida"
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",

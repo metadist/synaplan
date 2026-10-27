@@ -8,7 +8,7 @@
 # are omitted to save ~2 GB of images and RAM. Same volume names as compose.yaml,
 # so switching between compose.lite.yaml and compose.yaml keeps every chat and file.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.5.4}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.6.0}
 
 x-app-command: &app-command
   - |
@@ -27,7 +27,7 @@ x-app-environment: &app-environment
   FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
   FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: lite
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.5.4}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.6.0}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000} http://localhost:${SYNAPLAN_HTTP_PORT:-8000}}
@@ -66,7 +66,7 @@ x-app-environment: &app-environment
 
 services:
   secrets-init:
-    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
     restart: "no"
     environment:
       APP_SECRET: ${APP_SECRET:-}

@@ -6,6 +6,7 @@ namespace App\Service\Auth;
 
 use App\AI\Credential\ChatReadinessService;
 use App\Repository\ConfigRepository;
+use App\Service\Billing\PayFirst\PayFirstConfig;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Config\Runtime\RuntimeConfigContext;
 use App\Service\Config\Runtime\RuntimeConfigContributorInterface;
@@ -28,7 +29,8 @@ final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterf
         private ConfigRepository $configRepository,
         private ChatReadinessService $chatReadiness,
         private TurnstileVerifier $turnstile,
-        private string $turnstileSiteKey = '',
+        private string $turnstileSiteKey,
+        private PayFirstConfig $payFirst,
     ) {
     }
 
@@ -59,6 +61,7 @@ final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterf
             'auth' => [
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
                 'registrationMode' => $this->registrationConfig->mode(),
+                'payFirst' => $this->payFirst->isActive(),
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
                 'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],

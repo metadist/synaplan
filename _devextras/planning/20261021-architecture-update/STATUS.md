@@ -182,7 +182,7 @@ identity rule shared with PHP, the Downward API variables for the chart,
 and the "You are connected to" header for AU7 are written in `03` §6.1 and
 `04` §4.1, §5.2, §6. On the dev stack the snapshot read
 `"hostname":"<container id>","role":"web","place":{},"logs":{"collector":"docker","event_ring_host":"<container id>"}`.
-**Redis namespace (same day).** PHP's `RedisService` prefixes every key with `synaplan:<APP_ENV>:`; the watchdog now writes under that prefix (`APP_ENV` from the container, `prod` when unset), so the capacity page reads the snapshots and a dev stack next to a test stack does not see the other's servers. The seen-list `capacity:seen` (hash, 7 days) keeps a silent server on the page with its last report time.
+**Redis namespace (same day).** PHP's `RedisService` prefixes every key with `synaplan:<APP_ENV>:`; the watchdog now writes under that prefix (`APP_ENV` from the container, `prod` when unset), so the capacity page reads the snapshots and a dev stack next to a test stack does not see the other's servers. The seen-list `capacity:seen` (hash, 1 hour) keeps a silent server on the page with its last report time. A replaced container keeps its own id, so a week-long window filled the page with servers that were already gone. PHP applies the same hour itself, so a report written under the old week-long TTL still drops off.
 
 **Every role (same day).** The worker and scheduler roles start the same
 watchdog. Without FrankenPHP it skips the admin API and the PHP probe: its
