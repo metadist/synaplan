@@ -259,6 +259,10 @@ export function createPluginSession({
   refreshEveryMs = 30_000,
 }) {
   const commitSamples = Math.round(commitAfterMs * 48)
+  // The plugin answers 422 for a window longer than 30 s. Slice at the commit
+  // length, and never above that, so audio that arrives while speech
+  // recognition is still working cannot be merged into one rejected window.
+  const sliceMs = Math.min(commitAfterMs, 30_000)
   const origin = now()
   const speakers = new Map()
   let ended = false
@@ -368,25 +372,14 @@ export function createPluginSession({
     }))
   }
 
-  async function flush(tag, send, cut, { limit = Infinity, seq: expected = null } = {}) {
-    const entry = speakers.get(tag)
-    if (entry) {
-      entry.cutQueued = false
-    }
-    if (expected !== null && entry && entry.seq + 1 !== expected) {
+  async function sendWindow(entry, job, send) {
+    if (ended) {
+      entry.packets = []
+      entry.samples = 0
       return
     }
-    if (!entry || entry.packets.length === 0 || ended) {
-      if (entry) {
-        entry.packets = []
-        entry.samples = 0
-      }
-      return
-    }
-    const { packets, samples, at } = take(entry, limit)
-    const endpointId = entry.endpointId || endpointFromTag(tag)
-    entry.seq += 1
-    const seq = entry.seq
+    entry.cutQueued = false
+    const { packets, samples, at, seq, cut, endpointId } = job
     const t0Ms = Math.max(0, at - origin)
     const t1Ms = t0Ms + Math.max(1, Math.round(samples / 48))
     const audio = muxOpusPackets(packets)
@@ -434,12 +427,35 @@ export function createPluginSession({
     }))
   }
 
-  function enqueue(tag, send, cut, options) {
+  function enqueue(tag, send, cut, options = {}) {
     const entry = speaker(tag)
-    if (cut !== 'stop') {
-      entry.cutQueued = true
+    if (options.seq != null && options.seq !== entry.seq + 1) {
+      return entry.chain
     }
-    entry.chain = entry.chain.then(() => flush(tag, send, cut, options)).catch(() => {})
+    if (ended || entry.packets.length === 0) {
+      return entry.chain
+    }
+    const requested = options.limit ?? entry.packets.length
+    const count = Math.min(requested, Math.max(1, packetsWithin(entry, sliceMs)))
+    const sliced = take(entry, count)
+    if (sliced.packets.length === 0) {
+      return entry.chain
+    }
+    entry.seq += 1
+    const job = {
+      packets: sliced.packets,
+      samples: sliced.samples,
+      at: sliced.at,
+      cut,
+      seq: entry.seq,
+      endpointId: entry.endpointId || endpointFromTag(tag),
+    }
+    // The slice is taken now, not when the speech server answers. A later
+    // window stays on its own, however long this one takes.
+    entry.chain = entry.chain.then(() => sendWindow(entry, job, send)).catch(() => {})
+    if (entry.packets.length > 0 && (cut === 'stop' || entry.samples >= commitSamples)) {
+      return enqueue(tag, send, cut === 'stop' ? 'stop' : 'hard')
+    }
     return entry.chain
   }
 
@@ -568,7 +584,7 @@ export function createPluginSession({
     await Promise.all([...speakers.values()].map((entry) => entry.chain))
     for (const [tag, entry] of speakers) {
       if (entry.samples >= MIN_FINAL_SAMPLES) {
-        await flush(tag, send, 'stop')
+        await enqueue(tag, send, 'stop')
       }
       if (entry.interimSeq) {
         settleInterim(entry, entry.interimSeq, send)
