@@ -112,7 +112,7 @@ final class ResearchFollowUpTest extends ResearchUnitCase
         self::assertSame(ResearchUnitPlan::WRITE, $this->bus->sent[1]['unit']);
         self::assertSame('revise', $next->followUp);
         self::assertSame('The price is 12. [e1]', $next->priorReport);
-        self::assertSame('The price is 12. [e1]', $next->ledger->report());
+        self::assertNull($next->ledger->report());
         self::assertStringContainsString('keep its citation', FollowUpTask::text($next));
         self::assertStringContainsString('[e1]', FollowUpTask::text($next));
     }
@@ -122,7 +122,7 @@ final class ResearchFollowUpTest extends ResearchUnitCase
         $parent = $this->finished();
         $parent->ledger->addPoint('Price');
         $parent->ledger->addQuery('p1', 'unit price', 'files', 1);
-        $parent->ledger->setReport("The price is 12. [e1]\n\n## Not confirmed\n\nThe delivery date is June.");
+        $parent->ledger->setReport("The price is 12. [e1]\n\n## Not confirmed\n\nThe delivery date is June.\n\n1 of 2 statements are backed by a source.\n\nA model of the same provider did the fact-check. This project has no second provider.");
         $this->store->save($parent);
 
         $next = $this->runs->followUp($this->user, $parent->ref->id, [
@@ -138,6 +138,7 @@ final class ResearchFollowUpTest extends ResearchUnitCase
         self::assertSame('p2', $points[1]->id);
         self::assertSame('The delivery date is June.', $points[1]->title);
         self::assertSame('files', $points[1]->queries[0]['scope']);
+        self::assertCount(2, $points);
     }
 
     public function testRefreshReopensSourcesOlderThanTheTimeFrame(): void

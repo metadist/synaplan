@@ -37,8 +37,8 @@ final readonly class ResearchFollowUp
 
     public static function prepare(ResearchRunState $parent, string $kind, string $text): self
     {
-        $ledger = EvidenceLedger::fromArray($parent->ledger->toArray());
-        $prior = $ledger->report();
+        $prior = $parent->ledger->report();
+        $ledger = EvidenceLedger::fromArray(['report' => null, 'check' => null] + $parent->ledger->toArray());
 
         return match ($kind) {
             self::QUESTION => self::question($ledger, $text, $prior),
@@ -67,6 +67,9 @@ final readonly class ResearchFollowUp
         if (self::hasNotes($ledger, $prior)) {
             return self::writing(ResearchDepth::Quick, $ledger, self::QUESTION, $text, $prior);
         }
+        if ([] !== $ledger->points()) {
+            $ledger->addPoint($text, 'The notes had nothing on this question.', [self::query($ledger, $text)]);
+        }
 
         return new self(
             ResearchDepth::Quick,
@@ -82,7 +85,7 @@ final readonly class ResearchFollowUp
 
     private static function deeper(EvidenceLedger $ledger, string $text, ?string $prior): self
     {
-        if (0 === self::pointsFromNotConfirmed($ledger)) {
+        if (0 === self::pointsFromNotConfirmed($ledger, $prior)) {
             $ledger->addPoint($text, 'Look further than the last report.', [self::query($ledger, $text)]);
         }
 
@@ -124,9 +127,9 @@ final readonly class ResearchFollowUp
         return [] !== $ledger->evidenceForWriter() || (null !== $prior && '' !== trim($prior));
     }
 
-    private static function pointsFromNotConfirmed(EvidenceLedger $ledger): int
+    private static function pointsFromNotConfirmed(EvidenceLedger $ledger, ?string $prior): int
     {
-        $body = CheckReport::notConfirmedBody($ledger->report() ?? '');
+        $body = CheckReport::notConfirmedBody($prior ?? '');
         if ('' === $body) {
             return 0;
         }

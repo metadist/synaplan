@@ -121,7 +121,29 @@ final class CheckReport
             return '';
         }
 
-        return implode("\n", array_slice($lines, $section['start'], $section['end'] - $section['start']));
+        $body = array_filter(
+            array_slice($lines, $section['start'], $section['end'] - $section['start']),
+            static fn (string $line): bool => !self::isClosing($line),
+        );
+
+        return implode("\n", $body);
+    }
+
+    /** A line that close() appended: the count or the same-provider sentence. */
+    private static function isClosing(string $line): bool
+    {
+        $line = trim($line);
+        if (in_array($line, self::SAME_PROVIDER, true)) {
+            return true;
+        }
+        foreach (self::BACKED as $format) {
+            $pattern = '/^'.str_replace(['%1\$d', '%2\$d'], '\d+', preg_quote($format, '/')).'/u';
+            if (1 === preg_match($pattern, $line)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
