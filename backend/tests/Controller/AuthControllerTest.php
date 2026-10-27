@@ -602,6 +602,8 @@ class AuthControllerTest extends WebTestCase
             }
 
             $this->assertNull($this->em->getRepository(EmailVerificationAttempt::class)->findOneBy(['email' => 'resend-failed@test.com']));
+            $user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'resend-failed@test.com']);
+            $this->assertSame([], $this->em->getRepository(VerificationToken::class)->findBy(['userId' => $user->getId()]));
         } finally {
             $this->restoreEnv('MAILER_DSN', $previous);
         }

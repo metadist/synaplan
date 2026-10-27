@@ -84,7 +84,8 @@ final class VerificationResendServiceTest extends TestCase
         $this->mail->method('sendVerificationEmail')->willThrowException(new \RuntimeException('smtp down'));
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects($this->never())->method('persist');
-        $em->expects($this->never())->method('flush');
+        $em->expects($this->once())->method('remove');
+        $em->expects($this->once())->method('flush');
         $this->em = $em;
 
         $result = $this->service()->resend('ada@example.com', '127.0.0.1');
@@ -101,7 +102,9 @@ final class VerificationResendServiceTest extends TestCase
         $this->tokens->method('createToken')->willReturn($this->token());
         $this->mail->method('sendVerificationEmail')->willReturn(false);
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects($this->never())->method('flush');
+        $em->expects($this->never())->method('persist');
+        $em->expects($this->once())->method('remove');
+        $em->expects($this->once())->method('flush');
         $this->em = $em;
 
         $result = $this->service()->resend('ada@example.com', '127.0.0.1');
