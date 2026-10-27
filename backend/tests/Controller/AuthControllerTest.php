@@ -440,6 +440,8 @@ class AuthControllerTest extends WebTestCase
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('EMAIL_NOT_VERIFIED', $body['code']);
 
         // Cleanup
         $this->em->remove($user);

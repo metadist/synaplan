@@ -2,11 +2,7 @@
  * Authentication API - Login, Register, Password Management
  */
 
-import { z } from 'zod'
-import { PostApiAuthResendVerificationResponseSchema } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
-
-export type ResendVerificationResult = z.infer<typeof PostApiAuthResendVerificationResponseSchema>
 
 export const authApi = {
   async login(email: string, password: string): Promise<unknown> {
@@ -43,12 +39,11 @@ export const authApi = {
     })
   },
 
-  resendVerification(email: string): Promise<ResendVerificationResult> {
+  async resendVerification(email: string): Promise<unknown> {
     return httpClient('/api/v1/auth/resend-verification', {
       method: 'POST',
       body: JSON.stringify({ email }),
       skipAuth: true,
-      schema: PostApiAuthResendVerificationResponseSchema,
     })
   },
 

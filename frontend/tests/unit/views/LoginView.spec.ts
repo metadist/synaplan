@@ -29,11 +29,16 @@ vi.mock('@/services/api/nativeAppleAuth', () => ({ startNativeAppleSignIn: vi.fn
 vi.mock('@/composables/useSignupChallenge', () => ({
   useSignupChallenge: () => ({ getToken: vi.fn(async () => ''), isEnabled: false, provider: null }),
 }))
+const authState = vi.hoisted(() => ({
+  error: { value: '' },
+  errorCode: { value: null as string | null },
+}))
+
 vi.mock('@/composables/useAuth', () => ({
   useAuth: () => ({
     login: vi.fn(),
-    error: { value: '' },
-    errorCode: { value: null },
+    error: authState.error,
+    errorCode: authState.errorCode,
     loading: { value: false },
     clearError: vi.fn(),
   }),
@@ -77,6 +82,8 @@ describe('LoginView registration closed', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     config.auth.registrationEnabled = true
+    authState.error.value = ''
+    authState.errorCode.value = null
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ providers: [] }) }))
   })
 
@@ -95,5 +102,23 @@ describe('LoginView registration closed', () => {
 
     expect(wrapper.find('[data-testid="link-signup"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="login-registration-closed"]').exists()).toBe(true)
+  })
+})
+
+describe('LoginView unverified email', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ providers: [] }) }))
+    authState.error.value = 'Email not verified'
+    authState.errorCode.value = 'EMAIL_NOT_VERIFIED'
+  })
+
+  it('replaces the raw error with the way to confirm the address', async () => {
+    const wrapper = await mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="alert-login-unverified"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="alert-login-error"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Email not verified')
   })
 })

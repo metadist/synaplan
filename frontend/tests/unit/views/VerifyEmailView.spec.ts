@@ -12,10 +12,8 @@ vi.mock('@/utils/mailerConfigured', () => ({
   isMailerConfigured: () => mailerConfigured(),
 }))
 
-vi.mock('@/services/api', () => ({
-  authApi: {
-    resendVerification: (...args: unknown[]) => resendVerification(...args),
-  },
+vi.mock('@/services/api/verificationApi', () => ({
+  resendVerificationEmail: (...args: unknown[]) => resendVerification(...args),
 }))
 
 vi.mock('@/stores/config', () => ({

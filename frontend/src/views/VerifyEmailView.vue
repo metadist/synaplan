@@ -206,7 +206,7 @@ import {
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useConfigStore } from '@/stores/config'
-import { authApi } from '@/services/api'
+import { resendVerificationEmail } from '@/services/api/verificationApi'
 import { ApiError } from '@/services/api/httpClient'
 import { isMailerConfigured } from '@/utils/mailerConfigured'
 import Button from '../components/Button.vue'
@@ -259,7 +259,7 @@ const handleResendEmail = async () => {
   isResending.value = true
 
   try {
-    const response = await authApi.resendVerification(userEmail.value)
+    const response = await resendVerificationEmail(userEmail.value)
     if (response.mailDelivered === false) {
       mailUnavailable.value = true
       return

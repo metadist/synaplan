@@ -339,7 +339,17 @@ class AuthController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Invalid credentials')]
-    #[OA\Response(response: 403, description: 'Email not verified or external auth required')]
+    #[OA\Response(
+        response: 403,
+        description: 'Email not verified (code EMAIL_NOT_VERIFIED, sent only after the password matched) or the account cannot sign in',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string'),
+                new OA\Property(property: 'code', type: 'string', example: 'EMAIL_NOT_VERIFIED'),
+                new OA\Property(property: 'message', type: 'string'),
+            ]
+        )
+    )]
     public function login(Request $request): Response
     {
         $data = json_decode($request->getContent(), true);
@@ -383,7 +393,7 @@ class AuthController extends AbstractController
         // Check email verification
         if (!$user->isEmailVerified()) {
             return $this->json([
-                'error' => 'Email not verified',
+                'error' => 'Email not verified', 'code' => 'EMAIL_NOT_VERIFIED',
                 'message' => 'Please verify your email before logging in',
             ], Response::HTTP_FORBIDDEN);
         }
