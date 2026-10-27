@@ -6,6 +6,8 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
+use App\Service\PlatformLink\Exception\PlatformManagedByAdministratorException;
+use App\Service\PlatformLink\Exception\PlatformSsoException;
 use App\Service\PlatformLink\PlatformLinkExchangeService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;
@@ -45,7 +47,7 @@ final class MePlatformLinkController extends AbstractController
                             property: 'links',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'client', 'host', 'external_id', 'key_id', 'key_label', 'created', 'last_seen', 'can_copy'],
+                                required: ['id', 'client', 'host', 'external_id', 'key_id', 'key_label', 'created', 'last_seen', 'mode', 'status', 'can_copy'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer'),
                                     new OA\Property(property: 'client', type: 'string', example: 'nextcloud'),
@@ -55,6 +57,8 @@ final class MePlatformLinkController extends AbstractController
                                     new OA\Property(property: 'key_label', type: 'string'),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'last_seen', type: 'integer', format: 'int64'),
+                                    new OA\Property(property: 'mode', type: 'string', nullable: true, example: 'link'),
+                                    new OA\Property(property: 'status', type: 'string', example: 'active'),
                                     new OA\Property(property: 'can_copy', type: 'boolean', example: true),
                                     new OA\Property(property: 'can_read', type: 'boolean', example: true, description: 'The cloud app hands files to a run when asked'),
                                     new OA\Property(
@@ -125,6 +129,66 @@ final class MePlatformLinkController extends AbstractController
             $this->exchangeService->disconnect((int) $user->getId(), $id, $request->getClientIp() ?? '');
         } catch (PlatformInstanceNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Link not found.'], Response::HTTP_NOT_FOUND);
+        } catch (PlatformManagedByAdministratorException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage(), 'code' => PlatformManagedByAdministratorException::CODE], Response::HTTP_FORBIDDEN);
+        }
+
+        return $this->json(['success' => true]);
+    }
+
+    #[Route('/{id}/turn-off', name: 'turn_off', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/me/platform-links/{id}/turn-off',
+        operationId: 'turnOffMyPlatformLink',
+        summary: 'Turn an organisation-login connection off',
+        tags: ['Platform Links'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Turned off'),
+            new OA\Response(response: 403, description: 'Not organisation login'),
+            new OA\Response(response: 404, description: 'Unknown link'),
+        ]
+    )]
+    public function turnOff(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        return $this->change($user, $id, $request, false);
+    }
+
+    #[Route('/{id}/resume', name: 'resume', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/me/platform-links/{id}/resume',
+        operationId: 'resumeMyPlatformLink',
+        summary: 'Turn an organisation-login connection back on',
+        tags: ['Platform Links'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Turned back on'),
+            new OA\Response(response: 403, description: 'Not organisation login'),
+            new OA\Response(response: 404, description: 'Unknown link'),
+        ]
+    )]
+    public function resume(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        return $this->change($user, $id, $request, true);
+    }
+
+    private function change(?User $user, int $id, Request $request, bool $resume): JsonResponse
+    {
+        $this->guard($user?->getId());
+        if (!$user instanceof User) {
+            return $this->json(['success' => false, 'error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            if ($resume) {
+                $this->exchangeService->resume((int) $user->getId(), $id, $request->getClientIp() ?? '');
+            } else {
+                $this->exchangeService->turnOff((int) $user->getId(), $id, $request->getClientIp() ?? '');
+            }
+        } catch (PlatformInstanceNotFoundException) {
+            return $this->json(['success' => false, 'error' => 'Link not found.'], Response::HTTP_NOT_FOUND);
+        } catch (PlatformSsoException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage(), 'code' => $e->errorCode], $e->status);
         }
 
         return $this->json(['success' => true]);

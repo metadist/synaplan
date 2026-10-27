@@ -147,7 +147,56 @@
                 {{ formatSeen(link.last_seen) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
+                <p v-if="link.mode === 'provision'" class="text-sm txt-secondary">
+                  {{ $t('linkedPlatforms.managed') }}
+                </p>
+                <div
+                  v-else-if="
+                    link.mode === 'sso' &&
+                    (link.status === 'suspended' || link.status === 'blocked')
+                  "
+                  class="space-y-2"
+                >
+                  <p class="text-sm txt-secondary">{{ $t('linkedPlatforms.cloudDisabled') }}</p>
+                  <button
+                    v-if="link.status === 'blocked'"
+                    type="button"
+                    class="btn-primary px-4 py-2.5 text-sm font-medium"
+                    data-testid="btn-resume"
+                    @click="resume(link)"
+                  >
+                    {{ $t('linkedPlatforms.resume') }}
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="btn-secondary px-4 py-2.5 text-sm font-medium"
+                    data-testid="btn-turn-off"
+                    @click="turnOff(link)"
+                  >
+                    {{ $t('linkedPlatforms.turnOff') }}
+                  </button>
+                </div>
                 <button
+                  v-else-if="link.mode === 'sso' && link.status === 'paused'"
+                  type="button"
+                  class="btn-primary px-4 py-2.5 text-sm font-medium"
+                  data-testid="btn-resume"
+                  @click="resume(link)"
+                >
+                  {{ $t('linkedPlatforms.resume') }}
+                </button>
+                <button
+                  v-else-if="link.mode === 'sso'"
+                  type="button"
+                  class="btn-secondary px-4 py-2.5 text-sm font-medium"
+                  data-testid="btn-turn-off"
+                  @click="turnOff(link)"
+                >
+                  {{ $t('linkedPlatforms.turnOff') }}
+                </button>
+                <button
+                  v-else
                   type="button"
                   class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
                   data-testid="btn-disconnect"
@@ -237,6 +286,31 @@ async function loadLinks(): Promise<void> {
     error.value = t('linkedPlatforms.loadError')
   } finally {
     loading.value = false
+  }
+}
+
+async function turnOff(link: PlatformLink): Promise<void> {
+  const confirmed = await dialog.confirm({
+    title: t('linkedPlatforms.turnOffTitle'),
+    message: t('linkedPlatforms.turnOffConfirm', { host: link.host }),
+  })
+  if (!confirmed) return
+  try {
+    await platformLinksApi.turnOff(link.id)
+    success(t('linkedPlatforms.turnedOff'))
+    await loadLinks()
+  } catch {
+    showError(t('linkedPlatforms.disconnectError'))
+  }
+}
+
+async function resume(link: PlatformLink): Promise<void> {
+  try {
+    await platformLinksApi.resume(link.id)
+    success(t('linkedPlatforms.resumed'))
+    await loadLinks()
+  } catch {
+    showError(t('linkedPlatforms.disconnectError'))
   }
 }
 

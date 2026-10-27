@@ -112,7 +112,12 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
         }
 
-        $this->attribution->attribute($user, $claims);
+        $path = $request->getPathInfo();
+        $reconnect = 'POST' === $request->getMethod() && in_array($path, [
+            '/api/v1/platform-links/sso/bind',
+            '/api/v1/platform-links/sso/background-key',
+        ], true);
+        $this->attribution->attribute($user, $claims, $reconnect);
 
         $this->logger->debug('OIDC bearer token authenticated', [
             'user_id' => $user->getId(),

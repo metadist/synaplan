@@ -1028,7 +1028,7 @@ services:
   # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
   # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
   docling:
-    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.1@sha256:203c2ce82f19413bc3b83641962082165510352b9f93c1a840c0036be616eebf
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.2@sha256:7a480a1604fa3b42efeddc7db9527690d9f9bc903226136013e2bfe6b1a4dfb0
     container_name: synaplan-docling
     depends_on:
       backend:
@@ -1124,7 +1124,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest@sha256:42a200db07b4e70fbf32c594ad4521cf16399b8e54bbb5adceae98e7566dfbeb
+    image: phpmyadmin:latest@sha256:4de49392e023fa330f49ecc72a79384359783856ade762272112ed347ab32706
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db

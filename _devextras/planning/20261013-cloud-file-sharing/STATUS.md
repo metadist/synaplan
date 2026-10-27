@@ -47,8 +47,8 @@ not a chat message.
 | CF1.5 OpenCloud chat, media, binary save | `synaplan-opencloud` | P2 | planned | needs CF2.2 (D18); may run during P1 (row 34) |
 | CF2.1 Instance columns, capabilities both ways, delivery origin | `synaplan` | P1 | **merged** 2026-10-24 [#2694](https://github.com/metadist/synaplan/pull/2694) | Walk 2026-10-24 below |
 | CF2.2 Canonical identity rows, SSO bind, attribution, bearer on chat | `synaplan` | P1 | **in review** | D8, D15, D18; adoption of provisioned rows (row 39). Controller tests cover bind, adoption and bearer-on-chat; the Keycloak block of `cf2-identity.sh` waits on the live exchange |
-| CF2.3 Background key, `cloud:watch`, scope map | `synaplan` | P1 | planned |  |
-| CF2.4 Lifecycle endpoint | `synaplan` | P1 | planned | D16; never deletes an account still in use (row 38, C18) |
+| CF2.3 Background key, `cloud:watch`, scope map | `synaplan` | P1 | **in review** · [#2810](https://github.com/metadist/synaplan/pull/2810) · issue [#2809](https://github.com/metadist/synaplan/issues/2809) | `files rag cloud:watch`, plaintext once; `from-message` refused for every key |
+| CF2.4 Lifecycle endpoint | `synaplan` | P1 | **in review** · [#2812](https://github.com/metadist/synaplan/pull/2812) · issue [#2811](https://github.com/metadist/synaplan/issues/2811) | Stacked on #2810. API-key delete answers 409 account_in_use; a session admin is unchanged |
 | CF2.5 Apps cards: status, turn off, disconnect that keeps the row | `synaplan` | P1 | planned | D9, D19; no OpenCloud card (CF2.11) |
 | CF2.6 Nextcloud organisation login | `synaplan-nextcloud` | P1 | planned | only if CF-S2 says yes |
 | CF2.7 OpenCloud registration, consent, bind, Connect mode | `synaplan-opencloud` | P2 | planned | Connect mode is a cut line |

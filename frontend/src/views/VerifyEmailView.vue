@@ -45,12 +45,23 @@
         </div>
 
         <h1 class="text-3xl font-bold txt-primary mb-3">{{ $t('auth.verifyEmail') }}</h1>
-        <p class="txt-secondary mb-6">
+        <p v-if="!mailUnavailable && hasEmail" class="txt-secondary mb-6">
           {{ $t('auth.verifyEmailDesc', { email: userEmail }) }}
+        </p>
+        <p
+          v-else-if="!mailUnavailable"
+          class="txt-secondary mb-6"
+          data-testid="text-verify-no-email"
+        >
+          {{ $t('auth.resendInvalid') }}
         </p>
 
         <div class="space-y-4">
-          <div class="alert-info" data-testid="info-check-spam">
+          <div v-if="mailUnavailable" class="alert-warning" data-testid="alert-resend-unconfigured">
+            <p class="text-sm alert-warning-text">{{ $t('auth.resendNoMail') }}</p>
+          </div>
+
+          <div v-if="canResend" class="alert-info" data-testid="info-check-spam">
             <p class="text-sm alert-info-text flex items-start gap-2">
               <InformationCircleIcon class="w-5 h-5 alert-info-icon flex-shrink-0 mt-0.5" />
               <span>{{ $t('auth.checkSpam') }}</span>
@@ -99,22 +110,25 @@
 
           <!-- Remaining Attempts Info -->
           <div
-            v-if="remainingAttempts < 5"
+            v-if="canResend && remainingAttempts > 0 && remainingAttempts < 5"
             class="alert-warning"
             data-testid="text-remaining-attempts"
           >
             <p class="text-xs alert-warning-text text-center">
-              {{ remainingAttempts }} attempt{{ remainingAttempts !== 1 ? 's' : '' }} remaining
+              {{
+                $t('auth.resendAttemptsRemaining', { count: remainingAttempts }, remainingAttempts)
+              }}
             </p>
           </div>
 
           <Button
+            v-if="canResend"
             :disabled="isResending || countdown > 0 || remainingAttempts <= 0"
             class="w-full btn-secondary py-3 rounded-xl font-medium"
             data-testid="btn-resend-email"
             @click="handleResendEmail"
           >
-            <span v-if="remainingAttempts <= 0"> Maximum attempts reached </span>
+            <span v-if="remainingAttempts <= 0">{{ $t('auth.resendNoAttempts') }}</span>
             <span v-else-if="!isResending && countdown === 0">
               {{ $t('auth.resendEmail') }}
             </span>
@@ -142,7 +156,7 @@
               {{ $t('auth.sending') }}
             </span>
             <span v-else>
-              Wait {{ Math.floor(countdown / 60) }}:{{ String(countdown % 60).padStart(2, '0') }}
+              {{ $t('auth.resendIn', { seconds: countdown }) }}
             </span>
           </Button>
 
@@ -178,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { cycleLocale } from '@/i18n'
@@ -192,25 +206,30 @@ import {
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useConfigStore } from '@/stores/config'
-import { authApi } from '@/services/api'
-import { getApiErrorMessage } from '@/utils/errorMessage'
+import { resendVerificationEmail } from '@/services/api/verificationApi'
+import { ApiError } from '@/services/api/httpClient'
+import { isMailerConfigured } from '@/utils/mailerConfigured'
 import Button from '../components/Button.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const themeStore = useTheme()
 const config = useConfigStore()
 const { logoSrc } = useBrandLogo(themeStore.isDark)
 
-const userEmail = ref((route.query.email as string) || 'your@email.com')
+const userEmail = ref(typeof route.query.email === 'string' ? route.query.email.trim() : '')
 const isResending = ref(false)
 const countdown = ref(0)
 const remainingAttempts = ref(5)
 const cooldownMinutes = ref(2)
 const error = ref('')
 const successMessage = ref('')
+const mailUnavailable = ref(!isMailerConfigured())
 let countdownInterval: number | null = null
+
+const hasEmail = computed(() => userEmail.value !== '')
+const canResend = computed(() => hasEmail.value && !mailUnavailable.value)
 
 const currentLanguage = computed(() => locale.value)
 
@@ -240,69 +259,60 @@ const handleResendEmail = async () => {
   isResending.value = true
 
   try {
-    const response = (await authApi.resendVerification(userEmail.value)) as {
-      message?: string
-      remainingAttempts?: number
-      cooldownMinutes?: number
+    const response = await resendVerificationEmail(userEmail.value)
+    if (response.mailDelivered === false) {
+      mailUnavailable.value = true
+      return
     }
 
-    successMessage.value = response.message || 'Verification email sent!'
-
-    if (response.remainingAttempts !== undefined) {
+    successMessage.value = t('auth.resendSent')
+    if (typeof response.remainingAttempts === 'number') {
       remainingAttempts.value = response.remainingAttempts
     }
-
-    if (response.cooldownMinutes !== undefined) {
+    if (typeof response.cooldownMinutes === 'number') {
       cooldownMinutes.value = response.cooldownMinutes
       startCountdown(response.cooldownMinutes * 60)
     }
   } catch (err: unknown) {
-    console.error('Failed to resend email:', err)
-
-    const ax = err as {
-      response?: { status?: number; data?: Record<string, unknown> }
+    error.value = resendErrorMessage(err)
+    if (!(err instanceof ApiError) || err.status !== 429) {
+      return
     }
-    const status = ax.response?.status
-    const data = ax.response?.data
-
-    if (status === 429 && data) {
-      error.value = String(
-        data.message || data.error || 'Please wait before requesting another email'
-      )
-
-      if (typeof data.waitSeconds === 'number') {
-        startCountdown(data.waitSeconds)
-      }
-
-      if (data.remainingAttempts !== undefined) {
-        remainingAttempts.value = Number(data.remainingAttempts)
-      }
-
-      if (data.maxAttemptsReached) {
-        error.value = 'Maximum attempts reached. Please contact support.'
-        remainingAttempts.value = 0
-      }
-    } else if (status === 500) {
-      error.value =
-        (data?.message !== undefined ? String(data.message) : null) ||
-        'A technical error occurred. Please try again later.'
-    } else if (status === 400) {
-      error.value = String(data?.error || data?.message || 'Invalid request')
-    } else {
-      error.value = getApiErrorMessage(err) || 'Failed to send email. Please try again.'
+    const details = err.details ?? {}
+    if (details.maxAttemptsReached === true) {
+      remainingAttempts.value = 0
+      return
+    }
+    if (typeof details.waitSeconds === 'number') {
+      startCountdown(details.waitSeconds)
+    }
+    if (typeof details.remainingAttempts === 'number') {
+      remainingAttempts.value = details.remainingAttempts
     }
   } finally {
     isResending.value = false
   }
 }
 
+const resendErrorMessage = (err: unknown): string => {
+  if (!(err instanceof ApiError)) {
+    return t('auth.resendFailed')
+  }
+  if (err.status === 429 && err.details?.maxAttemptsReached === true) {
+    return t('auth.resendMaxAttempts')
+  }
+  if (err.status === 429) {
+    return t('auth.resendCooldown')
+  }
+  if (err.status === 400) {
+    return t('auth.resendInvalid')
+  }
+  return t('auth.resendFailed')
+}
+
 const handleChangeEmail = () => {
   router.push('/register')
 }
-
-onMounted(() => {
-  // Don't auto-start countdown, user must click resend first
-})
 
 onUnmounted(() => {
   if (countdownInterval) {

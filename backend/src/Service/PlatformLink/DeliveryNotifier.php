@@ -50,6 +50,10 @@ final readonly class DeliveryNotifier
         if (null === $id || '' === $identity->getInstanceId()) {
             return;
         }
-        $this->bus->dispatch(new NotifyIdentityRevoked($identity->getInstanceId(), (string) $id));
+        $this->bus->dispatch(new NotifyIdentityRevoked(
+            $identity->getInstanceId(),
+            (string) $id,
+            (int) ($identity->getRevokedAt() ?? 0),
+        ));
     }
 }

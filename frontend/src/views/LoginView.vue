@@ -306,8 +306,9 @@
               <LoginEmailLink :email="email" />
 
               <Transition name="error-slide">
+                <UnverifiedLoginHint v-if="emailNotVerified" :email="email" />
                 <div
-                  v-if="error"
+                  v-else-if="error"
                   class="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40"
                   data-testid="alert-login-error"
                 >
@@ -423,6 +424,7 @@ import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
 import LoginEmailLink from '@/components/auth/LoginEmailLink.vue'
 import RegistrationClosedHint from '@/components/auth/RegistrationClosedHint.vue'
+import UnverifiedLoginHint from '@/components/verification/UnverifiedLoginHint.vue'
 import { FIRST_RUN_ADMIN_EMAIL, FIRST_RUN_ADMIN_PASSWORD } from '@/constants/firstRunAdmin'
 import { firstRunLandingPath } from '@/composables/useFirstRunSetup'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
@@ -475,6 +477,9 @@ const emailError = ref('')
 const socialError = ref('')
 const error = computed(() => socialError.value || blockedOrAuthError())
 const blockedOrAuthError = () => signupBlockedText(t, authErrorCode.value, authError.value)
+const emailNotVerified = computed(
+  () => !socialError.value && authErrorCode.value === 'EMAIL_NOT_VERIFIED'
+)
 
 const onEmailBlur = () => {
   focusedField.value = null

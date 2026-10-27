@@ -8,10 +8,14 @@ use App\Entity\ApiKey;
 use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
 use App\Entity\User;
+use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
+use App\Security\ApiKeyScope;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use App\Service\PlatformLink\Exception\PlatformSsoException;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,8 +25,14 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final readonly class PlatformSsoService
 {
+    private const BACKGROUND_LABEL_SUFFIX = ' — while you are away';
+
+    private const NAME_MAX = 128;
+
     public function __construct(
         private ExternalIdentityRepository $identities,
+        private ApiKeyRepository $apiKeys,
+        private PremiumFeatureGate $premiumFeatureGate,
         private AuditLogWriter $auditLogWriter,
         private EntityManagerInterface $entityManager,
     ) {
@@ -58,7 +68,7 @@ final readonly class PlatformSsoService
 
         $externalId = $this->uid($externalId);
         $existing = $this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId);
-        if ($existing instanceof ExternalIdentity && $existing->isOff()) {
+        if ($existing instanceof ExternalIdentity && $existing->refusesReconnect()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
         }
         if ($existing instanceof ExternalIdentity && $existing->getUserId() !== (int) $user->getId()) {
@@ -74,6 +84,7 @@ final readonly class PlatformSsoService
             ExternalIdentity::MODE_SSO,
         );
         $row->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        $row->setRevokedAt(null);
         $this->entityManager->flush();
 
         $this->auditLogWriter->record(
@@ -97,6 +108,92 @@ final readonly class PlatformSsoService
             'status' => ExternalIdentity::STATUS_ACTIVE,
             'link_id' => (int) $row->getId(),
         ];
+    }
+
+    /**
+     * Mint the unattended key for an organisation-login identity. The
+     * plaintext is in the answer only the first time.
+     *
+     * @return array{success: bool, api_key_id: int, scopes: list<string>, key?: string}
+     */
+    public function backgroundKey(User $user, string $azp, PlatformInstance $instance, string $externalId, string $ip): array
+    {
+        $expected = $instance->getOidcClientId() ?? '';
+        if ('' === $expected || $azp !== $expected) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'azp_mismatch', 'This login is not the one registered for this cloud.');
+        }
+
+        $externalId = $this->uid($externalId);
+        $row = $this->activeOrganisationRow($user, $instance, $externalId);
+
+        /** @var array{success: bool, api_key_id: int, scopes: list<string>, key?: string} $minted */
+        $minted = $this->entityManager->wrapInTransaction(function () use ($row, $user, $instance, $externalId): array {
+            $this->entityManager->lock($row, LockMode::PESSIMISTIC_WRITE);
+            $this->entityManager->refresh($row);
+            if ($row->refusesReconnect()) {
+                throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
+            }
+            if ($row->ownerTurnedOff()) {
+                $row->setAccess(true, true);
+                $row->setRevokedAt(null);
+            }
+
+            $existing = $this->activeBackgroundKey($row);
+            if ($existing instanceof ApiKey) {
+                return [
+                    'success' => true,
+                    'api_key_id' => (int) $existing->getId(),
+                    'scopes' => ApiKeyScope::backgroundKeyScopes(),
+                ];
+            }
+
+            $this->premiumFeatureGate->assertApiKeysAllowed($user);
+            $previous = $this->boundKey($row);
+            if ($previous instanceof ApiKey && $previous->isActive()) {
+                $previous->setStatus('revoked');
+            }
+
+            $plain = 'sk_'.bin2hex(random_bytes(29));
+            $apiKey = new ApiKey();
+            $apiKey->setOwner($user);
+            $apiKey->setKey($plain);
+            $apiKey->setName($this->backgroundLabel($instance, $externalId));
+            $apiKey->setStatus('active');
+            $apiKey->setScopes(ApiKeyScope::backgroundKeyScopes());
+            $this->entityManager->persist($apiKey);
+            $this->entityManager->flush();
+
+            $keyId = $apiKey->getId();
+            if (null === $keyId) {
+                throw new \LogicException('Minted background key has no id.');
+            }
+            $row->setApiKeyId($keyId);
+
+            return [
+                'success' => true,
+                'api_key_id' => $keyId,
+                'scopes' => ApiKeyScope::backgroundKeyScopes(),
+                'key' => $plain,
+            ];
+        });
+
+        if (isset($minted['key'])) {
+            $this->auditLogWriter->record(
+                (int) $user->getId(),
+                'platform_link.background_key',
+                'platform_link',
+                (string) $row->getId(),
+                [
+                    'client' => $instance->getClient(),
+                    'host' => $instance->getHost(),
+                    'external_id' => $externalId,
+                    'api_key_id' => $minted['api_key_id'],
+                ],
+                $ip,
+            );
+        }
+
+        return $minted;
     }
 
     /**
@@ -185,6 +282,68 @@ final readonly class PlatformSsoService
             'link_id' => (int) $row->getId(),
             'api_key_id' => $row->getApiKeyId(),
         ];
+    }
+
+    private function activeOrganisationRow(User $user, PlatformInstance $instance, string $externalId): ExternalIdentity
+    {
+        $row = $this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId);
+        if (!$row instanceof ExternalIdentity || $row->getUserId() !== (int) $user->getId()) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_bound', 'Connect this cloud in Synaplan before watching folders.');
+        }
+        if ($row->refusesReconnect()) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
+        }
+        if (ExternalIdentity::MODE_SSO !== $row->getMode()) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_organisation_login', 'A background key is only for organisation login.');
+        }
+
+        return $row;
+    }
+
+    private function activeBackgroundKey(ExternalIdentity $row): ?ApiKey
+    {
+        $key = $this->boundKey($row);
+
+        return $key instanceof ApiKey && $key->isActive() && $this->isBackgroundKey($key) ? $key : null;
+    }
+
+    private function boundKey(ExternalIdentity $row): ?ApiKey
+    {
+        $keyId = $row->getApiKeyId();
+        if (null === $keyId) {
+            return null;
+        }
+        $key = $this->apiKeys->find($keyId);
+
+        return $key instanceof ApiKey ? $key : null;
+    }
+
+    private function isBackgroundKey(ApiKey $key): bool
+    {
+        $scopes = array_values($key->getScopes());
+        $expected = ApiKeyScope::backgroundKeyScopes();
+        sort($scopes);
+        sort($expected);
+
+        return $scopes === $expected;
+    }
+
+    private function backgroundLabel(PlatformInstance $instance, string $externalId): string
+    {
+        $app = match ($instance->getClient()) {
+            PlatformInstance::CLIENT_NEXTCLOUD => 'Nextcloud',
+            PlatformInstance::CLIENT_OWNCLOUD => 'ownCloud.online',
+            PlatformInstance::CLIENT_OPENCLOUD => 'OpenCloud',
+            default => ucfirst($instance->getClient()),
+        };
+        $host = preg_replace('#^https?://#', '', $instance->getHost()) ?? $instance->getHost();
+        $host = rtrim($host, '/');
+        $label = sprintf('%s: %s (%s)%s', $app, $host, $externalId, self::BACKGROUND_LABEL_SUFFIX);
+        if (mb_strlen($label) <= self::NAME_MAX) {
+            return $label;
+        }
+
+        return mb_substr($label, 0, self::NAME_MAX);
     }
 
     private function uid(string $externalId): string

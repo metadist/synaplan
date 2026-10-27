@@ -31,6 +31,12 @@ class ExternalIdentity
 
     public const STATUS_REVOKED = 'revoked';
 
+    /** The cloud disabled this person. The person did not turn it off. */
+    public const STATUS_SUSPENDED = 'suspended';
+
+    /** The person turned it off and the cloud disabled them. */
+    public const STATUS_BLOCKED = 'blocked';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -206,7 +212,43 @@ class ExternalIdentity
      */
     public function isOff(): bool
     {
-        return self::STATUS_PAUSED === $this->status || self::STATUS_REVOKED === $this->status;
+        return self::STATUS_ACTIVE !== $this->status;
+    }
+
+    public function refusesReconnect(): bool
+    {
+        return self::STATUS_REVOKED === $this->status || $this->cloudDisabled();
+    }
+
+    public function ownerTurnedOff(): bool
+    {
+        return self::STATUS_PAUSED === $this->status || self::STATUS_BLOCKED === $this->status;
+    }
+
+    public function cloudDisabled(): bool
+    {
+        return self::STATUS_SUSPENDED === $this->status || self::STATUS_BLOCKED === $this->status;
+    }
+
+    /**
+     * Access is allowed only when the person and the cloud both allow it.
+     */
+    public function setAccess(bool $ownerAllows, bool $cloudAllows): self
+    {
+        if ($ownerAllows && $cloudAllows) {
+            $this->status = self::STATUS_ACTIVE;
+
+            return $this;
+        }
+        if (!$ownerAllows && !$cloudAllows) {
+            $this->status = self::STATUS_BLOCKED;
+
+            return $this;
+        }
+
+        $this->status = $ownerAllows ? self::STATUS_SUSPENDED : self::STATUS_PAUSED;
+
+        return $this;
     }
 
     /**

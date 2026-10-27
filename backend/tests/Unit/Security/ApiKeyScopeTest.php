@@ -444,6 +444,41 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users', 'GET'));
     }
 
+    public function testCloudWatchScopeIsExactAndFromMessageIsSessionOnly(): void
+    {
+        self::assertSame(['files', 'rag', 'cloud:watch'], ApiKeyScope::backgroundKeyScopes());
+
+        self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/watches', 'GET'));
+        self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/watches', 'POST'));
+        self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/trials', 'POST'));
+        self::assertTrue(ApiKeyScope::allows(['cloud:watch'], '/api/v1/cloud/watches', 'GET'));
+        self::assertTrue(ApiKeyScope::allows(['cloud:watch'], '/api/v1/cloud/watches/4/files', 'POST'));
+        self::assertTrue(ApiKeyScope::allows(['cloud:watch'], '/api/v1/cloud/trials', 'POST'));
+        self::assertFalse(ApiKeyScope::allows(['cloud:watch'], '/api/v1/cloud/trials', 'GET'));
+        self::assertFalse(ApiKeyScope::allows(['cloud:watch'], '/api/v1/cloud/status', 'POST'));
+        self::assertTrue(ApiKeyScope::allows(['files'], '/api/v1/cloud/status', 'POST'));
+        self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/status', 'GET'));
+        self::assertTrue(ApiKeyScope::allows(['files'], '/api/v1/cloud/files/9', 'GET'));
+        self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/files/9', 'POST'));
+        self::assertFalse(ApiKeyScope::allows(['chat'], '/api/v1/cloud/status', 'POST'));
+
+        $fromMessage = '/api/v1/cloud/watches/from-message/12';
+        foreach ([[], ['*'], ['files'], ['cloud:watch'], ['chat'], ['rag'], ApiKeyScope::backgroundKeyScopes(), ApiKeyScope::platformLinkScopes(true)] as $scopes) {
+            self::assertFalse(ApiKeyScope::allows($scopes, $fromMessage, 'POST'));
+            self::assertTrue(ApiKeyScope::isSessionOnly('POST', $fromMessage));
+        }
+        self::assertFalse(ApiKeyScope::isSessionOnly('POST', '/api/v1/cloud/watches/12'));
+        $encoded = '/api/v1/cloud/watches/%66rom-message/12';
+        self::assertTrue(ApiKeyScope::isSessionOnly('POST', $encoded));
+        self::assertFalse(ApiKeyScope::allows(['*'], $encoded, 'POST'));
+        self::assertFalse(ApiKeyScope::allows(['cloud:watch'], $encoded, 'POST'));
+        self::assertFalse(ApiKeyScope::allows([], '/api/v1/cloud/watches/%2566rom-message/12', 'POST'));
+
+        foreach (['chat', 'files', 'rag'] as $scope) {
+            self::assertTrue(ApiKeyScope::allows([$scope], '/api/v1/platform-links/identities/adopt', 'POST'));
+        }
+    }
+
     public function testPlatformRoutesKeepTheGatewayScopes(): void
     {
         self::assertTrue(ApiKeyScope::allows(['desktop:messages'], '/v1/chat/completions', 'POST'));

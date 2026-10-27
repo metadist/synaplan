@@ -60,6 +60,15 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
         }
 
         $scopes = $apiKey->getScopes();
+        $path = $request->getPathInfo();
+        $method = $request->getMethod();
+
+        // Pinning a turn is signed-in only. A legacy or `*` key is refused too.
+        if (ApiKeyScope::isSessionOnly($method, $path)) {
+            $this->deny($event, $apiKey, $path, $method, $scopes);
+
+            return;
+        }
 
         // Grandfathered keys (empty / legacy-webhook-only / `*`) keep full
         // access — this listener is a no-op for them.
@@ -67,19 +76,25 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $path = $request->getPathInfo();
-
         // A key may always revoke itself (Synamail sign-out): a leaked key can
         // only destroy itself, never the owner's other keys.
-        if (ApiKeyScope::isSelfRevoke($request->getMethod(), $path, (int) $apiKey->getId())) {
+        if (ApiKeyScope::isSelfRevoke($method, $path, (int) $apiKey->getId())) {
             return;
         }
 
-        if (ApiKeyScope::allows($scopes, $path, $request->getMethod())) {
+        if (ApiKeyScope::allows($scopes, $path, $method)) {
             return;
         }
 
-        $required = ApiKeyScope::requiredScopesForPath($path, $request->getMethod());
+        $this->deny($event, $apiKey, $path, $method, $scopes);
+    }
+
+    /**
+     * @param list<string>|array<int|string, mixed> $scopes
+     */
+    private function deny(RequestEvent $event, ApiKey $apiKey, string $path, string $method, array $scopes): void
+    {
+        $required = ApiKeyScope::requiredScopesForPath($path, $method);
 
         $this->logger->warning('API key blocked by insufficient scope', [
             'key_id' => $apiKey->getId(),

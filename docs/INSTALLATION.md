@@ -534,12 +534,12 @@ docker compose exec backend uname -m   # expect: aarch64
 - `x86_64` means the local development container is running under emulation.
   Rebuild with `docker compose build --pull backend worker`, then run
   `make up`.
-- The optional `phpmyadmin` and `mailhog` services use amd64-only upstream images
-  and stay emulated. Enable **Docker Desktop → Settings → General → "Use Rosetta
-  for x86/amd64 emulation on Apple Silicon"** (macOS 13+) — much faster than the
-  default QEMU — or drop those two services if you don't need them. The
-  `requested image's platform (linux/amd64) does not match ...` warning refers to
-  them and is safe to ignore.
+- phpMyAdmin uses the official multi-arch image and runs natively. MailHog
+  uses an amd64-only upstream image and stays emulated. Enable **Docker
+  Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on
+  Apple Silicon"** (macOS 13+) — much faster than the default QEMU — or drop
+  MailHog if you don't need it. The `requested image's platform (linux/amd64)
+  does not match ...` warning refers to MailHog and is safe to ignore.
 - The first `make up` is slower because the image is built; every
   later start is a cache hit.
 

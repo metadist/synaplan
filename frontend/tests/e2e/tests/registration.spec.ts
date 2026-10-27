@@ -58,6 +58,24 @@ test.describe('@ci @password @auth Registration', () => {
         await expect(page).toHaveURL(/\/login/)
       })
 
+      await test.step('Act: sign in before confirming and resend from the hint', async () => {
+        await page.locator(selectors.login.email).fill(testEmail)
+        await page.locator(selectors.login.password).fill(testPassword)
+        await page.locator(selectors.login.submit).click()
+
+        await page
+          .locator(selectors.login.unverifiedAlert)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await page.locator(selectors.login.resendVerificationLink).click()
+        await expect(page).toHaveURL(/\/verify-email\?email=/)
+
+        await page.locator(selectors.verifyEmail.resendBtn).click()
+        await page
+          .locator(selectors.verifyEmail.resendSuccess)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await expect(page.locator(selectors.verifyEmail.resendBtn)).toBeDisabled()
+      })
+
       const href = await test.step('Act: wait for verification email', async () => {
         return waitForVerificationHref(request, testEmail, {
           timeout: TIMEOUTS.STANDARD,
