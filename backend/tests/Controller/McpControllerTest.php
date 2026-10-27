@@ -13,6 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 final class McpControllerTest extends WebTestCase
 {
@@ -31,6 +32,30 @@ final class McpControllerTest extends WebTestCase
 
         $this->createUserWithApiKey();
         $this->createAdminUserWithApiKey();
+
+        // The test rate-limiter pool is a filesystem cache that outlives the run.
+        $this->discoveryLimiter()->create('127.0.0.1')->reset();
+    }
+
+    public function testUnauthenticatedDiscoveryIsRateLimitedPerIp(): void
+    {
+        $this->discoveryLimiter()->create('127.0.0.1')->consume(30);
+
+        $this->client->request(
+            'POST',
+            '/mcp',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json, text/event-stream',
+            ],
+            content: (string) json_encode($this->initializePayload()),
+        );
+
+        $response = $this->client->getResponse();
+        self::assertSame(Response::HTTP_TOO_MANY_REQUESTS, $response->getStatusCode());
+        self::assertNotNull($response->headers->get('Retry-After'));
+
+        $this->initialize();
     }
 
     public function testUnauthenticatedDiscoveryListsPublicTools(): void
@@ -390,6 +415,14 @@ final class McpControllerTest extends WebTestCase
         $this->em->flush();
 
         return ['chatId' => (int) $chat->getId(), 'fileId' => (int) $file->getId()];
+    }
+
+    private function discoveryLimiter(): RateLimiterFactoryInterface
+    {
+        $limiter = static::getContainer()->get('limiter.mcp_discovery_anon');
+        self::assertInstanceOf(RateLimiterFactoryInterface::class, $limiter);
+
+        return $limiter;
     }
 
     /**

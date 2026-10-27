@@ -69,6 +69,17 @@ final class McpServerFactory
     private const SERVER_VERSION = '0.1.0';
     private const SESSION_TTL_SECONDS = 3600;
 
+    private const INSTRUCTIONS = 'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
+        .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
+        .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
+        .'store long-term memories; file_ingest to add documents to the knowledge base; and '
+        .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
+        .'Documents and memories are also available as resources, and task prompts as MCP '
+        .'prompts. Everything is scoped to the authenticated Synaplan account.';
+
+    private const DISCOVERY_INSTRUCTIONS = 'This session is not signed in: it lists the tools only. '
+        .'Connect with a Synaplan API key or your Synaplan account to call them.';
+
     /** Cap resource bodies so a single large document can't produce a huge MCP response. */
     private const MAX_RESOURCE_CHARS = 100000;
 
@@ -165,13 +176,13 @@ final class McpServerFactory
      */
     public function buildDiscovery(): Server
     {
-        $builder = $this->newBuilder();
-        $this->registerPublicTools($builder, $this->discoveryHandlers());
+        $builder = $this->newBuilder(self::INSTRUCTIONS.' '.self::DISCOVERY_INSTRUCTIONS);
+        (new McpPublicTools())->registerDiscovery($builder, null !== $this->assistantAliases);
 
         return $builder->build();
     }
 
-    private function newBuilder(): Builder
+    private function newBuilder(string $instructions = self::INSTRUCTIONS): Builder
     {
         return Server::builder()
             ->setServerInfo(
@@ -179,16 +190,7 @@ final class McpServerFactory
                 self::SERVER_VERSION,
                 'Synaplan MCP server — knowledge retrieval (RAG) and user memories.',
             )
-            ->setInstructions(
-                'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
-                .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
-                .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
-                .'store long-term memories; file_ingest to add documents to the knowledge base; and '
-                .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
-                .'Documents and memories are also available as resources, and task prompts as MCP '
-                .'prompts. Everything is scoped to the authenticated Synaplan account. '
-                .'Calling a tool requires an API key.',
-            )
+            ->setInstructions($instructions)
             ->setLogger($this->logger)
             ->setSession($this->sessionStore());
     }
@@ -222,29 +224,6 @@ final class McpServerFactory
         }
 
         return $handlers;
-    }
-
-    /**
-     * @return array<string, \Closure>
-     */
-    private function discoveryHandlers(): array
-    {
-        $refuse = static function (mixed ...$arguments): never {
-            throw new ToolCallException('Authentication required.');
-        };
-
-        return [
-            'synaplan_chat' => $refuse,
-            'rag_search' => $refuse,
-            'memory_search' => $refuse,
-            'memory_add' => $refuse,
-            'file_ingest' => $refuse,
-            'rag_similar' => $refuse,
-            'list_chats' => $refuse,
-            'get_messages' => $refuse,
-            'list_prompts' => $refuse,
-            'list_assistants' => $refuse,
-        ];
     }
 
     /**
@@ -1135,253 +1114,6 @@ final class McpServerFactory
                     'description' => 'Maximum number of events to return in recent mode (1-200).',
                 ],
             ],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function ragSimilarSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'message_id' => [
-                    'type' => 'integer',
-                    'description' => 'The source document/message id to find similar chunks for '
-                        .'(use a `message_id` returned by rag_search).',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 50,
-                    'default' => 10,
-                    'description' => 'Maximum number of similar chunks to return (1-50).',
-                ],
-            ],
-            'required' => ['message_id'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function listChatsSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 200,
-                    'default' => 50,
-                    'description' => 'Maximum number of chats to return (1-200).',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function getMessagesSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'chat_id' => [
-                    'type' => 'integer',
-                    'description' => 'The id of the chat (from list_chats) to read messages from.',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 100,
-                    'default' => 50,
-                    'description' => 'Maximum number of (most recent) messages to return (1-100).',
-                ],
-            ],
-            'required' => ['chat_id'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function listPromptsSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => new \stdClass(),
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function chatSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'message' => [
-                    'type' => 'string',
-                    'description' => 'The message or question to send through Synaplan\'s full AI '
-                        .'pipeline (classification, web search, RAG over the user\'s documents, '
-                        .'memories, and inference).',
-                ],
-                'chat_id' => [
-                    'type' => ['integer', 'null'],
-                    'description' => 'Optional existing chat id (from list_chats) to continue a '
-                        .'conversation. Omit to start a new chat.',
-                ],
-                'agentId' => [
-                    'type' => ['string', 'integer', 'null'],
-                    'description' => 'Optional assistant id or slug (see list_assistants). Pins the reply '
-                        .'to that assistant; fails when it is not published, not usable by you, '
-                        .'or does not allow connected apps.',
-                ],
-            ],
-            'required' => ['message'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function listAssistantsSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => new \stdClass(),
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function ragSearchSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'query' => [
-                    'type' => 'string',
-                    'description' => 'Natural-language search query.',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 50,
-                    'default' => 10,
-                    'description' => 'Maximum number of chunks to return (1-50).',
-                ],
-                'min_score' => [
-                    'type' => 'number',
-                    'minimum' => 0,
-                    'maximum' => 1,
-                    'default' => 0.3,
-                    'description' => 'Minimum similarity score (0-1) a chunk must reach to be returned.',
-                ],
-                'group_key' => [
-                    'type' => ['string', 'null'],
-                    'description' => 'Optional document group key to scope the search to a single document/collection.',
-                ],
-            ],
-            'required' => ['query'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function fileIngestSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'name' => [
-                    'type' => 'string',
-                    'description' => 'A human-readable name/title for the document.',
-                ],
-                'content' => [
-                    'type' => 'string',
-                    'description' => 'The text content to ingest. It is chunked, embedded, and made '
-                        .'retrievable via rag_search.',
-                ],
-                'group_key' => [
-                    'type' => ['string', 'null'],
-                    'description' => 'Optional group key to scope the document. Pass the same value to '
-                        .'rag_search to retrieve only this group; omit it to search the whole corpus.',
-                ],
-            ],
-            'required' => ['name', 'content'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function memoryAddSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'category' => [
-                    'type' => 'string',
-                    'description' => 'Category for the memory, e.g. preferences, work, personal, health.',
-                ],
-                'key' => [
-                    'type' => 'string',
-                    'minLength' => 3,
-                    'description' => 'Short identifier for the memory (min 3 characters), e.g. tech_stack.',
-                ],
-                'value' => [
-                    'type' => 'string',
-                    'minLength' => 1,
-                    'description' => 'The fact or preference to remember.',
-                ],
-            ],
-            'required' => ['category', 'key', 'value'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function memorySearchSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'query' => [
-                    'type' => 'string',
-                    'description' => 'Natural-language query describing the memory to look up.',
-                ],
-                'category' => [
-                    'type' => ['string', 'null'],
-                    'description' => 'Optional category filter (e.g. preferences, work, personal).',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 50,
-                    'default' => 5,
-                    'description' => 'Maximum number of memories to return (1-50).',
-                ],
-            ],
-            'required' => ['query'],
             'additionalProperties' => false,
         ];
     }

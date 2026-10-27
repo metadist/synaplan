@@ -22,6 +22,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -31,8 +32,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Exposes Synaplan capabilities to external MCP hosts (Claude, Cursor, …) over
  * the spec's Streamable HTTP transport. API key or OIDC bearer authenticates
  * a user when one is presented. `initialize` and `tools/list` are public so a
- * registry can read the tool catalog; every other method without a user is
- * rejected with 401 and the RFC 9728 challenge.
+ * registry can read the tool catalog (rate limited per client IP); every
+ * other method without a user is rejected with 401 and the RFC 9728 challenge.
  *
  * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports/streamable-http
  */
@@ -48,6 +49,7 @@ class McpController extends AbstractController
         private readonly string $appUrl,
         private readonly string $oidcDiscoveryUrl,
         private readonly McpAnonymousAccess $anonymousAccess,
+        private readonly RateLimiterFactoryInterface $mcpDiscoveryAnonLimiter,
         string $mcpAllowedHosts,
     ) {
         $this->extraAllowedHosts = array_values(array_filter(array_map(
@@ -63,8 +65,15 @@ class McpController extends AbstractController
             return new Response('', Response::HTTP_NO_CONTENT, ['Allow' => 'POST, DELETE, OPTIONS']);
         }
 
-        if (!$user instanceof User && !$this->anonymousAccess->allows($request)) {
-            return $this->unauthorized();
+        if (!$user instanceof User) {
+            if (!$this->anonymousAccess->allows($request)) {
+                return $this->unauthorized();
+            }
+
+            $limit = $this->mcpDiscoveryAnonLimiter->create($request->getClientIp() ?? 'unknown')->consume();
+            if (!$limit->isAccepted()) {
+                return $this->tooManyRequests($limit->getRetryAfter());
+            }
         }
 
         $transport = new StreamableHttpTransport(
@@ -174,6 +183,15 @@ class McpController extends AbstractController
             ['error' => 'Authentication required', 'code' => 'UNAUTHENTICATED'],
             Response::HTTP_UNAUTHORIZED,
             ['WWW-Authenticate' => $this->wwwAuthenticate()],
+        );
+    }
+
+    private function tooManyRequests(\DateTimeImmutable $retryAfter): JsonResponse
+    {
+        return new JsonResponse(
+            ['error' => 'Too many requests', 'code' => 'RATE_LIMITED'],
+            Response::HTTP_TOO_MANY_REQUESTS,
+            ['Retry-After' => (string) max(1, $retryAfter->getTimestamp() - time())],
         );
     }
 

@@ -39,6 +39,33 @@ final class McpAnonymousAccessTest extends TestCase
         self::assertFalse($this->access->allows($request));
     }
 
+    public function testAllowsABatchOfDiscoveryMethods(): void
+    {
+        $request = Request::create('/mcp', 'POST', content: (string) json_encode([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize'],
+            ['jsonrpc' => '2.0', 'method' => 'notifications/initialized'],
+        ]));
+
+        self::assertTrue($this->access->allows($request));
+    }
+
+    public function testRejectsAnEmptyBatchAndAMessageWithoutMethod(): void
+    {
+        self::assertFalse($this->access->allows(Request::create('/mcp', 'POST', content: '[]')));
+        self::assertFalse($this->access->allows(Request::create('/mcp', 'POST', content: '{"jsonrpc":"2.0","id":1}')));
+        self::assertFalse($this->access->allows(Request::create('/mcp', 'POST', content: '"tools/list"')));
+    }
+
+    public function testRejectsOtherHttpMethods(): void
+    {
+        self::assertFalse($this->access->allows(Request::create('/mcp', 'GET')));
+        self::assertFalse($this->access->allows(Request::create('/mcp', 'PUT', content: (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ]))));
+    }
+
     public function testAllowsSessionDelete(): void
     {
         self::assertTrue($this->access->allows(Request::create('/mcp', 'DELETE')));
