@@ -5,7 +5,7 @@ here, not a chat message.
 
 | Step | Issue | State |
 | ---- | ----- | ----- |
-| Plan | [#2823](https://github.com/metadist/synaplan/issues/2823) | written 2026-10-27; §0 unticked |
+| Plan | [#2823](https://github.com/metadist/synaplan/issues/2823) | written 2026-10-27; §0 ticked 2026-10-27 |
 | MO0 | see master plan §4 | not started |
 | MO1 | see master plan §4 | not started |
 | MO2 | [#2823](https://github.com/metadist/synaplan/issues/2823) | not started |

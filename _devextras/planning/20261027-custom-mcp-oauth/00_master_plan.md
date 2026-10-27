@@ -1,6 +1,6 @@
 # Sign in to your own MCP server — 2026-10-27
 
-**Status:** Plan. §0 unticked.
+**Status:** Plan. §0 ticked by the owner on 2026-10-27, every row as proposed; D2 as the owner chose it.
 **Issue:** [#2823](https://github.com/metadist/synaplan/issues/2823) (michael-laemmlein-marini).
 **Base:** `main` at `cc9957b41`.
 **Goal:** A person adds the address of their own MCP server, chooses
@@ -49,20 +49,20 @@ path needs two fixes first (MO0, MO1). Their details are private (§4).
 
 ## 2. Decisions (§0)
 
-Proposed. The owner ticks or changes each row before MO0 starts.
+Ticked by the owner on 2026-10-27.
 
 | # | Decision | Why |
 | - | -------- | --- |
-| D1 | [ ] **Security before the feature.** MO0 and MO1 merge and are deployed on web.synaplan.com before MO3 merges. | MO3 makes the sign-in path reachable for any address. |
-| D2 | [ ] **MO0 and MO1 are developed as the private note says** (§4), like row 29's IC0. Their public commit subjects are written in the note. | The repository is public. |
-| D3 | [ ] **Keep today's discovery contract.** A custom server must publish RFC 9728 protected-resource metadata and RFC 8414 authorization-server metadata, support RFC 7591 registration and PKCE S256. No OpenID Connect discovery fallback and no hand-entered client id in this track. | The issue says so. A broader discovery order (the MCP spec's OIDC forms) is a follow-up issue, not hidden scope. |
-| D4 | [ ] **Sign-in needs `https`.** The server address and every address its sign-in metadata names must be `https`. Access key and No sign-in keep accepting `http` as today. | Tokens over plain `http` can be read on the way. |
-| D5 | [ ] **Three methods, plain words:** No sign-in (`none`), Access key (`bearer`), Sign in with your account (`oauth`). The third appears only while `MCP.OAUTH_CONNECTORS_ENABLED` is on. Custom keeps Access key as its default. | U11: flag off ⇒ absent. The words a non-technical user understands. |
-| D6 | [ ] **An existing sign-in row while the flag is off** shows its method read-only with one sentence, and can still be renamed, switched off, disconnected and deleted. The backend refuses only a switch *to* `oauth` while the flag is off. | Today the form always sends `auth_mode`, so such a row cannot even be renamed. Undo is a click (bar item 5). |
-| D7 | [ ] **Write actions stay off by default** for a custom sign-in server; the person turns them on. | Unchanged default; restated because sign-in servers are often writable. |
-| D8 | [ ] **The method and the key fields move into a new `McpServerAuthFields.vue`.** `McpServersConfiguration.vue` does not grow. | It is 789 lines against the 300-line rule. |
-| D9 | [ ] **A failed start answers a stable `error_code`.** The page shows one sentence per code in all five locales, never the server's text. Saved-but-not-signed-in says both halves. | U8. The issue's "user-friendly language" criterion. |
-| D10 | [ ] **Walks use a real server.** The SSRF guard refuses local addresses, so J-MO-1 runs against (a) Notion's address entered through Custom and (b) a spec-compliant fixture published through a temporary public tunnel (`cloudflared`, installed on the walker's machine only, not a project dependency). A walk that cannot run is a STATUS line that says why. | `_devextras/planning/AGENTS.md`: no invented walks. |
+| D1 | [x] **Security before the feature.** MO0 and MO1 merge and are deployed on web.synaplan.com before MO3 merges. | MO3 makes the sign-in path reachable for any address. |
+| D2 | [x] **MO0 and MO1 are normal public pull requests** with the neutral commit subjects from the private note, deployed right after merge. No private fork, no interim switch on web.synaplan.com (owner, 2026-10-27). The note's details stay private until the release. | The fixes are small and ship within the day; the repository is public, so pull request text names the hardening, not the attack. |
+| D3 | [x] **Keep today's discovery contract.** A custom server must publish RFC 9728 protected-resource metadata and RFC 8414 authorization-server metadata, support RFC 7591 registration and PKCE S256. No OpenID Connect discovery fallback and no hand-entered client id in this track. | The issue says so. A broader discovery order (the MCP spec's OIDC forms) is a follow-up issue, not hidden scope. |
+| D4 | [x] **Sign-in needs `https`.** The server address and every address its sign-in metadata names must be `https`. Access key and No sign-in keep accepting `http` as today. | Tokens over plain `http` can be read on the way. |
+| D5 | [x] **Three methods, plain words:** No sign-in (`none`), Access key (`bearer`), Sign in with your account (`oauth`). The third appears only while `MCP.OAUTH_CONNECTORS_ENABLED` is on. Custom keeps Access key as its default. | U11: flag off ⇒ absent. The words a non-technical user understands. |
+| D6 | [x] **An existing sign-in row while the flag is off** shows its method read-only with one sentence, and can still be renamed, switched off, disconnected and deleted. The backend refuses only a switch *to* `oauth` while the flag is off. | Today the form always sends `auth_mode`, so such a row cannot even be renamed. Undo is a click (bar item 5). |
+| D7 | [x] **Write actions stay off by default** for a custom sign-in server; the person turns them on. | Unchanged default; restated because sign-in servers are often writable. |
+| D8 | [x] **The method and the key fields move into a new `McpServerAuthFields.vue`.** `McpServersConfiguration.vue` does not grow. | It is 789 lines against the 300-line rule. |
+| D9 | [x] **A failed start answers a stable `error_code`.** The page shows one sentence per code in all five locales, never the server's text. Saved-but-not-signed-in says both halves. | U8. The issue's "user-friendly language" criterion. |
+| D10 | [x] **Walks use a real server.** The SSRF guard refuses local addresses, so J-MO-1 runs against (a) Notion's address entered through Custom and (b) a spec-compliant fixture published through a temporary public tunnel (`cloudflared`, installed on the walker's machine only, not a project dependency). A walk that cannot run is a STATUS line that says why. | `_devextras/planning/AGENTS.md`: no invented walks. |
 
 ---
 
@@ -111,9 +111,10 @@ Delete; where it came from is the address.
 The security review of 2026-10-27 is recorded in
 `synaplan-platform/planning/20261027-mcp-oauth-security-note/README.md`.
 It holds MO0 and MO1: what they fix, their tests, their journeys, their
-public commit subjects, and the disclosure rule. Nothing from it moves into
-this repository — plan, commit message, pull request, issue, test name —
-until the rule there allows it. Then this section is replaced by its text.
+public commit subjects, and the disclosure rule. The MO0 and MO1 pull
+requests (D2) use those subjects and describe the hardening, not how it
+could be abused. The note's text moves here after the release, as the
+rule there says.
 
 ---
 
