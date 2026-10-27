@@ -9,7 +9,6 @@ use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
 use App\Entity\SavedTask;
 use App\Entity\User;
-use App\Repository\PlatformInstanceRepository;
 use App\Repository\CloudWatchItemRepository;
 use App\Repository\CloudWatchRepository;
 use App\Repository\ExternalIdentityRepository;
@@ -167,12 +166,9 @@ final readonly class CloudWatchService
 
     public function platformFor(ExternalIdentity $identity): PlatformInstance
     {
-        $repository = $this->entityManager->getRepository(PlatformInstance::class);
-        if ($repository instanceof PlatformInstanceRepository) {
-            $platform = $repository->findByInstanceId($identity->getInstanceId());
-            if ($platform instanceof PlatformInstance) {
-                return $platform;
-            }
+        $platform = $this->entityManager->getRepository(PlatformInstance::class)->findByInstanceId($identity->getInstanceId());
+        if ($platform instanceof PlatformInstance) {
+            return $platform;
         }
 
         throw new CloudWatchException(403, 'This key is not linked to a cloud.', 'platform_disconnected');
@@ -196,15 +192,9 @@ final readonly class CloudWatchService
 
     private function host(ExternalIdentity $identity): string
     {
-        $repository = $this->entityManager->getRepository(PlatformInstance::class);
-        if ($repository instanceof PlatformInstanceRepository) {
-            $platform = $repository->findByInstanceId($identity->getInstanceId());
-            if ($platform instanceof PlatformInstance) {
-                return $platform->getHost();
-            }
-        }
+        $platform = $this->entityManager->getRepository(PlatformInstance::class)->findByInstanceId($identity->getInstanceId());
 
-        return $identity->getInstanceId();
+        return $platform instanceof PlatformInstance ? $platform->getHost() : $identity->getInstanceId();
     }
 
     private function owned(User $user, int $id): CloudWatch

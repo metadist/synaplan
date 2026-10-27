@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\CloudWatch;
+use App\Entity\CloudWatchItem;
 use App\Entity\ExternalIdentity;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -17,6 +19,31 @@ class CloudWatchRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, CloudWatch::class);
+    }
+
+    public function deleteByOwner(int $ownerId): void
+    {
+        /** @var list<int|string> $ids */
+        $ids = $this->createQueryBuilder('w')
+            ->select('w.id')
+            ->where('w.ownerId = :owner')
+            ->setParameter('owner', $ownerId)
+            ->getQuery()
+            ->getSingleColumnResult();
+        if ([] !== $ids) {
+            $this->getEntityManager()->createQueryBuilder()
+                ->delete(CloudWatchItem::class, 'i')
+                ->where('i.watchId IN (:ids)')
+                ->setParameter('ids', $ids, ArrayParameterType::INTEGER)
+                ->getQuery()
+                ->execute();
+        }
+        $this->createQueryBuilder('w')
+            ->delete()
+            ->where('w.ownerId = :owner')
+            ->setParameter('owner', $ownerId)
+            ->getQuery()
+            ->execute();
     }
 
     public function countOpenForOwner(int $ownerId): int

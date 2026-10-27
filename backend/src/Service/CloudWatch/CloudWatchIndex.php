@@ -89,9 +89,7 @@ final readonly class CloudWatchIndex
             'body' => [
                 'items' => $this->present($rows, false),
                 'tombstones' => $this->tombstones($rows),
-                'next_cursor' => $last instanceof CloudWatch
-                    ? WatchIndexCursor::since($now, $last->getUpdated(), (int) $last->getId())
-                    : $cursor,
+                'next_cursor' => WatchIndexCursor::since($now, $last->getUpdated(), (int) $last->getId()),
             ],
         ];
     }
@@ -189,11 +187,7 @@ final readonly class CloudWatchIndex
 
     private function limit(Request $request): int
     {
-        $raw = $request->query->get('limit', '500');
-        if (!is_string($raw) && !is_int($raw)) {
-            throw new CloudWatchException(400, 'Ask for between 1 and 500 watches.');
-        }
-        $limit = (int) $raw;
+        $limit = (int) $request->query->get('limit', '500');
         if ($limit < 1 || $limit > 500) {
             throw new CloudWatchException(400, 'Ask for between 1 and 500 watches.');
         }

@@ -28,9 +28,6 @@ final readonly class CloudFilesConfig
     ) {
     }
 
-    /**
-     * @return array{bird: string|null, bird_eyes: string|null}
-     */
     public function watchesPerPerson(): int
     {
         return $this->positive(self::WATCHES_PER_PERSON, WatchLimits::DEFAULT_PER_PERSON);
@@ -41,6 +38,9 @@ final readonly class CloudFilesConfig
         return $this->positive(self::WATCHES_PER_INSTANCE, WatchLimits::DEFAULT_PER_INSTANCE);
     }
 
+    /**
+     * @return array{bird: string|null, bird_eyes: string|null}
+     */
     public function glyphs(): array
     {
         return [
