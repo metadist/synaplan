@@ -33,6 +33,7 @@ final readonly class ResearchRunService
         private ResearchReportPoster $reports,
         private ?ResearchSavedTaskSignal $savedTasks = null,
         private ?RagScopeResolver $scopes = null,
+        private ?ResearchBudgetStore $budgets = null,
     ) {
     }
 
@@ -259,7 +260,7 @@ final readonly class ResearchRunService
         }
         $this->guardLimits($userId, $request->depth);
         $now = $this->clock->now();
-        $limits = ResearchBudgetConfig::defaults($request->depth);
+        $limits = $this->budgets?->forDepth($request->depth) ?? ResearchBudgetConfig::defaults($request->depth);
         if (null !== $plan?->searchCap) {
             $limits = $limits->withSearches($plan->searchCap);
         }

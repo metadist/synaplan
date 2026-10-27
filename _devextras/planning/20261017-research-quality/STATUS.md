@@ -22,21 +22,42 @@ chat message.
 | RS8 | done | Free check, checker model, and one thorough revision. Seeded draft 6/6 caught, 0/6 false alarms. Smoke 2026-10-26, tool mode: citation precision 79.8 % without the check (RS7 reports) and 96.0 % with it; fact recall unchanged at 0.78 across 9. Exit met on these numbers, judges not calibrated. Owner merged the exit in #2790. Flag stays off |
 | RS9 | in progress | Keyword plus meaning on Qdrant, same owner scopes, palette fusion unchanged. Keyword words weighted by idf and ranked server-side. A research run searches files only when its start request turned them on (2026-10-27). Document cards are not generated. MariaDB stays meaning-only and the vector storage screen says so. Hybrid recall@5 not measured: the fixture corpus is not in the store. Flag stays off |
 | RS10 | done | Follow-ups reuse the parent sources and continue source, evidence and point numbers. The parent report is kept as the prior report, not copied into the new run. A question is quick and searches once when the findings and the report do not cover it. A revision checks only sentences whose words or citations changed. Deeper is thorough and adds a point per Not confirmed item (up to eight). Refresh reopens sources dated before the time frame. A follow-up on a run that is still going is refused with 409 and a sentence; `Idempotency-Key` works as on start. `stopped_by_admin` keeps the report written so far. Five follow-up rows (`fu-q`, `fu-r`, `fu-d`, `fu-f`, `fu-t`) are in `backend/tests/Eval/research/corpus.json` and are excluded from the fresh-question harness. Scored live 2026-10-27 (`5c10bd764`, Claude Sonnet 5 + gpt-oss-120b): fact recall 1.00 on all five, all `complete`, ids continue. Flag stays off |
-| RQ3 | planned | Bake-off, seeded presets, flag decision |
-| RD2 | planned | `ChatView.vue` split (synaplan-desktop) |
-| RD3 | planned | Research mode, progress, result card; J-RQ-2, J-RQ-6 |
-| RD4 | planned | Questions and plan review; J-RQ-4 |
-| RD5 | planned | Report, sources, versions, follow-ups; J-RQ-2, J-RQ-9 |
-| RD6 | planned | Turn into Word, slides, table, email; J-RQ-5 |
-| RD7 | planned | Add a folder; J-RQ-3 |
-| RD8 | planned | Research team in Models; J-RQ-7 |
-| RD9 | planned | Window closed, notification; J-RQ-4 |
+| RQ3 | planned | Not run. The stage matrix (40 items, five stages, thorough items about $1–$5) would pass the 15 € cap. No winners were seeded. `DEFAULTMODEL.READ` and `VERIFY` stay `-1`. Flag stays off. Spent this pass: $0 |
+| RD2 | done | Chat view split. Merged in synaplan-desktop #50. Live journeys were not walked |
+| RD3 | done | Research mode, progress and result card. Merged in synaplan-desktop #50. Flag stays off, so the chip stays hidden until an administrator turns research on |
+| RD4 | done | Questions and plan review. Merged in synaplan-desktop #50. Not walked live |
+| RD5 | done | Report, sources, versions, follow-ups. Merged in synaplan-desktop #50. Not walked live |
+| RD6 | done | Turn into Word, slides, table, email. Merged in synaplan-desktop #50. Not walked live |
+| RD7 | done | Add a folder. Merged in synaplan-desktop #50. Not walked live |
+| RD8 | done | Research team in Models. Merged in synaplan-desktop #50. Not walked live |
+| RD9 | done | Window closed, notification. Merged in synaplan-desktop #50. Not walked live |
 | RW1 | done | Research in the web chat; J-RQ-8. Merged in #2835. The `@ci` journey uses request stubs, not a live model run. Flag stays off |
-| RW2 | planned | Admin research settings; J-RQ-10 |
-| RW3 | in progress | Research as a waiting saved-task step. The runner pauses the task; the deliver unit continues it with the report or fails the step with the outcome sentence. Quick and standard only, no questions. `MULTITASK.RESEARCH_ENABLED` stays off, so the planner does not see the step. A live "weekly brief → email me" run was not started: it would call a paid model. The proof is the runner and resume tests. |
-| RX1 | planned | User docs: quick wins (synaplan-docs) |
-| RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
-| RX3 | planned | User docs: web research, administration (synaplan-docs) |
+| RW2 | done | Research tab on AI infrastructure; J-RQ-10. [#2838](https://github.com/metadist/synaplan/pull/2838). Switch, reading and fact-checking models, budgets per depth, plan limits, sample with a cost confirmation. Every save and sample start is audited. The sample was not clicked. Walked on localhost: turned on, Research appeared under Tools, turned off again. Flag stays off |
+| RW3 | done | Research as a waiting saved-task step. Merged in #2837. The runner pauses the task; the deliver unit continues it with the report or fails the step with the outcome sentence. Quick and standard only, no questions. `MULTITASK.RESEARCH_ENABLED` stays off. A live weekly-brief email was not started |
+| RX1 | done | User docs for the quick wins. Merged in synaplan-docs #36 |
+| RX2 | done | User docs: Desktop research, models, folders, air-gapped. The screens match synaplan-desktop #50. [synaplan-docs #37](https://github.com/metadist/synaplan-docs/pull/37), not merged |
+| RX3 | done | User docs: web research and the Research tab on AI infrastructure. [synaplan-docs #37](https://github.com/metadist/synaplan-docs/pull/37), not merged |
+
+---
+
+## 2026-10-27 — Desktop research and the admin tab
+
+synaplan-desktop #50 merged the chat split and the desktop research screens
+(RD2–RD9). synaplan #2837 merged the saved-task research step (RW3). This
+change adds the Research tab on AI infrastructure (RW2): the switch, the
+reading and fact-checking models, the four budget numbers per depth, the
+two plan limits, and a sample that states its cost before it starts. A save
+writes `research.settings.update`. A sample writes `research.sample.start`.
+Saved budgets are what a new run uses. The sample was not started. No model
+was called. Cost this pass: $0.
+
+RQ3 stays planned. The bake-off in `02_model_roles.md` §8 does not fit the
+15 € cap, so no preset was seeded and the flag stays off.
+
+```bash
+docker compose exec -T backend php vendor/bin/phpunit tests/Unit/Service/Research/Run/ResearchAdminServiceTest.php tests/Unit/Service/Research/Run/ResearchBudgetStoreTest.php
+docker compose exec -T frontend npx vitest run tests/unit/components/admin/research/ResearchAdminTab.spec.ts
+```
 
 ---
 

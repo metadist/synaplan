@@ -21,6 +21,8 @@ final readonly class ResearchConfig
     public const MAX_ACTIVE_THOROUGH = 'MAX_ACTIVE_THOROUGH_PER_USER';
     public const LEAD_MODE = 'LEAD_MODE';
     public const TOOL_MODE_MODELS = 'TOOL_MODE_MODELS';
+    public const ACTIVE_RUNS_RANGE = [1, 100];
+    public const ACTIVE_THOROUGH_RANGE = [0, 10];
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -28,13 +30,24 @@ final readonly class ResearchConfig
     ) {
     }
 
-    public function isEnabled(): bool
+    /** True or false when the environment pins the switch. Null when the stored row decides. */
+    public function envForces(): ?bool
     {
         if ($this->isOn($this->envValue)) {
             return true;
         }
         if ($this->isOff($this->envValue)) {
             return false;
+        }
+
+        return null;
+    }
+
+    public function isEnabled(): bool
+    {
+        $forced = $this->envForces();
+        if (null !== $forced) {
+            return $forced;
         }
         $stored = $this->configRepository->getValue(0, self::GROUP, self::ENABLED);
 
@@ -43,12 +56,12 @@ final readonly class ResearchConfig
 
     public function maxActiveRuns(): int
     {
-        return $this->bounded(self::MAX_ACTIVE_RUNS, 5, 1, 100);
+        return $this->bounded(self::MAX_ACTIVE_RUNS, 5, ...self::ACTIVE_RUNS_RANGE);
     }
 
     public function maxActiveThorough(): int
     {
-        return $this->bounded(self::MAX_ACTIVE_THOROUGH, 1, 0, 10);
+        return $this->bounded(self::MAX_ACTIVE_THOROUGH, 1, ...self::ACTIVE_THOROUGH_RANGE);
     }
 
     /** auto, tools or rounds. Anything else is auto, so the model list decides. */

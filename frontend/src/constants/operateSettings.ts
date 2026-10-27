@@ -24,7 +24,15 @@ export const AI_INFRA_PATH = '/admin/setup'
 export const SYSTEM_CONFIG_PATH = '/admin/config'
 
 export type AiTabId =
-  'providers' | 'health' | 'catalog' | 'documents' | 'search' | 'behavior' | 'prompts' | 'gateway'
+  | 'providers'
+  | 'health'
+  | 'catalog'
+  | 'documents'
+  | 'search'
+  | 'behavior'
+  | 'prompts'
+  | 'gateway'
+  | 'research'
 
 export const AI_TAB_IDS: readonly AiTabId[] = [
   'providers',
@@ -35,6 +43,7 @@ export const AI_TAB_IDS: readonly AiTabId[] = [
   'behavior',
   'prompts',
   'gateway',
+  'research',
 ]
 
 export function isAiTabId(value: unknown): value is AiTabId {
@@ -76,6 +85,7 @@ export const AI_TAB_SECTIONS: Record<AiTabId, readonly ConfigSectionRef[]> = {
   ],
   prompts: [],
   gateway: [],
+  research: [],
 }
 
 export type SystemGroupId = 'access' | 'features' | 'channels' | 'appearance' | 'more'

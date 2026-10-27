@@ -6,10 +6,18 @@ namespace App\Service\Research\Run;
 
 /**
  * Starting limits for one depth. The numbers are the plan's hypotheses until
- * a later bake-off replaces them. They are not read from the database yet.
+ * a later bake-off replaces them. An administrator can replace searches,
+ * sources, minutes and the cost cap; the store keeps those four.
  */
 final readonly class ResearchBudgetConfig
 {
+    public const MAX_SEARCHES = 200;
+    public const MIN_SOURCES = 1;
+    public const MAX_SOURCES = 200;
+    public const MIN_MINUTES = 1;
+    public const MAX_MINUTES = 120;
+    public const MAX_COST_CAP = 50.0;
+
     public function __construct(
         public int $searches,
         public int $sources,
@@ -52,6 +60,23 @@ final readonly class ResearchBudgetConfig
                 $extras->pointsMin,
                 $extras->pointsMax,
             ),
+        );
+    }
+
+    /**
+     * The same limits with the numbers an administrator can change.
+     * A null leaves that number as it is. Other limits stay on the built-in values.
+     */
+    public function withHumanLimits(?int $searches, ?int $sources, ?int $minutes, ?float $costCap): self
+    {
+        return new self(
+            null === $searches ? $this->searches : max(0, min(self::MAX_SEARCHES, $searches)),
+            null === $sources ? $this->sources : max(self::MIN_SOURCES, min(self::MAX_SOURCES, $sources)),
+            $this->rounds,
+            null === $minutes ? $this->wallSeconds : 60 * max(self::MIN_MINUTES, min(self::MAX_MINUTES, $minutes)),
+            null === $costCap ? $this->costCap : max(0.0, min(self::MAX_COST_CAP, $costCap)),
+            $this->maxModelCalls,
+            $this->extras,
         );
     }
 
