@@ -4,6 +4,7 @@
             {
                 "action": "AI_CALL",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "chat_id": 5,
                     "model": "gpt-4o",
@@ -13,6 +14,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -25,6 +27,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "facade_charged_cost": "0.000152",
                     "facade_metered": true,
@@ -36,6 +39,7 @@
                 "model": "",
                 "model_id": null,
                 "provider": "",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -134,6 +138,7 @@
             {
                 "action": "AI_CALL",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "chat_id": 5,
                     "model": "gpt-4o",
@@ -143,6 +148,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -155,6 +161,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "agentId": null,
                     "agentVersionId": null,
@@ -169,6 +176,7 @@
                 "model": "",
                 "model_id": null,
                 "provider": "",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -362,6 +370,7 @@
             {
                 "action": "IMAGES",
                 "cost": "0.040000",
+                "error": "",
                 "metadata": {
                     "model": "dall-e-3",
                     "provider": "openai"
@@ -369,6 +378,7 @@
                 "model": "dall-e-3",
                 "model_id": 41,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -441,6 +451,7 @@
             {
                 "action": "MEMORY_EXTRACTION",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "model": "gpt-4o",
                     "provider": "openai"
@@ -448,6 +459,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -594,6 +606,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000150",
+                "error": "",
                 "metadata": {
                     "key_source": "operator",
                     "model": "claude-sonnet-4-6",
@@ -603,6 +616,7 @@
                 "model": "claude-sonnet-4-6",
                 "model_id": 14,
                 "provider": "anthropic",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -688,6 +702,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000021",
+                "error": "",
                 "metadata": {
                     "key_source": "operator",
                     "model": "gemini-2.5-flash",
@@ -697,6 +712,7 @@
                 "model": "gemini-2.5-flash",
                 "model_id": 15,
                 "provider": "google",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -789,6 +805,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000083",
+                "error": "",
                 "metadata": {
                     "key_source": "operator",
                     "model": "gpt-4o",
@@ -798,6 +815,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -961,6 +979,7 @@
             {
                 "action": "AI_CALL",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "model": "gpt-4o",
                     "provider": "openai",
@@ -969,6 +988,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -981,6 +1001,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "facade_charged_cost": "0.000152",
                     "facade_metered": true,
@@ -992,6 +1013,7 @@
                 "model": "",
                 "model_id": null,
                 "provider": "",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1100,6 +1122,7 @@
             {
                 "action": "AI_CALL",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "model": "gpt-4o",
                     "provider": "openai",
@@ -1108,6 +1131,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -1120,6 +1144,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "facade_charged_cost": "0.000152",
                     "facade_metered": true,
@@ -1131,6 +1156,7 @@
                 "model": "",
                 "model_id": null,
                 "provider": "",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1277,6 +1303,7 @@
             {
                 "action": "EMBEDDINGS",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "inputs": 1,
                     "model": "text-embedding-3-small",
@@ -1286,6 +1313,7 @@
                 "model": "text-embedding-3-small",
                 "model_id": 21,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1364,6 +1392,7 @@
             {
                 "action": "IMAGES",
                 "cost": "0.040000",
+                "error": "",
                 "metadata": {
                     "model": "dall-e-3",
                     "provider": "openai",
@@ -1372,6 +1401,7 @@
                 "model": "dall-e-3",
                 "model_id": 41,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1505,6 +1535,7 @@
             {
                 "action": "SORTING",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "model": "gpt-4o",
                     "provider": "openai"
@@ -1512,6 +1543,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -1703,6 +1735,7 @@
             {
                 "action": "AUDIOS",
                 "cost": "0.000465",
+                "error": "",
                 "metadata": {
                     "model": "tts-1",
                     "provider": "openai"
@@ -1710,6 +1743,7 @@
                 "model": "tts-1",
                 "model_id": 45,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1781,6 +1815,7 @@
             {
                 "action": "TRANSCRIPTION",
                 "cost": "0.021000",
+                "error": "",
                 "metadata": {
                     "language": "de",
                     "model": "whisper-1",
@@ -1789,6 +1824,7 @@
                 "model": "whisper-1",
                 "model_id": 51,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1859,8 +1895,29 @@
     "vectorize": {
         "buselog": [
             {
+                "action": "embedding",
+                "cost": "0.000000",
+                "error": "OpenAI batch embedding error: Server error (HTTP 500) occurred.",
+                "metadata": {
+                    "failure_kind": "transient"
+                },
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "provider": "openai",
+                "status": "error",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            },
+            {
                 "action": "EMBEDDINGS",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "model": "text-embedding-3-small",
                     "provider": "openai",
@@ -1869,6 +1926,7 @@
                 "model": "text-embedding-3-small",
                 "model_id": 21,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,
@@ -1945,6 +2003,7 @@
             {
                 "action": "AI_CALL",
                 "cost": "0.000138",
+                "error": "",
                 "metadata": {
                     "chat_id": 5,
                     "model": "gpt-4o",
@@ -1954,6 +2013,7 @@
                 "model": "gpt-4o",
                 "model_id": 12,
                 "provider": "openai",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 4,
@@ -1966,6 +2026,7 @@
             {
                 "action": "MESSAGES",
                 "cost": "0.000000",
+                "error": "",
                 "metadata": {
                     "channel": "WIDGET",
                     "facade_charged_cost": "0.000152",
@@ -1979,6 +2040,7 @@
                 "model": "",
                 "model_id": null,
                 "provider": "",
+                "status": "success",
                 "tokens": {
                     "cache_creation": 0,
                     "cached": 0,

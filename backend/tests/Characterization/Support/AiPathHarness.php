@@ -1254,7 +1254,7 @@ final class AiPathHarness
             $healthConfig,
             new FailureClassifier(),
             $modelRepo,
-            $this->createStub(UsageFailureLogger::class),
+            new UsageFailureLogger($em->getConnection(), new NullLogger()),
             new NullLogger(),
         );
 
@@ -1683,10 +1683,12 @@ final class AiPathHarness
                 $this->buselog[] = [
                     'action' => (string) ($params['action'] ?? ''),
                     'cost' => number_format((float) ($params['cost'] ?? 0), 6, '.', ''),
+                    'error' => (string) ($params['error'] ?? ''),
                     'metadata' => $metadata,
                     'model' => (string) ($params['model'] ?? ''),
                     'model_id' => isset($params['model_id']) ? (int) $params['model_id'] : null,
                     'provider' => (string) ($params['provider'] ?? ''),
+                    'status' => (string) ($params['status'] ?? 'success'),
                     'tokens' => [
                         'cache_creation' => (int) ($params['cache_creation_tokens'] ?? 0),
                         'cached' => (int) ($params['cached_tokens'] ?? 0),
