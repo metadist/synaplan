@@ -28,6 +28,7 @@ use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\SelfAware\SelfAwarePromptDecorator;
+use App\Service\Usage\AiChatUsageMeter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -148,7 +149,7 @@ final readonly class ChatRunner implements TaskRunner
         $streamOptions = array_filter([
             'provider' => $provider,
             'model' => $modelName,
-            'temperature' => 0.3,
+            'temperature' => 0.3, AiChatUsageMeter::USAGE_SOURCE => 'MULTITASK', AiChatUsageMeter::USAGE_CHAT_ID => $context->message->getChatId(), AiChatUsageMeter::USAGE_AGENT_ID => $context->options['agentId'] ?? null,
         ], static fn ($v) => null !== $v);
         if (is_string($provider) && 'openaicompatible' === strtolower($provider)
             && is_string($modelName) && VisibleAnswer::modelHidesAnswerBehindThinking($modelName)) {
@@ -205,9 +206,9 @@ final readonly class ChatRunner implements TaskRunner
             'provider' => $response['provider'] ?? $provider,
             'model' => $response['model'] ?? $modelName,
             'model_id' => $modelId,
-            // Exact provider token counts so the turn's MESSAGES usage row can
-            // bill real tokens instead of byte-estimating the assembled text.
             'usage' => $response['usage'] ?? [],
+            'facade_metered' => true === ($response['facade_metered'] ?? false),
+            'facade_charged_cost' => $response['facade_charged_cost'] ?? null, 'facade_price_known' => $response['facade_price_known'] ?? true,
         ];
         if (Capability::RagQuery === $node->capability) {
             $metadata['rag_chunks'] = $ragChunks;

@@ -68,6 +68,7 @@ final readonly class MemoryInputParser
                 'model' => $memoryModelConfig['model'],
                 'provider' => $memoryModelConfig['provider'],
                 'temperature' => 0.3, // Low temperature for consistent JSON output
+                'caller_meters' => true,
             ]);
 
             if ($this->structuredOutputConfig->isEnabled($user->getId())) {

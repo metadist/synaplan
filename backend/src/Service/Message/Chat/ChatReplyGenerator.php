@@ -12,6 +12,7 @@ use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Document\ChatDocumentOutput;
 use App\Service\Infrastructure\DatabaseConnectionRelease;
 use App\Service\Message\ProgressCallback;
+use App\Service\Usage\FacadeMeteredChat;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -62,7 +63,7 @@ final readonly class ChatReplyGenerator
 
             return new ChatReply(
                 content: $documentEdit->content,
-                metadata: self::chosenModelMetadata($model, $documentEdit->usage),
+                metadata: self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost, $documentEdit->facadePriceKnown),
                 documentEdit: $documentEdit,
             );
         }
@@ -84,12 +85,12 @@ final readonly class ChatReplyGenerator
 
         return new ChatReply(
             content: $response['content'] ?? null,
-            metadata: [
+            metadata: FacadeMeteredChat::stamp([
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'usage' => $response['usage'] ?? [],
                 'response_id' => $response['response_id'] ?? null,
-            ],
+            ], $response),
             toolCalls: $response['tool_calls'] ?? [],
             finishReason: is_string($response['finish_reason'] ?? null) ? $response['finish_reason'] : null,
         );
@@ -160,7 +161,7 @@ final readonly class ChatReplyGenerator
         }
         $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $message, $aiOptions, $progressCallback, $incognito);
         if (null !== $documentEdit) {
-            $metadata = self::chosenModelMetadata($model, $documentEdit->usage);
+            $metadata = self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost, $documentEdit->facadePriceKnown);
             $this->documents->applyEditResult($documentEdit, $message, $metadata);
             $answer($documentEdit->content);
         } else {
@@ -237,12 +238,12 @@ final readonly class ChatReplyGenerator
 
         return new ChatReply(
             content: $collected,
-            metadata: [
+            metadata: FacadeMeteredChat::stamp([
                 'provider' => $streamMeta['provider'] ?? ($model->provider ?? 'unknown'),
                 'model' => $streamMeta['model'] ?? ($model->modelName ?? 'unknown'),
                 'usage' => $streamMeta['usage'] ?? [],
                 'response_id' => $streamMeta['response_id'] ?? null,
-            ],
+            ], $streamMeta),
             toolCalls: $streamMeta['tool_calls'] ?? [],
             finishReason: self::finishReason($streamMeta, $streamFinishReason),
         );
@@ -298,13 +299,20 @@ final readonly class ChatReplyGenerator
      *
      * @return array<string, mixed>
      */
-    private static function chosenModelMetadata(ChatModelChoice $model, array $usage): array
+    private static function chosenModelMetadata(ChatModelChoice $model, array $usage, bool $facadeMetered = false, ?string $facadeChargedCost = null, bool $facadePriceKnown = true): array
     {
-        return [
+        $metadata = [
             'provider' => $model->provider ?? 'unknown',
             'model' => $model->modelName ?? 'unknown',
             'usage' => $usage,
             'response_id' => null,
         ];
+        if ($facadeMetered) {
+            $metadata['facade_metered'] = true;
+            $metadata['facade_charged_cost'] = $facadeChargedCost;
+            $metadata['facade_price_known'] = $facadePriceKnown;
+        }
+
+        return $metadata;
     }
 }

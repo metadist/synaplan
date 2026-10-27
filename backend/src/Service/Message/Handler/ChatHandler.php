@@ -17,6 +17,7 @@ use App\Service\Message\Chat\ChatTurnContextLoader;
 use App\Service\Message\ProgressCallback;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingHandoffResolver;
+use App\Service\Usage\FacadeMeteredChat;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 /**
@@ -213,7 +214,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $deferredExtraction = $this->pendingMemory->afterTurn($message, (string) $reply->content, $thread, $turn->personal->memories, $options);
 
         return [
-            'metadata' => [
+            'metadata' => FacadeMeteredChat::stamp([
                 'provider' => $reply->metadata['provider'] ?? 'unknown',
                 'model' => $reply->metadata['model'] ?? 'unknown',
                 'model_id' => $model->modelId,
@@ -223,7 +224,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'documentChanges' => $reply->metadata['documentChanges'] ?? null,
                 'documentVersion' => $reply->metadata['documentVersion'] ?? null,
                 'documentFidelityLossy' => $reply->metadata['documentFidelityLossy'] ?? false,
-            ] + $turn->contextMetadata($prompt->docs) + ['extraction_payload' => $deferredExtraction],
+            ], $reply->metadata) + $turn->contextMetadata($prompt->docs) + ['extraction_payload' => $deferredExtraction],
         ];
     }
 }

@@ -458,6 +458,7 @@ final class ContextCondenser
                     'model' => $this->modelConfigService->getModelName($modelId),
                     'temperature' => 0.1,
                     'max_tokens' => self::CONDENSER_OUTPUT_TOKENS,
+                    'caller_meters' => true,
                 ],
             );
         } catch (\Throwable $e) {

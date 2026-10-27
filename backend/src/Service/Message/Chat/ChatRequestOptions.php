@@ -11,6 +11,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Model;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
+use App\Service\Usage\AiChatUsageMeter;
 
 /**
  * The provider options of a chat turn, apart from its messages: provider and
@@ -154,8 +155,59 @@ final readonly class ChatRequestOptions
     {
         $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $turn->profile, $turn->message->getUserId());
         $aiOptions = $this->applyReasoningLevel($aiOptions, $model->model, $options);
+        $aiOptions = $this->applyLocalThinkingBudget($aiOptions);
+        // Live voice folds this answer into its own session row. Metering it
+        // again in the facade would bill the same tokens twice.
+        if ($turn->isLiveVoice()) {
+            $aiOptions[AiChatUsageMeter::CALLER_METERS] = true;
+        }
 
-        return $this->applyLocalThinkingBudget($aiOptions);
+        return $this->withUsageContext($aiOptions, $turn);
+    }
+
+    /**
+     * Channel, chat and assistant for the usage row. The facade strips these
+     * before the provider sees the options.
+     *
+     * @param array<string, mixed> $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function withUsageContext(array $aiOptions, ChatTurn $turn): array
+    {
+        $aiOptions[AiChatUsageMeter::USAGE_SOURCE] = $this->usageSource($turn);
+        $chatId = $turn->message->getChatId();
+        if (null !== $chatId && $chatId > 0) {
+            $aiOptions[AiChatUsageMeter::USAGE_CHAT_ID] = $chatId;
+        }
+        if (is_numeric($turn->options['agentId'] ?? null) && (int) $turn->options['agentId'] > 0) {
+            $aiOptions[AiChatUsageMeter::USAGE_AGENT_ID] = (int) $turn->options['agentId'];
+        }
+        if (is_numeric($turn->options['agentVersionId'] ?? null) && (int) $turn->options['agentVersionId'] > 0) {
+            $aiOptions[AiChatUsageMeter::USAGE_AGENT_VERSION_ID] = (int) $turn->options['agentVersionId'];
+        }
+
+        return $aiOptions;
+    }
+
+    private function usageSource(ChatTurn $turn): string
+    {
+        $pinned = $turn->options[AiChatUsageMeter::USAGE_SOURCE] ?? null;
+        if (is_string($pinned) && '' !== trim($pinned)) {
+            return trim($pinned);
+        }
+        foreach (['source', 'channel'] as $key) {
+            $value = $turn->options[$key] ?? null;
+            if (is_string($value) && '' !== trim($value)) {
+                return trim($value);
+            }
+        }
+        $channel = $turn->message->getMeta('channel');
+        if (is_string($channel) && '' !== trim($channel)) {
+            return trim($channel);
+        }
+
+        return 'WEB';
     }
 
     /**

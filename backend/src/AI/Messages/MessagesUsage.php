@@ -92,6 +92,22 @@ final readonly class MessagesUsage
         return \is_array($breakdown) ? (int) ($breakdown['ephemeral_1h_input_tokens'] ?? 0) : 0;
     }
 
+    /**
+     * A finished stream is billable even when the only tokens are cache
+     * reads or writes. Input and output can both be zero on a cache hit;
+     * dropping that row hid the call from the usage log. A stop reason with
+     * no token fields still records, and the usage service estimates from
+     * the text.
+     */
+    public function shouldMeter(): bool
+    {
+        return $this->inputTokens > 0
+            || $this->outputTokens > 0
+            || $this->cacheCreationTokens > 0
+            || $this->cacheReadTokens > 0
+            || null !== $this->stopReason;
+    }
+
     public function withStopReason(?string $stopReason): self
     {
         return new self(

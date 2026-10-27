@@ -99,6 +99,33 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
+     * The priced catalog row for a provider call. Service names are stored in
+     * mixed case (`Anthropic`) while providers report themselves in lower case.
+     * A chat row wins over a vision row that shares the same model id.
+     */
+    public function findChatIdByProvider(string $providerName, string $modelName): ?int
+    {
+        /** @var list<Model> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->where('LOWER(m.service) = :service')
+            ->andWhere('m.providerId = :model')
+            ->setParameter('service', strtolower(trim($providerName)))
+            ->setParameter('model', $modelName)
+            ->getQuery()
+            ->getResult();
+
+        $chosen = null;
+        foreach ($rows as $row) {
+            if ('chat' === $row->getTag()) {
+                return (int) $row->getId();
+            }
+            $chosen ??= $row;
+        }
+
+        return null !== $chosen ? (int) $chosen->getId() : null;
+    }
+
+    /**
      * Get all available tags/capabilities.
      *
      * @return array Array of tag strings

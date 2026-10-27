@@ -20,6 +20,7 @@ use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\RecordedUsage;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -467,15 +468,11 @@ final readonly class TelegramConversation
     private function recordUsage(TelegramTurn $turn, Message $inbound, array $metadata, string $reply): ?RecordedUsage
     {
         try {
-            return $this->rateLimits->recordUsage($turn->owner, 'MESSAGES', [
-                'provider' => $metadata['provider'] ?? 'unknown',
-                'model' => $metadata['model'] ?? 'unknown',
-                'usage' => $metadata['usage'] ?? [],
-                'model_id' => $metadata['model_id'] ?? null,
-                'source' => 'TELEGRAM',
-                'response_text' => $reply,
-                'input_text' => $inbound->getText(),
-            ]);
+            return $this->rateLimits->recordUsage(
+                $turn->owner,
+                'MESSAGES',
+                FacadeMeteredChat::messages($metadata, 'TELEGRAM', $inbound->getText(), $reply),
+            );
         } catch (\Throwable $e) {
             $this->logger->warning('Telegram usage record failed', [
                 'user_id' => $turn->owner->getId(),

@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -125,9 +126,15 @@ final readonly class WhatsAppAnswerStore
         if (!empty($aiMetadata['usage']) && is_array($aiMetadata['usage'])) {
             $outgoingMessage->setMeta('ai_chat_usage', (string) json_encode($aiMetadata['usage']));
         }
-        $recordedChatUsage = $aiMetadata['recorded_chat_usage'] ?? null;
-        if ($recordedChatUsage instanceof RecordedUsage) {
-            $recordedChatUsage->attachChatCost($outgoingMessage);
+        $charged = FacadeMeteredChat::chargedCost($aiMetadata ?? []);
+        if (null !== $charged) {
+            $outgoingMessage->setMeta('ai_chat_cost', $charged);
+            FacadeMeteredChat::applyPriceKnown($outgoingMessage, $aiMetadata ?? []);
+        } else {
+            $recordedChatUsage = $aiMetadata['recorded_chat_usage'] ?? null;
+            if ($recordedChatUsage instanceof RecordedUsage) {
+                $recordedChatUsage->attachChatCost($outgoingMessage);
+            }
         }
         if (!empty($classification['sorting_provider'])) {
             $outgoingMessage->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);

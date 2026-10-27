@@ -53,6 +53,11 @@ trait CreatesTestEntities
             $id = $entity->getId();
             $found = null === $id ? null : $this->em->find($entity::class, $id);
             if (null !== $found) {
+                if ($found instanceof User) {
+                    // Chat calls now write a usage row. BUSELOG has no cascade,
+                    // so the row has to go before the user.
+                    $this->em->getConnection()->executeStatement('DELETE FROM BUSELOG WHERE BUSERID = ?', [$id]);
+                }
                 $this->em->remove($found);
             }
         }

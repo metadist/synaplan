@@ -13,6 +13,7 @@ use App\Service\Email\Turn\InboundEmailIntake;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -325,16 +326,7 @@ class WebhookController extends AbstractController
             $response = $result['response'];
             $responseContent = $response['content'] ?? '';
             $responseMeta = $response['metadata'] ?? [];
-
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
-                'provider' => $responseMeta['provider'] ?? 'unknown',
-                'model' => $responseMeta['model'] ?? 'unknown',
-                'usage' => $responseMeta['usage'] ?? [],
-                'model_id' => $responseMeta['model_id'] ?? null,
-                'source' => 'WEBHOOK',
-                'response_text' => $responseContent,
-                'input_text' => $message->getText(),
-            ]);
+            $this->recordWebhookChat($user, $message, $responseContent, $responseMeta);
 
             $webhookMediaType = $responseMeta['media_type'] ?? null;
             if ($webhookMediaType) {
@@ -379,5 +371,17 @@ class WebhookController extends AbstractController
                 'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function recordWebhookChat(User $user, Message $message, string $answer, array $metadata): void
+    {
+        $this->rateLimitService->recordUsage(
+            $user,
+            'MESSAGES',
+            FacadeMeteredChat::messages($metadata, 'WEBHOOK', $message->getText(), $answer),
+        );
     }
 }

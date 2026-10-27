@@ -124,6 +124,7 @@ final readonly class TaskPlanner
                 'model' => $modelName,
                 'temperature' => 0.1,
                 'max_tokens' => self::PLANNING_MAX_TOKENS,
+                'caller_meters' => true,
             ];
 
             if ($this->structuredOutputConfig->isEnabled($userId)) {

@@ -186,7 +186,7 @@ PROMPT;
             $aiOptions = [
                 'temperature' => 0.3, // Low temperature for consistent extraction
                 'model' => $extractionConfig['model'],
-                'provider' => $extractionConfig['provider'],
+                'provider' => $extractionConfig['provider'], 'caller_meters' => true,
             ];
 
             if ($this->structuredOutputConfig->isEnabled($message->getUserId())) {
