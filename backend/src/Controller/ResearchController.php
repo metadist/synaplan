@@ -100,6 +100,26 @@ final class ResearchController extends AbstractController
             new OA\Property(property: 'question', type: 'string', maxLength: 4000, example: 'Which suppliers deliver X in Germany?'),
             new OA\Property(property: 'depth', type: 'string', enum: ['quick', 'standard', 'thorough']),
             new OA\Property(property: 'chat_id', type: 'integer', nullable: true, example: 4711),
+            new OA\Property(
+                property: 'sources',
+                type: 'object',
+                nullable: true,
+                description: 'Where the run may search. Omitted searches the web only. Files are searched only when knowledge names folders, or knowledge or library is true. library covers every folder and wins over a folder list. A shared folder the caller cannot use is refused with 400. Web off with no files chosen is refused with 400.',
+                properties: [
+                    new OA\Property(property: 'web', type: 'boolean', nullable: true, example: true, description: 'Defaults to true.'),
+                    new OA\Property(
+                        property: 'knowledge',
+                        description: 'Up to 8 knowledge folder keys, or true for all of the caller\'s files.',
+                        nullable: true,
+                        oneOf: [
+                            new OA\Schema(type: 'boolean'),
+                            new OA\Schema(type: 'array', maxItems: 8, items: new OA\Items(type: 'string', maxLength: 120)),
+                        ],
+                        example: ['DESKTOP:42'],
+                    ),
+                    new OA\Property(property: 'library', type: 'boolean', nullable: true, example: false, description: 'Search all of the caller\'s files and the folders shared with them.'),
+                ]
+            ),
         ]
     ))]
     #[OA\Response(response: 202, description: 'The run was started', content: new OA\JsonContent(

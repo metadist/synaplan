@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\AI\ToolCalling\ToolCall;
+use App\Service\RAG\DocumentKeywordSearch;
+use App\Service\RAG\HybridKnowledgeSearch;
+use App\Service\RAG\RagScopeResolver;
+use App\Service\RAG\VectorSearchService;
+use App\Service\RAG\VectorStorage\DTO\RagScope;
 use App\Service\Research\Run\Lead\LeadRead;
 use App\Service\Research\Run\Lead\LeadSearch;
 use App\Service\Research\Run\Lead\LeadToolbox;
@@ -44,6 +49,76 @@ final class ResearchFileSourceTest extends TestCase
 
         self::assertSame('web files', $sources->label());
         self::assertSame([], $sources->knowledge);
+    }
+
+    public function testTheLibraryWinsOverAFolderListAndRepeatedFoldersCountOnce(): void
+    {
+        $library = ResearchSources::fromBody([
+            'sources' => ['knowledge' => ['DESKTOP:42'], 'library' => true],
+        ]);
+        $folders = ResearchSources::fromBody([
+            'sources' => ['knowledge' => ['DESKTOP:42', ' DESKTOP:42 ']],
+        ]);
+
+        self::assertSame([], $library->knowledge);
+        self::assertTrue($library->library);
+        self::assertSame(['DESKTOP:42'], $folders->knowledge);
+    }
+
+    public function testASharedFolderTheCallerCannotUseIsNotSearched(): void
+    {
+        $vectors = $this->createMock(VectorSearchService::class);
+        $vectors->expects(self::never())->method('semanticSearch');
+        $keywords = $this->createMock(DocumentKeywordSearch::class);
+        $keywords->expects(self::never())->method('find');
+        $scopes = $this->createStub(RagScopeResolver::class);
+        $scopes->method('canUsePickerKey')->willReturn(false);
+        $scopes->method('resolve')->willReturn([new RagScope(4, null)]);
+
+        $search = new ResearchFileSearch($vectors, $keywords, $this->createStub(HybridKnowledgeSearch::class), $scopes);
+
+        self::assertSame([], $search->find(4, 'prices', 5, ['shared:9:Team']));
+    }
+
+    public function testSeveralFoldersTakeTurns(): void
+    {
+        $vectors = $this->createStub(VectorSearchService::class);
+        $vectors->method('semanticSearch')->willReturnCallback(static fn (string $query, int $userId, ?string $key): array => 'A' === $key
+            ? [['file_id' => 1, 'file_name' => 'a1'], ['file_id' => 2, 'file_name' => 'a2'], ['file_id' => 3, 'file_name' => 'a3']]
+            : [['file_id' => 7, 'file_name' => 'b1']]);
+        $keywords = $this->createStub(DocumentKeywordSearch::class);
+        $keywords->method('find')->willReturn([]);
+        $hybrid = $this->createStub(HybridKnowledgeSearch::class);
+        $hybrid->method('merge')->willReturnArgument(0);
+        $scopes = $this->createStub(RagScopeResolver::class);
+        $scopes->method('canUsePickerKey')->willReturn(true);
+        $scopes->method('resolve')->willReturn([new RagScope(4, null)]);
+
+        $found = (new ResearchFileSearch($vectors, $keywords, $hybrid, $scopes))->find(4, 'prices', 2, ['A', 'B']);
+
+        self::assertSame([1, 7], array_column($found, 'file_id'));
+    }
+
+    public function testTheLeadSeesAFileItFoundBeforeUnderTheSameId(): void
+    {
+        $files = $this->createStub(ResearchFileSearch::class);
+        $files->method('find')->willReturn([['file_id' => 9, 'title' => 'Prices']]);
+        $search = new LeadSearch(new ScriptedSearch(), $files);
+        $ctx = $this->context('files', []);
+        $call = static fn (string $query): ToolCall => new ToolCall('1', 'search', [
+            'point' => 'p1',
+            'query' => $query,
+            'language' => 'en',
+            'scope' => 'files',
+        ]);
+
+        $first = json_decode($search->run($call('heat pump subsidy'), $ctx), true);
+        $second = json_decode($search->run($call('heat pump grant'), $ctx), true);
+
+        self::assertIsArray($first);
+        self::assertIsArray($second);
+        self::assertSame($first['results'][0]['id'], $second['results'][0]['id']);
+        self::assertCount(1, $ctx->state->ledger->sources());
     }
 
     public function testFilesOnlyIsRefusedWhenNothingIsChosen(): void

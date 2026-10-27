@@ -7,6 +7,7 @@ namespace App\Service\Research\Run;
 /**
  * Which places a run may search. The web is on unless the request turns it
  * off. Files are on when the request names a knowledge folder or the library.
+ * The library covers every folder, so it wins over a list of folders.
  */
 final readonly class ResearchSources
 {
@@ -55,10 +56,12 @@ final readonly class ResearchSources
             throw new ResearchRejected(400, 'invalid', 'sources', 'Choose the web, files, or both.');
         }
         $knowledge = $sources['knowledge'] ?? null;
+        $keys = self::keys($knowledge);
+        $library = self::flag($sources, 'library', false) || true === $knowledge;
         $parsed = new self(
             self::flag($sources, 'web', true),
-            self::keys($knowledge),
-            self::flag($sources, 'library', false) || true === $knowledge,
+            $library ? [] : $keys,
+            $library,
         );
         if ('' === $parsed->label()) {
             throw new ResearchRejected(400, 'invalid', 'sources', 'Turn on the web or choose files in this project.');
@@ -112,9 +115,9 @@ final readonly class ResearchSources
             if (!is_string($key) || '' === trim($key) || mb_strlen($key) > self::KEY_CHARS || 1 === preg_match('/[\x00-\x1F]/', $key)) {
                 throw new ResearchRejected(400, 'invalid', 'sources', 'Choose a folder this project can use.');
             }
-            $keys[] = trim($key);
+            $keys[trim($key)] = trim($key);
         }
 
-        return $keys;
+        return array_values($keys);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Service\Research\Run;
 
 use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Service\RAG\RagScopeResolver;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -31,6 +32,7 @@ final readonly class ResearchRunService
         private ClockInterface $clock,
         private ResearchReportPoster $reports,
         private ?ResearchSavedTaskSignal $savedTasks = null,
+        private ?RagScopeResolver $scopes = null,
     ) {
     }
 
@@ -40,8 +42,22 @@ final readonly class ResearchRunService
     public function start(User $user, array $body, bool $session, ?string $idempotencyKey): ResearchRunState
     {
         $request = ResearchRequest::fromBody($body, $session, $user, $this->chats);
+        $this->checkFolders($user, $request->sources);
 
         return $this->open($user, $request, $this->idempotencyKey($idempotencyKey), null, null);
+    }
+
+    /**
+     * A shared folder the caller cannot use is refused at the start, so the
+     * run never looks like it searched a folder it skipped.
+     */
+    private function checkFolders(User $user, ResearchSources $sources): void
+    {
+        foreach ($sources->knowledge as $key) {
+            if (null !== $this->scopes && !$this->scopes->canUsePickerKey($user->getId() ?? 0, $key)) {
+                throw new ResearchRejected(400, 'invalid', 'sources', 'A chosen folder is not shared with you. Research did not start.');
+            }
+        }
     }
 
     /**

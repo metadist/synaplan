@@ -7,6 +7,7 @@ namespace App\Service\Research\Run\Lead;
 use App\AI\ToolCalling\ToolCall;
 use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\Source;
+use App\Service\Research\Run\Stage\ResearchFileHits;
 use App\Service\Research\Run\Stage\ResearchFileSearch;
 use App\Service\Research\Run\Stage\ResearchHit;
 use App\Service\Research\Run\Stage\ResearchPrompts;
@@ -85,42 +86,15 @@ final readonly class LeadSearch
      */
     private function projectFiles(StageContext $ctx, string $point, string $query): array
     {
-        $found = $this->files?->find(
-            $ctx->state->ref->userId,
-            $query,
-            max(1, $ctx->state->budget->sourcesLeft()),
-            $ctx->state->knowledgeKeys,
-        ) ?? [];
-        $ctx->state->ledger->addQuery($point, $query, 'files', count($found));
-        $ctx->events->append($ctx->state->ref->id, 'search', [
-            'point' => $point,
-            'query' => $query,
-            'scope' => 'files',
-            'results' => count($found),
-        ]);
-        $rows = [];
-        foreach ($found as $row) {
-            if (!$ctx->state->budget->canRead()) {
-                break;
-            }
-            $before = count($ctx->state->ledger->sources());
-            $id = $ctx->state->ledger->addSource(Source::file($row['file_id'], $row['title']));
-            if (count($ctx->state->ledger->sources()) === $before) {
-                continue;
-            }
-            $source = $ctx->state->ledger->source($id);
-            if (null === $source) {
-                continue;
-            }
-            $ctx->events->append($ctx->state->ref->id, 'source', $source->toEvent());
-            $rows[] = [
-                'id' => $id,
-                'title' => ResearchPrompts::data($source->title),
-                'kind' => 'file',
-            ];
+        if (null === $this->files) {
+            return [];
         }
 
-        return $rows;
+        return array_map(static fn (Source $source): array => [
+            'id' => $source->id,
+            'title' => ResearchPrompts::data($source->title),
+            'kind' => 'file',
+        ], ResearchFileHits::gather($this->files, $ctx, $point, $query));
     }
 
     /**

@@ -44,7 +44,7 @@ chat message.
 
 No paid run. Cost $0. Research stays off. `DEFAULTMODEL.READ` and `VERIFY` stay unset.
 
-`POST /api/v1/research` keeps `sources`. A list of folder keys in `knowledge` searches those folders. `knowledge: true` (the web files switch) or `library: true` searches the caller's own files. Omitting `sources` stays web only. A shared folder the caller cannot use is skipped, so a refused share does not fall back to every file they own. The choice is stored on the run, and a follow-up keeps it. The lead's search tool offers files only when that source is on.
+`POST /api/v1/research` keeps `sources`. A list of folder keys in `knowledge` searches those folders. `knowledge: true` (the web files switch) or `library: true` searches the caller's own files; `library` wins over a folder list. Omitting `sources` stays web only. A start that names a shared folder the caller cannot use is refused with 400. A share revoked during the run is skipped from then on, so it never falls back to every file they own. Several folders take turns in the results. The choice is stored on the run, and a follow-up keeps it. The lead's search tool offers files only when that source is on.
 
 These steps are still open. Each one needs a paid model run, and together they pass the 15 € cap, so none of them was started:
 

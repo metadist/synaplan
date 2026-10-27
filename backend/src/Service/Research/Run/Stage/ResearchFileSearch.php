@@ -8,6 +8,7 @@ use App\Service\RAG\DocumentKeywordSearch;
 use App\Service\RAG\HybridKnowledgeSearch;
 use App\Service\RAG\RagScopeResolver;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RAG\VectorStorage\DTO\RagScope;
 
 /** File hits for one research query: meaning plus keywords, one row per file. */
 final readonly class ResearchFileSearch
@@ -21,6 +22,8 @@ final readonly class ResearchFileSearch
     }
 
     /**
+     * Several folders take turns, so the first one cannot fill the limit alone.
+     *
      * @param list<string> $groupKeys empty searches the caller's own files and folders they can use
      *
      * @return list<array{file_id: int, title: string}>
@@ -32,11 +35,13 @@ final readonly class ResearchFileSearch
         if ([] === $keys) {
             return $this->once($userId, $query, $limit, null);
         }
+        $lists = array_map(fn (string $key): array => $this->once($userId, $query, $limit, $key), $keys);
         $seen = [];
         $out = [];
-        foreach ($keys as $key) {
-            foreach ($this->once($userId, $query, $limit, $key) as $row) {
-                if (isset($seen[$row['file_id']])) {
+        for ($rank = 0; $rank < $limit; ++$rank) {
+            foreach ($lists as $rows) {
+                $row = $rows[$rank] ?? null;
+                if (null === $row || isset($seen[$row['file_id']])) {
                     continue;
                 }
                 $seen[$row['file_id']] = true;
@@ -61,11 +66,11 @@ final readonly class ResearchFileSearch
         foreach ($groupKeys as $key) {
             $key = trim($key);
             if ('' !== $key) {
-                $keys[] = $key;
+                $keys[$key] = $key;
             }
         }
 
-        return $keys;
+        return array_values($keys);
     }
 
     /**
@@ -98,12 +103,11 @@ final readonly class ResearchFileSearch
      * A shared folder the caller cannot use is skipped. Searching it through
      * the normal resolver would fall back to every file the caller owns.
      *
-     * @return list<\App\Service\RAG\VectorStorage\DTO\RagScope>
+     * @return list<RagScope>
      */
     private function scopesFor(int $userId, ?string $groupKey): array
     {
-        $picker = RagScopeResolver::parseSharedPicker($groupKey);
-        if (null !== $picker && !$this->scopes->canUse($userId, $picker[0], $picker[1])) {
+        if (null !== $groupKey && !$this->scopes->canUsePickerKey($userId, $groupKey)) {
             return [];
         }
 
