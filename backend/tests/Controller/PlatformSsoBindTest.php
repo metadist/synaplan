@@ -94,11 +94,16 @@ final class PlatformSsoBindTest extends WebTestCase
 
         $this->markStatus($row, ExternalIdentity::STATUS_PAUSED);
         $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->row($instance['instance_id'], 'ada')->getStatus());
+
+        $this->markStatus($this->row($instance['instance_id'], 'ada'), ExternalIdentity::STATUS_SUSPENDED);
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);
         self::assertSame(PlatformDisconnectedException::MESSAGE, $this->json()['message']);
 
-        $this->markStatus($row, ExternalIdentity::STATUS_REVOKED);
+        $this->markStatus($this->row($instance['instance_id'], 'ada'), ExternalIdentity::STATUS_REVOKED);
         $this->client->request('GET', '/v1/models', server: ['HTTP_AUTHORIZATION' => 'Bearer good.token.value']);
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);

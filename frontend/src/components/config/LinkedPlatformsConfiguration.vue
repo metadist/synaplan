@@ -151,7 +151,10 @@
                   {{ $t('linkedPlatforms.managed') }}
                 </p>
                 <div
-                  v-else-if="link.mode === 'sso' && (link.status === 'suspended' || link.status === 'blocked')"
+                  v-else-if="
+                    link.mode === 'sso' &&
+                    (link.status === 'suspended' || link.status === 'blocked')
+                  "
                   class="space-y-2"
                 >
                   <p class="text-sm txt-secondary">{{ $t('linkedPlatforms.cloudDisabled') }}</p>
