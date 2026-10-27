@@ -13,6 +13,8 @@ export const selectors = {
     submit: 'button[type="submit"]',
     signUpLink: '[data-testid="link-signup"]',
     errorAlert: '[data-testid="alert-login-error"]',
+    unverifiedAlert: '[data-testid="alert-login-unverified"]',
+    resendVerificationLink: '[data-testid="link-login-resend-verification"]',
   },
   register: {
     fullName: '[data-testid="input-full-name"]',
@@ -28,6 +30,8 @@ export const selectors = {
   verifyEmail: {
     successState: '[data-testid="state-success"]',
     goToLoginLink: '[data-testid="link-success-login"]',
+    resendBtn: '[data-testid="btn-resend-email"]',
+    resendSuccess: '[data-testid="alert-resend-success"]',
   },
   /**
    * The in-app header used to host mode/theme/language toggles, but those
