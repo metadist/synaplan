@@ -18,6 +18,7 @@ use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 use App\Service\PlatformLink\Exception\PlatformSsoException;
 use App\Service\PlatformLink\InstanceCredential;
 use App\Service\PlatformLink\PlatformInstanceService;
+use App\Service\PlatformLink\PlatformLifecycleService;
 use App\Service\PlatformLink\PlatformLinkExchangeService;
 use App\Service\PlatformLink\PlatformLinkRateLimiter;
 use App\Service\PlatformLink\PlatformLinksConfig;
@@ -44,6 +45,7 @@ final class PlatformLinkController extends AbstractController
         private readonly PlatformLinkExchangeService $exchangeService,
         private readonly PlatformLinkRateLimiter $rateLimiter,
         private readonly PlatformSsoService $sso,
+        private readonly PlatformLifecycleService $lifecycle,
         private readonly InstanceCredential $instanceCredential,
         private readonly ApiKeyRepository $apiKeys,
     ) {
@@ -373,6 +375,66 @@ final class PlatformLinkController extends AbstractController
                 $this->azp($request),
                 $this->credential($request),
                 is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
+                $request->getClientIp() ?? '',
+            );
+        } catch (PlatformSsoException $e) {
+            return $this->ssoError($e);
+        }
+
+        return $this->json($result);
+    }
+
+    #[Route('/lifecycle', name: 'lifecycle', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/platform-links/lifecycle',
+        operationId: 'platformLifecycle',
+        summary: 'A person was deleted, disabled or enabled in the cloud',
+        description: 'Instance credential. deleted revokes that identity and its key. The Synaplan account is removed only while this cloud alone manages it; otherwise it stays and the answer says why. A repeated event answers 200.',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['external_id', 'event'],
+                properties: [
+                    new OA\Property(property: 'external_id', type: 'string', example: 'ada'),
+                    new OA\Property(property: 'event', type: 'string', enum: ['deleted', 'disabled', 'enabled']),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Applied, or already in that state',
+                content: new OA\JsonContent(
+                    required: ['success', 'account', 'status', 'message'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'account', type: 'string', enum: ['deleted', 'kept', 'unchanged', 'absent']),
+                        new OA\Property(property: 'status', type: 'string', example: 'revoked'),
+                        new OA\Property(property: 'message', type: 'string'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Missing user id or unknown event'),
+            new OA\Response(response: 401, description: 'Instance credential missing'),
+            new OA\Response(response: 409, description: 'A removed person cannot be enabled'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function lifecycle(Request $request): JsonResponse
+    {
+        $this->guard(null);
+        $body = $this->jsonBody($request);
+
+        try {
+            $result = $this->lifecycle->apply(
+                $this->credential($request),
+                is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
+                is_string($body['event'] ?? null) ? $body['event'] : '',
                 $request->getClientIp() ?? '',
             );
         } catch (PlatformSsoException $e) {

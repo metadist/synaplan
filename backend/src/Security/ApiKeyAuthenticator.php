@@ -2,11 +2,14 @@
 
 namespace App\Security;
 
+use App\Entity\ExternalIdentity;
 use App\Entity\User;
 use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\Billing\PremiumFeatureGate;
+use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -33,6 +36,7 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
     public function __construct(
         private ApiKeyRepository $apiKeyRepository,
         private UserRepository $userRepository,
+        private ExternalIdentityRepository $identities,
         private LoggerInterface $logger,
         private PremiumFeatureGate $premiumFeatureGate,
     ) {
@@ -116,6 +120,11 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             throw new AuthenticationException('API key is inactive');
         }
 
+        $bound = $this->identities->findOneByApiKeyId((int) $apiKeyEntity->getId());
+        if ($bound instanceof ExternalIdentity && $bound->isOff()) {
+            throw new PlatformDisconnectedException();
+        }
+
         // The key's own flag is not the account. A suspended or deleted owner
         // cannot use the platform at all.
         $owner = $this->userRepository->find($apiKeyEntity->getOwnerId());
@@ -177,7 +186,8 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         // {success, error, message} shape is an unhelpful parse failure, and
         // a 401 of that shape is also retried for minutes.
         $planDenied = $exception instanceof ApiKeyPlanDeniedException;
-        $status = $planDenied ? Response::HTTP_FORBIDDEN : Response::HTTP_UNAUTHORIZED;
+        $paused = $exception instanceof PlatformDisconnectedException;
+        $status = $planDenied || $paused ? Response::HTTP_FORBIDDEN : Response::HTTP_UNAUTHORIZED;
 
         if (str_starts_with($request->getPathInfo(), '/v1/messages')) {
             return new JsonResponse([
@@ -191,6 +201,15 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
 
         if ($planDenied) {
             return new JsonResponse(ApiKeyPlanRequiredException::responseBody(), $status);
+        }
+
+        if ($paused) {
+            return new JsonResponse([
+                'success' => false,
+                'error' => PlatformDisconnectedException::CODE,
+                'code' => PlatformDisconnectedException::CODE,
+                'message' => PlatformDisconnectedException::MESSAGE,
+            ], $status);
         }
 
         return new JsonResponse([
