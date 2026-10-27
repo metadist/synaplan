@@ -619,18 +619,18 @@ class AiFacade
         ]);
 
         $call = new AiCall(
-            capability: AiCapability::VideoPoll,
+            capability: AiCapability::VideoStart,
             provider: $provider->getName(),
             model: $this->reportedModel($provider, $options, 'video_generation'),
             context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
             payload: AiCallPayload::mediaPrompt($prompt),
-            options: AiCallOptions::fromArray($options),
+            options: AiCallOptions::fromArray($options + ['skip_circuit_breaker' => true, 'skip_model_health' => true]),
         );
 
         /** @var array{operationName: string, model: string, duration: int, resolution: string} $operationData */
         $operationData = $this->pipeline()->run(
             $call,
-            static fn (AiCall $c): array => $provider->startVideoOperation((string) $c->payload->prompt, $c->options->providerOptions),
+            static fn (AiCall $c): array => $provider->startVideoOperation((string) $c->payload->prompt, array_diff_key($c->options->providerOptions, ['skip_circuit_breaker' => true, 'skip_model_health' => true])),
         )->value;
 
         return [

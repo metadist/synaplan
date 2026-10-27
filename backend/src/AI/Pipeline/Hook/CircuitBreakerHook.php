@@ -30,13 +30,17 @@ final readonly class CircuitBreakerHook implements AiCallHookInterface
 
     public function before(AiCall $call): AiCall|AiCallRefusal
     {
+        if (true === ($call->options->providerOptions['skip_circuit_breaker'] ?? false)) {
+            return $call;
+        }
+
         $serviceName = $call->capability->circuitBreakerService($call->provider);
         if (null === $serviceName) {
             return $call;
         }
 
         try {
-            $this->circuitBreaker->execute(static fn (): bool => true, $serviceName);
+            $this->circuitBreaker->admit($serviceName);
         } catch (ProviderException $e) {
             return AiCallRefusal::circuitOpen($call->provider, $e);
         }
@@ -46,21 +50,23 @@ final readonly class CircuitBreakerHook implements AiCallHookInterface
 
     public function after(AiCall $call, AiCallResult $result): void
     {
+        if (true === ($call->options->providerOptions['skip_circuit_breaker'] ?? false)) {
+            return;
+        }
+
         $serviceName = $call->capability->circuitBreakerService($call->provider);
         if (null === $serviceName) {
             return;
         }
 
-        if (AiCallOutcome::Failed !== $result->outcome || null === $result->exception) {
+        if (AiCallOutcome::Ok === $result->outcome) {
+            $this->circuitBreaker->recordOutcomeSuccess($serviceName);
+
             return;
         }
 
-        $exception = $result->exception;
-        try {
-            $this->circuitBreaker->execute(static function () use ($exception): never {
-                throw $exception;
-            }, $serviceName);
-        } catch (\Throwable) {
+        if (AiCallOutcome::Failed === $result->outcome && null !== $result->exception) {
+            $this->circuitBreaker->recordOutcomeException($serviceName, $result->exception);
         }
     }
 }

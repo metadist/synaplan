@@ -10,6 +10,7 @@ use App\AI\Pipeline\AiCallContext;
 use App\AI\Pipeline\AiCallOptions;
 use App\AI\Pipeline\AiCallPayload;
 use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\AiCallRefusedException;
 use App\AI\Pipeline\AiCallSource;
 use App\AI\Pipeline\AiCapability;
 use App\Service\Email\InternalEmailService;
@@ -115,8 +116,31 @@ final class AiEmbeddingExecutor
                 }
             );
         } catch (\Throwable $primaryError) {
+            if ($primaryError instanceof AiCallRefusedException) {
+                throw $primaryError;
+            }
             $fresh = $this->tryEmbeddingFallback(
-                static fn (EmbeddingProviderInterface $fb, array $fbOpts): array => $fb->embed($text, $fbOpts),
+                function (EmbeddingProviderInterface $fb, array $fbOpts) use ($text, $userId): array {
+                    $fbModel = (string) ($fbOpts['model'] ?? $fb->getDefaultModels()['embedding'] ?? 'default');
+                    $fbCall = new AiCall(
+                        capability: AiCapability::Embed,
+                        provider: $fb->getName(),
+                        model: $fbModel,
+                        context: new AiCallContext(
+                            userId: $userId,
+                            source: 0 === $userId ? AiCallSource::Probe : AiCallSource::Vectorize,
+                            billable: null !== $userId && $userId > 0,
+                        ),
+                        payload: AiCallPayload::embed($text),
+                        options: AiCallOptions::fromArray($fbOpts),
+                    );
+
+                    /* @var array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}} */
+                    return $this->pipeline->run(
+                        $fbCall,
+                        static fn (AiCall $c): array => $fb->embed($c->payload->texts[0] ?? $text, $c->options->providerOptions),
+                    )->value;
+                },
                 $provider->getName(),
                 $primaryError,
                 $options,
@@ -193,8 +217,32 @@ final class AiEmbeddingExecutor
                 static fn (AiCall $c): array => $provider->embedBatch($c->payload->texts, $c->options->providerOptions),
             )->value;
         } catch (\Throwable $primaryError) {
+            if ($primaryError instanceof AiCallRefusedException) {
+                throw $primaryError;
+            }
+
             return $this->tryEmbeddingFallback(
-                static fn (EmbeddingProviderInterface $fb, array $fbOpts): array => $fb->embedBatch($texts, $fbOpts),
+                function (EmbeddingProviderInterface $fb, array $fbOpts) use ($texts, $userId): array {
+                    $fbModel = (string) ($fbOpts['model'] ?? $fb->getDefaultModels()['embedding'] ?? 'default');
+                    $fbCall = new AiCall(
+                        capability: AiCapability::EmbedBatch,
+                        provider: $fb->getName(),
+                        model: $fbModel,
+                        context: new AiCallContext(
+                            userId: $userId,
+                            source: 0 === $userId ? AiCallSource::Probe : AiCallSource::Vectorize,
+                            billable: null !== $userId && $userId > 0,
+                        ),
+                        payload: AiCallPayload::embedBatch(array_values($texts)),
+                        options: AiCallOptions::fromArray($fbOpts),
+                    );
+
+                    /* @var array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}} */
+                    return $this->pipeline->run(
+                        $fbCall,
+                        static fn (AiCall $c): array => $fb->embedBatch($c->payload->texts, $c->options->providerOptions),
+                    )->value;
+                },
                 $provider->getName(),
                 $primaryError,
                 $options,

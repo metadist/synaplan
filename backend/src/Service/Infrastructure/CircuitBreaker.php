@@ -45,6 +45,36 @@ final readonly class CircuitBreaker
      */
     public function execute(callable $callback, string $serviceName, ?callable $fallback = null): mixed
     {
+        $admitted = $this->admit($serviceName, $fallback);
+        if (null !== $admitted) {
+            return $admitted();
+        }
+
+        // Execute callback
+        try {
+            $result = $callback();
+
+            // Success
+            $this->recordSuccess($serviceName);
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->recordOutcomeException($serviceName, $e);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Check whether a call may proceed through the circuit breaker, without
+     * recording a success yet (`CircuitBreakerHook::before()`).
+     *
+     * @return (callable(): mixed)|null fallback to run when OPEN, or null when admitted
+     *
+     * @throws \App\AI\Exception\ProviderException
+     */
+    public function admit(string $serviceName, ?callable $fallback = null): ?callable
+    {
         $state = $this->getState($serviceName);
 
         // OPEN: Fail fast
@@ -60,11 +90,9 @@ final readonly class CircuitBreaker
                 ]);
 
                 if ($fallback) {
-                    return $fallback();
+                    return $fallback;
                 }
 
-                // Throw ProviderException instead of RuntimeException
-                // Extract provider name from service name (format: ai_provider_xxx)
                 $providerName = str_replace('ai_provider_', '', $serviceName);
                 throw new \App\AI\Exception\ProviderException('Service temporarily unavailable (circuit breaker is OPEN). Please try again in '.$this->timeout.' seconds.', $providerName);
             }
@@ -74,52 +102,45 @@ final readonly class CircuitBreaker
         if (self::STATE_HALF_OPEN === $state) {
             if ($this->getHalfOpenAttempts($serviceName) >= $this->halfOpenMaxCalls) {
                 $this->setState($serviceName, self::STATE_OPEN);
-                // Throw ProviderException instead of RuntimeException
                 $providerName = str_replace('ai_provider_', '', $serviceName);
                 throw new \App\AI\Exception\ProviderException('Service temporarily unavailable (too many test attempts). Please try again later.', $providerName);
             }
             $this->incrementHalfOpenAttempts($serviceName);
         }
 
-        // Execute callback
-        try {
-            $result = $callback();
+        return null;
+    }
 
-            // Success
-            $this->recordSuccess($serviceName);
+    /**
+     * Record a successful provider execution (`CircuitBreakerHook::after()`).
+     */
+    public function recordOutcomeSuccess(string $serviceName): void
+    {
+        $this->recordSuccess($serviceName);
+    }
 
-            return $result;
-        } catch (StreamCancelledException $e) {
-            // The user pressed Stop. The provider was healthy — counting this
-            // would open the circuit for everyone after a few cancellations.
-            throw $e;
-        } catch (StructuredOutputViolationException $e) {
-            // The provider was up and answered; it rejected the model's own
-            // JSON against our schema. AiFacade heals that in-process — a
-            // handful of them must not fail every other call fast for a minute.
-            throw $e;
-        } catch (NoImageException $e) {
-            // The image model answered in text. The provider completed the
-            // request, so a burst of those replies must not open the circuit
-            // for the next image request.
-            throw $e;
-        } catch (\Exception $e) {
-            // A gateway that refuses on purpose (quota, expiry, pause) is up.
-            // Opening the circuit would fail every other endpoint of the provider.
-            if (UpstreamRefusal::isRefusal($e)) {
-                throw $e;
-            }
-
-            $this->recordFailure($serviceName);
-
-            $this->logger->error('Circuit breaker recorded failure', [
-                'service' => $serviceName,
-                'error' => $e->getMessage(),
-                'state' => $this->getState($serviceName),
-            ]);
-
-            throw $e;
+    /**
+     * Record a failed provider execution if the exception counts against the
+     * circuit (`CircuitBreakerHook::after()`).
+     */
+    public function recordOutcomeException(string $serviceName, \Throwable $e): void
+    {
+        if ($e instanceof StreamCancelledException
+            || $e instanceof StructuredOutputViolationException
+            || $e instanceof NoImageException
+            || !$e instanceof \Exception
+            || UpstreamRefusal::isRefusal($e)
+        ) {
+            return;
         }
+
+        $this->recordFailure($serviceName);
+
+        $this->logger->error('Circuit breaker recorded failure', [
+            'service' => $serviceName,
+            'error' => $e->getMessage(),
+            'state' => $this->getState($serviceName),
+        ]);
     }
 
     /**

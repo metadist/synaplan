@@ -54,6 +54,11 @@ $health = new ModelHealthRecorder(
     $logger,
 );
 
+// Prime ModelHealthRecorder's catalog memo so every benchmarked call executes
+// the real cache read-modify-write window update for model id 1.
+$refMemo = new ReflectionProperty(ModelHealthRecorder::class, 'resolveMemo');
+$refMemo->setValue($health, ['chat|test|test-model' => 1]);
+
 $pipeline = new AiCallPipeline([
     new RequestContextHook(),
     new CircuitBreakerHook($breaker),
@@ -74,9 +79,15 @@ $noop = static fn (AiCall $c): array => [
     'usage' => ['prompt_tokens' => 4, 'completion_tokens' => 2, 'total_tokens' => 6],
 ];
 
-// Warm up JIT / opcache / memoized reflection.
+// Warm up JIT / opcache and verify that the health counter actually increments.
 for ($i = 0; $i < 25; ++$i) {
     $pipeline->run($call, $noop);
+}
+
+$warmupSnapshot = $health->snapshot(1);
+if ($warmupSnapshot->successes < 25) {
+    fwrite(STDERR, "pipeline_overhead: ModelHealthRecorder did not record warmup successes\n");
+    exit(1);
 }
 
 $samplesMs = [];

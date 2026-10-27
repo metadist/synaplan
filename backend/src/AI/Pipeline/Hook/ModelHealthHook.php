@@ -33,6 +33,10 @@ final readonly class ModelHealthHook implements AiCallHookInterface
 
     public function after(AiCall $call, AiCallResult $result): void
     {
+        if (true === ($call->options->providerOptions['skip_model_health'] ?? false)) {
+            return;
+        }
+
         $capability = $call->capability->healthCapability();
         if (null === $capability) {
             return;

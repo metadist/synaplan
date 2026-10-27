@@ -25,8 +25,11 @@ use App\AI\Pipeline\StreamingAiCallHookInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Service\Exception\StreamCancelledException;
+use App\Service\Infrastructure\CircuitBreaker;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\AbstractLogger;
+use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -415,6 +418,37 @@ final class HookContractTest extends \PHPUnit\Framework\TestCase
         }
 
         self::assertSame(['ok', 'cancelled'], $afterOutcomes);
+    }
+
+    public function testCircuitBreakerHookAccumulatesConsecutiveFailuresUntilOpen(): void
+    {
+        $breaker = new CircuitBreaker(new ArrayAdapter(), new NullLogger(), failureThreshold: 2);
+        $pipeline = new AiCallPipeline([new CircuitBreakerHook($breaker)]);
+
+        for ($i = 0; $i < 2; ++$i) {
+            try {
+                $pipeline->run($this->sampleCall(), static function (): never {
+                    throw new ProviderException('Provider HTTP 500', 'openai', null, 500);
+                });
+                self::fail('Expected provider failure to throw.');
+            } catch (ProviderException) {
+            }
+        }
+
+        self::assertSame('open', $breaker->getCircuitStatus('ai_provider_openai')['state']);
+
+        $transportCalled = false;
+        try {
+            $pipeline->run($this->sampleCall(), static function () use (&$transportCalled): array {
+                $transportCalled = true;
+
+                return [];
+            });
+            self::fail('Expected open circuit breaker to refuse the call.');
+        } catch (ProviderException $e) {
+            self::assertStringContainsString('circuit breaker is OPEN', $e->getMessage());
+        }
+        self::assertFalse($transportCalled);
     }
 
     private function sampleCall(AiCapability $capability = AiCapability::Chat): AiCall

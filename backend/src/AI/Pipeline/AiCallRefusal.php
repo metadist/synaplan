@@ -26,7 +26,7 @@ final readonly class AiCallRefusal
             reason: 'policy',
             message: $message,
             provider: $provider,
-            exception: new ProviderException($message, $provider),
+            exception: new AiCallRefusedException('policy', $message, $provider),
         );
     }
 
@@ -46,12 +46,12 @@ final readonly class AiCallRefusal
             reason: 'rate_limit',
             message: $message,
             provider: $provider,
-            exception: new ProviderException($message, $provider),
+            exception: new AiCallRefusedException('rate_limit', $message, $provider),
         );
     }
 
     public function toThrowable(): \Throwable
     {
-        return $this->exception ?? new ProviderException($this->message, $this->provider);
+        return $this->exception ?? new AiCallRefusedException($this->reason, $this->message, $this->provider);
     }
 }
