@@ -32,7 +32,7 @@ final readonly class McpOAuthRegistration
     public function register(string $registrationEndpoint, string $redirectUri, string $clientUri, array $scopes): array
     {
         if ($this->ssrfGuard->isBlockedUrl($registrationEndpoint)) {
-            throw new McpOAuthException('Registration endpoint is not allowed');
+            throw new McpOAuthException('Registration endpoint is not allowed', McpOAuthFailure::AddressNotAllowed);
         }
         McpOAuthDiscovery::requireHttps($registrationEndpoint, 'The registration endpoint');
 
@@ -59,16 +59,16 @@ final readonly class McpOAuthRegistration
             $status = $response->getStatusCode();
             $raw = $response->getContent(false);
         } catch (\Throwable $e) {
-            throw new McpOAuthException('Could not register with the sign-in server: '.$e->getMessage(), 0, $e);
+            throw new McpOAuthException('Could not register with the sign-in server: '.$e->getMessage(), McpOAuthDiscovery::reasonFor($e, McpOAuthFailure::Unreachable), $e);
         }
 
         if ($status < 200 || $status >= 300) {
-            throw new McpOAuthException(sprintf('Sign-in registration failed (HTTP %d)', $status));
+            throw new McpOAuthException(sprintf('Sign-in registration failed (HTTP %d)', $status), McpOAuthFailure::RegistrationRefused);
         }
 
         $decoded = json_decode($raw, true);
         if (!is_array($decoded) || !is_string($decoded['client_id'] ?? null) || '' === $decoded['client_id']) {
-            throw new McpOAuthException('Sign-in registration returned no client id');
+            throw new McpOAuthException('Sign-in registration returned no client id', McpOAuthFailure::RegistrationRefused);
         }
 
         $grants = $decoded['grant_types'] ?? [];

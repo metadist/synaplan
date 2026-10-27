@@ -238,7 +238,7 @@ class McpServerConfigControllerTest extends WebTestCase
 
         $start = $this->request('POST', "/api/v1/mcp-servers/{$serverId}/oauth/start");
         self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
-        self::assertStringContainsString('disabled by an administrator', (string) $start['error']);
+        self::assertSame('disabled', $start['code'], 'the page maps this code to its sentence, never the text');
     }
 
     public function testOauthCallbackWithBadStateRedirectsWithError(): void

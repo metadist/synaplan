@@ -385,12 +385,25 @@
     "disconnectMessage": "Se eliminará el acceso guardado de \"{name}\". El servidor permanece en tu lista — inicia sesión de nuevo para usarlo.",
     "disconnected": "Acceso eliminado",
     "disconnectFailed": "No se pudo eliminar el acceso",
-    "oauthError": {
-      "denied": "El inicio de sesión se canceló",
-      "missing_code": "El inicio de sesión no se completó. Inténtalo de nuevo.",
-      "exchange_failed": "No se pudo terminar el inicio de sesión. Inténtalo de nuevo.",
-      "disabled": "Un administrador ha desactivado el inicio de sesión con el proveedor"
+    "signInError": {
+      "disabled": "Un administrador ha desactivado la conexión con inicio de sesión.",
+      "calls_off": "Las llamadas a servidores MCP están desactivadas. Un administrador puede activarlas en la configuración del sistema.",
+      "address_not_allowed": "Esta dirección no se puede usar. Introduzca la dirección pública del servidor.",
+      "https_required": "El inicio de sesión necesita una dirección segura. Use una dirección que empiece por https://.",
+      "unreachable": "El servidor no respondió. Compruebe la dirección e inténtelo de nuevo.",
+      "no_signin": "Este servidor no ofrece inicio de sesión. Si le dio una clave, úsela.",
+      "metadata_invalid": "La configuración de inicio de sesión del servidor está incompleta, así que Synaplan se detuvo. Pida a quien gestiona el servidor que la revise.",
+      "no_registration": "Este servidor no permite que Synaplan se registre para iniciar sesión. Pida una clave de acceso a quien lo gestiona.",
+      "unsupported_method": "Este servidor usa un método de inicio de sesión que Synaplan no admite. Pida una clave de acceso a quien lo gestiona.",
+      "registration_refused": "El servidor rechazó registrar a Synaplan para iniciar sesión. Inténtelo más tarde o pregunte a quien lo gestiona.",
+      "server_changed": "Este servidor se modificó durante el inicio de sesión. Haga clic en Conectar para empezar de nuevo.",
+      "expired": "El inicio de sesión tardó demasiado. Haga clic en Conectar para empezar de nuevo.",
+      "exchange_failed": "No se pudo completar el inicio de sesión. Inténtelo de nuevo.",
+      "denied": "Se canceló el inicio de sesión.",
+      "missing_code": "El inicio de sesión no se completó. Inténtelo de nuevo.",
+      "unknown": "No se pudo iniciar sesión. Inténtelo de nuevo o pregunte a quien gestiona el servidor."
     },
+    "savedSignInNotStarted": "Se guardó «{name}». El inicio de sesión no comenzó: {reason}",
     "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
     "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
     "writeBadge": "Escritura permitida"

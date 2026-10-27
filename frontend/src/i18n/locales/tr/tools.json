@@ -385,12 +385,25 @@
     "disconnectMessage": "\"{name}\" için kayıtlı oturum silinecek. Sunucu listenizde kalır — kullanmak için yeniden oturum açın.",
     "disconnected": "Oturum kaldırıldı",
     "disconnectFailed": "Oturum kaldırılamadı",
-    "oauthError": {
-      "denied": "Oturum iptal edildi",
-      "missing_code": "Oturum tamamlanmadı. Lütfen yeniden deneyin.",
-      "exchange_failed": "Oturum tamamlanamadı. Lütfen yeniden deneyin.",
-      "disabled": "Yönetici, sağlayıcı ile oturum açmayı kapattı"
+    "signInError": {
+      "disabled": "Oturum açarak bağlanma bir yönetici tarafından kapatıldı.",
+      "calls_off": "MCP sunucularına çağrılar kapalı. Bir yönetici bunları sistem yapılandırmasında açabilir.",
+      "address_not_allowed": "Bu adres kullanılamaz. Sunucunun herkese açık adresini girin.",
+      "https_required": "Oturum açmak için güvenli bir adres gerekir. https:// ile başlayan bir adres kullanın.",
+      "unreachable": "Sunucu yanıt vermedi. Adresi kontrol edip yeniden deneyin.",
+      "no_signin": "Bu sunucu oturum açma sunmuyor. Size bir anahtar verdiyse onu kullanın.",
+      "metadata_invalid": "Sunucunun oturum açma ayarı eksik olduğu için Synaplan durdu. Sunucuyu yöneten kişiden kontrol etmesini isteyin.",
+      "no_registration": "Bu sunucu Synaplan’ın oturum açma için kaydolmasına izin vermiyor. Sunucuyu yöneten kişiden bir erişim anahtarı isteyin.",
+      "unsupported_method": "Bu sunucu Synaplan’ın desteklemediği bir oturum açma yöntemi kullanıyor. Sunucuyu yöneten kişiden bir erişim anahtarı isteyin.",
+      "registration_refused": "Sunucu, Synaplan’ı oturum açma için kaydetmeyi reddetti. Daha sonra yeniden deneyin veya sunucuyu yöneten kişiye sorun.",
+      "server_changed": "Bu sunucu oturum açma sırasında değiştirildi. Yeniden başlamak için Bağlan’a tıklayın.",
+      "expired": "Oturum açma çok uzun sürdü. Yeniden başlamak için Bağlan’a tıklayın.",
+      "exchange_failed": "Oturum açma tamamlanamadı. Lütfen yeniden deneyin.",
+      "denied": "Oturum açma iptal edildi.",
+      "missing_code": "Oturum açma tamamlanmadı. Lütfen yeniden deneyin.",
+      "unknown": "Oturum açma başlatılamadı. Yeniden deneyin veya sunucuyu yöneten kişiye sorun."
     },
+    "savedSignInNotStarted": "\"{name}\" kaydedildi. Oturum açma başlamadı: {reason}",
     "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
     "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
     "writeBadge": "Yazma izinli"
