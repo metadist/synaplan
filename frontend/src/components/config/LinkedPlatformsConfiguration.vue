@@ -150,23 +150,47 @@
                 <p v-if="link.mode === 'provision'" class="text-sm txt-secondary">
                   {{ $t('linkedPlatforms.managed') }}
                 </p>
-                <button
-                  v-else-if="link.mode === 'sso' && link.status !== 'paused'"
-                  type="button"
-                  class="btn-secondary px-4 py-2.5 text-sm font-medium"
-                  data-testid="btn-turn-off"
-                  @click="turnOff(link)"
+                <div
+                  v-else-if="link.mode === 'sso' && (link.status === 'suspended' || link.status === 'blocked')"
+                  class="space-y-2"
                 >
-                  {{ $t('linkedPlatforms.turnOff') }}
-                </button>
+                  <p class="text-sm txt-secondary">{{ $t('linkedPlatforms.cloudDisabled') }}</p>
+                  <button
+                    v-if="link.status === 'blocked'"
+                    type="button"
+                    class="btn-primary px-4 py-2.5 text-sm font-medium"
+                    data-testid="btn-resume"
+                    @click="resume(link)"
+                  >
+                    {{ $t('linkedPlatforms.resume') }}
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="btn-secondary px-4 py-2.5 text-sm font-medium"
+                    data-testid="btn-turn-off"
+                    @click="turnOff(link)"
+                  >
+                    {{ $t('linkedPlatforms.turnOff') }}
+                  </button>
+                </div>
                 <button
-                  v-else-if="link.mode === 'sso'"
+                  v-else-if="link.mode === 'sso' && link.status === 'paused'"
                   type="button"
                   class="btn-primary px-4 py-2.5 text-sm font-medium"
                   data-testid="btn-resume"
                   @click="resume(link)"
                 >
                   {{ $t('linkedPlatforms.resume') }}
+                </button>
+                <button
+                  v-else-if="link.mode === 'sso'"
+                  type="button"
+                  class="btn-secondary px-4 py-2.5 text-sm font-medium"
+                  data-testid="btn-turn-off"
+                  @click="turnOff(link)"
+                >
+                  {{ $t('linkedPlatforms.turnOff') }}
                 </button>
                 <button
                   v-else

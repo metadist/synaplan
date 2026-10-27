@@ -27,9 +27,12 @@ final readonly class PlatformBearerAttribution
     }
 
     /**
+     * Signing in again is allowed when the person turned the connection off.
+     * A cloud that disabled or removed them is still refused.
+     *
      * @param array<string, mixed> $claims
      */
-    public function attribute(User $user, array $claims): void
+    public function attribute(User $user, array $claims, bool $allowOwnerReconnect = false): void
     {
         $azp = $claims['azp'] ?? null;
         $userId = $user->getId();
@@ -58,8 +61,11 @@ final readonly class PlatformBearerAttribution
             }
 
             foreach ($this->identities->findForUserOnInstance((int) $userId, $instance->getClient(), $instance->getInstanceId()) as $row) {
-                if ($row->isOff()) {
+                if ($row->refusesReconnect() || ($row->ownerTurnedOff() && !$allowOwnerReconnect)) {
                     throw new PlatformDisconnectedException();
+                }
+                if ($row->isOff()) {
+                    continue;
                 }
                 $matched[] = $row;
             }

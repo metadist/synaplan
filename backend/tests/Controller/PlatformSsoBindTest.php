@@ -190,10 +190,45 @@ final class PlatformSsoBindTest extends WebTestCase
         self::assertArrayNotHasKey('key', $again);
         self::assertCount(1, $this->em->getRepository(ApiKey::class)->findBy(['ownerId' => $person['id']]));
 
-        $this->markStatus($this->row($instance['instance_id'], 'ada'), ExternalIdentity::STATUS_PAUSED);
+        $this->markStatus($this->row($instance['instance_id'], 'ada'), ExternalIdentity::STATUS_SUSPENDED);
         $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);
+
+        $this->markStatus($this->row($instance['instance_id'], 'ada'), ExternalIdentity::STATUS_PAUSED);
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->row($instance['instance_id'], 'ada')->getStatus());
+    }
+
+    public function testDeletingTheBackgroundKeyCanBeSignedInAgain(): void
+    {
+        $this->client->disableReboot();
+        $person = $this->person();
+        $this->installToken($person['sub'], $person['email']);
+        $instance = $this->register();
+        $server = $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'];
+        $body = (string) json_encode(['external_id' => 'ada']);
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $minted = $this->json();
+
+        $user = $this->em->find(User::class, $person['id']);
+        self::assertInstanceOf(User::class, $user);
+        $this->authenticateClient($this->client, $user);
+        $this->client->request('DELETE', '/api/v1/apikeys/'.$minted['api_key_id']);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        self::assertSame(ExternalIdentity::STATUS_PAUSED, $this->row($instance['instance_id'], 'ada')->getStatus());
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $again = $this->json();
+        self::assertIsString($again['key'] ?? null);
+        self::assertNotSame($minted['api_key_id'], $again['api_key_id']);
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->row($instance['instance_id'], 'ada')->getStatus());
     }
 
     public function testBackgroundKeyRefusesASessionWithoutOrganisationLogin(): void

@@ -45,6 +45,7 @@
     "resume": "Réactiver",
     "resumed": "Synaplan est de nouveau actif pour ce cloud.",
     "managed": "Un administrateur a créé cette connexion. Demandez-lui de la désactiver.",
+    "cloudDisabled": "Votre cloud a désactivé cette connexion. Elle revient quand le cloud réactive votre compte.",
     "disconnectTitle": "Déconnecter cette plateforme ?",
     "disconnectConfirm": "Déconnecter {host} ? Cette plateforme ne pourra plus utiliser ce compte.",
     "disconnected": "Plateforme déconnectée.",

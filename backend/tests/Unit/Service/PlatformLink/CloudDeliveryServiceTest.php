@@ -24,6 +24,20 @@ use PHPUnit\Framework\TestCase;
 
 final class CloudDeliveryServiceTest extends TestCase
 {
+    public function testAPausedIdentityIsNotACopyDestination(): void
+    {
+        $identity = $this->identity(4, 7, 'pi_abc');
+        $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('find')->willReturn($identity);
+        $deliveries = $this->createMock(CloudDeliveryRepository::class);
+        $deliveries->expects(self::never())->method('save');
+
+        $result = $this->service($deliveries, $identities)->copy(new ShareableFile(1, 7, '/tmp/a', 'a.txt', 3), ['identity_id' => 4]);
+
+        self::assertFalse($result->ok);
+    }
+
     public function testACopyWithoutALinkIsRefused(): void
     {
         $service = $this->service(identities: $this->createStub(ExternalIdentityRepository::class));

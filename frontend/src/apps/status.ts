@@ -27,7 +27,7 @@ export async function loadConnectedAppIds(apps: readonly AppDefinition[]): Promi
   const hasConnection = async (match: (row: ConnectionItem) => boolean) =>
     (await listConnections()).some((row) => match(row) && row.status !== 'disconnected')
   const hasPlatformLink = async (client: string) =>
-    (await listPlatformLinks()).some((link) => link.client === client)
+    (await listPlatformLinks()).some((link) => link.client === client && link.status === 'active')
 
   const checks: Record<string, () => Promise<boolean>> = {
     telegram: async () => (await getTelegramChannel()).status === 'connected',

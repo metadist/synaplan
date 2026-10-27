@@ -246,7 +246,11 @@ final readonly class PlatformLinkExchangeService
         }
 
         $linkId = (string) $identity->getId();
-        $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
+        if (ExternalIdentity::MODE_SSO === $identity->getMode() && ExternalIdentity::STATUS_REVOKED !== $identity->getStatus()) {
+            $identity->setAccess(false, !$identity->cloudDisabled());
+        } else {
+            $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
+        }
         $identity->setRevokedAt(time());
         $this->externalIdentityRepository->save($identity);
         $this->notifier->identityRevoked($identity);
@@ -295,7 +299,7 @@ final readonly class PlatformLinkExchangeService
     public function turnOff(int $userId, int $linkId, string $ip): void
     {
         $identity = $this->organisationIdentity($userId, $linkId);
-        $identity->setStatus(ExternalIdentity::STATUS_PAUSED);
+        $identity->setAccess(false, !$identity->cloudDisabled());
         $this->externalIdentityRepository->save($identity);
         $this->auditLogWriter->record($userId, 'platform_link.turned_off', 'platform_link', (string) $linkId, null, $ip);
     }
@@ -303,7 +307,10 @@ final readonly class PlatformLinkExchangeService
     public function resume(int $userId, int $linkId, string $ip): void
     {
         $identity = $this->organisationIdentity($userId, $linkId);
-        $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        if (!$identity->ownerTurnedOff()) {
+            throw new PlatformSsoException(Response::HTTP_CONFLICT, 'cloud_disabled', 'Your cloud turned this connection off.');
+        }
+        $identity->setAccess(true, !$identity->cloudDisabled());
         $identity->setRevokedAt(null);
         $this->externalIdentityRepository->save($identity);
         $this->auditLogWriter->record($userId, 'platform_link.resumed', 'platform_link', (string) $linkId, null, $ip);
@@ -314,6 +321,9 @@ final readonly class PlatformLinkExchangeService
         $identity = $this->externalIdentityRepository->find($linkId);
         if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $userId) {
             throw new Exception\PlatformInstanceNotFoundException('Link not found.');
+        }
+        if (ExternalIdentity::STATUS_REVOKED === $identity->getStatus()) {
+            throw new PlatformSsoException(Response::HTTP_CONFLICT, 'identity_revoked', 'This connection was removed by the cloud.');
         }
         if (ExternalIdentity::MODE_SSO !== $identity->getMode()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_organisation_login', 'Turn off is for organisation login.');

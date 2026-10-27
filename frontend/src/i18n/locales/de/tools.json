@@ -45,6 +45,7 @@
     "resume": "Wieder einschalten",
     "resumed": "Synaplan ist für diese Cloud wieder an.",
     "managed": "Eine Administratorin oder ein Administrator hat diese Verbindung angelegt. Bitte dort ausschalten lassen.",
+    "cloudDisabled": "Ihre Cloud hat diese Verbindung ausgeschaltet. Sie kommt zurück, wenn die Cloud Ihr Konto wieder einschaltet.",
     "disconnectTitle": "Diese Plattform trennen?",
     "disconnectConfirm": "{host} trennen? Diese Plattform kann das Konto dann nicht mehr nutzen.",
     "disconnected": "Plattform getrennt.",

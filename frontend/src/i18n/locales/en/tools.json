@@ -45,6 +45,7 @@
     "resume": "Turn back on",
     "resumed": "Synaplan is on again for this cloud.",
     "managed": "An administrator created this connection. Ask them to turn it off.",
+    "cloudDisabled": "Your cloud turned this connection off. It comes back when the cloud enables your account.",
     "disconnectTitle": "Disconnect this platform?",
     "disconnectConfirm": "Disconnect {host}? That platform will no longer be able to use this account.",
     "disconnected": "Platform disconnected.",

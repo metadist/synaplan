@@ -45,6 +45,7 @@
     "resume": "Yeniden aç",
     "resumed": "Synaplan bu bulut için yeniden açık.",
     "managed": "Bu bağlantıyı bir yönetici oluşturdu. Kapatmasını ondan isteyin.",
+    "cloudDisabled": "Bulutunuz bu bağlantıyı kapattı. Hesabınız bulutta yeniden açılınca geri gelir.",
     "disconnectTitle": "Bu platformun bağlantısı kesilsin mi?",
     "disconnectConfirm": "{host} bağlantısı kesilsin mi? Bu platform artık bu hesabı kullanamaz.",
     "disconnected": "Platform bağlantısı kesildi.",

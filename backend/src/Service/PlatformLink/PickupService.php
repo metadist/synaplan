@@ -62,7 +62,8 @@ final readonly class PickupService
             return $this->refused('not_linked', 'Synaplan is not linked to this cloud. Nothing was read.');
         }
         $identity = $this->identities->find($identityId);
-        if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $ownerId || null === $identity->getId()) {
+        if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $ownerId || null === $identity->getId()
+            || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()) {
             return $this->refused('unauthorized', 'Nothing was read.');
         }
         $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
@@ -297,7 +298,7 @@ final readonly class PickupService
             'instanceId' => $instance->getInstanceId(),
             'externalId' => $externalId,
         ]);
-        if (!$identity instanceof ExternalIdentity) {
+        if (!$identity instanceof ExternalIdentity || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()) {
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_identity');
         }
         $clean = [];
@@ -344,7 +345,8 @@ final readonly class PickupService
         $out = [];
         $used = $usedChannels;
         foreach ($this->identities->findByUserId($ownerId) as $identity) {
-            if (null === $identity->getId() || '' === $identity->getInstanceId()) {
+            if (null === $identity->getId() || '' === $identity->getInstanceId()
+                || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()) {
                 continue;
             }
             $instance = $this->platforms->findByInstanceId($identity->getInstanceId());
@@ -490,7 +492,8 @@ final readonly class PickupService
         $identity = $this->identities->find($pickup->getIdentityId());
         if (!$identity instanceof ExternalIdentity
             || $identity->getUserId() !== $pickup->getOwnerId()
-            || $identity->getInstanceId() !== $instance->getInstanceId()) {
+            || $identity->getInstanceId() !== $instance->getInstanceId()
+            || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()) {
             throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
         }
 

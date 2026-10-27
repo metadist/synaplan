@@ -140,19 +140,21 @@ final readonly class PlatformLifecycleService
         }
 
         if ('disabled' === $event) {
-            $this->mark($row, ExternalIdentity::STATUS_PAUSED);
+            $row->setAccess(!$row->ownerTurnedOff(), false);
+            $this->entityManager->flush();
             $this->effects->onPaused($row);
             $this->record($user, $row, 'platform_link.disabled', $ip, []);
 
-            return $this->answer('kept', ExternalIdentity::STATUS_PAUSED, 'Synaplan is paused for this person.');
+            return $this->answer('kept', $row->getStatus(), 'Synaplan is paused for this person.');
         }
 
         if ('enabled' === $event) {
-            $this->mark($row, ExternalIdentity::STATUS_ACTIVE);
+            $row->setAccess(!$row->ownerTurnedOff(), true);
+            $this->entityManager->flush();
             $this->effects->onResumed($row);
             $this->record($user, $row, 'platform_link.enabled', $ip, []);
 
-            return $this->answer('kept', ExternalIdentity::STATUS_ACTIVE, 'Synaplan is on again for this person.');
+            return $this->answer('kept', $row->getStatus(), 'Synaplan is on again for this person.');
         }
 
         $this->entityManager->refresh($row);
@@ -205,9 +207,8 @@ final readonly class PlatformLifecycleService
         $status = $row->getStatus();
 
         return ('deleted' === $event && ExternalIdentity::STATUS_REVOKED === $status)
-            || ('disabled' === $event && ExternalIdentity::STATUS_PAUSED === $status)
-            || ('disabled' === $event && ExternalIdentity::STATUS_REVOKED === $status)
-            || ('enabled' === $event && ExternalIdentity::STATUS_ACTIVE === $status);
+            || ('disabled' === $event && ($row->cloudDisabled() || ExternalIdentity::STATUS_REVOKED === $status))
+            || ('enabled' === $event && !$row->cloudDisabled() && ExternalIdentity::STATUS_REVOKED !== $status);
     }
 
     private function mark(ExternalIdentity $row, string $status): void
