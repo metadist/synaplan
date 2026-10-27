@@ -13,6 +13,8 @@ export type ResearchRunView = z.infer<typeof GetApiResearchShowResponseSchema>
 export async function fetchResearchCapabilities(): Promise<ResearchCapabilities> {
   return httpClient('/api/v1/research/capabilities', {
     schema: GetApiResearchCapabilitiesResponseSchema,
+    // A guest is not signed in. A 401 from this probe must not log them out.
+    skipAuth: true,
   })
 }
 
