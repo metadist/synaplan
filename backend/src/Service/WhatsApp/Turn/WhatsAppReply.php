@@ -10,6 +10,7 @@ use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\WhatsApp\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -220,15 +221,11 @@ final readonly class WhatsAppReply
             $this->em->flush();
         }
 
-        $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
-            'provider' => $metadata['provider'] ?? 'unknown',
-            'model' => $metadata['model'] ?? 'unknown',
-            'usage' => $metadata['usage'] ?? [],
-            'model_id' => $metadata['model_id'] ?? null,
-            'source' => 'WHATSAPP',
-            'response_text' => $responseText,
-            'input_text' => $message->getText(),
-        ]);
+        $recordedChatUsage = $this->rateLimitService->recordUsage(
+            $user,
+            'MESSAGES',
+            FacadeMeteredChat::messages($metadata, 'WHATSAPP', $message->getText(), $responseText),
+        );
         $metadata['recorded_chat_usage'] = $recordedChatUsage;
         $rawTranscriptionUsage = $message->getMeta('ai_transcription_usage');
         if (null !== $rawTranscriptionUsage && '' !== $rawTranscriptionUsage) {

@@ -20,6 +20,9 @@ final readonly class DocumentEditResult
         public array $usage = [],
         public ?int $version = null,
         public bool $fidelityLossy = false,
+        public bool $facadeMetered = false,
+        public ?string $facadeChargedCost = null,
+        public bool $facadePriceKnown = true,
     ) {
     }
 }

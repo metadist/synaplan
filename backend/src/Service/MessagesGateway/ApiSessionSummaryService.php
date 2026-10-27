@@ -198,6 +198,7 @@ final readonly class ApiSessionSummaryService
                 'model' => $modelName,
                 'temperature' => 0.2,
                 'max_tokens' => self::SUMMARY_MAX_TOKENS,
+                'caller_meters' => true,
             ]);
 
             $summary = $this->clip(trim((string) ($response['content'] ?? '')), self::SUMMARY_MAX_CHARS);

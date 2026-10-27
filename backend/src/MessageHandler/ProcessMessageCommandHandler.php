@@ -3,9 +3,12 @@
 namespace App\MessageHandler;
 
 use App\Entity\Message;
+use App\Entity\User;
 use App\Message\ProcessMessageCommand;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Message\MessageProcessor;
+use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -23,6 +26,7 @@ class ProcessMessageCommandHandler
         private EntityManagerInterface $em,
         private MessageProcessor $processor,
         private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
+        private RateLimitService $rateLimits,
         private LoggerInterface $logger,
     ) {
     }
@@ -82,6 +86,7 @@ class ProcessMessageCommandHandler
 
             $this->em->persist($outgoingMessage);
             $this->em->flush();
+            $this->recordUsage($message, $response);
 
             $chatId = $message->getChatId();
             if (null !== $chatId && $chatId > 0) {
@@ -103,5 +108,24 @@ class ProcessMessageCommandHandler
 
             throw $e; // Rethrow for Messenger retry logic
         }
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private function recordUsage(Message $message, array $response): void
+    {
+        $user = $this->em->find(User::class, $message->getUserId());
+        if (!$user instanceof User) {
+            return;
+        }
+
+        $metadata = is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
+        $this->rateLimits->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages(
+            $metadata,
+            'QUEUE',
+            $message->getText(),
+            (string) ($response['content'] ?? ''),
+        ));
     }
 }

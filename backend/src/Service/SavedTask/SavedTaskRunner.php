@@ -21,6 +21,8 @@ use App\Service\Message\MessageProcessor;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
+use App\Service\Usage\AiChatUsageMeter;
+use App\Service\Usage\FacadeMeteredChat;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -170,11 +172,7 @@ final readonly class SavedTaskRunner
                 return ['run' => $run, 'task' => $task];
             }
 
-            $this->rateLimits->recordUsage($user, 'MESSAGES', [
-                'source' => 'SAVED_TASK',
-                'chat_id' => $chat->getId(),
-                'input_text' => $text,
-            ]);
+            $this->recordRun($user, $result, $chat, $text);
 
             $run->markCompleted($messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
             $task->recordSuccess();
@@ -246,6 +244,7 @@ final readonly class SavedTaskRunner
             'saved_task' => true,
             'saved_task_id' => (int) $task->getId(),
             'saved_task_name' => $task->getName(),
+            AiChatUsageMeter::USAGE_SOURCE => 'SAVED_TASK',
         ];
         if ([] !== $triggerPayload) {
             $options['trigger_payload'] = $triggerPayload;
@@ -503,6 +502,25 @@ final readonly class SavedTaskRunner
         $this->tasks->save($task);
 
         return $chat;
+    }
+
+    /**
+     * The model call is already on the usage log when the facade metered it.
+     * This row only counts the run against the message allowance. A call the
+     * facade did not see is recorded in full, from the processor metadata.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function recordRun(User $user, array $result, Chat $chat, string $text): void
+    {
+        $metadata = is_array($result['response']['metadata'] ?? null) ? $result['response']['metadata'] : [];
+        $this->rateLimits->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages(
+            $metadata,
+            'SAVED_TASK',
+            $text,
+            (string) ($result['response']['content'] ?? ''),
+            ['chat_id' => $chat->getId()],
+        ));
     }
 
     private function notifyPaused(SavedTask $task, string $reason): void

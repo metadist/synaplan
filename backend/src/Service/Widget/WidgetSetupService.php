@@ -137,7 +137,7 @@ final readonly class WidgetSetupService
         $aiOptions = [
             'temperature' => 0.7,
             'provider' => $modelConfig['provider'],
-            'model' => $modelConfig['model'],
+            'model' => $modelConfig['model'], 'caller_meters' => true,
         ];
 
         $response = $this->aiFacade->chat(
@@ -215,7 +215,7 @@ final readonly class WidgetSetupService
         $aiOptions = [
             'temperature' => 0.7,
             'provider' => $modelConfig['provider'],
-            'model' => $modelConfig['model'],
+            'model' => $modelConfig['model'], 'caller_meters' => true,
         ];
 
         $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
@@ -285,7 +285,7 @@ PROMPT;
         $aiOptions = [
             'temperature' => 0.1,
             'provider' => $modelConfig['provider'],
-            'model' => $modelConfig['model'],
+            'model' => $modelConfig['model'], 'caller_meters' => true,
         ];
 
         if ($this->structuredOutputConfig->isEnabled($user->getId())) {
@@ -468,7 +468,7 @@ PROMPT;
                 $aiOptions = [
                     'temperature' => 0.3,
                     'provider' => $metaModelConfig['provider'],
-                    'model' => $metaModelConfig['model'],
+                    'model' => $metaModelConfig['model'], 'caller_meters' => true,
                 ];
 
                 if ($this->structuredOutputConfig->isEnabled($user->getId())) {

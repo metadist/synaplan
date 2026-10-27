@@ -127,7 +127,7 @@ final readonly class ChatTitleService
         try {
             $summaryConfig = $this->modelConfigService->getSummaryModelConfig($ownerId);
 
-            $aiOptions = ['temperature' => 0.3];
+            $aiOptions = ['temperature' => 0.3, 'caller_meters' => true];
             if ($summaryConfig['provider'] && $summaryConfig['model']) {
                 $aiOptions['provider'] = $summaryConfig['provider'];
                 $aiOptions['model'] = $summaryConfig['model'];

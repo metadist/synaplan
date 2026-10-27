@@ -176,35 +176,7 @@ final class ResultAssembler
             }
         }
 
-        // Usage accounting: sum the exact provider token counts of every
-        // successful text node into the top-level `usage`, so the turn's
-        // MESSAGES row in BUSELOG bills real tokens instead of falling back to
-        // the byte-length estimation on the assembled answer text.
-        $promptTokens = 0;
-        $completionTokens = 0;
-        $totalTokens = 0;
-        foreach ($plan->nodes as $usageNode) {
-            $usageNodeResult = $context->getResult($usageNode->id);
-            if (null === $usageNodeResult || !$usageNodeResult->isSuccessful()) {
-                continue;
-            }
-            $nodeUsage = $usageNodeResult->metadata['usage'] ?? null;
-            if (!is_array($nodeUsage) || [] === $nodeUsage) {
-                continue;
-            }
-            $nodePrompt = (int) ($nodeUsage['prompt_tokens'] ?? 0);
-            $nodeCompletion = (int) ($nodeUsage['completion_tokens'] ?? 0);
-            $promptTokens += $nodePrompt;
-            $completionTokens += $nodeCompletion;
-            $totalTokens += (int) ($nodeUsage['total_tokens'] ?? ($nodePrompt + $nodeCompletion));
-        }
-        if ($totalTokens > 0) {
-            $metadata['usage'] = [
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $totalTokens,
-            ];
-        }
+        $metadata = NodeUsageFold::into($plan, $context, $metadata);
 
         // Propagate web_search results from the first successful WebSearch node
         // into the top-level metadata so StreamController can set the

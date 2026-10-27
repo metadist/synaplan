@@ -124,7 +124,7 @@ final readonly class LlmReranker implements RerankProviderInterface
         $response = $this->aiFacade->chat([
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => "Query:\n".$query."\n\nCandidates:\n".implode("\n", $lines)],
-        ], null, $chatOptions);
+        ], $options->userId, $chatOptions);
 
         $content = $response['content'] ?? '';
 

@@ -31,6 +31,7 @@ use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Mcp\Exception\ResourceNotFoundException;
@@ -865,22 +866,11 @@ final class McpServerFactory
     }
 
     /**
-     * Record chat usage (and media usage for image/video/audio turns), mirroring
-     * WebhookController::generic() so MCP traffic counts against the same budgets.
-     *
      * @param array<string, mixed> $meta
      */
     private function recordChatUsage(User $user, string $input, string $answer, array $meta): void
     {
-        $this->rateLimit->recordUsage($user, 'MESSAGES', [
-            'provider' => $meta['provider'] ?? 'unknown',
-            'model' => $meta['model'] ?? 'unknown',
-            'usage' => $meta['usage'] ?? [],
-            'model_id' => $meta['model_id'] ?? null,
-            'source' => 'MCP',
-            'response_text' => $answer,
-            'input_text' => $input,
-        ]);
+        $this->rateLimit->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages($meta, 'MCP', $input, $answer));
 
         $mediaAction = match ($meta['media_type'] ?? null) {
             'image' => 'IMAGES',

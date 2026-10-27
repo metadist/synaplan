@@ -150,7 +150,7 @@ final readonly class SearchQueryGenerator
             // Call AI for query generation
             $response = $this->aiFacade->chat($messages, $userId, [
                 'provider' => $provider,
-                'model' => $modelName,
+                'model' => $modelName, 'caller_meters' => true,
                 'temperature' => 0.3, // Low temperature for consistent results
                 'max_tokens' => 100, // Short response expected
             ]);

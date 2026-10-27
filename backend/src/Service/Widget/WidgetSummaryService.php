@@ -550,7 +550,7 @@ PROMPT;
                 'temperature' => 0.3,
                 'max_tokens' => 4000,
                 'provider' => $modelConfig['provider'],
-                'model' => $modelConfig['model'],
+                'model' => $modelConfig['model'], 'caller_meters' => true,
             ];
 
             $result = $this->aiFacade->chat([

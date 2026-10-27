@@ -8,6 +8,7 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -181,9 +182,7 @@ final readonly class TelegramMessageStore
         if (!empty($metadata['usage']) && is_array($metadata['usage'])) {
             $outbound->setMeta('ai_chat_usage', (string) json_encode($metadata['usage']));
         }
-        if (null !== $recorded) {
-            $recorded->attachChatCost($outbound);
-        }
+        FacadeMeteredChat::attach($outbound, $recorded, $metadata);
         foreach (['sorting_provider' => 'ai_sorting_provider', 'sorting_model_name' => 'ai_sorting_model', 'sorting_model_id' => 'ai_sorting_model_id'] as $source => $key) {
             $value = $classification[$source] ?? null;
             if (!empty($value) && is_scalar($value)) {

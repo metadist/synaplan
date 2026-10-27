@@ -190,6 +190,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -386,6 +387,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -578,6 +580,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "From JSON",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -775,6 +778,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "<think>Weighing it.</think>Short answer",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -975,6 +979,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -1178,6 +1183,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -1386,6 +1392,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -1612,6 +1619,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Here is your image.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -2053,6 +2061,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             },
@@ -2066,6 +2075,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }
@@ -2549,6 +2559,7 @@
                     "model_id": 12,
                     "provider": "test",
                     "response_text": "Hello there.",
+                    "source": "WIDGET",
                     "usage": []
                 }
             }

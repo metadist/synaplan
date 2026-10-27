@@ -67,7 +67,17 @@ final class WidgetAnswerStoreTest extends TestCase
     {
         $this->store()->store($this->turn(), $this->stored([4]), 'Answer', ['response' => ['metadata' => ['provider' => 'test', 'model' => 'm', 'model_id' => 12, 'usage' => ['total' => 9]]]]);
 
-        self::assertSame([['MESSAGES', ['provider' => 'test', 'model' => 'm', 'model_id' => 12, 'usage' => ['total' => 9], 'channel' => 'WIDGET', 'files' => [4], 'response_text' => 'Answer', 'input_text' => 'Hi']]], $this->usage);
+        self::assertSame([['MESSAGES', [
+            'channel' => 'WIDGET',
+            'files' => [4],
+            'provider' => 'test',
+            'model' => 'm',
+            'usage' => ['total' => 9],
+            'model_id' => 12,
+            'source' => 'WIDGET',
+            'input_text' => 'Hi',
+            'response_text' => 'Answer',
+        ]]], $this->usage);
     }
 
     public function testOnlyCitedSourcesCount(): void

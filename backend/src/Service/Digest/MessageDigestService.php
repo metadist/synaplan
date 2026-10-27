@@ -181,6 +181,7 @@ PROMPT;
                 'temperature' => 0.2,
                 'model' => $modelConfig['model'],
                 'provider' => $modelConfig['provider'],
+                'caller_meters' => true,
             ];
 
             if ($this->structuredOutputConfig->isEnabled($user->getId())) {

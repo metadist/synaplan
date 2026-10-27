@@ -311,7 +311,7 @@ final readonly class MessageSorter
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
-                'max_tokens' => self::CLASSIFICATION_MAX_TOKENS,
+                'max_tokens' => self::CLASSIFICATION_MAX_TOKENS, 'caller_meters' => true,
             ];
 
             // Enum-constrains BTOPIC/BLANG/BMEDIA/BINPUTMODE/BRESOLUTION on

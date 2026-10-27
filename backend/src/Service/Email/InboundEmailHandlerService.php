@@ -573,7 +573,7 @@ final readonly class InboundEmailHandlerService
                 userId: $handler->getUserId(),
                 options: [
                     'provider' => $provider,
-                    'model' => $modelName,
+                    'model' => $modelName, 'caller_meters' => true,
                 ]
             );
 

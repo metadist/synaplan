@@ -11,6 +11,7 @@ use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Vision\VisionPolicy;
+use App\AI\Stream\StreamTextCapture;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
@@ -491,9 +492,6 @@ final readonly class MessagesGateway
     }
 
     /**
-     * Stream via the translator. $emit receives raw SSE strings (passthrough)
-     * or synthesized event arrays. Returns final usage after the stream ends.
-     *
      * @param GatewaySuccess                                                          $prepared
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
      */
@@ -509,6 +507,7 @@ final readonly class MessagesGateway
             return new MessagesUsage();
         }
 
+        $capture = StreamTextCapture::wrap($emit);
         if ($prepared['tool_loop'] && null !== $prepared['tool_catalog']) {
             $usage = $this->toolLoop->runStream(
                 $prepared['request_body'],
@@ -516,15 +515,15 @@ final readonly class MessagesGateway
                 $translator,
                 $user,
                 $prepared['tool_catalog'],
-                $emit,
+                $capture,
                 $prepared['replaced_server_tools'],
             );
         } else {
-            $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $emit);
+            $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $capture);
         }
 
-        if ($usage->outputTokens > 0 || $usage->inputTokens > 0) {
-            $this->recordUsage($user, $prepared, $usage, null);
+        if ($usage->shouldMeter()) {
+            $this->recordUsage($user, $prepared, $usage, null, $capture->text());
         }
 
         return $usage;
@@ -824,10 +823,10 @@ final readonly class MessagesGateway
      * @param GatewaySuccess            $prepared
      * @param array<string, mixed>|null $responseBody
      */
-    private function recordUsage(User $user, array $prepared, MessagesUsage $usage, ?array $responseBody): void
+    private function recordUsage(User $user, array $prepared, MessagesUsage $usage, ?array $responseBody, string $answerText = ''): void
     {
         $inputText = $this->lastUserText($prepared['request_body']);
-        $responseText = null !== $responseBody ? $this->extractResponseText($responseBody) : '';
+        $responseText = null !== $responseBody ? $this->extractResponseText($responseBody) : $answerText;
 
         $metadata = [
             'provider' => $prepared['resolved']['provider'],

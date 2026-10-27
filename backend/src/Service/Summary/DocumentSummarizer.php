@@ -33,7 +33,7 @@ final readonly class DocumentSummarizer
     public function summarize(User $user, SummaryCall $call): array
     {
         $model = $this->model($user);
-        $options = ['temperature' => $call->temperature];
+        $options = ['temperature' => $call->temperature, 'caller_meters' => true];
         if ($model['provider']) {
             $options['provider'] = $model['provider'];
         }

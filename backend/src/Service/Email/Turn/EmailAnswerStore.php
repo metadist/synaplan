@@ -9,6 +9,7 @@ use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\RateLimitService;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -38,16 +39,13 @@ final readonly class EmailAnswerStore
      */
     public function recordUsage(InboundEmail $email, StoredInboundEmail $stored, string $answer, array $metadata, float $processingTime): RecordedUsage
     {
-        $usage = $this->rateLimits->recordUsage($email->user, 'MESSAGES', [
-            'provider' => $metadata['provider'] ?? 'unknown',
-            'model' => $metadata['model'] ?? 'unknown',
-            'usage' => $metadata['usage'] ?? [],
-            'model_id' => $metadata['model_id'] ?? null,
-            'latency' => (int) ($processingTime * 1000),
-            'source' => 'EMAIL',
-            'response_text' => $answer,
-            'input_text' => $stored->message->getText(),
-        ]);
+        $usage = $this->rateLimits->recordUsage($email->user, 'MESSAGES', FacadeMeteredChat::messages(
+            $metadata,
+            'EMAIL',
+            $stored->message->getText(),
+            $answer,
+            ['latency' => (int) ($processingTime * 1000)],
+        ));
 
         $mediaType = $metadata['media_type'] ?? null;
         $mediaAction = is_string($mediaType) ? (self::MEDIA_ACTIONS[$mediaType] ?? null) : null;
@@ -106,7 +104,13 @@ final readonly class EmailAnswerStore
         if (!empty($metadata['model_id'])) {
             $outgoing->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
         }
-        $usage->attachChatCost($outgoing);
+        $charged = FacadeMeteredChat::chargedCost($metadata);
+        if (null !== $charged) {
+            $outgoing->setMeta('ai_chat_cost', $charged);
+            FacadeMeteredChat::applyPriceKnown($outgoing, $metadata);
+        } else {
+            $usage->attachChatCost($outgoing);
+        }
         $docs = PlatformDocReferenceResolver::encodeDocsMeta($metadata);
         if (null !== $docs) {
             $outgoing->setMeta('docs', $docs);
