@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\ApiKey;
 use App\Entity\AuditLogEntry;
 use App\Entity\ExternalIdentity;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Security\ApiKeyScope;
 use App\Service\Auth\OidcTokenService;
 use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
@@ -140,6 +142,58 @@ final class PlatformSsoBindTest extends WebTestCase
         $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('second.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertSame('identity_conflict', $this->json()['code']);
+    }
+
+    public function testBackgroundKeyIsMintedOnceBoundAndScoped(): void
+    {
+        $this->client->disableReboot();
+        $person = $this->person();
+        $this->installToken($person['sub'], $person['email']);
+        $instance = $this->register();
+        $server = $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'];
+        $body = (string) json_encode(['external_id' => 'ada']);
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertSame('not_bound', $this->json()['code']);
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $minted = $this->json();
+        self::assertSame(ApiKeyScope::backgroundKeyScopes(), $minted['scopes']);
+        self::assertIsString($minted['key']);
+        self::assertStringStartsWith('sk_', $minted['key']);
+        $row = $this->row($instance['instance_id'], 'ada');
+        self::assertSame($minted['api_key_id'], $row->getApiKeyId());
+        $key = $this->em->find(ApiKey::class, $minted['api_key_id']);
+        self::assertInstanceOf(ApiKey::class, $key);
+        self::assertSame($minted['key'], $key->getKey());
+        self::assertSame(ApiKeyScope::backgroundKeyScopes(), $key->getScopes());
+        self::assertStringContainsString('OpenCloud:', $key->getName());
+        self::assertStringContainsString('(ada)', $key->getName());
+        self::assertStringContainsString('while you are away', $key->getName());
+
+        $this->em->clear();
+        $audit = $this->em->getRepository(AuditLogEntry::class)->findBy([
+            'actorId' => $person['id'],
+            'action' => 'platform_link.background_key',
+        ]);
+        self::assertCount(1, $audit);
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $again = $this->json();
+        self::assertSame($minted['api_key_id'], $again['api_key_id']);
+        self::assertArrayNotHasKey('key', $again);
+        self::assertCount(1, $this->em->getRepository(ApiKey::class)->findBy(['ownerId' => $person['id']]));
+
+        $this->markStatus($this->row($instance['instance_id'], 'ada'), ExternalIdentity::STATUS_PAUSED);
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);
     }
 
     public function testBearerReachesChatAndModelsAndIsRefusedElsewhere(): void
