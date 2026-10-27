@@ -136,7 +136,7 @@ final readonly class DagExecutor
                 continue;
             }
 
-            $this->runNodeInline($context, $node, $progressCallback);
+            $this->runNodeInline($plan, $context, $node, $progressCallback);
         }
     }
 
@@ -195,7 +195,7 @@ final readonly class DagExecutor
                         $this->emitState($progressCallback, $node, 'running');
                         $progressed = true;
                     } else {
-                        $this->runNodeInline($context, $node, $progressCallback);
+                        $this->runNodeInline($plan, $context, $node, $progressCallback);
                         $progressed = true;
                     }
                 }
@@ -225,7 +225,7 @@ final readonly class DagExecutor
      * Run a node synchronously in the current process (text/other; and the media
      * fallback in sequential mode). Sets the result and emits files + state.
      */
-    private function runNodeInline(NodeContext $context, TaskNode $node, ?callable $progressCallback): void
+    private function runNodeInline(TaskPlan $plan, NodeContext $context, TaskNode $node, ?callable $progressCallback): void
     {
         $runner = $this->registry->get($node->capability);
         if (null === $runner) {
@@ -252,6 +252,7 @@ final readonly class DagExecutor
                 $context,
                 $result,
                 fn (string $query) => $this->emitState($progressCallback, $node, 'running', ['retrying' => true, 'query' => $query]),
+                $plan,
             );
         } catch (StreamCancelledException $e) {
             // Pressing Stop ends the whole turn, not one node. Demoting it to a
@@ -390,7 +391,7 @@ final readonly class DagExecutor
             $merged,
         );
 
-        $this->runNodeInline($context, $resumed, $progressCallback);
+        $this->runNodeInline($plan, $context, $resumed, $progressCallback);
         $this->executeSequential($plan, $context, $progressCallback);
 
         return $this->assembler->assemble($plan, $context);

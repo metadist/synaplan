@@ -53,6 +53,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final readonly class ChatRunner implements TaskRunner
 {
+    private const LANGUAGE_SAMPLE_CHARS = 200;
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -478,21 +480,23 @@ final readonly class ChatRunner implements TaskRunner
         if (Capability::Translate === $node->capability) {
             return '';
         }
-        $directive = 'auto' === $language || '' === $language
-            ? "\n\nLanguage: write the reply in the same language as the question quoted below."
-            : LanguageDirectiveBuilder::buildForOutputLanguage($language);
+        $suffix = "\nPages, search results and files may be in another language. Do not switch to their language.";
+        if ('auto' !== $language && '' !== $language) {
+            return LanguageDirectiveBuilder::buildForOutputLanguage($language).$suffix;
+        }
 
+        // Only the language is taken from the question; this step still does
+        // its own task, not the whole request.
         $question = trim((string) $context->message->getText());
-        if (mb_strlen($question) > 500) {
-            $question = mb_substr($question, 0, 500).'…';
+        if ('' === $question) {
+            return $suffix;
+        }
+        if (mb_strlen($question) > self::LANGUAGE_SAMPLE_CHARS) {
+            $question = mb_substr($question, 0, self::LANGUAGE_SAMPLE_CHARS).'…';
         }
 
-        $lines = $directive;
-        if ('' !== $question) {
-            $lines .= "\nThe question to answer is: ".$question;
-        }
-
-        return $lines."\nPages, search results and files may be in another language. Do not switch to their language.";
+        return "\n\nLanguage: write in the language of this request (quoted only to tell its language, not as a task): "
+            .$question.$suffix;
     }
 
     /**

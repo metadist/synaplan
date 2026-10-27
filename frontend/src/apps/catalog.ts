@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { m365Api } from '@/services/api/m365Api'
 import { dropboxApi } from '@/services/api/dropboxApi'
 import { notionAppApi } from '@/services/api/notionAppApi'
+import { ApiError } from '@/services/api/httpClient'
 
 export type AppCategory = 'messengers' | 'website' | 'email' | 'files' | 'ai' | 'developer'
 
@@ -47,13 +48,16 @@ async function providerAvailable(status: () => Promise<{ available: boolean }>):
 
 const always = (): boolean => true
 
-/** Flag off is a 404, so the app is absent for everyone, including admins (U11). */
+/**
+ * Flag off is a 404, so the app is absent for everyone, including admins (U11).
+ * Any other failure keeps the app listed; its panel offers a retry.
+ */
 async function notionAvailable(): Promise<boolean> {
   try {
     await notionAppApi.status()
     return true
-  } catch {
-    return false
+  } catch (err) {
+    return !(err instanceof ApiError && err.status === 404)
   }
 }
 

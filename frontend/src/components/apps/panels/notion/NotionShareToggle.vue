@@ -12,7 +12,7 @@
           @change="onChange"
         />
         <span
-          class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+          class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand)] transition-colors"
         ></span>
         <span
           class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
@@ -30,6 +30,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { notionAppApi, type NotionAppStatus } from '@/services/api/notionAppApi'
+import { userFacingError } from '@/utils/userFacingError'
 
 defineProps<{ shared: boolean }>()
 const emit = defineEmits<{ saved: [status: NotionAppStatus] }>()
@@ -48,7 +49,7 @@ const onChange = async (event: Event) => {
     success(next ? t('apps.notion.sharing.savedOn') : t('apps.notion.sharing.savedOff'))
   } catch (err) {
     input.checked = !next
-    error(err instanceof Error && err.message ? err.message : t('apps.notion.sharing.failed'))
+    error(userFacingError(err, t('apps.notion.sharing.failed')))
   } finally {
     saving.value = false
   }

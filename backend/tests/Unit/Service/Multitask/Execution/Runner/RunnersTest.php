@@ -459,7 +459,7 @@ final class RunnersTest extends TestCase
         self::assertTrue($result->isSuccessful());
         self::assertIsString($capturedSystem);
         self::assertStringContainsString('German', $capturedSystem);
-        self::assertStringContainsString($question, $capturedSystem);
+        self::assertStringNotContainsString($question, $capturedSystem);
         self::assertStringContainsString('Do not switch to their language.', $capturedSystem);
     }
 

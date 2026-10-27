@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { notionAppApi } from '@/services/api/notionAppApi'
+import { userFacingError } from '@/utils/userFacingError'
 
 /**
  * "Add to a Notion page" on a library file. Offered only while the person's
@@ -43,7 +44,7 @@ export function useNotionFilePush() {
         },
       })
     } catch (err) {
-      error(err instanceof Error && err.message ? err.message : t('files.notion.failed'))
+      error(userFacingError(err, t('files.notion.failed')))
     } finally {
       busyId.value = null
     }

@@ -32,6 +32,12 @@ final class NotionImagePlan
         'hier' => true, 'chat' => true, 'mir' => true, 'ein' => true, 'eine' => true, 'einem' => true, 'einer' => true,
         'the' => true, 'my' => true, 'whole' => true, 'for' => true, 'attach' => true, 'attached' => true,
         'first' => true, 'find' => true, 'here' => true, 'this' => true, 'workspace' => true, 'seite' => true, 'page' => true,
+        'show' => true, 'send' => true, 'photo' => true, 'photos' => true,
+        'busca' => true, 'imagen' => true, 'imágenes' => true, 'imagenes' => true, 'adjunta' => true, 'muestra' => true,
+        'primera' => true, 'página' => true, 'pagina' => true, 'por' => true, 'favor' => true, 'mis' => true,
+        'cherche' => true, 'joins' => true, 'montre' => true, 'première' => true, 'premiere' => true, 'mes' => true,
+        'bul' => true, 'resim' => true, 'resmi' => true, 'görsel' => true, 'görseli' => true, 'ekle' => true, 'göster' => true,
+        'ilk' => true, 'sayfa' => true, 'sayfadaki' => true, 'lütfen' => true,
     ];
 
     /**
@@ -118,8 +124,8 @@ final class NotionImagePlan
 
     public static function wantsAttachedImage(string $text): bool
     {
-        $image = 1 === preg_match('/\b(bilder?n?|fotos?|images?|pictures?|png|jpe?g|gif|webp)\b/iu', $text);
-        $attach = 1 === preg_match('/anhäng|anhaeng|h[äa]ng|attach|zeig|schick|sende|\bsend\b/iu', $text);
+        $image = 1 === preg_match('/\b(bilder?n?|fotos?|images?|pictures?|photos?|imagen(?:es)?|im[áa]genes|resim\w*|resm\w*|g[öo]rsel\w*|foto[ğg]raf\w*|png|jpe?g|gif|webp)\b/iu', $text);
+        $attach = 1 === preg_match('/anhäng|anhaeng|\bh[äa]ng|attach|zeig|schick|sende|\bsend\b|\bshow\b|adj[uú]nt|mu[ée]stra|env[íi]a|manda|joins?\b|joindre|montre|envoie|ekle|g[öo]ster|g[öo]nder/iu', $text);
 
         return $image && $attach;
     }

@@ -14,6 +14,7 @@ use App\Service\Multitask\Execution\Recovery\SearchRecovery;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Plan\TaskPlan;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -187,6 +188,59 @@ final class SearchRecoveryTest extends TestCase
         self::assertSame('Metadist', $seen[0]['input']);
         self::assertSame('email_search', $seen[1]['capability']);
         self::assertSame('Metadist', $seen[1]['param']);
+    }
+
+    public function testAReadThatFeedsAWriteIsNotWidened(): void
+    {
+        $calls = 0;
+        $runner = $this->runner(function () use (&$calls): NodeResult {
+            ++$calls;
+
+            return NodeResult::ok('{"results":[{"id":"other-page"}]}');
+        });
+        $relaxer = $this->createMock(QueryRelaxer::class);
+        $relaxer->method('suggest')->willReturn(['query' => 'Metadist']);
+        $plan = TaskPlan::fromArray([
+            'version' => 1,
+            'language' => 'en',
+            'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch', 'depends_on' => [], 'inputs' => ['arguments' => ['query' => 'Metadsit']], 'params' => ['server_id' => 1, 'tool' => 'notion-search']],
+                ['id' => 'n2', 'capability' => 'mcp_action', 'depends_on' => ['n1'], 'inputs' => ['arguments' => ['page_id' => '$n1.page_id']], 'params' => ['server_id' => 1, 'tool' => 'notion-update-page']],
+                ['id' => 'n3', 'capability' => 'chat', 'depends_on' => ['n2'], 'inputs' => [], 'params' => []],
+            ],
+        ]);
+
+        $result = $this->recovery($relaxer)->recover(
+            $runner,
+            $this->mcpNode('Metadsit'),
+            $this->context('Rename Metadsit'),
+            NodeResult::ok('{"results":[]}'),
+            null,
+            $plan,
+        );
+
+        self::assertSame(0, $calls);
+        self::assertArrayNotHasKey('recovery', $result->metadata);
+    }
+
+    public function testAFailedRetryStillEndsAsAnHonestEmptyResult(): void
+    {
+        $runner = $this->runner(static fn (): NodeResult => NodeResult::failed('invalid argument'));
+        $relaxer = $this->createMock(QueryRelaxer::class);
+        $relaxer->method('suggest')->willReturn(['query' => 'Meta']);
+        $relaxer->method('broaden')->willReturn(null);
+
+        $result = $this->recovery($relaxer)->recover(
+            $runner,
+            $this->mcpNode('Metadsit'),
+            $this->context('Metadsit'),
+            NodeResult::ok('{"results":[]}'),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertTrue($result->metadata['recovery']['empty'] ?? false);
+        self::assertSame(['Metadsit', 'Meta'], array_column($result->metadata['recovery']['attempts'], 'query'));
     }
 
     private function recovery(QueryRelaxer $relaxer): SearchRecovery

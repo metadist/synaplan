@@ -42,17 +42,20 @@ final readonly class ApprovalPolicy
         ?PolicyOutcome $nodeOverride = null,
     ): PolicyOutcome {
         $class = $tool->sideEffect;
-        $resolved = $this->mostRestrictive([
-            $this->baseOutcome($tool, $actorId, $class, $context),
+        $restrictions = [
             $this->groupPolicy->outcomeFor($actorId, $tool, $class),
             $this->assistantPolicy->outcomeFor($assistantTools, $tool, $class),
             $this->hardBlock($tool, $class),
             $nodeOverride,
-        ]);
+        ];
+        $resolved = $this->mostRestrictive([$this->baseOutcome($tool, $actorId, $class, $context), ...$restrictions]);
         if (PolicyOutcome::Approve !== $resolved || SideEffect::Write !== $class) {
             return $resolved;
         }
-        if (PolicyContext::Interactive === $context && $this->mcpWritesWithoutAsking($tool)) {
+        // The connection's switch only skips the instance default. An admin
+        // group, assistant or step that asks for approval still asks.
+        if (PolicyContext::Interactive === $context && $this->mcpWritesWithoutAsking($tool)
+            && PolicyOutcome::Auto === $this->mostRestrictive($restrictions)) {
             return PolicyOutcome::Auto;
         }
         if (PolicyContext::Unattended === $context && $allowUnattended) {
@@ -107,7 +110,9 @@ final readonly class ApprovalPolicy
 
     private function mcpWritesWithoutAsking(ToolDescriptor $tool): bool
     {
-        return ToolSource::Mcp === $tool->source && true === ($tool->meta['writeAuto'] ?? false);
+        return ToolSource::Mcp === $tool->source
+            && true === ($tool->meta['allowWrite'] ?? false)
+            && true === ($tool->meta['writeAuto'] ?? false);
     }
 
     private function isAlwaysAllowed(int $actorId, ?string $assistantKey, ToolDescriptor $tool): bool

@@ -10,6 +10,7 @@ use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpOAuthState;
+use App\Service\Mcp\Notion\NotionSharing;
 use App\Service\Mcp\NotionLinkedPageReader;
 use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -151,6 +152,41 @@ final class NotionLinkedPageReaderTest extends TestCase
         self::assertSame(1, $read->successCount());
         self::assertStringContainsString('Connection: Notion', $read->prompt());
         self::assertStringNotContainsString('Old Notion', $read->prompt());
+    }
+
+    public function testLeavesAPublishedPageToThePublicReaderWithoutAConnection(): void
+    {
+        $this->servers->method('findEnabledByUser')->willReturn([]);
+
+        $read = $this->reader->read(['https://acme.notion.site/Handbook-99', self::PAGE], 1);
+
+        self::assertSame([self::PAGE], $read->handledUrls());
+    }
+
+    public function testReadsThroughTheSharedConnectionWithoutAnOwnOne(): void
+    {
+        $shared = $this->oauthServer(McpOAuthState::STATUS_CONNECTED, 12);
+        $this->servers->method('findEnabledByUser')->willReturn([]);
+        $sharing = $this->createStub(NotionSharing::class);
+        $sharing->method('sharedServer')->willReturn($shared);
+        $this->client->expects($this->once())->method('listTools')->with($shared)->willReturn([[
+            'name' => 'notion-fetch',
+            'description' => 'Open a page',
+            'inputSchema' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']]],
+            'annotations' => ['readOnlyHint' => true],
+        ]]);
+        $this->client->expects($this->once())->method('callTool')->willReturn([
+            'content' => [['type' => 'text', 'text' => 'Shared page body']],
+            'isError' => false,
+        ]);
+        $config = $this->createMock(ConfigRepository::class);
+        $config->method('getValue')->willReturn('1');
+        $reader = new NotionLinkedPageReader($this->servers, $this->client, new McpClientConfig($config), $this->encryption, new NullLogger(), $sharing);
+
+        $read = $reader->read([self::PAGE], 1);
+
+        self::assertSame(1, $read->successCount());
+        self::assertStringContainsString('Shared page body', $read->prompt());
     }
 
     private function server(int $id = 7, string $name = 'Notion'): McpServerConfig

@@ -16,6 +16,7 @@ vi.mock('@/services/api/notionAppApi', () => ({
 }))
 
 const { useNotionFilePush } = await import('@/composables/useNotionFilePush')
+const { ApiError } = await import('@/services/api/httpClient')
 
 describe('useNotionFilePush', () => {
   beforeEach(() => {
@@ -65,7 +66,7 @@ describe('useNotionFilePush', () => {
   it('shows the honest server reason when Notion refuses', async () => {
     prompt.mockResolvedValue('https://www.notion.so/Reports-1')
     pushFile.mockRejectedValue(
-      new Error('Notion did not accept the file. Nothing was added to Notion.')
+      new ApiError(422, 'Notion did not accept the file. Nothing was added to Notion.')
     )
 
     await useNotionFilePush().pushFile(7, 'q3.pdf')
@@ -73,5 +74,14 @@ describe('useNotionFilePush', () => {
     expect(error).toHaveBeenCalledWith(
       'Notion did not accept the file. Nothing was added to Notion.'
     )
+  })
+
+  it('never shows a raw gateway error', async () => {
+    prompt.mockResolvedValue('https://www.notion.so/Reports-1')
+    pushFile.mockRejectedValue(new ApiError(502, 'HTTP 502: Bad Gateway'))
+
+    await useNotionFilePush().pushFile(7, 'q3.pdf')
+
+    expect(error).toHaveBeenCalledWith('files.notion.failed')
   })
 })

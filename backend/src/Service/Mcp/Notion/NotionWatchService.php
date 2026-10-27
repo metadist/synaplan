@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\NotionWatchRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
+use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
 use App\Service\SavedTask\SavedTaskRunner;
 use Psr\Log\LoggerInterface;
@@ -33,6 +34,7 @@ final readonly class NotionWatchService
         private SavedTaskRepository $tasks,
         private SavedTaskRunner $runner,
         private UserRepository $users,
+        private McpClientConfig $config,
         private LoggerInterface $logger,
     ) {
     }
@@ -117,10 +119,18 @@ final readonly class NotionWatchService
         return true;
     }
 
+    /**
+     * With Notion turned off for the installation or the person, nothing
+     * calls Notion in the background; the page is looked at again later.
+     */
     public function pollDue(int $now, int $limit): int
     {
         $checked = 0;
         foreach ($this->watches->findDue($now, $limit) as $watch) {
+            if (!$this->config->isOAuthConnectorsEnabled() || !$this->config->isClientEnabled($watch->getUserId())) {
+                $this->watches->save($watch->deferTo($now + self::INTERVAL_SECONDS));
+                continue;
+            }
             $this->check($watch, $now);
             ++$checked;
         }

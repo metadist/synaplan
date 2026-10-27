@@ -128,6 +128,7 @@ import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { mcpServersApi } from '@/services/api/mcpServersApi'
+import { userFacingError } from '@/utils/userFacingError'
 import NotionConnectedSection from './notion/NotionConnectedSection.vue'
 import NotionRecentChanges from './notion/NotionRecentChanges.vue'
 import NotionWatches from './notion/NotionWatches.vue'
@@ -178,7 +179,7 @@ const connect = async () => {
   try {
     window.location.assign(await notionAppApi.connect())
   } catch (err) {
-    error(err instanceof Error && err.message ? err.message : t('apps.notion.connectFailed'))
+    error(userFacingError(err, t('apps.notion.connectFailed')))
     connecting.value = false
   }
 }
@@ -190,7 +191,7 @@ const useShared = async () => {
     success(t('apps.notion.sharing.usingToast'))
     tryPrompt('')
   } catch (err) {
-    error(err instanceof Error && err.message ? err.message : t('apps.notion.sharing.useFailed'))
+    error(userFacingError(err, t('apps.notion.sharing.useFailed')))
   } finally {
     usingShared.value = false
   }
@@ -201,7 +202,9 @@ const disconnect = async () => {
   if (id == null) return
   const ok = await confirm({
     title: t('apps.notion.disconnectTitle'),
-    message: t('apps.notion.disconnectMessage'),
+    message: status.value?.sharing.shared_on
+      ? t('apps.notion.disconnectMessageShared')
+      : t('apps.notion.disconnectMessage'),
     confirmText: t('apps.notion.disconnect'),
     danger: true,
   })
@@ -211,7 +214,7 @@ const disconnect = async () => {
     success(t('apps.notion.disconnected'))
     await load()
   } catch (err) {
-    error(err instanceof Error && err.message ? err.message : t('apps.notion.disconnectFailed'))
+    error(userFacingError(err, t('apps.notion.disconnectFailed')))
   }
 }
 

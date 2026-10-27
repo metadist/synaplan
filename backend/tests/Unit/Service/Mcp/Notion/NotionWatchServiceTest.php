@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\NotionWatchRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
+use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\Notion\NotionActionException;
 use App\Service\Mcp\Notion\NotionGateway;
@@ -117,14 +118,36 @@ final class NotionWatchServiceTest extends TestCase
         $this->gateway->method('call')->willReturn(['title' => $title, 'text' => 'Body', 'page_last_edited_at' => $edited]);
     }
 
-    private function service(): NotionWatchService
+    public function testPollingLeavesNotionAloneWhileItIsTurnedOff(): void
     {
+        $watch = new NotionWatch(4, '39797ad6-0eb3-806d-b59e-ef7653838664', 'https://www.notion.so/x', NotionWatch::ACTION_SEARCHABLE);
         $watches = $this->createStub(NotionWatchRepository::class);
-        $watches->method('findOneByPage')->willReturn(null);
-        $watches->method('countByUser')->willReturn(0);
+        $watches->method('findDue')->willReturn([$watch]);
+        $gateway = $this->createMock(NotionGateway::class);
+        $gateway->expects($this->never())->method('call');
+        $this->gateway = $gateway;
+
+        $checked = $this->service($watches, false)->pollDue(1000, 10);
+
+        self::assertSame(0, $checked);
+        self::assertSame(1000 + NotionWatchService::INTERVAL_SECONDS, $watch->getNextCheckAt());
+        self::assertNull($watch->getCheckedAt());
+        self::assertNull($watch->getLastError());
+    }
+
+    private function service(?NotionWatchRepository $watches = null, bool $enabled = true): NotionWatchService
+    {
+        if (null === $watches) {
+            $watches = $this->createStub(NotionWatchRepository::class);
+            $watches->method('findOneByPage')->willReturn(null);
+            $watches->method('countByUser')->willReturn(0);
+        }
         $users = $this->createStub(UserRepository::class);
         $users->method('find')->willReturn(new User());
+        $config = $this->createStub(McpClientConfig::class);
+        $config->method('isOAuthConnectorsEnabled')->willReturn($enabled);
+        $config->method('isClientEnabled')->willReturn($enabled);
 
-        return new NotionWatchService($watches, $this->gateway, $this->indexer, $this->tasks, $this->runner, $users, new NullLogger());
+        return new NotionWatchService($watches, $this->gateway, $this->indexer, $this->tasks, $this->runner, $users, $config, new NullLogger());
     }
 }

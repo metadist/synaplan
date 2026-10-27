@@ -1041,6 +1041,7 @@
       "disconnect": "Desconectar",
       "disconnectTitle": "¿Desconectar Notion?",
       "disconnectMessage": "La IA ya no podrá leer ni cambiar Notion. Las páginas que ya están en Notion se quedan. Puedes conectar de nuevo más tarde.",
+      "disconnectMessageShared": "La IA ya no podrá leer ni cambiar Notion, y todas las personas con las que compartes esta conexión también perderán el acceso de lectura. Las páginas que ya están en Notion se quedan. Puedes conectar de nuevo más tarde.",
       "disconnected": "Notion está desconectado. En Notion no se cambió nada.",
       "disconnectFailed": "Notion sigue conectado. No se cambió nada. Inténtalo de nuevo.",
       "exampleMeetings": "¿Qué decidimos esta semana en mis reuniones en Notion?",

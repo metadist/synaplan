@@ -20,7 +20,7 @@
             @change="onWrite"
           />
           <span
-            class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+            class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand)] transition-colors"
           ></span>
           <span
             class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
@@ -60,6 +60,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import { userFacingError } from '@/utils/userFacingError'
 import NotionShareToggle from './NotionShareToggle.vue'
 import {
   notionAppApi,
@@ -108,7 +109,7 @@ const onWrite = async (event: Event) => {
     success(next ? t('apps.notion.writeSavedOn') : t('apps.notion.writeSavedOff'))
   } catch (err) {
     input.checked = !next
-    error(err instanceof Error && err.message ? err.message : t('apps.notion.writeFailed'))
+    error(userFacingError(err, t('apps.notion.writeFailed')))
   } finally {
     saving.value = false
   }

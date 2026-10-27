@@ -9,6 +9,8 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Plan\TaskPlan;
+use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -36,11 +38,17 @@ final readonly class SearchRecovery
     /**
      * @param (callable(string): void)|null $onRetry fired before each extra call, with the query label
      */
-    public function recover(TaskRunner $runner, TaskNode $node, NodeContext $context, NodeResult $result, ?callable $onRetry = null): NodeResult
+    public function recover(TaskRunner $runner, TaskNode $node, NodeContext $context, NodeResult $result, ?callable $onRetry = null, ?TaskPlan $plan = null): NodeResult
     {
         if (!in_array($node->capability, self::READS, true) || !$this->detector->isEmpty($result)) {
             return $result;
         }
+        // A wider query can match a different item. When a write step uses
+        // this result, that would change the wrong page, ticket or file.
+        if (null !== $plan && self::feedsWrite($plan, $node->id)) {
+            return $result;
+        }
+        $empty = $result;
 
         $userText = (string) $context->message->getText();
         $tool = is_string($node->params['tool'] ?? null) && '' !== trim($node->params['tool'])
@@ -80,12 +88,9 @@ final readonly class SearchRecovery
             }
 
             $result = $runner->run($this->withArguments($node, $next), $context);
-            if ($this->detector->isEmpty($result)) {
+            if ($this->detector->isEmpty($result) || !$result->isSuccessful()) {
                 $attempts[] = ['query' => $label, 'hits' => 0];
                 continue;
-            }
-            if (!$result->isSuccessful()) {
-                return $result;
             }
 
             $this->logger->info('SearchRecovery: broader query matched', [
@@ -96,7 +101,32 @@ final readonly class SearchRecovery
             return $this->annotate($result, $attempts, $label, $this->hits($result));
         }
 
-        return $this->finishEmpty($result, $attempts);
+        return $this->finishEmpty($empty, $attempts);
+    }
+
+    /**
+     * Whether a write step depends on this node, directly or through steps
+     * in between.
+     */
+    private static function feedsWrite(TaskPlan $plan, string $nodeId): bool
+    {
+        $sources = [$nodeId => true];
+        $changed = true;
+        while ($changed) {
+            $changed = false;
+            foreach ($plan->nodes as $candidate) {
+                if (isset($sources[$candidate->id]) || [] === array_intersect($candidate->dependsOn, array_keys($sources))) {
+                    continue;
+                }
+                if (in_array($candidate->capability->value, SkillToolSource::WRITE_CAPABILITIES, true)) {
+                    return true;
+                }
+                $sources[$candidate->id] = true;
+                $changed = true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -163,8 +193,10 @@ final readonly class SearchRecovery
      */
     private function argumentsOf(TaskNode $node, NodeContext $context): array
     {
+        // `$n1.text` must be the upstream text, not the literal reference.
+        $inputs = $context->resolveInputs($node);
         if (Capability::McpFetch === $node->capability) {
-            $arguments = $node->inputs['arguments'] ?? [];
+            $arguments = $inputs['arguments'] ?? [];
             if (is_string($arguments)) {
                 $decoded = json_decode($arguments, true);
                 $arguments = is_array($decoded) ? $decoded : [];
@@ -174,12 +206,12 @@ final readonly class SearchRecovery
         }
 
         if (Capability::EmailSearch === $node->capability) {
-            $query = $node->params['query'] ?? $node->inputs['query'] ?? $node->inputs['text'] ?? null;
+            $query = $node->params['query'] ?? $inputs['query'] ?? $inputs['text'] ?? null;
 
             return ['query' => is_string($query) && '' !== trim($query) ? $query : (string) $context->message->getText()];
         }
 
-        $query = $node->inputs['query'] ?? $node->inputs['prompt'] ?? $node->inputs['text'] ?? null;
+        $query = $inputs['query'] ?? $inputs['prompt'] ?? $inputs['text'] ?? null;
 
         return ['query' => is_string($query) && '' !== trim($query) ? $query : (string) $context->message->getText()];
     }

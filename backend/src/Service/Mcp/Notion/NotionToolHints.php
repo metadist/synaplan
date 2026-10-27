@@ -12,9 +12,10 @@ use App\Entity\McpServerConfig;
  * Notion ships new tools often and does not always annotate them. A missing
  * `readOnlyHint` would put a write on the read path, so this is an
  * allow-list: known read tools read, known write tools need "The AI may
- * change Notion", and everything else is marked destructive, which hides it
- * from every planner catalog and refuses it at run time. Applies only to
- * `mcp.notion.com`.
+ * change Notion", an unknown tool stays only when Notion itself declares it
+ * read-only and not destructive, and everything else is marked destructive,
+ * which hides it from every planner catalog and refuses it at run time.
+ * Applies only to `mcp.notion.com`.
  */
 final class NotionToolHints
 {

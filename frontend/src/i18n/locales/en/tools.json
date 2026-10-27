@@ -1115,6 +1115,7 @@
       "disconnect": "Disconnect",
       "disconnectTitle": "Disconnect Notion?",
       "disconnectMessage": "The AI will no longer read or change Notion. Pages already in Notion stay. You can connect again later.",
+      "disconnectMessageShared": "The AI will no longer read or change Notion, and everyone you share this connection with loses read access too. Pages already in Notion stay. You can connect again later.",
       "disconnected": "Notion is disconnected. Nothing was changed in Notion.",
       "disconnectFailed": "Notion is still connected. Nothing was changed. Try again.",
       "exampleMeetings": "What did we decide in my meetings this week in Notion?",

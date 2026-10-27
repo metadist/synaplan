@@ -15,7 +15,7 @@ final readonly class SkillToolSource implements ToolSourceInterface
 {
     /** Capabilities that change something outside the chat. Compose-reply only
      *  writes the assistant bubble, so it stays read and is not gated. */
-    private const WRITE_CAPABILITIES = [
+    public const WRITE_CAPABILITIES = [
         Capability::EmailMe->value,
         Capability::SaveToFolder->value,
         Capability::SaveToNotion->value,

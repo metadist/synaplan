@@ -29,7 +29,7 @@ final class SaveToNotionRunnerTest extends TestCase
     public function testCreatesAChildPageWithTheEarlierStepsText(): void
     {
         $gateway = $this->createMock(NotionGateway::class);
-        $gateway->method('writable')->willReturn(new McpServerConfig());
+        $gateway->method('writable')->willReturn($this->writableServer());
         $gateway->expects(self::once())->method('call')
             ->with($this->anything(), 'create-pages', [
                 'parent' => ['page_id' => '39797ad6-0eb3-806d-b59e-ef7653838664'],
@@ -69,10 +69,24 @@ final class SaveToNotionRunnerTest extends TestCase
         self::assertStringContainsString('Notion is not connected', (string) $result->error);
     }
 
-    public function testReportsWhatNotionSaidWhenThePageIsNotCreated(): void
+    public function testDoesNotWriteWhileNotionIsReadOnly(): void
     {
         $gateway = $this->createMock(NotionGateway::class);
         $gateway->method('writable')->willReturn(new McpServerConfig());
+        $gateway->expects(self::never())->method('call');
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('Body'));
+
+        $result = $this->runner($gateway)->run($this->node(['page' => self::PAGE]), $ctx);
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('Notion is read-only', (string) $result->error);
+    }
+
+    public function testReportsWhatNotionSaidWhenThePageIsNotCreated(): void
+    {
+        $gateway = $this->createMock(NotionGateway::class);
+        $gateway->method('writable')->willReturn($this->writableServer());
         $gateway->method('call')->willThrowException(new McpClientException('Could not find page'));
         $ctx = $this->context();
         $ctx->setResult('n1', NodeResult::ok('Body'));
@@ -86,7 +100,7 @@ final class SaveToNotionRunnerTest extends TestCase
     public function testPausesForApprovalBeforeWriting(): void
     {
         $gateway = $this->createMock(NotionGateway::class);
-        $gateway->method('writable')->willReturn(new McpServerConfig());
+        $gateway->method('writable')->willReturn($this->writableServer());
         $gateway->expects(self::never())->method('call');
         $gate = $this->createMock(StepApprovalGate::class);
         $gate->method('consult')->willReturn(NodeResult::waitingApproval(5, []));
@@ -104,6 +118,11 @@ final class SaveToNotionRunnerTest extends TestCase
 
         self::assertSame(Capability::SaveToNotion, $descriptors[0]->capability);
         self::assertTrue($descriptors[0]->requiresDynamicNote);
+    }
+
+    private function writableServer(): McpServerConfig
+    {
+        return (new McpServerConfig())->setAllowWrite(true);
     }
 
     private function runner(NotionGateway $gateway, ?StepApprovalGate $gate = null): SaveToNotionRunner

@@ -12,6 +12,7 @@ use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Execution\TaskRunner;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
@@ -53,6 +54,8 @@ final readonly class SaveToNotionRunner implements TaskRunner
                 Capability::SaveToNotion,
                 'Put the result on a new Notion page under a page the user names by link. ONLY when the user explicitly asks to save or deliver the result to Notion and gives the Notion page link. Inputs: text ($nX.text) and attachments ($nX.file). params.page is that Notion link, params.title an optional page title. Never the reply node.',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->renderAvailabilityNote($userId),
+                enabledFlag: MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED,
+                enabledDefault: false,
                 requiresDynamicNote: true,
             ),
         ];
@@ -70,6 +73,9 @@ final readonly class SaveToNotionRunner implements TaskRunner
         if (null === $server) {
             return NodeResult::failed('Notion is not connected — connect it under Apps → Notion. Nothing was saved to Notion');
         }
+        if (!$server->allowsWrite()) {
+            return NodeResult::failed('Notion is read-only — turn on "The AI may change Notion" under Apps → Notion. Nothing was saved to Notion');
+        }
 
         $inputs = $context->resolveInputs($node);
         $text = is_string($inputs['text'] ?? null) ? trim($inputs['text']) : '';
@@ -77,7 +83,7 @@ final readonly class SaveToNotionRunner implements TaskRunner
         if ('' === $text && [] === $attachments) {
             [$text, $attachments] = $this->fromDependencies($node, $context);
         }
-        $files = $this->files->resolve($attachments);
+        $files = $this->files->resolve($attachments, $userId);
         if ('' === $text && [] === $files) {
             return NodeResult::failed('nothing to save: the previous steps produced no text and no file');
         }
@@ -187,7 +193,7 @@ final readonly class SaveToNotionRunner implements TaskRunner
             return null;
         }
         try {
-            if (null === $this->gateway->writable($userId)) {
+            if (true !== $this->gateway->writable($userId)?->allowsWrite()) {
                 return null;
             }
         } catch (\Throwable) {

@@ -148,6 +148,22 @@ final class ApprovalPolicyTest extends TestCase
         $this->assertSame(PolicyOutcome::Block, $policy->decide($tool, 1, PolicyContext::Interactive));
     }
 
+    public function testMcpWriteAutoKeepsAnApprovalAnAdminOrStepAsksFor(): void
+    {
+        $group = $this->createMock(GroupPolicyProviderInterface::class);
+        $group->method('outcomeFor')->willReturn(PolicyOutcome::Approve);
+        $config = $this->createMock(ToolsConfig::class);
+        $config->method('defaultOutcome')->willReturn(PolicyOutcome::Approve);
+        $config->method('alwaysAllowTools')->willReturn([]);
+        $write = $this->mcpTool(SideEffect::Write, true);
+
+        $byGroup = new ApprovalPolicy($config, $group, $this->assistant());
+        $this->assertSame(PolicyOutcome::Approve, $byGroup->decide($write, 1, PolicyContext::Interactive));
+
+        $byStep = $this->policy();
+        $this->assertSame(PolicyOutcome::Approve, $byStep->decide($write, 1, PolicyContext::Interactive, nodeOverride: PolicyOutcome::Approve));
+    }
+
     public function testMostRestrictiveWins(): void
     {
         $group = $this->createMock(GroupPolicyProviderInterface::class);

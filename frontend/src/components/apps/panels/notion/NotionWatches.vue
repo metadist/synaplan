@@ -53,7 +53,7 @@
             </button>
             <button
               type="button"
-              class="icon-ghost p-2 rounded-lg"
+              class="icon-ghost p-2 rounded-lg text-red-400/70 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
               :aria-label="$t('apps.notion.watches.remove')"
               :title="$t('apps.notion.watches.remove')"
               :disabled="busy === row.id"
@@ -86,6 +86,7 @@ import { TrashIcon } from '@heroicons/vue/24/outline'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { userFacingError } from '@/utils/userFacingError'
 import NotionWatchForm from './NotionWatchForm.vue'
 import {
   notionAppApi,
@@ -105,8 +106,7 @@ const saving = ref(false)
 const busy = ref<number | null>(null)
 const form = ref<InstanceType<typeof NotionWatchForm> | null>(null)
 
-const message = (err: unknown, fallback: string) =>
-  err instanceof Error && err.message ? err.message : fallback
+const message = userFacingError
 
 const describe = (row: NotionWatch) => {
   if (!row.enabled) return t('apps.notion.watches.paused')

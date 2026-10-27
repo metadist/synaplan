@@ -1038,6 +1038,7 @@
       "disconnect": "Trennen",
       "disconnectTitle": "Notion trennen?",
       "disconnectMessage": "Die KI kann Notion danach nicht mehr lesen oder ändern. Seiten, die schon in Notion sind, bleiben. Du kannst später neu verbinden.",
+      "disconnectMessageShared": "Die KI kann Notion danach nicht mehr lesen oder ändern, und alle, mit denen du diese Verbindung teilst, verlieren ebenfalls den Lesezugriff. Seiten, die schon in Notion sind, bleiben. Du kannst später neu verbinden.",
       "disconnected": "Notion ist getrennt. In Notion wurde nichts geändert.",
       "disconnectFailed": "Notion ist weiter verbunden. Es wurde nichts geändert. Versuch es erneut.",
       "exampleMeetings": "Was haben wir diese Woche in meinen Meetings in Notion entschieden?",

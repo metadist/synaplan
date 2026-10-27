@@ -6,6 +6,7 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Mcp\Notion\NotionSharing;
 use App\Service\Mcp\Notion\NotionToolHints;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
@@ -13,9 +14,11 @@ use Psr\Log\LoggerInterface;
 /**
  * Reads a pasted Notion link through the user's Notion connection.
  *
- * A public fetch of notion.so only sees the sign-in screen. When Notion is
- * not connected, the link is still claimed so the public reader never runs,
- * and the answer says to connect Notion under Apps.
+ * A public fetch of notion.so only sees the sign-in screen. Without an own
+ * connection the organisation's shared one is used. When neither is there,
+ * the link is still claimed so the public reader never runs, and the answer
+ * says to connect Notion under Apps; only a page published to the web
+ * (`*.notion.site`) is left to the public reader.
  */
 final readonly class NotionLinkedPageReader
 {
@@ -31,6 +34,7 @@ final readonly class NotionLinkedPageReader
         private McpClientConfig $clientConfig,
         private EncryptionService $encryption,
         private LoggerInterface $logger,
+        private ?NotionSharing $sharing = null,
     ) {
     }
 
@@ -46,16 +50,16 @@ final readonly class NotionLinkedPageReader
             return new NotionLinkedPageRead([]);
         }
         if ($userId <= 0 || !$this->clientConfig->isClientEnabled($userId)) {
-            return new NotionLinkedPageRead($this->failures($pages, 'Notion', self::CONNECT));
+            return new NotionLinkedPageRead($this->failures($this->privatePages($pages), 'Notion', self::CONNECT));
         }
 
         $enabled = $this->servers->findEnabledByUser($userId);
         $any = $this->pick($enabled, null);
-        $allowed = $topicAllowsMcp ? $this->pick($enabled, $serverAllowlist) : null;
+        $allowed = $topicAllowsMcp ? ($this->pick($enabled, $serverAllowlist) ?? $this->shared($userId, $any, $serverAllowlist)) : null;
         if (null === $allowed) {
             $text = null === $any ? self::CONNECT : self::NOT_ALLOWED;
 
-            return new NotionLinkedPageRead($this->failures($pages, 'Notion', $text));
+            return new NotionLinkedPageRead($this->failures($this->privatePages($pages), 'Notion', $text));
         }
 
         if (null !== $onReady) {
@@ -105,6 +109,42 @@ final readonly class NotionLinkedPageReader
         }
 
         return $pages;
+    }
+
+    /**
+     * Without a connection, a page published to the web (`*.notion.site`)
+     * is left to the public reader, which can open it.
+     *
+     * @param list<array{url: string}> $pages
+     *
+     * @return list<array{url: string}>
+     */
+    private function privatePages(array $pages): array
+    {
+        return array_values(array_filter($pages, static function (array $page): bool {
+            $host = strtolower((string) parse_url($page['url'], PHP_URL_HOST));
+
+            return 'notion.site' !== $host && !str_ends_with($host, '.notion.site');
+        }));
+    }
+
+    /**
+     * The organisation's shared, read-only Notion, for a person without a
+     * Notion connection of their own.
+     *
+     * @param list<int>|null $allowlist
+     */
+    private function shared(int $userId, ?McpServerConfig $own, ?array $allowlist): ?McpServerConfig
+    {
+        if (null !== $own || null === $this->sharing) {
+            return null;
+        }
+        $server = $this->sharing->sharedServer($userId);
+        if (null === $server || (null !== $allowlist && !in_array((int) $server->getId(), $allowlist, true))) {
+            return null;
+        }
+
+        return $server;
     }
 
     private function isNotionUrl(string $url): bool

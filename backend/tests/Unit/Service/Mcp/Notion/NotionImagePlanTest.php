@@ -76,4 +76,13 @@ final class NotionImagePlanTest extends TestCase
         self::assertSame('Launch plan', NotionImagePlan::query('Häng das Bild von der Seite "Launch plan" aus Notion an'));
         self::assertSame('logo', NotionImagePlan::query('Such in Notion nach dem Logo und häng es an'));
     }
+
+    public function testRecognisesTheRequestInEveryLocale(): void
+    {
+        self::assertTrue(NotionImagePlan::wantsAttachedImage('Show me the first picture from my Notion page'));
+        self::assertTrue(NotionImagePlan::wantsAttachedImage('Busca en Notion la primera imagen y adjúntala aquí'));
+        self::assertTrue(NotionImagePlan::wantsAttachedImage('Cherche la première image dans Notion et joins-la ici'));
+        self::assertTrue(NotionImagePlan::wantsAttachedImage('Notion sayfasındaki ilk resmi bul ve buraya ekle'));
+        self::assertFalse(NotionImagePlan::wantsAttachedImage('Show me the meeting notes from Notion'));
+    }
 }

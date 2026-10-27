@@ -150,7 +150,9 @@ const pluginCards = computed<Card[]>(() =>
     }))
 )
 
-const connectedCount = computed(() => connectedIds.value.size + pluginCards.value.length)
+const connectedCount = computed(
+  () => new Set([...connectedIds.value, ...attentionIds.value]).size + pluginCards.value.length
+)
 
 function toCard(app: AppDefinition): Card {
   const key = appMessageKey(app.id)
@@ -168,7 +170,7 @@ function toCard(app: AppDefinition): Card {
 const sections = computed(() => {
   const needle = query.value.trim().toLowerCase()
   const keep = (card: Card) =>
-    (!connectedOnly.value || card.connected) &&
+    (!connectedOnly.value || card.connected || card.attention) &&
     (needle === '' || `${card.name} ${card.tagline}`.toLowerCase().includes(needle))
 
   const result = APP_CATEGORIES.map((category) => ({

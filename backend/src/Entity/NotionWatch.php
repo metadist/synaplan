@@ -215,6 +215,17 @@ class NotionWatch
         return $this;
     }
 
+    /**
+     * Not checked now (Notion is turned off); look again later without
+     * touching the last check or error.
+     */
+    public function deferTo(int $nextCheckAt): self
+    {
+        $this->nextCheckAt = $nextCheckAt;
+
+        return $this;
+    }
+
     public function recordFailure(int $now, int $nextCheckAt, string $reason): self
     {
         $this->checkedAt = $now;
