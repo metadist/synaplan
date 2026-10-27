@@ -16,6 +16,10 @@ vi.mock('@/composables/useMcpSignInTarget', () => ({
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: mockError, success: vi.fn() }),
 }))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn() }),
+}))
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, string>) =>
