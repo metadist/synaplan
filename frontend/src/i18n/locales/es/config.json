@@ -32,7 +32,8 @@
         "completed": "Completada",
         "failed": "Fallida",
         "cancelled": "Cancelada",
-        "waiting_approval": "Esperando aprobación"
+        "waiting_approval": "Esperando aprobación",
+        "waiting_research": "La investigación está en curso"
       },
       "runTrigger": {
         "manual": "iniciada por ti",

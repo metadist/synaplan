@@ -154,6 +154,27 @@ final readonly class SavedTaskSerializer
             return 0;
         }
 
-        return $this->runs->countWaitingForTask($taskId);
+        $waiting = array_filter(
+            $this->runs->findWaitingForTask($taskId),
+            static fn (SavedTaskRun $run): bool => !self::waitsOnResearch($run),
+        );
+
+        return count($waiting);
+    }
+
+    /** A research step pauses the run too, but nobody has to approve anything. */
+    private static function waitsOnResearch(SavedTaskRun $run): bool
+    {
+        $snapshot = $run->getPlanSnapshot() ?? [];
+        $cards = is_array($snapshot['cards'] ?? null) ? $snapshot['cards'] : [];
+        foreach ($cards as $card) {
+            if (is_array($card)
+                && $run->getWaitingNode() === ($card['nodeId'] ?? null)
+                && Capability::Research->value === ($card['capability'] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

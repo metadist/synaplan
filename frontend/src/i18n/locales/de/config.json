@@ -483,7 +483,8 @@
         "completed": "Abgeschlossen",
         "failed": "Fehlgeschlagen",
         "cancelled": "Abgebrochen",
-        "waiting_approval": "Wartet auf Freigabe"
+        "waiting_approval": "Wartet auf Freigabe",
+        "waiting_research": "Recherche läuft"
       },
       "runTrigger": {
         "manual": "von dir gestartet",

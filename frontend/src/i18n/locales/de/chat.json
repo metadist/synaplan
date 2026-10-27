@@ -679,7 +679,8 @@
       "failed": "Fehlgeschlagen",
       "skipped": "Übersprungen",
       "cancelled": "Gestoppt",
-      "waiting_approval": "Wartet auf Freigabe"
+      "waiting_approval": "Wartet auf Freigabe",
+      "researchRunning": "Recherche läuft"
     },
     "kind": {
       "text": "Text",
@@ -716,7 +717,8 @@
       "save_to_folder": "Im Ordner speichern",
       "code_run": "Arbeitet mit Ihrer Datei",
       "folder_fetch": "Dateien lesen",
-      "save_to_notion": "In Notion speichern"
+      "save_to_notion": "In Notion speichern",
+      "research": "Recherche"
     },
     "copyText": "Inhalt kopieren",
     "copied": "In die Zwischenablage kopiert",
@@ -728,6 +730,7 @@
     "askSubmit": "Senden",
     "askSkip": "Überspringen",
     "askNeedAnswer": "Wähle eine Option oder schreibe eine Antwort.",
+    "researchContinues": "Du kannst dieses Fenster schließen. Die Recherche läuft weiter, und der Bericht erscheint in diesem Chat. Der nächste Schritt startet, wenn der Bericht fertig ist.",
     "askFailed": "Der Lauf konnte nicht weitergehen. Sende eine neue Nachricht.",
     "askReadOnly": "Nur die besitzende Person kann antworten. Die Frage können Sie trotzdem lesen.",
     "folderRead": {

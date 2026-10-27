@@ -32,7 +32,8 @@
         "completed": "Tamamlandı",
         "failed": "Başarısız",
         "cancelled": "İptal edildi",
-        "waiting_approval": "Onay bekleniyor"
+        "waiting_approval": "Onay bekleniyor",
+        "waiting_research": "Araştırma sürüyor"
       },
       "runTrigger": {
         "manual": "senin tarafından başlatıldı",

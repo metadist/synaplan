@@ -87,6 +87,7 @@ final class SkillCatalogTest extends TestCase
         // save_to_folder, save_to_notion and folder_fetch (also dynamic: no
         // connected folder or Notion means no note) are missing. document_export and document_combine
         // are engine/service-gated: without constructors they are omitted too.
+        // research is default-off, so the planner does not see it.
         $default = SkillCatalogFactory::real()->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $default);
         self::assertStringNotContainsString('"mcp_fetch"', $default);
@@ -101,7 +102,8 @@ final class SkillCatalogTest extends TestCase
         self::assertStringNotContainsString('"outbound_webhook"', $default);
         self::assertStringNotContainsString('"condition"', $default);
         self::assertStringNotContainsString('"code_run"', $default);
-        self::assertCount(count(Capability::cases()) - 12, explode("\n", $default));
+        self::assertStringNotContainsString('"research"', $default);
+        self::assertCount(count(Capability::cases()) - 13, explode("\n", $default));
 
         // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
         // block from the planner again.
@@ -115,5 +117,21 @@ final class SkillCatalogTest extends TestCase
         );
 
         self::assertStringNotContainsString('"url_fetch"', $catalog->renderCapabilityList());
+    }
+
+    public function testResearchIsOnlyOfferedToASavedTask(): void
+    {
+        $configRepo = $this->createStub(\App\Repository\ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'RESEARCH_ENABLED' === $setting ? '1' : null,
+        );
+        $catalog = new SkillCatalog(
+            SkillCatalogFactory::runners(),
+            new \App\Service\Multitask\MultitaskRoutingConfig($configRepo),
+        );
+
+        // A chat turn has its own research mode; a step there could only fail.
+        self::assertStringNotContainsString('"research"', $catalog->renderCapabilityList(7));
+        self::assertStringContainsString('- "research": ', $catalog->renderCapabilityList(7, ['saved_task' => true]));
     }
 }

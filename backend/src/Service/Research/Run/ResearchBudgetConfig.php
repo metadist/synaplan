@@ -30,6 +30,31 @@ final readonly class ResearchBudgetConfig
         };
     }
 
+    /** The same limits, with no questions, so an unattended step cannot pause. */
+    public function withoutQuestions(): self
+    {
+        $extras = $this->extras;
+
+        return new self(
+            $this->searches,
+            $this->sources,
+            $this->rounds,
+            $this->wallSeconds,
+            $this->costCap,
+            $this->maxModelCalls,
+            new ResearchBudgetExtras(
+                $extras->resultsPerSearch,
+                $extras->fetchParallel,
+                $extras->readParallel,
+                0,
+                $extras->reportWords,
+                $extras->maxActions,
+                $extras->pointsMin,
+                $extras->pointsMax,
+            ),
+        );
+    }
+
     /** The same limits with at most this many searches. */
     public function withSearches(int $searches): self
     {

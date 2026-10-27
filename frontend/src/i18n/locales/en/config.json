@@ -498,7 +498,8 @@
         "completed": "Completed",
         "failed": "Failed",
         "cancelled": "Cancelled",
-        "waiting_approval": "Waiting for approval"
+        "waiting_approval": "Waiting for approval",
+        "waiting_research": "Research is running"
       },
       "runTrigger": {
         "manual": "started by you",

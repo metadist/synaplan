@@ -681,7 +681,8 @@
       "failed": "Failed",
       "skipped": "Skipped",
       "cancelled": "Stopped",
-      "waiting_approval": "Waiting for approval"
+      "waiting_approval": "Waiting for approval",
+      "researchRunning": "Research is running"
     },
     "kind": {
       "text": "Text",
@@ -718,7 +719,8 @@
       "save_to_folder": "Save to folder",
       "code_run": "Working with your file",
       "folder_fetch": "Reading files",
-      "save_to_notion": "Save to Notion"
+      "save_to_notion": "Save to Notion",
+      "research": "Research"
     },
     "copyText": "Copy content",
     "copied": "Copied to clipboard",
@@ -730,6 +732,7 @@
     "askSubmit": "Submit",
     "askSkip": "Skip",
     "askNeedAnswer": "Choose an option or type an answer.",
+    "researchContinues": "You can close this window. Research continues, and the report appears in this chat. The next step runs when the report is ready.",
     "askFailed": "The run could not continue. Send a new message.",
     "askReadOnly": "Only the owner can answer this. You can still read the question.",
     "folderRead": {

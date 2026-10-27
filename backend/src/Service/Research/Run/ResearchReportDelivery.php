@@ -125,6 +125,13 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         }
         $message->addFile($file);
         $this->em->flush();
+        if ('' !== $stored['path']) {
+            $state->reportFile = [
+                'path' => '/api/v1/files/uploads/'.$stored['path'],
+                'type' => 'text/markdown',
+                'local_path' => $stored['path'],
+            ];
+        }
     }
 
     private function locale(int $userId): string

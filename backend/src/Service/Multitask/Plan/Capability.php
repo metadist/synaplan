@@ -130,6 +130,12 @@ enum Capability: string
     case FolderFetch = 'folder_fetch';
 
     /**
+     * Start a quick or standard research and wait for its report.
+     * The planner only sees it when MULTITASK.RESEARCH_ENABLED is on.
+     */
+    case Research = 'research';
+
+    /**
      * Capabilities that exist only for the Steps editor (flag-gated at validate).
      *
      * @return list<string>
@@ -175,6 +181,7 @@ enum Capability: string
             self::CodeRun => 'compute',
             self::AskUser => 'text',
             self::FolderFetch => 'search',
+            self::Research => 'text',
         };
     }
 
@@ -215,7 +222,8 @@ enum Capability: string
             self::Condition,
             self::CodeRun,
             self::AskUser,
-            self::FolderFetch => null,
+            self::FolderFetch,
+            self::Research => null,
         };
     }
 

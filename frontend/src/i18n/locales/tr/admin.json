@@ -1270,6 +1270,7 @@
         "MULTITASK_MCP_FETCH_ENABLED": "Bağlı araçlardan oku",
         "MULTITASK_MCP_ACTION_ENABLED": "Bağlı araçlarla işlem yap",
         "MULTITASK_EMAIL_SEARCH_ENABLED": "E-posta ara",
+        "MULTITASK_RESEARCH_ENABLED": "Kayıtlı görevlerde araştırma",
         "TOOLS_REGISTRY_ENABLED": "Araç kataloğu",
         "TOOLS_APPROVALS_ENABLED": "Araç onayları",
         "TOOLS_CUSTOM_HTTP_ENABLED": "Özel HTTP araçları",
