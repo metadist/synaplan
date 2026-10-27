@@ -159,7 +159,7 @@ Digest updates are the single largest stream of dependency PRs and there is no c
 
 - **Exact tag** (`mariadb:12.3.3@sha256:…`, `qdrant/qdrant:v1.19.0@sha256:…`, `apache/tika:3.3.1.0@sha256:…`): a rebuild of the same declared version, i.e. base-OS patches. Green CI is sufficient evidence — merge.
 - **Floating tag** (`node:24@sha256:…`, `redis:7.4-alpine@sha256:…`, `quay.io/keycloak/keycloak:26.7@sha256:…`): the digest can hide a real version move inside that line. Establish what changed (the image's own version label, or the upstream release notes for that line) and review it as a minor bump.
-- **`:latest` tag** (`ollama/ollama`, `mailhog/mailhog`, `phpmyadmin/phpmyadmin`, `ghcr.io/metadist/synaplan-tts`): genuinely opaque — the tag guarantees nothing. All of these are dev tooling or optional companions, so green CI plus a working local stack is the only evidence available, and that is enough. Never extend this exemption to an image on the production path.
+- **`:latest` tag** (`ollama/ollama`, `mailhog/mailhog`, `phpmyadmin`, `ghcr.io/metadist/synaplan-tts`): genuinely opaque — the tag guarantees nothing. All of these are dev tooling or optional companions, so green CI plus a working local stack is the only evidence available, and that is enough. Never extend this exemption to an image on the production path.
 
 ### Test locally
 
