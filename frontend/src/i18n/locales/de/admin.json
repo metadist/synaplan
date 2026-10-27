@@ -1274,6 +1274,7 @@
         "MULTITASK_MCP_FETCH_ENABLED": "Verbundene Werkzeuge lesen",
         "MULTITASK_MCP_ACTION_ENABLED": "Über verbundene Werkzeuge handeln",
         "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen",
+        "MULTITASK_RESEARCH_ENABLED": "Recherche in gespeicherten Aufgaben",
         "TOOLS_REGISTRY_ENABLED": "Werkzeugkatalog",
         "TOOLS_APPROVALS_ENABLED": "Werkzeug-Freigaben",
         "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",

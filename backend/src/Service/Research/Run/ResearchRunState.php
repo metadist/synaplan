@@ -53,6 +53,20 @@ final class ResearchRunState
      */
     public array $replies = [];
 
+    /** The saved task run that is waiting for this research, when it was started as a step. */
+    public ?int $savedTaskRunId = null;
+
+    /** The step in that saved task. */
+    public ?string $savedTaskNodeId = null;
+
+    /**
+     * The report file, set when it is saved. Not stored: the resume reads it
+     * in the same request that wrote the file.
+     *
+     * @var array{path: string, type: string, local_path: string}|null
+     */
+    public ?array $reportFile = null;
+
     public function __construct(
         public readonly ResearchRunRef $ref,
         public ResearchStatus $status,
@@ -114,6 +128,8 @@ final class ResearchRunState
             'questions' => $this->questions?->toArray(),
             'questions_asked' => $this->questionsAsked,
             'replies' => $this->replies,
+            'saved_task_run_id' => $this->savedTaskRunId,
+            'saved_task_node_id' => $this->savedTaskNodeId,
         ];
     }
 
@@ -206,6 +222,10 @@ final class ResearchRunState
         $asked = $data['questions_asked'] ?? 0;
         $state->questionsAsked = is_numeric($asked) ? max(0, (int) $asked) : 0;
         $state->replies = self::replies($data['replies'] ?? null);
+        $taskRun = $data['saved_task_run_id'] ?? null;
+        $state->savedTaskRunId = is_numeric($taskRun) && (int) $taskRun > 0 ? (int) $taskRun : null;
+        $taskNode = $data['saved_task_node_id'] ?? null;
+        $state->savedTaskNodeId = is_string($taskNode) && '' !== $taskNode ? $taskNode : null;
 
         return $state;
     }

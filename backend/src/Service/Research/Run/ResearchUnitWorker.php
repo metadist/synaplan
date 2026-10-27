@@ -28,6 +28,7 @@ final readonly class ResearchUnitWorker
         private ResearchEventLog $events,
         private ResearchConfig $config,
         private ResearchReportPoster $reports,
+        private ?ResearchSavedTaskSignal $savedTasks = null,
     ) {
     }
 
@@ -145,6 +146,7 @@ final readonly class ResearchUnitWorker
     {
         if ($state->status->isTerminal()) {
             $this->reports->deliver($state);
+            $this->savedTasks?->after($state);
         }
     }
 

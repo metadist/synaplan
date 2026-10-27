@@ -678,7 +678,8 @@
       "failed": "Échoué",
       "skipped": "Ignoré",
       "cancelled": "Arrêté",
-      "waiting_approval": "En attente d’approbation"
+      "waiting_approval": "En attente d’approbation",
+      "researchRunning": "La recherche est en cours"
     },
     "kind": {
       "text": "Texte",
@@ -713,7 +714,8 @@
       "email_me": "Résultat par e-mail",
       "save_to_folder": "Enregistrer dans le dossier",
       "code_run": "Travail sur votre fichier",
-      "folder_fetch": "Lecture de fichiers"
+      "folder_fetch": "Lecture de fichiers",
+      "research": "Recherche"
     },
     "copyText": "Copier le contenu",
     "copied": "Copié dans le presse-papiers",
@@ -725,6 +727,7 @@
     "askSubmit": "Envoyer",
     "askSkip": "Ignorer",
     "askNeedAnswer": "Choisissez une option ou écrivez une réponse.",
+    "researchContinues": "Vous pouvez fermer cette fenêtre. La recherche continue, et le rapport apparaît dans ce chat. L’étape suivante démarre quand le rapport est prêt.",
     "askFailed": "L'exécution n'a pas pu continuer. Envoyez un nouveau message.",
     "askReadOnly": "Seul le propriétaire peut répondre. Vous pouvez quand même lire la question.",
     "folderRead": {

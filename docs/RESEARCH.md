@@ -151,6 +151,29 @@ already posted.
 Deleting the account removes that person's research keys after the account
 rows are committed.
 
+## Saved tasks
+
+A saved task can take a `research` step when `MULTITASK.RESEARCH_ENABLED` is on
+and research itself is on. The step starts a quick or standard run in the
+task's chat, then waits. The research units keep running on their own worker,
+so the saved-task worker is free. When the report is ready, the next step
+(for example "email me") receives the report text and the markdown file.
+A run that does not finish fails the step with its sentence, and later steps
+skip. The step does not ask questions and cannot be thorough.
+
+The planner does not see the step while the flag is off, and never offers it
+to a normal chat turn (that has its own research mode). Closing the window
+does not stop the research. The report still appears in the chat, and so does
+what the later steps produce.
+
+The hand-over runs on the worker (`ContinueSavedTaskAfterResearch`), never in
+the request that stopped the run. Stopping or deleting the research fails the
+waiting step with one sentence. When the hand-over keeps failing for thirty
+minutes, the step fails too, so a saved task never waits forever. Later steps
+run under the unattended policy, because nobody is watching when the report
+arrives. While the run waits, the saved task's approval badge does not count
+it: nothing waits for a decision.
+
 ## Operator
 
 The system status page shows how many research runs are in progress when the

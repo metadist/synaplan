@@ -108,7 +108,7 @@ final readonly class TaskPlanExecutor
         Capability::CodeRun,
         Capability::McpFetch,
         Capability::McpAction,
-        Capability::FolderFetch,
+        Capability::FolderFetch, Capability::Research,
     ];
 
     public function __construct(
