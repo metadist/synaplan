@@ -31,6 +31,7 @@ final readonly class CloudFileStatus
         private PlatformInstanceRepository $platforms,
         private ExternalIdentityRepository $identities,
         private RedisService $redis,
+        private CloudFileStatusCache $cache,
         private EntityManagerInterface $entityManager,
     ) {
     }
@@ -44,7 +45,7 @@ final readonly class CloudFileStatus
     {
         $items = $this->items($body);
         $instanceId = $this->instances->fromRequest($request) ?? '';
-        $key = 'cloud_status:'.(int) $user->getId().':'.$instanceId.':'.hash('sha256', (string) json_encode($items));
+        $key = 'cloud_status:'.(int) $user->getId().':'.$instanceId.':'.$this->cache->generation((int) $user->getId()).':'.hash('sha256', (string) json_encode($items));
         $cached = $this->redis->get($key);
         if (is_string($cached)) {
             $decoded = json_decode($cached, true);
@@ -93,7 +94,7 @@ final readonly class CloudFileStatus
         $byId = [];
         if ($platform instanceof PlatformInstance) {
             $copies = $this->withoutDeletedFilter(
-                fn (): array => $this->files->findCopiesOfRemotes($platform->getClient(), $ids, $platform->getInstanceId()),
+                fn (): array => $this->files->findCopiesOfRemotes($platform->getClient(), $ids, $platform->getInstanceId(), (int) $user->getId()),
             );
             foreach ($copies as $file) {
                 if ($file->getUserId() !== (int) $user->getId() || !$this->belongsTo($file, $platform)) {

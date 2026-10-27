@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Repository\FileRepository;
+use App\Service\Document\Persist\DocumentRevisionService;
 use App\Service\File\CloudSourceEvents;
 use App\Service\File\FileStorageService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -25,6 +26,7 @@ final class ReapSourceDeletedFilesCommand extends Command
         private readonly FileRepository $files,
         private readonly FileStorageService $storage,
         private readonly VectorStorageFacade $vectors,
+        private readonly DocumentRevisionService $revisions,
         private readonly EntityManagerInterface $entityManager,
     ) {
         parent::__construct();
@@ -49,6 +51,7 @@ final class ReapSourceDeletedFilesCommand extends Command
             $expired = $this->files->findSourceDeletedBefore($now - CloudSourceEvents::GRACE_SECONDS);
             foreach ($expired as $file) {
                 $this->vectors->deleteByFile($file->getUserId(), (int) $file->getId());
+                $this->revisions->deleteForFile($file);
                 $path = $file->getFilePath();
                 if ('' !== $path) {
                     $this->storage->deleteFile($path);

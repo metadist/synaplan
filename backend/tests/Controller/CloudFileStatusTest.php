@@ -13,6 +13,8 @@ use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
 use App\Service\File\CloudFilesConfig;
 use App\Service\File\CloudSourceEvents;
+use App\Service\Iam\Erasure\FileEraser;
+use App\Service\Iam\Erasure\UserErasure;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -148,7 +150,7 @@ final class CloudFileStatusTest extends WebTestCase
         $filters->disable('source_deleted');
         $back = $this->em->find(File::class, $restored->getId());
         self::assertNull($back?->getSourceDeletedAt());
-        self::assertSame(File::VECTOR_STATE_PENDING, $back?->getVectorState());
+        self::assertSame(File::VECTOR_STATE_FAILED, $back?->getVectorState());
         $filters->enable('source_deleted');
 
         $application = new Application(self::$kernel);
@@ -156,6 +158,23 @@ final class CloudFileStatusTest extends WebTestCase
         $tester->execute(['--now' => (string) time()]);
         $filters->disable('source_deleted');
         self::assertNull($this->em->find(File::class, $expired->getId()));
+    }
+
+    public function testErasingAnAccountRemovesAHiddenCloudCopy(): void
+    {
+        $cloud = $this->cloud('erase');
+        $hidden = $this->file($cloud['user'], $cloud['instance_id'], 'hidden', 'v', false);
+        $hidden->setSourceDeletedAt(time());
+        $this->em->flush();
+        $hiddenId = $hidden->getId();
+        self::assertNotNull($hiddenId);
+
+        $erasure = new UserErasure((int) $cloud['user']->getId(), (string) $cloud['user']->getMail());
+        static::getContainer()->get(FileEraser::class)->erase($erasure);
+        $this->em->flush();
+        $this->em->clear();
+        $this->em->getFilters()->disable('source_deleted');
+        self::assertNull($this->em->find(File::class, $hiddenId));
     }
 
     public function testCapabilitiesNameTheFeatureOnlyWhileItIsOn(): void

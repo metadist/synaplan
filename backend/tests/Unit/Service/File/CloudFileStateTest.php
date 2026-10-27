@@ -28,6 +28,14 @@ final class CloudFileStateTest extends TestCase
         $failed = $this->file(File::VECTOR_STATE_FAILED, '"v1"');
         self::assertSame(CloudFileState::FAILED, CloudFileState::of($failed, '"v1"'));
 
+        $processing = $this->file(File::VECTOR_STATE_NONE, '"v1"');
+        $processing->setStatus('extracting');
+        self::assertSame(CloudFileState::ADDING, CloudFileState::of($processing, '"v1"'));
+
+        $overwrite = $this->file(File::VECTOR_STATE_PENDING, '"v1"');
+        $overwrite->setStatus('error');
+        self::assertSame(CloudFileState::FAILED, CloudFileState::of($overwrite, '"v1"'));
+
         $gone = $this->file(File::VECTOR_STATE_VECTORIZED, '"v1"');
         $gone->setSourceDeletedAt(time());
         self::assertSame(CloudFileState::NONE, CloudFileState::of($gone, '"v1"'));

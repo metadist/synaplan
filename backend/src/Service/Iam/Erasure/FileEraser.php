@@ -48,7 +48,19 @@ final readonly class FileEraser implements UserDataEraserInterface
         $this->revisions->deleteForUser($userId);
 
         $paths = [];
-        foreach ($this->files->findBy(['userId' => $userId]) as $file) {
+        $filters = $this->em->getFilters();
+        $hidden = $filters->isEnabled('source_deleted');
+        if ($hidden) {
+            $filters->disable('source_deleted');
+        }
+        try {
+            $owned = $this->files->findBy(['userId' => $userId]);
+        } finally {
+            if ($hidden) {
+                $filters->enable('source_deleted');
+            }
+        }
+        foreach ($owned as $file) {
             $filePath = $file->getFilePath();
             if ($filePath) {
                 $paths[(int) $file->getId()] = $filePath;

@@ -747,35 +747,38 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
-     * Every copy of these remote ids on this cloud, including a legacy row
-     * that has not been claimed yet. The caller drops an unclaimed row when
-     * the owner has another cloud of the same kind.
+     * Copies of these remote ids. A user id limits the query to that owner.
+     * Live rows come before deleted ones, an exact instance before an unscoped row, newest id last.
      *
      * @param list<string> $sourceIds
      *
      * @return list<File>
      */
-    public function findCopiesOfRemotes(string $source, array $sourceIds, string $instanceId): array
+    public function findCopiesOfRemotes(string $source, array $sourceIds, string $instanceId, ?int $userId = null): array
     {
         if ([] === $sourceIds) {
             return [];
         }
-
-        return $this->createQueryBuilder('f')
+        $qb = $this->createQueryBuilder('f')
             ->where('f.source = :source')
             ->andWhere('f.sourceId IN (:ids)')
             ->andWhere('f.sourceInstance = :instance OR f.sourceInstance IS NULL')
             ->setParameter('source', $source)
             ->setParameter('ids', $sourceIds)
             ->setParameter('instance', $instanceId)
-            ->getQuery()
-            ->getResult();
+            ->addSelect('CASE WHEN f.sourceDeletedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN liveFirst')
+            ->addSelect('CASE WHEN f.sourceInstance = :instance THEN 0 ELSE 1 END AS HIDDEN exactFirst')
+            ->orderBy('liveFirst', 'ASC')
+            ->addOrderBy('exactFirst', 'ASC')
+            ->addOrderBy('f.id', 'DESC');
+        if (null !== $userId) {
+            $qb->andWhere('f.userId = :userId')->setParameter('userId', $userId);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
-     * Copies whose source was deleted long enough ago to remove.
-     * The source-deleted filter must be off, or this list is always empty.
-     *
      * @return list<File>
      */
     public function findSourceDeletedBefore(int $cutoff): array

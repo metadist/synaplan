@@ -691,6 +691,7 @@ run_scheduler_hourly_lane() {
     trap scheduler_lane_on_term TERM
 
     run_scheduler_job 900 bin/console --env="$env" app:files:reap-ephemeral --no-interaction
+    run_scheduler_job 900 bin/console --env="$env" app:cloud-files:reap --no-interaction
 
     # Tool approvals nobody decided within their deadline (default 72 h)
     # flip to `expired` and fail the paused Saved Task run. Cheap: one

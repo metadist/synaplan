@@ -24,10 +24,10 @@ final class CloudFileState
         if (!$file instanceof File || null !== $file->getSourceDeletedAt()) {
             return self::NONE;
         }
-        if (File::VECTOR_STATE_FAILED === $file->getVectorState()) {
+        if ('error' === $file->getStatus() || File::VECTOR_STATE_FAILED === $file->getVectorState()) {
             return self::FAILED;
         }
-        if (File::VECTOR_STATE_PENDING === $file->getVectorState()) {
+        if (in_array($file->getStatus(), ['extracting', 'vectorizing', 'processing'], true) || File::VECTOR_STATE_PENDING === $file->getVectorState()) {
             return self::ADDING;
         }
         if ($file->isStale() || File::VECTOR_STATE_STALE === $file->getVectorState() || ($file->getSourceEtag() ?? '') !== $version) {

@@ -28,6 +28,7 @@ final readonly class CloudSourceEvents
         private UserRepository $users,
         private FileUploadService $uploads,
         private VectorStorageFacade $vectors,
+        private CloudFileIndexGuard $indexGuard,
         private AuditLogWriter $audit,
         private EntityManagerInterface $entityManager,
     ) {
@@ -98,9 +99,6 @@ final readonly class CloudSourceEvents
         }
         $file->setStale(true);
         $file->setVectorState(File::VECTOR_STATE_STALE);
-        if ('' !== $event['version']) {
-            $file->setSourceEtag($event['version']);
-        }
         if (!$file->isKeepSynced()) {
             return true;
         }
@@ -122,9 +120,10 @@ final readonly class CloudSourceEvents
             return false;
         }
         $name = basename($path);
-        if ('' !== $name && '.' !== $name && '..' !== $name) {
-            $file->setFileName($name);
+        if (strlen($path) > 255 || strlen($name) > 255 || '' === $name || '.' === $name || '..' === $name) {
+            return false;
         }
+        $file->setFileName($name);
         $file->setOriginalName($path);
 
         return true;
@@ -135,10 +134,13 @@ final readonly class CloudSourceEvents
         if (null !== $file->getSourceDeletedAt()) {
             return false;
         }
-        $file->setSourceDeletedAt(time());
-        $file->setStale(false);
-        $file->setVectorState(File::VECTOR_STATE_NONE);
-        $this->vectors->deleteByFile($file->getUserId(), (int) $file->getId());
+        $this->indexGuard->exclusive((int) $file->getId(), function () use ($file): void {
+            $file->setSourceDeletedAt(time());
+            $file->setStale(false);
+            $file->setVectorState(File::VECTOR_STATE_NONE);
+            $this->entityManager->flush();
+            $this->vectors->deleteByFile($file->getUserId(), (int) $file->getId());
+        });
 
         return true;
     }
@@ -151,10 +153,13 @@ final readonly class CloudSourceEvents
         }
         $file->setSourceDeletedAt(null);
         $file->setStale(false);
-        $file->setVectorState(File::VECTOR_STATE_PENDING);
         $user = $this->users->find($file->getUserId());
-        if ($user instanceof User) {
-            $this->uploads->reVectorize($file, $user, (string) ($file->getGroupKey() ?? ''));
+        $result = $user instanceof User
+            ? $this->uploads->reVectorize($file, $user, (string) ($file->getGroupKey() ?? ''))
+            : ['success' => false];
+        if (true !== $result['success']) {
+            $file->setStatus('error');
+            $file->setVectorState(File::VECTOR_STATE_FAILED);
         }
 
         return true;
@@ -210,8 +215,8 @@ final readonly class CloudSourceEvents
             }
             $version = $event['version'] ?? '';
             $path = $event['path'] ?? '';
-            if (!is_string($version) || !is_string($path) || strlen($version) > 255 || strlen($path) > 1024) {
-                throw new CloudFileRequestException('Version and path must be strings.');
+            if (!is_string($version) || !is_string($path) || strlen($version) > 255 || strlen($path) > 255) {
+                throw new CloudFileRequestException('Version and path must fit in 255 characters.');
             }
             $events[] = ['id' => $event['id'], 'event' => $event['event'], 'version' => $version, 'path' => $path];
         }
