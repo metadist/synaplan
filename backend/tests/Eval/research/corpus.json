@@ -341,17 +341,18 @@
     "id": "fu-q",
     "category": "current",
     "language": "en",
-    "question": "What is the warranty, using only the sources already in the report?",
+    "question": "In which year was that regulation published?",
     "depth": "quick",
     "sources": { "web": true, "knowledge": false },
     "gold": [
-      { "id": "g1", "assertion": "The answer cites a source that was already in the parent report.", "kind": "fact", "match": ["[e"] }
+      { "id": "g1", "assertion": "The answer comes from the parent's notes: the Act was published in 2024.", "kind": "fact", "match": ["2024"] }
     ],
-    "preferred_sources": [],
-    "valid_until": null,
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": "2027-06-01",
     "trap": null,
     "smoke": false,
     "follow_up": "question",
+    "parent": "fact-01",
     "written_by": "rs10",
     "checked_on": "2026-10-27"
   },
@@ -359,17 +360,18 @@
     "id": "fu-r",
     "category": "current",
     "language": "en",
-    "question": "Make the report shorter and keep every citation that stays.",
+    "question": "Make the report two sentences long.",
     "depth": "standard",
     "sources": { "web": true, "knowledge": false },
     "gold": [
-      { "id": "g1", "assertion": "A sentence that did not change still carries its citation.", "kind": "fact", "match": ["[e"] }
+      { "id": "g1", "assertion": "The shorter report still says 72 hours.", "kind": "fact", "match": ["72"] }
     ],
     "preferred_sources": [],
     "valid_until": null,
     "trap": null,
     "smoke": false,
     "follow_up": "revise",
+    "parent": "reg-01",
     "written_by": "rs10",
     "checked_on": "2026-10-27"
   },
@@ -377,17 +379,18 @@
     "id": "fu-d",
     "category": "current",
     "language": "en",
-    "question": "Look further into what the report could not confirm.",
+    "question": "Which licence does SearXNG use?",
     "depth": "thorough",
     "sources": { "web": true, "knowledge": false },
     "gold": [
-      { "id": "g1", "assertion": "The next plan point continues the parent's numbering.", "kind": "fact", "match": ["p"] }
+      { "id": "g1", "assertion": "SearXNG is licensed under the AGPL.", "kind": "fact", "match": ["AGPL"] }
     ],
-    "preferred_sources": [],
+    "preferred_sources": ["github.com", "docs.searxng.org"],
     "valid_until": null,
     "trap": null,
     "smoke": false,
     "follow_up": "deeper",
+    "parent": "cmp-01",
     "written_by": "rs10",
     "checked_on": "2026-10-27"
   },
@@ -399,13 +402,14 @@
     "depth": "standard",
     "sources": { "web": true, "knowledge": false },
     "gold": [
-      { "id": "g1", "assertion": "A source older than the time frame is read again.", "kind": "fact", "match": ["changed"] }
+      { "id": "g1", "assertion": "After the sources are read again, the report still says 201 Created.", "kind": "fact", "match": ["201"] }
     ],
     "preferred_sources": [],
     "valid_until": null,
     "trap": null,
     "smoke": false,
     "follow_up": "refresh",
+    "parent": "tech-01",
     "written_by": "rs10",
     "checked_on": "2026-10-27"
   },
@@ -413,17 +417,19 @@
     "id": "fu-t",
     "category": "current",
     "language": "de",
-    "question": "Übersetze den Bericht und behalte die Belege.",
+    "question": "Übersetze den Bericht ins Englische und behalte die Belege.",
     "depth": "standard",
     "sources": { "web": true, "knowledge": false },
     "gold": [
-      { "id": "g1", "assertion": "A translated sentence that replaces one is checked again; a sentence left as it is keeps its citation.", "kind": "fact", "match": ["[e"] }
+      { "id": "g1", "assertion": "The English report still names Article 17.", "kind": "fact", "match": ["17"] },
+      { "id": "g2", "assertion": "The report is in English: it names the right to erasure.", "kind": "fact", "match": ["erasure"] }
     ],
     "preferred_sources": [],
     "valid_until": null,
     "trap": null,
     "smoke": false,
     "follow_up": "revise",
+    "parent": "reg-02",
     "written_by": "rs10",
     "checked_on": "2026-10-27"
   }

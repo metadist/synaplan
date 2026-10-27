@@ -131,30 +131,37 @@ final readonly class ResearchRunService
     /**
      * @param array<string, mixed> $body
      */
-    public function followUp(User $user, string $runId, array $body): ResearchRunState
+    public function followUp(User $user, string $runId, array $body, ?string $idempotencyKey = null): ResearchRunState
     {
         $state = $this->owned($user, $runId);
         $type = is_string($body['type'] ?? null) ? $body['type'] : '';
-        if (!in_array($type, ['question', 'revise', 'deeper', 'refresh'], true)) {
+        if (!in_array($type, ResearchFollowUp::KINDS, true)) {
             throw new ResearchRejected(400, 'invalid', 'type', 'Choose a follow-up: a question, a revision, a deeper look, or a refresh.');
         }
         $text = trim(is_string($body['text'] ?? null) ? $body['text'] : '');
-        if ('refresh' !== $type && '' === $text) {
+        if (ResearchFollowUp::QUESTION === $type && '' === $text) {
+            throw new ResearchRejected(400, 'invalid', 'text', 'Write your question.');
+        }
+        if (ResearchFollowUp::REVISE === $type && '' === $text) {
             throw new ResearchRejected(400, 'invalid', 'text', 'Write what should change.');
         }
-        if (!$state->status->isTerminal()) {
-            throw new ResearchRejected(400, 'invalid', 'type', 'Wait until this research finishes. Then you can ask a follow-up.');
-        }
-        $question = 'refresh' === $type ? $state->ref->question : $text;
-        if (mb_strlen($question) > ResearchRequest::MAX_QUESTION) {
+        if (mb_strlen($text) > ResearchRequest::MAX_QUESTION) {
             throw new ResearchRejected(400, 'invalid', 'text', 'That follow-up needs 4000 characters or fewer.');
         }
+        if (!$state->status->isTerminal()) {
+            throw new ResearchRejected(409, 'conflict', 'type', 'Wait until this research finishes. Then you can ask a follow-up.');
+        }
+        if (ResearchFollowUp::REVISE === $type && null === $state->ledger->report()) {
+            throw new ResearchRejected(409, 'conflict', 'type', 'This research has no report to revise. Ask a question or look deeper instead.');
+        }
+        $key = $this->idempotencyKey($idempotencyKey);
         $plan = ResearchFollowUp::prepare($state, $type, $text);
+        $question = ResearchFollowUp::QUESTION === $type ? $text : $state->ref->question;
 
         return $this->open(
             $user,
             new ResearchRequest($question, $plan->depth, $state->ref->chatId),
-            null,
+            $key,
             $state->ref->id,
             $plan,
         );
@@ -196,7 +203,11 @@ final readonly class ResearchRunService
         }
         $this->guardLimits($userId, $request->depth);
         $now = $this->clock->now();
-        $budget = ResearchBudget::for($request->depth, ResearchBudgetConfig::defaults($request->depth), $now);
+        $limits = ResearchBudgetConfig::defaults($request->depth);
+        if (null !== $plan?->searchCap) {
+            $limits = $limits->withSearches($plan->searchCap);
+        }
+        $budget = ResearchBudget::for($request->depth, $limits, $now);
         $budget->at($now);
         $state = ResearchRunState::open(
             ResearchRunRef::start($userId, $request->depth, $request->question, $request->chatId, $now),
@@ -213,9 +224,6 @@ final readonly class ResearchRunService
             $unit = $plan->unit;
             if (ResearchStatus::Briefing !== $plan->status) {
                 $state->advance($plan->status);
-            }
-            if ($plan->oneSearch && $state->budget->searchesLeft() > 1) {
-                $state->budget->spend('searches', $state->budget->searchesLeft() - 1);
             }
         }
         $this->store->save($state);

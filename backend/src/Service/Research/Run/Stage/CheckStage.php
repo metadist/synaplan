@@ -7,6 +7,7 @@ namespace App\Service\Research\Run\Stage;
 use App\AI\StructuredOutput\Schema\ResearchCheckSchema;
 use App\Service\Research\Run\Ledger\PassageText;
 use App\Service\Research\Run\ResearchDepth;
+use App\Service\Research\Run\ResearchFollowUp;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchStatus;
 
@@ -51,7 +52,7 @@ final readonly class CheckStage implements ResearchStage
         $sorted = $this->sort(CheckReport::withoutNotConfirmed($original), $passages);
         $ask = $sorted['ask'];
         $carried = [];
-        if ('revise' === $ctx->state->followUp) {
+        if (ResearchFollowUp::REVISE === $ctx->state->followUp) {
             [$ask, $carried] = ChangedSentences::split($ctx->state->priorReport ?? '', $sorted['ask']);
         }
         $verdicts = [];

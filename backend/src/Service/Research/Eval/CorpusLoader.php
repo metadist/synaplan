@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Eval;
 
+use App\Service\Research\Run\ResearchFollowUp;
+
 /**
  * Reads the research corpus. A bad row fails the load; it is never skipped.
  */
@@ -82,7 +84,17 @@ final readonly class CorpusLoader
                 $questions[] = $item;
                 continue;
             }
-            $followUps[] = new FollowUpCorpusRow($item->id, $kind, $item->question);
+            $parent = $row['parent'] ?? null;
+            if (!\is_string($parent) || '' === $parent) {
+                throw new \RuntimeException($item->id.' is a follow-up without a parent.');
+            }
+            $followUps[] = new FollowUpCorpusRow($item->id, $kind, $item->question, $parent, $item->facts);
+        }
+        $parents = array_map(static fn (CorpusItem $item): string => $item->id, $questions);
+        foreach ($followUps as $followUp) {
+            if (!\in_array($followUp->parent, $parents, true)) {
+                throw new \RuntimeException($followUp->id.' continues '.$followUp->parent.', which is not a question in this corpus.');
+            }
         }
 
         return ['questions' => $questions, 'followUps' => $followUps];
@@ -197,7 +209,7 @@ final readonly class CorpusLoader
             return null;
         }
         $kind = $row['follow_up'];
-        if (!\is_string($kind) || !\in_array($kind, ['question', 'revise', 'deeper', 'refresh'], true)) {
+        if (!\is_string($kind) || !\in_array($kind, ResearchFollowUp::KINDS, true)) {
             throw new \RuntimeException($id.' has an unknown follow-up.');
         }
 

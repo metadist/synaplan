@@ -37,16 +37,20 @@ The same actions are on `/api/v1/research` (signed-in app) and `/v1/research`
 | DELETE | `research/{id}` | Removes the run, its updates and its cached pages. |
 
 A follow-up is a new run. It keeps the parent's sources and continues the
-source, evidence and point numbers. It does not gain a source the parent
-did not already use. The parent has to be finished; until then the answer
-is "Wait until this research finishes. Then you can ask a follow-up."
+source, evidence and point numbers, and it stays inside the parent's world.
+The parent's report is kept as the prior report, not as the new run's
+report, so a follow-up that stops early never shows the parent's text as
+its own. The parent has to be finished; until then the answer is 409
+"Wait until this research finishes. Then you can ask a follow-up." The
+`Idempotency-Key` header works as on start, so a double click starts one
+follow-up.
 
-| Type | What it does |
-| --- | --- |
-| question | A short run. It searches once only when the notes have nothing on the question, and otherwise answers from them. A finished question with an answer sets `can_add_to_report`, so a later screen can offer Add to report. This app does not show that button yet. |
-| revise | Rewrites the report from the instruction (shorter, for the board, a translation, a table, one section). A cited sentence that did not change keeps its citation and is not checked again. |
-| deeper | Uses the thorough budget. Each line under Not confirmed becomes the next plan point. |
-| refresh | Reads sources older than the brief's time frame again, and says what changed. With no time frame, it checks every source that was already read. |
+| Type | Text | What it does |
+| --- | --- | --- |
+| question | required | A quick run. When at least half of the question's words appear in the findings or the report, it answers from them. Otherwise it searches once for the question. A completed question with an answer sets `can_add_to_report`, so a later screen can offer Add to report. This app does not show that button yet. |
+| revise | required | Rewrites the report from the instruction (shorter, for the board, a translation, a table, one section). A cited sentence with the same words and the same citations keeps its verdict and is not checked again; any other cited sentence is checked. A parent without a report answers 409. |
+| deeper | optional | Uses the thorough budget. Each line under Not confirmed (up to eight; the closing count is not a line) becomes a plan point, and so does the text. With neither, the parent question is searched again. |
+| refresh | optional | Reads sources dated before the start of the brief's time frame again, and sources without a date, and says what changed. With no start date, it reads every source that was already read again. |
 
 An id that is not the caller's is 404. The session route requires `chat_id`
 and the chat must belong to the caller. The API route rejects `chat_id`; the

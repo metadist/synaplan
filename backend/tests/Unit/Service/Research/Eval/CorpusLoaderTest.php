@@ -29,6 +29,8 @@ final class CorpusLoaderTest extends TestCase
         foreach ($followUps as $item) {
             $kinds[$item->kind] = true;
             $this->assertNotContains($item->id, $ids);
+            $this->assertContains($item->parent, $ids);
+            $this->assertNotSame([], $item->facts->entries, $item->id);
         }
         $this->assertCount(5, $followUps);
         $this->assertSame(['question', 'revise', 'deeper', 'refresh'], array_keys($kinds));
@@ -80,6 +82,33 @@ final class CorpusLoaderTest extends TestCase
 
         try {
             (new CorpusLoader())->load($path, false);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testAFollowUpWithoutAKnownParentIsRejected(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'corpus');
+        $this->assertIsString($path);
+        file_put_contents($path, json_encode([[
+            'id' => 'fu-x',
+            'category' => 'current',
+            'language' => 'en',
+            'question' => 'Make it shorter.',
+            'depth' => 'standard',
+            'sources' => ['web' => true, 'knowledge' => false],
+            'gold' => [],
+            'smoke' => false,
+            'follow_up' => 'revise',
+            'parent' => 'missing-01',
+        ]], JSON_THROW_ON_ERROR));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('missing-01');
+
+        try {
+            (new CorpusLoader())->followUps($path);
         } finally {
             unlink($path);
         }
