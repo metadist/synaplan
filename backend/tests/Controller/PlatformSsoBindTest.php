@@ -196,6 +196,57 @@ final class PlatformSsoBindTest extends WebTestCase
         self::assertSame(PlatformDisconnectedException::CODE, $this->json()['code']);
     }
 
+    public function testBackgroundKeyRefusesASessionWithoutOrganisationLogin(): void
+    {
+        $this->client->disableReboot();
+        $person = $this->person();
+        $this->installToken($person['sub'], $person['email']);
+        $instance = $this->register();
+        $server = $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'];
+        $body = (string) json_encode(['external_id' => 'ada']);
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $user = $this->em->find(User::class, $person['id']);
+        self::assertInstanceOf(User::class, $user);
+        $this->authenticateClient($this->client, $user);
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_INSTANCE_ID' => $instance['instance_id'],
+            'HTTP_X_INSTANCE_SECRET' => $instance['instance_secret'],
+        ], content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        self::assertSame('unauthorized', $this->json()['code']);
+    }
+
+    public function testAChangedBackgroundKeyIsRevokedWhenReplaced(): void
+    {
+        $this->client->disableReboot();
+        $person = $this->person();
+        $this->installToken($person['sub'], $person['email']);
+        $instance = $this->register();
+        $server = $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'];
+        $body = (string) json_encode(['external_id' => 'ada']);
+        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $server, content: $body);
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $firstId = $this->json()['api_key_id'];
+        $first = $this->em->find(ApiKey::class, $firstId);
+        self::assertInstanceOf(ApiKey::class, $first);
+        $first->setScopes(['files']);
+        $this->em->flush();
+
+        $this->client->request('POST', '/api/v1/platform-links/sso/background-key', server: $server, content: $body);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $second = $this->json();
+        self::assertNotSame($firstId, $second['api_key_id']);
+        self::assertArrayHasKey('key', $second);
+        $this->em->clear();
+        $old = $this->em->find(ApiKey::class, $firstId);
+        self::assertInstanceOf(ApiKey::class, $old);
+        self::assertSame('revoked', $old->getStatus());
+    }
+
     public function testBearerReachesChatAndModelsAndIsRefusedElsewhere(): void
     {
         $this->client->disableReboot();

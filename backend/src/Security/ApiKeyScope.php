@@ -271,7 +271,25 @@ final class ApiKeyScope
      */
     public static function isSessionOnly(string $method, string $path): bool
     {
-        return self::matchesPrefix($path, '/api/v1/cloud/watches/from-message');
+        return self::matchesPrefix(self::decodedPath($path), '/api/v1/cloud/watches/from-message');
+    }
+
+    /**
+     * Symfony matches the decoded path. One decode is not enough for a
+     * double-encoded segment (`%2566` → `%66` → `f`).
+     */
+    private static function decodedPath(string $path): string
+    {
+        $current = $path;
+        for ($i = 0; $i < 3; ++$i) {
+            $next = rawurldecode($current);
+            if ($next === $current) {
+                return $current;
+            }
+            $current = $next;
+        }
+
+        return $current;
     }
 
     /**
@@ -454,6 +472,8 @@ final class ApiKeyScope
         if (self::matchesPrefix($path, '/api/v1/files')) {
             return [self::DESKTOP_FILES, self::ADDIN_FILES, self::PLATFORM_FILES];
         }
+
+        $path = self::decodedPath($path);
 
         if (self::isSessionOnly($method, $path)) {
             return [];

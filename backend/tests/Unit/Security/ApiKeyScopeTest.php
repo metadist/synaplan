@@ -468,6 +468,11 @@ final class ApiKeyScopeTest extends TestCase
             self::assertTrue(ApiKeyScope::isSessionOnly('POST', $fromMessage));
         }
         self::assertFalse(ApiKeyScope::isSessionOnly('POST', '/api/v1/cloud/watches/12'));
+        $encoded = '/api/v1/cloud/watches/%66rom-message/12';
+        self::assertTrue(ApiKeyScope::isSessionOnly('POST', $encoded));
+        self::assertFalse(ApiKeyScope::allows(['*'], $encoded, 'POST'));
+        self::assertFalse(ApiKeyScope::allows(['cloud:watch'], $encoded, 'POST'));
+        self::assertFalse(ApiKeyScope::allows([], '/api/v1/cloud/watches/%2566rom-message/12', 'POST'));
 
         foreach (['chat', 'files', 'rag'] as $scope) {
             self::assertTrue(ApiKeyScope::allows([$scope], '/api/v1/platform-links/identities/adopt', 'POST'));

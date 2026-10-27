@@ -15,6 +15,7 @@ use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use App\Service\PlatformLink\Exception\PlatformSsoException;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -114,62 +115,77 @@ final readonly class PlatformSsoService
      *
      * @return array{success: bool, api_key_id: int, scopes: list<string>, key?: string}
      */
-    public function backgroundKey(User $user, PlatformInstance $instance, string $externalId, string $ip): array
+    public function backgroundKey(User $user, string $azp, PlatformInstance $instance, string $externalId, string $ip): array
     {
+        $expected = $instance->getOidcClientId() ?? '';
+        if ('' === $expected || $azp !== $expected) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'azp_mismatch', 'This login is not the one registered for this cloud.');
+        }
+
         $externalId = $this->uid($externalId);
         $row = $this->activeOrganisationRow($user, $instance, $externalId);
-        $existing = $this->activeBackgroundKey($row);
-        if ($existing instanceof ApiKey) {
+
+        /** @var array{success: bool, api_key_id: int, scopes: list<string>, key?: string} $minted */
+        $minted = $this->entityManager->wrapInTransaction(function () use ($row, $user, $instance, $externalId): array {
+            $this->entityManager->lock($row, LockMode::PESSIMISTIC_WRITE);
+            $this->entityManager->refresh($row);
+
+            $existing = $this->activeBackgroundKey($row);
+            if ($existing instanceof ApiKey) {
+                return [
+                    'success' => true,
+                    'api_key_id' => (int) $existing->getId(),
+                    'scopes' => ApiKeyScope::backgroundKeyScopes(),
+                ];
+            }
+
+            $this->premiumFeatureGate->assertApiKeysAllowed($user);
+            $previous = $this->boundKey($row);
+            if ($previous instanceof ApiKey && $previous->isActive()) {
+                $previous->setStatus('revoked');
+            }
+
+            $plain = 'sk_'.bin2hex(random_bytes(29));
+            $apiKey = new ApiKey();
+            $apiKey->setOwner($user);
+            $apiKey->setKey($plain);
+            $apiKey->setName($this->backgroundLabel($instance, $externalId));
+            $apiKey->setStatus('active');
+            $apiKey->setScopes(ApiKeyScope::backgroundKeyScopes());
+            $this->entityManager->persist($apiKey);
+            $this->entityManager->flush();
+
+            $keyId = $apiKey->getId();
+            if (null === $keyId) {
+                throw new \LogicException('Minted background key has no id.');
+            }
+            $row->setApiKeyId($keyId);
+
             return [
                 'success' => true,
-                'api_key_id' => (int) $existing->getId(),
-                'scopes' => ApiKeyScope::backgroundKeyScopes(),
-            ];
-        }
-
-        $this->premiumFeatureGate->assertApiKeysAllowed($user);
-        $previous = $this->boundKey($row);
-        if ($previous instanceof ApiKey && $this->isBackgroundKey($previous)) {
-            $previous->setStatus('revoked');
-        }
-
-        $plain = 'sk_'.bin2hex(random_bytes(29));
-        $apiKey = new ApiKey();
-        $apiKey->setOwner($user);
-        $apiKey->setKey($plain);
-        $apiKey->setName($this->backgroundLabel($instance, $externalId));
-        $apiKey->setStatus('active');
-        $apiKey->setScopes(ApiKeyScope::backgroundKeyScopes());
-        $this->entityManager->persist($apiKey);
-        $this->entityManager->flush();
-
-        $keyId = $apiKey->getId();
-        if (null === $keyId) {
-            throw new \LogicException('Minted background key has no id.');
-        }
-        $row->setApiKeyId($keyId);
-        $this->entityManager->flush();
-
-        $this->auditLogWriter->record(
-            (int) $user->getId(),
-            'platform_link.background_key',
-            'platform_link',
-            (string) $row->getId(),
-            [
-                'client' => $instance->getClient(),
-                'host' => $instance->getHost(),
-                'external_id' => $externalId,
                 'api_key_id' => $keyId,
-            ],
-            $ip,
-        );
+                'scopes' => ApiKeyScope::backgroundKeyScopes(),
+                'key' => $plain,
+            ];
+        });
 
-        return [
-            'success' => true,
-            'api_key_id' => $keyId,
-            'scopes' => ApiKeyScope::backgroundKeyScopes(),
-            'key' => $plain,
-        ];
+        if (isset($minted['key'])) {
+            $this->auditLogWriter->record(
+                (int) $user->getId(),
+                'platform_link.background_key',
+                'platform_link',
+                (string) $row->getId(),
+                [
+                    'client' => $instance->getClient(),
+                    'host' => $instance->getHost(),
+                    'external_id' => $externalId,
+                    'api_key_id' => $minted['api_key_id'],
+                ],
+                $ip,
+            );
+        }
+
+        return $minted;
     }
 
     /**

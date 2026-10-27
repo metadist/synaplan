@@ -361,11 +361,16 @@ final class PlatformLinkController extends AbstractController
             return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if (!is_array($request->attributes->get(OidcBearerAuthenticator::CLAIMS_ATTRIBUTE))) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized', 'message' => 'Organisation login is required.'], Response::HTTP_UNAUTHORIZED);
+        }
+
         $body = $this->jsonBody($request);
 
         try {
             $result = $this->sso->backgroundKey(
                 $user,
+                $this->azp($request),
                 $this->credential($request),
                 is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
                 $request->getClientIp() ?? '',
