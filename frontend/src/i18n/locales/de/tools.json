@@ -300,10 +300,29 @@
     "emptyHint": "Starte mit einem leeren Formular oder wähle ein bekanntes System, um Name und Vorgaben vorauszufüllen. Die Wahl kannst du jederzeit ändern oder wieder aufheben.",
     "nameLabel": "Name",
     "urlLabel": "Server-URL",
+    "addressDropsSignIn": "Wenn Sie eine andere Adresse speichern, wird dieser Server abgemeldet. Verbinden Sie ihn danach erneut.",
     "addressDropsKey": "Wenn Sie einen anderen Host speichern, wird der gespeicherte Auth-Header-Wert entfernt. Geben Sie ihn unten erneut ein.",
     "authHeaderLabel": "Auth-Header-Name (optional)",
     "authTokenLabel": "Auth-Header-Wert",
     "authTokenPlaceholder": "z. B. Bearer sk-…",
+    "authMethodLabel": "Wie Synaplan sich verbindet",
+    "authMethod": {
+      "none": {
+        "label": "Ohne Anmeldung",
+        "hint": "Für Server, die jede und jeder nutzen darf."
+      },
+      "bearer": {
+        "label": "Zugangsschlüssel",
+        "hint": "Ein Schlüssel oder Token vom Server. Verschlüsselt gespeichert und nie wieder angezeigt."
+      },
+      "oauth": {
+        "label": "Mit Ihrem Konto anmelden",
+        "hint": "Nach dem Speichern melden Sie sich auf der Seite des Servers an. Synaplan speichert die Anmeldung, nie Ihr Passwort."
+      }
+    },
+    "authMethodOffByAdmin": "Eine Administratorin oder ein Administrator hat die Anmeldung ausgeschaltet. Sie können diesen Server trotzdem trennen oder löschen.",
+    "saveAndSignIn": "Speichern und anmelden",
+    "signInHost": "Anmeldung bei {host}",
     "enabledLabel": "Aktiviert",
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",
@@ -336,7 +355,7 @@
       "custom": {
         "name": "Eigener Server",
         "summary": "Beliebiger MCP-Endpunkt",
-        "hint": "Füge die HTTPS-URL eines beliebigen Streamable-HTTP-MCP-Servers ein und bei Bedarf ein Zugriffstoken. CRM, Wiki, Tickets, Automatisierung — spricht es MCP, funktioniert es hier."
+        "hint": "Fügen Sie die https-Adresse eines beliebigen MCP-Servers ein und wählen Sie unten, wie Synaplan sich mit ihm verbindet."
       },
       "github": {
         "name": "GitHub",
@@ -375,7 +394,7 @@
     "oauthConnected": "Verbunden",
     "oauthReauth": "Aktion nötig (erneut verbinden)",
     "oauthNotConnected": "Nicht verbunden",
-    "oauthConnectedToast": "Erfolgreich angemeldet",
+    "oauthConnectedToast": "Bei {name} angemeldet.",
     "disconnect": "Trennen",
     "disconnecting": "Wird getrennt…",
     "disconnectTitle": "Diesen Server trennen?",

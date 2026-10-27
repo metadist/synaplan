@@ -303,10 +303,29 @@
     "emptyHint": "Boş bir formla başlayın veya adı ve varsayılanları doldurmak için bilinen bir sistem seçin. Bu seçimi istediğiniz zaman değiştirebilir veya temizleyebilirsiniz.",
     "nameLabel": "Ad",
     "urlLabel": "Sunucu URL'si",
+    "addressDropsSignIn": "Farklı bir adres kaydetmek bu sunucunun oturumunu kapatır. Kaydettikten sonra yeniden bağlanın.",
     "addressDropsKey": "Farklı bir ana makine kaydetmek, kayıtlı kimlik doğrulama başlığı değerini siler. Aşağıya yeniden girin.",
     "authHeaderLabel": "Kimlik doğrulama başlığı adı (isteğe bağlı)",
     "authTokenLabel": "Kimlik doğrulama başlığı değeri",
     "authTokenPlaceholder": "örn. Bearer sk-…",
+    "authMethodLabel": "Synaplan nasıl bağlanır",
+    "authMethod": {
+      "none": {
+        "label": "Oturum açmadan",
+        "hint": "Herkesin kullanabildiği sunucular için."
+      },
+      "bearer": {
+        "label": "Erişim anahtarı",
+        "hint": "Sunucudan alınan bir anahtar veya token. Şifreli saklanır, bir daha gösterilmez."
+      },
+      "oauth": {
+        "label": "Hesabınızla oturum açın",
+        "hint": "Kaydettikten sonra sunucunun kendi sayfasında oturum açarsınız. Synaplan oturumu saklar, şifrenizi asla."
+      }
+    },
+    "authMethodOffByAdmin": "Bir yönetici oturum açmayı kapattı. Bu sunucunun bağlantısını yine de kesebilir veya silebilirsiniz.",
+    "saveAndSignIn": "Kaydet ve oturum aç",
+    "signInHost": "{host} adresinde oturum açar",
     "enabledLabel": "Etkin",
     "enabled": "Etkin",
     "disabled": "Devre dışı",
@@ -339,7 +358,7 @@
       "custom": {
         "name": "Özel sunucu",
         "summary": "Herhangi bir MCP uç noktası",
-        "hint": "Herhangi bir Streamable HTTP MCP sunucusunun HTTPS URL'sini ve gerekirse bir erişim token'ını yapıştırın. CRM, wiki, talepler, otomasyon — MCP konuşuyorsa burada çalışır."
+        "hint": "Herhangi bir MCP sunucusunun https adresini yapıştırın, ardından aşağıda Synaplan’ın ona nasıl bağlanacağını seçin."
       },
       "github": {
         "name": "GitHub",
@@ -378,7 +397,7 @@
     "oauthConnected": "Bağlandı",
     "oauthReauth": "İşlem gerekli (yeniden bağlan)",
     "oauthNotConnected": "Bağlı değil",
-    "oauthConnectedToast": "Oturum başarıyla açıldı",
+    "oauthConnectedToast": "{name} için oturum açıldı.",
     "disconnect": "Bağlantıyı kes",
     "disconnecting": "Bağlantı kesiliyor…",
     "disconnectTitle": "Bu sunucunun bağlantısı kesilsin mi?",

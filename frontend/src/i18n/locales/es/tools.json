@@ -303,10 +303,29 @@
     "emptyHint": "Empieza con un formulario en blanco o elige un sistema conocido para rellenar el nombre y los valores por defecto. Puedes cambiar o borrar esa elección en cualquier momento.",
     "nameLabel": "Nombre",
     "urlLabel": "URL del servidor",
+    "addressDropsSignIn": "Si guarda otra dirección, este servidor cerrará la sesión. Vuelva a conectarlo después de guardar.",
     "addressDropsKey": "Al guardar otro host se elimina el valor de la cabecera de autenticación guardado. Vuelva a introducirlo abajo.",
     "authHeaderLabel": "Nombre de la cabecera de autenticación (opcional)",
     "authTokenLabel": "Valor de la cabecera de autenticación",
     "authTokenPlaceholder": "p. ej. Bearer sk-…",
+    "authMethodLabel": "Cómo se conecta Synaplan",
+    "authMethod": {
+      "none": {
+        "label": "Sin inicio de sesión",
+        "hint": "Para servidores que cualquiera puede usar."
+      },
+      "bearer": {
+        "label": "Clave de acceso",
+        "hint": "Una clave o token del servidor. Se guarda cifrada y no se vuelve a mostrar."
+      },
+      "oauth": {
+        "label": "Iniciar sesión con su cuenta",
+        "hint": "Después de guardar, inicia sesión en la propia página del servidor. Synaplan guarda el inicio de sesión, nunca su contraseña."
+      }
+    },
+    "authMethodOffByAdmin": "Un administrador ha desactivado el inicio de sesión. Aún puede desconectar o eliminar este servidor.",
+    "saveAndSignIn": "Guardar e iniciar sesión",
+    "signInHost": "Inicia sesión en {host}",
     "enabledLabel": "Activado",
     "enabled": "Activado",
     "disabled": "Desactivado",
@@ -339,7 +358,7 @@
       "custom": {
         "name": "Servidor personalizado",
         "summary": "Cualquier endpoint MCP",
-        "hint": "Pega la URL HTTPS de cualquier servidor MCP Streamable HTTP y, si hace falta, un token de acceso. CRM, wiki, tickets, automatización: si habla MCP, funciona aquí."
+        "hint": "Pegue la dirección https de cualquier servidor MCP y elija abajo cómo se conecta Synaplan a él."
       },
       "github": {
         "name": "GitHub",
@@ -378,7 +397,7 @@
     "oauthConnected": "Conectado",
     "oauthReauth": "Acción necesaria (volver a conectar)",
     "oauthNotConnected": "No conectado",
-    "oauthConnectedToast": "Sesión iniciada correctamente",
+    "oauthConnectedToast": "Sesión iniciada en {name}.",
     "disconnect": "Desconectar",
     "disconnecting": "Desconectando…",
     "disconnectTitle": "¿Desconectar este servidor?",

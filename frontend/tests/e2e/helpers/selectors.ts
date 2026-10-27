@@ -835,6 +835,11 @@ export const selectors = {
     serverRow: (id: number) => `[data-testid="mcp-server-${id}"]`,
     serverRowAny: '[data-testid^="mcp-server-"]',
     deleteServer: (id: number) => `[data-testid="btn-mcp-delete-${id}"]`,
+    authMethod: (mode: 'none' | 'bearer' | 'oauth') => `[data-testid="radio-mcp-auth-${mode}"]`,
+    authToken: '[data-testid="input-mcp-auth-token"]',
+    oauthStatus: (id: number) => `[data-testid="mcp-oauth-status-${id}"]`,
+    oauthDisconnect: (id: number) => `[data-testid="btn-mcp-oauth-disconnect-${id}"]`,
+    signInHost: (id: number) => `[data-testid="mcp-sign-in-host-${id}"]`,
   },
   smartSearch: {
     openSidebar: '[data-testid="btn-sidebar-v2-search"]',

@@ -7,6 +7,8 @@ namespace App\Tests\Integration\Controller;
 use App\Entity\Config;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
+use App\Service\Mcp\McpOAuthState;
+use App\Service\Security\EncryptionService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -239,6 +241,39 @@ class McpServerConfigControllerTest extends WebTestCase
         $start = $this->request('POST', "/api/v1/mcp-servers/{$serverId}/oauth/start");
         self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
         self::assertSame('disabled', $start['code'], 'the page maps this code to its sentence, never the text');
+    }
+
+    public function testASignInServerStaysEditableWhileSignInIsOff(): void
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $encryption = $this->client->getContainer()->get(EncryptionService::class);
+        $server = (new McpServerConfig())
+            ->setUserId((int) $this->user->getId())
+            ->setName('Wiki (integration test)')
+            ->setUrl('https://wiki.example.com/mcp')
+            ->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $server->setDecryptedOAuthState(new McpOAuthState(
+            resource: 'https://wiki.example.com/mcp',
+            authorizationEndpoint: 'https://auth.example.com/authorize',
+            status: McpOAuthState::STATUS_CONNECTED,
+        ), $encryption);
+        $em->persist($server);
+        $em->flush();
+        $this->createdIds[] = (int) $server->getId();
+
+        $list = $this->request('GET', '/api/v1/mcp-servers');
+        $row = array_values(array_filter($list['servers'], static fn (array $s): bool => (int) $s['id'] === (int) $server->getId()))[0];
+        self::assertSame('auth.example.com', $row['oauth_sign_in_host']);
+
+        $renamed = $this->request('PATCH', '/api/v1/mcp-servers/'.$server->getId(), ['name' => 'Wiki renamed', 'enabled' => false]);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame('Wiki renamed', $renamed['server']['name']);
+        self::assertSame('oauth', $renamed['server']['auth_mode']);
+
+        $bearer = $this->request('POST', '/api/v1/mcp-servers', ['name' => 'CRM switch test', 'url' => 'https://crm.example.com/mcp']);
+        $this->createdIds[] = (int) $bearer['server']['id'];
+        $this->request('PATCH', '/api/v1/mcp-servers/'.$bearer['server']['id'], ['auth_mode' => 'oauth']);
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode(), 'switching to sign-in stays refused while it is off');
     }
 
     public function testOauthCallbackWithBadStateRedirectsWithError(): void

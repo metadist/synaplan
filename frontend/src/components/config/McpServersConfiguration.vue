@@ -120,6 +120,13 @@
           <div class="flex-1 min-w-0">
             <p class="txt-primary text-sm font-medium truncate">{{ server.name }}</p>
             <p class="txt-secondary text-xs font-mono truncate">{{ server.url }}</p>
+            <p
+              v-if="server.oauth_sign_in_host"
+              class="txt-secondary text-xs truncate"
+              :data-testid="`mcp-sign-in-host-${server.id}`"
+            >
+              {{ $t('mcpServers.signInHost', { host: server.oauth_sign_in_host }) }}
+            </p>
           </div>
           <span
             class="text-xs px-2 py-1 rounded-full"
@@ -328,38 +335,19 @@
         </label>
         <McpServerUrlField
           v-model="form.url"
-          :locked="form.authMode === 'oauth' && !!form.url"
+          :locked="addressLocked"
           :saved-url="editingId !== null ? editingUrl : ''"
           :has-saved-key="editingHasToken && form.authMode === 'bearer'"
+          :signed-in="editingSignedIn && form.authMode === 'oauth'"
         />
-        <div v-if="form.authMode !== 'oauth'" class="grid sm:grid-cols-2 gap-4">
-          <label class="block">
-            <span class="text-sm font-medium txt-primary">{{
-              $t('mcpServers.authHeaderLabel')
-            }}</span>
-            <input
-              v-model="form.authHeader"
-              type="text"
-              autocomplete="off"
-              placeholder="Authorization"
-              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
-              data-testid="input-mcp-auth-header"
-            />
-          </label>
-          <label class="block">
-            <span class="text-sm font-medium txt-primary">{{
-              $t('mcpServers.authTokenLabel')
-            }}</span>
-            <input
-              v-model="form.authToken"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="editingHasToken ? '••••••••' : $t('mcpServers.authTokenPlaceholder')"
-              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
-              data-testid="input-mcp-auth-token"
-            />
-          </label>
-        </div>
+        <McpServerAuthFields
+          v-model:mode="form.authMode"
+          v-model:auth-header="form.authHeader"
+          v-model:auth-token="form.authToken"
+          :oauth-enabled="oauthConnectorsEnabled"
+          :locked="authLocked"
+          :has-saved-token="editingHasToken"
+        />
         <label class="inline-flex items-center gap-2 text-sm txt-primary">
           <input v-model="form.enabled" type="checkbox" class="accent-[var(--brand)]" />
           {{ $t('mcpServers.enabledLabel') }}
@@ -388,7 +376,13 @@
           data-testid="btn-mcp-save"
           @click="save"
         >
-          {{ saving ? $t('common.saving') : $t('common.save') }}
+          {{
+            saving
+              ? $t('common.saving')
+              : signsInOnSave
+                ? $t('mcpServers.saveAndSignIn')
+                : $t('common.save')
+          }}
         </button>
         <button
           type="button"
@@ -405,16 +399,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useMcpSignInStart } from '@/composables/useMcpSignInStart'
-import { mcpSignInErrorKey } from '@/components/config/mcpSignInError'
 import { updateConfigValue } from '@/services/api/adminConfigApi'
 import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
 import McpServerUrlField from '@/components/config/McpServerUrlField.vue'
+import McpServerAuthFields from '@/components/config/McpServerAuthFields.vue'
 import {
   MCP_CUSTOM_TEMPLATE,
   findMcpServerTemplate,
@@ -429,9 +423,7 @@ import { useAuthStore } from '@/stores/auth'
 const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
-const { connectingId, start: startOAuth } = useMcpSignInStart(() => load())
-const route = useRoute()
-const router = useRouter()
+const { connectingId, start: startOAuth, finish: finishSignIn } = useMcpSignInStart(() => load())
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
@@ -462,6 +454,8 @@ const editorSection = ref<HTMLElement | null>(null)
 const editingId = ref<number | null>(null)
 const editingHasToken = ref(false)
 const editingUrl = ref('')
+const editingAuthMode = ref<McpAuthMode>('bearer')
+const editingSignedIn = ref(false)
 const form = reactive({
   name: '',
   url: '',
@@ -473,6 +467,28 @@ const form = reactive({
 })
 
 const activeTemplate = ref(MCP_CUSTOM_TEMPLATE)
+
+/** Only a template's fixed sign-in address is read-only; your own stays editable. */
+const addressLocked = computed(
+  () =>
+    editingId.value === null &&
+    isOAuthTemplate(findMcpServerTemplate(activeTemplate.value)) &&
+    form.url === findMcpServerTemplate(activeTemplate.value).urlPrefill
+)
+const authLocked = computed(
+  () =>
+    editingId.value !== null && editingAuthMode.value === 'oauth' && !oauthConnectorsEnabled.value
+)
+/** A rename of a signed-in server does not send the person through consent again. */
+const signsInOnSave = computed(
+  () =>
+    form.authMode === 'oauth' &&
+    oauthConnectorsEnabled.value &&
+    (editingId.value === null ||
+      editingAuthMode.value !== 'oauth' ||
+      !editingSignedIn.value ||
+      form.url.trim().replace(/\/+$/, '') !== editingUrl.value.replace(/\/+$/, ''))
+)
 
 /**
  * Prefill only the fields a template owns. A name the user already typed is
@@ -614,6 +630,9 @@ const startEdit = (server: McpServer) => {
   editingId.value = server.id ?? null
   editingHasToken.value = server.has_auth_token ?? false
   editingUrl.value = server.url ?? ''
+  editingAuthMode.value = (server.auth_mode as McpAuthMode | undefined) ?? 'bearer'
+  editingSignedIn.value =
+    server.oauth_status === 'connected' || server.oauth_status === 'reauth_required'
   activeTemplate.value = MCP_CUSTOM_TEMPLATE
   Object.assign(form, {
     name: server.name ?? '',
@@ -656,7 +675,9 @@ const save = async () => {
       auth_header: form.authHeader.trim(),
       enabled: form.enabled,
       allow_write: form.allowWrite,
-      auth_mode: form.authMode,
+      ...(editingId.value === null || form.authMode !== editingAuthMode.value
+        ? { auth_mode: form.authMode }
+        : {}),
       // Only send the secret when the user actually typed one — absent keeps
       // the stored value.
       ...(form.authToken !== '' ? { auth_token: form.authToken } : {}),
@@ -665,8 +686,7 @@ const save = async () => {
       editingId.value !== null
         ? await mcpServersApi.update(editingId.value, payload)
         : await mcpServersApi.create(payload)
-    const shouldConnect =
-      payload.auth_mode === 'oauth' && saved.id !== undefined && oauthConnectorsEnabled.value
+    const shouldConnect = signsInOnSave.value && saved.id !== undefined
     if (!shouldConnect) {
       success(t('mcpServers.saved'))
     }
@@ -757,21 +777,9 @@ const disconnectOAuth = async (server: McpServer) => {
   }
 }
 
-const consumeOAuthCallback = async () => {
-  const connected = route.query.connected
-  const oauthError = route.query.oauth_error
-  if (typeof connected === 'string' && connected !== '') {
-    success(t('mcpServers.oauthConnectedToast'))
-    await router.replace({ query: { ...route.query, connected: undefined } })
-  } else if (typeof oauthError === 'string' && oauthError !== '') {
-    error(t(mcpSignInErrorKey(oauthError)))
-    await router.replace({ query: { ...route.query, oauth_error: undefined } })
-  }
-}
-
-onMounted(() => {
-  void load()
+onMounted(async () => {
   void loadTaskPrompts()
-  void consumeOAuthCallback()
+  await load()
+  await finishSignIn(servers.value)
 })
 </script>
