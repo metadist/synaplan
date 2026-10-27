@@ -25,6 +25,7 @@ final class ScheduledJobsTest extends TestCase
             ],
             'tasks' => [
                 'app:saved-tasks:tick',
+                'app:notion-watches:poll',
             ],
             'hourly' => [
                 'app:files:reap-ephemeral',

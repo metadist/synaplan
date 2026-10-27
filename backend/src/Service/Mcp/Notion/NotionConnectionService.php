@@ -6,6 +6,7 @@ namespace App\Service\Mcp\Notion;
 
 use App\Entity\McpServerConfig;
 use App\Entity\Prompt;
+use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\Mcp\McpClientConfig;
@@ -40,6 +41,8 @@ final readonly class NotionConnectionService
         private PromptService $promptService,
         private EntityManagerInterface $entityManager,
         private NotionAccountReader $account,
+        private NotionGateway $gateway,
+        private NotionSharing $sharing,
     ) {
     }
 
@@ -60,16 +63,63 @@ final readonly class NotionConnectionService
     }
 
     /**
-     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool}
+     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
      *
      * @throws NotionAppUnavailableException
      */
-    public function status(int $userId): array
+    public function status(int $userId, bool $isAdmin = false): array
     {
         $this->assertAvailable($userId);
         $server = $this->notionServer($userId);
+        $present = $this->present($server);
+        $connected = McpOAuthState::STATUS_CONNECTED === $present['status'];
+        $shared = null !== $this->sharing->sharedServer($userId) ? $this->sharing->describe() : null;
 
-        return $this->present($server);
+        return [...$present, 'sharing' => [
+            'shared_by' => $connected || null === $shared ? null : $shared['owner_name'],
+            'can_share' => $isAdmin && $connected,
+            'shared_on' => null !== $server && $connected && $this->sharing->isShared($server),
+        ]];
+    }
+
+    /**
+     * An admin shares their own connection with everyone, read-only.
+     *
+     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
+     *
+     * @throws NotionAppUnavailableException
+     * @throws NotionConnectionMissingException
+     */
+    public function setShared(User $admin, bool $on): array
+    {
+        $userId = (int) $admin->getId();
+        $this->assertAvailable($userId);
+        $server = $this->gateway->writable($userId);
+        if (null === $server) {
+            throw new NotionConnectionMissingException('Connect Notion first. Nothing was shared.');
+        }
+        try {
+            $this->sharing->share($admin, $server, $on);
+        } catch (\InvalidArgumentException $e) {
+            throw new NotionConnectionMissingException($e->getMessage());
+        }
+
+        return $this->status($userId, $admin->isAdmin());
+    }
+
+    /**
+     * A member turns on Notion in their chat with the shared connection.
+     *
+     * @throws NotionAppUnavailableException
+     * @throws NotionConnectionMissingException
+     */
+    public function useShared(int $userId): void
+    {
+        $this->assertAvailable($userId);
+        if (null === $this->sharing->sharedServer($userId)) {
+            throw new NotionConnectionMissingException('Nobody shares a Notion connection here. Connect your own instead.');
+        }
+        $this->ensureGeneralChatCanUseNotion($userId);
     }
 
     /**
@@ -93,12 +143,12 @@ final readonly class NotionConnectionService
     }
 
     /**
-     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool}
+     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
      *
      * @throws NotionAppUnavailableException
      * @throws NotionConnectionMissingException
      */
-    public function setWriting(int $userId, bool $allow): array
+    public function setWriting(int $userId, bool $allow, bool $isAdmin = false): array
     {
         $this->assertAvailable($userId);
         $server = $this->notionServer($userId);
@@ -110,13 +160,13 @@ final readonly class NotionConnectionService
         $server->setWriteAuto($allow);
         $this->servers->save($server);
 
-        return $this->present($server);
+        return $this->status($userId, $isAdmin);
     }
 
     /**
      * @throws NotionAppUnavailableException
      */
-    private function assertAvailable(int $userId): void
+    public function assertAvailable(int $userId): void
     {
         if (!$this->config->isClientEnabled($userId) || !$this->config->isOAuthConnectorsEnabled()) {
             throw new NotionAppUnavailableException('Notion is turned off on this installation.');
@@ -125,18 +175,7 @@ final readonly class NotionConnectionService
 
     private function notionServer(int $userId): ?McpServerConfig
     {
-        $fallback = null;
-        foreach ($this->servers->findByUser($userId) as $server) {
-            if (NotionToolHints::HOST !== strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST))) {
-                continue;
-            }
-            $fallback ??= $server;
-            if ($server->isOAuth() && McpOAuthState::STATUS_CONNECTED === $server->getDecryptedOAuthState($this->encryption)->status) {
-                return $server;
-            }
-        }
-
-        return $fallback;
+        return $this->gateway->find($userId);
     }
 
     private function create(int $userId): McpServerConfig

@@ -725,7 +725,8 @@
       "email_me": "Envío por correo",
       "save_to_folder": "Guardar en carpeta",
       "code_run": "Trabajando con su archivo",
-      "folder_fetch": "Lectura de archivos"
+      "folder_fetch": "Lectura de archivos",
+      "save_to_notion": "Guardar en Notion"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",

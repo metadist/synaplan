@@ -18,6 +18,7 @@ final readonly class SkillToolSource implements ToolSourceInterface
     private const WRITE_CAPABILITIES = [
         Capability::EmailMe->value,
         Capability::SaveToFolder->value,
+        Capability::SaveToNotion->value,
         Capability::CalendarEvent->value,
         Capability::McpAction->value,
     ];

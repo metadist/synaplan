@@ -41,13 +41,24 @@ final class NotionAppController extends AbstractController
                 response: 200,
                 description: 'Current Notion connection',
                 content: new OA\JsonContent(
-                    required: ['success', 'status', 'server_id', 'allow_write', 'write_auto'],
+                    required: ['success', 'status', 'server_id', 'allow_write', 'write_auto', 'sharing'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'status', type: 'string', enum: ['not_connected', 'connected', 'reauth_required'], example: 'connected'),
                         new OA\Property(property: 'server_id', type: 'integer', nullable: true, example: 12),
                         new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                         new OA\Property(property: 'write_auto', type: 'boolean', example: false),
+                        new OA\Property(
+                            property: 'sharing',
+                            description: 'Organisation-wide sharing. shared_by names the admin whose connection this person can read with when they have none of their own.',
+                            required: ['shared_by', 'can_share', 'shared_on'],
+                            properties: [
+                                new OA\Property(property: 'shared_by', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                                new OA\Property(property: 'can_share', type: 'boolean', example: false),
+                                new OA\Property(property: 'shared_on', type: 'boolean', example: false),
+                            ],
+                            type: 'object'
+                        ),
                     ]
                 )
             ),
@@ -62,7 +73,7 @@ final class NotionAppController extends AbstractController
         }
 
         try {
-            return $this->json($this->notion->status($user->getId()));
+            return $this->json($this->notion->status($user->getId(), $user->isAdmin()));
         } catch (NotionAppUnavailableException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         }
@@ -167,13 +178,24 @@ final class NotionAppController extends AbstractController
                 response: 200,
                 description: 'Writing preference saved',
                 content: new OA\JsonContent(
-                    required: ['success', 'status', 'server_id', 'allow_write', 'write_auto'],
+                    required: ['success', 'status', 'server_id', 'allow_write', 'write_auto', 'sharing'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'status', type: 'string', enum: ['not_connected', 'connected', 'reauth_required']),
                         new OA\Property(property: 'server_id', type: 'integer', nullable: true),
                         new OA\Property(property: 'allow_write', type: 'boolean', example: true),
                         new OA\Property(property: 'write_auto', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'sharing',
+                            description: 'Organisation-wide sharing. shared_by names the admin whose connection this person can read with when they have none of their own.',
+                            required: ['shared_by', 'can_share', 'shared_on'],
+                            properties: [
+                                new OA\Property(property: 'shared_by', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                                new OA\Property(property: 'can_share', type: 'boolean', example: false),
+                                new OA\Property(property: 'shared_on', type: 'boolean', example: false),
+                            ],
+                            type: 'object'
+                        ),
                     ]
                 )
             ),
@@ -194,7 +216,109 @@ final class NotionAppController extends AbstractController
         }
 
         try {
-            return $this->json($this->notion->setWriting($user->getId(), $payload['allow_write']));
+            return $this->json($this->notion->setWriting($user->getId(), $payload['allow_write'], $user->isAdmin()));
+        } catch (NotionAppUnavailableException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (NotionConnectionMissingException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    #[Route('/sharing', name: 'sharing', methods: ['PATCH'])]
+    #[OA\Patch(
+        path: '/api/v1/apps/notion/sharing',
+        summary: 'Share your Notion connection with everyone, read-only',
+        description: 'Admins only. Everyone without their own Notion connection can then let the AI read what this Notion account can read. Nobody else can change Notion through it.',
+        security: [['Bearer' => []]],
+        tags: ['Notion'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['shared'],
+                properties: [new OA\Property(property: 'shared', type: 'boolean', example: true)]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Sharing saved; same body as GET /api/v1/apps/notion',
+                content: new OA\JsonContent(
+                    required: ['success', 'status', 'server_id', 'allow_write', 'write_auto', 'sharing'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'status', type: 'string', enum: ['not_connected', 'connected', 'reauth_required']),
+                        new OA\Property(property: 'server_id', type: 'integer', nullable: true),
+                        new OA\Property(property: 'allow_write', type: 'boolean'),
+                        new OA\Property(property: 'write_auto', type: 'boolean'),
+                        new OA\Property(
+                            property: 'sharing',
+                            description: 'Organisation-wide sharing. shared_by names the admin whose connection this person can read with when they have none of their own.',
+                            required: ['shared_by', 'can_share', 'shared_on'],
+                            properties: [
+                                new OA\Property(property: 'shared_by', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                                new OA\Property(property: 'can_share', type: 'boolean', example: false),
+                                new OA\Property(property: 'shared_on', type: 'boolean', example: false),
+                            ],
+                            type: 'object'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Not connected, not an admin, or the body is invalid'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Notion is turned off'),
+        ]
+    )]
+    public function sharing(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload) || !is_bool($payload['shared'] ?? null)) {
+            return $this->json(['success' => false, 'error' => 'Say whether to share the connection.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            return $this->json($this->notion->setShared($user, $payload['shared']));
+        } catch (NotionAppUnavailableException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (NotionConnectionMissingException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    #[Route('/shared/use', name: 'shared_use', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/apps/notion/shared/use',
+        summary: 'Let chat read Notion through the shared connection',
+        description: 'Turns on Notion in this person\'s general chat. Read-only: the AI never changes Notion through a shared connection.',
+        security: [['Bearer' => []]],
+        tags: ['Notion'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Chat can read Notion now',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [new OA\Property(property: 'success', type: 'boolean', example: true)]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Nobody shares a Notion connection'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Notion is turned off'),
+        ]
+    )]
+    public function useShared(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $this->notion->useShared($user->getId());
+
+            return $this->json(['success' => true]);
         } catch (NotionAppUnavailableException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         } catch (NotionConnectionMissingException $e) {

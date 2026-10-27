@@ -33,6 +33,31 @@ final class NotionFetchArgumentsTest extends TestCase
         );
     }
 
+    public function testTheRowsStepGetsOnlyTheDataSourceOfTheFetchedDatabase(): void
+    {
+        $fetched = 'Here is the result of "fetch" <database><data-source url="collection://0f5d4c2e-1111-4a2b-9c3d-123456789abc"></data-source></database>';
+
+        self::assertSame(
+            ['data' => ['mode' => 'rows', 'data_source_url' => 'collection://0f5d4c2e-1111-4a2b-9c3d-123456789abc', 'limit' => 50]],
+            $this->arguments->complete($this->notion(), ['name' => 'notion-query-data-sources'], ['data' => ['mode' => 'rows', 'data_source_url' => $fetched, 'limit' => 50]], ''),
+        );
+    }
+
+    public function testADatabaseQuestionPrefersDatabaseResults(): void
+    {
+        $payload = (string) json_encode([
+            'results' => [
+                ['id' => '11111111-1111-1111-1111-111111111111', 'title' => 'Tasks overview', 'type' => 'page'],
+                ['id' => '22222222-2222-2222-2222-222222222222', 'title' => 'Tasks', 'type' => 'database'],
+            ],
+        ]);
+
+        self::assertSame(
+            ['id' => '22222222-2222-2222-2222-222222222222'],
+            $this->arguments->complete($this->notion(), ['name' => 'fetch'], ['id' => $payload], 'Show my Tasks database in Notion'),
+        );
+    }
+
     public function testASearchPayloadBecomesThePageThePersonNamed(): void
     {
         $payload = (string) json_encode([

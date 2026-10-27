@@ -286,7 +286,8 @@
       "widget": "Widget",
       "api": "API",
       "generated": "KI-erzeugt",
-      "compute": "Dateiarbeit"
+      "compute": "Dateiarbeit",
+      "notion": "Notion"
     },
     "vectorState": {
       "vectorized": "KI-durchsuchbar",
@@ -404,7 +405,17 @@
       "dismiss": "Verstanden",
       "reopen": "Was ist das?"
     },
-    "searchIntro": "Stelle eine Frage in eigenen Worten und sieh, welche Stellen in deinen Dateien sie beantworten."
+    "searchIntro": "Stelle eine Frage in eigenen Worten und sieh, welche Stellen in deinen Dateien sie beantworten.",
+    "notion": {
+      "action": "Zu einer Notion-Seite hinzufügen",
+      "title": "Zu einer Notion-Seite hinzufügen",
+      "message": "Füge den Link der Notion-Seite ein, die „{file}“ bekommen soll. Die Datei wird am Ende der Seite angefügt.",
+      "placeholder": "https://www.notion.so/…",
+      "confirm": "Zur Seite hinzufügen",
+      "done": "„{file}“ wurde zu „{page}“ in Notion hinzugefügt. Die Datei bleibt auch hier.",
+      "open": "In Notion öffnen",
+      "failed": "Die Datei wurde nicht zu Notion hinzugefügt. Es wurde nichts geändert. Versuch es noch einmal."
+    }
   },
   "vectorStorage": {
     "intro": "Ein Überblick über deinen Vektorspeicher — wie viele Dateien indexiert sind und wie viele Vektoren (Chunks) für die semantische Suche gespeichert werden.",

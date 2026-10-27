@@ -38,6 +38,7 @@ final class CapabilityMessageHandlerTest extends TestCase
             'calendar_event' => null,
             'email_me' => null,
             'save_to_folder' => null,
+            'save_to_notion' => null,
             'compose_reply' => null,
             'tool_call' => null,
             'outbound_webhook' => null,

@@ -9,11 +9,15 @@ use App\Entity\Prompt;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptRepository;
+use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpOAuthConsentService;
 use App\Service\Mcp\McpOAuthState;
+use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionAccountReader;
 use App\Service\Mcp\Notion\NotionConnectionService;
+use App\Service\Mcp\Notion\NotionGateway;
+use App\Service\Mcp\Notion\NotionSharing;
 use App\Service\Prompt\PromptService;
 use App\Service\Security\EncryptionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -61,6 +65,7 @@ final class NotionConnectionServiceTest extends TestCase
             $promptService,
             $this->createStub(EntityManagerInterface::class),
             $this->createStub(NotionAccountReader::class),
+            ...$this->notion($servers, new EncryptionService('test-secret', new NullLogger())),
         );
 
         $result = $service->connect(4);
@@ -96,9 +101,23 @@ final class NotionConnectionServiceTest extends TestCase
             $this->createStub(PromptService::class),
             $this->createStub(EntityManagerInterface::class),
             $reader,
+            ...$this->notion($servers, $encryption),
         );
 
         self::assertNull($service->account(4)['workspace_name']);
         self::assertSame('Acme', $service->account(4)['workspace_name']);
+    }
+
+    /**
+     * @return array{NotionGateway, NotionSharing}
+     */
+    private function notion(McpServerConfigRepository $servers, EncryptionService $encryption): array
+    {
+        $sharing = $this->createStub(NotionSharing::class);
+
+        return [
+            new NotionGateway($servers, $encryption, $this->createStub(McpClient::class), $this->createStub(McpToolRegistry::class), $sharing),
+            $sharing,
+        ];
     }
 }

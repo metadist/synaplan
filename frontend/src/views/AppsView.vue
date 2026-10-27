@@ -77,6 +77,7 @@
                 :tagline="card.tagline"
                 :icon="card.icon"
                 :connected="card.connected"
+                :attention="card.attention"
                 :test-id="`card-app-${card.id}`"
               />
             </div>
@@ -98,7 +99,7 @@ import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import AppCard from '@/components/apps/AppCard.vue'
 import { APP_CATEGORIES, appMessageKey, availableApps, type AppDefinition } from '@/apps/catalog'
-import { loadConnectedAppIds } from '@/apps/status'
+import { loadAttentionAppIds, loadConnectedAppIds } from '@/apps/status'
 import { useConfigStore } from '@/stores/config'
 
 interface Card {
@@ -108,6 +109,7 @@ interface Card {
   tagline: string
   icon: string
   connected: boolean
+  attention: boolean
 }
 
 const { t } = useI18n()
@@ -116,6 +118,7 @@ const configStore = useConfigStore()
 
 const apps = ref<AppDefinition[]>([])
 const connectedIds = ref<Set<string>>(new Set())
+const attentionIds = ref<Set<string>>(new Set())
 const loading = ref(true)
 const query = ref('')
 
@@ -143,6 +146,7 @@ const pluginCards = computed<Card[]>(() =>
       icon: 'heroicons:puzzle-piece',
       // A plugin installed for the user is in use by definition.
       connected: true,
+      attention: false,
     }))
 )
 
@@ -157,6 +161,7 @@ function toCard(app: AppDefinition): Card {
     tagline: t(`apps.items.${key}.tagline`),
     icon: app.icon,
     connected: connectedIds.value.has(app.id),
+    attention: attentionIds.value.has(app.id),
   }
 }
 
@@ -180,7 +185,10 @@ const sections = computed(() => {
 onMounted(async () => {
   try {
     apps.value = await availableApps()
-    connectedIds.value = await loadConnectedAppIds(apps.value)
+    ;[connectedIds.value, attentionIds.value] = await Promise.all([
+      loadConnectedAppIds(apps.value),
+      loadAttentionAppIds(apps.value),
+    ])
   } finally {
     loading.value = false
   }

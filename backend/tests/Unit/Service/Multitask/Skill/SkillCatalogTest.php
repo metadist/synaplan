@@ -84,8 +84,8 @@ final class SkillCatalogTest extends TestCase
         // DYNAMIC blocks (requiresDynamicNote) that additionally need a
         // per-user sub-catalog / availability note — without one they stay
         // invisible regardless of their flags, so those three plus
-        // save_to_folder and folder_fetch (also dynamic: no connected folder
-        // means no note) are missing. document_export and document_combine
+        // save_to_folder, save_to_notion and folder_fetch (also dynamic: no
+        // connected folder or Notion means no note) are missing. document_export and document_combine
         // are engine/service-gated: without constructors they are omitted too.
         $default = SkillCatalogFactory::real()->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $default);
@@ -93,6 +93,7 @@ final class SkillCatalogTest extends TestCase
         self::assertStringNotContainsString('"mcp_action"', $default);
         self::assertStringNotContainsString('"email_search"', $default);
         self::assertStringNotContainsString('"save_to_folder"', $default);
+        self::assertStringNotContainsString('"save_to_notion"', $default);
         self::assertStringNotContainsString('"folder_fetch"', $default);
         self::assertStringNotContainsString('"document_export"', $default);
         self::assertStringNotContainsString('"document_combine"', $default);
@@ -100,7 +101,7 @@ final class SkillCatalogTest extends TestCase
         self::assertStringNotContainsString('"outbound_webhook"', $default);
         self::assertStringNotContainsString('"condition"', $default);
         self::assertStringNotContainsString('"code_run"', $default);
-        self::assertCount(count(Capability::cases()) - 11, explode("\n", $default));
+        self::assertCount(count(Capability::cases()) - 12, explode("\n", $default));
 
         // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
         // block from the planner again.

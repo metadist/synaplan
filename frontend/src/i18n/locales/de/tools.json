@@ -650,7 +650,8 @@
       "email_me": "Ergebnis per E-Mail an mich",
       "tool_call": "Verbundenes Werkzeug nutzen",
       "condition": "Nur fortfahren, wenn…",
-      "outbound_webhook": "An ein anderes System senden"
+      "outbound_webhook": "An ein anderes System senden",
+      "save_to_notion": "In Notion speichern"
     },
     "kindHints": {
       "email_search": "Schaut ins verbundene Postfach.",
@@ -659,7 +660,8 @@
       "email_me": "Schickt dir eine E-Mail.",
       "tool_call": "Führt ein bereits verbundenes Werkzeug aus.",
       "condition": "Stoppt spätere Schritte, wenn der Wert nicht passt.",
-      "outbound_webhook": "Sendet das Ergebnis an eine https-Adresse."
+      "outbound_webhook": "Sendet das Ergebnis an eine https-Adresse.",
+      "save_to_notion": "Legt eine neue Seite unter einer Notion-Seite deiner Wahl an."
     },
     "empty": "Noch keine Schritte. Füge einen hinzu.",
     "stepN": "Schritt {n}",
@@ -681,7 +683,10 @@
     "useTemplateConfirm": "Eigene Kopie anlegen? Sie bleibt aus, bis Sie sie einschalten. Eine neue Adresse wird erzeugt, wenn ein anderes System diese Aufgabe starten kann.",
     "useTemplateDone": "Kopie erstellt. Sie ist aus, bis Sie sie einschalten.",
     "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
-    "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}."
+    "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}.",
+    "notionPage": "Notion-Seite",
+    "notionPageHint": "Füge den Link der Seite ein. Jeder Lauf legt darunter eine neue Seite an.",
+    "notionTitle": "Seitentitel (optional)"
   },
   "tours": {
     "common": {
@@ -943,7 +948,8 @@
         "name": "Notion",
         "tagline": "Lies und bearbeite deine Notion-Seiten im Chat.",
         "about": "Nach dem Verbinden kann die KI deine Notion-Seiten lesen. Schreiben schaltest du extra ein. Löschen, Verschieben und Überschreiben bleiben aus.",
-        "stop": "Trenne die Verbindung unten. Die KI kann Notion danach nicht mehr lesen oder ändern. Vorhandene Seiten bleiben."
+        "stop": "Trenne die Verbindung unten. Die KI kann Notion danach nicht mehr lesen oder ändern. Vorhandene Seiten bleiben.",
+        "who": "Nur du. Ein Admin kann zusätzlich die eigene Verbindung für alle hier freigeben, nur zum Lesen; diese Seite zeigt, wenn das an ist."
       },
       "mcp": {
         "name": "Tool-Server (MCP)",
@@ -997,7 +1003,70 @@
       "disconnectTitle": "Notion trennen?",
       "disconnectMessage": "Die KI kann Notion danach nicht mehr lesen oder ändern. Seiten, die schon in Notion sind, bleiben. Du kannst später neu verbinden.",
       "disconnected": "Notion ist getrennt. In Notion wurde nichts geändert.",
-      "disconnectFailed": "Notion ist weiter verbunden. Es wurde nichts geändert. Versuch es erneut."
+      "disconnectFailed": "Notion ist weiter verbunden. Es wurde nichts geändert. Versuch es erneut.",
+      "exampleMeetings": "Was haben wir diese Woche in meinen Meetings in Notion entschieden?",
+      "exampleDatabase": "Zeig die offenen Einträge meiner Aufgaben-Datenbank in Notion",
+      "activity": {
+        "title": "Zuletzt von Synaplan geändert",
+        "loadFailed": "Die Liste konnte nicht geladen werden. Es wurde nichts geändert.",
+        "empty": "Seiten, die Synaplan in Notion anlegt oder ändert, erscheinen hier.",
+        "action": {
+          "created": "Angelegt",
+          "updated": "Bearbeitet",
+          "file": "Datei hinzugefügt"
+        }
+      },
+      "watches": {
+        "title": "Beobachtete Seiten",
+        "intro": "Synaplan prüft diese Seiten etwa alle 15 Minuten und reagiert, wenn sich eine ändert.",
+        "loadFailed": "Die beobachteten Seiten konnten nicht geladen werden. Es wurde nichts geändert.",
+        "empty": "Füge unten den Link einer Notion-Seite ein, um sie durchsuchbar zu halten oder bei Änderungen eine gespeicherte Aufgabe zu starten.",
+        "pageLabel": "Link der Notion-Seite",
+        "pagePlaceholder": "https://www.notion.so/…",
+        "actionLabel": "Wenn sich die Seite ändert",
+        "actionSearchable": "Durchsuchbare Kopie in meinen Dateien behalten",
+        "actionTask": "Gespeicherte Aufgabe starten",
+        "folderLabel": "Ordner",
+        "taskLabel": "Gespeicherte Aufgabe",
+        "noTasks": "Du hast noch keine gespeicherte Aufgabe, die du selbst startest.",
+        "openTasks": "Gespeicherte Aufgaben öffnen",
+        "add": "Seite beobachten",
+        "openCopy": "Kopie in Dateien öffnen",
+        "pause": "Pausieren",
+        "resume": "Fortsetzen",
+        "remove": "Nicht mehr beobachten",
+        "limit": "Du beobachtest {count} Seiten, das ist das Maximum. Entferne eine, um eine neue hinzuzufügen.",
+        "paused": "Pausiert. Synaplan prüft diese Seite nicht.",
+        "describeTask": "Startet „{task}“, wenn sich die Seite ändert.",
+        "describeSearchable": "Durchsuchbar im Ordner „{folder}“.",
+        "notChecked": "Noch nicht geprüft.",
+        "checked": "{time} geprüft. Keine Änderung seit dem Hinzufügen.",
+        "changed": "{time} geprüft. Letzte Änderung {changed}.",
+        "addedWithError": "Die Seite wird beobachtet, aber die erste Prüfung ist fehlgeschlagen. Der Grund steht in der Liste.",
+        "addedTask": "Die Seite wird beobachtet. Die gespeicherte Aufgabe startet bei der nächsten Änderung.",
+        "addedSearchable": "Die Seite wird beobachtet. Ihre Kopie liegt im Ordner „{folder}“ unter Dateien.",
+        "addFailed": "Die Seite wird nicht beobachtet. Es wurde nichts geändert. Versuch es noch einmal.",
+        "pausedToast": "Pausiert. Synaplan prüft diese Seite nicht mehr.",
+        "resumedToast": "Fortgesetzt. Synaplan hat die Seite sofort geprüft.",
+        "saveFailed": "Die Änderung wurde nicht gespeichert. Versuch es noch einmal.",
+        "removeTitle": "Diese Seite nicht mehr beobachten?",
+        "removeSearchable": "Synaplan prüft die Seite nicht mehr. Die Kopie bleibt in deinen Dateien, bis du sie dort löschst. In Notion ändert sich nichts.",
+        "removeTask": "Synaplan prüft die Seite nicht mehr und startet die gespeicherte Aufgabe dafür nicht mehr. Die Aufgabe selbst bleibt. In Notion ändert sich nichts.",
+        "removed": "Synaplan beobachtet diese Seite nicht mehr. In Notion wurde nichts geändert."
+      },
+      "sharing": {
+        "label": "Mit allen hier teilen, nur lesend",
+        "on": "Wer keine eigene Notion-Verbindung hat, kann die KI lesen lassen, was dieses Notion-Konto sehen kann. Niemand kann darüber etwas in Notion ändern.",
+        "off": "Nur du nutzt diese Verbindung.",
+        "savedOn": "Geteilt. Alle hier können die KI über deine Verbindung in Notion lesen lassen. Niemand kann darüber etwas in Notion ändern.",
+        "savedOff": "Teilen ist aus. Nur du nutzt diese Verbindung jetzt.",
+        "failed": "Die Einstellung zum Teilen wurde nicht gespeichert. Es wurde nichts geändert. Versuch es noch einmal.",
+        "memberNote": "{owner} teilt eine Notion-Verbindung. Die KI kann damit in Notion lesen, aber nie etwas ändern.",
+        "use": "Im Chat nutzen",
+        "connectOwn": "Eigenes Notion verbinden",
+        "usingToast": "Der Chat kann Notion jetzt über die geteilte Verbindung lesen.",
+        "useFailed": "Der Chat kann die geteilte Verbindung nicht nutzen. Es wurde nichts geändert. Versuch es noch einmal."
+      }
     },
     "linkedSteps": {
       "title": "So verbindest du es",
@@ -1014,6 +1083,7 @@
       "watched": "die Ordner, die du beobachtest",
       "allowed": "die Ordner, die du beobachtest, {folders}",
       "all": "alle deine Dateien"
-    }
+    },
+    "needsAttention": "Neu anmelden"
   }
 }

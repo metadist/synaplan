@@ -87,6 +87,7 @@ final class SavedTaskOutcomeNarrator
         return match ($capability) {
             'email_me' => 'The email',
             'save_to_folder' => 'Saving the file',
+            'save_to_notion' => 'Saving to Notion',
             'outbound_webhook' => 'Sending to the other system',
             'tool_call', 'mcp_action' => 'The connected action',
             'email_search' => 'The mailbox search',

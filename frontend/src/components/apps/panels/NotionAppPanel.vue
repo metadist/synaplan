@@ -50,106 +50,87 @@
       class="surface-card rounded-2xl p-4 sm:p-5"
       data-testid="section-notion-connect"
     >
-      <p class="txt-primary text-sm">{{ $t('apps.notion.notConnected') }}</p>
-      <button
-        type="button"
-        class="btn-primary mt-4 px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="connecting"
-        data-testid="btn-notion-connect"
-        @click="connect"
-      >
-        {{ $t('apps.notion.connect') }}
-      </button>
-    </div>
-
-    <div
-      v-else
-      class="surface-card rounded-2xl p-4 sm:p-5 space-y-5"
-      data-testid="section-notion-connected"
-    >
-      <div>
-        <p class="txt-primary text-sm break-words" data-testid="text-notion-account">
-          {{ accountLine }}
+      <template v-if="status?.sharing.shared_by">
+        <p class="txt-primary text-sm" data-testid="text-notion-shared">
+          {{ $t('apps.notion.sharing.memberNote', { owner: status.sharing.shared_by }) }}
         </p>
-        <p class="txt-secondary text-sm mt-1">{{ $t('apps.notion.scope') }}</p>
-      </div>
-
-      <div>
-        <label class="inline-flex items-center gap-3 cursor-pointer">
-          <span class="text-sm font-medium txt-primary">{{ $t('apps.notion.writeLabel') }}</span>
-          <span class="relative inline-flex">
-            <input
-              type="checkbox"
-              class="sr-only peer"
-              :checked="status.allow_write"
-              :disabled="saving"
-              data-testid="toggle-notion-write"
-              @change="onWrite"
-            />
-            <span
-              class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
-            ></span>
-            <span
-              class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
-            ></span>
-          </span>
-        </label>
-        <p class="txt-secondary text-sm mt-2" data-testid="text-notion-write-consequence">
-          {{ status.allow_write ? $t('apps.notion.writeOn') : $t('apps.notion.writeOff') }}
-        </p>
-      </div>
-
-      <div>
-        <p class="text-sm font-medium txt-primary">{{ $t('apps.notion.examplesTitle') }}</p>
-        <div class="mt-2 flex flex-wrap gap-2">
+        <div class="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 text-sm font-medium"
-            data-testid="btn-notion-example-read"
-            @click="tryPrompt($t('apps.notion.exampleRead'))"
+            class="btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="usingShared"
+            data-testid="btn-notion-use-shared"
+            @click="useShared"
           >
-            {{ $t('apps.notion.exampleRead') }}
+            {{ $t('apps.notion.sharing.use') }}
           </button>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 text-sm font-medium"
-            data-testid="btn-notion-example-write"
-            @click="tryPrompt($t('apps.notion.exampleWrite'))"
+            class="btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="connecting"
+            data-testid="btn-notion-connect"
+            @click="connect"
           >
-            {{ $t('apps.notion.exampleWrite') }}
+            {{ $t('apps.notion.sharing.connectOwn') }}
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <p class="txt-primary text-sm">{{ $t('apps.notion.notConnected') }}</p>
+        <button
+          type="button"
+          class="btn-primary mt-4 px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="connecting"
+          data-testid="btn-notion-connect"
+          @click="connect"
+        >
+          {{ $t('apps.notion.connect') }}
+        </button>
+      </template>
+    </div>
+
+    <div v-else class="space-y-4" data-testid="section-notion-connected">
+      <div class="surface-card rounded-2xl p-4 sm:p-5 space-y-5">
+        <NotionConnectedSection v-model:status="status" :account="account" @try="tryPrompt" />
+        <div class="flex flex-wrap gap-3">
+          <button
+            type="button"
+            class="btn-primary px-4 py-2.5 text-sm font-medium"
+            data-testid="btn-notion-try-chat"
+            @click="tryPrompt('')"
+          >
+            {{ $t('apps.notion.tryChat') }}
+          </button>
+          <button
+            type="button"
+            class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
+            data-testid="btn-notion-disconnect"
+            @click="disconnect"
+          >
+            {{ $t('apps.notion.disconnect') }}
           </button>
         </div>
       </div>
-
-      <div class="flex flex-wrap gap-3">
-        <button
-          type="button"
-          class="btn-primary px-4 py-2.5 text-sm font-medium"
-          data-testid="btn-notion-try-chat"
-          @click="tryPrompt('')"
-        >
-          {{ $t('apps.notion.tryChat') }}
-        </button>
-        <button
-          type="button"
-          class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
-          data-testid="btn-notion-disconnect"
-          @click="disconnect"
-        >
-          {{ $t('apps.notion.disconnect') }}
-        </button>
+      <div class="surface-card rounded-2xl p-4 sm:p-5">
+        <NotionWatches />
+      </div>
+      <div class="surface-card rounded-2xl p-4 sm:p-5">
+        <NotionRecentChanges />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { mcpServersApi } from '@/services/api/mcpServersApi'
+import NotionConnectedSection from './notion/NotionConnectedSection.vue'
+import NotionRecentChanges from './notion/NotionRecentChanges.vue'
+import NotionWatches from './notion/NotionWatches.vue'
 import {
   notionAppApi,
   type NotionAppAccount,
@@ -164,20 +145,10 @@ const { success, error } = useNotification()
 
 const loading = ref(true)
 const loadError = ref(false)
-const saving = ref(false)
 const connecting = ref(false)
+const usingShared = ref(false)
 const status = ref<NotionAppStatus | null>(null)
 const account = ref<NotionAppAccount | null>(null)
-
-const accountLine = computed(() => {
-  const name = account.value?.user_name
-  const email = account.value?.user_email
-  const who = name && email ? `${name} (${email})` : (name ?? email)
-  const workspace = account.value?.workspace_name
-  if (who && workspace) return t('apps.notion.connectedAs', { workspace, account: who })
-  if (who) return t('apps.notion.connectedAsAccount', { account: who })
-  return t('apps.notion.connected')
-})
 
 const loadAccount = async () => {
   try {
@@ -212,19 +183,16 @@ const connect = async () => {
   }
 }
 
-const onWrite = async (event: Event) => {
-  const input = event.target
-  if (!(input instanceof HTMLInputElement) || !status.value) return
-  const next = input.checked
-  saving.value = true
+const useShared = async () => {
+  usingShared.value = true
   try {
-    status.value = await notionAppApi.setWriting(next)
-    success(next ? t('apps.notion.writeSavedOn') : t('apps.notion.writeSavedOff'))
+    await notionAppApi.useShared()
+    success(t('apps.notion.sharing.usingToast'))
+    tryPrompt('')
   } catch (err) {
-    input.checked = !next
-    error(err instanceof Error && err.message ? err.message : t('apps.notion.writeFailed'))
+    error(err instanceof Error && err.message ? err.message : t('apps.notion.sharing.useFailed'))
   } finally {
-    saving.value = false
+    usingShared.value = false
   }
 }
 

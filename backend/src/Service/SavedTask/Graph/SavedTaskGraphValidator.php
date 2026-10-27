@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\SavedTask\Graph;
 
+use App\Service\Mcp\Notion\NotionGateway;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\Security\SsrfGuard;
@@ -72,6 +73,8 @@ final class SavedTaskGraphValidator
             $capability = $node['capability'] ?? null;
             if (!is_string($capability) || !in_array($capability, $allowed, true)) {
                 $errors[] = "step[$i] has an unknown action";
+            } elseif (Capability::SaveToNotion->value === $capability && !self::hasNotionPage($node)) {
+                $errors[] = "step[$i] needs the link of a Notion page";
             }
         }
 
@@ -223,5 +226,15 @@ final class SavedTaskGraphValidator
         }
 
         return false;
+    }
+
+    /**
+     * @param array<mixed> $node
+     */
+    private static function hasNotionPage(array $node): bool
+    {
+        $page = is_array($node['params'] ?? null) ? ($node['params']['page'] ?? null) : null;
+
+        return is_string($page) && null !== NotionGateway::pageId($page);
     }
 }

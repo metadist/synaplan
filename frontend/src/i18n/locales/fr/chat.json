@@ -717,7 +717,8 @@
       "email_me": "Résultat par e-mail",
       "save_to_folder": "Enregistrer dans le dossier",
       "code_run": "Travail sur votre fichier",
-      "folder_fetch": "Lecture de fichiers"
+      "folder_fetch": "Lecture de fichiers",
+      "save_to_notion": "Enregistrer dans Notion"
     },
     "copyText": "Copier le contenu",
     "copied": "Copié dans le presse-papiers",

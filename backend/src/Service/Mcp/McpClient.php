@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
+use App\Service\Mcp\Notion\NotionActivityLog;
 use App\Service\Mcp\Notion\NotionWriteGuard;
 use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
@@ -44,6 +45,7 @@ final readonly class McpClient
         private McpClientConfig $config,
         private LoggerInterface $logger,
         private ?McpOAuthTokenProvider $oauthTokens = null,
+        private ?NotionActivityLog $notionActivity = null,
     ) {
     }
 
@@ -119,10 +121,13 @@ final readonly class McpClient
             }
         }
 
-        return [
+        $answer = [
             'content' => $content,
             'isError' => (bool) ($result['isError'] ?? false),
         ];
+        $this->notionActivity?->recordToolCall($server, $tool, $arguments, $answer);
+
+        return $answer;
     }
 
     /**

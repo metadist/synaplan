@@ -15,6 +15,7 @@ use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Mcp\Notion\NotionImageAttach;
 use App\Service\Mcp\Notion\NotionImagePlan;
+use App\Service\Mcp\Notion\NotionReadPlan;
 use App\Service\Mcp\Notion\NotionToolHints;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -83,7 +84,7 @@ final readonly class McpFetchRunner implements TaskRunner
                 enabledDefault: false,
                 requiresDynamicNote: true,
                 available: null,
-                planAdjuster: fn (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array => $this->adjustNotionImagePlan($payload, $messageText, $userId, $allowed, $topic),
+                planAdjuster: fn (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array => $this->adjustNotionPlans($payload, $messageText, $userId, $allowed, $topic),
             ),
         ];
     }
@@ -105,7 +106,8 @@ final readonly class McpFetchRunner implements TaskRunner
         }
 
         // Ownership + enabled — cross-tenant access is structurally impossible.
-        $server = $this->servers->findByIdAndUser($serverId, (int) $userId);
+        $server = $this->servers->findByIdAndUser($serverId, (int) $userId)
+            ?? $this->toolRegistry->sharedServer($serverId, (int) $userId);
         if (null === $server || !$server->isEnabled()) {
             return NodeResult::failed('this data connection is not available');
         }
@@ -266,7 +268,7 @@ final readonly class McpFetchRunner implements TaskRunner
         $allowlist = $this->serverAllowlist($topicMetadata);
 
         $lines = [];
-        foreach ($this->toolRegistry->catalogForUser($userId) as $entry) {
+        foreach ([...$this->toolRegistry->catalogForUser($userId), ...$this->toolRegistry->sharedCatalogFor($userId)] as $entry) {
             $server = $entry['server'];
             $serverId = (int) $server->getId();
             if (null !== $allowlist && !in_array($serverId, $allowlist, true)) {
@@ -300,21 +302,22 @@ final readonly class McpFetchRunner implements TaskRunner
     }
 
     /**
-     * An image the person wants from Notion still needs a fresh search. A
-     * chat-only plan, including the fallback after an earlier Notion turn,
-     * never reaches the connection.
+     * Notion reads the model rarely plans by itself: an image from a page,
+     * meeting notes, and a question about a database. A chat-only plan,
+     * including the fallback after an earlier Notion turn, never reaches the
+     * connection.
      *
      * @param array<string, mixed> $payload
      * @param list<string>|null    $allowed
      *
      * @return array<string, mixed>
      */
-    private function adjustNotionImagePlan(array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array
+    private function adjustNotionPlans(array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array
     {
         if (!(new \ReflectionProperty(self::class, 'clientConfig'))->isInitialized($this)) {
             return $payload;
         }
-        if (null !== $allowed && (!in_array(Capability::McpFetch->value, $allowed, true) || !in_array(Capability::ComposeReply->value, $allowed, true))) {
+        if (null !== $allowed && !in_array(Capability::McpFetch->value, $allowed, true)) {
             return $payload;
         }
         if (null === $userId || $userId <= 0
@@ -329,7 +332,11 @@ final readonly class McpFetchRunner implements TaskRunner
         }
 
         $server = null;
-        foreach ($this->servers->findEnabledByUser($userId) as $candidate) {
+        $candidates = $this->servers->findEnabledByUser($userId);
+        foreach ($this->toolRegistry->sharedCatalogFor($userId) as $entry) {
+            $candidates[] = $entry['server'];
+        }
+        foreach ($candidates as $candidate) {
             if (NotionToolHints::HOST !== strtolower((string) parse_url($candidate->getUrl(), PHP_URL_HOST))) {
                 continue;
             }
@@ -343,23 +350,24 @@ final readonly class McpFetchRunner implements TaskRunner
             return $payload;
         }
 
-        $search = null;
-        $urls = null;
+        $tools = [];
         foreach ($this->toolRegistry->toolsFor($server) as $tool) {
-            $bare = strtolower($tool['name']);
-            $bare = str_starts_with($bare, 'notion-') ? substr($bare, strlen('notion-')) : $bare;
-            if ('search' === $bare && null === $search) {
-                $search = $tool['name'];
-            }
-            if (NotionImagePlan::URLS_TOOL === $bare && null === $urls) {
-                $urls = $tool['name'];
+            $tools[NotionToolHints::bare($tool['name'])] ??= $tool['name'];
+        }
+        $serverId = (int) $server->getId();
+
+        if (null === $allowed || in_array(Capability::ComposeReply->value, $allowed, true)) {
+            $adjusted = NotionImagePlan::install($payload, $messageText, $serverId, $tools['search'] ?? '', $tools[NotionImagePlan::URLS_TOOL] ?? '', $server->getName(), $allowed);
+            if ($adjusted !== $payload) {
+                return $adjusted;
             }
         }
-        if (null === $search || null === $urls) {
-            return $payload;
+        $adjusted = NotionReadPlan::installMeetings($payload, $messageText, $serverId, $tools[NotionReadPlan::MEETINGS_TOOL] ?? '', $allowed);
+        if ($adjusted !== $payload) {
+            return $adjusted;
         }
 
-        return NotionImagePlan::install($payload, $messageText, (int) $server->getId(), $search, $urls, $server->getName(), $allowed);
+        return NotionReadPlan::installDatabase($payload, $messageText, $serverId, $tools['search'] ?? '', $tools['fetch'] ?? '', $tools[NotionReadPlan::ROWS_TOOL] ?? '', $allowed);
     }
 
     /**

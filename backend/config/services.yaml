@@ -367,6 +367,11 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    # save_to_notion DAG node: upstream files are read from the shared uploads dir.
+    App\Service\Multitask\Execution\Runner\UploadedNodeFiles:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # calendar_event DAG node: the stored .ics lives under the shared uploads
     # dir; the runner needs the absolute path for a calendar-channel delivery.
     App\Service\Multitask\Execution\Runner\CalendarEventRunner:

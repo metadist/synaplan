@@ -6,6 +6,7 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Mcp\Notion\NotionSharing;
 use App\Service\Mcp\Notion\NotionToolHints;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -34,7 +35,42 @@ final readonly class McpToolRegistry
         private CacheInterface $cache,
         private LoggerInterface $logger,
         private NotionToolHints $notionHints = new NotionToolHints(),
+        private ?NotionSharing $notionSharing = null,
     ) {
+    }
+
+    /**
+     * The organisation's shared Notion for a person without their own Notion
+     * connection. Read-only: only `mcp_fetch` resolves it.
+     *
+     * @return list<array{server: McpServerConfig, tools: list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>}>
+     */
+    public function sharedCatalogFor(int $userId): array
+    {
+        $server = $this->sharedNotion($userId);
+
+        return null === $server ? [] : [['server' => $server, 'tools' => $this->toolsFor($server)]];
+    }
+
+    public function sharedServer(int $serverId, int $userId): ?McpServerConfig
+    {
+        $server = $this->sharedNotion($userId);
+
+        return null !== $server && $server->getId() === $serverId ? $server : null;
+    }
+
+    private function sharedNotion(int $userId): ?McpServerConfig
+    {
+        if (null === $this->notionSharing || $userId <= 0) {
+            return null;
+        }
+        foreach ($this->servers->findEnabledByUser($userId) as $own) {
+            if (NotionToolHints::isNotion($own->getUrl())) {
+                return null;
+            }
+        }
+
+        return $this->notionSharing->sharedServer($userId);
     }
 
     /**

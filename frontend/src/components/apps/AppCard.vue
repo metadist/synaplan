@@ -8,9 +8,10 @@ withDefaults(
     tagline: string
     icon: string
     connected?: boolean
+    attention?: boolean
     testId?: string
   }>(),
-  { connected: false, testId: undefined }
+  { connected: false, attention: false, testId: undefined }
 )
 </script>
 
@@ -30,7 +31,14 @@ withDefaults(
       <span class="flex items-center gap-2 min-w-0">
         <span class="font-medium txt-primary truncate">{{ name }}</span>
         <span
-          v-if="connected"
+          v-if="attention"
+          class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]"
+          data-testid="badge-app-attention"
+        >
+          {{ $t('apps.needsAttention') }}
+        </span>
+        <span
+          v-else-if="connected"
           class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--status-success-muted)] text-[var(--status-success-text)]"
           data-testid="badge-app-connected"
         >

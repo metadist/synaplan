@@ -581,6 +581,7 @@
         "saves": {
           "email": "eine E-Mail an dich",
           "folder": "eine Datei im verbundenen Ordner",
+          "notion": "eine neue Notion-Seite",
           "calendar": "einen Kalendereintrag",
           "reply": "eine Antwort im Chat"
         }

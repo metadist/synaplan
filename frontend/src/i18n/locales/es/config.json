@@ -130,6 +130,7 @@
         "saves": {
           "email": "un correo para ti",
           "folder": "un archivo en la carpeta conectada",
+          "notion": "una nueva página de Notion",
           "calendar": "una entrada de calendario",
           "reply": "una respuesta en el chat"
         }

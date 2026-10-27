@@ -725,7 +725,8 @@
       "email_me": "E-posta gönderimi",
       "save_to_folder": "Klasöre kaydet",
       "code_run": "Dosyanızla çalışılıyor",
-      "folder_fetch": "Dosya okuma"
+      "folder_fetch": "Dosya okuma",
+      "save_to_notion": "Notion’a kaydet"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",

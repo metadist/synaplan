@@ -138,7 +138,8 @@
       "document_generation": "Rédiger un document",
       "image_generation": "Créer une image",
       "calendar_event": "Créer un événement de calendrier",
-      "save_to_folder": "Enregistrer dans un dossier"
+      "save_to_folder": "Enregistrer dans un dossier",
+      "save_to_notion": "Enregistrer dans Notion"
     },
     "advancedSettings": "Réglages avancés",
     "advancedSettingsHint": "Créativité, longueur, langue et format de réponse facultatif.",

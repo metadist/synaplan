@@ -653,7 +653,8 @@
       "email_me": "Sonucu bana e-postala",
       "tool_call": "Bağlı bir araç kullan",
       "condition": "Yalnızca şu durumda devam et…",
-      "outbound_webhook": "Başka bir sisteme gönder"
+      "outbound_webhook": "Başka bir sisteme gönder",
+      "save_to_notion": "Notion’a kaydet"
     },
     "kindHints": {
       "email_search": "Bağlı postakutuya bakar.",
@@ -662,7 +663,8 @@
       "email_me": "Sana bir e-posta gönderir.",
       "tool_call": "Önceden bağladığın bir aracı çalıştırır.",
       "condition": "Değer uymazsa sonraki adımları durdurur.",
-      "outbound_webhook": "Sonucu bir https adresine gönderir."
+      "outbound_webhook": "Sonucu bir https adresine gönderir.",
+      "save_to_notion": "Seçtiğin bir Notion sayfasının altında yeni bir sayfa oluşturur."
     },
     "empty": "Henüz adım yok. Başlamak için bir tane ekle.",
     "stepN": "Adım {n}",
@@ -684,7 +686,10 @@
     "useTemplateConfirm": "Kendi kopyanız oluşturulsun mu? Siz açana kadar kapalı kalır. Başka bir sistem bunu başlatabiliyorsa yeni bir adres oluşturulur.",
     "useTemplateDone": "Kopya oluşturuldu. Siz açana kadar kapalı.",
     "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın.",
-    "useTemplateNeedsSetupItems": "Kopya oluşturuldu ve kapalı bırakıldı. Hâlâ gerekli: {items}."
+    "useTemplateNeedsSetupItems": "Kopya oluşturuldu ve kapalı bırakıldı. Hâlâ gerekli: {items}.",
+    "notionPage": "Notion sayfası",
+    "notionPageHint": "Sayfanın bağlantısını yapıştır. Her çalıştırma altına yeni bir sayfa ekler.",
+    "notionTitle": "Sayfa başlığı (isteğe bağlı)"
   },
   "tours": {
     "common": {
@@ -946,7 +951,8 @@
         "name": "Notion",
         "tagline": "Notion sayfalarınızı sohbette okuyun ve düzenleyin.",
         "about": "Bağladıktan sonra yapay zeka Notion sayfalarınızı okuyabilir. Yazma ayrı bir anahtardır. Silme, taşıma ve üzerine yazma kapalı kalır.",
-        "stop": "Aşağıdan bağlantıyı kesin. Yapay zeka artık Notion'u okuyamaz veya değiştiremez. Var olan sayfalar kalır."
+        "stop": "Aşağıdan bağlantıyı kesin. Yapay zeka artık Notion'u okuyamaz veya değiştiremez. Var olan sayfalar kalır.",
+        "who": "Yalnızca siz. Bir yönetici kendi bağlantısını buradaki herkesle salt okunur olarak da paylaşabilir; bu sayfa bunun açık olduğunu gösterir."
       },
       "mcp": {
         "name": "Araç sunucuları (MCP)",
@@ -1000,7 +1006,70 @@
       "disconnectTitle": "Notion bağlantısı kesilsin mi?",
       "disconnectMessage": "Yapay zeka artık Notion'u okuyamaz veya değiştiremez. Notion'da olan sayfalar kalır. Daha sonra yeniden bağlayabilirsiniz.",
       "disconnected": "Notion bağlantısı kesildi. Notion'da hiçbir şey değişmedi.",
-      "disconnectFailed": "Notion bağlı kalıyor. Hiçbir şey değişmedi. Yeniden deneyin."
+      "disconnectFailed": "Notion bağlı kalıyor. Hiçbir şey değişmedi. Yeniden deneyin.",
+      "exampleMeetings": "Bu hafta Notion’daki toplantılarımda ne karar verdik?",
+      "exampleDatabase": "Notion’daki Görevler veritabanımın açık satırlarını göster",
+      "activity": {
+        "title": "Synaplan’ın son değiştirdikleri",
+        "loadFailed": "Liste yüklenemedi. Hiçbir şey değişmedi.",
+        "empty": "Synaplan’ın Notion’da oluşturduğu veya değiştirdiği sayfalar burada görünür.",
+        "action": {
+          "created": "Oluşturuldu",
+          "updated": "Düzenlendi",
+          "file": "Dosya eklendi"
+        }
+      },
+      "watches": {
+        "title": "Takip edilen sayfalar",
+        "intro": "Synaplan bu sayfaları yaklaşık her 15 dakikada bir kontrol eder ve biri değiştiğinde harekete geçer.",
+        "loadFailed": "Takip edilen sayfalar yüklenemedi. Hiçbir şey değişmedi.",
+        "empty": "Aranabilir tutmak veya değiştiğinde kayıtlı bir görev başlatmak için aşağıya bir Notion sayfa bağlantısı yapıştır.",
+        "pageLabel": "Notion sayfa bağlantısı",
+        "pagePlaceholder": "https://www.notion.so/…",
+        "actionLabel": "Sayfa değiştiğinde",
+        "actionSearchable": "Dosyalarımda aranabilir bir kopya tut",
+        "actionTask": "Kayıtlı bir görev başlat",
+        "folderLabel": "Klasör",
+        "taskLabel": "Kayıtlı görev",
+        "noTasks": "Henüz kendin başlattığın kayıtlı bir görevin yok.",
+        "openTasks": "Kayıtlı görevleri aç",
+        "add": "Sayfayı takip et",
+        "openCopy": "Kopyayı Dosyalar’da aç",
+        "pause": "Duraklat",
+        "resume": "Sürdür",
+        "remove": "Takibi bırak",
+        "limit": "{count} sayfayı takip ediyorsun, izin verilen en fazla sayı bu. Yenisini eklemek için birini kaldır.",
+        "paused": "Duraklatıldı. Synaplan bu sayfayı kontrol etmiyor.",
+        "describeTask": "Sayfa değiştiğinde “{task}” görevini başlatır.",
+        "describeSearchable": "“{folder}” klasöründe aranabilir tutulur.",
+        "notChecked": "Henüz kontrol edilmedi.",
+        "checked": "{time} kontrol edildi. Eklendiğinden beri değişiklik yok.",
+        "changed": "{time} kontrol edildi. Son değişiklik {changed}.",
+        "addedWithError": "Sayfa takip ediliyor ama ilk kontrol başarısız oldu. Nedeni listede görünüyor.",
+        "addedTask": "Sayfa takip ediliyor. Kayıtlı görev, sayfa bir sonraki değiştiğinde başlar.",
+        "addedSearchable": "Sayfa takip ediliyor. Kopyası Dosyalar’daki “{folder}” klasöründe.",
+        "addFailed": "Sayfa takip edilmiyor. Hiçbir şey değişmedi. Tekrar dene.",
+        "pausedToast": "Duraklatıldı. Synaplan bu sayfayı artık kontrol etmiyor.",
+        "resumedToast": "Sürdürüldü. Synaplan sayfayı hemen kontrol etti.",
+        "saveFailed": "Değişiklik kaydedilmedi. Tekrar dene.",
+        "removeTitle": "Bu sayfanın takibi bırakılsın mı?",
+        "removeSearchable": "Synaplan sayfayı artık kontrol etmez. Kopya, sen orada silene kadar dosyalarında kalır. Notion’da hiçbir şey değişmez.",
+        "removeTask": "Synaplan sayfayı artık kontrol etmez ve onun için kayıtlı görevi bir daha başlatmaz. Görevin kendisi kalır. Notion’da hiçbir şey değişmez.",
+        "removed": "Synaplan bu sayfayı artık takip etmiyor. Notion’da hiçbir şey değişmedi."
+      },
+      "sharing": {
+        "label": "Buradaki herkesle paylaş, salt okunur",
+        "on": "Kendi Notion bağlantısı olmayanlar, AI’ın bu Notion hesabının görebildiklerini okumasına izin verebilir. Bu bağlantı üzerinden kimse Notion’u değiştiremez.",
+        "off": "Bu bağlantıyı yalnızca sen kullanıyorsun.",
+        "savedOn": "Paylaşıldı. Buradaki herkes AI’ın senin bağlantınla Notion’u okumasına izin verebilir. Bu bağlantı üzerinden kimse Notion’u değiştiremez.",
+        "savedOff": "Paylaşım kapalı. Bu bağlantıyı artık yalnızca sen kullanıyorsun.",
+        "failed": "Paylaşım ayarı kaydedilmedi. Hiçbir şey değişmedi. Tekrar dene.",
+        "memberNote": "{owner} bir Notion bağlantısı paylaşıyor. AI bununla Notion’u okuyabilir ama hiçbir şeyi değiştiremez.",
+        "use": "Sohbette kullan",
+        "connectOwn": "Kendi Notion’umu bağla",
+        "usingToast": "Sohbet artık paylaşılan bağlantı üzerinden Notion’u okuyabilir.",
+        "useFailed": "Sohbet paylaşılan bağlantıyı kullanamıyor. Hiçbir şey değişmedi. Tekrar dene."
+      }
     },
     "linkedSteps": {
       "title": "Nasıl bağlanır",
@@ -1017,6 +1086,7 @@
       "watched": "izlediğiniz klasörler",
       "allowed": "izlediğiniz klasörler, {folders}",
       "all": "tüm dosyalarınız"
-    }
+    },
+    "needsAttention": "Yeniden oturum aç"
   }
 }

@@ -8,6 +8,7 @@ const status = {
   server_id: null as number | null,
   allow_write: false,
   write_auto: false,
+  sharing: { shared_by: null as string | null, can_share: false, shared_on: false },
 }
 
 const {
@@ -20,6 +21,8 @@ const {
   success,
   error,
   push,
+  setShared,
+  useShared,
 } = vi.hoisted(() => ({
   statusMock: vi.fn(),
   accountMock: vi.fn(),
@@ -30,10 +33,21 @@ const {
   success: vi.fn(),
   error: vi.fn(),
   push: vi.fn(),
+  setShared: vi.fn(),
+  useShared: vi.fn(),
 }))
 
 vi.mock('@/services/api/notionAppApi', () => ({
-  notionAppApi: { status: statusMock, account: accountMock, setWriting, connect },
+  notionAppApi: {
+    status: statusMock,
+    account: accountMock,
+    setWriting,
+    connect,
+    setShared,
+    useShared,
+    activity: vi.fn(async () => []),
+    watches: vi.fn(async () => ({ success: true, watches: [], tasks: [], limit: 20 })),
+  },
 }))
 vi.mock('@/services/api/mcpServersApi', () => ({
   mcpServersApi: { disconnectOAuth },
@@ -62,6 +76,7 @@ describe('NotionAppPanel', () => {
     status.server_id = null
     status.allow_write = false
     status.write_auto = false
+    status.sharing = { shared_by: null, can_share: false, shared_on: false }
     statusMock.mockImplementation(async () => ({ ...status }))
     accountMock.mockResolvedValue({
       success: true,
@@ -167,5 +182,52 @@ describe('NotionAppPanel', () => {
     expect(confirm).toHaveBeenCalled()
     expect(disconnectOAuth).toHaveBeenCalledWith(4)
     expect(wrapper.get('[data-testid="btn-notion-connect"]').text()).toBe('Connect Notion')
+  })
+
+  it('offers the shared connection to a person without their own', async () => {
+    status.sharing = { shared_by: 'Ada Lovelace', can_share: false, shared_on: false }
+    useShared.mockResolvedValue(undefined)
+    const wrapper = await mountPanel()
+
+    expect(wrapper.get('[data-testid="text-notion-shared"]').text()).toContain('Ada Lovelace')
+    expect(wrapper.get('[data-testid="btn-notion-connect"]').text()).toBe('Connect your own Notion')
+
+    await wrapper.get('[data-testid="btn-notion-use-shared"]').trigger('click')
+    await flushPromises()
+
+    expect(useShared).toHaveBeenCalled()
+    expect(success).toHaveBeenCalledWith('Chat can now read Notion through the shared connection.')
+    expect(push).toHaveBeenCalledWith({ name: 'chat' })
+  })
+
+  it('lets an admin share the connection read-only and says what that means', async () => {
+    status.status = 'connected'
+    status.server_id = 4
+    status.sharing = { shared_by: null, can_share: true, shared_on: false }
+    setShared.mockImplementation(async (on: boolean) => ({
+      ...status,
+      sharing: { shared_by: null, can_share: true, shared_on: on },
+    }))
+    const wrapper = await mountPanel()
+    expect(wrapper.get('[data-testid="text-notion-share-consequence"]').text()).toBe(
+      'Only you use this connection.'
+    )
+
+    await wrapper.get('[data-testid="toggle-notion-share"]').setValue(true)
+    await flushPromises()
+
+    expect(setShared).toHaveBeenCalledWith(true)
+    expect(wrapper.get('[data-testid="text-notion-share-consequence"]').text()).toContain(
+      'Nobody can change Notion through it.'
+    )
+  })
+
+  it('hides sharing from people who are not admins', async () => {
+    status.status = 'connected'
+    status.server_id = 4
+    const wrapper = await mountPanel()
+    expect(wrapper.find('[data-testid="section-notion-sharing"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="section-notion-watches"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-notion-activity"]').exists()).toBe(true)
   })
 })

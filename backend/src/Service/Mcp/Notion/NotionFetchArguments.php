@@ -42,6 +42,9 @@ final readonly class NotionFetchArguments
      */
     public function complete(McpServerConfig $server, array $tool, array $arguments, string $sourceText): array
     {
+        if ($this->isTool($server->getUrl(), (string) $tool['name'], NotionReadPlan::ROWS_TOOL)) {
+            return $this->completeRows($arguments);
+        }
         if (!$this->isFetch($server->getUrl(), (string) $tool['name'])) {
             return $arguments;
         }
@@ -80,13 +83,36 @@ final readonly class NotionFetchArguments
 
     private function isFetch(string $serverUrl, string $toolName): bool
     {
-        if (NotionToolHints::HOST !== strtolower((string) parse_url($serverUrl, PHP_URL_HOST))) {
-            return false;
+        return $this->isTool($serverUrl, $toolName, 'fetch');
+    }
+
+    private function isTool(string $serverUrl, string $toolName, string $bare): bool
+    {
+        return NotionToolHints::isNotion($serverUrl) && $bare === NotionToolHints::bare($toolName);
+    }
+
+    /**
+     * The rows step receives the whole fetched database. Notion wants only
+     * its `collection://` data source there.
+     *
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed>
+     */
+    private function completeRows(array $arguments): array
+    {
+        $data = is_array($arguments['data'] ?? null) ? $arguments['data'] : null;
+        $current = is_string($data['data_source_url'] ?? null) ? $data['data_source_url'] : null;
+        if (null === $data || null === $current || 1 === preg_match('/^collection:\/\/[0-9a-f-]{36}$/i', trim($current))) {
+            return $arguments;
+        }
+        $url = NotionReadPlan::dataSourceUrl($current);
+        if (null !== $url) {
+            $data['data_source_url'] = $url;
+            $arguments['data'] = $data;
         }
 
-        $name = strtolower($toolName);
-
-        return 'fetch' === (str_starts_with($name, 'notion-') ? substr($name, strlen('notion-')) : $name);
+        return $arguments;
     }
 
     private function payload(mixed $id): ?array
@@ -118,6 +144,7 @@ final readonly class NotionFetchArguments
         }
 
         $rows = is_array($payload['results'] ?? null) ? $payload['results'] : (array_is_list($payload) ? $payload : []);
+        $rows = $this->databasesFirst($rows, $sourceText);
         $bestId = null;
         $bestLength = 0;
         $first = null;
@@ -141,6 +168,23 @@ final readonly class NotionFetchArguments
         }
 
         return $bestId ?? $first;
+    }
+
+    /**
+     * A question about a database looks at database results before pages.
+     *
+     * @param array<mixed> $rows
+     *
+     * @return array<mixed>
+     */
+    private function databasesFirst(array $rows, string $sourceText): array
+    {
+        if (1 !== preg_match('/datenbank|database|tabelle|base\s+de\s+(?:datos|donn)|veritaban/iu', $sourceText)) {
+            return $rows;
+        }
+        $databases = array_filter($rows, static fn (mixed $row): bool => is_array($row) && in_array($row['type'] ?? null, ['database', 'data_source'], true));
+
+        return [] === $databases ? $rows : array_values($databases);
     }
 
     /**

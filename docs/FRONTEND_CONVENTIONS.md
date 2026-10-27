@@ -76,6 +76,7 @@ and the live-conversation waveform.
 | Preview / view | `EyeIcon` |
 | Delete | `TrashIcon` (`text-red-400/70 hover:text-red-500`, never the secondary ink) |
 | Open in chat | `ChatBubbleLeftRightIcon` |
+| Add to a Notion page | `simple-icons:notion` (brand glyph, as on the Notion app tile) |
 | Upload | `CloudArrowUpIcon` |
 | Search | `MagnifyingGlassIcon` |
 | Close | `XMarkIcon` |
@@ -84,7 +85,7 @@ and the live-conversation waveform.
 | Live conversation | `mdi:waveform` (Heroicons has no waveform; `MicrophoneIcon` stays dictation, `SpeakerWaveIcon` stays spoken replies) |
 
 File rows never hand-roll buttons: `frontend/src/components/files/FileRowActions.vue`
-owns the glyphs, order (chat → preview → download → delete), density (`p-1.5`,
+owns the glyphs, order (chat → preview → download → Notion → delete), density (`p-1.5`,
 `w-4 h-4` icons) and delete styling. Callers pass titles, test IDs and handlers
 only. A new file-row action extends the component, never a second button set.
 Row deletes carry `data-testid="btn-delete"` (E2E deletion journey); keep it stable.

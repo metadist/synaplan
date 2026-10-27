@@ -50,12 +50,13 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { BUILTIN_STEP_KINDS } from './stepTypes'
+import { BUILTIN_STEP_KINDS, NOTION_STEP_KIND } from './stepTypes'
 import type { RegistryTool } from '@/services/api/toolsApi'
 
 const props = defineProps<{
   modelValue: string
   tools?: RegistryTool[]
+  notion?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -72,10 +73,13 @@ const icons: Record<string, string> = {
   condition: 'heroicons:funnel',
   outbound_webhook: 'heroicons:arrow-up-right',
   tool_call: 'heroicons:wrench-screwdriver',
+  [NOTION_STEP_KIND]: 'simple-icons:notion',
 }
 
 const options = computed(() => {
-  const builtins = BUILTIN_STEP_KINDS.map((key) => ({
+  const kinds: string[] = [...BUILTIN_STEP_KINDS]
+  if (props.notion) kinds.push(NOTION_STEP_KIND)
+  const builtins = kinds.map((key) => ({
     key,
     icon: icons[key] ?? 'heroicons:squares-2x2',
     name: t(`workflows.kinds.${key}`),

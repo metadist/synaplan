@@ -79,6 +79,34 @@
       </label>
     </div>
 
+    <div v-if="step.capability === 'save_to_notion'" class="space-y-3">
+      <label class="block text-sm font-medium txt-primary">
+        {{ $t('workflows.notionPage') }}
+        <input
+          :class="STEP_FIELD_CLASS"
+          type="url"
+          :value="stringParam('page')"
+          placeholder="https://www.notion.so/…"
+          data-testid="input-step-notion-page"
+          @input="setParam('page', ($event.target as HTMLInputElement).value)"
+        />
+        <span class="block text-xs txt-secondary mt-1 font-normal">
+          {{ $t('workflows.notionPageHint') }}
+        </span>
+      </label>
+      <label class="block text-sm font-medium txt-primary">
+        {{ $t('workflows.notionTitle') }}
+        <input
+          :class="STEP_FIELD_CLASS"
+          type="text"
+          maxlength="200"
+          :value="stringParam('title')"
+          data-testid="input-step-notion-title"
+          @input="setParam('title', ($event.target as HTMLInputElement).value)"
+        />
+      </label>
+    </div>
+
     <div v-if="step.capability === 'condition'" class="space-y-3">
       <label class="block text-sm font-medium txt-primary">
         {{ $t('workflows.condition') }}

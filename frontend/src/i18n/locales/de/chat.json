@@ -715,7 +715,8 @@
       "email_me": "E-Mail-Versand",
       "save_to_folder": "Im Ordner speichern",
       "code_run": "Arbeitet mit Ihrer Datei",
-      "folder_fetch": "Dateien lesen"
+      "folder_fetch": "Dateien lesen",
+      "save_to_notion": "In Notion speichern"
     },
     "copyText": "Inhalt kopieren",
     "copied": "In die Zwischenablage kopiert",

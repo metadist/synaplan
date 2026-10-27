@@ -727,7 +727,8 @@
       "email_me": "Mail me the result",
       "tool_call": "Use a connected tool",
       "condition": "Only continue if…",
-      "outbound_webhook": "Send to another system"
+      "outbound_webhook": "Send to another system",
+      "save_to_notion": "Save to Notion"
     },
     "kindHints": {
       "email_search": "Looks in the connected mailbox.",
@@ -736,7 +737,8 @@
       "email_me": "Sends you an email.",
       "tool_call": "Runs a tool you already connected.",
       "condition": "Stops later steps when the value does not match.",
-      "outbound_webhook": "Posts the result to an https address."
+      "outbound_webhook": "Posts the result to an https address.",
+      "save_to_notion": "Creates a new page under a Notion page you choose."
     },
     "empty": "No steps yet. Add one to start.",
     "stepN": "Step {n}",
@@ -758,7 +760,10 @@
     "useTemplateConfirm": "Create your own copy? It stays off until you turn it on. A new address is created if another system can start this task.",
     "useTemplateDone": "Copy created. It is off until you turn it on.",
     "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.",
-    "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}."
+    "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}.",
+    "notionPage": "Notion page",
+    "notionPageHint": "Paste the link of the page. Each run adds a new page under it.",
+    "notionTitle": "Page title (optional)"
   },
   "tours": {
     "common": {
@@ -1020,7 +1025,8 @@
         "name": "Notion",
         "tagline": "Read and edit your Notion pages in chat.",
         "about": "After you connect, the AI can read your Notion pages. Writing is a separate switch. Deleting, moving and overwriting stay off.",
-        "stop": "Disconnect below. The AI can no longer read or change Notion. Pages already there stay."
+        "stop": "Disconnect below. The AI can no longer read or change Notion. Pages already there stay.",
+        "who": "Only you. An admin can also share their own connection with everyone here, read-only; this page says when that is on."
       },
       "mcp": {
         "name": "Tool servers (MCP)",
@@ -1074,7 +1080,70 @@
       "disconnectTitle": "Disconnect Notion?",
       "disconnectMessage": "The AI will no longer read or change Notion. Pages already in Notion stay. You can connect again later.",
       "disconnected": "Notion is disconnected. Nothing was changed in Notion.",
-      "disconnectFailed": "Notion is still connected. Nothing was changed. Try again."
+      "disconnectFailed": "Notion is still connected. Nothing was changed. Try again.",
+      "exampleMeetings": "What did we decide in my meetings this week in Notion?",
+      "exampleDatabase": "Show the open rows of my Tasks database in Notion",
+      "activity": {
+        "title": "Recently changed by Synaplan",
+        "loadFailed": "The list could not be loaded. Nothing was changed.",
+        "empty": "Pages Synaplan creates or changes in Notion show up here.",
+        "action": {
+          "created": "Created",
+          "updated": "Edited",
+          "file": "File added"
+        }
+      },
+      "watches": {
+        "title": "Followed pages",
+        "intro": "Synaplan checks these pages about every 15 minutes and acts when one changes.",
+        "loadFailed": "Followed pages could not be loaded. Nothing was changed.",
+        "empty": "Paste a Notion page link below to keep it searchable or to start a saved task when it changes.",
+        "pageLabel": "Notion page link",
+        "pagePlaceholder": "https://www.notion.so/…",
+        "actionLabel": "When the page changes",
+        "actionSearchable": "Keep a searchable copy in my files",
+        "actionTask": "Start a saved task",
+        "folderLabel": "Folder",
+        "taskLabel": "Saved task",
+        "noTasks": "You have no saved task you start yourself yet.",
+        "openTasks": "Open saved tasks",
+        "add": "Follow page",
+        "openCopy": "Open the copy in Files",
+        "pause": "Pause",
+        "resume": "Resume",
+        "remove": "Stop following",
+        "limit": "You follow {count} pages, the most allowed. Remove one to add another.",
+        "paused": "Paused. Synaplan does not check this page.",
+        "describeTask": "Starts “{task}” when the page changes.",
+        "describeSearchable": "Kept searchable in the folder “{folder}”.",
+        "notChecked": "Not checked yet.",
+        "checked": "Checked {time}. No change since it was added.",
+        "changed": "Checked {time}. Last change {changed}.",
+        "addedWithError": "The page is followed, but the first check failed. The reason is shown in the list.",
+        "addedTask": "The page is followed. The saved task starts the next time it changes.",
+        "addedSearchable": "The page is followed. Its copy is in the folder “{folder}” in Files.",
+        "addFailed": "The page is not followed. Nothing was changed. Try again.",
+        "pausedToast": "Paused. Synaplan stops checking this page.",
+        "resumedToast": "Resumed. Synaplan checked the page right away.",
+        "saveFailed": "The change was not saved. Try again.",
+        "removeTitle": "Stop following this page?",
+        "removeSearchable": "Synaplan stops checking the page. The copy stays in your files until you delete it there. Nothing changes in Notion.",
+        "removeTask": "Synaplan stops checking the page and will not start the saved task for it again. The saved task itself stays. Nothing changes in Notion.",
+        "removed": "Synaplan no longer follows this page. Nothing was changed in Notion."
+      },
+      "sharing": {
+        "label": "Share with everyone here, read-only",
+        "on": "People without their own Notion connection can let the AI read what this Notion account can read. Nobody can change Notion through it.",
+        "off": "Only you use this connection.",
+        "savedOn": "Shared. Everyone here can let the AI read Notion through your connection. Nobody can change Notion through it.",
+        "savedOff": "Sharing is off. Only you use this connection now.",
+        "failed": "The sharing setting was not saved. Nothing was changed. Try again.",
+        "memberNote": "{owner} shares a Notion connection. The AI can read Notion with it, but never change anything.",
+        "use": "Use it in chat",
+        "connectOwn": "Connect your own Notion",
+        "usingToast": "Chat can now read Notion through the shared connection.",
+        "useFailed": "Chat cannot use the shared connection. Nothing was changed. Try again."
+      }
     },
     "linkedSteps": {
       "title": "How to connect",
@@ -1091,6 +1160,7 @@
       "watched": "the folders you watch",
       "allowed": "the folders you watch, {folders}",
       "all": "all your files"
-    }
+    },
+    "needsAttention": "Sign in again"
   }
 }

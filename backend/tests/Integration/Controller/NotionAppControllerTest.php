@@ -174,6 +174,51 @@ class NotionAppControllerTest extends WebTestCase
         $stopped = $this->request('PATCH', '/api/v1/apps/notion', ['allow_write' => false]);
         self::assertFalse($stopped['allow_write']);
         self::assertFalse($stopped['write_auto']);
+        self::assertSame(['shared_by' => null, 'can_share' => false, 'shared_on' => false], $stopped['sharing']);
+
+        $sharing = $this->request('PATCH', '/api/v1/apps/notion/sharing', ['shared' => true]);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        self::assertSame('Only an admin can share their own Notion connection. Nothing was shared.', $sharing['error']);
+    }
+
+    public function testNewNotionEndpointsAreAbsentWhileOauthConnectorsAreOff(): void
+    {
+        $this->setOauthFlag('0');
+
+        foreach ([['GET', '/api/v1/apps/notion/activity'], ['GET', '/api/v1/apps/notion/watches'], ['DELETE', '/api/v1/apps/notion/watches/1']] as [$method, $uri]) {
+            $this->request($method, $uri);
+            self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+        }
+    }
+
+    public function testActivityWatchesAndFilesWithoutAConnection(): void
+    {
+        $this->setOauthFlag('1');
+
+        $activity = $this->request('GET', '/api/v1/apps/notion/activity');
+        self::assertSame(['success' => true, 'items' => []], $activity);
+
+        $watches = $this->request('GET', '/api/v1/apps/notion/watches');
+        self::assertSame([], $watches['watches']);
+        self::assertSame(20, $watches['limit']);
+
+        $follow = $this->request('POST', '/api/v1/apps/notion/watches', [
+            'page' => 'https://www.notion.so/Roadmap-39797ad60eb3806db59eef7653838664',
+            'action' => 'searchable',
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        self::assertSame('Connect Notion first. Nothing is followed yet.', $follow['error']);
+
+        $push = $this->request('POST', '/api/v1/apps/notion/files', ['file_id' => 999999, 'page' => 'https://www.notion.so/x']);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        self::assertStringContainsString('Nothing was added to Notion.', (string) $push['error']);
+
+        $shared = $this->request('POST', '/api/v1/apps/notion/shared/use');
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        self::assertSame('Nobody shares a Notion connection here. Connect your own instead.', $shared['error']);
+
+        $this->request('PATCH', '/api/v1/apps/notion/watches/999999', ['enabled' => false]);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     private function setOauthFlag(string $value): void

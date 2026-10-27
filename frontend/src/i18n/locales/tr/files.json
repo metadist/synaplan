@@ -299,7 +299,8 @@
       "widget": "Widget",
       "api": "API",
       "generated": "Yapay zekâ üretimi",
-      "compute": "Dosya çalışması"
+      "compute": "Dosya çalışması",
+      "notion": "Notion"
     },
     "vectorState": {
       "vectorized": "Yapay zekâ ile aranabilir",
@@ -417,7 +418,17 @@
       "dismiss": "Anladım",
       "reopen": "Bu nedir?"
     },
-    "searchIntro": "Kendi sözlerinizle bir soru sorun ve dosyalarınızdaki hangi bölümlerin yanıt verdiğini görün."
+    "searchIntro": "Kendi sözlerinizle bir soru sorun ve dosyalarınızdaki hangi bölümlerin yanıt verdiğini görün.",
+    "notion": {
+      "action": "Bir Notion sayfasına ekle",
+      "title": "Bir Notion sayfasına ekle",
+      "message": "“{file}” dosyasını alacak Notion sayfasının bağlantısını yapıştır. Dosya sayfanın sonuna eklenir.",
+      "placeholder": "https://www.notion.so/…",
+      "confirm": "Sayfaya ekle",
+      "done": "“{file}”, Notion’daki “{page}” sayfasına eklendi. Dosya burada da duruyor.",
+      "open": "Notion’da aç",
+      "failed": "Dosya Notion’a eklenmedi. Hiçbir şey değişmedi. Tekrar dene."
+    }
   },
   "vectorStorage": {
     "intro": "Vektör deponuza genel bir bakış — kaç dosyanın dizinlendiği ve anlamsal arama için kaç vektörün (parça) saklandığı.",

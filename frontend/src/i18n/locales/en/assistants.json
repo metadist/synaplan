@@ -138,7 +138,8 @@
       "document_generation": "Write a document",
       "image_generation": "Create an image",
       "calendar_event": "Create a calendar event",
-      "save_to_folder": "Save to a folder"
+      "save_to_folder": "Save to a folder",
+      "save_to_notion": "Save to Notion"
     },
     "advancedSettings": "Advanced settings",
     "advancedSettingsHint": "Creativity, length, language and an optional answer format.",
