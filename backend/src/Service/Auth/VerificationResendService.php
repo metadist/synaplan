@@ -40,9 +40,7 @@ final readonly class VerificationResendService
     public function resend(string $email, ?string $ip): VerificationResendResult
     {
         if (!$this->mailerConfig->isConfigured()) {
-            $this->logger->warning('Verification resend skipped: mail transport is not configured', [
-                'email' => $email,
-            ]);
+            $this->logger->warning('Verification resend skipped: mail transport is not configured');
 
             return new VerificationResendResult(VerificationResendStatus::Unconfigured);
         }
@@ -56,9 +54,13 @@ final readonly class VerificationResendService
 
         $user = $this->users->findOneBy(['mail' => $email]);
         if (null === $user || $user->isEmailVerified()) {
-            $this->recordAttempt($attempt, $email, $ip);
+            $attempt = $this->recordAttempt($attempt, $email, $ip);
 
-            return new VerificationResendResult(VerificationResendStatus::Accepted);
+            return new VerificationResendResult(
+                VerificationResendStatus::Accepted,
+                remainingAttempts: $attempt->getRemainingAttempts($maxAttempts),
+                cooldownMinutes: $cooldownMinutes,
+            );
         }
 
         $token = null;

@@ -6,6 +6,11 @@ import { PostApiAuthResendVerificationResponseSchema } from '@/generated/api-sch
 import { ApiError } from '@/services/api/httpClient'
 
 const resendVerification = vi.fn()
+const mailerConfigured = vi.fn(() => true)
+
+vi.mock('@/utils/mailerConfigured', () => ({
+  isMailerConfigured: () => mailerConfigured(),
+}))
 
 vi.mock('@/services/api', () => ({
   authApi: {
@@ -27,7 +32,7 @@ const notSent = {
   cooldownMinutes: null,
 }
 
-async function mountPage() {
+async function mountPage(query: Record<string, string> = { email: 'ada@example.com' }) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -36,7 +41,7 @@ async function mountPage() {
       { path: '/register', component: { template: '<div />' } },
     ],
   })
-  await router.push({ path: '/verify-email', query: { email: 'ada@example.com' } })
+  await router.push({ path: '/verify-email', query })
   await router.isReady()
 
   return mount(VerifyEmailView, { global: { plugins: [router] } })
@@ -49,6 +54,44 @@ describe('VerifyEmailView resend', () => {
 
   beforeEach(() => {
     resendVerification.mockReset()
+    mailerConfigured.mockReturnValue(true)
+  })
+
+  it('says up front that no email can be sent when mail is not set up', async () => {
+    mailerConfigured.mockReturnValue(false)
+    const page = await mountPage()
+
+    expect(page.get('[data-testid="alert-resend-unconfigured"]').text()).toContain(
+      'No email was sent'
+    )
+    expect(page.find('[data-testid="btn-resend-email"]').exists()).toBe(false)
+    expect(resendVerification).not.toHaveBeenCalled()
+  })
+
+  it('offers no resend when the page does not know the address', async () => {
+    const page = await mountPage({})
+
+    expect(page.get('[data-testid="text-verify-no-email"]').text()).toContain(
+      "We don't know which address"
+    )
+    expect(page.find('[data-testid="btn-resend-email"]').exists()).toBe(false)
+    expect(page.find('[data-testid="btn-change-email"]').exists()).toBe(true)
+  })
+
+  it('uses the singular for the last attempt', async () => {
+    resendVerification.mockResolvedValue({
+      success: true,
+      mailDelivered: true,
+      message: 'If your email is registered and unverified, you will receive a verification email.',
+      remainingAttempts: 1,
+      cooldownMinutes: 2,
+    })
+    const page = await mountPage()
+
+    await page.get('[data-testid="btn-resend-email"]').trigger('click')
+    await flushPromises()
+
+    expect(page.get('[data-testid="text-remaining-attempts"]').text()).toBe('1 attempt left')
   })
 
   it('says that no email was sent when mail is not set up, and hides resend', async () => {

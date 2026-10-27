@@ -558,6 +558,17 @@ class AuthControllerTest extends WebTestCase
                 [],
                 [],
                 ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['email' => 'resend-unknown@test.com'])
+            );
+            $this->assertResponseIsSuccessful();
+            $this->assertSame($sent, json_decode($this->client->getResponse()->getContent(), true));
+
+            $this->client->request(
+                'POST',
+                '/api/v1/auth/resend-verification',
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
                 json_encode(['email' => 'resend-sent@test.com'])
             );
 

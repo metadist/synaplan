@@ -16,8 +16,8 @@ enum VerificationResendStatus
     case Sent;
 
     /**
-     * The address is unknown or already verified. The response stays generic
-     * so it does not reveal which, and the attempt is counted.
+     * The address is unknown or already verified. The attempt is counted and
+     * the response is identical to {@see self::Sent}, so it reveals neither.
      */
     case Accepted;
 

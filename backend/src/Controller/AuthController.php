@@ -997,7 +997,7 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(
         response: 200,
-        description: 'Accepted, sent, or not sent because mail is not configured. When mail works, an unknown address gets the same success body, so the response does not reveal whether the address exists.',
+        description: 'Sent, or not sent because mail is not configured. When mail works, an unknown or already verified address gets the same body as a real send, so the response does not reveal whether the address exists.',
         content: new OA\JsonContent(
             required: ['success', 'message', 'mailDelivered', 'remainingAttempts', 'cooldownMinutes'],
             properties: [
@@ -1062,17 +1062,10 @@ class AuthController extends AbstractController
                     ],
                 Response::HTTP_TOO_MANY_REQUESTS,
             ),
-            VerificationResendStatus::Accepted => $this->json([
+            VerificationResendStatus::Accepted, VerificationResendStatus::Sent => $this->json([
                 'success' => true,
                 'mailDelivered' => true,
                 'message' => 'If your email is registered and unverified, you will receive a verification email.',
-                'remainingAttempts' => null,
-                'cooldownMinutes' => null,
-            ]),
-            VerificationResendStatus::Sent => $this->json([
-                'success' => true,
-                'mailDelivered' => true,
-                'message' => 'Verification email sent successfully',
                 'remainingAttempts' => $result->remainingAttempts,
                 'cooldownMinutes' => $result->cooldownMinutes,
             ]),

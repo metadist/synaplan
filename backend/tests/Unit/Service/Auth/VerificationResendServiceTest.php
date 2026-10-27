@@ -178,6 +178,8 @@ final class VerificationResendServiceTest extends TestCase
         $result = $this->service()->resend('missing@example.com', '127.0.0.1');
 
         $this->assertSame(VerificationResendStatus::Accepted, $result->status);
+        $this->assertSame(4, $result->remainingAttempts);
+        $this->assertSame(2, $result->cooldownMinutes);
     }
 
     public function testTheAllowanceStopsFurtherSends(): void

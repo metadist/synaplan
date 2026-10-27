@@ -26,7 +26,6 @@
         "src/Controller/AuthController.php::AuthController::refreshImpersonatedSession": 74,
         "src/Controller/AuthController.php::AuthController::refreshOidcTokens": 105,
         "src/Controller/AuthController.php::AuthController::register": 73,
-        "src/Controller/AuthController.php::AuthController::resendVerification": 97,
         "src/Controller/ChatController.php::ChatController::getMessages": 79,
         "src/Controller/DesktopController.php::DesktopController::enqueueJob": 75,
         "src/Controller/FileController.php::FileController::indexPrompt": 52,
@@ -117,7 +116,6 @@
     },
     "entityManager": [
         "src/Controller/AdminController.php",
-        "src/Controller/AuthController.php",
         "src/Controller/GuestChatController.php",
         "src/Controller/InboundEmailHandlerController.php",
         "src/Controller/MessageController.php",

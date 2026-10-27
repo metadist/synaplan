@@ -45,8 +45,15 @@
         </div>
 
         <h1 class="text-3xl font-bold txt-primary mb-3">{{ $t('auth.verifyEmail') }}</h1>
-        <p v-if="!mailUnavailable" class="txt-secondary mb-6">
+        <p v-if="!mailUnavailable && hasEmail" class="txt-secondary mb-6">
           {{ $t('auth.verifyEmailDesc', { email: userEmail }) }}
+        </p>
+        <p
+          v-else-if="!mailUnavailable"
+          class="txt-secondary mb-6"
+          data-testid="text-verify-no-email"
+        >
+          {{ $t('auth.resendInvalid') }}
         </p>
 
         <div class="space-y-4">
@@ -54,7 +61,7 @@
             <p class="text-sm alert-warning-text">{{ $t('auth.resendNoMail') }}</p>
           </div>
 
-          <div v-if="!mailUnavailable" class="alert-info" data-testid="info-check-spam">
+          <div v-if="canResend" class="alert-info" data-testid="info-check-spam">
             <p class="text-sm alert-info-text flex items-start gap-2">
               <InformationCircleIcon class="w-5 h-5 alert-info-icon flex-shrink-0 mt-0.5" />
               <span>{{ $t('auth.checkSpam') }}</span>
@@ -103,17 +110,19 @@
 
           <!-- Remaining Attempts Info -->
           <div
-            v-if="!mailUnavailable && remainingAttempts > 0 && remainingAttempts < 5"
+            v-if="canResend && remainingAttempts > 0 && remainingAttempts < 5"
             class="alert-warning"
             data-testid="text-remaining-attempts"
           >
             <p class="text-xs alert-warning-text text-center">
-              {{ $t('auth.resendAttemptsRemaining', { count: remainingAttempts }) }}
+              {{
+                $t('auth.resendAttemptsRemaining', { count: remainingAttempts }, remainingAttempts)
+              }}
             </p>
           </div>
 
           <Button
-            v-if="!mailUnavailable"
+            v-if="canResend"
             :disabled="isResending || countdown > 0 || remainingAttempts <= 0"
             class="w-full btn-secondary py-3 rounded-xl font-medium"
             data-testid="btn-resend-email"
@@ -199,6 +208,7 @@ import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useConfigStore } from '@/stores/config'
 import { authApi } from '@/services/api'
 import { ApiError } from '@/services/api/httpClient'
+import { isMailerConfigured } from '@/utils/mailerConfigured'
 import Button from '../components/Button.vue'
 
 const route = useRoute()
@@ -208,15 +218,18 @@ const themeStore = useTheme()
 const config = useConfigStore()
 const { logoSrc } = useBrandLogo(themeStore.isDark)
 
-const userEmail = ref((route.query.email as string) || 'your@email.com')
+const userEmail = ref(typeof route.query.email === 'string' ? route.query.email.trim() : '')
 const isResending = ref(false)
 const countdown = ref(0)
 const remainingAttempts = ref(5)
 const cooldownMinutes = ref(2)
 const error = ref('')
 const successMessage = ref('')
-const mailUnavailable = ref(false)
+const mailUnavailable = ref(!isMailerConfigured())
 let countdownInterval: number | null = null
+
+const hasEmail = computed(() => userEmail.value !== '')
+const canResend = computed(() => hasEmail.value && !mailUnavailable.value)
 
 const currentLanguage = computed(() => locale.value)
 
