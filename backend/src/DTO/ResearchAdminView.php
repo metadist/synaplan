@@ -30,9 +30,10 @@ use OpenApi\Attributes as OA;
             new OA\Property(property: 'standard', ref: new Model(type: ResearchBudgetView::class)),
             new OA\Property(property: 'thorough', ref: new Model(type: ResearchBudgetView::class)),
         ]),
-        new OA\Property(property: 'sample', type: 'object', nullable: true, required: ['id', 'sentence'], properties: [
+        new OA\Property(property: 'sample', description: 'The newest sample run, or null when there is none', type: 'object', nullable: true, required: ['id', 'status', 'sentence'], properties: [
             new OA\Property(property: 'id', type: 'string'),
-            new OA\Property(property: 'sentence', type: 'string'),
+            new OA\Property(property: 'status', type: 'string', enum: ['running', 'done']),
+            new OA\Property(property: 'sentence', description: 'The outcome in one sentence once the sample is done', type: 'string', nullable: true),
         ]),
     ],
 )]

@@ -236,7 +236,7 @@ const tabs = computed<TabNavItem[]>(() => [
   {
     id: 'research',
     label: t('adminSetup.tabs.research'),
-    icon: 'mdi:book-search-outline',
+    icon: 'heroicons:document-magnifying-glass',
     testid: 'admin-setup-tab-research',
   },
 ])

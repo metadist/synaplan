@@ -8,14 +8,22 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Model\ModelListingService;
+use Psr\Clock\ClockInterface;
 
 /**
  * The research tab on AI infrastructure: the switch, the two model slots,
  * the limits an administrator can change, and one sample run.
+ *
+ * A save is checked as a whole first, so a refused value never leaves the
+ * other half of the form stored.
  */
 final readonly class ResearchAdminService
 {
     private const SAMPLE_QUESTION = 'What is worth knowing about technology this week?';
+    /** Sample runs are told apart from other runs by this idempotency-key prefix. */
+    private const SAMPLE_KEY_PREFIX = 'admin-sample.';
+    private const MODEL_SLOTS = ['readingModelId' => 'READ', 'checkingModelId' => 'VERIFY'];
+    private const UNSET_MODEL = '-1';
 
     public function __construct(
         private ResearchConfig $config,
@@ -25,6 +33,7 @@ final readonly class ResearchAdminService
         private ResearchRunService $runs,
         private ResearchStateStore $store,
         private AuditLogWriter $audit,
+        private ClockInterface $clock,
     ) {
     }
 
@@ -33,23 +42,17 @@ final readonly class ResearchAdminService
      */
     public function describe(User $admin): array
     {
-        $options = $this->chatOptions($admin);
-
         return [
             'enabled' => $this->config->isEnabled(),
             'envLocked' => null !== $this->config->envForces(),
             'readingModelId' => $this->storedModel('READ'),
             'checkingModelId' => $this->storedModel('VERIFY'),
-            'models' => $options,
+            'models' => $this->chatOptions($admin),
             'limits' => [
                 'maxActiveRuns' => $this->config->maxActiveRuns(),
                 'maxActiveThorough' => $this->config->maxActiveThorough(),
             ],
-            'budgets' => [
-                'quick' => $this->budgets->human(ResearchDepth::Quick),
-                'standard' => $this->budgets->human(ResearchDepth::Standard),
-                'thorough' => $this->budgets->human(ResearchDepth::Thorough),
-            ],
+            'budgets' => $this->currentBudgets(),
             'sample' => $this->latestSample($admin),
         ];
     }
@@ -61,23 +64,43 @@ final readonly class ResearchAdminService
      */
     public function update(User $admin, array $body, string $ip): array
     {
-        $this->applyEnabled($body);
-        $this->applyLimits($body);
-        $this->applyBudgets($body);
-        if (array_key_exists('readingModelId', $body)) {
-            $this->applyModel($admin, 'READ', $body['readingModelId']);
+        $input = ResearchSettingsInput::fromBody($body);
+        $wasEnabled = $this->config->isEnabled();
+        if (null !== $input->enabled && null !== $this->config->envForces()) {
+            throw new ResearchRejected(409, 'env_locked', 'enabled', 'This switch is set by the server and cannot be changed here.');
         }
-        if (array_key_exists('checkingModelId', $body)) {
-            $this->applyModel($admin, 'VERIFY', $body['checkingModelId']);
+        $modelWrites = $this->modelWrites($admin, $body);
+        $budgetsBefore = $this->currentBudgets();
+        $changed = [];
+
+        if (null !== $input->enabled && $input->enabled !== $wasEnabled) {
+            $this->configRepository->setValue(0, ResearchConfig::GROUP, ResearchConfig::ENABLED, $input->enabled ? '1' : '0');
+            $changed[] = 'enabled';
         }
-        $this->audit->record(
-            (int) $admin->getId(),
-            'research.settings.update',
-            'research',
-            'workspace',
-            ['enabled' => $this->config->isEnabled()],
-            $ip,
-        );
+        $changed = [...$changed, ...$this->storeLimits($input)];
+        foreach ($input->budgets as $depth => $row) {
+            $this->budgets->save(ResearchDepth::from($depth), $row['searches'], $row['sources'], $row['minutes'], $row['costCap']);
+        }
+        foreach ($this->currentBudgets() as $depth => $row) {
+            if ($row !== $budgetsBefore[$depth]) {
+                $changed[] = 'budgets.'.$depth;
+            }
+        }
+        foreach ($modelWrites as $field => $value) {
+            $this->configRepository->setValue(0, 'DEFAULTMODEL', self::MODEL_SLOTS[$field], $value);
+            $changed[] = $field;
+        }
+
+        if ([] !== $changed) {
+            $this->audit->record(
+                (int) $admin->getId(),
+                'research.settings.update',
+                'research',
+                'workspace',
+                ['changed' => $changed, 'enabledBefore' => $wasEnabled, 'enabled' => $this->config->isEnabled()],
+                $ip,
+            );
+        }
 
         return $this->describe($admin);
     }
@@ -90,17 +113,20 @@ final readonly class ResearchAdminService
         if (!$this->config->isEnabled()) {
             throw new ResearchRejected(409, 'research_off', null, 'Research is off. Turn it on before running a sample.');
         }
+        if ('running' === ($this->latestSample($admin)['status'] ?? null)) {
+            throw new ResearchRejected(409, 'sample_running', null, 'A sample is already running. Wait until it is done.');
+        }
         $state = $this->runs->start($admin, [
             'question' => self::SAMPLE_QUESTION,
             'depth' => ResearchDepth::Quick->value,
             'sources' => ['web' => true, 'files' => false],
-        ], false, 'admin-sample-'.$this->runsClockDay());
+        ], false, self::SAMPLE_KEY_PREFIX.$this->clock->now()->format('YmdHis'));
         $this->audit->record(
             (int) $admin->getId(),
             'research.sample.start',
             'research',
             $state->ref->id,
-            ['depth' => 'quick'],
+            ['depth' => ResearchDepth::Quick->value, 'costCap' => $this->budgets->forDepth(ResearchDepth::Quick)->costCap],
             $ip,
         );
 
@@ -112,87 +138,80 @@ final readonly class ResearchAdminService
     }
 
     /**
-     * @param array<string, mixed> $body
+     * @return list<string> the limits that changed
      */
-    private function applyEnabled(array $body): void
+    private function storeLimits(ResearchSettingsInput $input): array
     {
-        if (!array_key_exists('enabled', $body)) {
-            return;
-        }
-        if (null !== $this->config->envForces()) {
-            throw new ResearchRejected(409, 'env_locked', 'enabled', 'This switch is set by the server and cannot be changed here.');
-        }
-        if (!is_bool($body['enabled'])) {
-            throw new ResearchRejected(400, 'invalid', 'enabled', 'Choose on or off.');
-        }
-        $this->configRepository->setValue(0, ResearchConfig::GROUP, ResearchConfig::ENABLED, $body['enabled'] ? '1' : '0');
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     */
-    private function applyLimits(array $body): void
-    {
-        $limits = $body['limits'] ?? null;
-        if (!is_array($limits)) {
-            return;
-        }
-        $this->storeLimit($limits, 'maxActiveRuns', ResearchConfig::MAX_ACTIVE_RUNS, 1, 100);
-        $this->storeLimit($limits, 'maxActiveThorough', ResearchConfig::MAX_ACTIVE_THOROUGH, 0, 10);
-    }
-
-    /**
-     * @param array<string, mixed> $limits
-     */
-    private function storeLimit(array $limits, string $key, string $setting, int $min, int $max): void
-    {
-        if (!array_key_exists($key, $limits) || !is_numeric($limits[$key])) {
-            return;
-        }
-        $value = max($min, min($max, (int) $limits[$key]));
-        $this->configRepository->setValue(0, ResearchConfig::GROUP, $setting, (string) $value);
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     */
-    private function applyBudgets(array $body): void
-    {
-        $budgets = $body['budgets'] ?? null;
-        if (!is_array($budgets)) {
-            return;
-        }
-        foreach (ResearchDepth::cases() as $depth) {
-            $row = $budgets[$depth->value] ?? null;
-            if (!is_array($row)) {
+        $changed = [];
+        $limits = [
+            'limits.maxActiveRuns' => [ResearchConfig::MAX_ACTIVE_RUNS, $input->maxActiveRuns, $this->config->maxActiveRuns()],
+            'limits.maxActiveThorough' => [ResearchConfig::MAX_ACTIVE_THOROUGH, $input->maxActiveThorough, $this->config->maxActiveThorough()],
+        ];
+        foreach ($limits as $field => [$setting, $next, $current]) {
+            if (null === $next || $next === $current) {
                 continue;
             }
-            $this->budgets->save(
-                $depth,
-                self::number($row, 'searches', 0),
-                self::number($row, 'sources', 1),
-                self::number($row, 'minutes', 1),
-                self::decimal($row, 'costCap'),
-            );
+            $this->configRepository->setValue(0, ResearchConfig::GROUP, $setting, (string) $next);
+            $changed[] = $field;
         }
+
+        return $changed;
     }
 
-    private function applyModel(User $admin, string $slot, mixed $modelId): void
+    /**
+     * Checks both model fields before anything is stored.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, string> field => value to store, only for fields that change
+     */
+    private function modelWrites(User $admin, array $body): array
     {
-        if (null === $modelId || '' === $modelId || (is_numeric($modelId) && (int) $modelId < 1)) {
-            $this->configRepository->setValue(0, 'DEFAULTMODEL', $slot, '-1');
+        $writes = [];
+        $options = null;
+        foreach (self::MODEL_SLOTS as $field => $slot) {
+            if (!array_key_exists($field, $body)) {
+                continue;
+            }
+            $stored = $this->storedModel($slot);
+            $modelId = $body[$field];
+            if (null === $modelId || 0 === $modelId) {
+                if (null !== $stored) {
+                    $writes[$field] = self::UNSET_MODEL;
+                }
+                continue;
+            }
+            if (!is_int($modelId) || $modelId < 1) {
+                throw new ResearchRejected(400, 'invalid', $field, 'Choose a model from the list.');
+            }
+            if ($modelId === $stored) {
+                continue;
+            }
+            $options ??= array_column($this->chatOptions($admin), null, 'id');
+            $option = $options[$modelId] ?? null;
+            if (null === $option) {
+                throw new ResearchRejected(400, 'invalid', $field, 'That model is not available for this.');
+            }
+            if (!$option['available']) {
+                throw new ResearchRejected(400, 'model_unavailable', $field, 'That model is not ready yet. Choose one that is.');
+            }
+            $writes[$field] = (string) $modelId;
+        }
 
-            return;
+        return $writes;
+    }
+
+    /**
+     * @return array<string, array{searches: int, sources: int, minutes: int, costCap: float}>
+     */
+    private function currentBudgets(): array
+    {
+        $budgets = [];
+        foreach (ResearchDepth::cases() as $depth) {
+            $budgets[$depth->value] = $this->budgets->human($depth);
         }
-        if (!is_numeric($modelId)) {
-            throw new ResearchRejected(400, 'invalid', $slot, 'Choose a model from the list.');
-        }
-        $id = (int) $modelId;
-        $allowed = array_column($this->chatOptions($admin), 'id');
-        if (!in_array($id, $allowed, true)) {
-            throw new ResearchRejected(400, 'invalid', $slot, 'That model is not available for this.');
-        }
-        $this->configRepository->setValue(0, 'DEFAULTMODEL', $slot, (string) $id);
+
+        return $budgets;
     }
 
     /**
@@ -230,41 +249,33 @@ final readonly class ResearchAdminService
     }
 
     /**
-     * @return array{id: string, sentence: string}|null
+     * The newest sample, running or done. Null when there is none or the
+     * research store does not answer, so the rest of the tab still loads.
+     *
+     * @return array{id: string, status: 'running'|'done', sentence: string|null}|null
      */
     private function latestSample(User $admin): ?array
     {
-        $runs = $this->store->runsFor((int) $admin->getId());
-        usort($runs, static fn (ResearchRunState $a, ResearchRunState $b): int => $b->ref->createdAt <=> $a->ref->createdAt);
-        foreach ($runs as $run) {
-            if (self::SAMPLE_QUESTION !== $run->ref->question || null === $run->outcome) {
-                continue;
-            }
-
-            return ['id' => $run->ref->id, 'sentence' => $run->outcome->text()];
+        try {
+            $runs = $this->store->runsFor((int) $admin->getId());
+        } catch (ResearchStoreUnavailable) {
+            return null;
         }
+        $samples = array_filter(
+            $runs,
+            static fn (ResearchRunState $run): bool => str_starts_with((string) $run->idempotencyKey, self::SAMPLE_KEY_PREFIX),
+        );
+        usort($samples, static fn (ResearchRunState $a, ResearchRunState $b): int => $b->ref->createdAt <=> $a->ref->createdAt);
+        $latest = $samples[0] ?? null;
+        if (null === $latest) {
+            return null;
+        }
+        $done = $latest->status->isTerminal();
 
-        return null;
-    }
-
-    private function runsClockDay(): string
-    {
-        return (new \DateTimeImmutable('now'))->format('Ymd');
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private static function number(array $row, string $key, int $fallback): int
-    {
-        return is_numeric($row[$key] ?? null) ? (int) $row[$key] : $fallback;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private static function decimal(array $row, string $key): float
-    {
-        return is_numeric($row[$key] ?? null) ? (float) $row[$key] : 0.0;
+        return [
+            'id' => $latest->ref->id,
+            'status' => $done ? 'done' : 'running',
+            'sentence' => $done ? $latest->outcome?->text() : null,
+        ];
     }
 }

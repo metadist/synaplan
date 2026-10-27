@@ -49,9 +49,10 @@ final readonly class ResearchBudgetStore
         ];
     }
 
-    public function save(ResearchDepth $depth, int $searches, int $sources, int $minutes, float $costCap): void
+    /** A null keeps the number that is stored now. */
+    public function save(ResearchDepth $depth, ?int $searches, ?int $sources, ?int $minutes, ?float $costCap): void
     {
-        $applied = ResearchBudgetConfig::defaults($depth)->withHumanLimits($searches, $sources, $minutes, $costCap);
+        $applied = $this->forDepth($depth)->withHumanLimits($searches, $sources, $minutes, $costCap);
         $payload = json_encode([
             'searches' => $applied->searches,
             'sources' => $applied->sources,

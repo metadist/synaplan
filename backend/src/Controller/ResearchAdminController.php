@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\DTO\ResearchAdminView;
+use App\DTO\ResearchBudgetView;
+use App\DTO\ResearchErrorView;
 use App\DTO\ResearchSampleView;
 use App\Entity\User;
 use App\Service\Research\Run\ResearchAdminService;
 use App\Service\Research\Run\ResearchRejected;
+use App\Service\Research\Run\ResearchStoreUnavailable;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -57,18 +60,29 @@ final class ResearchAdminController extends AbstractController
     )]
     #[OA\RequestBody(
         required: true,
+        description: 'Send only what changes. A left-out value keeps what is stored; 0 or null resets a model to the recommended one.',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'enabled', type: 'boolean'),
-                new OA\Property(property: 'readingModelId', type: 'integer', nullable: true),
-                new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true),
+                new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                new OA\Property(property: 'readingModelId', type: 'integer', nullable: true, example: 12),
+                new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true, example: 0),
+                new OA\Property(property: 'limits', type: 'object', properties: [
+                    new OA\Property(property: 'maxActiveRuns', type: 'integer', minimum: 1, maximum: 100, example: 5),
+                    new OA\Property(property: 'maxActiveThorough', type: 'integer', minimum: 0, maximum: 10, example: 1),
+                ]),
+                new OA\Property(property: 'budgets', type: 'object', properties: [
+                    new OA\Property(property: 'quick', ref: new Model(type: ResearchBudgetView::class)),
+                    new OA\Property(property: 'standard', ref: new Model(type: ResearchBudgetView::class)),
+                    new OA\Property(property: 'thorough', ref: new Model(type: ResearchBudgetView::class)),
+                ]),
             ],
             type: 'object'
         )
     )]
     #[OA\Response(response: 200, description: 'The research tab after the change', content: new OA\JsonContent(ref: new Model(type: ResearchAdminView::class)))]
+    #[OA\Response(response: 400, description: 'A value is missing its form or is out of range. Nothing was stored.', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 409, description: 'The switch is pinned by the server')]
+    #[OA\Response(response: 409, description: 'The switch is pinned by the server. Nothing was stored.', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     public function update(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $admin = $this->admin($user);
@@ -96,7 +110,9 @@ final class ResearchAdminController extends AbstractController
     )]
     #[OA\Response(response: 200, description: 'The sample has started', content: new OA\JsonContent(ref: new Model(type: ResearchSampleView::class)))]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 409, description: 'Research is off')]
+    #[OA\Response(response: 409, description: 'Research is off, or a sample is already running', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
+    #[OA\Response(response: 429, description: 'Too many research runs are going', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
+    #[OA\Response(response: 503, description: 'The research store did not answer. The sample did not start.', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     public function sample(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $admin = $this->admin($user);
@@ -107,6 +123,11 @@ final class ResearchAdminController extends AbstractController
             return $this->json($this->research->startSample($admin, (string) $request->getClientIp()));
         } catch (ResearchRejected $rejected) {
             return $this->json($rejected->body(), $rejected->status);
+        } catch (ResearchStoreUnavailable $unavailable) {
+            return $this->json(
+                ['error' => ['code' => 'unavailable', 'field' => null, 'message' => $unavailable->getMessage()]],
+                Response::HTTP_SERVICE_UNAVAILABLE,
+            );
         }
     }
 

@@ -11,6 +11,13 @@ namespace App\Service\Research\Run;
  */
 final readonly class ResearchBudgetConfig
 {
+    public const MAX_SEARCHES = 200;
+    public const MIN_SOURCES = 1;
+    public const MAX_SOURCES = 200;
+    public const MIN_MINUTES = 1;
+    public const MAX_MINUTES = 120;
+    public const MAX_COST_CAP = 50.0;
+
     public function __construct(
         public int $searches,
         public int $sources,
@@ -63,11 +70,11 @@ final readonly class ResearchBudgetConfig
     public function withHumanLimits(?int $searches, ?int $sources, ?int $minutes, ?float $costCap): self
     {
         return new self(
-            null === $searches ? $this->searches : max(0, min(200, $searches)),
-            null === $sources ? $this->sources : max(1, min(200, $sources)),
+            null === $searches ? $this->searches : max(0, min(self::MAX_SEARCHES, $searches)),
+            null === $sources ? $this->sources : max(self::MIN_SOURCES, min(self::MAX_SOURCES, $sources)),
             $this->rounds,
-            null === $minutes ? $this->wallSeconds : max(60, min(7200, $minutes * 60)),
-            null === $costCap ? $this->costCap : max(0.0, min(50.0, $costCap)),
+            null === $minutes ? $this->wallSeconds : 60 * max(self::MIN_MINUTES, min(self::MAX_MINUTES, $minutes)),
+            null === $costCap ? $this->costCap : max(0.0, min(self::MAX_COST_CAP, $costCap)),
             $this->maxModelCalls,
             $this->extras,
         );
