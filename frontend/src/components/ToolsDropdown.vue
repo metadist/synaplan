@@ -152,6 +152,23 @@
         </Transition>
       </button>
 
+      <button
+        v-if="researchAvailable"
+        ref="itemRefs"
+        class="dropdown-item"
+        type="button"
+        data-testid="btn-tool-research"
+        @click="openResearch"
+        @keydown.down.prevent="focusNext"
+        @keydown.up.prevent="focusPrevious"
+      >
+        <DocumentMagnifyingGlassIcon class="w-5 h-5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ $t('research.menu') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('research.menuHint') }}</div>
+        </div>
+      </button>
+
       <!-- Summarize a document stays in chat: attach a file and send. -->
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
 
@@ -205,6 +222,7 @@ import {
   ChevronUpIcon,
   CheckIcon,
   LightBulbIcon,
+  DocumentMagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -216,7 +234,9 @@ import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 import { useDesktopDevices } from '@/composables/useDesktopDevices'
 import { DESKTOP_CHECK_IN_MINUTES, desktopPresence } from '@/utils/desktopPresence'
+import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
+import { useResearchStore } from '@/stores/research'
 
 interface Props {
   activeCommand?: string | null
@@ -243,6 +263,8 @@ const emit = defineEmits<{
 }>()
 
 const configStore = useConfigStore()
+const researchStore = useResearchStore()
+const { available: researchAvailable } = storeToRefs(researchStore)
 
 /** Feature-gated tools that toggle a removable badge in the chat input. */
 const commandTools = computed(() => {
@@ -408,6 +430,12 @@ const closeDropdown = () => {
   isOpen.value = false
 }
 
+function openResearch(): void {
+  closeDropdown()
+  researchStore.openComposer()
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+}
+
 const selectToolCommand = (toolId: string, commandName: string) => {
   const feature = featuresStatus.value[toolId]
 
@@ -474,6 +502,7 @@ const handleClickOutside = (e: MouseEvent) => {
 }
 
 onMounted(() => {
+  void researchStore.ensureCapabilities()
   document.addEventListener('click', handleClickOutside)
   mobileMq.addEventListener('change', onMobileMqChange)
   // Know whether to offer "Run on this computer" without waiting for the menu to

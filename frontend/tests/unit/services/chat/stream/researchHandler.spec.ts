@@ -1,0 +1,80 @@
+import { describe, expect, it } from 'vitest'
+import {
+  applyResearchFrame,
+  emptyProgress,
+  parseResearchSse,
+  progressFromRun,
+  sourceCounts,
+} from '@/services/chat/stream/handlers/research'
+
+const FIXTURE = [
+  'id: 1',
+  'event: plan',
+  'data: {"points":[{"id":"p1","title":"Delivery times"}]}',
+  '',
+  'id: 2',
+  'event: source',
+  'data: {"id":"s1","title":"Harbour notice","status":"found"}',
+  '',
+  'id: 3',
+  'event: source',
+  'data: {"id":"s1","status":"read"}',
+  '',
+  'id: 4',
+  'event: point',
+  'data: {"id":"p1","status":"answered"}',
+  '',
+  'id: 5',
+  'event: check',
+  'data: {"statements":4,"supported":3,"removed":1}',
+  '',
+  'id: 6',
+  'event: complete',
+  'data: {"outcome":{"code":"complete"}}',
+  '',
+  'event: queued',
+  'data: {"since_seconds":20}',
+  '',
+].join('\n')
+
+describe('research event handler', () => {
+  it('builds the card from a fixture stream and ignores a late queued frame', () => {
+    let progress = emptyProgress('run-1', 7, 'When do the ferries run?')
+
+    for (const frame of parseResearchSse(FIXTURE)) {
+      progress = applyResearchFrame(progress, frame)
+    }
+
+    expect(progress.status).toBe('complete')
+    expect(progress.lastSeq).toBe(6)
+    expect(progress.queuedSeconds).toBeNull()
+    expect(progress.points).toEqual([{ id: 'p1', title: 'Delivery times', status: 'answered' }])
+    expect(sourceCounts(progress)).toEqual({ found: 1, read: 1, blocked: 0 })
+    expect(progress.check).toEqual({ statements: 4, supported: 3, removed: 1 })
+  })
+
+  it('marks a stop and keeps the check that arrived with the run', () => {
+    const started = emptyProgress('run-2', 7, 'When do the ferries run?')
+    const stopped = applyResearchFrame(started, {
+      seq: 2,
+      event: 'stopped',
+      data: {},
+    })
+    const fromRun = progressFromRun(7, {
+      id: 'run-2',
+      status: 'stopped',
+      question: 'When do the ferries run?',
+      plan: { points: [{ id: 'p1', title: 'Delivery times', status: 'open' }] },
+      sources: [{ id: 's1', title: 'Harbour notice', status: 'blocked' }],
+      evidence: [{ source: 's1', quotes: [{ text: 'The last boat is at 18:00.' }] }],
+      check: { statements: 2, supported: 1, removed: 1 },
+    })
+
+    expect(stopped.status).toBe('stopped')
+    expect(fromRun.snippets).toEqual([
+      { title: 'Harbour notice', quote: 'The last boat is at 18:00.' },
+    ])
+    expect(sourceCounts(fromRun).blocked).toBe(1)
+    expect(fromRun.check?.removed).toBe(1)
+  })
+})
