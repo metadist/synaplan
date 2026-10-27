@@ -102,12 +102,14 @@ final class PlatformLinkExchangeServiceTest extends TestCase
         $identity = $this->identity(5, 7, 99);
         $identities = $this->createMock(ExternalIdentityRepository::class);
         $identities->expects(self::once())->method('findOneByApiKeyId')->with(99)->willReturn($identity);
-        $identities->expects(self::once())->method('remove')->with($identity);
+        $identities->expects(self::once())->method('save')->with($identity);
+        $identities->expects(self::never())->method('remove');
         $audit = $this->createMock(AuditLogWriter::class);
         $audit->expects(self::once())->method('record')
             ->with(7, 'platform_link.disconnected', 'platform_link', '5', null, '127.0.0.1');
 
         $this->service(identities: $identities, audit: $audit)->endLinkOfKey(7, 99, '127.0.0.1');
+        self::assertSame('revoked', $identity->getStatus());
     }
 
     public function testAKeyOfNoLinkOrOfAnotherPersonEndsNothing(): void

@@ -17,6 +17,9 @@ use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
 use App\Service\PlatformLink\Exception\PlatformLinkCodeException;
+use App\Service\PlatformLink\Exception\PlatformManagedByAdministratorException;
+use App\Service\PlatformLink\Exception\PlatformSsoException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Server-to-server exchange of a one-time link_code for a scoped API key.
@@ -104,6 +107,9 @@ final readonly class PlatformLinkExchangeService
             $instance->getInstanceId(),
             (int) $apiKey->getId(), ExternalIdentity::MODE_LINK,
         );
+        $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        $identity->setRevokedAt(null);
+        $this->externalIdentityRepository->save($identity);
 
         $instance->touchLastSeen();
 
@@ -169,7 +175,7 @@ final readonly class PlatformLinkExchangeService
     }
 
     /**
-     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, can_copy: bool, can_read: bool, read_scope: array{mode: string, folders: list<string>}}>
+     * @return list<array{id: int, client: string, host: string, external_id: string, key_id: int|null, key_label: string, created: int, last_seen: int, mode: string|null, status: string, can_copy: bool, can_read: bool, read_scope: array{mode: string, folders: list<string>}}>
      */
     public function listForUser(int $userId): array
     {
@@ -179,7 +185,7 @@ final readonly class PlatformLinkExchangeService
                 continue;
             }
             $instance = $this->instanceRepository->findByInstanceId($identity->getInstanceId());
-            if (!$instance instanceof PlatformInstance) {
+            if (!$instance instanceof PlatformInstance || ExternalIdentity::STATUS_REVOKED === $identity->getStatus()) {
                 continue;
             }
             $keyLabel = '';
@@ -200,6 +206,8 @@ final readonly class PlatformLinkExchangeService
                 'key_label' => $keyLabel,
                 'created' => $identity->getCreated(),
                 'last_seen' => $identity->getLastSeen(),
+                'mode' => $identity->getMode(),
+                'status' => $identity->getStatus(),
                 'can_copy' => $instance->canReceiveCopies(),
                 'can_read' => $instance->reports('pickups'),
                 'read_scope' => $this->readScopeOf($identity),
@@ -238,7 +246,13 @@ final readonly class PlatformLinkExchangeService
         }
 
         $linkId = (string) $identity->getId();
-        $this->externalIdentityRepository->remove($identity);
+        if (ExternalIdentity::MODE_SSO === $identity->getMode() && ExternalIdentity::STATUS_REVOKED !== $identity->getStatus()) {
+            $identity->setAccess(false, !$identity->cloudDisabled());
+        } else {
+            $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
+        }
+        $identity->setRevokedAt(time());
+        $this->externalIdentityRepository->save($identity);
         $this->notifier->identityRevoked($identity);
 
         $this->auditLogWriter->record(
@@ -257,6 +271,9 @@ final readonly class PlatformLinkExchangeService
         if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $userId) {
             throw new Exception\PlatformInstanceNotFoundException('Link not found.');
         }
+        if (ExternalIdentity::MODE_PROVISION === $identity->getMode()) {
+            throw new PlatformManagedByAdministratorException();
+        }
 
         if (null !== $identity->getApiKeyId()) {
             $key = $this->apiKeyRepository->find($identity->getApiKeyId());
@@ -264,7 +281,9 @@ final readonly class PlatformLinkExchangeService
                 $this->apiKeyRepository->remove($key, false);
             }
         }
-        $this->externalIdentityRepository->remove($identity);
+        $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
+        $identity->setRevokedAt(time());
+        $this->externalIdentityRepository->save($identity);
         $this->notifier->identityRevoked($identity);
 
         $this->auditLogWriter->record(
@@ -275,6 +294,42 @@ final readonly class PlatformLinkExchangeService
             null,
             $ip,
         );
+    }
+
+    public function turnOff(int $userId, int $linkId, string $ip): void
+    {
+        $identity = $this->organisationIdentity($userId, $linkId);
+        $identity->setAccess(false, !$identity->cloudDisabled());
+        $this->externalIdentityRepository->save($identity);
+        $this->auditLogWriter->record($userId, 'platform_link.turned_off', 'platform_link', (string) $linkId, null, $ip);
+    }
+
+    public function resume(int $userId, int $linkId, string $ip): void
+    {
+        $identity = $this->organisationIdentity($userId, $linkId);
+        if (!$identity->ownerTurnedOff()) {
+            throw new PlatformSsoException(Response::HTTP_CONFLICT, 'cloud_disabled', 'Your cloud turned this connection off.');
+        }
+        $identity->setAccess(true, !$identity->cloudDisabled());
+        $identity->setRevokedAt(null);
+        $this->externalIdentityRepository->save($identity);
+        $this->auditLogWriter->record($userId, 'platform_link.resumed', 'platform_link', (string) $linkId, null, $ip);
+    }
+
+    private function organisationIdentity(int $userId, int $linkId): ExternalIdentity
+    {
+        $identity = $this->externalIdentityRepository->find($linkId);
+        if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $userId) {
+            throw new Exception\PlatformInstanceNotFoundException('Link not found.');
+        }
+        if (ExternalIdentity::STATUS_REVOKED === $identity->getStatus()) {
+            throw new PlatformSsoException(Response::HTTP_CONFLICT, 'identity_revoked', 'This connection was removed by the cloud.');
+        }
+        if (ExternalIdentity::MODE_SSO !== $identity->getMode()) {
+            throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_organisation_login', 'Turn off is for organisation login.');
+        }
+
+        return $identity;
     }
 
     /**

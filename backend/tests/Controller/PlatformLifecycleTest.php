@@ -118,7 +118,7 @@ final class PlatformLifecycleTest extends WebTestCase
         $sso = $this->localPerson('sso');
         $this->attach($sso, $instance, 'sso', ExternalIdentity::MODE_SSO);
         $this->post($instance, 'sso', 'disabled');
-        self::assertSame(ExternalIdentity::STATUS_PAUSED, $this->json()['status']);
+        self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $this->json()['status']);
         $this->post($instance, 'sso', 'enabled');
         self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->json()['status']);
         $this->post($instance, 'sso', 'enabled');
@@ -228,6 +228,48 @@ final class PlatformLifecycleTest extends WebTestCase
         self::assertContains('lifecycle', $this->json()['capabilities']);
     }
 
+    public function testTurnOffAndCloudDisableDoNotUndoEachOther(): void
+    {
+        $instance = $this->register();
+        $sso = $this->localPerson('split');
+        $userId = (int) $sso->getId();
+        $this->attach($sso, $instance, 'split', ExternalIdentity::MODE_SSO);
+        $linkId = (int) $this->identity($instance, 'split')->getId();
+
+        $this->asPerson($userId);
+        $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/turn-off');
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $this->client->getCookieJar()->clear();
+        $this->post($instance, 'split', 'enabled');
+        self::assertSame(ExternalIdentity::STATUS_PAUSED, $this->identity($instance, 'split')->getStatus());
+
+        $this->asPerson($userId);
+        $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/resume');
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->identity($instance, 'split')->getStatus());
+        $this->client->getCookieJar()->clear();
+
+        $this->post($instance, 'split', 'disabled');
+        self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $this->identity($instance, 'split')->getStatus());
+        $this->asPerson($userId);
+        $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/resume');
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        self::assertSame('cloud_disabled', $this->json()['code']);
+        $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/turn-off');
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        self::assertSame(ExternalIdentity::STATUS_BLOCKED, $this->identity($instance, 'split')->getStatus());
+        $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/resume');
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $this->identity($instance, 'split')->getStatus());
+        $this->client->getCookieJar()->clear();
+
+        $this->post($instance, 'split', 'deleted');
+        $this->asPerson($userId);
+        $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/resume');
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        self::assertSame('identity_revoked', $this->json()['code']);
+    }
+
     /**
      * @param array{instance_id: string, instance_secret: string} $instance
      */
@@ -279,6 +321,13 @@ final class PlatformLifecycleTest extends WebTestCase
         );
 
         return $result['user'];
+    }
+
+    private function asPerson(int $userId): void
+    {
+        $user = $this->em->find(User::class, $userId);
+        self::assertInstanceOf(User::class, $user);
+        $this->authenticateClient($this->client, $user);
     }
 
     private function localPerson(string $prefix): User

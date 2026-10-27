@@ -25,6 +25,22 @@ use PHPUnit\Framework\TestCase;
 
 final class PickupServiceTest extends TestCase
 {
+    public function testAPausedIdentityNeverOpensATicket(): void
+    {
+        $identity = $this->identity();
+        $identity->setStatus(ExternalIdentity::STATUS_PAUSED);
+        $identity->setReadScope(['mode' => 'all', 'folders' => []]);
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('find')->willReturn($identity);
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->expects(self::never())->method('save');
+
+        $result = $this->service($pickups, $identities)->open(7, 4, ['folder_path' => 'Docs'], 'fetch');
+
+        self::assertFalse($result['ok']);
+        self::assertSame('unauthorized', $result['error']);
+    }
+
     public function testAFolderOutsideTheReadScopeNeverOpensATicket(): void
     {
         $identity = $this->identity();

@@ -16,6 +16,7 @@ final readonly class NotifyIdentityRevoked
     public function __construct(
         public string $instanceId,
         public string $identityId,
+        public int $revokedAt = 0,
     ) {
     }
 }

@@ -68,7 +68,7 @@ final readonly class PlatformSsoService
 
         $externalId = $this->uid($externalId);
         $existing = $this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId);
-        if ($existing instanceof ExternalIdentity && $existing->isOff()) {
+        if ($existing instanceof ExternalIdentity && $existing->refusesReconnect()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
         }
         if ($existing instanceof ExternalIdentity && $existing->getUserId() !== (int) $user->getId()) {
@@ -84,6 +84,7 @@ final readonly class PlatformSsoService
             ExternalIdentity::MODE_SSO,
         );
         $row->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        $row->setRevokedAt(null);
         $this->entityManager->flush();
 
         $this->auditLogWriter->record(
@@ -129,8 +130,12 @@ final readonly class PlatformSsoService
         $minted = $this->entityManager->wrapInTransaction(function () use ($row, $user, $instance, $externalId): array {
             $this->entityManager->lock($row, LockMode::PESSIMISTIC_WRITE);
             $this->entityManager->refresh($row);
-            if ($row->isOff()) {
+            if ($row->refusesReconnect()) {
                 throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
+            }
+            if ($row->ownerTurnedOff()) {
+                $row->setAccess(true, true);
+                $row->setRevokedAt(null);
             }
 
             $existing = $this->activeBackgroundKey($row);
@@ -285,7 +290,7 @@ final readonly class PlatformSsoService
         if (!$row instanceof ExternalIdentity || $row->getUserId() !== (int) $user->getId()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_bound', 'Connect this cloud in Synaplan before watching folders.');
         }
-        if ($row->isOff()) {
+        if ($row->refusesReconnect()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
         }
         if (ExternalIdentity::MODE_SSO !== $row->getMode()) {

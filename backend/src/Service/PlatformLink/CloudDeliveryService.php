@@ -84,6 +84,7 @@ final readonly class CloudDeliveryService
             !$identity instanceof ExternalIdentity
             || $identity->getUserId() !== $file->ownerId
             || null === $identity->getId()
+            || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()
         ) {
             return DestinationResult::failure(DestinationFailureCode::Unauthorized);
         }
@@ -272,7 +273,9 @@ final readonly class CloudDeliveryService
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
         }
         $identity = $this->identities->find($delivery->getIdentityId());
-        if (!$identity instanceof ExternalIdentity || $identity->getInstanceId() !== $instance->getInstanceId()) {
+        if (!$identity instanceof ExternalIdentity
+            || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()
+            || $identity->getInstanceId() !== $instance->getInstanceId()) {
             $this->fail($instance);
             throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
         }
