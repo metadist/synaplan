@@ -10,6 +10,7 @@ use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
 use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
 use App\Service\PlatformLink\Exception\PlatformLinkLimitException;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
+use App\Service\File\CloudFilesConfig;
 use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;
@@ -29,6 +30,7 @@ final class PlatformInstanceController extends AbstractController
         private readonly PlatformLinksConfig $platformLinksConfig,
         private readonly PlatformInstanceService $instanceService,
         private readonly DeliveryAddressService $deliveryAddress,
+        private readonly CloudFilesConfig $cloudFiles,
     ) {
     }
 
@@ -143,6 +145,9 @@ final class PlatformInstanceController extends AbstractController
 
         try {
             $result = $this->instanceService->describeSelf($instanceId, $secret);
+            if ($this->cloudFiles->isEnabled()) {
+                $result['capabilities'] = [...$result['capabilities'], 'cloud_status', 'source_events'];
+            }
         } catch (PlatformInstanceNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
         } catch (PlatformInstanceSecretException $e) {

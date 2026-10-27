@@ -14,6 +14,8 @@
     { "method": "GET", "path": "/api/v1/files/groups", "scopes": ["files"] },
     { "method": "POST", "path": "/api/v1/files/upload", "scopes": ["files"] },
     { "method": "POST", "path": "/api/v1/files/check-stale", "scopes": ["files"] },
+    { "method": "POST", "path": "/api/v1/cloud/status", "scopes": ["files"] },
+    { "method": "GET", "path": "/api/v1/cloud/files/{id}", "scopes": ["files"] },
     { "method": "GET", "path": "/api/v1/files/{id}/content", "scopes": ["files"] },
     { "method": "DELETE", "path": "/api/v1/files/{id}", "scopes": ["files"] },
     { "method": "GET", "path": "/api/v1/files/uploads/{path}", "scopes": ["files"] },

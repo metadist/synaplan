@@ -419,6 +419,13 @@ final class ApiKeyScope
             return [self::DESKTOP_FILES, self::ADDIN_FILES, self::PLATFORM_FILES];
         }
 
+        if ('POST' === strtoupper($method) && '/api/v1/cloud/status' === $path) {
+            return [self::PLATFORM_FILES];
+        }
+        if ('GET' === strtoupper($method) && 1 === preg_match('#^/api/v1/cloud/files/[^/]+$#', $path)) {
+            return [self::PLATFORM_FILES];
+        }
+
         if (self::matchesPrefix($path, '/api/v1/messages')
             || self::matchesPrefix($path, '/api/v1/tts')
             || self::matchesPrefix($path, '/api/v1/config/models')

@@ -745,4 +745,46 @@ class FileRepository extends ServiceEntityRepository
             'updatedAt' => (int) $row['updatedAt'],
         ], $rows));
     }
+
+    /**
+     * Every copy of these remote ids on this cloud, including a legacy row
+     * that has not been claimed yet. The caller drops an unclaimed row when
+     * the owner has another cloud of the same kind.
+     *
+     * @param list<string> $sourceIds
+     *
+     * @return list<File>
+     */
+    public function findCopiesOfRemotes(string $source, array $sourceIds, string $instanceId): array
+    {
+        if ([] === $sourceIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('f')
+            ->where('f.source = :source')
+            ->andWhere('f.sourceId IN (:ids)')
+            ->andWhere('f.sourceInstance = :instance OR f.sourceInstance IS NULL')
+            ->setParameter('source', $source)
+            ->setParameter('ids', array_values($sourceIds))
+            ->setParameter('instance', $instanceId)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Copies whose source was deleted long enough ago to remove.
+     * The source-deleted filter must be off, or this list is always empty.
+     *
+     * @return list<File>
+     */
+    public function findSourceDeletedBefore(int $cutoff): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.sourceDeletedAt IS NOT NULL')
+            ->andWhere('f.sourceDeletedAt <= :cutoff')
+            ->setParameter('cutoff', $cutoff)
+            ->getQuery()
+            ->getResult();
+    }
 }

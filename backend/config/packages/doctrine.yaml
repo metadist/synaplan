@@ -58,6 +58,10 @@ doctrine:
             default:
                 connection: default
                 naming_strategy: App\Doctrine\CustomNamingStrategy
+                filters:
+                    source_deleted:
+                        class: App\Doctrine\SourceDeletedFilter
+                        enabled: true
                 mappings:
                     App:
                         type: attribute

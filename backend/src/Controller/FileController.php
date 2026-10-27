@@ -265,7 +265,7 @@ class FileController extends AbstractController
             return $hints;
         }
 
-        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource, $hints->vectorizeModelId, $instances->fromRequest($request));
+        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource, $hints->vectorizeModelId, $instances->fromRequest($request), $request->request->has('keep_synced') ? $request->request->getBoolean('keep_synced') : null);
 
         $uploadedFiles = $request->files->get('files', []);
 

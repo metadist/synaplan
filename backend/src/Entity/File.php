@@ -204,6 +204,14 @@ class File
     #[ORM\Column(name: 'BSOURCEINSTANCE', length: 64, nullable: true)]
     private ?string $sourceInstance = null;
 
+    /** Set when the cloud reports the file deleted. Hidden until this moment plus 7 days. */
+    #[ORM\Column(name: 'BSOURCEDELETEDAT', type: 'bigint', nullable: true)]
+    private ?int $sourceDeletedAt = null;
+
+    /** The person asked Synaplan to follow later versions of this cloud file. */
+    #[ORM\Column(name: 'BKEEPSYNCED', type: 'boolean', options: ['default' => false])]
+    private bool $keepSynced = false;
+
     /**
      * External version/etag captured at ingest. A differing etag reported later
      * means the source drifted and the KB copy is {@see self::VECTOR_STATE_STALE}
@@ -514,6 +522,30 @@ class File
     {
         $sourceInstance = null !== $sourceInstance ? trim($sourceInstance) : null;
         $this->sourceInstance = ('' === $sourceInstance) ? null : $sourceInstance;
+
+        return $this;
+    }
+
+    public function getSourceDeletedAt(): ?int
+    {
+        return $this->sourceDeletedAt;
+    }
+
+    public function setSourceDeletedAt(?int $sourceDeletedAt): self
+    {
+        $this->sourceDeletedAt = $sourceDeletedAt;
+
+        return $this;
+    }
+
+    public function isKeepSynced(): bool
+    {
+        return $this->keepSynced;
+    }
+
+    public function setKeepSynced(bool $keepSynced): self
+    {
+        $this->keepSynced = $keepSynced;
 
         return $this;
     }

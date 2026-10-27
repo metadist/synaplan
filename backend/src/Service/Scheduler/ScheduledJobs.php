@@ -37,6 +37,7 @@ final class ScheduledJobs
         ],
         self::LANE_HOURLY => [
             'app:files:reap-ephemeral',
+            'app:cloud-files:reap',
             'app:approvals:expire',
             'app:models:discover',
             'app:freeapi:maintain',
