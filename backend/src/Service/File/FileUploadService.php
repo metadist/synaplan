@@ -246,7 +246,7 @@ final readonly class FileUploadService
         // group + original name), replace that row's content and keep its id so
         // the KB never accumulates duplicates of a synced source file.
         $existing = $options->overwrite
-            ? $this->fileRepository->findForOverwrite($user->getId(), $options->source, $options->sourceId, $groupKey, $options->originalName)
+            ? $this->fileRepository->findForOverwrite($user->getId(), $options->source, $options->sourceId, $groupKey, $options->originalName, $options->sourceInstance)
             : null;
 
         if (null !== $existing) {
@@ -397,8 +397,8 @@ final readonly class FileUploadService
         $file->setGroupKey($groupKey);
         $file->setStatus('uploaded');
         $file->setSource($options->source);
-        // External pushes wait in the Incoming inbox for triage (03_file-management.md §3.3) unless a cloud
-        // app already filed them into a knowledge folder. Web uploads are never incoming.
+        $file->setSourceInstance($options->sourceInstance);
+        // A cloud upload that names a knowledge folder skips Incoming. Web uploads never land there.
         $file->setIncoming(File::arrivesIncoming($options->source, $groupKey));
         // Preserve the original ".heic" filename for provenance when we
         // transcoded the upload and the caller didn't supply its own.
@@ -447,10 +447,9 @@ final readonly class FileUploadService
         }
         $file->setIncoming($file->isIncoming() && !File::namesKnowledgeFolder($options->source, $groupKey));
         $file->setStatus('uploaded');
-        // Force re-extraction from the new binary: the pipeline only re-extracts
-        // when the stored text is empty.
         $file->setFileText('');
         $file->setSource($options->source);
+        $file->setSourceInstance($options->sourceInstance ?? $file->getSourceInstance());
         $file->setOriginalName($options->originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : $file->getOriginalName()));
         $file->setSourceId($options->sourceId ?? $file->getSourceId());
         $file->setSourceEtag($options->sourceEtag);

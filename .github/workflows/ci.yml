@@ -2513,14 +2513,23 @@ jobs:
 
           # Either token may push this branch; GITHUB_TOKEN keeps the job
           # working when the release App is not configured at all.
-          PUSH_TOKEN="${APP_TOKEN:-$GH_TOKEN}"
+          push_branch() {
+            git push -q --force \
+              "https://x-access-token:${1}@github.com/${GITHUB_REPOSITORY}.git" \
+              "HEAD:refs/heads/${BRANCH}"
+          }
 
           # Force-push the fixed branch: if an earlier release's proposal is
           # still open, it is carried forward to the newest release rather than
           # leaving two competing pull requests behind.
-          git push -q --force \
-            "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "HEAD:refs/heads/${BRANCH}"
+          if [ -n "${APP_TOKEN:-}" ]; then
+            if ! push_branch "$APP_TOKEN"; then
+              echo "::warning::The release App could not push ${BRANCH}; retrying with GITHUB_TOKEN."
+              push_branch "$GH_TOKEN"
+            fi
+          else
+            push_branch "$GH_TOKEN"
+          fi
 
           # Non-fatal on purpose: under `set -e` a bare assignment from a
           # failing lookup would end the step right here — after the push, but

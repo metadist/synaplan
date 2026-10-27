@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Repository;
 
 use App\Entity\Chat;
+use App\Entity\ExternalIdentity;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
@@ -170,6 +171,101 @@ class FileRepositoryTest extends KernelTestCase
 
         $this->assertCount(1, $found);
         $this->assertSame($newer->getId(), $found[0]->getId());
+    }
+
+    public function testTwoCloudsWithTheSameRemoteIdDoNotOverwriteEachOther(): void
+    {
+        $user = $this->createUser('cloud');
+        $this->identity($user, 'nextcloud', 'inst-a');
+        $this->identity($user, 'nextcloud', 'inst-b');
+
+        $onA = $this->createFile($user, 'a.txt');
+        $onA->setSource('nextcloud');
+        $onA->setSourceId('5678');
+        $onA->setSourceInstance('inst-a');
+        $this->em->flush();
+
+        $found = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', '5678', null, null, 'inst-b');
+        self::assertNull($found);
+
+        $same = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', '5678', null, null, 'inst-a');
+        self::assertSame($onA->getId(), $same?->getId());
+
+        $plain = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', '5678', null, null, null);
+        self::assertNull($plain);
+    }
+
+    public function testAnUnscopedFileIsClaimedOnlyForAnOwnerWithOneCloud(): void
+    {
+        $one = $this->createUser('one-cloud');
+        $this->identity($one, 'nextcloud', 'inst-only');
+        $file = $this->createFile($one, 'old.txt');
+        $file->setSource('nextcloud');
+        $file->setSourceId('5678');
+        $this->em->flush();
+
+        $claimed = $this->repository->findForOverwrite((int) $one->getId(), 'nextcloud', '5678', null, null, 'inst-only');
+        self::assertSame('inst-only', $claimed?->getSourceInstance());
+
+        $two = $this->createUser('two-clouds');
+        $this->identity($two, 'nextcloud', 'inst-a');
+        $this->identity($two, 'nextcloud', 'inst-b');
+        $shared = $this->createFile($two, 'shared.txt');
+        $shared->setSource('nextcloud');
+        $shared->setSourceId('5678');
+        $this->em->flush();
+
+        self::assertNull($this->repository->findForOverwrite((int) $two->getId(), 'nextcloud', '5678', null, null, 'inst-a'));
+    }
+
+    public function testAnExactInstanceMatchWinsOverANewerUnscopedRow(): void
+    {
+        $user = $this->createUser('exact');
+        $this->identity($user, 'nextcloud', 'inst-a');
+        $this->identity($user, 'nextcloud', 'inst-b');
+        $scoped = $this->createFile($user, 'scoped.txt');
+        $scoped->setSource('nextcloud');
+        $scoped->setSourceId('5678');
+        $scoped->setSourceInstance('inst-a');
+        $newer = $this->createFile($user, 'newer.txt');
+        $newer->setSource('nextcloud');
+        $newer->setSourceId('5678');
+        $this->em->flush();
+
+        $found = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', '5678', null, null, 'inst-a');
+        self::assertSame($scoped->getId(), $found?->getId());
+
+        $byName = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', null, null, 'scoped.txt', 'inst-b');
+        self::assertNull($byName);
+    }
+
+    public function testCheckStalePersistsAClaimedInstance(): void
+    {
+        $user = $this->createUser('stale-claim');
+        $this->identity($user, 'nextcloud', 'inst-only');
+        $file = $this->createFile($user, 'claim.txt');
+        $file->setSource('nextcloud');
+        $file->setSourceId('99');
+        $this->em->flush();
+
+        $check = static::getContainer()->get(\App\Service\File\SourceStaleCheck::class);
+        $check->check((int) $user->getId(), 'nextcloud', [['source_id' => '99', 'source_etag' => null]], 'inst-only');
+        $this->em->clear();
+        $reloaded = $this->em->find(File::class, $file->getId());
+        self::assertSame('inst-only', $reloaded?->getSourceInstance());
+    }
+
+    private function identity(User $user, string $source, string $instanceId): void
+    {
+        $row = (new ExternalIdentity())
+            ->setUserId((int) $user->getId())
+            ->setSource($source)
+            ->setInstanceId($instanceId)
+            ->setExternalId($instanceId.'-user')
+            ->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        $this->em->persist($row);
+        $this->em->flush();
+        $this->toRemove[] = $row;
     }
 
     private function createUser(string $prefix): User

@@ -26,10 +26,10 @@ final readonly class SourceStaleCheck
      *     counts: array{current: int, stale: int, missing: int}
      * }
      */
-    public function check(int $userId, string $source, array $items): array
+    public function check(int $userId, string $source, array $items, ?string $sourceInstance = null): array
     {
         $requested = $this->requestedEtags($items);
-        $found = $this->fileRepository->findByUserSourceIds($userId, $source, array_keys($requested));
+        $found = $this->fileRepository->findByUserSourceIds($userId, $source, array_keys($requested), $sourceInstance);
 
         $results = [];
         $counts = ['current' => 0, 'stale' => 0, 'missing' => 0];
@@ -59,6 +59,8 @@ final readonly class SourceStaleCheck
                 'vector_state' => $vectorState,
             ];
         }
+
+        $this->fileRepository->flush();
 
         return ['results' => $results, 'counts' => $counts];
     }
