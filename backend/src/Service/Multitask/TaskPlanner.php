@@ -161,17 +161,7 @@ final readonly class TaskPlanner
             return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
-        // A node that reads `$nX.text` but forgot to list nX in depends_on
-        // may be scheduled before nX and answer from an empty reference.
-        // Complete the edges from the references themselves (#mcp-handover).
-        $repaired = TaskPlanNormalizer::missingDependencies($decoded);
-        if ([] !== $repaired) {
-            $this->logger->info('TaskPlanner: inferred missing depends_on edges from $nX references', [
-                'added' => $repaired,
-            ]);
-            $decoded = TaskPlanNormalizer::inferDependencies($decoded);
-        }
-
+        $decoded = $this->withInferredDependencies($decoded);
         $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, $adjustTopic);
         $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
@@ -197,6 +187,28 @@ final readonly class TaskPlanner
             errors: [],
             planningUsage: $planningUsage,
         );
+    }
+
+    /**
+     * A node that reads `$nX.text` but forgot to list nX in depends_on
+     * may be scheduled before nX and answer from an empty reference.
+     * Complete the edges from the references themselves (#mcp-handover).
+     *
+     * @param array<string, mixed> $decoded
+     *
+     * @return array<string, mixed>
+     */
+    private function withInferredDependencies(array $decoded): array
+    {
+        $repaired = TaskPlanNormalizer::missingDependencies($decoded);
+        if ([] === $repaired) {
+            return $decoded;
+        }
+        $this->logger->info('TaskPlanner: inferred missing depends_on edges from $nX references', [
+            'added' => $repaired,
+        ]);
+
+        return TaskPlanNormalizer::inferDependencies($decoded);
     }
 
     /**
