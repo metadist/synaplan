@@ -135,9 +135,9 @@ describe('mediaAuth', () => {
 
   describe('isExternalMediaUrl', () => {
     it('treats a Notion https link as external and a Synaplan path as local', () => {
-      expect(isExternalMediaUrl('https://prod-files-secure.s3.us-west-2.amazonaws.com/shot.png')).toBe(
-        true
-      )
+      expect(
+        isExternalMediaUrl('https://prod-files-secure.s3.us-west-2.amazonaws.com/shot.png')
+      ).toBe(true)
       expect(isExternalMediaUrl(UPLOAD_PATH)).toBe(false)
       expect(isExternalMediaUrl('data:image/png;base64,AAA')).toBe(false)
     })

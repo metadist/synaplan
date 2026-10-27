@@ -155,7 +155,13 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
-import { fetchMediaBlob, isExternalMediaUrl, openExternalMedia, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
+import {
+  fetchMediaBlob,
+  isExternalMediaUrl,
+  openExternalMedia,
+  resolveMediaUrl,
+  useMediaSrc,
+} from '@/services/api/mediaAuth'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
 interface Props {

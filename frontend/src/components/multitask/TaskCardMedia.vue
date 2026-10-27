@@ -85,7 +85,13 @@
 import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { downloadMediaUrl, isExternalMediaUrl, openExternalMedia, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
+import {
+  downloadMediaUrl,
+  isExternalMediaUrl,
+  openExternalMedia,
+  resolveMediaUrl,
+  useMediaSrc,
+} from '@/services/api/mediaAuth'
 
 /**
  * Media body of a completed task card (#1229): image with lightbox +
