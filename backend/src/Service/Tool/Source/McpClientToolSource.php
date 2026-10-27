@@ -56,6 +56,7 @@ final readonly class McpClientToolSource implements ToolSourceInterface
                         'serverName' => $server->getName(),
                         'tool' => (string) $tool['name'],
                         'allowWrite' => $server->allowsWrite(),
+                        'writeAuto' => $server->isWriteAuto(),
                         'gatewayName' => $gatewayName,
                         'annotations' => $annotations,
                     ],

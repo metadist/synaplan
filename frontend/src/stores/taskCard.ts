@@ -1,4 +1,5 @@
 import type { FolderRead } from '@/utils/folderRead'
+import type { SearchRecovery } from '@/utils/searchRecovery'
 
 export const TASK_CARD_KINDS = [
   'text',
@@ -71,6 +72,10 @@ export interface TaskCard {
   durationMs?: number
   /** What a folder-read step read, live while it runs and after it settles. */
   folderRead?: FolderRead
+  /** Empty-search widening: the queries tried, and which one matched. */
+  recovery?: SearchRecovery
+  /** True while a wider query is in flight. */
+  retrying?: boolean
   /**
    * #1229 smart collapse: the card's prose is already contained in the final
    * answer body, so the card collapses to its header (set by ResultAssembler

@@ -155,7 +155,13 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
-import { fetchMediaBlob, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
+import {
+  fetchMediaBlob,
+  isExternalMediaUrl,
+  openExternalMedia,
+  resolveMediaUrl,
+  useMediaSrc,
+} from '@/services/api/mediaAuth'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
 interface Props {
@@ -217,15 +223,16 @@ const downloadFilename = (): string => {
   return name && name.includes('.') ? name : 'image.png'
 }
 
-// Downloads always fetch their own blob (issue #1071): the displayed image is
-// a plain `src`, so there is nothing in JS to reuse, and the request goes out
-// with `Authorization: Bearer` rather than a credential in a URL. Saving goes
-// through saveOrDownloadBlob: web keeps the anchor download; Android writes to
-// Documents; iOS still uses the share sheet. An `<a download>` click is a
-// silent no-op inside the WebView.
+// Synaplan media is fetched as an authenticated blob (issue #1071). A picture
+// that already lives on another host, such as Notion, is opened there instead.
 const downloadImage = async () => {
+  const url = resolveMediaUrl(props.url)
+  if (isExternalMediaUrl(url)) {
+    openExternalMedia(url)
+    return
+  }
   try {
-    const blob = await fetchMediaBlob(resolveMediaUrl(props.url))
+    const blob = await fetchMediaBlob(url)
     await saveOrDownloadBlob(blob, downloadFilename())
   } catch (error) {
     console.error('Failed to download image:', error)

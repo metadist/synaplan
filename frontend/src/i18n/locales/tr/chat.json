@@ -678,6 +678,9 @@
     "stop": "Durdur",
     "rendering": "Oluşturuluyor…",
     "searchSummary": "Web arandı · {count} kaynak",
+    "searchedInstead": "“{original}” için sonuç yok. Bunun yerine “{matched}” arandı.",
+    "searchedNothing": "Aranan: {queries} — hiçbir şey bulunamadı.",
+    "searchingAgain": "Yeniden aranıyor…",
     "retryWith": "{model} ile yeniden dene",
     "state": {
       "pending": "Sırada",
@@ -710,6 +713,7 @@
       "web_search": "Web araması",
       "url_fetch": "Web sayfası okunuyor",
       "mcp_fetch": "Bağlı veriler alınıyor",
+      "mcp_action": "Bağlı veriler değiştiriliyor",
       "email_search": "E-postalarınızda aranıyor",
       "file_analysis": "Dosya analizi",
       "image_generation": "Görsel",
@@ -723,6 +727,7 @@
       "save_to_folder": "Klasöre kaydet",
       "code_run": "Dosyanızla çalışılıyor",
       "folder_fetch": "Dosya okuma",
+      "save_to_notion": "Notion’a kaydet",
       "research": "Araştırma"
     },
     "copyText": "İçeriği kopyala",

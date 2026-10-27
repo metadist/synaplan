@@ -9,6 +9,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\ConnectedSystemMention;
 use App\Service\SelfAware\CapabilityFact;
 use App\Service\SelfAware\CapabilityInventory;
 use App\Service\SelfAware\CapabilityReport;
@@ -99,6 +100,18 @@ final class SelfAwarePromptDecoratorTest extends TestCase
         $this->assertStringContainsString('AVAILABLE NOW:', $none);
     }
 
+    public function testGeneralNamesTheUsersConnectedSources(): void
+    {
+        $sources = $this->createMock(ConnectedSystemMention::class);
+        $sources->expects(self::once())->method('names')->with(2)->willReturn(['Notion']);
+
+        $general = $this->decorator(enabled: true, inventoryInGeneral: true, sources: $sources)
+            ->apply('[PLATFORM_CAPABILITIES]', 'general', 2, false);
+
+        $this->assertStringContainsString('CONNECTED SOURCES: "Notion"', $general);
+        $this->assertStringContainsString('Never tell the user to connect a source that is listed as connected.', $general);
+    }
+
     public function testWidgetConversationHelper(): void
     {
         $this->assertTrue(SelfAwarePromptDecorator::isWidgetConversation(['source' => 'widget'], []));
@@ -106,7 +119,7 @@ final class SelfAwarePromptDecoratorTest extends TestCase
         $this->assertFalse(SelfAwarePromptDecorator::isWidgetConversation(['source' => 'web'], ['channel' => 'WEB']));
     }
 
-    private function decorator(bool $enabled, bool $inventoryInGeneral, ?int $defaultModelId = null): SelfAwarePromptDecorator
+    private function decorator(bool $enabled, bool $inventoryInGeneral, ?int $defaultModelId = null, ?ConnectedSystemMention $sources = null): SelfAwarePromptDecorator
     {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
@@ -154,6 +167,7 @@ final class SelfAwarePromptDecoratorTest extends TestCase
             new KnowledgeContextFormatter(),
             $models,
             $modelConfig,
+            $sources,
         );
     }
 }

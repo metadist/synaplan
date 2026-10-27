@@ -196,6 +196,31 @@ final class TaskPlanStoreTest extends TestCase
         self::assertSame('Read 1 of 2 files', $cards[0]['text']);
     }
 
+    public function testASearchRecoverySurvivesTheRoundTrip(): void
+    {
+        $stored = null;
+        $this->connection->method('update')->willReturnCallback(function (string $table, array $data) use (&$stored): int {
+            $stored = $data['BRESULTREF'];
+
+            return 1;
+        });
+        $recovery = [
+            'attempts' => [
+                ['query' => 'Metadsit', 'hits' => 0],
+                ['query' => 'Metadist', 'hits' => 1],
+            ],
+            'matched_query' => 'Metadist',
+            'empty' => false,
+        ];
+
+        $this->store->updateNodeStatus(42, 'n1', 'done', ['query' => 'Notion · notion-search', 'recovery' => $recovery]);
+        $this->connection->method('fetchAllAssociative')->willReturn([
+            ['BNODEID' => 'n1', 'BCAPABILITY' => 'mcp_fetch', 'BSTATUS' => 'done', 'BRESULTREF' => $stored, 'BERROR' => null],
+        ]);
+
+        self::assertSame($recovery, $this->store->loadCards(42)[0]['recovery']);
+    }
+
     public function testUpdateNodeStatusKeepsTextWhenUtf8WasCutMidCharacter(): void
     {
         $captured = [];

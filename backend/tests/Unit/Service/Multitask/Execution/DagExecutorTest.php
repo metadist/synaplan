@@ -13,6 +13,9 @@ use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
 use App\Service\Multitask\Execution\Parallel\MediaNodeJob;
 use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
 use App\Service\Multitask\Execution\Parallel\SettledMediaNodeJob;
+use App\Service\Multitask\Execution\Recovery\EmptyResultDetector;
+use App\Service\Multitask\Execution\Recovery\QueryRelaxer;
+use App\Service\Multitask\Execution\Recovery\SearchRecovery;
 use App\Service\Multitask\Execution\ResultAssembler;
 use App\Service\Multitask\Execution\RunnerRegistry;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -24,6 +27,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class DagExecutorTest extends TestCase
 {
@@ -91,7 +95,7 @@ final class DagExecutorTest extends TestCase
         return $config;
     }
 
-    private function executor(TaskRunner $runner, bool $parallel = false, ?MediaNodeDispatcher $dispatcher = null, int $cap = 3): DagExecutor
+    private function executor(TaskRunner $runner, bool $parallel = false, ?MediaNodeDispatcher $dispatcher = null, int $cap = 3, ?SearchRecovery $recovery = null): DagExecutor
     {
         return new DagExecutor(
             new RunnerRegistry([$runner]),
@@ -99,7 +103,17 @@ final class DagExecutorTest extends TestCase
             $dispatcher ?? $this->dispatcher(),
             $this->config($parallel, $cap),
             $this->createMock(LoggerInterface::class),
+            $recovery ?? $this->passthroughRecovery(),
         );
+    }
+
+    /** Leaves every result as the runner returned it. Widening is covered on its own. */
+    private function passthroughRecovery(): SearchRecovery
+    {
+        $recovery = $this->createMock(SearchRecovery::class);
+        $recovery->method('recover')->willReturnArgument(3);
+
+        return $recovery;
     }
 
     private function context(string $language = 'en'): NodeContext
@@ -280,6 +294,7 @@ final class DagExecutorTest extends TestCase
             $this->dispatcher(),
             $config,
             $this->createMock(LoggerInterface::class),
+            $this->passthroughRecovery(),
         );
 
         $message = $this->createMock(Message::class);
@@ -334,6 +349,7 @@ final class DagExecutorTest extends TestCase
             $this->dispatcher(),
             $this->config(false),
             $this->createMock(LoggerInterface::class),
+            $this->passthroughRecovery(),
         );
 
         $result = $executor->execute($plan, $this->context());
@@ -998,5 +1014,50 @@ final class DagExecutorTest extends TestCase
 
         self::assertSame('Skipped because the condition was not met.', $context->getResult('n2')?->error);
         self::assertSame('Skipped because the condition was not met.', $context->getResult('n3')?->error);
+    }
+
+    public function testAnEmptyReadIsBroadenedBeforeTheAnswer(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch', 'inputs' => ['arguments' => ['query' => 'Metadsit']], 'params' => ['tool' => 'notion-search']],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $relaxer = $this->createMock(QueryRelaxer::class);
+        $relaxer->method('suggest')->willReturn(['query' => 'Metadist']);
+        $relaxer->method('broaden')->willReturn(null);
+        $recovery = new SearchRecovery(new EmptyResultDetector(), $relaxer, new NullLogger());
+
+        $runner = $this->runner(function (TaskNode $node): NodeResult {
+            if (Capability::Chat === $node->capability) {
+                return NodeResult::ok('Found the Metadist page.');
+            }
+            $query = is_array($node->inputs['arguments'] ?? null) ? ($node->inputs['arguments']['query'] ?? '') : '';
+
+            return 'Metadist' === $query
+                ? NodeResult::ok('{"results":[{"title":"Metadist"}]}', [], ['query' => 'Notion · notion-search'])
+                : NodeResult::ok('{"results":[]}', [], ['query' => 'Notion · notion-search']);
+        });
+
+        $events = [];
+        $result = $this->executor($runner, recovery: $recovery)->execute(
+            $plan,
+            $this->context(),
+            static function (array $event) use (&$events): void {
+                $events[] = $event;
+            },
+        );
+
+        self::assertSame('Found the Metadist page.', $result['content']);
+        self::assertSame('done', $result['node_statuses']['n1']);
+        $retrying = array_values(array_filter(
+            $events,
+            static fn (array $event): bool => true === ($event['metadata']['retrying'] ?? false),
+        ));
+        self::assertSame('Metadist', $retrying[0]['metadata']['query'] ?? null);
+        $cards = $result['metadata']['task_plan_render']['cards'] ?? [];
+        self::assertSame('Metadist', $cards[0]['recovery']['matched_query'] ?? null);
     }
 }

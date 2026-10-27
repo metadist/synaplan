@@ -9,6 +9,8 @@ use App\Service\Mcp\ConfluenceLinkedPageRead;
 use App\Service\Mcp\ConfluenceLinkedPageReader;
 use App\Service\Mcp\JiraLinkedIssueRead;
 use App\Service\Mcp\JiraLinkedIssueReader;
+use App\Service\Mcp\NotionLinkedPageRead;
+use App\Service\Mcp\NotionLinkedPageReader;
 use App\Service\Research\UrlContentService;
 use App\Service\Research\WebResearchService;
 use Psr\Log\LoggerInterface;
@@ -17,10 +19,10 @@ use Psr\Log\LoggerInterface;
  * Reads the links pasted into a message into classification['url_content'],
  * so the answer comes from the page (ChatHandler, and UrlFetchRunner reuse).
  *
- * Confluence and Jira links are behind a login: they are read through the
- * user's Atlassian connection and kept away from the public reader, so the
- * answer is the page — or an honest connection error — never the sign-in
- * screen. With {@see WebResearchService} (production wiring) every other
+ * Confluence, Jira and Notion links are behind a login: they are read through
+ * the user's connection and kept away from the public reader, so the answer
+ * is the page — or an honest connection error — never the sign-in screen.
+ * With {@see WebResearchService} (production wiring) every other
  * link is read by default (`URL_READ.ENABLED`): redirects and shortlinks are
  * followed, login walls reported, large pages condensed to the question.
  * Without it, the legacy light fetch runs for the prompt flag
@@ -34,6 +36,7 @@ final readonly class LinkedContentReader
         private ?WebResearchService $webResearch = null,
         private ?ConfluenceLinkedPageReader $confluencePages = null,
         private ?JiraLinkedIssueReader $jiraIssues = null,
+        private ?NotionLinkedPageReader $notionPages = null,
     ) {
     }
 
@@ -54,6 +57,7 @@ final readonly class LinkedContentReader
         $handled = array_merge(
             is_array($classification['confluence_mcp_urls'] ?? null) ? $classification['confluence_mcp_urls'] : [],
             is_array($classification['jira_mcp_urls'] ?? null) ? $classification['jira_mcp_urls'] : [],
+            is_array($classification['notion_mcp_urls'] ?? null) ? $classification['notion_mcp_urls'] : [],
         );
         $urls = array_values(array_filter($urls, static fn (string $url): bool => !in_array($url, $handled, true)));
         if ([] === $urls) {
@@ -121,11 +125,26 @@ final readonly class LinkedContentReader
      */
     private function readThroughConnections(Message $message, array $urls, array $classification, TurnStatus $status, array $promptMetadata): array
     {
-        if (true !== ($promptMetadata['tool_mcp'] ?? null)) {
+        $topicAllows = true === ($promptMetadata['tool_mcp'] ?? null);
+        $allowlist = $topicAllows ? $this->mcpServerAllowlist($promptMetadata) : [];
+
+        // Notion links are claimed even when this chat cannot call MCP, so a
+        // pasted page never falls through to the public sign-in screen.
+        if (null !== $this->notionPages) {
+            $read = $this->notionPages->read(
+                $urls,
+                $message->getUserId(),
+                $topicAllows ? $allowlist : [],
+                $topicAllows ? static fn () => $status->report('fetching_urls', 'Reading the Notion page from your connection...') : null,
+                $topicAllows,
+            );
+            $classification = $this->applyLinkedRead($classification, $read, $urls, 'notion');
+        }
+
+        if (!$topicAllows) {
             return $classification;
         }
 
-        $allowlist = $this->mcpServerAllowlist($promptMetadata);
         if (null !== $this->confluencePages) {
             $read = $this->confluencePages->read($urls, $message->getUserId(), $allowlist,
                 static fn () => $status->report('fetching_urls', 'Reading the Confluence page from your connection...'));
@@ -146,7 +165,7 @@ final readonly class LinkedContentReader
      *
      * @return array<string, mixed>
      */
-    private function applyLinkedRead(array $classification, ConfluenceLinkedPageRead|JiraLinkedIssueRead $read, array $urls, string $source): array
+    private function applyLinkedRead(array $classification, ConfluenceLinkedPageRead|JiraLinkedIssueRead|NotionLinkedPageRead $read, array $urls, string $source): array
     {
         if (!$read->attempted()) {
             return $classification;

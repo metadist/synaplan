@@ -245,7 +245,8 @@
       "widget": "Widget",
       "api": "API",
       "generated": "AI-generated",
-      "compute": "File work"
+      "compute": "File work",
+      "notion": "Notion"
     },
     "vectorState": {
       "vectorized": "Searchable by AI",
@@ -363,7 +364,17 @@
       "dismiss": "Got it",
       "reopen": "What is this?"
     },
-    "searchIntro": "Ask a question in your own words and see which passages in your files answer it."
+    "searchIntro": "Ask a question in your own words and see which passages in your files answer it.",
+    "notion": {
+      "action": "Add to a Notion page",
+      "title": "Add to a Notion page",
+      "message": "Paste the link of the Notion page that should get “{file}”. It is added at the end of the page.",
+      "placeholder": "https://www.notion.so/…",
+      "confirm": "Add to page",
+      "done": "Added “{file}” to “{page}” in Notion. The file is still here.",
+      "open": "Open in Notion",
+      "failed": "The file was not added to Notion. Nothing was changed. Try again."
+    }
   },
   "vectorStorage": {
     "intro": "An overview of your vector storage — how many files have been indexed and how many vectors (chunks) are stored for semantic search.",

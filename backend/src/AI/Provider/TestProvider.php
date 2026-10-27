@@ -394,7 +394,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         // model that echoes without deciding leaves multi_step = null and the
         // planner still runs). The test stub must vote, from the same
         // predicates mockTaskPlan() routes on, so the two cannot disagree.
-        $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText);
+        $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText, $systemContent);
 
         $topicEnum = $this->schemaTopicEnum($schema);
         $availableTopics = $topicEnum ?? $this->extractAvailableTopics($systemContent);
@@ -540,9 +540,9 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      * produce always agree — a vote of 0 makes TaskPlanExecutor skip planning
      * altogether, so a disagreement silently kills the DAG.
      */
-    private function needsMultiStepPlan(string $text): bool
+    private function needsMultiStepPlan(string $text, string $systemContent = ''): bool
     {
-        return $this->isSummarizeTranslateRequest($text) || $this->isWebSearchPlanRequest($text);
+        return $this->isSummarizeTranslateRequest($text) || $this->isWebSearchPlanRequest($text) || ConnectedSystemSortVote::matches($text, $systemContent);
     }
 
     private function isSummarizeTranslateRequest(string $text): bool

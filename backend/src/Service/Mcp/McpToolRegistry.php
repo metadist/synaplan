@@ -6,6 +6,8 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Mcp\Notion\NotionSharing;
+use App\Service\Mcp\Notion\NotionToolHints;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -32,7 +34,43 @@ final readonly class McpToolRegistry
         private McpServerConfigRepository $servers,
         private CacheInterface $cache,
         private LoggerInterface $logger,
+        private NotionToolHints $notionHints = new NotionToolHints(),
+        private ?NotionSharing $notionSharing = null,
     ) {
+    }
+
+    /**
+     * The organisation's shared Notion for a person without their own Notion
+     * connection. Read-only: only `mcp_fetch` resolves it.
+     *
+     * @return list<array{server: McpServerConfig, tools: list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>}>
+     */
+    public function sharedCatalogFor(int $userId): array
+    {
+        $server = $this->sharedNotion($userId);
+
+        return null === $server ? [] : [['server' => $server, 'tools' => $this->toolsFor($server)]];
+    }
+
+    public function sharedServer(int $serverId, int $userId): ?McpServerConfig
+    {
+        $server = $this->sharedNotion($userId);
+
+        return null !== $server && $server->getId() === $serverId ? $server : null;
+    }
+
+    private function sharedNotion(int $userId): ?McpServerConfig
+    {
+        if (null === $this->notionSharing || $userId <= 0) {
+            return null;
+        }
+        foreach ($this->servers->findEnabledByUser($userId) as $own) {
+            if (NotionToolHints::isNotion($own->getUrl())) {
+                return null;
+            }
+        }
+
+        return $this->notionSharing->sharedServer($userId);
     }
 
     /**
@@ -44,7 +82,7 @@ final readonly class McpToolRegistry
     public function toolsFor(McpServerConfig $server): array
     {
         try {
-            return $this->cache->get($this->cacheKey($server), function (ItemInterface $item) use ($server): array {
+            $tools = $this->cache->get($this->cacheKey($server), function (ItemInterface $item) use ($server): array {
                 $item->expiresAfter(self::CACHE_TTL_SECONDS);
 
                 return $this->client->listTools($server);
@@ -57,6 +95,8 @@ final readonly class McpToolRegistry
 
             return [];
         }
+
+        return $this->notionHints->apply($server, $this->toolList($tools));
     }
 
     /**
@@ -77,7 +117,7 @@ final readonly class McpToolRegistry
             return $tools;
         });
 
-        return $tools;
+        return $this->notionHints->apply($server, $tools);
     }
 
     /**
@@ -104,7 +144,7 @@ final readonly class McpToolRegistry
         }
         $tools = $item->get();
 
-        return is_array($tools) ? array_values($tools) : null;
+        return is_array($tools) ? $this->notionHints->apply($server, $this->toolList($tools)) : null;
     }
 
     /**
@@ -121,6 +161,31 @@ final readonly class McpToolRegistry
         }
 
         return $catalog;
+    }
+
+    /**
+     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>
+     */
+    private function toolList(mixed $tools): array
+    {
+        if (!is_array($tools)) {
+            return [];
+        }
+
+        $list = [];
+        foreach ($tools as $tool) {
+            if (!is_array($tool) || !is_string($tool['name'] ?? null)) {
+                continue;
+            }
+            $list[] = [
+                'name' => $tool['name'],
+                'description' => is_string($tool['description'] ?? null) ? $tool['description'] : '',
+                'inputSchema' => is_array($tool['inputSchema'] ?? null) ? $tool['inputSchema'] : [],
+                'annotations' => is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [],
+            ];
+        }
+
+        return $list;
     }
 
     private function cacheKey(McpServerConfig $server): string

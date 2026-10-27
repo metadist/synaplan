@@ -668,6 +668,9 @@
     "stop": "Stopp",
     "rendering": "Wird gerendert…",
     "searchSummary": "Web durchsucht · {count} Quelle | Web durchsucht · {count} Quellen",
+    "searchedInstead": "Nichts zu „{original}“ – stattdessen „{matched}“ gesucht.",
+    "searchedNothing": "Gesucht: {queries} – nichts gefunden.",
+    "searchingAgain": "Suche nochmal…",
     "retryWith": "Nochmal mit {model}",
     "state": {
       "pending": "Wartet",
@@ -700,6 +703,7 @@
       "web_search": "Websuche",
       "url_fetch": "Webseite lesen",
       "mcp_fetch": "Verbundene Daten abrufen",
+      "mcp_action": "Verbundene Daten ändern",
       "email_search": "E-Mails durchsuchen",
       "file_analysis": "Dateianalyse",
       "image_generation": "Bild",
@@ -713,6 +717,7 @@
       "save_to_folder": "Im Ordner speichern",
       "code_run": "Arbeitet mit Ihrer Datei",
       "folder_fetch": "Dateien lesen",
+      "save_to_notion": "In Notion speichern",
       "research": "Recherche"
     },
     "copyText": "Inhalt kopieren",

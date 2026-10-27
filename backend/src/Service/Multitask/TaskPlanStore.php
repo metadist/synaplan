@@ -295,7 +295,7 @@ final readonly class TaskPlanStore
         if (true === ($result['step_output_truncated'] ?? false)) {
             $ref['step_output_truncated'] = true;
         }
-        foreach (['ask_user', 'folder_read'] as $key) {
+        foreach (['ask_user', 'folder_read', 'recovery'] as $key) {
             if (is_array($result[$key] ?? null)) {
                 $ref[$key] = $result[$key];
             }
@@ -343,7 +343,7 @@ final readonly class TaskPlanStore
         if (true === ($decoded['step_output_truncated'] ?? false)) {
             $out['step_output_truncated'] = true;
         }
-        foreach (['ask_user', 'folder_read'] as $key) {
+        foreach (['ask_user', 'folder_read', 'recovery'] as $key) {
             if (is_array($decoded[$key] ?? null)) {
                 $out[$key] = $decoded[$key];
             }

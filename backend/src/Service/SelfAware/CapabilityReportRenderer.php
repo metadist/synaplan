@@ -19,18 +19,25 @@ final readonly class CapabilityReportRenderer
 {
     public const MAX_CHARS = 2400;
 
-    public function render(CapabilityReport $report, ?string $modelLine = null): string
+    /**
+     * @param list<string> $connectedSources display names of the user's enabled MCP connections
+     */
+    public function render(CapabilityReport $report, ?string $modelLine = null, array $connectedSources = []): string
     {
         $available = $this->joinFacts($report->byState(CapabilityState::Available), includeAlternative: false);
         $needsSetup = $this->joinNeedsSetup($report);
         $absent = $this->joinFacts($report->byState(CapabilityState::Absent), includeAlternative: true);
+        $sources = $this->sourceLine($connectedSources);
 
         $lines = [
             '## This Synaplan installation (live, version '.$report->version.')',
-            $this->rulesLine($report),
+            $this->rulesLine($report, null !== $sources),
         ];
         if (null !== $modelLine && '' !== trim($modelLine)) {
             $lines[] = $modelLine;
+        }
+        if (null !== $sources) {
+            $lines[] = $sources;
         }
         $lines[] = 'AVAILABLE NOW: '.('' !== $available ? $available : 'none');
         $lines[] = 'NEEDS SETUP: '.('' !== $needsSetup ? $needsSetup : 'none');
@@ -98,7 +105,7 @@ final readonly class CapabilityReportRenderer
         return $text;
     }
 
-    private function rulesLine(CapabilityReport $report): string
+    private function rulesLine(CapabilityReport $report, bool $hasConnectedSources): string
     {
         $rules = 'RULES: Answer capability questions from the lists below only. '
             .'Say plainly what is not available here and offer the closest alternative. '
@@ -107,7 +114,40 @@ final readonly class CapabilityReportRenderer
         if ($report->billingEnabled) {
             $rules .= ' For plans and pricing, link the pricing page.';
         }
+        if ($hasConnectedSources) {
+            $rules .= ' If no results from a connected source are in this turn, say the lookup did not run this time and ask the user to try again. Never tell the user to connect a source that is listed as connected.';
+        }
 
         return $rules;
+    }
+
+    /**
+     * JSON-quoted names, capped so a long connection list cannot eat the budget.
+     * Names are untrusted configuration text.
+     *
+     * @param list<string> $connectedSources
+     */
+    private function sourceLine(array $connectedSources): ?string
+    {
+        $quoted = [];
+        foreach ($connectedSources as $name) {
+            if ('' === trim($name)) {
+                continue;
+            }
+            $quoted[] = json_encode($name, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR);
+            if (count($quoted) >= 8) {
+                break;
+            }
+        }
+        if ([] === $quoted) {
+            return null;
+        }
+
+        $line = 'CONNECTED SOURCES: '.implode(', ', $quoted);
+        if (count($connectedSources) > count($quoted)) {
+            $line .= ', …';
+        }
+
+        return $line;
     }
 }

@@ -49,6 +49,7 @@ final class SavedTaskSummary
         $params['saves'] = match (true) {
             in_array('email_me', $caps, true) => 'email',
             in_array('save_to_folder', $caps, true) => 'folder',
+            in_array('save_to_notion', $caps, true) => 'notion',
             in_array('calendar_event', $caps, true) => 'calendar',
             default => 'reply',
         };

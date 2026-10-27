@@ -29,6 +29,12 @@ final readonly class McpOAuthConsentService
     private const VERIFIER_TTL_SECONDS = 600;
     private const ADDRESS_CHANGED = 'The server address changed during sign-in. Please start again.';
 
+    /** Where the browser returns when the caller does not name a page. */
+    public const DEFAULT_RETURN = '/channels/mcp';
+
+    /** @var list<string> */
+    public const ALLOWED_RETURN_TO = ['/apps/notion', '/apps/mcp'];
+
     public function __construct(
         private McpClientConfig $config,
         private McpOAuthDiscovery $discovery,
@@ -53,7 +59,7 @@ final readonly class McpOAuthConsentService
      *
      * @throws McpOAuthException
      */
-    public function start(McpServerConfig $server, int $ownerId): string
+    public function start(McpServerConfig $server, int $ownerId, ?string $returnTo = null): string
     {
         if (!$this->config->isOAuthConnectorsEnabled()) {
             throw new McpOAuthException('Connecting with a sign-in is disabled by an administrator', McpOAuthFailure::Disabled);
@@ -125,11 +131,16 @@ final readonly class McpOAuthConsentService
         $item->expiresAfter(self::VERIFIER_TTL_SECONDS);
         $this->cache->save($item);
 
-        $signed = $this->state->generateState(self::PROVIDER, [
+        $extra = [
             'owner_id' => $ownerId,
             'server_id' => $server->getId(),
             'pkce_nonce' => $nonce,
-        ]);
+        ];
+        if (in_array($returnTo, self::ALLOWED_RETURN_TO, true)) {
+            $extra['return_to'] = $returnTo;
+        }
+
+        $signed = $this->state->generateState(self::PROVIDER, $extra);
 
         $provider = $this->toProviderConfig($state);
 
@@ -203,6 +214,22 @@ final readonly class McpOAuthConsentService
         ]);
 
         return $server;
+    }
+
+    /**
+     * Page path to send the browser to after consent. Anything outside the
+     * whitelist, including a full URL, falls back to the MCP servers page.
+     */
+    public function returnPath(?string $stateToken): string
+    {
+        if (!is_string($stateToken) || '' === $stateToken) {
+            return self::DEFAULT_RETURN;
+        }
+
+        $payload = $this->state->validateState($stateToken, self::PROVIDER);
+        $path = is_array($payload) && is_string($payload['return_to'] ?? null) ? $payload['return_to'] : '';
+
+        return in_array($path, self::ALLOWED_RETURN_TO, true) ? $path : self::DEFAULT_RETURN;
     }
 
     public function disconnect(McpServerConfig $server): void

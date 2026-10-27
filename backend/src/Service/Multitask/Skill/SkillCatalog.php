@@ -122,6 +122,28 @@ final class SkillCatalog
         return implode("\n", $lines);
     }
 
+    /**
+     * Let a skill repair a decoded plan before validation. A no-op when no
+     * skill registered an adjuster. Used so a title change named only by
+     * page title still searches before it writes.
+     *
+     * @param array<string, mixed> $payload
+     * @param list<string>|null    $allowedCapabilities
+     *
+     * @return array<string, mixed>
+     */
+    public function adjustPlan(array $payload, string $messageText, ?int $userId, ?array $allowedCapabilities = null, string $topic = ''): array
+    {
+        foreach ($this->byCapability as $descriptor) {
+            if (null === $descriptor->planAdjuster) {
+                continue;
+            }
+            $payload = ($descriptor->planAdjuster)($payload, $messageText, $userId, $allowedCapabilities, $topic);
+        }
+
+        return $payload;
+    }
+
     private function isEnabled(SkillDescriptor $descriptor, ?int $userId): bool
     {
         if (null === $descriptor->enabledFlag) {

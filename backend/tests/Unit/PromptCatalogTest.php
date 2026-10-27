@@ -251,6 +251,25 @@ final class PromptCatalogTest extends TestCase
         // Engine-off default: the planner still refuses real PDFs. The live
         // OfficePdfRoutingDecorator rewrites this only when OFFICE_CONVERT_URL is set.
         $this->assertStringContainsString('Real PDFs are NOT supported', $plan['prompt']);
+        $this->assertStringContainsString('broadened on its own', $plan['prompt']);
+        $this->assertStringContainsString('distinctive name', $plan['prompt']);
+    }
+
+    public function testQueryRelaxPromptStaysInternalAndGivesUp(): void
+    {
+        $entry = null;
+        foreach (PromptCatalog::all() as $candidate) {
+            if ('tools:query_relax' === $candidate['topic']) {
+                $entry = $candidate;
+                break;
+            }
+        }
+
+        $this->assertNotNull($entry);
+        $this->assertStringStartsWith('tools:', $entry['topic']);
+        $this->assertStringContainsString('{"give_up": true}', $entry['prompt']);
+        $this->assertStringContainsString('Never repeat an attempt', $entry['prompt']);
+        $this->assertStringContainsString('Metadsit → Metadata is wrong', $entry['prompt']);
     }
 
     public function testPlanPromptRoutesScriptExecutionToCodeRun(): void

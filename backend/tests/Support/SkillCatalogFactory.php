@@ -24,6 +24,7 @@ use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\OutboundWebhookRunner;
 use App\Service\Multitask\Execution\Runner\ResearchRunner;
 use App\Service\Multitask\Execution\Runner\SaveToFolderRunner;
+use App\Service\Multitask\Execution\Runner\SaveToNotionRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\ToolCallRunner;
 use App\Service\Multitask\Execution\Runner\UrlFetchRunner;
@@ -65,6 +66,7 @@ final class SkillCatalogFactory
         CalendarEventRunner::class,
         EmailMeRunner::class,
         SaveToFolderRunner::class,
+        SaveToNotionRunner::class,
         ComposeReplyRunner::class,
         AskUserRunner::class,
         ToolCallRunner::class,

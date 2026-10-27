@@ -25,24 +25,28 @@ use App\Service\Multitask\Plan\Capability;
 final readonly class SkillDescriptor
 {
     /**
-     * @param string                                               $summary             one-line, planner-facing description ([CAPABILITYLIST] entry)
-     * @param (\Closure(?int, array<string, mixed>): ?string)|null $dynamicNote         per-user/per-turn expansion appended below the
-     *                                                                                  summary; receives the user id and the render
-     *                                                                                  context (`topic`, `topic_metadata`)
-     * @param string|null                                          $enabledFlag         BCONFIG `MULTITASK.<flag>` gating this block; when the
-     *                                                                                  flag resolves to false the capability is OMITTED from
-     *                                                                                  the planner catalog (the planner never learns it
-     *                                                                                  exists — plan 09 §6)
-     * @param bool                                                 $enabledDefault      flag value when no BCONFIG row exists (new experimental
-     *                                                                                  blocks ship default-off and are flipped on when validated)
-     * @param bool                                                 $requiresDynamicNote when true the capability line is rendered ONLY when the
-     *                                                                                  dynamic note expands to something — a dynamic block with
-     *                                                                                  nothing to offer (no connected servers, topic not
-     *                                                                                  entitled) stays invisible to the planner entirely
-     * @param (\Closure(): bool)|null                              $available           install-level precondition of the block (an external
-     *                                                                                  engine that must be configured); when it returns false
-     *                                                                                  the capability is OMITTED like a disabled flag, so the
-     *                                                                                  planner never plans work the install cannot run
+     * @param string                                                                                    $summary             one-line, planner-facing description ([CAPABILITYLIST] entry)
+     * @param (\Closure(?int, array<string, mixed>): ?string)|null                                      $dynamicNote         per-user/per-turn expansion appended below the
+     *                                                                                                                       summary; receives the user id and the render
+     *                                                                                                                       context (`topic`, `topic_metadata`)
+     * @param string|null                                                                               $enabledFlag         BCONFIG `MULTITASK.<flag>` gating this block; when the
+     *                                                                                                                       flag resolves to false the capability is OMITTED from
+     *                                                                                                                       the planner catalog (the planner never learns it
+     *                                                                                                                       exists — plan 09 §6)
+     * @param bool                                                                                      $enabledDefault      flag value when no BCONFIG row exists (new experimental
+     *                                                                                                                       blocks ship default-off and are flipped on when validated)
+     * @param bool                                                                                      $requiresDynamicNote when true the capability line is rendered ONLY when the
+     *                                                                                                                       dynamic note expands to something — a dynamic block with
+     *                                                                                                                       nothing to offer (no connected servers, topic not
+     *                                                                                                                       entitled) stays invisible to the planner entirely
+     * @param (\Closure(): bool)|null                                                                   $available           install-level precondition of the block (an external
+     *                                                                                                                       engine that must be configured); when it returns false
+     *                                                                                                                       the capability is OMITTED like a disabled flag, so the
+     *                                                                                                                       planner never plans work the install cannot run
+     * @param (\Closure(array<string, mixed>, string, ?int, ?array, string): array<string, mixed>)|null $planAdjuster
+     *                                                                                                                       optional repair of a decoded plan before validation.
+     *                                                                                                                       Arguments: payload, message text, user id, allowed
+     *                                                                                                                       capabilities (null = unrestricted), topic
      */
     public function __construct(
         public Capability $capability,
@@ -52,6 +56,7 @@ final readonly class SkillDescriptor
         public bool $enabledDefault = false,
         public bool $requiresDynamicNote = false,
         public ?\Closure $available = null,
+        public ?\Closure $planAdjuster = null,
     ) {
     }
 

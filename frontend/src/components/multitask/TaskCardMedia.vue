@@ -85,7 +85,13 @@
 import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { downloadMediaUrl, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
+import {
+  downloadMediaUrl,
+  isExternalMediaUrl,
+  openExternalMedia,
+  resolveMediaUrl,
+  useMediaSrc,
+} from '@/services/api/mediaAuth'
 
 /**
  * Media body of a completed task card (#1229): image with lightbox +
@@ -134,13 +140,17 @@ const downloadFilename = (): string => {
   return name && name.includes('.') ? name : 'download'
 }
 
-// Authenticated blob download (the MessageImage pattern, issue #1071): a bare
-// anchor to an API URL would save an HTML error page for cookie-authed media.
-// downloadMediaUrl authenticates per platform (cookie / Bearer) and saves via
-// saveOrDownloadBlob (web anchor, Android Documents, iOS share sheet).
+// A Notion picture is an external https link. Opening it directly keeps the
+// bytes on Notion. Synaplan media still goes through the authenticated blob
+// download, because a bare anchor to an API URL saves an HTML error page.
 const download = async () => {
+  const url = resolveMediaUrl(props.url)
+  if (isExternalMediaUrl(url)) {
+    openExternalMedia(url)
+    return
+  }
   try {
-    await downloadMediaUrl(resolveMediaUrl(props.url), downloadFilename())
+    await downloadMediaUrl(url, downloadFilename())
   } catch (error) {
     console.error('Failed to download task media:', error)
   }

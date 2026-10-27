@@ -1,5 +1,6 @@
 import type { TaskCard } from '@/stores/taskCard'
 import { parseFolderRead } from '@/utils/folderRead'
+import { parseSearchRecovery } from '@/utils/searchRecovery'
 
 /**
  * Card fields a step reports besides its text, file and error, in their wire
@@ -12,11 +13,12 @@ export interface CardTraceWire {
   step_output_truncated?: boolean | null
   duration_ms?: number | null
   folder_read?: unknown
+  recovery?: unknown
 }
 
 type CardTraceFields = Pick<
   TaskCard,
-  'stepInput' | 'stepOutput' | 'stepOutputTruncated' | 'durationMs' | 'folderRead'
+  'stepInput' | 'stepOutput' | 'stepOutputTruncated' | 'durationMs' | 'folderRead' | 'recovery'
 >
 
 /** Only the fields that are present, so a later event never blanks an earlier one. */
@@ -28,5 +30,7 @@ export function cardTraceFrom(wire: CardTraceWire): CardTraceFields {
   if (typeof wire.duration_ms === 'number') fields.durationMs = wire.duration_ms
   const folderRead = parseFolderRead(wire.folder_read)
   if (folderRead) fields.folderRead = folderRead
+  const recovery = parseSearchRecovery(wire.recovery)
+  if (recovery) fields.recovery = recovery
   return fields
 }

@@ -20,6 +20,7 @@ use App\Service\Multitask\Execution\UpstreamHandover;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Prompt\LanguageDirectiveBuilder;
 use App\Service\Prompt\PromptService;
 use App\Service\RAG\ChatKnowledgeContextLoader;
 use App\Service\RAG\VectorSearchService;
@@ -53,6 +54,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final readonly class ChatRunner implements TaskRunner
 {
+    private const LANGUAGE_SAMPLE_CHARS = 200;
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -118,7 +121,7 @@ final readonly class ChatRunner implements TaskRunner
             }
             $systemPrompt .= $ragContext;
         }
-        $systemPrompt .= $this->linkedPagesContext($context);
+        $systemPrompt .= $this->linkedPagesContext($context).$this->answerLanguage($node, $language, $context);
 
         // Structural handover: whatever the plan wired (or forgot to wire),
         // the output of every upstream step reaches the answering model.
@@ -134,7 +137,7 @@ final readonly class ChatRunner implements TaskRunner
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => $text.UpstreamHandover::render($handover)],
+            ['role' => 'user', 'content' => $text.UpstreamHandover::render($handover, $node, $context, $text)],
         ];
 
         // Stream tokens into the node's card (task_chunk) while accumulating the
@@ -453,20 +456,48 @@ final readonly class ChatRunner implements TaskRunner
             ? $topicPrompt
             : match ($node->capability) {
                 Capability::Summarize => sprintf(
-                    'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
+                    'You are a precise summarizer. Summarize the user text concisely%s. Return ONLY the summary, no preamble.',
                     isset($node->params['max_words']) && is_numeric($node->params['max_words']) ? ' in about '.(int) $node->params['max_words'].' words' : '',
-                    $language,
                 ),
                 Capability::Translate => sprintf(
                     'Translate the user text into "%s". Return ONLY the translation.',
                     is_string($node->params['target'] ?? null) ? $node->params['target'] : $language,
                 ),
-                default => sprintf('You are a helpful assistant. Answer in language "%s".', $language),
+                default => 'You are a helpful assistant.',
             };
 
         return $this->withAssistantInstructions($task, $context)
             .$this->pipelineDirective($context)
             .$this->promptService->connectedFolderReadHonestyForRunner($node, $context, $inputs);
+    }
+
+    /**
+     * The answer follows the person's question. A Notion page, a search
+     * result or a file in another language must not switch the reply.
+     * Appended last so a long English source cannot override it.
+     */
+    private function answerLanguage(TaskNode $node, string $language, NodeContext $context): string
+    {
+        if (Capability::Translate === $node->capability) {
+            return '';
+        }
+        $suffix = "\nPages, search results and files may be in another language. Do not switch to their language.";
+        if ('auto' !== $language && '' !== $language) {
+            return LanguageDirectiveBuilder::buildForOutputLanguage($language).$suffix;
+        }
+
+        // Only the language is taken from the question; this step still does
+        // its own task, not the whole request.
+        $question = trim((string) $context->message->getText());
+        if ('' === $question) {
+            return $suffix;
+        }
+        if (mb_strlen($question) > self::LANGUAGE_SAMPLE_CHARS) {
+            $question = mb_substr($question, 0, self::LANGUAGE_SAMPLE_CHARS).'…';
+        }
+
+        return "\n\nLanguage: write in the language of this request (quoted only to tell its language, not as a task): "
+            .$question.$suffix;
     }
 
     /**

@@ -210,4 +210,55 @@ final class ChatRunnerHandoverTest extends TestCase
 
         self::assertSame([], UpstreamHandover::missing($node, $ctx, 'Answer in German.', ['text' => 'Answer in German.', 'language' => 'de']));
     }
+
+    public function testAWidenedSearchIsNamedEvenWhenTheDataIsAlreadyInThePrompt(): void
+    {
+        $captured = null;
+        $ctx = new NodeContext($this->message('Finde Metadsit'), [], 1, ['language' => 'de']);
+        $ctx->setResult('n1', NodeResult::ok('{"results":[{"title":"Metadist"}]}', [], [
+            'query' => 'Notion · notion-search',
+            'recovery' => [
+                'attempts' => [
+                    ['query' => 'Metadsit', 'hits' => 0],
+                    ['query' => 'Metadist', 'hits' => 1],
+                ],
+                'matched_query' => 'Metadist',
+                'empty' => false,
+            ],
+        ]));
+        $node = new TaskNode('n2', Capability::Chat, ['n1'], [
+            'text' => "Answer based on:\n".'{"results":[{"title":"Metadist"}]}',
+        ]);
+
+        $this->runner($captured)->run($node, $ctx);
+
+        $user = $captured[1]['content'];
+        self::assertStringContainsString("Search for 'Metadsit' found nothing; results below are for 'Metadist'", $user);
+        self::assertStringContainsString('Tell the user which title you matched', $user);
+    }
+
+    public function testAnExhaustedSearchTellsTheAnswerToStopGuessing(): void
+    {
+        $ctx = new NodeContext($this->message('Finde Zzzzz'), [], 1, ['language' => 'de']);
+        $ctx->setResult('n1', NodeResult::ok('{"results":[]}', [], [
+            'recovery' => [
+                'attempts' => [
+                    ['query' => 'Zzzzz', 'hits' => 0],
+                    ['query' => 'Zzz', 'hits' => 0],
+                ],
+                'empty' => true,
+            ],
+        ]));
+        $node = new TaskNode('n2', Capability::Chat, ['n1'], ['text' => 'Answer.']);
+
+        $rendered = UpstreamHandover::render(
+            UpstreamHandover::missing($node, $ctx, 'Answer.', ['text' => 'Answer.']),
+            $node,
+            $ctx,
+            'Answer.',
+        );
+
+        self::assertStringContainsString('Searches for Zzzzz, Zzz found nothing', $rendered);
+        self::assertStringContainsString('Do not guess other causes', $rendered);
+    }
 }

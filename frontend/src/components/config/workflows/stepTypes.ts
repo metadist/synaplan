@@ -12,6 +12,9 @@ export const BUILTIN_STEP_KINDS = [
 
 export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number]
 
+/** Offered only while the person's own Notion is connected. */
+export const NOTION_STEP_KIND = 'save_to_notion'
+
 export type InputSpec = Record<string, unknown>
 
 export type AuthoredStep = {
@@ -50,6 +53,10 @@ export function emptyStep(
   if (capability === 'tool_call') {
     params.tool = ''
     params.inputs = {}
+  }
+  if (capability === NOTION_STEP_KIND) {
+    params.page = ''
+    params.title = ''
   }
   return { id, capability, depends_on: [], params }
 }

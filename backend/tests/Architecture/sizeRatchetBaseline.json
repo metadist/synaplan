@@ -107,7 +107,6 @@
         "src/Service/Message/MessageSorter.php::MessageSorter": 18,
         "src/Service/Multitask/Execution/Runner/CodeRunRunner.php::CodeRunRunner": 13,
         "src/Service/Multitask/Execution/Runner/McpActionRunner.php::McpActionRunner": 11,
-        "src/Service/Multitask/TaskPlanExecutor.php::TaskPlanExecutor": 12,
         "src/Service/Multitask/TaskPlanner.php::TaskPlanner": 17,
         "src/Service/OidcUserService.php::OidcUserService": 12,
         "src/Service/Plugin/PluginAgentInstaller.php::PluginAgentInstaller": 12,

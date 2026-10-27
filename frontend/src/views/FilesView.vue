@@ -1428,6 +1428,7 @@ import {
 import { isDocumentToolsEnabled } from '@/composables/useDocumentToolsFeature'
 import { isModuleConfigured } from '@/composables/useModuleFeature'
 import { useNotification } from '@/composables/useNotification'
+import { useNotionFilePush } from '@/composables/useNotionFilePush'
 import { useDialog } from '@/composables/useDialog'
 import { ApiError } from '@/services/api/httpClient'
 import { useFilePersistence } from '@/composables/useInputPersistence'
@@ -2065,6 +2066,8 @@ const getFileIcon = (filename: string): string => previewIconForName(filename)
 
 // Canonical file-row actions (chat → preview → download → delete), shared by
 // the mobile card and the desktop table via FileRowActions (U9/U12).
+const notionPush = useNotionFilePush()
+
 const rowActions = (file: FileItem): FileRowAction[] => {
   const actions: FileRowAction[] = []
   if (file.chat_id && openSharedFolder.value === null) {
@@ -2089,6 +2092,15 @@ const rowActions = (file: FileItem): FileRowAction[] => {
       onSelect: () => downloadFile(file.id, file.filename),
     }
   )
+  if (notionPush.available.value && openSharedFolder.value === null) {
+    actions.push({
+      id: 'sendToNotion',
+      title: t('files.notion.action'),
+      testid: `btn-notion-push-${file.id}`,
+      disabled: notionPush.busyId.value === file.id,
+      onSelect: () => notionPush.pushFile(file.id, displayName(file)),
+    })
+  }
   if (canChangeOpenFolder.value) {
     actions.push({
       id: 'delete',
@@ -2693,6 +2705,7 @@ const displayName = (file: FileItem): string =>
 // Load initial data
 onMounted(async () => {
   document.addEventListener('click', closeFolderMenu)
+  void notionPush.load()
   await Promise.all([loadFileGroups(), loadFiles(), loadFacets(), loadSharedFolders()])
 
   // #1268: deep-link from /files/search "View file" (?file=<id>).

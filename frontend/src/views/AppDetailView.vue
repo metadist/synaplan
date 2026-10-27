@@ -30,7 +30,7 @@
           </div>
           <div>
             <dt class="font-medium txt-primary">{{ $t('apps.factWho') }}</dt>
-            <dd class="txt-secondary mt-1">{{ $t('apps.ownerOnly') }}</dd>
+            <dd class="txt-secondary mt-1">{{ who }}</dd>
           </div>
           <div>
             <dt class="font-medium txt-primary">{{ $t('apps.factStop') }}</dt>
@@ -56,7 +56,7 @@ import AppPanelHost from '@/components/apps/AppPanelHost.vue'
 import { appMessageKey, findApp } from '@/apps/catalog'
 import { getTour } from '@/tours'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const route = useRoute()
 
 const appId = computed(() => String(route.params.appId ?? ''))
@@ -64,5 +64,9 @@ const app = computed(() => findApp(appId.value))
 const messageKey = computed(() => appMessageKey(appId.value))
 const name = computed(() => t(`apps.items.${messageKey.value}.name`))
 const tagline = computed(() => t(`apps.items.${messageKey.value}.tagline`))
+const who = computed(() => {
+  const key = `apps.items.${messageKey.value}.who`
+  return te(key) ? t(key) : t('apps.ownerOnly')
+})
 const tourId = computed(() => (getTour(`app.${appId.value}`) ? `app.${appId.value}` : undefined))
 </script>
