@@ -22,6 +22,11 @@
     { "method": "GET", "path": "/api/v1/cloud/files/{id}", "scopes": ["files"] },
     { "method": "GET", "path": "/api/v1/cloud/watches", "scopes": ["cloud:watch"] },
     { "method": "POST", "path": "/api/v1/cloud/watches", "scopes": ["cloud:watch"] },
+    { "method": "GET", "path": "/api/v1/cloud/watches/options", "scopes": ["cloud:watch"] },
+    { "method": "PATCH", "path": "/api/v1/cloud/watches/{id}", "scopes": ["cloud:watch"] },
+    { "method": "DELETE", "path": "/api/v1/cloud/watches/{id}", "scopes": ["cloud:watch"] },
+    { "method": "POST", "path": "/api/v1/cloud/watches/{id}/files", "scopes": ["cloud:watch"] },
+    { "method": "POST", "path": "/api/v1/cloud/watches/{id}/reconcile", "scopes": ["cloud:watch"] },
     { "method": "POST", "path": "/api/v1/cloud/trials", "scopes": ["cloud:watch"] }
   ],
   "anyKey": [

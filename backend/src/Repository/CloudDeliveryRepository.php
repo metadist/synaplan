@@ -54,6 +54,22 @@ class CloudDeliveryRepository extends ServiceEntityRepository
             ->execute();
     }
 
+    public function writtenRecently(int $identityId, string $remoteId, int $since): bool
+    {
+        $count = $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->where('d.identityId = :identity')
+            ->andWhere('d.remoteId = :remote')
+            ->andWhere('d.created >= :since')
+            ->setParameter('identity', $identityId)
+            ->setParameter('remote', $remoteId)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
     public function save(CloudDelivery $delivery): void
     {
         $this->getEntityManager()->persist($delivery);

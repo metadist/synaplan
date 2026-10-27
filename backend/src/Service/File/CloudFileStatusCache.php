@@ -34,7 +34,12 @@ final readonly class CloudFileStatusCache
         if (!in_array($file->getSource(), ['nextcloud', 'opencloud', 'owncloud'], true)) {
             return;
         }
-        $this->redis->increment($this->key((int) $file->getUserId()));
+        $this->bumpUser((int) $file->getUserId());
+    }
+
+    public function bumpUser(int $userId): void
+    {
+        $this->redis->increment($this->key($userId));
     }
 
     private function key(int $userId): string

@@ -8,9 +8,11 @@ use App\Entity\ExternalIdentity;
 use App\Entity\File;
 use App\Entity\PlatformInstance;
 use App\Entity\User;
+use App\Repository\CloudWatchRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\FileRepository;
 use App\Repository\PlatformInstanceRepository;
+use App\Service\CloudWatch\WatchSentence;
 use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\SourceInstanceResolver;
 use Doctrine\ORM\EntityManagerInterface;
@@ -33,6 +35,8 @@ final readonly class CloudFileStatus
         private RedisService $redis,
         private CloudFileStatusCache $cache,
         private EntityManagerInterface $entityManager,
+        private CloudWatchRepository $watches,
+        private WatchSentence $sentences,
     ) {
     }
 
@@ -58,7 +62,7 @@ final readonly class CloudFileStatus
         $platform = '' === $instanceId ? null : $this->platforms->findByInstanceId($instanceId);
         $answer = [
             'items' => $this->fresh($user, $platform, $items),
-            'watches' => [],
+            'watches' => $this->watchRows($user, $instanceId, $items),
         ];
         $this->redis->set($key, (string) json_encode($answer), self::CACHE_SECONDS);
 
@@ -172,6 +176,26 @@ final readonly class CloudFileStatus
         }
 
         return $items;
+    }
+
+    /**
+     * @param list<array{id: string, version: string}> $items
+     *
+     * @return list<array{id: int, target_id: string, sentence: string, state: string}>
+     */
+    private function watchRows(User $user, string $instanceId, array $items): array
+    {
+        $rows = [];
+        foreach ($this->watches->touching((int) $user->getId(), $instanceId, array_column($items, 'id')) as $watch) {
+            $rows[] = [
+                'id' => (int) $watch->getId(),
+                'target_id' => $watch->getTargetId(),
+                'sentence' => $this->sentences->for($watch),
+                'state' => $watch->getState(),
+            ];
+        }
+
+        return $rows;
     }
 
     /**

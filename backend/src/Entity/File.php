@@ -212,6 +212,10 @@ class File
     #[ORM\Column(name: 'BKEEPSYNCED', type: 'boolean', options: ['default' => false])]
     private bool $keepSynced = false;
 
+    /** When set, the ephemeral reaper deletes this hidden file at this moment. */
+    #[ORM\Column(name: 'BEXPIRESAT', type: 'bigint', nullable: true)]
+    private ?int $expiresAt = null;
+
     /**
      * External version/etag captured at ingest. A differing etag reported later
      * means the source drifted and the KB copy is {@see self::VECTOR_STATE_STALE}
@@ -546,6 +550,18 @@ class File
     public function setKeepSynced(bool $keepSynced): self
     {
         $this->keepSynced = $keepSynced;
+
+        return $this;
+    }
+
+    public function getExpiresAt(): ?int
+    {
+        return $this->expiresAt;
+    }
+
+    public function setExpiresAt(?int $expiresAt): self
+    {
+        $this->expiresAt = $expiresAt;
 
         return $this;
     }

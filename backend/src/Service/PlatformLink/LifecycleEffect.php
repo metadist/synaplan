@@ -7,7 +7,7 @@ namespace App\Service\PlatformLink;
 use App\Entity\ExternalIdentity;
 
 /**
- * What a lifecycle event does to watches. CF5.1 replaces the no-op.
+ * What a lifecycle event does to watches.
  */
 interface LifecycleEffect
 {

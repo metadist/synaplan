@@ -63,7 +63,7 @@ final class CloudFilesModule implements FeatureModuleInterface
 
     public function capabilityIds(): array
     {
-        return ['cloud_status'];
+        return ['cloud_status', 'watches'];
     }
 
     public function routeNames(): array
@@ -72,6 +72,14 @@ final class CloudFilesModule implements FeatureModuleInterface
             'api_cloud_status',
             'api_cloud_file_detail',
             'api_cloud_source_events',
+            'api_cloud_watches_list',
+            'api_cloud_watches_options',
+            'api_cloud_watches_create',
+            'api_cloud_watches_update',
+            'api_cloud_watches_delete',
+            'api_cloud_watches_files',
+            'api_cloud_watches_reconcile',
+            'api_cloud_watch_index',
         ];
     }
 
@@ -82,6 +90,8 @@ final class CloudFilesModule implements FeatureModuleInterface
             'App\Service\File\CloudFileStatus',
             'App\Service\File\CloudSourceEvents',
             'App\Controller\CloudFileController',
+            'App\Controller\CloudWatchController',
+            'App\Service\CloudWatch\CloudWatchService',
         ];
     }
 
