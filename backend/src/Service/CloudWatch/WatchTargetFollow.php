@@ -34,8 +34,11 @@ final readonly class WatchTargetFollow
         foreach ($this->watches->targets($instance->getInstanceId(), $targetId) as $watch) {
             $did = $this->follow($watch, $event, $now);
             $identity = null !== $watch->getIdentityId() ? $this->identities->find($watch->getIdentityId()) : null;
-            if ($did && $identity instanceof ExternalIdentity) {
-                $this->publisher->changed($watch, $identity);
+            if ($did) {
+                $this->watches->stamp($watch, $instance->getInstanceId());
+                if ($identity instanceof ExternalIdentity) {
+                    $this->publisher->changed($watch, $identity);
+                }
             }
             $changed = $changed || $did;
         }
@@ -45,15 +48,17 @@ final readonly class WatchTargetFollow
 
     private function follow(CloudWatch $watch, string $event, int $now): bool
     {
-        if ('deleted' === $event && CloudWatch::STATE_STOPPED !== $watch->getState()) {
+        if ('deleted' === $event && CloudWatch::STATE_ACTIVE === $watch->getState()) {
             $watch->mark(CloudWatch::STATE_ATTENTION, CloudWatch::REASON_TARGET_GONE);
             $watch->setLastEventAt($now);
 
             return true;
         }
-        if ('restored' === $event && CloudWatch::REASON_TARGET_GONE === $watch->getReason()) {
+        if ('restored' === $event && CloudWatch::STATE_ATTENTION === $watch->getState() && CloudWatch::REASON_TARGET_GONE === $watch->getReason()) {
             $goneAt = $watch->getLastEventAt() ?? 0;
-            if ($now - $goneAt <= self::GRACE_SECONDS) {
+            $identityId = $watch->getIdentityId();
+            $identity = null !== $identityId ? $this->identities->find($identityId) : null;
+            if ($identity instanceof ExternalIdentity && !$identity->isOff() && $now - $goneAt <= self::GRACE_SECONDS) {
                 $watch->mark(CloudWatch::STATE_ACTIVE, null);
 
                 return true;

@@ -11,18 +11,18 @@ final class WatchIndexCursor
 {
     public const TTL_SECONDS = 604800;
 
-    public static function page(int $now, int $afterId): string
+    public static function page(int $now, int $boundary, int $afterId): string
     {
-        return self::pack($now, 'p', 0, $afterId);
+        return self::pack($now, 'p', $boundary, $afterId);
     }
 
-    public static function since(int $now, int $updated, int $id): string
+    public static function since(int $now, int $revision): string
     {
-        return self::pack($now, 's', $updated, $id);
+        return self::pack($now, 's', $revision, 0);
     }
 
     /**
-     * @return array{iat: int, kind: string, updated: int, id: int}|null null when the cursor cannot be read or has expired
+     * @return array{iat: int, kind: string, revision: int, id: int}|null null when the cursor cannot be read or has expired
      */
     public static function read(string $cursor, int $now): ?array
     {
@@ -39,7 +39,7 @@ final class WatchIndexCursor
             return null;
         }
 
-        return ['iat' => $iat, 'kind' => $parts[1], 'updated' => (int) $parts[2], 'id' => (int) $parts[3]];
+        return ['iat' => $iat, 'kind' => $parts[1], 'revision' => (int) $parts[2], 'id' => (int) $parts[3]];
     }
 
     private static function pack(int $now, string $kind, int $updated, int $id): string

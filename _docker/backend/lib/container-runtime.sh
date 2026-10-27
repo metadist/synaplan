@@ -672,6 +672,7 @@ run_scheduler_tick_lane() {
     if [ "$smart_mailbox" = "1" ]; then
         run_scheduler_job 300 bin/console --env="$env" app:process-emails --no-interaction
     fi
+    run_scheduler_job 300 bin/console --env="$env" app:cloud-watches:sweep --no-interaction
 }
 
 # shellcheck disable=SC2317
@@ -692,7 +693,6 @@ run_scheduler_hourly_lane() {
 
     run_scheduler_job 900 bin/console --env="$env" app:files:reap-ephemeral --no-interaction
     run_scheduler_job 900 bin/console --env="$env" app:cloud-files:reap --no-interaction
-    run_scheduler_job 900 bin/console --env="$env" app:cloud-watches:sweep --no-interaction
 
     # Tool approvals nobody decided within their deadline (default 72 h)
     # flip to `expired` and fail the paused Saved Task run. Cheap: one

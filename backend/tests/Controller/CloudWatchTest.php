@@ -169,7 +169,7 @@ final class CloudWatchTest extends WebTestCase
         $this->client->request('GET', '/api/v1/platform-links/watches?since='.rawurlencode((string) $since), server: $headers);
         self::assertContains($first, $this->json()['tombstones']);
 
-        $expired = WatchIndexCursor::since(time() - WatchIndexCursor::TTL_SECONDS - 5, 0, 0);
+        $expired = WatchIndexCursor::since(time() - WatchIndexCursor::TTL_SECONDS - 5, 0);
         $this->client->request('GET', '/api/v1/platform-links/watches?since='.rawurlencode($expired), server: $headers);
         self::assertResponseStatusCodeSame(Response::HTTP_GONE);
     }

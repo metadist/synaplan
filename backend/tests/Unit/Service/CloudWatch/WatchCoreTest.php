@@ -44,10 +44,10 @@ final class WatchCoreTest extends TestCase
     public function testACursorOlderThanSevenDaysIsRefused(): void
     {
         $now = 1_700_000_000;
-        $fresh = WatchIndexCursor::since($now - 10, 5, 9);
-        $stale = WatchIndexCursor::since($now - WatchIndexCursor::TTL_SECONDS - 1, 5, 9);
+        $fresh = WatchIndexCursor::since($now - 10, 5);
+        $stale = WatchIndexCursor::since($now - WatchIndexCursor::TTL_SECONDS - 1, 5);
 
-        self::assertSame(['iat' => $now - 10, 'kind' => 's', 'updated' => 5, 'id' => 9], WatchIndexCursor::read($fresh, $now));
+        self::assertSame(['iat' => $now - 10, 'kind' => 's', 'revision' => 5, 'id' => 0], WatchIndexCursor::read($fresh, $now));
         self::assertNull(WatchIndexCursor::read($stale, $now));
         self::assertNull(WatchIndexCursor::read('not-a-cursor', $now));
     }

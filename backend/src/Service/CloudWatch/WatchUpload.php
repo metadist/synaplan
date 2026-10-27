@@ -10,7 +10,10 @@ use App\Entity\File;
 use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\CloudWatchItemRepository;
+use App\Repository\CloudWatchRepository;
 use App\Service\File\FileStorageService;
+use App\Service\Usage\StorageQuotaService;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -28,6 +31,8 @@ final readonly class WatchUpload
         private QuietPeriod $quiet,
         private FileStorageService $storage,
         private EntityManagerInterface $entityManager,
+        private StorageQuotaService $quota,
+        private CloudWatchRepository $watches,
     ) {
     }
 
@@ -44,34 +49,34 @@ final readonly class WatchUpload
         if ('' === $sourceId || '' === $version || strlen($sourceId) > 255 || strlen($version) > 255) {
             throw new CloudWatchException(400, 'A file id and version are required, each at most 255 characters.');
         }
-        if (CloudWatch::KIND_FILE === $watch->getTargetKind() && $sourceId !== $watch->getTargetId() && 'deleted' !== $this->text($fields, 'event') && 'restored' !== $this->text($fields, 'event')) {
+        if (CloudWatch::KIND_FILE === $watch->getTargetKind() && $sourceId !== $watch->getTargetId()) {
             throw new CloudWatchException(422, 'This watch follows one file.');
         }
-        if (CloudWatch::STATE_ACTIVE !== $watch->getState()) {
-            throw new CloudWatchException(409, 'This watch is not running.');
-        }
-
-        $existing = $this->items->findVersion((int) $watch->getId(), $sourceId, $version);
-        if ($existing instanceof CloudWatchItem) {
-            return ['item_id' => (int) $existing->getId(), 'state' => 'already_handled'];
-        }
-
         $event = $this->text($fields, 'event');
-        if ('deleted' === $event && $sourceId === $watch->getTargetId()) {
+        if ('deleted' === $event && $sourceId === $watch->getTargetId() && CloudWatch::STATE_ACTIVE === $watch->getState()) {
             $watch->mark(CloudWatch::STATE_ATTENTION, CloudWatch::REASON_TARGET_GONE);
             $watch->setLastEventAt($now);
+            $this->watches->stamp($watch, $instance->getInstanceId());
             $this->entityManager->flush();
 
             return ['state' => CloudWatch::STATE_ATTENTION, 'reason' => CloudWatch::REASON_TARGET_GONE];
         }
-        if ('restored' === $event && CloudWatch::REASON_TARGET_GONE === $watch->getReason()) {
+        if ('restored' === $event && CloudWatch::STATE_ATTENTION === $watch->getState() && CloudWatch::REASON_TARGET_GONE === $watch->getReason()) {
             $goneAt = $watch->getLastEventAt() ?? 0;
             if ($now - $goneAt <= self::GRACE_SECONDS) {
                 $watch->mark(CloudWatch::STATE_ACTIVE, null);
+                $this->watches->stamp($watch, $instance->getInstanceId());
                 $this->entityManager->flush();
             }
 
             return ['state' => $watch->getState(), 'reason' => $watch->getReason()];
+        }
+        if (CloudWatch::STATE_ACTIVE !== $watch->getState()) {
+            throw new CloudWatchException(409, 'This watch is not running.');
+        }
+        $existing = $this->items->findVersion((int) $watch->getId(), $sourceId, $version);
+        if ($existing instanceof CloudWatchItem) {
+            return ['item_id' => (int) $existing->getId(), 'state' => 'already_handled'];
         }
 
         $name = $this->text($fields, 'name');
@@ -92,16 +97,30 @@ final readonly class WatchUpload
         if (!$upload instanceof UploadedFile) {
             throw new CloudWatchException(400, 'The file itself is missing.');
         }
-
+        try {
+            $this->quota->checkStorageLimit($user, $size);
+        } catch (\RuntimeException $e) {
+            throw new CloudWatchException(409, $e->getMessage(), 'storage_quota');
+        }
         foreach ($this->items->waitingForSource((int) $watch->getId(), $sourceId) as $previous) {
             if (!$this->quiet->due($previous->getUpdated(), $now)) {
                 $previous->mark(CloudWatchItem::STATE_SKIPPED, CloudWatchItem::REASON_GONE);
             }
         }
+        $claimed = $this->claim((int) $watch->getId(), $sourceId, $version, $now);
+        if (!$claimed instanceof CloudWatchItem) {
+            return ['state' => 'already_handled'];
+        }
 
         $waiting = $this->overLimit($watch, $instanceWatchIds, $now);
-        $stored = $this->store($watch, $user, $instance, $upload, $sourceId, $version, $name);
-        $item = new CloudWatchItem((int) $watch->getId(), $sourceId, $version, CloudWatchItem::STATE_WAITING);
+        try {
+            $stored = $this->store($watch, $user, $instance, $upload, $sourceId, $version, $name);
+        } catch (\Throwable $e) {
+            $this->entityManager->remove($claimed);
+            $this->entityManager->flush();
+            throw $e;
+        }
+        $item = $claimed;
         $item->setFileId($stored);
         if ($waiting) {
             $item->mark(CloudWatchItem::STATE_WAITING, CloudWatchItem::REASON_LIMIT_WAITING);
@@ -137,6 +156,21 @@ final readonly class WatchUpload
         }
 
         return ['process' => $process, 'forget' => $forget];
+    }
+
+    private function claim(int $watchId, string $sourceId, string $version, int $now): CloudWatchItem|string
+    {
+        try {
+            $this->entityManager->getConnection()->executeStatement(
+                'INSERT INTO BCLOUDWATCHITEMS (BWATCHID, BSOURCEID, BVERSION, BSTATE, BCREATED, BUPDATED) VALUES (?, ?, ?, ?, ?, ?)',
+                [$watchId, $sourceId, $version, CloudWatchItem::STATE_WAITING, $now, $now],
+            );
+        } catch (UniqueConstraintViolationException) {
+            return 'already_handled';
+        }
+        $item = $this->items->findVersion($watchId, $sourceId, $version);
+
+        return $item instanceof CloudWatchItem ? $item : 'already_handled';
     }
 
     /** @param list<int> $instanceWatchIds */

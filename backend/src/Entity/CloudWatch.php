@@ -133,6 +133,9 @@ class CloudWatch
     #[ORM\Column(name: 'BUPDATED', type: 'bigint')]
     private int $updated;
 
+    #[ORM\Column(name: 'BREVISION', type: 'bigint', options: ['default' => 0])]
+    private int $revision = 0;
+
     public function __construct(int $ownerId, string $targetKind, string $targetId)
     {
         $this->ownerId = $ownerId;
@@ -387,6 +390,18 @@ class CloudWatch
     public function getUpdated(): int
     {
         return $this->updated;
+    }
+
+    public function getRevision(): int
+    {
+        return $this->revision;
+    }
+
+    public function setRevision(int $revision): self
+    {
+        $this->revision = $revision;
+
+        return $this;
     }
 
     public function isSearchable(): bool

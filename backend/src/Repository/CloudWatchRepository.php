@@ -9,6 +9,7 @@ use App\Entity\CloudWatchItem;
 use App\Entity\ExternalIdentity;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -21,15 +22,31 @@ class CloudWatchRepository extends ServiceEntityRepository
         parent::__construct($registry, CloudWatch::class);
     }
 
+    public function stamp(CloudWatch $watch, string $instanceId): void
+    {
+        $revision = $this->nextRevision($instanceId);
+        $watch->setRevision($revision);
+        if (CloudWatch::STATE_STOPPED === $watch->getState() && null !== $watch->getId()) {
+            $this->remember($instanceId, (int) $watch->getId(), $revision);
+        }
+    }
+
     public function deleteByOwner(int $ownerId): void
     {
-        /** @var list<int|string> $ids */
-        $ids = $this->createQueryBuilder('w')
-            ->select('w.id')
+        /** @var list<array{id: int|string, instanceId: string}> $rows */
+        $rows = $this->createQueryBuilder('w')
+            ->select('w.id AS id, i.instanceId AS instanceId')
+            ->innerJoin(ExternalIdentity::class, 'i', 'WITH', 'i.id = w.identityId')
             ->where('w.ownerId = :owner')
             ->setParameter('owner', $ownerId)
             ->getQuery()
-            ->getSingleColumnResult();
+            ->getArrayResult();
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) $row['id'];
+            $ids[] = $id;
+            $this->remember((string) $row['instanceId'], $id, $this->nextRevision((string) $row['instanceId']));
+        }
         if ([] !== $ids) {
             $this->getEntityManager()->createQueryBuilder()
                 ->delete(CloudWatchItem::class, 'i')
@@ -136,13 +153,15 @@ class CloudWatchRepository extends ServiceEntityRepository
     }
 
     /** @return list<CloudWatch> */
-    public function page(string $instanceId, int $afterId, int $limit): array
+    public function page(string $instanceId, int $afterId, int $boundary, int $limit): array
     {
         /** @var list<CloudWatch> $rows */
         $rows = $this->scoped($instanceId)
             ->andWhere('w.state != :stopped')
+            ->andWhere('w.revision <= :boundary')
             ->andWhere('w.id > :after')
             ->setParameter('stopped', CloudWatch::STATE_STOPPED)
+            ->setParameter('boundary', $boundary)
             ->setParameter('after', $afterId)
             ->orderBy('w.id', 'ASC')
             ->setMaxResults($limit)
@@ -153,15 +172,15 @@ class CloudWatchRepository extends ServiceEntityRepository
     }
 
     /** @return list<CloudWatch> */
-    public function changedSince(string $instanceId, int $updated, int $id, int $limit): array
+    public function changedSince(string $instanceId, int $revision, int $limit): array
     {
         /** @var list<CloudWatch> $rows */
         $rows = $this->scoped($instanceId)
-            ->andWhere('w.updated > :updated OR (w.updated = :updated AND w.id > :id)')
-            ->setParameter('updated', $updated)
-            ->setParameter('id', $id)
-            ->orderBy('w.updated', 'ASC')
-            ->addOrderBy('w.id', 'ASC')
+            ->andWhere('w.revision > :revision')
+            ->andWhere('w.state != :stopped')
+            ->setParameter('revision', $revision)
+            ->setParameter('stopped', CloudWatch::STATE_STOPPED)
+            ->orderBy('w.revision', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -198,14 +217,74 @@ class CloudWatchRepository extends ServiceEntityRepository
         return array_map(static fn (int|string $id): int => (int) $id, $ids);
     }
 
-    public function highWater(string $instanceId): int
+    public function currentRevision(string $instanceId): int
     {
-        $value = $this->scoped($instanceId)
-            ->select('MAX(w.updated)')
-            ->getQuery()
-            ->getSingleScalarResult();
+        $value = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT BREVISION FROM BCLOUDWATCHFEED WHERE BINSTANCEID = ?',
+            [$instanceId],
+        );
 
         return is_numeric($value) ? (int) $value : 0;
+    }
+
+    /**
+     * @return list<array{id: int, revision: int}>
+     */
+    public function tombstonesSince(string $instanceId, int $revision, int $limit): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT BWATCHID AS id, BREVISION AS revision FROM BCLOUDWATCHTOMBSTONES WHERE BINSTANCEID = ? AND BREVISION > ? ORDER BY BREVISION ASC LIMIT ?',
+            [$instanceId, $revision, $limit],
+            [ParameterType::STRING, ParameterType::INTEGER, ParameterType::INTEGER],
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = ['id' => (int) $row['id'], 'revision' => (int) $row['revision']];
+        }
+
+        return $out;
+    }
+
+    public function nextRevision(string $instanceId): int
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        $own = 0 === $connection->getTransactionNestingLevel();
+        if ($own) {
+            $connection->beginTransaction();
+        }
+        try {
+            $connection->executeStatement(
+                'INSERT INTO BCLOUDWATCHFEED (BINSTANCEID, BREVISION) VALUES (?, 0) ON DUPLICATE KEY UPDATE BINSTANCEID = BINSTANCEID',
+                [$instanceId],
+            );
+            $current = $connection->fetchOne(
+                'SELECT BREVISION FROM BCLOUDWATCHFEED WHERE BINSTANCEID = ? FOR UPDATE',
+                [$instanceId],
+            );
+            $revision = (is_numeric($current) ? (int) $current : 0) + 1;
+            $connection->executeStatement(
+                'UPDATE BCLOUDWATCHFEED SET BREVISION = ? WHERE BINSTANCEID = ?',
+                [$revision, $instanceId],
+            );
+            if ($own) {
+                $connection->commit();
+            }
+
+            return $revision;
+        } catch (\Throwable $e) {
+            if ($own && $connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    private function remember(string $instanceId, int $watchId, int $revision): void
+    {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'INSERT INTO BCLOUDWATCHTOMBSTONES (BINSTANCEID, BWATCHID, BREVISION, BCREATED) VALUES (?, ?, ?, ?)',
+            [$instanceId, $watchId, $revision, time()],
+        );
     }
 
     private function scoped(string $instanceId): \Doctrine\ORM\QueryBuilder

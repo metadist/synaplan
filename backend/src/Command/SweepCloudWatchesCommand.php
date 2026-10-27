@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Entity\CloudWatchItem;
 use App\Repository\CloudWatchItemRepository;
+use App\Service\CloudWatch\WatchPromoter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -24,18 +25,20 @@ final class SweepCloudWatchesCommand extends Command
     public function __construct(
         private readonly CloudWatchItemRepository $items,
         private readonly EntityManagerInterface $entityManager,
+        private readonly WatchPromoter $promoter,
     ) {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $promoted = $this->promoter->promote(time());
         $stuck = $this->items->stuckRunning(time() - self::STUCK_SECONDS);
         foreach ($stuck as $item) {
             $item->mark(CloudWatchItem::STATE_FAILED, CloudWatchItem::REASON_FAILED_RUN);
         }
         $this->entityManager->flush();
-        $output->writeln(sprintf('Failed %d stuck watch item(s).', count($stuck)));
+        $output->writeln(sprintf('Finished %d quiet watch item(s). Failed %d stuck watch item(s).', $promoted, count($stuck)));
 
         return Command::SUCCESS;
     }

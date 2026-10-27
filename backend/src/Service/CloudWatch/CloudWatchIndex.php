@@ -33,7 +33,7 @@ final readonly class CloudWatchIndex
     public function feed(PlatformInstance $instance, Request $request, int $now): array
     {
         $limit = $this->limit($request);
-        $etag = '"'.$this->watches->highWater($instance->getInstanceId()).'"';
+        $etag = '"'.$this->watches->currentRevision($instance->getInstanceId()).'"';
         $since = $request->query->get('since');
         $cursor = $request->query->get('cursor');
         if (is_string($since) && '' !== $since && is_string($cursor) && '' !== $cursor) {
@@ -43,19 +43,21 @@ final readonly class CloudWatchIndex
             return $this->changes($instance, $since, $limit, $etag, $now);
         }
         $after = 0;
+        $boundary = $this->watches->currentRevision($instance->getInstanceId());
         if (is_string($cursor) && '' !== $cursor) {
             $read = WatchIndexCursor::read($cursor, $now);
             if (null === $read || 'p' !== $read['kind']) {
                 return ['status' => 410, 'etag' => $etag, 'body' => ['error' => 'cursor_expired']];
             }
             $after = $read['id'];
+            $boundary = $read['revision'];
         }
-        $page = $this->watches->page($instance->getInstanceId(), $after, $limit);
+        $page = $this->watches->page($instance->getInstanceId(), $after, $boundary, $limit);
         $more = count($page) === $limit;
         $last = $page[array_key_last($page)] ?? null;
         $next = $more && $last instanceof CloudWatch
-            ? WatchIndexCursor::page($now, (int) $last->getId())
-            : WatchIndexCursor::since($now, $this->watches->highWater($instance->getInstanceId()), (int) ($last instanceof CloudWatch ? $last->getId() : $after));
+            ? WatchIndexCursor::page($now, $boundary, (int) $last->getId())
+            : WatchIndexCursor::since($now, $boundary);
         $body = [
             'items' => $this->present($page, false),
             'tombstones' => [],
@@ -77,19 +79,26 @@ final readonly class CloudWatchIndex
         if (null === $read) {
             return ['status' => 410, 'etag' => $etag, 'body' => ['error' => 'cursor_expired']];
         }
-        $rows = $this->watches->changedSince($instance->getInstanceId(), $read['updated'], $read['id'], $limit);
-        if ([] === $rows) {
+        $rows = $this->watches->changedSince($instance->getInstanceId(), $read['revision'], $limit);
+        $gone = $this->watches->tombstonesSince($instance->getInstanceId(), $read['revision'], $limit);
+        if ([] === $rows && [] === $gone) {
             return ['status' => 304, 'etag' => $etag, 'body' => null];
         }
-        $last = $rows[array_key_last($rows)];
+        $revision = $read['revision'];
+        foreach ($rows as $watch) {
+            $revision = max($revision, $watch->getRevision());
+        }
+        foreach ($gone as $tombstone) {
+            $revision = max($revision, $tombstone['revision']);
+        }
 
         return [
             'status' => 200,
             'etag' => $etag,
             'body' => [
                 'items' => $this->present($rows, false),
-                'tombstones' => $this->tombstones($rows),
-                'next_cursor' => WatchIndexCursor::since($now, $last->getUpdated(), (int) $last->getId()),
+                'tombstones' => array_map(static fn (array $tombstone): int => $tombstone['id'], $gone),
+                'next_cursor' => WatchIndexCursor::since($now, $revision),
             ],
         ];
     }
@@ -121,23 +130,6 @@ final readonly class CloudWatchIndex
         }
 
         return $items;
-    }
-
-    /**
-     * @param list<CloudWatch> $rows
-     *
-     * @return list<int>
-     */
-    private function tombstones(array $rows): array
-    {
-        $ids = [];
-        foreach ($rows as $watch) {
-            if (CloudWatch::STATE_STOPPED === $watch->getState()) {
-                $ids[] = (int) $watch->getId();
-            }
-        }
-
-        return $ids;
     }
 
     /**

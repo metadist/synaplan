@@ -88,6 +88,23 @@ class CloudWatchItemRepository extends ServiceEntityRepository
     }
 
     /** @return list<CloudWatchItem> */
+    public function due(int $cutoff): array
+    {
+        /** @var list<CloudWatchItem> $rows */
+        $rows = $this->createQueryBuilder('i')
+            ->where('i.state = :waiting')
+            ->andWhere('i.reason IS NULL')
+            ->andWhere('i.updated <= :cutoff')
+            ->setParameter('waiting', CloudWatchItem::STATE_WAITING)
+            ->setParameter('cutoff', $cutoff)
+            ->setMaxResults(100)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    /** @return list<CloudWatchItem> */
     public function stuckRunning(int $cutoff): array
     {
         /** @var list<CloudWatchItem> $rows */

@@ -7,14 +7,13 @@ namespace App\Service\CloudWatch;
 use App\Entity\CloudWatch;
 use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
-use App\Entity\SavedTask;
 use App\Entity\User;
 use App\Repository\CloudWatchItemRepository;
 use App\Repository\CloudWatchRepository;
 use App\Repository\ExternalIdentityRepository;
-use App\Repository\SavedTaskRepository;
 use App\Service\File\CloudFilesConfig;
 use App\Service\PlatformLink\SourceInstanceResolver;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -27,7 +26,7 @@ final readonly class CloudWatchService
         private CloudWatchRepository $watches,
         private CloudWatchItemRepository $items,
         private ExternalIdentityRepository $identities,
-        private SavedTaskRepository $tasks,
+        private WatchTasks $tasks,
         private SourceInstanceResolver $instances,
         private CloudFilesConfig $config,
         private WatchLimits $limits,
@@ -57,13 +56,8 @@ final readonly class CloudWatchService
     /** @return array{tasks: list<array{id: int, name: string}>, languages: list<string>, shortcuts: list<array<string, mixed>>, folders: list<array<string, mixed>>} */
     public function options(User $user): array
     {
-        $tasks = [];
-        foreach ($this->tasks->findManual((int) $user->getId()) as $task) {
-            $tasks[] = ['id' => (int) $task->getId(), 'name' => $task->getName()];
-        }
-
         return [
-            'tasks' => $tasks,
+            'tasks' => $this->tasks->manual((int) $user->getId()),
             'languages' => ['en', 'de', 'es', 'fr', 'tr'],
             'shortcuts' => [],
             'folders' => [],
@@ -83,22 +77,27 @@ final readonly class CloudWatchService
         if (!in_array($kind, [CloudWatch::KIND_FOLDER, CloudWatch::KIND_FILE], true) || '' === $targetId || strlen($targetId) > 255) {
             throw new CloudWatchException(400, 'Choose a folder or a file.');
         }
-        $this->guardCaps((int) $user->getId(), $identity);
         $preset = $this->text($body, 'preset');
-        $watch = new CloudWatch((int) $user->getId(), $kind, $targetId);
-        $watch->setIdentityId((int) $identity->getId());
-        $watch->setTargetPath(substr($this->text($body, 'target_path'), 0, 255));
-        $watch->setRecursive(true === ($body['recursive'] ?? false));
-        $this->applyPreset($watch, $user, $preset, $body);
-        $this->entityManager->persist($watch);
-        $this->entityManager->flush();
-        if (null !== $watch->getTaskId()) {
-            $task = $this->tasks->findByIdAndOwner((int) $watch->getTaskId(), (int) $user->getId());
-            if ($task instanceof SavedTask) {
-                $task->setTrigger(SavedTask::TRIGGER_FILE_EVENT, ['watch_id' => $watch->getId()]);
-                $this->entityManager->flush();
+        $watch = $this->entityManager->wrapInTransaction(function () use ($user, $identity, $body, $kind, $targetId, $preset): CloudWatch {
+            $this->entityManager->lock($identity, LockMode::PESSIMISTIC_WRITE);
+            $this->entityManager->lock($this->platformFor($identity), LockMode::PESSIMISTIC_WRITE);
+            $this->guardCaps((int) $user->getId(), $identity);
+            $created = new CloudWatch((int) $user->getId(), $kind, $targetId);
+            $created->setIdentityId((int) $identity->getId());
+            $created->setTargetPath(substr($this->text($body, 'target_path'), 0, 255));
+            $created->setRecursive(true === ($body['recursive'] ?? false));
+            $this->applyPreset($created, $user, $preset, $body);
+            $this->entityManager->persist($created);
+            $this->entityManager->flush();
+            $this->watches->stamp($created, $identity->getInstanceId());
+            if (null !== $created->getTaskId()) {
+                $task = $this->tasks->requireManual((int) $user->getId(), (int) $created->getTaskId());
+                $this->tasks->bind($task, (int) $created->getId());
             }
-        }
+            $this->entityManager->flush();
+
+            return $created;
+        });
         $this->publisher->changed($watch, $identity);
 
         return $this->row($watch);
@@ -112,18 +111,20 @@ final readonly class CloudWatchService
     public function update(User $user, Request $request, int $id, array $body): array
     {
         $identity = $this->identity($user, $request);
-        $watch = $this->owned($user, $id);
+        $watch = $this->owned($user, $id, $identity);
         $state = $this->text($body, 'state');
         if (CloudWatch::STATE_PAUSED === $state) {
             if (CloudWatch::STATE_STOPPED === $watch->getState()) {
                 throw new CloudWatchException(409, 'This watch has stopped.');
             }
             $watch->mark(CloudWatch::STATE_PAUSED, CloudWatch::REASON_BY_OWNER);
+            $this->watches->stamp($watch, $identity->getInstanceId());
         } elseif (CloudWatch::STATE_ACTIVE === $state) {
             if (CloudWatch::REASON_BY_OWNER !== $watch->getReason() || CloudWatch::STATE_PAUSED !== $watch->getState()) {
                 throw new CloudWatchException(409, $this->sentences->for($watch));
             }
             $watch->mark(CloudWatch::STATE_ACTIVE, null);
+            $this->watches->stamp($watch, $identity->getInstanceId());
         } else {
             throw new CloudWatchException(400, 'Say whether the watch is paused or active.');
         }
@@ -139,12 +140,13 @@ final readonly class CloudWatchService
     public function stop(User $user, Request $request, int $id): array
     {
         $identity = $this->identity($user, $request);
-        $watch = $this->owned($user, $id);
+        $watch = $this->owned($user, $id, $identity);
         if (CloudWatch::STATE_STOPPED === $watch->getState()) {
             return $this->row($watch);
         }
         $watch->mark(CloudWatch::STATE_STOPPED, CloudWatch::REASON_BY_OWNER);
-        $this->releaseTask($watch);
+        $this->tasks->release($watch);
+        $this->watches->stamp($watch, $identity->getInstanceId());
         $this->entityManager->flush();
         $this->publisher->changed($watch, $identity);
 
@@ -153,9 +155,9 @@ final readonly class CloudWatchService
 
     public function open(User $user, Request $request, int $id): CloudWatch
     {
-        $this->identity($user, $request);
+        $identity = $this->identity($user, $request);
 
-        return $this->owned($user, $id);
+        return $this->owned($user, $id, $identity);
     }
 
     /** @return list<int> */
@@ -197,10 +199,10 @@ final readonly class CloudWatchService
         return $platform instanceof PlatformInstance ? $platform->getHost() : $identity->getInstanceId();
     }
 
-    private function owned(User $user, int $id): CloudWatch
+    private function owned(User $user, int $id, ExternalIdentity $identity): CloudWatch
     {
         $watch = $this->watches->findForOwner($id, (int) $user->getId());
-        if (!$watch instanceof CloudWatch) {
+        if (!$watch instanceof CloudWatch || $watch->getIdentityId() !== (int) $identity->getId()) {
             throw new CloudWatchException(404, 'That watch does not exist.');
         }
 
@@ -248,10 +250,7 @@ final readonly class CloudWatchService
         if (!is_int($taskId) && !(is_string($taskId) && ctype_digit($taskId))) {
             throw new CloudWatchException(400, 'Choose one of your tasks.');
         }
-        $task = $this->tasks->findByIdAndOwner((int) $taskId, (int) $user->getId());
-        if (!$task instanceof SavedTask || SavedTask::TRIGGER_MANUAL !== $task->getTriggerType()) {
-            throw new CloudWatchException(422, 'That task cannot be used. Pick a task you start yourself.');
-        }
+        $task = $this->tasks->requireManual((int) $user->getId(), (int) $taskId);
         $watch->setAction(CloudWatch::ACTION_TASK);
         $watch->setPreset($preset);
         $watch->setTaskId((int) $task->getId());
@@ -286,32 +285,10 @@ final readonly class CloudWatchService
         return $value;
     }
 
-    private function releaseTask(CloudWatch $watch): void
-    {
-        $taskId = $watch->getTaskId();
-        if (null === $taskId) {
-            return;
-        }
-        $task = $this->tasks->findByIdAndOwner($taskId, $watch->getOwnerId());
-        if (!$task instanceof SavedTask) {
-            return;
-        }
-        if (CloudWatch::PRESET_TASK === $watch->getPreset()) {
-            $task->setTrigger(SavedTask::TRIGGER_MANUAL, null);
-
-            return;
-        }
-        $task->setEnabled(false);
-    }
-
     /** @return array<string, mixed> */
     private function row(CloudWatch $watch): array
     {
-        $taskName = null;
-        if (null !== $watch->getTaskId()) {
-            $task = $this->tasks->findByIdAndOwner((int) $watch->getTaskId(), $watch->getOwnerId());
-            $taskName = $task instanceof SavedTask ? $task->getName() : null;
-        }
+        $taskName = $this->tasks->name($watch);
 
         return [
             'id' => (int) $watch->getId(),

@@ -20,6 +20,7 @@ final readonly class WatchLifecycleEffect implements LifecycleEffect
         private CloudWatchRepository $watches,
         private EntityManagerInterface $entityManager,
         private WatchPublisher $publisher,
+        private WatchTasks $tasks,
     ) {
     }
 
@@ -30,6 +31,7 @@ final readonly class WatchLifecycleEffect implements LifecycleEffect
                 return;
             }
             $watch->mark(CloudWatch::STATE_STOPPED, CloudWatch::REASON_IDENTITY_DELETED);
+            $this->tasks->release($watch);
         });
     }
 
@@ -49,15 +51,7 @@ final readonly class WatchLifecycleEffect implements LifecycleEffect
     public function onResumed(ExternalIdentity $identity): void
     {
         $this->each($identity, function (CloudWatch $watch) use ($identity): void {
-            if (CloudWatch::STATE_PAUSED !== $watch->getState()) {
-                return;
-            }
-            if ($identity->isOff()) {
-                $watch->mark(
-                    CloudWatch::STATE_PAUSED,
-                    $identity->cloudDisabled() ? CloudWatch::REASON_PLATFORM_USER_DISABLED : CloudWatch::REASON_IDENTITY_OFF,
-                );
-
+            if ($identity->isOff() || CloudWatch::STATE_PAUSED !== $watch->getState()) {
                 return;
             }
             if (in_array($watch->getReason(), [CloudWatch::REASON_IDENTITY_OFF, CloudWatch::REASON_PLATFORM_USER_DISABLED], true)) {
@@ -74,8 +68,14 @@ final readonly class WatchLifecycleEffect implements LifecycleEffect
             return;
         }
         $rows = $this->watches->forIdentity($id);
+        $instanceId = $identity->getInstanceId();
         foreach ($rows as $watch) {
+            $before = $watch->getState().'|'.$watch->getReason();
             $change($watch);
+            if ($before === $watch->getState().'|'.$watch->getReason()) {
+                continue;
+            }
+            $this->watches->stamp($watch, $instanceId);
             $this->publisher->changed($watch, $identity);
         }
         $this->entityManager->flush();

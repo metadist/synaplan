@@ -128,6 +128,13 @@ class CloudWatchItem
         return $this;
     }
 
+    public function setRunId(?int $runId): self
+    {
+        $this->runId = $runId;
+
+        return $this;
+    }
+
     public function getCreated(): int
     {
         return $this->created;

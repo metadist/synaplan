@@ -44,11 +44,6 @@ final readonly class DeliveryNotifier
      * Queues the notice. The caller has already committed the revocation, so
      * a slow or unreachable cloud cannot hold that write open.
      */
-    public function watchesChanged(PlatformInstance $instance, int $watchId): void
-    {
-        $this->client->post($instance, 'watches_changed', (string) $watchId);
-    }
-
     public function identityRevoked(ExternalIdentity $identity): void
     {
         $id = $identity->getId();

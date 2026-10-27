@@ -37,6 +37,7 @@ final readonly class PlatformLinkExchangeService
         private AuditLogWriter $auditLogWriter,
         private DeliveryNotifier $notifier,
         private PremiumFeatureGate $premiumFeatureGate,
+        private LifecycleEffect $effects,
     ) {
     }
 
@@ -208,7 +209,7 @@ final readonly class PlatformLinkExchangeService
                 'last_seen' => $identity->getLastSeen(),
                 'mode' => $identity->getMode(),
                 'status' => $identity->getStatus(),
-                'can_copy' => $instance->canReceiveCopies(),
+                'can_copy' => $instance->canReceiveCopies() && !$identity->isOff(),
                 'can_read' => $instance->reports('pickups'),
                 'read_scope' => $this->readScopeOf($identity),
             ];
@@ -248,8 +249,10 @@ final readonly class PlatformLinkExchangeService
         $linkId = (string) $identity->getId();
         if (ExternalIdentity::MODE_SSO === $identity->getMode() && ExternalIdentity::STATUS_REVOKED !== $identity->getStatus()) {
             $identity->setAccess(false, !$identity->cloudDisabled());
+            $this->effects->onPaused($identity);
         } else {
             $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
+            $this->effects->onDeleted($identity);
         }
         $identity->setRevokedAt(time());
         $this->externalIdentityRepository->save($identity);
@@ -284,6 +287,7 @@ final readonly class PlatformLinkExchangeService
         $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
         $identity->setRevokedAt(time());
         $this->externalIdentityRepository->save($identity);
+        $this->effects->onDeleted($identity);
         $this->notifier->identityRevoked($identity);
 
         $this->auditLogWriter->record(
@@ -298,28 +302,37 @@ final readonly class PlatformLinkExchangeService
 
     public function turnOff(int $userId, int $linkId, string $ip): void
     {
-        $identity = $this->organisationIdentity($userId, $linkId);
-        $identity->setAccess(false, !$identity->cloudDisabled());
-        $this->externalIdentityRepository->save($identity);
+        $updated = $this->externalIdentityRepository->modify($linkId, function (ExternalIdentity $identity) use ($userId): void {
+            $this->guardOwner($identity, $userId);
+            $identity->setAccess(false, !$identity->cloudDisabled());
+            $this->effects->onPaused($identity);
+        });
+        if (!$updated instanceof ExternalIdentity) {
+            throw new Exception\PlatformInstanceNotFoundException('Link not found.');
+        }
         $this->auditLogWriter->record($userId, 'platform_link.turned_off', 'platform_link', (string) $linkId, null, $ip);
     }
 
     public function resume(int $userId, int $linkId, string $ip): void
     {
-        $identity = $this->organisationIdentity($userId, $linkId);
-        if (!$identity->ownerTurnedOff()) {
-            throw new PlatformSsoException(Response::HTTP_CONFLICT, 'cloud_disabled', 'Your cloud turned this connection off.');
+        $updated = $this->externalIdentityRepository->modify($linkId, function (ExternalIdentity $identity) use ($userId): void {
+            $this->guardOwner($identity, $userId);
+            if (!$identity->ownerTurnedOff()) {
+                throw new PlatformSsoException(Response::HTTP_CONFLICT, 'cloud_disabled', 'Your cloud turned this connection off.');
+            }
+            $identity->setAccess(true, !$identity->cloudDisabled());
+            $identity->setRevokedAt(null);
+            $this->effects->onResumed($identity);
+        });
+        if (!$updated instanceof ExternalIdentity) {
+            throw new Exception\PlatformInstanceNotFoundException('Link not found.');
         }
-        $identity->setAccess(true, !$identity->cloudDisabled());
-        $identity->setRevokedAt(null);
-        $this->externalIdentityRepository->save($identity);
         $this->auditLogWriter->record($userId, 'platform_link.resumed', 'platform_link', (string) $linkId, null, $ip);
     }
 
-    private function organisationIdentity(int $userId, int $linkId): ExternalIdentity
+    private function guardOwner(ExternalIdentity $identity, int $userId): void
     {
-        $identity = $this->externalIdentityRepository->find($linkId);
-        if (!$identity instanceof ExternalIdentity || $identity->getUserId() !== $userId) {
+        if ($identity->getUserId() !== $userId) {
             throw new Exception\PlatformInstanceNotFoundException('Link not found.');
         }
         if (ExternalIdentity::STATUS_REVOKED === $identity->getStatus()) {
@@ -328,8 +341,6 @@ final readonly class PlatformLinkExchangeService
         if (ExternalIdentity::MODE_SSO !== $identity->getMode()) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'not_organisation_login', 'Turn off is for organisation login.');
         }
-
-        return $identity;
     }
 
     /**
