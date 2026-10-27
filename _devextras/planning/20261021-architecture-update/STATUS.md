@@ -18,6 +18,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | merged (`3b0c6f627`) | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
 | 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | merged (`33f498065`) | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
 | 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
+| 2026-10-27 | AU9 | in progress | branch `test/au9-ai-paths` | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
 
 ## Baselines
 
@@ -30,6 +31,31 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-27 — AU9: characterization of every AI call path
+
+Started from `main` at `f7fc12d2e` ([#2837](https://github.com/metadist/synaplan/pull/2837), after [#2836](https://github.com/metadist/synaplan/pull/2836) `4db96d6e2` added `AiChatUsageMeter` and `FacadeMeteredChat`).
+
+**Start metrics (`make -C backend metrics`, `make perf-runtime`).**
+- Size ledger: 2,347 files scanned; 47 files over 800 lines, 65 constructors over 10 parameters, 122 methods over 100 lines (`AiFacade.php`: 1,747 lines, 16 constructor parameters).
+- `make perf-runtime`: `/api/health` p95 1.7 ms (1 client, budget ≤ 15 ms) and 3.3 ms (8 clients); `runtime-config` 279.5 req/s (p95 10.2 ms); gateway TTFT p50 9.3 ms (`test-model`).
+
+**Recorded (`UPDATE_AI_PATH_SNAPSHOTS=1`).** `backend/tests/Characterization/AiPathCharacterizationTest.php` and `backend/tests/Characterization/__snapshots__/ai_paths.json` cover all 19 paths offline (`OfflineHttpGuard`, `OpenAISdkRecorder`, `ProviderHttpRecorder`): `in_app_stream`, `buffered_chat_email`, `widget_stream`, `openai_chat_buffered`, `openai_chat_stream`, `openai_embeddings`, `openai_images_generations`, `messages_passthrough_anthropic`, `messages_translated_openai`, `messages_translated_gemini`, `sorter`, `memory_extraction`, `vectorize`, `llm_rerank`, `perplexity_web_answer`, `media_image`, `transcription`, `synthesis`, `model_probe`.
+
+Only production seam added: optional `?\Closure $sdkFactory = null` on `PerplexityProvider::__construct()` (`backend/src/AI/Provider/PerplexityProvider.php:37`), matching `OpenAIProvider::__construct()`.
+
+**Paths that write no `BUSELOG` usage row today:**
+1. `perplexity_web_answer` — `PerplexityAdapter::maybeAnswer()` (`backend/src/Plug/WebSearch/Adapter/PerplexityAdapter.php:144`) calls `$this->chat->chat()` directly on `PerplexityProvider` with no user id and no `RateLimitService::recordUsage()` call.
+2. `llm_rerank` (unattributed / `userId: null`) — `LlmReranker::ask()` (`backend/src/Plug/Rerank/Adapter/LlmReranker.php:125`) calls `AiFacade::chat()` with `$options->userId`; when `userId` is `null`, `AiChatUsageMeter::record()` (`backend/src/Service/Usage/AiChatUsageMeter.php:60`) skips metering, and `LlmReranker::rerank()` (`backend/src/Plug/Rerank/Adapter/LlmReranker.php:82`) returns `new RerankResult($hits, self::KEY, $ms)` with `meter: false` and `modelId: null`, so `RerankStage::recordUsage()` (`backend/src/Plug/Rerank/RerankStage.php:100`) also writes no `RERANK` row. (When `RerankStage::apply()` passes a signed-in `User`, `#2836` now writes an `AI_CALL` row via `AiChatUsageMeter`.)
+3. `model_probe` — `CapabilityProbe::probe()` (`backend/src/AI/Import/CapabilityProbe.php:37`) and `ProviderModelInventory::probe()` (`backend/src/AI/Service/ProviderModelInventory.php:129`, called from `ModelAvailabilityChecker::run()` at `backend/src/AI/Service/ModelAvailabilityChecker.php:98`) call `HttpClientInterface` directly and write no usage row (by design: probes stay `billable: false`).
+
+Also noted for AU12: `messages_passthrough_anthropic`, `messages_translated_openai`, and `messages_translated_gemini` write their `MESSAGES` usage row (`MessagesGateway::recordUsage()`, `backend/src/AI/Messages/MessagesGateway.php:848`) but record `circuit_breaker: []` and `model_health: []` today because the translators bypass `AiFacade`.
+
+**Mutation check.** Removed `$this->recordUsage(...)` in `OpenAiEmbeddingsService::create()` (`backend/src/Service/Api/OpenAiEmbeddingsService.php:54`); `AiPathCharacterizationTest` failed with `AI call paths drifted from the committed snapshot` on `openai_embeddings.buselog`; restored and green (1 test, 88 assertions).
+
+**Contract hardening (`03_contracts.md` §1.7).** Added the complete `AiFacade` + AU12 method map, `AiCallPayload`, `AiCallOptions`, `AiUsage`, `AiCallTimings`, `PipelineStreamChunk`, `AiCallPipeline::stream()`, and `AiCallDeadline` shapes in `03_contracts.md` §1.7.
 
 ---
 

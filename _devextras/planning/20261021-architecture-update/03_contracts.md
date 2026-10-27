@@ -228,32 +228,189 @@ move with the tool invoker (S4).
 | Perplexity web answer (`PerplexityAdapter::maybeAnswer`) | through `AiFacade::chat()` |
 | `ModelAvailabilityChecker`, capability probes, admin embed preflight | `AiCallContext::probe()`: hooks run, metering skips, metrics label `source=probe` |
 
-### 1.7 Pre-sprint hardening — must merge before AU10 (AU0b)
+### 1.7 Pre-sprint hardening — merged with AU9
 
-§1.1 names `AiCallPayload`, `AiCallOptions`, `AiUsage`, `AiCallTimings`
-and §1.2 names `StreamChunk`, but no section gives their fields; and no
-table maps the facade's methods to the pipeline. AU10 must not start
-until a `docs(architecture)` pull request has added, in this section:
+#### 1.7.1 Method map (`AiFacade` and AU12 paths)
 
-1. **The method map:** every public `AiFacade` method (and the AU12 paths
-   of §1.6) with its `AiCapability`, its `AiCallSource`, its billable
-   flag and its accounting unit (§1.5) — one row per method, checked
-   against `AiPathCharacterizationTest`'s case list from AU9.
-2. **The value shapes:** the fields of `AiCallPayload` (one variant per
-   capability, or one class with capability-checked fields — the pull
-   request decides and says why), `AiCallOptions`, `AiUsage`,
-   `AiCallTimings` and `StreamChunk`, each with types; no `mixed` outside
-   `AiCallResult::$value`, whose per-capability type the method map names.
-3. **The streaming shape:** the signature of `AiCallPipeline::stream()`,
-   who cancels it, and what a hook sees per chunk — enough that AU29's
-   decoders can be written against it without reopening this section.
-4. **The deadline shape:** how a blocking hook's one deadline (§1.4) is
-   represented and handed to the transport and to a model call — a field
-   on `AiCallOptions` or a value the pipeline passes — so no hook or
-   provider adapter computes (or resets) its own.
+| Method / path | `AiCapability` | Default `AiCallSource` | Billable | Accounting unit | `AiCallResult::$value` type | `AiPathCharacterizationTest` case |
+| ------------- | -------------- | ---------------------- | -------- | --------------- | --------------------------- | --------------------------------- |
+| `AiFacade::chat()` | `chat` | `chat_web` (or caller `usage_source`: `email`, `sorter`, `memory`, `rerank`, `openai_api`, …) | `true` | `AI_CALL` per call (`AiChatUsageMeter`) + caller action (`MESSAGES` quota via `FacadeMeteredChat`, or `SORTING` / `MEMORY_EXTRACTION` when `caller_meters: true`) | `array{content: string, provider: string, model: string, usage: array<string, int>, response_id: ?string, tool_calls: list<mixed>, finish_reason?: string, facade_metered?: bool, facade_charged_cost?: ?string, facade_price_known?: bool}` | `buffered_chat_email`, `openai_chat_buffered`, `sorter`, `memory_extraction`, `llm_rerank` |
+| `AiFacade::chatStream()` | `chat_stream` | `chat_stream` (`widget`, `openai_api`, …) | `true` | `AI_CALL` per call + per-turn `MESSAGES` quota row via `FacadeMeteredChat` | `array{provider: string, model: string, content: string, usage: array<string, int>, response_id: ?string, tool_calls: list<mixed>, finish_reason: ?string, facade_metered?: bool, facade_charged_cost?: ?string, facade_price_known?: bool}` | `in_app_stream`, `widget_stream`, `openai_chat_stream` |
+| `AiFacade::embed()` | `embed` | `vectorize` (`probe` when `userId === 0`) | `userId > 0` | `EMBEDDINGS` per call (or batch window in `VectorizationService`) | `array{embedding: list<float>, usage: array{prompt_tokens: int, total_tokens: int}}` | `vectorize` |
+| `AiFacade::embedBatch()` | `embed_batch` | `vectorize` (`openai_api` on `/v1/embeddings`) | `userId > 0` | `EMBEDDINGS` per call | `array{embeddings: list<list<float>>, usage: array{prompt_tokens: int, total_tokens: int}}` | `openai_embeddings`, `vectorize` |
+| `AiFacade::analyzeImage()` | `vision` | `chat_web` | `true` | `FILE_ANALYSIS` (deduped per file upload) / `AI_CALL` when joined | `array{content: string, provider: string, model: string}` | covered by `OpenAIProviderRequestCharacterizationTest` + AU10 |
+| `AiFacade::generateImage()` | `image` | `media` (`openai_api` on `/v1/images/generations`) | `true` | `IMAGES` per call | `array{images: list<array<string, mixed>>, provider: string, model: string, image_count: int}` | `openai_images_generations`, `media_image` |
+| `AiFacade::generateVideo()` | `video_start` | `media` | `true` | `VIDEOS` per call | `array{videos: list<array<string, mixed>>, provider: string, model: string, duration_seconds: float\|int\|null, resolution: ?string}` | covered by `MediaTurnCharacterizationTest` + AU10 |
+| `AiFacade::startVideoGeneration()` | `video_start` | `media` | `true` | `VIDEOS` on completion (`MediaJobUsageRecorder`) | `array{operationName: string, provider: string, model: string, duration: int, resolution: string}` | AU10 |
+| `AiFacade::pollVideoOperation()` | `video_poll` | `media` | `false` | billed on completion | `array{done: bool, videoUri: ?string, error: ?string, status?: ?string, percent?: ?int}` | AU10 |
+| `AiFacade::transcribe()` | `transcribe` | `media` | `true` | `TRANSCRIPTION` per call (`TranscriptionUsageRecorder`) | `array{text: string, language: string, duration: float, segments: list<mixed>, provider: string, model: string, model_id: ?int, transcription_usage?: array<string, mixed>}` | `transcription` |
+| `AiFacade::synthesize()` | `synthesize` | `media` | `true` | `AUDIOS` per call | `array{filename: string, relativePath: string, provider: string, model: string, model_id: ?int, text_length: int}` | `synthesis` |
+| `AiFacade::synthesizeStream()` | `synthesize_stream` | `media` | `true` | `AUDIOS` per call | `array{generator: \Generator, contentType: string, provider: string, supportsStreaming: bool}` | AU10 |
+| `MessagesGateway::executeComplete()` / `executeStream()` (AU12) | `passthrough` / `chat_stream` | `messages_api` | `true` | `MESSAGES` per turn | `GatewaySuccess\|MessagesUsage` | `messages_passthrough_anthropic`, `messages_translated_openai`, `messages_translated_gemini` |
+| `VoiceLiveUsageService::open()` / `tick()` / `close()` (AU12) | `voice_session` | `voice_live` | `true` | `VOICE_LIVE` per session | `VoiceSession\|VoiceLiveDecision\|null` | AU12 |
+| `PerplexityAdapter::maybeAnswer()` (AU12) | `chat` | `system` (`web_search`) | `true` | `AI_CALL` when user-attributed | `?ProviderAnswer` | `perplexity_web_answer` |
+| `CapabilityProbe::probe()` / `ProviderModelInventory::probe()` (AU12) | `chat` / `embed` / `probe` | `probe` | `false` | none (`billable: false`) | `ProbeResult\|ModelProbeResult` | `model_probe` |
 
-The hardening pull request changes no production code. AU10's vibe brief
-re-checks its capability commits against the merged map.
+Non-call query helpers on `AiFacade` (`supportsAsyncVideo()`, `supportsInlineReferenceImage()`, `hasConfiguredSttProvider()`, `downloadVideoContent()`, `downloadVideoRaw()`, `cancelVideoOperation()`) do not invoke a model generation and stay direct methods.
+
+#### 1.7.2 Value shapes
+
+One `final readonly` `AiCallPayload` class with named static constructors per capability is used instead of a class hierarchy so hooks inspect a single type without `instanceof` ladders while static constructors enforce per-capability arguments:
+
+```php
+namespace App\AI\Pipeline;
+
+use App\AI\StructuredOutput\StructuredOutputSchema;
+
+final readonly class AiCallPayload
+{
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param list<string>               $texts
+     * @param array<string, mixed>       $passthroughBody
+     */
+    public function __construct(
+        public array $messages = [],
+        public array $texts = [],
+        public ?string $prompt = null,
+        public ?string $filePath = null,
+        public ?string $operationId = null,
+        public array $passthroughBody = [],
+    ) {}
+
+    /** @param list<array<string, mixed>> $messages */
+    public static function chat(array $messages): self { return new self(messages: $messages); }
+    public static function embed(string $text): self { return new self(texts: [$text]); }
+    /** @param list<string> $texts */
+    public static function embedBatch(array $texts): self { return new self(texts: $texts); }
+    public static function vision(string $imagePath, string $prompt): self { return new self(prompt: $prompt, filePath: $imagePath); }
+    public static function mediaPrompt(string $prompt): self { return new self(prompt: $prompt); }
+    public static function videoOperation(string $operationId): self { return new self(operationId: $operationId); }
+    public static function audioFile(string $audioPath): self { return new self(filePath: $audioPath); }
+    public static function speechText(string $text): self { return new self(prompt: $text); }
+    /** @param array<string, mixed> $body */
+    public static function passthrough(array $body): self { return new self(passthroughBody: $body); }
+}
+
+final readonly class AiCallOptions
+{
+    /**
+     * @param list<array<string, mixed>> $tools
+     * @param array<string, mixed>       $providerOptions
+     */
+    public function __construct(
+        public ?int $modelId = null,
+        public ?float $temperature = null,
+        public ?int $maxTokens = null,
+        public bool $stream = false,
+        public ?string $reasoningEffort = null,
+        public ?StructuredOutputSchema $structuredOutput = null,
+        public array $tools = [],
+        public string|array|null $toolChoice = null,
+        public ?string $language = null,
+        public bool $callerMeters = false,
+        public ?AiCallDeadline $deadline = null,
+        public array $providerOptions = [],
+    ) {}
+}
+
+final readonly class AiUsage
+{
+    public function __construct(
+        public int $promptTokens = 0,
+        public int $completionTokens = 0,
+        public int $totalTokens = 0,
+        public int $cachedTokens = 0,
+        public int $cacheCreationTokens = 0,
+        public int $cacheCreation1hTokens = 0,
+        public int $imageCount = 0,
+        public float $durationSeconds = 0.0,
+        public int $characterCount = 0,
+        public ?string $chargedCost = null,
+        public bool $priceKnown = true,
+    ) {}
+}
+
+final readonly class AiCallTimings
+{
+    public function __construct(
+        public float $queuedMs = 0.0,
+        public float $hooksBeforeMs = 0.0,
+        public ?float $ttftMs = null,
+        public float $providerMs = 0.0,
+        public float $hooksAfterMs = 0.0,
+    ) {}
+}
+
+final readonly class PipelineStreamChunk
+{
+    /**
+     * @param 'content'|'reasoning'|'tool_call_delta'|'finish'|'raw' $type
+     * @param array<string, mixed>                                   $payload
+     */
+    public function __construct(
+        public string $type,
+        public string $content = '',
+        public ?string $finishReason = null,
+        public array $payload = [],
+    ) {}
+}
+```
+
+#### 1.7.3 Streaming shape
+
+```php
+/**
+ * @param callable(AiCall, callable(mixed): void): mixed $transport
+ * @param callable(mixed): void                          $onChunk
+ */
+public function stream(AiCall $call, callable $transport, callable $onChunk): AiCallResult;
+```
+
+1. `before()` hooks run in descending priority order (900 → 100). A `AiCallRefusal` short-circuits before `$transport` is called and still runs `after()` hooks with `AiCallOutcome::Refused`.
+2. `$onChunk` is wrapped by the pipeline: on the first visible chunk (`PipelineStreamChunk::$type === 'content'` and `'' !== $content`) `ttftMs` is stamped from `hrtime(true)`; every chunk is normalized to `PipelineStreamChunk` and passed to each `StreamingAiCallHookInterface::onChunk($call, $chunk)` in descending priority order before forwarding the original chunk to the caller's `$onChunk`.
+3. Cancellation is owned by the caller's `$onChunk` callback (or `$transport`) throwing `StreamCancelledException`. The pipeline catches `StreamCancelledException`, records `AiCallOutcome::Cancelled` (which `CircuitBreakerHook` and `ModelHealthHook` ignore so user stops never trip a breaker), runs `after()` hooks in descending priority order, and rethrows `StreamCancelledException`.
+
+#### 1.7.4 Deadline shape
+
+```php
+final readonly class AiCallDeadline
+{
+    public function __construct(
+        public int $startedHrtimeNs,
+        public int $budgetMs,
+    ) {}
+
+    public static function start(int $budgetMs): self
+    {
+        return new self(hrtime(true), max(1, $budgetMs));
+    }
+
+    public function remainingSeconds(): float
+    {
+        $elapsedMs = (hrtime(true) - $this->startedHrtimeNs) / 1_000_000.0;
+
+        return max(0.001, ($this->budgetMs - $elapsedMs) / 1000.0);
+    }
+
+    public function isOverBudget(): bool
+    {
+        return ((hrtime(true) - $this->startedHrtimeNs) / 1_000_000.0) > $this->budgetMs;
+    }
+
+    /**
+     * @return array{timeout: float, max_duration: float}
+     */
+    public function toHttpClientOptions(): array
+    {
+        $remaining = $this->remainingSeconds();
+
+        return ['timeout' => $remaining, 'max_duration' => $remaining];
+    }
+}
+```
+
+The pipeline creates one `AiCallDeadline::start($attr->budgetMs)` before invoking a `blocking: true` hook and attaches it to `$call->options->deadline`. Any HTTP request or nested `AiFacade` call made by that hook reads `$call->options->deadline->toHttpClientOptions()`, sharing the single start timestamp across retries without ever resetting it.
 
 ---
 
