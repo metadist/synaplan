@@ -377,6 +377,7 @@
     "emptyHint": "Commencez par un formulaire vide, ou choisissez un système connu pour préremplir le nom et les valeurs par défaut. Vous pouvez changer ou effacer ce choix à tout moment.",
     "nameLabel": "Nom",
     "urlLabel": "URL du serveur",
+    "addressDropsKey": "Enregistrer un autre hôte supprime la valeur de l’en-tête d’auth enregistrée. Saisissez-la à nouveau ci-dessous.",
     "authHeaderLabel": "Nom de l’en-tête d’auth (facultatif)",
     "authTokenLabel": "Valeur de l’en-tête d’auth",
     "authTokenPlaceholder": "p. ex. Bearer sk-…",

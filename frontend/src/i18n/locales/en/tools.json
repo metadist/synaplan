@@ -377,6 +377,7 @@
     "emptyHint": "Start from a blank form, or pick a known system to prefill the name and defaults. You can change or clear that choice at any time.",
     "nameLabel": "Name",
     "urlLabel": "Server URL",
+    "addressDropsKey": "Saving a different host removes the saved auth header value. Enter it again below.",
     "authHeaderLabel": "Auth header name (optional)",
     "authTokenLabel": "Auth header value",
     "authTokenPlaceholder": "e.g. Bearer sk-…",

@@ -128,12 +128,27 @@ class McpServerConfig
         return $this->url;
     }
 
+    /**
+     * A sign-in is issued for one address and a key is meant for one host:
+     * neither may follow the row to another server.
+     */
     public function setUrl(string $url): self
     {
+        if (!$this->hasAddress($url)) {
+            $this->oauth = '';
+            if (self::origin($url) !== self::origin($this->url)) {
+                $this->authToken = '';
+            }
+        }
         $this->url = $url;
         $this->touch();
 
         return $this;
+    }
+
+    public function hasAddress(string $url): bool
+    {
+        return self::normalizedAddress($url) === self::normalizedAddress($this->url);
     }
 
     public function getAuthHeader(): string
@@ -210,6 +225,14 @@ class McpServerConfig
 
     public function setAuthMode(string $authMode): self
     {
+        if ($authMode !== $this->authMode) {
+            if (self::AUTH_MODE_OAUTH === $this->authMode) {
+                $this->oauth = '';
+            }
+            if (self::AUTH_MODE_BEARER === $this->authMode) {
+                $this->authToken = '';
+            }
+        }
         $this->authMode = $authMode;
         $this->touch();
 
@@ -272,5 +295,33 @@ class McpServerConfig
         $this->updated = date('YmdHis');
 
         return $this;
+    }
+
+    private static function normalizedAddress(string $url): string
+    {
+        $url = rtrim(trim($url), '/');
+        $origin = self::origin($url);
+        if ('' === $origin) {
+            return $url;
+        }
+
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $query = parse_url($url, PHP_URL_QUERY);
+
+        return $origin.$path.(is_string($query) ? '?'.$query : '');
+    }
+
+    /** Lower-case scheme://host:port with the scheme's default port, or '' when unparsable. */
+    private static function origin(string $url): string
+    {
+        $parts = parse_url(trim($url));
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return '';
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        $port = $parts['port'] ?? ('https' === $scheme ? 443 : ('http' === $scheme ? 80 : 0));
+
+        return $scheme.'://'.strtolower($parts['host']).':'.$port;
     }
 }

@@ -270,13 +270,16 @@
       "unknownKey": "This file has a field this Synaplan does not know ({detail})",
       "needsModel": "Needs a model — pick one after import ({key})",
       "needsKey": "Needs a key — add it under Connections ({key})",
+      "needsCredential": "Needs a sign-in or a key — add it under Apps › MCP Servers after import ({key})",
       "needsMcpServer": "Needs an MCP server named {detail}",
       "needsMailbox": "Needs a mailbox — connect one after import ({key})",
       "needsWidget": "Needs a website widget — connect one after import ({key})",
       "needsWhatsapp": "Needs a WhatsApp number — connect one after import ({key})",
       "schedulesOff": "Schedules are off until you turn them on ({key})",
+      "writeOff": "Write actions stay off for {detail} — turn them on yourself if you want them",
       "droppedFolders": "Shared folders were not included ({key})",
       "conflict": "Already exists — will be skipped unless you replace it ({key})",
+      "addressDiffers": "You already have a server named {detail} at another address — it stays as it is, and this one is skipped",
       "skipped": "Skipped ({key})"
     }
   }

@@ -100,7 +100,12 @@ final readonly class McpOAuthConsentService
         $nonce = bin2hex(random_bytes(16));
 
         $item = $this->cache->getItem($this->verifierKey($nonce));
-        $item->set(['verifier' => $verifier, 'owner_id' => $ownerId, 'server_id' => $server->getId()]);
+        $item->set([
+            'verifier' => $verifier,
+            'owner_id' => $ownerId,
+            'server_id' => $server->getId(),
+            'server_url' => $server->getUrl(),
+        ]);
         $item->expiresAfter(self::VERIFIER_TTL_SECONDS);
         $this->cache->save($item);
 
@@ -137,11 +142,15 @@ final readonly class McpOAuthConsentService
             throw new McpOAuthException('The sign-in link is incomplete. Please start again.');
         }
 
-        $verifier = $this->consumeVerifier($nonce, $ownerId, $serverId);
+        $pending = $this->consumeVerifier($nonce, $ownerId, $serverId);
         $server = $this->servers->findByIdAndUser($serverId, $ownerId);
         if (null === $server) {
             throw new McpOAuthException('Server not found');
         }
+        if (!$server->hasAddress($pending['server_url'])) {
+            throw new McpOAuthException('The server address changed during sign-in. Please start again.');
+        }
+        $verifier = $pending['verifier'];
 
         $oauthState = $server->getDecryptedOAuthState($this->encryption);
         $tokens = $this->oauth->exchangeCode($this->toProviderConfig($oauthState), $code, $verifier);
@@ -192,7 +201,10 @@ final readonly class McpOAuthConsentService
         );
     }
 
-    private function consumeVerifier(string $nonce, int $ownerId, int $serverId): string
+    /**
+     * @return array{verifier: string, server_url: string}
+     */
+    private function consumeVerifier(string $nonce, int $ownerId, int $serverId): array
     {
         $key = $this->verifierKey($nonce);
         $item = $this->cache->getItem($key);
@@ -206,13 +218,14 @@ final readonly class McpOAuthConsentService
 
         if (!is_array($stored)
             || !is_string($stored['verifier'] ?? null)
+            || !is_string($stored['server_url'] ?? null)
             || ($stored['owner_id'] ?? null) !== $ownerId
             || ($stored['server_id'] ?? null) !== $serverId
         ) {
             throw new McpOAuthException('The sign-in attempt could not be verified. Please start again.');
         }
 
-        return $stored['verifier'];
+        return ['verifier' => $stored['verifier'], 'server_url' => $stored['server_url']];
     }
 
     private function verifierKey(string $nonce): string

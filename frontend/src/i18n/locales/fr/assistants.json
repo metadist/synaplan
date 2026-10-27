@@ -269,13 +269,16 @@
       "unknownKey": "Ce fichier a un champ que ce Synaplan ne connaît pas ({detail})",
       "needsModel": "Il manque un modèle — choisissez-en un après l’import ({key})",
       "needsKey": "Il manque une clé — ajoutez-la dans Connexions ({key})",
+      "needsCredential": "Il manque une connexion ou une clé — ajoutez-la dans Apps › Serveurs MCP après l’import ({key})",
       "needsMcpServer": "Il manque un serveur MCP nommé {detail}",
       "needsMailbox": "Il manque une boîte mail — connectez-en une après l’import ({key})",
       "needsWidget": "Il manque un widget de site — connectez-en un après l’import ({key})",
       "needsWhatsapp": "Il manque un numéro WhatsApp — connectez-en un après l’import ({key})",
       "schedulesOff": "Les planifications restent désactivées jusqu’à ce que vous les activiez ({key})",
+      "writeOff": "Les actions d’écriture restent désactivées pour {detail} — activez-les vous-même si besoin",
       "droppedFolders": "Les dossiers partagés n’étaient pas inclus ({key})",
       "conflict": "Existe déjà — sera ignoré sauf si vous remplacez ({key})",
+      "addressDiffers": "Vous avez déjà un serveur nommé {detail} à une autre adresse — il reste tel quel et celui-ci est ignoré",
       "skipped": "Ignoré ({key})"
     },
     "publishedOnly": "Seuls les assistants publiés sont inclus. Les brouillons restent sur ce compte."

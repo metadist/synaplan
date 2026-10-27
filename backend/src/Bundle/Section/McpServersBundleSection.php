@@ -68,12 +68,17 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
             $key = (string) ($item['key'] ?? $item['name'] ?? '');
             $name = (string) ($item['name'] ?? $key);
             $existing = $this->findByName($userId, $name);
-            if (null !== $existing) {
+            if (null !== $existing && !$existing->hasAddress((string) ($item['url'] ?? ''))) {
+                $rows[] = new ChecklistItem('addressDiffers', $key, $name);
+            } elseif (null !== $existing) {
                 $rows[] = new ChecklistItem('conflict', $key, $name);
             }
             $authMode = (string) ($item['authMode'] ?? McpServerConfig::AUTH_MODE_NONE);
             if (McpServerConfig::AUTH_MODE_NONE !== $authMode) {
                 $rows[] = new ChecklistItem('needsCredential', $key, $name);
+            }
+            if (true === ($item['allowWrite'] ?? false)) {
+                $rows[] = new ChecklistItem('writeOff', $key, $name);
             }
         }
 
@@ -98,6 +103,11 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
                     $skipped[] = $key;
                     continue;
                 }
+                // Replacing never moves a person's server to another address.
+                if (null !== $existing && !$existing->hasAddress((string) $item['url'])) {
+                    $skipped[] = $key;
+                    continue;
+                }
                 $server = $existing ?? new McpServerConfig();
                 $server->setUserId($userId);
                 $server->setName($name);
@@ -107,8 +117,8 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
                     $authMode = McpServerConfig::AUTH_MODE_NONE;
                 }
                 $server->setAuthMode($authMode);
-                $server->setAllowWrite((bool) ($item['allowWrite'] ?? false));
                 $server->setEnabled((bool) ($item['enabled'] ?? true));
+                // `allowWrite` is never applied: a file does not switch on write actions.
                 $this->servers->save($server);
                 $created[] = $key;
             } catch (\Throwable $e) {

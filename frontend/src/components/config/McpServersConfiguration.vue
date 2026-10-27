@@ -326,18 +326,12 @@
             data-testid="input-mcp-name"
           />
         </label>
-        <label class="block">
-          <span class="text-sm font-medium txt-primary">{{ $t('mcpServers.urlLabel') }}</span>
-          <input
-            v-model="form.url"
-            type="url"
-            placeholder="https://example.com/mcp"
-            :readonly="form.authMode === 'oauth' && !!form.url"
-            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
-            :class="form.authMode === 'oauth' && form.url ? 'opacity-80' : ''"
-            data-testid="input-mcp-url"
-          />
-        </label>
+        <McpServerUrlField
+          v-model="form.url"
+          :locked="form.authMode === 'oauth' && !!form.url"
+          :saved-url="editingId !== null ? editingUrl : ''"
+          :has-saved-key="editingHasToken && form.authMode === 'bearer'"
+        />
         <div v-if="form.authMode !== 'oauth'" class="grid sm:grid-cols-2 gap-4">
           <label class="block">
             <span class="text-sm font-medium txt-primary">{{
@@ -418,6 +412,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { updateConfigValue } from '@/services/api/adminConfigApi'
 import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
+import McpServerUrlField from '@/components/config/McpServerUrlField.vue'
 import {
   MCP_CUSTOM_TEMPLATE,
   findMcpServerTemplate,
@@ -464,6 +459,7 @@ const editorOpen = ref(false)
 const editorSection = ref<HTMLElement | null>(null)
 const editingId = ref<number | null>(null)
 const editingHasToken = ref(false)
+const editingUrl = ref('')
 const form = reactive({
   name: '',
   url: '',
@@ -615,6 +611,7 @@ const startCreateFromTemplate = (key: string) => {
 const startEdit = (server: McpServer) => {
   editingId.value = server.id ?? null
   editingHasToken.value = server.has_auth_token ?? false
+  editingUrl.value = server.url ?? ''
   activeTemplate.value = MCP_CUSTOM_TEMPLATE
   Object.assign(form, {
     name: server.name ?? '',

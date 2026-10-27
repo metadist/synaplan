@@ -86,7 +86,12 @@ final class McpOAuthConsentServiceTest extends TestCase
 
         $nonce = bin2hex(random_bytes(16));
         $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', $nonce));
-        $item->set(['verifier' => 'the-verifier', 'owner_id' => 7, 'server_id' => 42]);
+        $item->set([
+            'verifier' => 'the-verifier',
+            'owner_id' => 7,
+            'server_id' => 42,
+            'server_url' => 'https://mcp.notion.com/mcp',
+        ]);
         $cache->save($item);
 
         $signed = $stateService->generateState(McpOAuthConsentService::PROVIDER, [
@@ -101,6 +106,67 @@ final class McpOAuthConsentServiceTest extends TestCase
         self::assertSame('at-1', $stored->accessToken);
         self::assertSame('rt-1', $stored->refreshToken);
         self::assertSame(McpOAuthState::STATUS_CONNECTED, $stored->status);
+    }
+
+    public function testStartRemembersTheAddressForTheCallback(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $cache = new ArrayAdapter();
+        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $server = $this->server();
+
+        $service = $this->service(
+            $encryption,
+            $this->createMock(McpServerConfigRepository::class),
+            $this->tokenClient([]),
+            cache: $cache,
+            state: $stateService,
+        );
+
+        $url = $service->start($server, 7);
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $payload = $stateService->validateState((string) $query['state'], McpOAuthConsentService::PROVIDER);
+        self::assertIsArray($payload);
+        $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', (string) $payload['pkce_nonce']));
+        self::assertTrue($item->isHit());
+        self::assertSame('https://mcp.notion.com/mcp', $item->get()['server_url']);
+    }
+
+    public function testCompleteIsRefusedWhenTheAddressChangedSinceStart(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $cache = new ArrayAdapter();
+        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $server = $this->server();
+        $server->setUrl('https://mcp.other.example/mcp');
+
+        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo->method('findByIdAndUser')->willReturn($server);
+        $repo->expects(self::never())->method('save');
+
+        $service = $this->service($encryption, $repo, $this->tokenClient([]), cache: $cache, state: $stateService);
+
+        $nonce = bin2hex(random_bytes(16));
+        $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', $nonce));
+        $item->set([
+            'verifier' => 'the-verifier',
+            'owner_id' => 7,
+            'server_id' => 42,
+            'server_url' => 'https://mcp.notion.com/mcp',
+        ]);
+        $cache->save($item);
+
+        $signed = $stateService->generateState(McpOAuthConsentService::PROVIDER, [
+            'owner_id' => 7,
+            'server_id' => 42,
+            'pkce_nonce' => $nonce,
+        ]);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/address changed/');
+
+        $service->complete('the-code', $signed);
     }
 
     public function testReplayedCallbackIsRejected(): void
