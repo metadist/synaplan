@@ -77,13 +77,10 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
     if (!isTerminalStatus(bag.progress.value.status)) startPoll(bag)
     return
   }
+  bag.progress.value = null
+  stopPoll(bag)
   const saved = readSaved(chatId)
-  if (saved === null) {
-    bag.progress.value = null
-    stopPoll(bag)
-    return
-  }
-  void resume(bag, chatId, saved)
+  if (saved !== null) void resume(bag, chatId, saved)
 }
 
 export async function beginResearch(
@@ -112,8 +109,10 @@ export async function stopResearch(bag: ResearchBag): Promise<void> {
   bag.stopping.value = true
   try {
     const run = await cancelResearch(current.id)
-    bag.progress.value = progressFromRun(current.chatId, run)
-    stopPoll(bag)
+    if (bag.progress.value?.id === current.id) {
+      bag.progress.value = progressFromRun(current.chatId, run)
+      stopPoll(bag)
+    }
     await reloadChat(current.chatId)
   } catch {
     bag.startError.value = 'stopFailed'
@@ -165,9 +164,10 @@ async function acceptRun(
   })
   const next = emptyProgress(accepted.id, chatId, input.question)
   next.status = accepted.status
-  bag.progress.value = next
   localStorage.setItem(storageKey(chatId), accepted.id)
   bag.composerOpen.value = false
+  if (bag.boundChatId !== chatId) return
+  bag.progress.value = next
   startPoll(bag)
 }
 

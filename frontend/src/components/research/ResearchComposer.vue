@@ -165,7 +165,7 @@ function submit(): void {
   void research.begin({
     question: question.value.trim(),
     depth: depth.value,
-    web: web.value,
+    web: webAvailable.value && web.value,
     knowledge: files.value,
   })
 }
