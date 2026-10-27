@@ -32,11 +32,11 @@ chat message.
 | RD8 | done | Research team in Models. Merged in synaplan-desktop #50. Not walked live |
 | RD9 | done | Window closed, notification. Merged in synaplan-desktop #50. Not walked live |
 | RW1 | done | Research in the web chat; J-RQ-8. Merged in #2835. The `@ci` journey uses request stubs, not a live model run. Flag stays off |
-| RW2 | done | Research tab on AI infrastructure; J-RQ-10. Switch, reading and fact-checking models, budgets per depth, plan limits, sample with a cost confirmation. Every save and sample start is audited. The sample was not clicked. `RESEARCH.ENABLED` stays off unless the environment pins it. Flag stays off |
+| RW2 | done | Research tab on AI infrastructure; J-RQ-10. [#2838](https://github.com/metadist/synaplan/pull/2838). Switch, reading and fact-checking models, budgets per depth, plan limits, sample with a cost confirmation. Every save and sample start is audited. The sample was not clicked. Walked on localhost: turned on, Research appeared under Tools, turned off again. Flag stays off |
 | RW3 | done | Research as a waiting saved-task step. Merged in #2837. The runner pauses the task; the deliver unit continues it with the report or fails the step with the outcome sentence. Quick and standard only, no questions. `MULTITASK.RESEARCH_ENABLED` stays off. A live weekly-brief email was not started |
 | RX1 | done | User docs for the quick wins. Merged in synaplan-docs #36 |
-| RX2 | done | User docs: Desktop research, models, folders, air-gapped. The screens match synaplan-desktop #50. Docs pull request is not merged |
-| RX3 | done | User docs: web research and the Research tab on AI infrastructure. Docs pull request is not merged |
+| RX2 | done | User docs: Desktop research, models, folders, air-gapped. The screens match synaplan-desktop #50. [synaplan-docs #37](https://github.com/metadist/synaplan-docs/pull/37), not merged |
+| RX3 | done | User docs: web research and the Research tab on AI infrastructure. [synaplan-docs #37](https://github.com/metadist/synaplan-docs/pull/37), not merged |
 
 ---
 
