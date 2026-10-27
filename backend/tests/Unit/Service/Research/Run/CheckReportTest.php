@@ -21,7 +21,7 @@ final class CheckReportTest extends TestCase
 
     public function testARemovedFirstSentenceOfAListItemKeepsTheMarker(): void
     {
-        $report = $this->removing("- The date is open. [e1] The code is 201. [e2]", 'The date is open. [e1]');
+        $report = $this->removing('- The date is open. [e1] The code is 201. [e2]', 'The date is open. [e1]');
 
         self::assertStringStartsWith('- The code is 201. [e2]', $report);
     }
