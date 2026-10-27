@@ -8,10 +8,20 @@ use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\ChatProviderInterface;
-use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
+use App\AI\Pipeline\AiCall;
+use App\AI\Pipeline\AiCallContext;
+use App\AI\Pipeline\AiCallOptions;
+use App\AI\Pipeline\AiCallPayload;
+use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\AiCallSource;
+use App\AI\Pipeline\AiCapability;
+use App\AI\Pipeline\AiUsage;
+use App\AI\Pipeline\Hook\CircuitBreakerHook;
+use App\AI\Pipeline\Hook\ModelHealthHook;
+use App\AI\Pipeline\Hook\RequestContextHook;
 use App\AI\Provider\GoogleProvider;
 use App\AI\Stream\StreamTextCapture;
 use App\AI\StructuredOutput\StructuredOutputRecovery;
@@ -32,27 +42,14 @@ use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
-use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Service\Attribute\Required;
 
 class AiFacade
 {
-    /**
-     * 7 days. The vector for a given (text, provider, model, options) tuple is
-     * deterministic, so once a successful primary-path embedding is cached we
-     * can reuse it across requests AND across web nodes (cache.app is Redis).
-     * Bump the EMBEDDING_SHARED_CACHE_KEY_PREFIX version when the on-disk
-     * shape of the returned array changes, so old entries are skipped instead
-     * of mis-deserialised.
-     */
-    private const EMBEDDING_SHARED_CACHE_TTL_SECONDS = 604800;
-
-    private const EMBEDDING_SHARED_CACHE_KEY_PREFIX = 'embed.v1.';
-
-    /** @var array<string, array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}> */
-    private array $embedCache = [];
-
     private ?AiChatUsageMeter $usageMeter = null;
+    private ?AiCallPipeline $pipeline = null;
+    private ?AiEmbeddingExecutor $embeddings = null;
+    private ?AiVisionExecutor $vision = null;
 
     public function __construct(
         private ProviderRegistry $registry,
@@ -63,11 +60,6 @@ class AiFacade
         private DiscordNotificationService $discordNotification,
         private InternalEmailService $emailService,
         private CacheInterface $cache,
-        // Same physical pool as `$cache` (cache.app → Redis in prod, array in
-        // tests). The Contracts interface is great for the cache-aside helper
-        // used by embed(), but embedBatch() needs the PSR-6 surface so it can
-        // distinguish hits from misses WITHOUT triggering one provider call
-        // per missing text. Both interfaces target the same Redis keys.
         private CacheItemPoolInterface $cachePool,
         private HiggsfieldCredentialResolver $higgsfieldCredentials,
         private TranscriptionUsageRecorder $transcriptionUsageRecorder,
@@ -89,12 +81,49 @@ class AiFacade
         $this->usageMeter = $usageMeter;
     }
 
+    #[Required]
+    public function setPipeline(AiCallPipeline $pipeline): void
+    {
+        $this->pipeline = $pipeline;
+        $this->embeddings = null;
+        $this->vision = null;
+    }
+
+    public function pipeline(): AiCallPipeline
+    {
+        return $this->pipeline ??= new AiCallPipeline([
+            new RequestContextHook(),
+            new CircuitBreakerHook($this->circuitBreaker),
+            new ModelHealthHook($this->health),
+        ], $this->logger);
+    }
+
+    private function embeddingExecutor(): AiEmbeddingExecutor
+    {
+        return $this->embeddings ??= new AiEmbeddingExecutor(
+            $this->registry,
+            $this->modelConfig,
+            $this->pipeline(),
+            $this->cache,
+            $this->cachePool,
+            $this->discordNotification,
+            $this->emailService,
+            $this->logger,
+            $this->embeddingFallbackProvider,
+        );
+    }
+
+    private function visionExecutor(): AiVisionExecutor
+    {
+        return $this->vision ??= new AiVisionExecutor(
+            $this->registry,
+            $this->modelConfig,
+            $this->pipeline(),
+            $this->logger,
+        );
+    }
+
     /**
-     * For providers whose credentials may differ per user (currently only
-     * Higgsfield), resolve the right key+secret pair and inject it into the
-     * options array passed down to the provider. No-op for every other
-     * provider — they read their credentials from constructor env values.
-     *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
@@ -105,8 +134,7 @@ class AiFacade
             return $options;
         }
 
-        if (isset($options['credentials']) && is_array($options['credentials'])) {
-            // Caller supplied explicit credentials — respect them.
+        if (isset($options['credentials']) && \is_array($options['credentials'])) {
             return $options;
         }
 
@@ -127,50 +155,36 @@ class AiFacade
      * @param int|null     $userId   User ID for config lookup
      * @param array        $options  Additional options (provider, model, temperature, etc.)
      *
-     * @return array Response mit content, provider, model, usage
+     * @return array Response with content, provider, model, usage
      */
     public function chat(array|string $messages, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
 
-        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'chat');
         }
 
         $provider = $this->registry->getChatProvider($providerName);
 
-        // String zu Messages konvertieren
-        if (is_string($messages)) {
+        if (\is_string($messages)) {
             $messages = [['role' => 'user', 'content' => $messages]];
         }
 
         $messages = Utf8MessageSanitizer::apply($messages);
         $billTo = AiChatUsageMeter::claim($options);
+        $source = AiCallSource::fromChannel(\is_string($billTo['source'] ?? null) ? $billTo['source'] : null, AiCallSource::ChatWeb);
 
         $this->logger->info('AI chat request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
-            'messages_count' => count($messages),
+            'messages_count' => \count($messages),
         ]);
 
-        // Execute with Circuit Breaker protection
         try {
-            $response = $this->executeWithHealth(
-                callback: fn () => $provider->chat($messages, $options),
-                serviceName: 'ai_provider_'.$provider->getName(),
-                capability: 'chat',
-                provider: $provider,
-                options: $options,
-                userId: $userId,
-                fallback: null // NO FALLBACK - let ProviderException bubble up
-            );
+            $response = $this->runChatCall($provider, $messages, $options, $userId, $source, (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false));
         } catch (StructuredOutputViolationException $e) {
-            // The provider answered — it just rejected the model's own JSON
-            // against the schema we asked for. Heal in-process before anyone
-            // sees an error: salvage the rejected output, else retry once
-            // with a corrective turn. Anything else still bubbles up typed.
-            $response = $this->recoverStructuredOutput($e, $provider, $messages, $options, $userId);
+            $response = $this->recoverStructuredOutput($e, $provider, $messages, $options, $userId, $source, (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false));
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -186,21 +200,15 @@ class AiFacade
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $response['usage'] ?? [],
             'response_id' => $response['response_id'] ?? null,
-            // Native tool calls, normalised to list<ToolCall> by the provider
-            // ({@see \App\AI\ToolCalling\ToolCallParser}). Always present so a
-            // caller that declared tools can read the key unconditionally;
-            // empty for every provider and every call that declared none.
             'tool_calls' => $response['tool_calls'] ?? [],
         ];
-        if (isset($response[StructuredOutputRecovery::RESPONSE_KEY]) && is_string($response[StructuredOutputRecovery::RESPONSE_KEY])) {
-            // Tells the caller its answer came from the healing loop so it can
-            // log/score it; absent on a first-try success.
+        if (isset($response[StructuredOutputRecovery::RESPONSE_KEY]) && \is_string($response[StructuredOutputRecovery::RESPONSE_KEY])) {
             $out[StructuredOutputRecovery::RESPONSE_KEY] = $response[StructuredOutputRecovery::RESPONSE_KEY];
         }
-        if (isset($response['tool_calls']) && is_array($response['tool_calls'])) {
+        if (isset($response['tool_calls']) && \is_array($response['tool_calls'])) {
             $out['tool_calls'] = $response['tool_calls'];
         }
-        if (isset($response['finish_reason']) && is_string($response['finish_reason']) && '' !== $response['finish_reason']) {
+        if (isset($response['finish_reason']) && \is_string($response['finish_reason']) && '' !== $response['finish_reason']) {
             $out['finish_reason'] = $response['finish_reason'];
         }
 
@@ -208,22 +216,40 @@ class AiFacade
     }
 
     /**
-     * Self-healing loop for a schema-rejected generation — cheapest step first,
-     * bounded to a single extra provider call:
-     *
-     *   1. salvage the rejected output locally (drop forbidden keys, re-validate);
-     *   2. otherwise retry ONCE with the rejection fed back as a correction;
-     *   3. if that is rejected too, salvage that one, else give up typed so the
-     *      call site can apply its own safe default.
-     *
-     * Every step is logged with the schema name so a recurring violation shows
-     * up as a prompt/schema problem to fix, not as silent retries.
-     *
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
      *
-     * @return array<string, mixed> provider-shaped response (`content`, `usage`, …)
-     *                              plus {@see StructuredOutputRecovery::RESPONSE_KEY}
+     * @return array<string, mixed>
+     */
+    private function runChatCall(
+        ChatProviderInterface $provider,
+        array $messages,
+        array $options,
+        ?int $userId,
+        AiCallSource $source,
+        bool $callerMeters,
+    ): array {
+        $call = new AiCall(
+            capability: AiCapability::Chat,
+            provider: $provider->getName(),
+            model: $this->reportedModel($provider, $options, 'chat'),
+            context: new AiCallContext(userId: $userId, source: $source),
+            payload: AiCallPayload::chat($messages),
+            options: AiCallOptions::fromArray($options, stream: false, callerMeters: $callerMeters),
+        );
+
+        /* @var array<string, mixed> */
+        return $this->pipeline()->run(
+            $call,
+            static fn (AiCall $c): array => $provider->chat($c->payload->messages, $c->options->providerOptions),
+        )->value;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
      */
     private function recoverStructuredOutput(
         StructuredOutputViolationException $violation,
@@ -231,11 +257,11 @@ class AiFacade
         array $messages,
         array $options,
         ?int $userId,
+        AiCallSource $source,
+        bool $callerMeters,
     ): array {
         $schema = $options['structured_output'] ?? null;
         if (!$schema instanceof StructuredOutputSchema) {
-            // A violation without a schema on OUR side is not something we
-            // can validate against — nothing to heal with.
             throw $violation;
         }
 
@@ -261,15 +287,7 @@ class AiFacade
         $repairMessages = $this->structuredOutputRecovery->repairMessages($messages, $violation, $schema);
 
         try {
-            $response = $this->executeWithHealth(
-                callback: fn () => $provider->chat($repairMessages, $options),
-                serviceName: 'ai_provider_'.$provider->getName(),
-                capability: 'chat',
-                provider: $provider,
-                options: $options,
-                userId: $userId,
-                fallback: null,
-            );
+            $response = $this->runChatCall($provider, $repairMessages, $options, $userId, $source, $callerMeters);
         } catch (StructuredOutputViolationException $retryViolation) {
             $salvaged = $this->structuredOutputRecovery->salvage($retryViolation->getFailedGeneration(), $schema);
             if (null !== $salvaged) {
@@ -293,10 +311,6 @@ class AiFacade
     }
 
     /**
-     * A salvaged answer never reached the usage counters: the provider's 400
-     * carries no `usage` block, so the tokens it burned are reported as zero
-     * rather than guessed.
-     *
      * @return array<string, mixed>
      */
     private function salvagedResponse(string $content): array
@@ -328,50 +342,50 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // If no provider specified, use user configuration
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'chat');
         }
 
         $provider = $this->registry->getChatProvider($providerName);
 
-        // Convert string to messages format
-        if (is_string($messages)) {
+        if (\is_string($messages)) {
             $messages = [['role' => 'user', 'content' => $messages]];
         }
 
         $messages = Utf8MessageSanitizer::apply($messages);
         $billTo = AiChatUsageMeter::claim($options);
+        $source = AiCallSource::fromChannel(\is_string($billTo['source'] ?? null) ? $billTo['source'] : null, AiCallSource::ChatStream);
         $answer = StreamTextCapture::wrap($streamCallback);
 
         $this->logger->info('🔵 AiFacade: Starting chat stream', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
-            'messages_count' => count($messages),
+            'messages_count' => \count($messages),
             'model' => $options['model'] ?? 'default',
         ]);
 
-        // Execute streaming with Circuit Breaker protection
-        $streamResult = null;
+        $call = new AiCall(
+            capability: AiCapability::ChatStream,
+            provider: $provider->getName(),
+            model: $this->reportedModel($provider, $options, 'chat'),
+            context: new AiCallContext(userId: $userId, source: $source),
+            payload: AiCallPayload::chat($messages),
+            options: AiCallOptions::fromArray($options, stream: true, callerMeters: (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false)),
+        );
+
         try {
-            $this->executeWithHealth(
-                callback: function () use ($provider, $messages, $answer, $options, &$streamResult) {
+            $streamResult = $this->pipeline()->stream(
+                $call,
+                function (AiCall $c, callable $onChunk) use ($provider): mixed {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
-                    $streamResult = $provider->chatStream($messages, $answer, $options);
+                    $res = $provider->chatStream($c->payload->messages, $onChunk, $c->options->providerOptions);
                     $this->logger->info('🔵 AiFacade: Provider chatStream completed');
 
-                    return null;
+                    return $res;
                 },
-                serviceName: 'ai_provider_'.$provider->getName(),
-                capability: 'chat',
-                provider: $provider,
-                options: $options,
-                fallback: null // NO FALLBACK - let ProviderException bubble up
-            );
+                $answer,
+            )->value;
         } catch (ProviderException|StreamCancelledException $e) {
-            // A user cancel travels up through the stream callback. Wrapping it
-            // in a ProviderException would turn "you pressed Stop" into a
-            // provider outage for every caller downstream.
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('🔴 AiFacade: Chat stream failed', [
@@ -381,21 +395,15 @@ class AiFacade
             throw new ProviderException('AI provider failed for streaming', 'unknown', null, 0, $e);
         }
 
-        $streamed = $this->withUsage([
+        return $this->withUsage([
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'content' => $answer->text(),
-            'usage' => $streamResult['usage'] ?? [],
-            'response_id' => $streamResult['response_id'] ?? null,
-            // See chat(): tool calls reassembled from the stream fragments by
-            // {@see \App\AI\ToolCalling\StreamingToolCallAccumulator}. A tool
-            // call is NOT emitted to the stream callback — the client must
-            // never see a routing hand-off as if it were answer text.
-            'tool_calls' => $streamResult['tool_calls'] ?? [],
-            'finish_reason' => is_string($streamResult['finish_reason'] ?? null) ? $streamResult['finish_reason'] : null,
+            'usage' => \is_array($streamResult) ? ($streamResult['usage'] ?? []) : [],
+            'response_id' => \is_array($streamResult) ? ($streamResult['response_id'] ?? null) : null,
+            'tool_calls' => \is_array($streamResult) ? ($streamResult['tool_calls'] ?? []) : [],
+            'finish_reason' => \is_array($streamResult) && \is_string($streamResult['finish_reason'] ?? null) ? $streamResult['finish_reason'] : null,
         ], $messages, $options, $userId, $billTo);
-
-        return $streamed;
     }
 
     /**
@@ -419,639 +427,67 @@ class AiFacade
     }
 
     /**
-     * Embedding: Text → Vector.
-     *
-     * @param string   $text    Text to embed
-     * @param int|null $userId  User ID for config lookup
-     * @param array    $options Additional options (provider, model, etc.)
-     *
      * @return array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embed(string $text, ?int $userId = null, array $options = []): array
     {
-        $providerName = $options['provider'] ?? null;
-        $model = $options['model'] ?? null;
-
-        if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
-        }
-
-        $provider = $this->registry->getEmbeddingProvider($providerName);
-        $resolvedModel = $model ?? $provider->getDefaultModels()['embedding'] ?? 'default';
-
-        // Two-layer cache:
-        //   1. In-process (`$this->embedCache`) collapses duplicates inside the
-        //      same request — useful for batch handlers that re-embed the same
-        //      chunk multiple times.
-        //   2. Shared (Symfony cache.app → Redis) collapses duplicates across
-        //      requests AND across web nodes. The vector for a given
-        //      (text, provider, model, options) tuple is deterministic, so
-        //      this is a pure performance win — no provider call needed.
-        $inProcessKey = $this->embeddingInProcessCacheKey($text, $provider->getName(), $resolvedModel, $options);
-        if (isset($this->embedCache[$inProcessKey])) {
-            $this->logger->debug('AI embedding in-process cache hit', [
-                'provider' => $provider->getName(),
-                'model' => $resolvedModel,
-                'text_length' => strlen($text),
-            ]);
-
-            return $this->embedCache[$inProcessKey];
-        }
-
-        $sharedKey = $this->embeddingSharedCacheKey($text, $provider->getName(), $resolvedModel, $options);
-
-        try {
-            // The callback only runs on a cache MISS, so the
-            // 'AI embedding request' log line below faithfully reflects when
-            // we actually call out to a provider.
-            return $this->embedCache[$inProcessKey] = $this->cache->get(
-                $sharedKey,
-                function (ItemInterface $item) use ($text, $provider, $options, $userId, $resolvedModel): array {
-                    $item->expiresAfter(self::EMBEDDING_SHARED_CACHE_TTL_SECONDS);
-                    $this->logger->info('AI embedding request', [
-                        'provider' => $provider->getName(),
-                        'user_id' => $userId,
-                        'model' => $resolvedModel,
-                        'text_length' => strlen($text),
-                    ]);
-
-                    return $this->observing(
-                        'embedding',
-                        $provider->getName(),
-                        $resolvedModel,
-                        $userId,
-                        fn () => $provider->embed($text, $options),
-                    );
-                }
-            );
-        } catch (ProviderException $primaryError) {
-            // Fallback path is intentionally NOT cached under the primary key:
-            // a Cloudflare vector must never be returned later when the
-            // primary (e.g. Ollama) is healthy again — different model spaces
-            // are not interchangeable. We still fill the in-process cache so
-            // the same request doesn't double-bill the fallback provider.
-            $fresh = $this->tryEmbeddingFallback(
-                fn ($fb, $fbOpts) => $fb->embed($text, $fbOpts),
-                $provider->getName(),
-                $primaryError,
-                $options,
-            );
-            $this->embedCache[$inProcessKey] = $fresh;
-
-            return $fresh;
-        }
+        return $this->embeddingExecutor()->embed($text, $userId, $options);
     }
 
     /**
-     * Options that can change the embedding vector for the same text+model+provider.
-     * Anything outside this allow-list (e.g. request-id, telemetry tags) MUST
-     * NOT influence the cache key — otherwise the shared cache hit-rate
-     * collapses to ~zero.
-     *
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
-     */
-    private function embeddingOptionsForCacheKey(array $options): array
-    {
-        $slice = array_intersect_key($options, array_flip(['dimensions', 'encoding_format']));
-        ksort($slice);
-
-        return $slice;
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     */
-    private function embeddingInProcessCacheKey(string $text, string $providerName, string $resolvedModel, array $options): string
-    {
-        return md5($text.'|'.$providerName.'|'.$resolvedModel.'|'.$this->embeddingOptionsJson($options));
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     */
-    private function embeddingSharedCacheKey(string $text, string $providerName, string $resolvedModel, array $options): string
-    {
-        return self::EMBEDDING_SHARED_CACHE_KEY_PREFIX.md5(
-            $text.'|'.$providerName.'|'.$resolvedModel.'|'.$this->embeddingOptionsJson($options)
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     */
-    private function embeddingOptionsJson(array $options): string
-    {
-        try {
-            return json_encode($this->embeddingOptionsForCacheKey($options), JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return '';
-        }
-    }
-
-    /**
-     * Batch Embedding.
-     *
-     * Cache strategy mirrors {@see embed()} on a per-text basis: every input
-     * text is looked up under the same `embed.v1.*` key shape, so single and
-     * batch calls share one Redis namespace. Only the texts that miss the
-     * cache are forwarded to the provider in a single batch call. The
-     * resulting vectors are persisted under their respective keys so a later
-     * `embed()` for the same text can return without a provider hop.
-     *
-     * Fallback path stays intentionally uncached — exactly like `embed()` —
-     * to prevent vectors from one model space leaking into another model's
-     * key once the primary recovers.
-     *
-     * @param string[]    $texts        Texts to embed
-     * @param int|null    $userId       User ID for config lookup
-     * @param string|null $providerName Explicit provider name
-     * @param array       $options      Additional options (model, etc.) forwarded to the provider
+     * @param string[] $texts
      *
      * @return array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
-        if ([] === $texts) {
-            return [
-                'embeddings' => [],
-                'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
-            ];
-        }
-
-        if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
-        }
-
-        $provider = $this->registry->getEmbeddingProvider($providerName);
-        $resolvedModel = $options['model'] ?? $provider->getDefaultModels()['embedding'] ?? 'default';
-
-        // Resolve every input slot from the in-process and shared caches
-        // first. We deliberately keep the original index of each missing text
-        // so the final vector list maps 1:1 to the caller-supplied order — a
-        // hard requirement for VectorizationService and EmbeddingReindexService.
-        $resolved = array_fill(0, count($texts), null);
-        /** @var array<int, string> $missingByIndex */
-        $missingByIndex = [];
-        /** @var array<int, string> $sharedKeyByIndex */
-        $sharedKeyByIndex = [];
-        /** @var array<int, string> $inProcessKeyByIndex */
-        $inProcessKeyByIndex = [];
-
-        foreach ($texts as $i => $text) {
-            $inProcessKey = $this->embeddingInProcessCacheKey($text, $provider->getName(), $resolvedModel, $options);
-            $inProcessKeyByIndex[$i] = $inProcessKey;
-
-            if (isset($this->embedCache[$inProcessKey])) {
-                $resolved[$i] = $this->embedCache[$inProcessKey];
-                continue;
-            }
-
-            $sharedKey = $this->embeddingSharedCacheKey($text, $provider->getName(), $resolvedModel, $options);
-            $sharedKeyByIndex[$i] = $sharedKey;
-            $missingByIndex[$i] = $text;
-        }
-
-        if ([] !== $sharedKeyByIndex) {
-            try {
-                $items = $this->cachePool->getItems(array_values(array_unique($sharedKeyByIndex)));
-            } catch (\Psr\Cache\InvalidArgumentException $e) {
-                // Cache lookup failure must never break embedding — fall back
-                // to treating every shared-cache entry as a miss and let the
-                // provider produce fresh vectors.
-                $this->logger->warning('AI batch embedding shared-cache lookup failed', [
-                    'error' => $e->getMessage(),
-                ]);
-                $items = [];
-            }
-
-            $itemsByKey = [];
-            foreach ($items as $item) {
-                $itemsByKey[$item->getKey()] = $item;
-            }
-
-            foreach ($sharedKeyByIndex as $i => $sharedKey) {
-                $item = $itemsByKey[$sharedKey] ?? null;
-                if (null !== $item && $item->isHit()) {
-                    /** @var array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}} $cached */
-                    $cached = $item->get();
-                    $resolved[$i] = $cached;
-                    $this->embedCache[$inProcessKeyByIndex[$i]] = $cached;
-                    unset($missingByIndex[$i]);
-                }
-            }
-        }
-
-        $this->logger->info('AI batch embedding request', [
-            'provider' => $provider->getName(),
-            'user_id' => $userId,
-            'count' => count($texts),
-            'cache_hits' => count($texts) - count($missingByIndex),
-            'cache_misses' => count($missingByIndex),
-        ]);
-
-        // Whole batch served from cache → skip the provider entirely.
-        if ([] === $missingByIndex) {
-            return [
-                'embeddings' => array_map(static fn (array $r): array => $r['embedding'], $resolved),
-                'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
-            ];
-        }
-
-        // Preserve insertion order so the returned embeddings line up with
-        // the texts we sent to the provider (most providers preserve order
-        // by index in their response array).
-        $missingTexts = array_values($missingByIndex);
-        $missingIndexes = array_keys($missingByIndex);
-
-        try {
-            $batch = $this->observing(
-                'embedding',
-                $provider->getName(),
-                $resolvedModel,
-                $userId,
-                fn () => $provider->embedBatch($missingTexts, $options),
-            );
-        } catch (\Throwable $primaryError) {
-            // The fallback covers the FULL original text list (not just the
-            // misses). Mixing cached primary vectors with fallback vectors
-            // would silently violate the model-space invariant the cache key
-            // is designed to enforce.
-            return $this->tryEmbeddingFallback(
-                fn ($fb, $fbOpts) => $fb->embedBatch($texts, $fbOpts),
-                $provider->getName(),
-                $primaryError,
-                $options,
-            );
-        }
-
-        $providerEmbeddings = $batch['embeddings'];
-        $usage = $batch['usage'];
-
-        foreach ($missingIndexes as $position => $originalIndex) {
-            $vector = $providerEmbeddings[$position] ?? [];
-            $entry = [
-                'embedding' => $vector,
-                // Per-text usage cannot be reconstructed from a batch response,
-                // so we only attach the aggregate to the first miss to keep
-                // the cache shape compatible with embed()'s schema. Everything
-                // else stores zeroes — the cache hit path doesn't account for
-                // tokens anyway.
-                'usage' => 0 === $position
-                    ? ['prompt_tokens' => $usage['prompt_tokens'], 'total_tokens' => $usage['total_tokens']]
-                    : ['prompt_tokens' => 0, 'total_tokens' => 0],
-            ];
-
-            $resolved[$originalIndex] = $entry;
-            $this->embedCache[$inProcessKeyByIndex[$originalIndex]] = $entry;
-
-            // Empty vectors typically signal a downstream issue (dimension
-            // mismatch, transient provider hiccup, etc.). Skipping the cache
-            // write keeps the next call fresh instead of pinning a bad value
-            // for a week.
-            if ([] === $vector) {
-                continue;
-            }
-
-            try {
-                $item = $this->cachePool->getItem($sharedKeyByIndex[$originalIndex]);
-                $item->set($entry);
-                $item->expiresAfter(self::EMBEDDING_SHARED_CACHE_TTL_SECONDS);
-                $this->cachePool->save($item);
-            } catch (\Psr\Cache\InvalidArgumentException $e) {
-                $this->logger->warning('AI batch embedding shared-cache write failed', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        return [
-            'embeddings' => array_map(static fn (?array $r): array => null === $r ? [] : $r['embedding'], $resolved),
-            'usage' => ['prompt_tokens' => $usage['prompt_tokens'], 'total_tokens' => $usage['total_tokens']],
-        ];
+        return $this->embeddingExecutor()->embedBatch($texts, $userId, $providerName, $options);
     }
 
     /**
-     * Try a fallback embedding provider when the primary fails.
-     *
-     * @template T
-     *
-     * @param callable(EmbeddingProviderInterface, array): T $operation
-     *
-     * @return T
-     */
-    private function tryEmbeddingFallback(callable $operation, string $primaryName, \Throwable $primaryError, array $options): mixed
-    {
-        $fallbackName = $this->embeddingFallbackProvider;
-
-        if ('' === $fallbackName || $fallbackName === $primaryName) {
-            throw $primaryError;
-        }
-
-        // Use `error` (not `warning`) so this shows up in the same log
-        // bucket as production incidents — silent failovers were called
-        // out as a risk in the embedding-stack review. The success
-        // path further down logs `notice` so on-call can correlate
-        // "primary failed" with "fallback succeeded" without grepping
-        // two channels.
-        $this->logger->error('Embedding primary provider failed; attempting fallback', [
-            'primary' => $primaryName,
-            'fallback' => $fallbackName,
-            'error' => $primaryError->getMessage(),
-            'event' => 'embedding.fallback.attempt',
-        ]);
-
-        try {
-            $fallback = $this->registry->getEmbeddingProvider($fallbackName);
-        } catch (\Throwable) {
-            throw $primaryError;
-        }
-
-        $fallbackOptions = $options;
-        $fallbackOptions['provider'] = $fallbackName;
-        unset($fallbackOptions['model']);
-
-        $result = $operation($fallback, $fallbackOptions);
-
-        $this->logger->notice('Embedding fallback succeeded', [
-            'primary' => $primaryName,
-            'fallback' => $fallbackName,
-            'event' => 'embedding.fallback.success',
-        ]);
-
-        $this->sendFallbackNotification($primaryName, $fallbackName, $primaryError->getMessage());
-
-        return $result;
-    }
-
-    /**
-     * Send a throttled warning notification when the embedding fallback activates.
-     * Max one notification per provider pair per hour to prevent spam.
-     */
-    private function sendFallbackNotification(string $primaryProvider, string $fallbackProvider, string $error): void
-    {
-        $throttleKey = 'embedding_fallback_'.md5($primaryProvider.$fallbackProvider);
-
-        try {
-            $isNewNotification = false;
-            $this->cache->get($throttleKey, function ($item) use (&$isNewNotification) {
-                $item->expiresAfter(3600);
-                $isNewNotification = true;
-
-                return true;
-            });
-
-            if (!$isNewNotification) {
-                return;
-            }
-        } catch (\Throwable $e) {
-            $this->logger->debug('Fallback throttle cache error (non-critical)', ['error' => $e->getMessage()]);
-        }
-
-        try {
-            $this->discordNotification->notifyEmbeddingFallback($primaryProvider, $fallbackProvider, $error);
-        } catch (\Throwable $e) {
-            $this->logger->debug('Discord fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
-        }
-
-        try {
-            $this->emailService->sendEmbeddingFallbackWarning($primaryProvider, $fallbackProvider, $error);
-        } catch (\Throwable $e) {
-            $this->logger->debug('Email fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Analyze Image with Vision AI.
-     *
-     * @param string   $imagePath Relative path to image from upload dir
-     * @param string   $prompt    Analysis prompt
-     * @param int|null $userId    User ID for config lookup
-     * @param array    $options   Additional options (provider, model, etc.)
-     *
-     * @return array Response mit content, provider, model
+     * @return array<string, mixed>
      */
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
-        $providerWasExplicit = array_key_exists('provider', $options);
-        $callerSuppliedModel = array_key_exists('model', $options);
-        $resolvedVisionProvider = null;
-
-        // The settings UI persists the user's vision pick to
-        // BCONFIG.DEFAULTMODEL.PIC2TEXT. Honour that configured row before
-        // falling through to the legacy default-vision-provider chain.
-        if (!$providerWasExplicit && null !== $userId) {
-            $visionDefault = $this->modelConfig->resolveVisionDefault($userId);
-            $resolvedVisionProvider = $visionDefault['provider'];
-
-            if (null !== $visionDefault['model_id']) {
-                $options['provider'] = $visionDefault['provider'];
-                $providerWasExplicit = true;
-                if (null !== $visionDefault['model'] && !$callerSuppliedModel) {
-                    $options['model'] = $visionDefault['model'];
-                }
-            }
-        }
-
-        $requestedProvider = $options['provider'] ?? $resolvedVisionProvider ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
-        // Don't default to 'test' - let real providers be tried first via fallback logic
-        $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
-
-        // The model id stashed in $options is the API identifier of whichever
-        // provider we just picked as primary. When we fall back to a *different*
-        // provider, that string is meaningless (and often actively harmful: e.g.
-        // OpenAI/Google read $options['model'] verbatim and will 400 on a Groq
-        // model name). Remember whose model this is so we can strip it for any
-        // non-matching candidate further down — mirrors the embedding fallback's
-        // `unset($fallbackOptions['model'])` safeguard.
-        $modelOwnerProvider = (isset($options['model']) && $normalizedRequested)
-            ? $normalizedRequested
-            : null;
-
-        $candidates = [];
-
-        // Prefer explicitly requested provider first (unless it is the dummy test provider)
-        if ($providerWasExplicit && $requestedProvider && 'test' !== $normalizedRequested) {
-            $candidates[] = [
-                'name' => $requestedProvider,
-                'requireCapability' => true,
-            ];
-        } elseif ($requestedProvider && 'test' !== $normalizedRequested) {
-            $candidates[] = [
-                'name' => $requestedProvider,
-                'requireCapability' => true,
-            ];
-        }
-        $this->logger->info('AI vision request - provider selection', [
-            'requested_provider' => $requestedProvider,
-            'user_id' => $userId,
-            'image' => basename($imagePath),
-            'options' => $options,
-        ]);
-
-        // Add all available real providers next (ALWAYS - even if a provider was requested)
-        $fallbackRequireCapability = true;
-        $fallbackProviders = $this->registry->getAvailableProviders('vision', includeTest: false, requireCapability: true);
-
-        if (empty($fallbackProviders)) {
-            $this->logger->info('AI vision fallback: no DB-enabled providers, probing available providers with API keys', [
-                'requested_provider' => $requestedProvider,
-                'user_id' => $userId,
-            ]);
-
-            $fallbackProviders = $this->registry->getAvailableProviders('vision', includeTest: false, requireCapability: false);
-            $fallbackRequireCapability = false;
-        }
-
-        foreach ($fallbackProviders as $fallbackName) {
-            if ($normalizedRequested && 0 === strcasecmp($fallbackName, $requestedProvider)) {
-                continue;
-            }
-
-            $candidates[] = [
-                'name' => $fallbackName,
-                'requireCapability' => $fallbackRequireCapability,
-            ];
-        }
-
-        // Only add TestProvider as last resort if NO real providers are available
-        // TestProvider should NEVER be used in production for actual file analysis
-        if (empty($candidates)) {
-            $this->logger->warning('AI vision: No real providers available, falling back to TestProvider (development only)', [
-                'user_id' => $userId,
-            ]);
-            $candidates[] = [
-                'name' => 'test',
-                'requireCapability' => false,
-            ];
-        }
-
-        $attempted = [];
-        $lastException = null;
-
-        foreach ($candidates as $candidate) {
-            $candidateName = $candidate['name'];
-            $normalizedCandidate = strtolower($candidateName);
-
-            if (in_array($normalizedCandidate, $attempted, true)) {
-                continue;
-            }
-            $attempted[] = $normalizedCandidate;
-
-            try {
-                $provider = $this->registry->getVisionProvider($candidateName, $candidate['requireCapability']);
-            } catch (ProviderException $e) {
-                $this->logger->warning('AI vision provider not available', [
-                    'provider' => $candidateName,
-                    'require_capability' => $candidate['requireCapability'],
-                    'error' => $e->getMessage(),
-                ]);
-                $lastException = $e;
-                continue;
-            }
-
-            // Build per-candidate options: drop the provider-specific `model`
-            // override whenever the candidate isn't the provider that string
-            // belongs to, so each provider gets either its own model or nothing
-            // (in which case it falls back to its internal default).
-            $candidateOptions = $options;
-            $candidateOptions['provider'] = $candidateName;
-            if (null !== $modelOwnerProvider && $modelOwnerProvider !== $normalizedCandidate) {
-                unset($candidateOptions['model']);
-            }
-
-            $this->logger->info('AI vision request via '.$provider->getName(), [
-                'provider' => $provider->getName(),
-                'user_id' => $userId,
-                'image' => basename($imagePath),
-                'model' => $candidateOptions['model'] ?? null,
-            ]);
-
-            try {
-                $response = $this->executeWithHealth(
-                    callback: fn () => $provider->explainImage($imagePath, $prompt, $candidateOptions),
-                    serviceName: 'ai_provider_vision_'.$provider->getName(),
-                    capability: 'vision',
-                    provider: $provider,
-                    options: $candidateOptions,
-                    userId: $userId,
-                    fallback: null // NO FALLBACK
-                );
-
-                return [
-                    'content' => $response,
-                    'provider' => $provider->getName(),
-                    'model' => $this->reportedModel($provider, $candidateOptions, 'vision'),
-                ];
-            } catch (ProviderException $e) {
-                $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [
-                    'provider' => $provider->getName(),
-                    'error' => $e->getMessage(),
-                ]);
-                $lastException = $e;
-                continue;
-            } catch (\Throwable $e) {
-                $this->logger->error('AI vision provider error: '.$provider->getName().' - '.$e->getMessage(), [
-                    'provider' => $provider->getName(),
-                    'error' => $e->getMessage(),
-                ]);
-                $lastException = new ProviderException(
-                    'Vision provider error: '.$e->getMessage(),
-                    $provider->getName(),
-                    null,
-                    0,
-                    $e
-                );
-                continue;
-            }
-        }
-
-        $this->logger->error('AI vision failed after exhausting providers', [
-            'image' => basename($imagePath),
-            'attempted' => $attempted,
-        ]);
-
-        throw $lastException;
+        return $this->visionExecutor()->analyzeImage($imagePath, $prompt, $userId, $options);
     }
 
     /**
-     * Generate Image with AI (DALL-E, etc.).
-     *
-     * @param string   $prompt  Image generation prompt
-     * @param int|null $userId  User ID for config lookup
-     * @param array    $options Additional options (provider, model, size, quality, style, etc.)
-     *
-     * @return array Generated images with metadata
+     * @return array<string, mixed>
      */
     public function generateImage(string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
 
-        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'image_generation');
         }
 
         $provider = $this->registry->getImageGenerationProvider($providerName);
         $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
+        $reportedModel = $this->reportedModel($provider, $options, 'image_generation');
 
         $this->logger->info('AI image generation request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
-            'prompt_length' => strlen($prompt),
+            'prompt_length' => \strlen($prompt),
         ]);
 
+        $call = new AiCall(
+            capability: AiCapability::Image,
+            provider: $provider->getName(),
+            model: $reportedModel,
+            context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
+            payload: AiCallPayload::mediaPrompt($prompt),
+            options: AiCallOptions::fromArray($options),
+        );
+
         try {
-            $images = $this->executeWithHealth(
-                callback: fn () => $provider->generateImage($prompt, $options),
-                serviceName: 'ai_provider_image_'.$provider->getName(),
-                capability: 'image_generation',
-                provider: $provider,
-                options: $options,
-                userId: $userId,
-                fallback: null // NO FALLBACK
-            );
+            $images = $this->pipeline()->run(
+                $call,
+                static fn (AiCall $c): mixed => $provider->generateImage((string) $c->payload->prompt, $c->options->providerOptions),
+                static fn (mixed $imgs): AiUsage => new AiUsage(imageCount: \is_array($imgs) ? \count($imgs) : 1),
+            )->value;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -1064,48 +500,46 @@ class AiFacade
         return [
             'images' => $images,
             'provider' => $provider->getName(),
-            'model' => $this->reportedModel($provider, $options, 'image_generation'),
-            'image_count' => is_array($images) ? count($images) : 1,
+            'model' => $reportedModel,
+            'image_count' => \is_array($images) ? \count($images) : 1,
         ];
     }
 
     /**
-     * Generate Video with AI.
-     *
-     * @param string   $prompt  Video generation prompt
-     * @param int|null $userId  User ID for config lookup
-     * @param array    $options Additional options (provider, model, duration, resolution, etc.)
-     *
-     * @return array Generated videos with metadata
+     * @return array<string, mixed>
      */
     public function generateVideo(string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
 
-        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'video_generation');
         }
 
         $provider = $this->registry->getVideoGenerationProvider($providerName);
         $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
+        $reportedModel = $this->reportedModel($provider, $options, 'video_generation');
 
         $this->logger->info('AI video generation request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
-            'prompt_length' => strlen($prompt),
+            'prompt_length' => \strlen($prompt),
         ]);
 
+        $call = new AiCall(
+            capability: AiCapability::VideoStart,
+            provider: $provider->getName(),
+            model: $reportedModel,
+            context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
+            payload: AiCallPayload::mediaPrompt($prompt),
+            options: AiCallOptions::fromArray($options),
+        );
+
         try {
-            $videos = $this->executeWithHealth(
-                callback: fn () => $provider->generateVideo($prompt, $options),
-                serviceName: 'ai_provider_video_'.$provider->getName(),
-                capability: 'video_generation',
-                provider: $provider,
-                options: $options,
-                userId: $userId,
-                fallback: null // NO FALLBACK
-            );
+            $videos = $this->pipeline()->run(
+                $call,
+                static fn (AiCall $c): mixed => $provider->generateVideo((string) $c->payload->prompt, $c->options->providerOptions),
+            )->value;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -1117,7 +551,7 @@ class AiFacade
 
         $durationSeconds = null;
         $resolution = null;
-        if (is_array($videos) && !empty($videos)) {
+        if (\is_array($videos) && !empty($videos)) {
             $durationSeconds = $videos[0]['duration'] ?? $videos[0]['duration_seconds'] ?? null;
             $resolution = $videos[0]['resolution'] ?? null;
         }
@@ -1125,18 +559,12 @@ class AiFacade
         return [
             'videos' => $videos,
             'provider' => $provider->getName(),
-            'model' => $this->reportedModel($provider, $options, 'video_generation'),
+            'model' => $reportedModel,
             'duration_seconds' => $durationSeconds,
             'resolution' => $resolution,
         ];
     }
 
-    /**
-     * Whether the named video provider supports the async submit/poll surface
-     * ({@see SupportsAsyncVideo}). Used by the chat path to decide whether a
-     * render can detach to {@see \App\Service\Media\MediaJobService} or must
-     * stay on the legacy blocking {@see generateVideo()} path.
-     */
     public function supportsAsyncVideo(?string $providerName): bool
     {
         if (null === $providerName || '' === $providerName) {
@@ -1152,12 +580,6 @@ class AiFacade
         return $provider instanceof SupportsAsyncVideo;
     }
 
-    /**
-     * Whether the named video provider can take an image-to-video reference
-     * frame as inline bytes ({@see SupportsInlineReferenceImage}). Lets the chat
-     * path hand over the local upload path instead of republishing the file at a
-     * public URL the provider would have to fetch.
-     */
     public function supportsInlineReferenceImage(?string $providerName): bool
     {
         if (null === $providerName || '' === $providerName) {
@@ -1174,8 +596,6 @@ class AiFacade
     }
 
     /**
-     * Start an async video generation operation (non-blocking).
-     *
      * @return array{operationName: string, provider: string, model: string, duration: int, resolution: string}
      */
     public function startVideoGeneration(string $prompt, ?int $userId = null, array $options = []): array
@@ -1198,7 +618,20 @@ class AiFacade
             'user_id' => $userId,
         ]);
 
-        $operationData = $provider->startVideoOperation($prompt, $options);
+        $call = new AiCall(
+            capability: AiCapability::VideoPoll,
+            provider: $provider->getName(),
+            model: $this->reportedModel($provider, $options, 'video_generation'),
+            context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
+            payload: AiCallPayload::mediaPrompt($prompt),
+            options: AiCallOptions::fromArray($options),
+        );
+
+        /** @var array{operationName: string, model: string, duration: int, resolution: string} $operationData */
+        $operationData = $this->pipeline()->run(
+            $call,
+            static fn (AiCall $c): array => $provider->startVideoOperation((string) $c->payload->prompt, $c->options->providerOptions),
+        )->value;
 
         return [
             ...$operationData,
@@ -1207,12 +640,6 @@ class AiFacade
     }
 
     /**
-     * Poll an async video operation once.
-     *
-     * When $userId is given, per-provider credentials are re-injected into
-     * $options so providers that authenticate per-call (e.g. Higgsfield) can
-     * poll statelessly from a background worker. Veo ignores $options.
-     *
      * @param array<string, mixed> $options
      *
      * @return array{done: bool, videoUri: ?string, error: ?string, status?: ?string, percent?: ?int}
@@ -1229,12 +656,22 @@ class AiFacade
             $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
         }
 
-        return $provider->pollVideoOperationOnce($operationName, $options);
+        $call = new AiCall(
+            capability: AiCapability::VideoPoll,
+            provider: $provider->getName(),
+            model: $this->reportedModel($provider, $options, 'video_generation'),
+            context: new AiCallContext(userId: $userId, source: AiCallSource::Media, billable: false),
+            payload: AiCallPayload::videoOperation($operationName),
+            options: AiCallOptions::fromArray($options),
+        );
+
+        /* @var array{done: bool, videoUri: ?string, error: ?string, status?: ?string, percent?: ?int} */
+        return $this->pipeline()->run(
+            $call,
+            static fn (AiCall $c): array => $provider->pollVideoOperationOnce((string) $c->payload->operationId, $c->options->providerOptions),
+        )->value;
     }
 
-    /**
-     * Download video content from a provider URI (as data URL).
-     */
     public function downloadVideoContent(string $videoUri, ?string $providerName = null): string
     {
         $provider = $this->registry->getVideoGenerationProvider($providerName);
@@ -1247,8 +684,6 @@ class AiFacade
     }
 
     /**
-     * Download raw video bytes from a provider URI (avoids base64 overhead).
-     *
      * @param array<string, mixed> $options
      */
     public function downloadVideoRaw(string $videoUri, ?string $providerName = null, ?int $userId = null, array $options = []): string
@@ -1267,9 +702,6 @@ class AiFacade
     }
 
     /**
-     * Best-effort cancel of an async video render so we stop billing for output
-     * nobody is waiting for. Never throws.
-     *
      * @param array<string, mixed> $options
      */
     public function cancelVideoOperation(string $operationName, ?string $providerName = null, ?int $userId = null, array $options = []): void
@@ -1295,32 +727,18 @@ class AiFacade
     }
 
     /**
-     * Transcribe Audio (Whisper).
-     *
-     * @param array $options Additional options (provider, model, language, etc.)
-     *
-     * @return array Transcription result with text, language, duration, segments
-     */
-    /**
-     * Resolve the concrete model name to report in a response's metadata.
-     *
-     * The message-details popover ("AI Model" row) surfaces this value, so a
-     * literal "unknown" makes the row disappear. Prefer the explicitly
-     * requested model, then the provider's advertised default for the given
-     * capability, before falling back to "unknown" as a last resort.
-     *
      * @param array<string, mixed> $options
      */
     private function reportedModel(ProviderMetadataInterface $provider, array $options, string $capability): string
     {
         $requested = $options['model'] ?? null;
-        if (is_string($requested) && '' !== trim($requested)) {
+        if (\is_string($requested) && '' !== trim($requested)) {
             return $requested;
         }
 
         $defaults = $provider->getDefaultModels();
         $default = $defaults[$capability] ?? null;
-        if (is_string($default) && '' !== trim($default)) {
+        if (\is_string($default) && '' !== trim($default)) {
             return $default;
         }
 
@@ -1328,79 +746,20 @@ class AiFacade
     }
 
     /**
-     * Run a provider call through the circuit breaker and tell the health
-     * monitor how it ended.
-     *
-     * This is the single choke point for passive detection: every capability
-     * already goes through the circuit breaker, so wrapping it here observes
-     * real traffic without adding a single extra provider request. Recording
-     * never throws — {@see ModelHealthRecorder} swallows its own errors — so a
-     * broken counter cannot take down the call it is watching.
-     *
-     * @param array<string, mixed> $options
+     * @return array<string, mixed>
      */
-    private function executeWithHealth(
-        callable $callback,
-        string $serviceName,
-        string $capability,
-        ProviderMetadataInterface $provider,
-        array $options,
-        ?int $userId = null,
-        ?callable $fallback = null,
-    ): mixed {
-        return $this->observing(
-            $capability,
-            $provider->getName(),
-            $this->reportedModel($provider, $options, $capability),
-            $userId,
-            fn () => $this->circuitBreaker->execute($callback, $serviceName, $fallback),
-        );
-    }
-
-    /**
-     * Report how a provider call ended to the health monitor and pass the
-     * result (or the exception) straight through.
-     *
-     * Used directly by the embedding path, which caches and falls back instead
-     * of going through the circuit breaker.
-     */
-    private function observing(string $capability, string $providerName, ?string $model, ?int $userId, callable $callback): mixed
-    {
-        try {
-            $result = $callback();
-        } catch (\Throwable $e) {
-            $this->health->recordFailure($capability, $providerName, $model, $e, $userId);
-            throw $e;
-        }
-
-        $this->health->recordSuccess($capability, $providerName, $model);
-
-        return $result;
-    }
-
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
-        $callerSuppliedModel = array_key_exists('model', $options);
+        $callerSuppliedModel = \array_key_exists('model', $options);
         $sttModelId = $this->positiveIntOrNull($options['model_id'] ?? null);
         unset($options['model_id']);
 
-        // The settings UI persists the user's transcription pick to
-        // BCONFIG.DEFAULTMODEL.SOUND2TEXT. Honour that configured row before
-        // falling through to the legacy ai/default_speech_to_text_provider
-        // chain — that legacy key is never written by the UI, so prior to this
-        // we silently picked whichever provider the smart fallback returned
-        // (often OpenAI/whisper-1 instead of the user's Groq/whisper-large-v3).
-        // See issue #696.
         if (!$providerName && null !== $userId && $userId > 0) {
             $sttDefault = $this->modelConfig->resolveSttDefault($userId);
             $providerName = $sttDefault['provider'];
             $sttModelId ??= $sttDefault['model_id'];
 
-            // Only forward the SOUND2TEXT model name when it actually resolved
-            // to a BMODELS row — otherwise the provider would receive a stale
-            // string from a different provider's catalog and 400 (mirrors the
-            // PIC2TEXT safeguard in analyzeImage()).
             if (null !== $sttDefault['model'] && !$callerSuppliedModel) {
                 $options['model'] = $sttDefault['model'];
             }
@@ -1408,10 +767,7 @@ class AiFacade
 
         $provider = $this->registry->getSpeechToTextProvider($providerName);
 
-        // An explicit language is the hint for a second pass, not a forced
-        // first pass. Callers also pass ui_language / channel_language; those
-        // stay out of the provider payload (#2288).
-        $explicit = is_string($options['language'] ?? null) ? $options['language'] : null;
+        $explicit = \is_string($options['language'] ?? null) ? $options['language'] : null;
         $languageOptions = $options;
         unset($options['language'], $options['ui_language'], $options['channel_language'], $options['expected_languages']);
         $speech = null !== $this->speechLanguages
@@ -1435,17 +791,20 @@ class AiFacade
                         $callOptions['language'] = $hint;
                     }
 
-                    $transcribed = $this->executeWithHealth(
-                        callback: fn () => $provider->transcribe($audioPath, $callOptions),
-                        serviceName: 'ai_provider_stt_'.$provider->getName(),
-                        capability: 'speech_to_text',
-                        provider: $provider,
-                        options: $callOptions,
-                        userId: $userId,
-                        fallback: null // NO FALLBACK
+                    $call = new AiCall(
+                        capability: AiCapability::Transcribe,
+                        provider: $provider->getName(),
+                        model: $this->reportedModel($provider, $callOptions, 'speech_to_text'),
+                        context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
+                        payload: AiCallPayload::audioFile($audioPath),
+                        options: AiCallOptions::fromArray($callOptions),
                     );
+                    $transcribed = $this->pipeline()->run(
+                        $call,
+                        static fn (AiCall $c): mixed => $provider->transcribe((string) $c->payload->filePath, $c->options->providerOptions),
+                    )->value;
 
-                    return is_array($transcribed) ? $transcribed : [];
+                    return \is_array($transcribed) ? $transcribed : [];
                 },
                 $speech['expected'],
                 $speech['hint'],
@@ -1465,11 +824,6 @@ class AiFacade
             'model_id' => $sttModelId,
         ]);
 
-        // Bill the transcription on the audio duration the provider reported.
-        // This is the single choke point for every external (paid) STT call —
-        // local whisper.cpp bypasses AiFacade and is free — so recording here
-        // meters all channels exactly once (#1314). No-ops without a user, a
-        // priced model_id, or a positive duration.
         $recordedTranscriptionUsage = $this->transcriptionUsageRecorder->record(
             userId: $userId,
             modelId: $sttModelId,
@@ -1489,17 +843,6 @@ class AiFacade
         return $enriched;
     }
 
-    /**
-     * Check if the user has a usable cloud speech-to-text model.
-     *
-     * True only when the stored SOUND2TEXT binding names a provider other
-     * than local whisper.cpp and that provider can actually serve a request
-     * (it has a key). The stored row is used as written: an unusable cloud
-     * binding is not replaced by another cloud provider that happens to have
-     * a key. That install falls through to whisper.cpp. A positive model id
-     * whose provider has no key is not "configured" — treating it as such
-     * sent the recording to that provider and surfaced the HTTP failure.
-     */
     public function hasConfiguredSttProvider(?int $userId): bool
     {
         if (!$userId || $userId <= 0) {
@@ -1517,19 +860,7 @@ class AiFacade
     }
 
     /**
-     * Synthesize Speech (TTS).
-     *
-     * Language is a required argument so PHPStan flags every caller that omits
-     * the answer language (issue #2283). Do not default to "en" here — callers
-     * must pass the language of the text being spoken. Text is always sanitized
-     * and truncated in the facade so callers cannot skip TtsTextSanitizer.
-     *
-     * @param string   $text     Text to synthesize
-     * @param string   $language Language of the spoken text (e.g. "de", "en")
-     * @param int|null $userId   User ID for config lookup
-     * @param array    $options  Additional options (provider, model, voice, speed, format, etc.)
-     *
-     * @return array Result with relativePath (user-based path) and metadata
+     * @return array<string, mixed>
      */
     public function synthesize(string $text, string $language, ?int $userId = null, array $options = []): array
     {
@@ -1560,29 +891,35 @@ class AiFacade
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
 
-        // Always sanitize + truncate here so callers cannot skip it (#2283, #1665).
         $text = TtsTextSanitizer::prepareForSynthesis($text);
         if ('' === $text) {
             throw new NoSpeakableTextException();
         }
 
+        $reportedModel = $this->reportedModel($provider, $options, 'text_to_speech');
+
         $this->logger->info('AI TTS request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'language' => $language,
-            'text_length' => strlen($text),
+            'text_length' => \strlen($text),
         ]);
 
+        $call = new AiCall(
+            capability: AiCapability::Synthesize,
+            provider: $provider->getName(),
+            model: $reportedModel,
+            context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
+            payload: AiCallPayload::speechText($text),
+            options: AiCallOptions::fromArray($options),
+        );
+
         try {
-            $filename = $this->executeWithHealth(
-                callback: fn () => $provider->synthesize($text, $options),
-                serviceName: 'ai_provider_tts_'.$provider->getName(),
-                capability: 'text_to_speech',
-                provider: $provider,
-                options: $options,
-                userId: $userId,
-                fallback: null // NO FALLBACK
-            );
+            $filename = (string) $this->pipeline()->run(
+                $call,
+                static fn (AiCall $c): string => $provider->synthesize((string) $c->payload->prompt, $c->options->providerOptions),
+                static fn (): AiUsage => new AiUsage(characterCount: mb_strlen($text)),
+            )->value;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -1598,27 +935,13 @@ class AiFacade
             'filename' => basename($relativePath),
             'relativePath' => $relativePath,
             'provider' => $provider->getName(),
-            'model' => $this->reportedModel($provider, $options, 'text_to_speech'),
+            'model' => $reportedModel,
             'model_id' => $ttsModelId ?? null,
             'text_length' => mb_strlen($text),
         ];
     }
 
     /**
-     * Stream TTS audio via the user's configured provider.
-     *
-     * Resolves the provider from the user's DEFAULTMODEL/TEXT2SOUND config
-     * (same source the UI "Sprachsynthese" dropdown writes to) so streaming
-     * and MP3 generation always use the same voice.
-     *
-     * Language is required — see {@see synthesize()}. Text is always sanitized
-     * and truncated in the facade.
-     *
-     * @param string   $text     Text to synthesize
-     * @param string   $language Language of the spoken text (e.g. "de", "en")
-     * @param int|null $userId   User ID for config lookup
-     * @param array    $options  Additional options (provider, model, voice, speed, format, etc.)
-     *
      * @return array{generator: \Generator, contentType: string, provider: string, supportsStreaming: bool}
      */
     public function synthesizeStream(string $text, string $language, ?int $userId = null, array $options = []): array
@@ -1656,7 +979,7 @@ class AiFacade
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'language' => $language,
-            'text_length' => strlen($text),
+            'text_length' => \strlen($text),
             'supports_streaming' => $provider->supportsStreaming(),
         ]);
 
@@ -1668,20 +991,10 @@ class AiFacade
         ];
     }
 
-    /**
-     * Move a file from uploadDir root to user-based path structure.
-     *
-     * @param string   $filename     The filename in uploadDir root (e.g., tts_xxx.mp3)
-     * @param int|null $userId       User ID for path generation
-     * @param string   $providerName Provider name for logging
-     *
-     * @return string Relative path from uploadDir (e.g., 13/000/00013/2025/01/tts_xxx.mp3)
-     */
     private function moveToUserPath(string $filename, ?int $userId, string $providerName): string
     {
         $sourcePath = $this->uploadDir.'/'.$filename;
 
-        // If no userId, keep file in root (fallback)
         if (!$userId) {
             $this->logger->warning('AiFacade: No userId for TTS file, keeping in root', [
                 'filename' => $filename,
@@ -1691,36 +1004,30 @@ class AiFacade
             return $filename;
         }
 
-        // Build user-based path
         $year = date('Y');
         $month = date('m');
         $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
         $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
         $targetPath = $this->uploadDir.'/'.$relativePath;
 
-        // Create directory if not exists
         if (!FileHelper::ensureParentDirectory($targetPath)) {
             $this->logger->error('AiFacade: Failed to create user directory for TTS', [
-                'dir' => dirname($targetPath),
+                'dir' => \dirname($targetPath),
                 'filename' => $filename,
             ]);
 
-            // Fall back to root path
             return $filename;
         }
 
-        // Move file and set permissions/ownership
         if (!rename($sourcePath, $targetPath)) {
             $this->logger->error('AiFacade: Failed to move TTS file to user path', [
                 'source' => $sourcePath,
                 'target' => $targetPath,
             ]);
 
-            // Fall back to root path
             return $filename;
         }
 
-        // Set proper permissions and ownership on the moved file
         FileHelper::setFilePermissions($targetPath);
 
         $this->logger->info('AiFacade: Moved TTS file to user path', [
@@ -1734,10 +1041,10 @@ class AiFacade
 
     private function positiveIntOrNull(mixed $value): ?int
     {
-        if (is_int($value) && $value > 0) {
+        if (\is_int($value) && $value > 0) {
             return $value;
         }
-        if (is_string($value) && ctype_digit($value) && (int) $value > 0) {
+        if (\is_string($value) && ctype_digit($value) && (int) $value > 0) {
             return (int) $value;
         }
 
