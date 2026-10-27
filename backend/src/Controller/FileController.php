@@ -229,7 +229,7 @@ class FileController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function uploadFiles(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    public function uploadFiles(Request $request, #[CurrentUser] ?User $user, \App\Service\PlatformLink\SourceInstanceResolver $instances): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -265,7 +265,7 @@ class FileController extends AbstractController
             return $hints;
         }
 
-        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource, $hints->vectorizeModelId);
+        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource, $hints->vectorizeModelId, $instances->fromRequest($request));
 
         $uploadedFiles = $request->files->get('files', []);
 
@@ -1640,7 +1640,7 @@ class FileController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function checkStale(Request $request, #[CurrentUser] ?User $user, SourceStaleCheck $sourceStaleCheck): JsonResponse
+    public function checkStale(Request $request, #[CurrentUser] ?User $user, SourceStaleCheck $sourceStaleCheck, \App\Service\PlatformLink\SourceInstanceResolver $instances): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1660,7 +1660,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'items (array of {source_id, source_etag}) is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        $check = $sourceStaleCheck->check($user->getId(), $source, $items);
+        $check = $sourceStaleCheck->check($user->getId(), $source, $items, $instances->fromRequest($request));
 
         return $this->json(['success' => true, ...$check]);
     }
