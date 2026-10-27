@@ -46,6 +46,7 @@
     "register": "Register",
     "forgotPassword": "Forgot Password",
     "codeSignup": "Invitation code",
+    "loginLink": "Sign in",
     "resetPassword": "Reset Password",
     "changePassword": "Change Password",
     "verifyEmail": "Verify Email",

@@ -1201,15 +1201,10 @@ class AuthController extends AbstractController
             $impersonatorId = $admin?->getId();
         }
 
-        // Keep the generation this session already had. Minting "now" would
-        // let a token from before the mailbox proof trade itself for a fresh
-        // one and then create an API key.
-        $carried = $request->attributes->get('access_token_mbg');
-        $generation = is_int($carried) || (is_string($carried) && ctype_digit($carried)) ? (int) $carried : 0;
         $accessToken = $this->tokenService->generateAccessToken(
             $user,
             $impersonatorId,
-            $request->attributes->has('access_token_mbg') ? $generation : null,
+            $this->tokenService->carriedMailboxGeneration($request),
         );
 
         return $this->json([
