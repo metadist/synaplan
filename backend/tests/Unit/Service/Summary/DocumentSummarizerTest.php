@@ -21,7 +21,7 @@ final class DocumentSummarizerTest extends TestCase
     {
         $ai = $this->createMock(AiFacade::class);
         $ai->expects(self::once())->method('chat')
-            ->with([['role' => 'system', 'content' => 'Be brief.'], ['role' => 'user', 'content' => 'Summarize: a long text']], 7, ['temperature' => 0.3, 'provider' => 'groq', 'model' => 'llama'])
+            ->with([['role' => 'system', 'content' => 'Be brief.'], ['role' => 'user', 'content' => 'Summarize: a long text']], 7, ['temperature' => 0.3, 'provider' => 'groq', 'model' => 'llama', 'caller_meters' => true])
             ->willReturn(['content' => "  A short text.\n", 'provider' => 'groq', 'model' => 'llama', 'usage' => ['total_tokens' => 9]]);
         $usage = $this->createMock(RateLimitService::class);
         $usage->expects(self::once())->method('recordUsage')->with(self::anything(), 'FILE_SUMMARY', [
@@ -38,7 +38,7 @@ final class DocumentSummarizerTest extends TestCase
     public function testWithoutASummaryModelTheProviderDefaultAnswersAndTheLatencyIsRecorded(): void
     {
         $ai = $this->createMock(AiFacade::class);
-        $ai->expects(self::once())->method('chat')->with(self::anything(), 7, ['temperature' => 0.5])->willReturn(['content' => 'Done.']);
+        $ai->expects(self::once())->method('chat')->with(self::anything(), 7, ['temperature' => 0.5, 'caller_meters' => true])->willReturn(['content' => 'Done.']);
         $usage = $this->createMock(RateLimitService::class);
         $usage->expects(self::once())->method('recordUsage')->with(self::anything(), 'DOC_SUMMARY', self::callback(
             static fn (array $metadata): bool => 'unknown' === $metadata['provider'] && null === $metadata['model_id'] && \is_int($metadata['latency']) && 'the document' === $metadata['input_text'],
