@@ -27,10 +27,14 @@ final class PerplexityProvider implements ChatProviderInterface
     private ?OpenAI\Client $client = null;
     private ?string $clientKey = null;
 
+    /**
+     * @param (\Closure(string): OpenAI\Client)|null $sdkFactory
+     */
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly ?string $apiKey = null,
         private readonly ?ProviderKeyStore $keyStore = null,
+        private readonly ?\Closure $sdkFactory = null,
     ) {
     }
 
@@ -168,10 +172,12 @@ final class PerplexityProvider implements ChatProviderInterface
         }
 
         if (null === $this->client || $this->clientKey !== $key) {
-            $this->client = \OpenAI::factory()
-                ->withApiKey($key)
-                ->withBaseUri(self::BASE_URI)
-                ->make();
+            $this->client = null !== $this->sdkFactory
+                ? ($this->sdkFactory)($key)
+                : \OpenAI::factory()
+                    ->withApiKey($key)
+                    ->withBaseUri(self::BASE_URI)
+                    ->make();
             $this->clientKey = $key;
         }
 
