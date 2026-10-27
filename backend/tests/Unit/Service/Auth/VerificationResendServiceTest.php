@@ -15,16 +15,17 @@ use App\Service\Auth\VerificationResendService;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\MailerConfig;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 final class VerificationResendServiceTest extends TestCase
 {
-    private EmailVerificationAttemptRepository $attempts;
-    private UserRepository $users;
-    private VerificationTokenRepository $tokens;
-    private EntityManagerInterface $em;
-    private InternalEmailService $mail;
+    private EmailVerificationAttemptRepository&Stub $attempts;
+    private UserRepository&Stub $users;
+    private VerificationTokenRepository&Stub $tokens;
+    private EntityManagerInterface&Stub $em;
+    private InternalEmailService&Stub $mail;
 
     /** @var array<string, string|null> */
     private array $previousEnv = [];
