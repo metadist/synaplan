@@ -37,7 +37,11 @@
             {{ form.enabled ? t('adminSetup.research.turnOff') : t('adminSetup.research.turnOn') }}
           </button>
         </div>
-        <p v-if="errorPlace === 'switch'" class="text-sm text-red-600 dark:text-red-400 mt-3" role="alert">
+        <p
+          v-if="errorPlace === 'switch'"
+          class="text-sm text-red-600 dark:text-red-400 mt-3"
+          role="alert"
+        >
           {{ errorText }}
         </p>
       </section>
@@ -48,11 +52,7 @@
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <label v-for="slot in modelSlots" :key="slot.field" class="block text-sm">
             <span class="font-medium txt-primary">{{ t(slot.label) }}</span>
-            <select
-              v-model="models[slot.field]"
-              :class="FIELD_CLASS"
-              :data-testid="slot.testid"
-            >
+            <select v-model="models[slot.field]" :class="FIELD_CLASS" :data-testid="slot.testid">
               <option value="">{{ t('adminSetup.research.recommended') }}</option>
               <option
                 v-for="model in form.models"
@@ -76,7 +76,11 @@
             {{ t(`adminSetup.research.depth.${depth}`) }}
           </h3>
           <div class="mt-2 grid gap-3 grid-cols-2 sm:grid-cols-4">
-            <label v-for="field in BUDGET_FIELDS" :key="field.key" class="block text-sm txt-primary">
+            <label
+              v-for="field in BUDGET_FIELDS"
+              :key="field.key"
+              class="block text-sm txt-primary"
+            >
               {{ t(field.label) }}
               <input
                 v-model.number="form.budgets[depth][field.key]"
@@ -121,7 +125,11 @@
         <p v-if="saved && !dirty" class="text-sm txt-secondary mt-2" role="status">
           {{ t('adminSetup.research.saved') }}
         </p>
-        <p v-if="errorPlace === 'save'" class="text-sm text-red-600 dark:text-red-400 mt-2" role="alert">
+        <p
+          v-if="errorPlace === 'save'"
+          class="text-sm text-red-600 dark:text-red-400 mt-2"
+          role="alert"
+        >
           {{ errorText }}
         </p>
       </section>
@@ -166,8 +174,16 @@ const LIMIT_FIELDS: { key: LimitKey; label: string; min: number; max: number }[]
   { key: 'maxActiveThorough', label: 'adminSetup.research.maxThorough', min: 0, max: 10 },
 ]
 const modelSlots: { field: ModelField; label: string; testid: string }[] = [
-  { field: 'readingModelId', label: 'adminSetup.research.readingLabel', testid: 'research-admin-reading' },
-  { field: 'checkingModelId', label: 'adminSetup.research.checkingLabel', testid: 'research-admin-checking' },
+  {
+    field: 'readingModelId',
+    label: 'adminSetup.research.readingLabel',
+    testid: 'research-admin-reading',
+  },
+  {
+    field: 'checkingModelId',
+    label: 'adminSetup.research.checkingLabel',
+    testid: 'research-admin-checking',
+  },
 ]
 
 const { t } = useI18n()

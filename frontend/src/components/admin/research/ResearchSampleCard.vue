@@ -27,7 +27,11 @@
       <p v-if="!enabled" class="text-sm txt-secondary mt-4">
         {{ t('adminSetup.research.sampleNeedsOn') }}
       </p>
-      <p v-else-if="dirty" class="text-sm txt-secondary mt-4" data-testid="research-admin-sample-dirty">
+      <p
+        v-else-if="dirty"
+        class="text-sm txt-secondary mt-4"
+        data-testid="research-admin-sample-dirty"
+      >
         {{ t('adminSetup.research.sampleNeedsSave') }}
       </p>
       <label class="mt-4 flex items-start gap-2 text-sm txt-primary">

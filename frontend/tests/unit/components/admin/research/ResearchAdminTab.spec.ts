@@ -49,7 +49,9 @@ describe('ResearchAdminTab', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="research-admin-status"]').text()).toContain('Research is off')
-    expect(wrapper.get('[data-testid="research-admin-sample"]').attributes('disabled')).toBeDefined()
+    expect(
+      wrapper.get('[data-testid="research-admin-sample"]').attributes('disabled')
+    ).toBeDefined()
 
     await wrapper.get('[data-testid="research-admin-turn-on"]').trigger('click')
     await flushPromises()
