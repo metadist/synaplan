@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpOAuthConsentService;
 use App\Service\Mcp\McpOAuthException;
+use App\Service\Mcp\McpOAuthFailure;
 use App\Service\OAuth\OAuthException;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -29,6 +30,12 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'MCP Servers')]
 final class McpOAuthController extends AbstractController
 {
+    private const FAILURE_CODES = [
+        'address_not_allowed', 'https_required', 'unreachable', 'no_signin', 'metadata_invalid',
+        'no_registration', 'unsupported_method', 'registration_refused', 'server_changed', 'expired',
+        'exchange_failed', 'unknown',
+    ];
+
     public function __construct(
         private readonly McpServerConfigRepository $repository,
         private readonly McpOAuthConsentService $consent,
@@ -63,7 +70,30 @@ final class McpOAuthController extends AbstractController
                     ]
                 )
             ),
-            new OA\Response(response: 403, description: 'OAuth connectors disabled by administrator'),
+            new OA\Response(
+                response: 400,
+                description: 'The server cannot be signed in to; `code` names why',
+                content: new OA\JsonContent(
+                    required: ['success', 'code', 'error'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'code', type: 'string', enum: self::FAILURE_CODES, example: 'no_registration'),
+                        new OA\Property(property: 'error', type: 'string', description: 'English detail for logs; not shown to people', example: 'This server does not support automatic app registration'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Sign-in connectors or MCP calls are switched off',
+                content: new OA\JsonContent(
+                    required: ['success', 'code', 'error'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'code', type: 'string', enum: ['disabled', 'calls_off'], example: 'disabled'),
+                        new OA\Property(property: 'error', type: 'string', example: 'Connecting with a sign-in is disabled by an administrator'),
+                    ]
+                )
+            ),
             new OA\Response(response: 404, description: 'Not found'),
         ]
     )]
@@ -84,11 +114,10 @@ final class McpOAuthController extends AbstractController
         try {
             $url = $this->consent->start($server, $user->getId(), $returnTo);
         } catch (McpOAuthException $e) {
-            $status = str_contains($e->getMessage(), 'disabled by an administrator')
-                ? Response::HTTP_FORBIDDEN
-                : Response::HTTP_BAD_REQUEST;
-
-            return $this->json(['success' => false, 'error' => $e->getMessage()], $status);
+            return $this->json(
+                ['success' => false, 'code' => $e->reason->value, 'error' => $e->getMessage()],
+                $e->reason->isForbidden() ? Response::HTTP_FORBIDDEN : Response::HTTP_BAD_REQUEST,
+            );
         }
 
         return $this->json(['success' => true, 'authorize_url' => $url]);
@@ -104,6 +133,7 @@ final class McpOAuthController extends AbstractController
             new OA\Parameter(name: 'code', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'state', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'error', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'iss', in: 'query', required: false, description: 'RFC 9207 issuer of the answer; must match the server the sign-in started with', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 302, description: 'Redirect to /channels/mcp with connected={id} or oauth_error={reason}'),
@@ -126,14 +156,16 @@ final class McpOAuthController extends AbstractController
             return $this->resultRedirect(null, 'missing_code', $returnTo);
         }
 
+        $issuer = $request->query->get('iss');
+
         try {
-            $server = $this->consent->complete($code, $state);
+            $server = $this->consent->complete($code, $state, is_string($issuer) && '' !== $issuer ? $issuer : null);
         } catch (McpOAuthException|OAuthException $e) {
             $this->logger->warning('MCP OAuth consent could not be completed', ['reason' => $e->getMessage()]);
 
-            $reason = str_contains($e->getMessage(), 'disabled by an administrator') ? 'disabled' : 'exchange_failed';
+            $reason = $e instanceof McpOAuthException ? $e->reason : McpOAuthFailure::ExchangeFailed;
 
-            return $this->resultRedirect(null, $reason, $returnTo);
+            return $this->resultRedirect(null, $reason->value, $returnTo);
         }
 
         return $this->resultRedirect($server->getId(), null, $returnTo);

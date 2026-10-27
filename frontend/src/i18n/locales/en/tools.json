@@ -377,9 +377,29 @@
     "emptyHint": "Start from a blank form, or pick a known system to prefill the name and defaults. You can change or clear that choice at any time.",
     "nameLabel": "Name",
     "urlLabel": "Server URL",
+    "addressDropsSignIn": "Saving a different address signs this server out. Connect again after saving.",
+    "addressDropsKey": "Saving a different host removes the saved auth header value. Enter it again below.",
     "authHeaderLabel": "Auth header name (optional)",
     "authTokenLabel": "Auth header value",
     "authTokenPlaceholder": "e.g. Bearer sk-…",
+    "authMethodLabel": "How Synaplan connects",
+    "authMethod": {
+      "none": {
+        "label": "No sign-in",
+        "hint": "For servers anyone may use."
+      },
+      "bearer": {
+        "label": "Access key",
+        "hint": "A key or token from the server. Stored encrypted, never shown again."
+      },
+      "oauth": {
+        "label": "Sign in with your account",
+        "hint": "After you save, you sign in on the server's own page. Synaplan keeps the sign-in, never your password."
+      }
+    },
+    "authMethodOffByAdmin": "An administrator has turned sign-in off. You can still disconnect or delete this server.",
+    "saveAndSignIn": "Save and sign in",
+    "signInHost": "Signs in at {host}",
     "enabledLabel": "Enabled",
     "enabled": "Enabled",
     "disabled": "Disabled",
@@ -412,7 +432,7 @@
       "custom": {
         "name": "Custom server",
         "summary": "Any MCP endpoint",
-        "hint": "Paste the HTTPS URL of any Streamable HTTP MCP server and, if needed, an access token. CRM, wiki, tickets, automation — if it speaks MCP, it works here."
+        "hint": "Paste the https address of any MCP server, then choose below how Synaplan connects to it."
       },
       "github": {
         "name": "GitHub",
@@ -445,22 +465,38 @@
     "reconnect": "Reconnect",
     "connecting": "Opening sign-in…",
     "connectFailed": "Could not start sign-in",
+    "signInElsewhereTitle": "Sign in at {host}?",
+    "signInElsewhereMessage": "{name} ({serverHost}) sends you to {authHost} to sign in. Continue only if you expect that page for this server.",
+    "signInElsewhereConfirm": "Continue to sign-in",
     "oauthConnected": "Connected",
     "oauthReauth": "Action needed (reconnect)",
     "oauthNotConnected": "Not connected",
-    "oauthConnectedToast": "Signed in successfully",
+    "oauthConnectedToast": "Signed in to {name}.",
     "disconnect": "Disconnect",
     "disconnecting": "Disconnecting…",
     "disconnectTitle": "Disconnect this server?",
     "disconnectMessage": "The stored sign-in for \"{name}\" will be deleted. The server stays in your list — sign in again to use it.",
     "disconnected": "Sign-in removed",
     "disconnectFailed": "Could not remove the sign-in",
-    "oauthError": {
-      "denied": "Sign-in was cancelled",
-      "missing_code": "Sign-in did not complete. Please try again.",
+    "signInError": {
+      "disabled": "Connecting with a sign-in is turned off by an administrator.",
+      "calls_off": "Calls to MCP servers are turned off. An administrator can turn them on in System configuration.",
+      "address_not_allowed": "This address can't be used. Enter the server's public address.",
+      "https_required": "Sign-in needs a secure address. Use an address that starts with https://.",
+      "unreachable": "The server didn't answer. Check the address and try again.",
+      "no_signin": "This server doesn't offer a sign-in. If it gave you a key, use that instead.",
+      "metadata_invalid": "The server's sign-in setup is incomplete, so Synaplan stopped. Ask whoever runs the server to check it.",
+      "no_registration": "This server doesn't let Synaplan register for sign-in. Ask whoever runs it for an access key.",
+      "unsupported_method": "This server uses a sign-in method Synaplan doesn't support. Ask whoever runs it for an access key.",
+      "registration_refused": "The server refused to register Synaplan for sign-in. Try again later or ask whoever runs it.",
+      "server_changed": "This server was changed during sign-in. Click Connect to start again.",
+      "expired": "The sign-in took too long. Click Connect to start again.",
       "exchange_failed": "Could not finish sign-in. Please try again.",
-      "disabled": "Connecting with a sign-in is turned off by an administrator"
+      "denied": "Sign-in was cancelled.",
+      "missing_code": "Sign-in did not complete. Please try again.",
+      "unknown": "Sign-in could not start. Try again, or ask whoever runs the server."
     },
+    "savedSignInNotStarted": "Saved \"{name}\". Sign-in did not start: {reason}",
     "allowWriteLabel": "Allow write actions (create/update)",
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"

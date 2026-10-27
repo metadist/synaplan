@@ -30,6 +30,20 @@ final readonly class ResearchBudgetConfig
         };
     }
 
+    /** The same limits with at most this many searches. */
+    public function withSearches(int $searches): self
+    {
+        return new self(
+            min($this->searches, max(0, $searches)),
+            $this->sources,
+            $this->rounds,
+            $this->wallSeconds,
+            $this->costCap,
+            $this->maxModelCalls,
+            $this->extras,
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */

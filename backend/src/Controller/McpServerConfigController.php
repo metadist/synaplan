@@ -64,6 +64,7 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
                                 new OA\Property(property: 'auth_mode', type: 'string', example: 'bearer', enum: ['none', 'bearer', 'oauth']),
                                 new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'connected', enum: ['not_connected', 'connected', 'reauth_required']),
+                                new OA\Property(property: 'oauth_sign_in_host', type: 'string', nullable: true, example: 'auth.atlassian.com', description: 'Host of the page where this server signs people in; null before the first sign-in'),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
                                 new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
@@ -130,6 +131,9 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'url', type: 'string', example: 'https://crm.example.com/mcp'),
                                 new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
+                                new OA\Property(property: 'auth_mode', type: 'string', example: 'bearer', enum: ['none', 'bearer', 'oauth']),
+                                new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'not_connected', enum: ['not_connected', 'connected', 'reauth_required']),
+                                new OA\Property(property: 'oauth_sign_in_host', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
                                 new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
@@ -187,6 +191,9 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'url', type: 'string', example: 'https://crm.example.com/mcp'),
                                 new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
+                                new OA\Property(property: 'auth_mode', type: 'string', example: 'bearer', enum: ['none', 'bearer', 'oauth']),
+                                new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'not_connected', enum: ['not_connected', 'connected', 'reauth_required']),
+                                new OA\Property(property: 'oauth_sign_in_host', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
                                 new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
@@ -212,7 +219,7 @@ final class McpServerConfigController extends AbstractController
         }
 
         $data = $this->payload($request);
-        $error = $this->validate($data, requireAll: false);
+        $error = $this->validate($data, requireAll: false, current: $server);
         if (null !== $error) {
             return $this->json(['success' => false, 'error' => $error], Response::HTTP_BAD_REQUEST);
         }
@@ -376,7 +383,7 @@ final class McpServerConfigController extends AbstractController
     /**
      * @param array<string, mixed> $data
      */
-    private function validate(array $data, bool $requireAll): ?string
+    private function validate(array $data, bool $requireAll, ?McpServerConfig $current = null): ?string
     {
         if ($requireAll || array_key_exists('name', $data)) {
             $name = $data['name'] ?? null;
@@ -400,7 +407,8 @@ final class McpServerConfigController extends AbstractController
             if (!is_string($mode) || !in_array($mode, McpServerConfig::AUTH_MODES, true)) {
                 return 'auth_mode must be none, bearer, or oauth';
             }
-            if (McpServerConfig::AUTH_MODE_OAUTH === $mode && !$this->clientConfig->isOAuthConnectorsEnabled()) {
+            $alreadyOAuth = null !== $current && $current->isOAuth();
+            if (McpServerConfig::AUTH_MODE_OAUTH === $mode && !$alreadyOAuth && !$this->clientConfig->isOAuthConnectorsEnabled()) {
                 return 'Connecting with a sign-in is disabled by an administrator';
             }
         }
@@ -422,6 +430,11 @@ final class McpServerConfigController extends AbstractController
         if (array_key_exists('auth_header', $data) && is_string($data['auth_header'])) {
             $server->setAuthHeader(trim($data['auth_header']));
         }
+        // After the address and the mode: changing either drops the stored
+        // credential, and a key sent in the same request must survive that.
+        if (array_key_exists('auth_mode', $data) && is_string($data['auth_mode'])) {
+            $server->setAuthMode($data['auth_mode']);
+        }
         // The auth value is write-only: absent key = keep the stored secret;
         // empty string = clear it; anything else = replace it.
         if (array_key_exists('auth_token', $data) && is_string($data['auth_token'])) {
@@ -433,9 +446,6 @@ final class McpServerConfigController extends AbstractController
         if (array_key_exists('allow_write', $data)) {
             $server->setAllowWrite((bool) $data['allow_write']);
         }
-        if (array_key_exists('auth_mode', $data) && is_string($data['auth_mode'])) {
-            $server->setAuthMode($data['auth_mode']);
-        }
     }
 
     /**
@@ -444,8 +454,12 @@ final class McpServerConfigController extends AbstractController
     private function serialize(McpServerConfig $server): array
     {
         $oauthStatus = null;
+        $signInHost = null;
         if ($server->isOAuth()) {
-            $oauthStatus = $server->getDecryptedOAuthState($this->encryptionService)->status;
+            $state = $server->getDecryptedOAuthState($this->encryptionService);
+            $oauthStatus = $state->status;
+            $host = parse_url($state->authorizationEndpoint, PHP_URL_HOST);
+            $signInHost = is_string($host) && '' !== $host ? $host : null;
         }
 
         return [
@@ -456,6 +470,7 @@ final class McpServerConfigController extends AbstractController
             'has_auth_token' => $server->hasAuthToken(),
             'auth_mode' => $server->getAuthMode(),
             'oauth_status' => $oauthStatus,
+            'oauth_sign_in_host' => $signInHost,
             'enabled' => $server->isEnabled(),
             'allow_write' => $server->allowsWrite(),
             'created' => $server->getCreated(),

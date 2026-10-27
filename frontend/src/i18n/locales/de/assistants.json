@@ -270,13 +270,16 @@
       "unknownKey": "Diese Datei hat ein Feld, das dieses Synaplan nicht kennt ({detail})",
       "needsModel": "Braucht ein Modell — nach dem Import eines wählen ({key})",
       "needsKey": "Braucht einen Schlüssel — unter Verbindungen hinzufügen ({key})",
+      "needsCredential": "Braucht eine Anmeldung oder einen Schlüssel — nach dem Import hinzufügen ({key})",
       "needsMcpServer": "Braucht einen MCP-Server namens {detail}",
       "needsMailbox": "Braucht ein Postfach — nach dem Import verbinden ({key})",
       "needsWidget": "Braucht ein Website-Widget — nach dem Import verbinden ({key})",
       "needsWhatsapp": "Braucht eine WhatsApp-Nummer — nach dem Import verbinden ({key})",
       "schedulesOff": "Zeitpläne bleiben aus, bis Sie sie einschalten ({key})",
+      "writeOff": "Schreibaktionen bleiben für {detail} aus — schalten Sie sie bei Bedarf selbst ein",
       "droppedFolders": "Geteilte Ordner waren nicht enthalten ({key})",
       "conflict": "Existiert bereits — wird übersprungen, außer Sie ersetzen ({key})",
+      "addressDiffers": "Sie haben bereits einen Server namens {detail} mit einer anderen Adresse — er bleibt unverändert, dieser wird übersprungen",
       "skipped": "Übersprungen ({key})"
     },
     "publishedOnly": "Nur veröffentlichte KI-Assistenten sind enthalten. Entwürfe bleiben auf diesem Konto."

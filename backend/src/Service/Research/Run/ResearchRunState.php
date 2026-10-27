@@ -19,6 +19,15 @@ final class ResearchRunState
     /** The run this one continues, when it is a follow-up. */
     public ?string $parent = null;
 
+    /** question, revise, deeper or refresh. Null when the run was started on its own. */
+    public ?string $followUp = null;
+
+    /** What the person asked this follow-up to do. */
+    public string $instruction = '';
+
+    /** The parent report, so a revision checks only the sentences that changed. */
+    public ?string $priorReport = null;
+
     /** The start key, so deleting the run also forgets the retry. */
     public ?string $idempotencyKey = null;
 
@@ -96,6 +105,9 @@ final class ResearchRunState
             'ledger' => $this->ledger->toArray(),
             'budget' => $this->budget->export(),
             'parent' => $this->parent,
+            'follow_up' => $this->followUp,
+            'instruction' => $this->instruction,
+            'prior_report' => $this->priorReport,
             'idempotency_key' => $this->idempotencyKey,
             'strategy_hint' => $this->strategyHint,
             'conversation' => $this->conversation->toArray(),
@@ -174,6 +186,12 @@ final class ResearchRunState
         }
         $parent = $data['parent'] ?? null;
         $state->parent = is_string($parent) && ResearchIds::isValid($parent) ? $parent : null;
+        $followUp = $data['follow_up'] ?? null;
+        $state->followUp = is_string($followUp) && in_array($followUp, ResearchFollowUp::KINDS, true) ? $followUp : null;
+        $instruction = $data['instruction'] ?? '';
+        $state->instruction = is_string($instruction) ? $instruction : '';
+        $prior = $data['prior_report'] ?? null;
+        $state->priorReport = is_string($prior) && '' !== trim($prior) ? $prior : null;
         $idempotency = $data['idempotency_key'] ?? null;
         $state->idempotencyKey = is_string($idempotency) && '' !== $idempotency ? $idempotency : null;
         $state->strategyHint = true === ($data['strategy_hint'] ?? false);

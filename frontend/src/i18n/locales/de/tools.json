@@ -300,9 +300,29 @@
     "emptyHint": "Starte mit einem leeren Formular oder wähle ein bekanntes System, um Name und Vorgaben vorauszufüllen. Die Wahl kannst du jederzeit ändern oder wieder aufheben.",
     "nameLabel": "Name",
     "urlLabel": "Server-URL",
+    "addressDropsSignIn": "Wenn Sie eine andere Adresse speichern, wird dieser Server abgemeldet. Verbinden Sie ihn danach erneut.",
+    "addressDropsKey": "Wenn Sie einen anderen Host speichern, wird der gespeicherte Auth-Header-Wert entfernt. Geben Sie ihn unten erneut ein.",
     "authHeaderLabel": "Auth-Header-Name (optional)",
     "authTokenLabel": "Auth-Header-Wert",
     "authTokenPlaceholder": "z. B. Bearer sk-…",
+    "authMethodLabel": "Wie Synaplan sich verbindet",
+    "authMethod": {
+      "none": {
+        "label": "Ohne Anmeldung",
+        "hint": "Für Server, die jede und jeder nutzen darf."
+      },
+      "bearer": {
+        "label": "Zugangsschlüssel",
+        "hint": "Ein Schlüssel oder Token vom Server. Verschlüsselt gespeichert und nie wieder angezeigt."
+      },
+      "oauth": {
+        "label": "Mit Ihrem Konto anmelden",
+        "hint": "Nach dem Speichern melden Sie sich auf der Seite des Servers an. Synaplan speichert die Anmeldung, nie Ihr Passwort."
+      }
+    },
+    "authMethodOffByAdmin": "Eine Administratorin oder ein Administrator hat die Anmeldung ausgeschaltet. Sie können diesen Server trotzdem trennen oder löschen.",
+    "saveAndSignIn": "Speichern und anmelden",
+    "signInHost": "Anmeldung bei {host}",
     "enabledLabel": "Aktiviert",
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",
@@ -335,7 +355,7 @@
       "custom": {
         "name": "Eigener Server",
         "summary": "Beliebiger MCP-Endpunkt",
-        "hint": "Füge die HTTPS-URL eines beliebigen Streamable-HTTP-MCP-Servers ein und bei Bedarf ein Zugriffstoken. CRM, Wiki, Tickets, Automatisierung — spricht es MCP, funktioniert es hier."
+        "hint": "Fügen Sie die https-Adresse eines beliebigen MCP-Servers ein und wählen Sie unten, wie Synaplan sich mit ihm verbindet."
       },
       "github": {
         "name": "GitHub",
@@ -368,22 +388,38 @@
     "reconnect": "Erneut verbinden",
     "connecting": "Anmeldung wird geöffnet…",
     "connectFailed": "Anmeldung konnte nicht gestartet werden",
+    "signInElsewhereTitle": "Bei {host} anmelden?",
+    "signInElsewhereMessage": "{name} ({serverHost}) schickt Sie zur Anmeldung zu {authHost}. Fahren Sie nur fort, wenn Sie diese Seite für diesen Server erwarten.",
+    "signInElsewhereConfirm": "Weiter zur Anmeldung",
     "oauthConnected": "Verbunden",
     "oauthReauth": "Aktion nötig (erneut verbinden)",
     "oauthNotConnected": "Nicht verbunden",
-    "oauthConnectedToast": "Erfolgreich angemeldet",
+    "oauthConnectedToast": "Bei {name} angemeldet.",
     "disconnect": "Trennen",
     "disconnecting": "Wird getrennt…",
     "disconnectTitle": "Diesen Server trennen?",
     "disconnectMessage": "Die gespeicherte Anmeldung für \"{name}\" wird gelöscht. Der Server bleibt in der Liste — zur Nutzung erneut anmelden.",
     "disconnected": "Anmeldung entfernt",
     "disconnectFailed": "Anmeldung konnte nicht entfernt werden",
-    "oauthError": {
-      "denied": "Anmeldung wurde abgebrochen",
-      "missing_code": "Anmeldung nicht abgeschlossen. Bitte erneut versuchen.",
-      "exchange_failed": "Anmeldung konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
-      "disabled": "Die Anmeldung über den Anbieter ist vom Administrator deaktiviert"
+    "signInError": {
+      "disabled": "Die Verbindung per Anmeldung wurde von einer Administratorin oder einem Administrator ausgeschaltet.",
+      "calls_off": "Aufrufe an MCP-Server sind ausgeschaltet. Eine Administratorin oder ein Administrator kann sie in der Systemkonfiguration einschalten.",
+      "address_not_allowed": "Diese Adresse kann nicht verwendet werden. Geben Sie die öffentliche Adresse des Servers ein.",
+      "https_required": "Die Anmeldung braucht eine sichere Adresse. Verwenden Sie eine Adresse, die mit https:// beginnt.",
+      "unreachable": "Der Server hat nicht geantwortet. Prüfen Sie die Adresse und versuchen Sie es erneut.",
+      "no_signin": "Dieser Server bietet keine Anmeldung an. Wenn Sie einen Schlüssel bekommen haben, verwenden Sie diesen.",
+      "metadata_invalid": "Die Anmeldung des Servers ist unvollständig eingerichtet, deshalb hat Synaplan abgebrochen. Bitten Sie die Betreiber des Servers, sie zu prüfen.",
+      "no_registration": "Dieser Server lässt Synaplan nicht für die Anmeldung registrieren. Bitten Sie die Betreiber um einen Zugangsschlüssel.",
+      "unsupported_method": "Dieser Server verwendet ein Anmeldeverfahren, das Synaplan nicht unterstützt. Bitten Sie die Betreiber um einen Zugangsschlüssel.",
+      "registration_refused": "Der Server hat die Registrierung von Synaplan abgelehnt. Versuchen Sie es später erneut oder fragen Sie die Betreiber.",
+      "server_changed": "Dieser Server wurde während der Anmeldung geändert. Klicken Sie auf Verbinden, um neu zu beginnen.",
+      "expired": "Die Anmeldung hat zu lange gedauert. Klicken Sie auf Verbinden, um neu zu beginnen.",
+      "exchange_failed": "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+      "denied": "Die Anmeldung wurde abgebrochen.",
+      "missing_code": "Die Anmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.",
+      "unknown": "Die Anmeldung konnte nicht starten. Versuchen Sie es erneut oder fragen Sie die Betreiber des Servers."
     },
+    "savedSignInNotStarted": "„{name}“ wurde gespeichert. Die Anmeldung hat nicht begonnen: {reason}",
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"

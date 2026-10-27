@@ -1134,5 +1134,46 @@
     "loadFailed": "Your shortcuts could not be loaded. They are still saved.",
     "deleteTitle": "Delete shortcut?",
     "deleteConfirm": "/{command} disappears from the chat menu. Messages you already sent stay as they are."
+  },
+  "research": {
+    "menu": "Research",
+    "menuHint": "A written report with sources, in this chat",
+    "title": "Research",
+    "questionLabel": "What do you want to find out?",
+    "depth": {
+      "standard": "Standard",
+      "thorough": "Thorough"
+    },
+    "depthHint": {
+      "standard": "About {minutes} minutes",
+      "thorough": "About {minutes} minutes"
+    },
+    "sourcesLabel": "Sources",
+    "sourceWeb": "Web",
+    "sourceFiles": "Library folders",
+    "start": "Start research",
+    "startNeedsQuestion": "Write what you want to find out.",
+    "startNeedsSource": "Turn on the web or add files.",
+    "noSources": "Web search and Library folders are both off, so research cannot start.",
+    "noChat": "Open a chat, then start research.",
+    "startFailed": "Research could not start. Check the question and try again.",
+    "stopFailed": "Research could not be stopped. It is still running.",
+    "incognito": "Research saves a report in the chat. End the incognito chat first.",
+    "close": "Close",
+    "continues": "You can close this window. Research continues, and the report appears in this chat.",
+    "stop": "Stop",
+    "stopConsequence": "Stopping keeps what was already written and does not search further.",
+    "stopped": "Research stopped. What was already written stays in this chat. Nothing further was searched.",
+    "failed": "Research could not finish. Nothing new was added to this chat.",
+    "working": "Research is working.",
+    "workingDone": "Research finished.",
+    "queued": "Research is queued. It has been waiting {seconds} seconds.",
+    "factCheck": "Fact-check: {supported} of {total} statements are backed. {removed} were removed.",
+    "find": "The report is in this chat. You can also open it under Library, then Files, or search for its title.",
+    "sourcesCount": "{found} found, {read} read, {blocked} blocked",
+    "pointDone": "Done",
+    "pointOpen": "Still open",
+    "pointNotConfirmed": "Not confirmed",
+    "depthLabel": "How thorough?"
   }
 }

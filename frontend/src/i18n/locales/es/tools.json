@@ -303,9 +303,29 @@
     "emptyHint": "Empieza con un formulario en blanco o elige un sistema conocido para rellenar el nombre y los valores por defecto. Puedes cambiar o borrar esa elección en cualquier momento.",
     "nameLabel": "Nombre",
     "urlLabel": "URL del servidor",
+    "addressDropsSignIn": "Si guarda otra dirección, este servidor cerrará la sesión. Vuelva a conectarlo después de guardar.",
+    "addressDropsKey": "Al guardar otro host se elimina el valor de la cabecera de autenticación guardado. Vuelva a introducirlo abajo.",
     "authHeaderLabel": "Nombre de la cabecera de autenticación (opcional)",
     "authTokenLabel": "Valor de la cabecera de autenticación",
     "authTokenPlaceholder": "p. ej. Bearer sk-…",
+    "authMethodLabel": "Cómo se conecta Synaplan",
+    "authMethod": {
+      "none": {
+        "label": "Sin inicio de sesión",
+        "hint": "Para servidores que cualquiera puede usar."
+      },
+      "bearer": {
+        "label": "Clave de acceso",
+        "hint": "Una clave o token del servidor. Se guarda cifrada y no se vuelve a mostrar."
+      },
+      "oauth": {
+        "label": "Iniciar sesión con su cuenta",
+        "hint": "Después de guardar, inicia sesión en la propia página del servidor. Synaplan guarda el inicio de sesión, nunca su contraseña."
+      }
+    },
+    "authMethodOffByAdmin": "Un administrador ha desactivado el inicio de sesión. Aún puede desconectar o eliminar este servidor.",
+    "saveAndSignIn": "Guardar e iniciar sesión",
+    "signInHost": "Inicia sesión en {host}",
     "enabledLabel": "Activado",
     "enabled": "Activado",
     "disabled": "Desactivado",
@@ -338,7 +358,7 @@
       "custom": {
         "name": "Servidor personalizado",
         "summary": "Cualquier endpoint MCP",
-        "hint": "Pega la URL HTTPS de cualquier servidor MCP Streamable HTTP y, si hace falta, un token de acceso. CRM, wiki, tickets, automatización: si habla MCP, funciona aquí."
+        "hint": "Pegue la dirección https de cualquier servidor MCP y elija abajo cómo se conecta Synaplan a él."
       },
       "github": {
         "name": "GitHub",
@@ -371,22 +391,38 @@
     "reconnect": "Volver a conectar",
     "connecting": "Abriendo el inicio de sesión…",
     "connectFailed": "No se pudo iniciar el acceso",
+    "signInElsewhereTitle": "¿Iniciar sesión en {host}?",
+    "signInElsewhereMessage": "{name} ({serverHost}) le envía a {authHost} para iniciar sesión. Continúe solo si espera esa página para este servidor.",
+    "signInElsewhereConfirm": "Continuar al inicio de sesión",
     "oauthConnected": "Conectado",
     "oauthReauth": "Acción necesaria (volver a conectar)",
     "oauthNotConnected": "No conectado",
-    "oauthConnectedToast": "Sesión iniciada correctamente",
+    "oauthConnectedToast": "Sesión iniciada en {name}.",
     "disconnect": "Desconectar",
     "disconnecting": "Desconectando…",
     "disconnectTitle": "¿Desconectar este servidor?",
     "disconnectMessage": "Se eliminará el acceso guardado de \"{name}\". El servidor permanece en tu lista — inicia sesión de nuevo para usarlo.",
     "disconnected": "Acceso eliminado",
     "disconnectFailed": "No se pudo eliminar el acceso",
-    "oauthError": {
-      "denied": "El inicio de sesión se canceló",
-      "missing_code": "El inicio de sesión no se completó. Inténtalo de nuevo.",
-      "exchange_failed": "No se pudo terminar el inicio de sesión. Inténtalo de nuevo.",
-      "disabled": "Un administrador ha desactivado el inicio de sesión con el proveedor"
+    "signInError": {
+      "disabled": "Un administrador ha desactivado la conexión con inicio de sesión.",
+      "calls_off": "Las llamadas a servidores MCP están desactivadas. Un administrador puede activarlas en la configuración del sistema.",
+      "address_not_allowed": "Esta dirección no se puede usar. Introduzca la dirección pública del servidor.",
+      "https_required": "El inicio de sesión necesita una dirección segura. Use una dirección que empiece por https://.",
+      "unreachable": "El servidor no respondió. Compruebe la dirección e inténtelo de nuevo.",
+      "no_signin": "Este servidor no ofrece inicio de sesión. Si le dio una clave, úsela.",
+      "metadata_invalid": "La configuración de inicio de sesión del servidor está incompleta, así que Synaplan se detuvo. Pida a quien gestiona el servidor que la revise.",
+      "no_registration": "Este servidor no permite que Synaplan se registre para iniciar sesión. Pida una clave de acceso a quien lo gestiona.",
+      "unsupported_method": "Este servidor usa un método de inicio de sesión que Synaplan no admite. Pida una clave de acceso a quien lo gestiona.",
+      "registration_refused": "El servidor rechazó registrar a Synaplan para iniciar sesión. Inténtelo más tarde o pregunte a quien lo gestiona.",
+      "server_changed": "Este servidor se modificó durante el inicio de sesión. Haga clic en Conectar para empezar de nuevo.",
+      "expired": "El inicio de sesión tardó demasiado. Haga clic en Conectar para empezar de nuevo.",
+      "exchange_failed": "No se pudo completar el inicio de sesión. Inténtelo de nuevo.",
+      "denied": "Se canceló el inicio de sesión.",
+      "missing_code": "El inicio de sesión no se completó. Inténtelo de nuevo.",
+      "unknown": "No se pudo iniciar sesión. Inténtelo de nuevo o pregunte a quien gestiona el servidor."
     },
+    "savedSignInNotStarted": "Se guardó «{name}». El inicio de sesión no comenzó: {reason}",
     "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
     "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
     "writeBadge": "Escritura permitida"

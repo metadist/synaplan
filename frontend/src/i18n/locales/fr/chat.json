@@ -1134,5 +1134,46 @@
     "loadFailed": "Vos raccourcis n’ont pas pu être chargés. Ils sont toujours enregistrés.",
     "deleteTitle": "Supprimer le raccourci ?",
     "deleteConfirm": "/{command} disparaît du menu du chat. Les messages déjà envoyés restent inchangés."
+  },
+  "research": {
+    "menu": "Recherche",
+    "menuHint": "Un rapport écrit avec des sources, dans ce chat",
+    "title": "Recherche",
+    "questionLabel": "Que voulez-vous découvrir ?",
+    "depth": {
+      "standard": "Standard",
+      "thorough": "Approfondi"
+    },
+    "depthHint": {
+      "standard": "Environ {minutes} minutes",
+      "thorough": "Environ {minutes} minutes"
+    },
+    "sourcesLabel": "Sources",
+    "sourceWeb": "Web",
+    "sourceFiles": "Dossiers de la bibliothèque",
+    "start": "Lancer la recherche",
+    "startNeedsQuestion": "Écrivez ce que vous voulez découvrir.",
+    "startNeedsSource": "Activez le web ou ajoutez des fichiers.",
+    "noSources": "La recherche web et les dossiers de la bibliothèque sont désactivés, donc la recherche ne peut pas démarrer.",
+    "noChat": "Ouvrez un chat, puis lancez la recherche.",
+    "startFailed": "La recherche n'a pas pu démarrer. Vérifiez la question et réessayez.",
+    "stopFailed": "La recherche n'a pas pu être arrêtée. Elle continue.",
+    "incognito": "La recherche enregistre un rapport dans le chat. Terminez d'abord le chat incognito.",
+    "close": "Fermer",
+    "continues": "Vous pouvez fermer cette fenêtre. La recherche continue et le rapport apparaît dans ce chat.",
+    "stop": "Arrêter",
+    "stopConsequence": "Arrêter conserve ce qui est déjà écrit et ne cherche plus.",
+    "stopped": "La recherche est arrêtée. Ce qui était déjà écrit reste dans ce chat. Rien de plus n'a été cherché.",
+    "failed": "La recherche n'a pas pu se terminer. Rien de nouveau n'a été ajouté à ce chat.",
+    "working": "La recherche est en cours.",
+    "workingDone": "La recherche est terminée.",
+    "queued": "La recherche est en attente. Elle attend depuis {seconds} secondes.",
+    "factCheck": "Vérification : {supported} affirmations sur {total} sont étayées. {removed} ont été retirées.",
+    "find": "Le rapport est dans ce chat. Vous pouvez aussi l'ouvrir sous Bibliothèque, puis Fichiers, ou le chercher par son titre.",
+    "sourcesCount": "{found} trouvées, {read} lues, {blocked} bloquées",
+    "pointDone": "Fait",
+    "pointOpen": "Encore ouvert",
+    "pointNotConfirmed": "Non confirmé",
+    "depthLabel": "Jusqu'où aller ?"
   }
 }

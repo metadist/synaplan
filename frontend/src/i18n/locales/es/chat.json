@@ -1069,5 +1069,46 @@
     "loadFailed": "No se pudieron cargar tus atajos. Siguen guardados.",
     "deleteTitle": "¿Eliminar atajo?",
     "deleteConfirm": "/{command} desaparece del menú del chat. Los mensajes ya enviados no cambian."
+  },
+  "research": {
+    "menu": "Investigar",
+    "menuHint": "Un informe escrito con fuentes, en este chat",
+    "title": "Investigar",
+    "questionLabel": "¿Qué quieres averiguar?",
+    "depth": {
+      "standard": "Estándar",
+      "thorough": "A fondo"
+    },
+    "depthHint": {
+      "standard": "Unos {minutes} minutos",
+      "thorough": "Unos {minutes} minutos"
+    },
+    "sourcesLabel": "Fuentes",
+    "sourceWeb": "Web",
+    "sourceFiles": "Carpetas de la biblioteca",
+    "start": "Empezar a investigar",
+    "startNeedsQuestion": "Escribe lo que quieres averiguar.",
+    "startNeedsSource": "Activa la web o añade archivos.",
+    "noSources": "La búsqueda web y las carpetas de la biblioteca están apagadas, así que la investigación no puede empezar.",
+    "noChat": "Abre un chat y luego empieza a investigar.",
+    "startFailed": "La investigación no pudo empezar. Revisa la pregunta e inténtalo de nuevo.",
+    "stopFailed": "La investigación no se pudo detener. Sigue en marcha.",
+    "incognito": "La investigación guarda un informe en el chat. Termina primero el chat de incógnito.",
+    "close": "Cerrar",
+    "continues": "Puedes cerrar esta ventana. La investigación sigue y el informe aparece en este chat.",
+    "stop": "Detener",
+    "stopConsequence": "Detener conserva lo ya escrito y no busca más.",
+    "stopped": "La investigación se detuvo. Lo ya escrito permanece en este chat. No se buscó nada más.",
+    "failed": "La investigación no pudo terminar. No se añadió nada nuevo a este chat.",
+    "working": "La investigación está en marcha.",
+    "workingDone": "La investigación ha terminado.",
+    "queued": "La investigación está en espera. Lleva {seconds} segundos esperando.",
+    "factCheck": "Comprobación: {supported} de {total} afirmaciones están respaldadas. Se quitaron {removed}.",
+    "find": "El informe está en este chat. También puedes abrirlo en Biblioteca y luego Archivos, o buscarlo por el título.",
+    "sourcesCount": "{found} encontradas, {read} leídas, {blocked} bloqueadas",
+    "pointDone": "Hecho",
+    "pointOpen": "Aún abierto",
+    "pointNotConfirmed": "Sin confirmar",
+    "depthLabel": "¿Qué tan a fondo?"
   }
 }

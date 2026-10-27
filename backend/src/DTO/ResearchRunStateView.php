@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ResearchRunStateView',
     description: 'One research run as its owner reads it (research_protocol 1). Budget pairs are [used, limit].',
-    required: ['id', 'research_protocol', 'status', 'depth', 'question', 'stop_requested', 'write_requested', 'queued_since', 'questions', 'created_at', 'updated_at'],
+    required: ['id', 'research_protocol', 'status', 'depth', 'question', 'follow_up', 'can_add_to_report', 'stop_requested', 'write_requested', 'queued_since', 'questions', 'created_at', 'updated_at'],
     properties: [
         new OA\Property(property: 'id', type: 'string', example: 'rr_0123456789abcdef'),
         new OA\Property(property: 'research_protocol', type: 'integer', example: 1),
@@ -17,6 +17,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'depth', type: 'string', enum: ['quick', 'standard', 'thorough'], example: 'standard'),
         new OA\Property(property: 'question', type: 'string', example: 'Which suppliers deliver X in Germany?'),
         new OA\Property(property: 'parent', type: 'string', nullable: true, example: null),
+        new OA\Property(property: 'follow_up', type: 'string', nullable: true, enum: ['question', 'revise', 'deeper', 'refresh'], description: 'Set on a follow-up. Null when the run was started on its own.', example: null),
+        new OA\Property(property: 'can_add_to_report', type: 'boolean', description: 'True when a question follow-up completed with an answer a later screen can add to the parent report. A stopped or failed run is false. This response does not add it.', example: false),
         new OA\Property(property: 'stop_requested', type: 'boolean', example: false),
         new OA\Property(property: 'write_requested', type: 'boolean', description: 'The person asked to write the report from what was already found.', example: false),
         new OA\Property(property: 'queued_since', type: 'integer', nullable: true, description: 'Seconds the next step has waited for a worker, from 20 seconds on. Null while a worker has it, while the run waits for the person, and once it has finished.', example: null),

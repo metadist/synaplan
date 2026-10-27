@@ -79,6 +79,7 @@ and the live-conversation waveform.
 | Add to a Notion page | `simple-icons:notion` (brand glyph, as on the Notion app tile) |
 | Upload | `CloudArrowUpIcon` |
 | Search | `MagnifyingGlassIcon` |
+| Research | `DocumentMagnifyingGlassIcon` |
 | Close | `XMarkIcon` |
 | Share | `ShareIcon` |
 | Folder / new folder | `FolderIcon` / `FolderPlusIcon` |

@@ -377,9 +377,29 @@
     "emptyHint": "Commencez par un formulaire vide, ou choisissez un système connu pour préremplir le nom et les valeurs par défaut. Vous pouvez changer ou effacer ce choix à tout moment.",
     "nameLabel": "Nom",
     "urlLabel": "URL du serveur",
+    "addressDropsSignIn": "Enregistrer une autre adresse déconnecte ce serveur. Reconnectez-le après l’enregistrement.",
+    "addressDropsKey": "Enregistrer un autre hôte supprime la valeur de l’en-tête d’auth enregistrée. Saisissez-la à nouveau ci-dessous.",
     "authHeaderLabel": "Nom de l’en-tête d’auth (facultatif)",
     "authTokenLabel": "Valeur de l’en-tête d’auth",
     "authTokenPlaceholder": "p. ex. Bearer sk-…",
+    "authMethodLabel": "Comment Synaplan se connecte",
+    "authMethod": {
+      "none": {
+        "label": "Sans connexion",
+        "hint": "Pour les serveurs que tout le monde peut utiliser."
+      },
+      "bearer": {
+        "label": "Clé d’accès",
+        "hint": "Une clé ou un jeton fourni par le serveur. Stocké chiffré, jamais réaffiché."
+      },
+      "oauth": {
+        "label": "Se connecter avec votre compte",
+        "hint": "Après l’enregistrement, vous vous connectez sur la page du serveur. Synaplan garde la connexion, jamais votre mot de passe."
+      }
+    },
+    "authMethodOffByAdmin": "Un administrateur a désactivé la connexion. Vous pouvez toujours déconnecter ou supprimer ce serveur.",
+    "saveAndSignIn": "Enregistrer et se connecter",
+    "signInHost": "Connexion sur {host}",
     "enabledLabel": "Activé",
     "enabled": "Activé",
     "disabled": "Désactivé",
@@ -412,7 +432,7 @@
       "custom": {
         "name": "Serveur personnalisé",
         "summary": "N’importe quel point de terminaison MCP",
-        "hint": "Collez l’URL HTTPS de n’importe quel serveur MCP Streamable HTTP et, si besoin, un jeton d’accès. CRM, wiki, tickets, automatisation — s’il parle MCP, cela fonctionne ici."
+        "hint": "Collez l’adresse https de n’importe quel serveur MCP, puis choisissez ci-dessous comment Synaplan s’y connecte."
       },
       "github": {
         "name": "GitHub",
@@ -445,22 +465,38 @@
     "reconnect": "Reconnecter",
     "connecting": "Ouverture de la connexion…",
     "connectFailed": "Impossible de démarrer la connexion",
+    "signInElsewhereTitle": "Se connecter sur {host} ?",
+    "signInElsewhereMessage": "{name} ({serverHost}) vous envoie sur {authHost} pour vous connecter. Continuez seulement si vous attendez cette page pour ce serveur.",
+    "signInElsewhereConfirm": "Continuer vers la connexion",
     "oauthConnected": "Connecté",
     "oauthReauth": "Action nécessaire (reconnecter)",
     "oauthNotConnected": "Non connecté",
-    "oauthConnectedToast": "Connexion réussie",
+    "oauthConnectedToast": "Connecté à {name}.",
     "disconnect": "Déconnecter",
     "disconnecting": "Déconnexion…",
     "disconnectTitle": "Déconnecter ce serveur ?",
     "disconnectMessage": "La connexion enregistrée pour « {name} » sera supprimée. Le serveur reste dans votre liste — reconnectez-vous pour l’utiliser.",
     "disconnected": "Connexion retirée",
     "disconnectFailed": "Impossible de retirer la connexion",
-    "oauthError": {
-      "denied": "La connexion a été annulée",
-      "missing_code": "La connexion n’est pas allée jusqu’au bout. Veuillez réessayer.",
+    "signInError": {
+      "disabled": "La connexion avec identification a été désactivée par un administrateur.",
+      "calls_off": "Les appels aux serveurs MCP sont désactivés. Un administrateur peut les activer dans la configuration du système.",
+      "address_not_allowed": "Cette adresse ne peut pas être utilisée. Saisissez l’adresse publique du serveur.",
+      "https_required": "La connexion a besoin d’une adresse sécurisée. Utilisez une adresse qui commence par https://.",
+      "unreachable": "Le serveur n’a pas répondu. Vérifiez l’adresse et réessayez.",
+      "no_signin": "Ce serveur ne propose pas de connexion. S’il vous a donné une clé, utilisez-la.",
+      "metadata_invalid": "La connexion du serveur est configurée de façon incomplète, Synaplan s’est donc arrêté. Demandez à la personne qui gère le serveur de la vérifier.",
+      "no_registration": "Ce serveur ne permet pas à Synaplan de s’enregistrer pour la connexion. Demandez une clé d’accès à la personne qui le gère.",
+      "unsupported_method": "Ce serveur utilise une méthode de connexion que Synaplan ne prend pas en charge. Demandez une clé d’accès à la personne qui le gère.",
+      "registration_refused": "Le serveur a refusé d’enregistrer Synaplan pour la connexion. Réessayez plus tard ou demandez à la personne qui le gère.",
+      "server_changed": "Ce serveur a été modifié pendant la connexion. Cliquez sur Connecter pour recommencer.",
+      "expired": "La connexion a pris trop de temps. Cliquez sur Connecter pour recommencer.",
       "exchange_failed": "Impossible de terminer la connexion. Veuillez réessayer.",
-      "disabled": "La connexion par identifiant est désactivée par un administrateur"
+      "denied": "La connexion a été annulée.",
+      "missing_code": "La connexion n’a pas abouti. Veuillez réessayer.",
+      "unknown": "La connexion n’a pas pu démarrer. Réessayez ou demandez à la personne qui gère le serveur."
     },
+    "savedSignInNotStarted": "« {name} » est enregistré. La connexion n’a pas démarré : {reason}",
     "allowWriteLabel": "Autoriser les actions d’écriture (créer/mettre à jour)",
     "allowWriteHint": "Lorsqu’elles sont activées, l’assistant peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
     "writeBadge": "Écritures autorisées"

@@ -19,7 +19,8 @@ final readonly class WriteStage implements ResearchStage
 
     public function run(StageContext $ctx): StageResult
     {
-        if ([] === $ctx->state->ledger->evidenceForWriter()) {
+        $prior = $ctx->state->priorReport;
+        if ([] === $ctx->state->ledger->evidenceForWriter() && (null === $prior || '' === trim($prior))) {
             return new StageResult('check');
         }
         $brief = $ctx->state->ledger->brief();
@@ -42,7 +43,7 @@ final readonly class WriteStage implements ResearchStage
         $ctx->state->advance(ResearchStatus::Writing);
         $ctx->events->append($ctx->state->ref->id, 'writing', ['section' => $sections[0]]);
 
-        $called = $this->calls->once($ctx, 'writing', $ctx->roles->writer, $system, 'Write the report.', null);
+        $called = $this->calls->once($ctx, 'writing', $ctx->roles->writer, $system, FollowUpTask::text($ctx->state), null);
         if ($called->stop instanceof StageResult) {
             return $called->stop;
         }

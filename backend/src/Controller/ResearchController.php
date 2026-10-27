@@ -236,12 +236,13 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/followups', name: 'api_research_followups', methods: ['POST'])]
     #[Route('/v1/research/{id}/followups', name: 'v1_research_followups', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/research/{id}/followups', summary: 'Start a follow-up research run', description: 'Starts a new run with this one as its parent, at the same depth and in the same chat.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Post(path: '/api/v1/research/{id}/followups', summary: 'Start a follow-up research run', description: 'Starts a new run that keeps this run\'s sources and continues its source, evidence and point numbers. A question is short and searches once when the notes do not cover it. A revision rewrites the report and checks only sentences that changed. A deeper look uses the thorough budget and adds a point for each item under Not confirmed. A refresh reads sources older than the time frame again and says what changed. The parent must already have finished. A run that is not the caller\'s is not found. Returns the same id when the Idempotency-Key header repeats within 24 hours.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Parameter(name: 'Idempotency-Key', in: 'header', required: false, schema: new OA\Schema(type: 'string', maxLength: 64, pattern: '^[A-Za-z0-9._:-]+$'))]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(
         required: ['type'],
         properties: [
             new OA\Property(property: 'type', type: 'string', enum: ['question', 'revise', 'deeper', 'refresh']),
-            new OA\Property(property: 'text', type: 'string', maxLength: 4000, nullable: true, description: 'Required unless type is refresh'),
+            new OA\Property(property: 'text', type: 'string', maxLength: 4000, nullable: true, description: 'Required for question and revise. Optional for deeper (what else to look into) and refresh (what to watch for).'),
         ]
     ))]
     #[OA\Response(response: 202, description: 'The follow-up was started', content: new OA\JsonContent(
@@ -255,11 +256,12 @@ final class ResearchController extends AbstractController
     ))]
     #[OA\Response(response: 400, description: 'The follow-up is not valid', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     #[OA\Response(response: 404, description: 'Research is turned off, or no such run')]
+    #[OA\Response(response: 409, description: 'The research has not finished yet, or it has no report to revise', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     #[OA\Response(response: 429, description: 'Too many research runs are already going', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     public function followups(string $id, Request $request, #[CurrentUser] ?User $user): Response
     {
         return $this->respond($user, true, fn (User $user): Response => $this->accepted(
-            $this->runs->followUp($user, $id, $this->body($request)),
+            $this->runs->followUp($user, $id, $this->body($request), $request->headers->get('Idempotency-Key')),
         ));
     }
 

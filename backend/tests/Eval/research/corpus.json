@@ -336,5 +336,101 @@
     "smoke": false,
     "written_by": "rq2",
     "checked_on": "2026-10-22"
+  },
+  {
+    "id": "fu-q",
+    "category": "current",
+    "language": "en",
+    "question": "In which year was that regulation published?",
+    "depth": "quick",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The answer comes from the parent's notes: the Act was published in 2024.", "kind": "fact", "match": ["2024"] }
+    ],
+    "preferred_sources": ["eur-lex.europa.eu"],
+    "valid_until": "2027-06-01",
+    "trap": null,
+    "smoke": false,
+    "follow_up": "question",
+    "parent": "fact-01",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-r",
+    "category": "current",
+    "language": "en",
+    "question": "Make the report two sentences long.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The shorter report still says 72 hours.", "kind": "fact", "match": ["72"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "revise",
+    "parent": "reg-01",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-d",
+    "category": "current",
+    "language": "en",
+    "question": "Which licence does SearXNG use?",
+    "depth": "thorough",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "SearXNG is licensed under the AGPL.", "kind": "fact", "match": ["AGPL"] }
+    ],
+    "preferred_sources": ["github.com", "docs.searxng.org"],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "deeper",
+    "parent": "cmp-01",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-f",
+    "category": "current",
+    "language": "en",
+    "question": "Check the sources again and say what changed.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "After the sources are read again, the report still says 201 Created.", "kind": "fact", "match": ["201"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "refresh",
+    "parent": "tech-01",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-t",
+    "category": "current",
+    "language": "de",
+    "question": "Übersetze den Bericht ins Englische und behalte die Belege.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The English report still names Article 17.", "kind": "fact", "match": ["17"] },
+      { "id": "g2", "assertion": "The report is in English: it names the right to erasure.", "kind": "fact", "match": ["erasure"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "revise",
+    "parent": "reg-02",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
   }
 ]

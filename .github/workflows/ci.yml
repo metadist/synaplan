@@ -9,7 +9,9 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  # write so a failed test can cancel the rest of the run. Fork pull requests
+  # still receive a read-only token; the cancel step warns and that run continues.
+  actions: write
 
 # Three run modes (scripts/ci-change-scope.mjs), fail-closed to `heavy`:
 #   heavy   — application change: full tests, and on main/tags the publish path
@@ -22,6 +24,12 @@ permissions:
 # and one run peaks at ~7). Push/tag runs get a unique group (run_id) so main
 # runs neither serialize nor cancel each other — the publish jobs and
 # cloudflare-deploy must never be interrupted or skipped.
+#
+# One failed test cancels the rest of a pull request, and of a push that does
+# not publish (scripts/ci-cancel-on-failure.sh, last step of every test job).
+# All Checks Passed uses if: always(), so it still runs and fails the required
+# check. Main and tag pushes are not cancelled: the arm64 image and the
+# transcriber manifest are already publishing while the tests run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -49,7 +57,7 @@ jobs:
       voice: ${{ steps.classify.outputs.voice }}
     permissions:
       contents: read
-      actions: read
+      actions: write
       pull-requests: read
 
     steps:
@@ -175,6 +183,12 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "Application version for this run: ${version}"
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   lint:
     name: PHP Code Formatting
     runs-on: ubuntu-latest
@@ -234,6 +248,12 @@ jobs:
       - name: Run the AWS first-boot tests
         run: bash deploy/aws/scripts/tests/test-firstboot.sh
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   deployment-templates:
     name: Deployment Templates (AWS)
     runs-on: ubuntu-latest
@@ -275,6 +295,12 @@ jobs:
           # lookup would need an AWS account.
           packer validate deploy/aws/packer/synaplan.pkr.hcl
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   mobile-tooling:
     name: Mobile Release Tooling
     runs-on: ubuntu-latest
@@ -293,6 +319,12 @@ jobs:
       # over the air, so its own tests are a release gate, not a nicety.
       - name: Run release tooling tests
         run: node --test "tests/*.test.mjs"
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   compute-sidecar:
     name: Compute Sidecar (Go)
@@ -323,6 +355,12 @@ jobs:
           go build ./...
           make lint test
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   watchdog-sidecar:
     name: Watchdog Sidecar (Go)
     runs-on: ubuntu-latest
@@ -346,6 +384,12 @@ jobs:
           set -euo pipefail
           go build ./...
           make test
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   transcriber-sidecar:
     name: Transcriber Sidecar (Node)
@@ -375,6 +419,12 @@ jobs:
           name: transcriber-image
           path: /tmp/transcriber-image.tar
           retention-days: 1
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   transcriber-push-amd64:
     name: Publish Transcriber amd64 Image
@@ -608,6 +658,12 @@ jobs:
           docker build -t synaplan-voice:ci .
           docker run --rm -v "$PWD/test:/app/test:ro" synaplan-voice:ci node --test --test-force-exit
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   backend:
     name: Backend (PHP/Symfony)
     # Off the critical path (done around minute 2-3 while e2e runs until
@@ -779,6 +835,12 @@ jobs:
             exit 1
           }
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   # Intermezzo S4 (FM18): a second backend job, not a matrix on `backend`.
   # The full job must stay identical (C1). PHPUnit here is scoped so the
   # extra lane stays inside the +4 min budget.
@@ -897,6 +959,12 @@ jobs:
           name: openapi-spec-minimal
           path: backend/openapi-spec.json
           retention-days: 1
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   frontend-build:
     name: Frontend Build
@@ -1074,6 +1142,12 @@ jobs:
           path: frontend/dist-widget/
           retention-days: 1
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   # Intermezzo S4 (FM19 / C2): the OpenAPI contract must not depend on which
   # optional modules are configured. frontend-build stays off the critical
   # path of backend-minimal — this job waits for both dumps.
@@ -1111,6 +1185,16 @@ jobs:
           echo "::error::OpenAPI spec differs between the full and minimal configurations (C2)"
           diff -u "$FULL" "$MIN" | head -n 200
           exit 1
+
+      - name: Checkout the cancel script
+        if: failure()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   frontend-checks:
     name: Frontend (Vue/TypeScript)
@@ -1228,6 +1312,12 @@ jobs:
         working-directory: frontend
         run: npm run test
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
@@ -1303,6 +1393,12 @@ jobs:
           path: /tmp/docker-image.tar
           retention-days: 1
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   e2e:
     name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
     # E2E jobs run on free ubuntu-latest runners, which are unlimited for
@@ -1332,7 +1428,10 @@ jobs:
     timeout-minutes: 20
     needs: [docker-build]
     strategy:
-      fail-fast: false
+      # One failed shard cancels the others. The shared runner pool is the
+      # scarce resource; finishing the remaining shards after one is already
+      # red does not change the gate.
+      fail-fast: true
       matrix:
         include:
           # Standard password auth — chromium sharded into 3 parallel jobs
@@ -1611,6 +1710,12 @@ jobs:
           PROFILE="${{ matrix.compose_profiles }}"
           $COMPOSE $PROFILE down -v
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   # One Discord ping after the whole E2E matrix finishes (not per shard).
   # merge-multiple must stay false: every shard uploads reports/results.json at
   # the same relative path — merging would overwrite and under-count flakes.
@@ -1767,6 +1872,12 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
+
   deploy-smoke:
     name: Deploy Smoke Test (self-host)
     # E2E runs the image with APP_ENV=test, a synchronous in-memory messenger
@@ -1852,6 +1963,12 @@ jobs:
         run: |
           docker compose --env-file deploy/.env -f deploy/compose.yaml ps -a
           docker compose --env-file deploy/.env -f deploy/compose.yaml logs --no-color --tail=200
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   docker-push-amd64:
     name: Publish amd64 Image
@@ -2716,6 +2833,12 @@ jobs:
       - name: Validate Worker build (dry-run)
         working-directory: cloudflare
         run: npx wrangler deploy --env production --dry-run --outdir dist
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   openapi-promote:
     name: Carry OpenAPI Spec Forward

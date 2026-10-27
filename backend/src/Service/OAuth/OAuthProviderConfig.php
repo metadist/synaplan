@@ -28,6 +28,9 @@ final readonly class OAuthProviderConfig
      *                                                           downscope leaves a token that
      *                                                           can read the account but cannot
      *                                                           upload files
+     * @param array<string, string> $extraTokenParams            sent on code exchange and
+     *                                                           refresh (MCP: RFC 8707
+     *                                                           `resource`)
      */
     public function __construct(
         public string $provider,
@@ -39,6 +42,7 @@ final readonly class OAuthProviderConfig
         public array $scopes,
         public array $extraAuthorizeParams = [],
         public bool $includeScopeInTokenRequests = true,
+        public array $extraTokenParams = [],
     ) {
     }
 

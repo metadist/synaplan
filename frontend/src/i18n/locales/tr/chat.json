@@ -1069,5 +1069,46 @@
     "loadFailed": "Kısayollarınız yüklenemedi. Hâlâ kayıtlılar.",
     "deleteTitle": "Kısayol silinsin mi?",
     "deleteConfirm": "/{command} sohbet menüsünden kaldırılır. Daha önce gönderdiğiniz mesajlar olduğu gibi kalır."
+  },
+  "research": {
+    "menu": "Araştırma",
+    "menuHint": "Kaynaklı yazılı bir rapor, bu sohbette",
+    "title": "Araştırma",
+    "questionLabel": "Ne öğrenmek istiyorsun?",
+    "depth": {
+      "standard": "Standart",
+      "thorough": "Ayrıntılı"
+    },
+    "depthHint": {
+      "standard": "Yaklaşık {minutes} dakika",
+      "thorough": "Yaklaşık {minutes} dakika"
+    },
+    "sourcesLabel": "Kaynaklar",
+    "sourceWeb": "Web",
+    "sourceFiles": "Kitaplık klasörleri",
+    "start": "Araştırmayı başlat",
+    "startNeedsQuestion": "Ne öğrenmek istediğini yaz.",
+    "startNeedsSource": "Web'i aç veya dosya ekle.",
+    "noSources": "Web araması ve Kitaplık klasörleri kapalı, bu yüzden araştırma başlayamaz.",
+    "noChat": "Bir sohbet aç, sonra araştırmayı başlat.",
+    "startFailed": "Araştırma başlatılamadı. Soruyu kontrol edip yeniden dene.",
+    "stopFailed": "Araştırma durdurulamadı. Hâlâ sürüyor.",
+    "incognito": "Araştırma raporu sohbete kaydeder. Önce gizli sohbeti bitir.",
+    "close": "Kapat",
+    "continues": "Bu pencereyi kapatabilirsin. Araştırma sürer ve rapor bu sohbette görünür.",
+    "stop": "Durdur",
+    "stopConsequence": "Durdurmak şimdiye kadar yazılanı tutar ve başka arama yapmaz.",
+    "stopped": "Araştırma durdu. Şimdiye kadar yazılan bu sohbette kalır. Başka arama yapılmadı.",
+    "failed": "Araştırma bitirilemedi. Bu sohbete yeni bir şey eklenmedi.",
+    "working": "Araştırma sürüyor.",
+    "workingDone": "Araştırma bitti.",
+    "queued": "Araştırma sırada. {seconds} saniyedir bekliyor.",
+    "factCheck": "Olgu kontrolü: {total} ifadeden {supported} tanesi destekleniyor. {removed} tanesi çıkarıldı.",
+    "find": "Rapor bu sohbette. Kitaplık, sonra Dosyalar altında da açabilir veya başlığıyla arayabilirsin.",
+    "sourcesCount": "{found} bulundu, {read} okundu, {blocked} engellendi",
+    "pointDone": "Bitti",
+    "pointOpen": "Açık",
+    "pointNotConfirmed": "Doğrulanmadı",
+    "depthLabel": "Ne kadar ayrıntılı?"
   }
 }

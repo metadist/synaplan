@@ -7,6 +7,7 @@ namespace App\Service\Research\Run\Stage;
 use App\AI\StructuredOutput\Schema\ResearchCheckSchema;
 use App\Service\Research\Run\Ledger\PassageText;
 use App\Service\Research\Run\ResearchDepth;
+use App\Service\Research\Run\ResearchFollowUp;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchStatus;
 
@@ -49,8 +50,13 @@ final readonly class CheckStage implements ResearchStage
 
         $passages = $this->passages($ctx);
         $sorted = $this->sort(CheckReport::withoutNotConfirmed($original), $passages);
+        $ask = $sorted['ask'];
+        $carried = [];
+        if (ResearchFollowUp::REVISE === $ctx->state->followUp) {
+            [$ask, $carried] = ChangedSentences::split($ctx->state->priorReport ?? '', $sorted['ask']);
+        }
         $verdicts = [];
-        foreach ($this->batches->groups($sorted['ask'], $this->chars()) as $index => $group) {
+        foreach ($this->batches->groups($ask, $this->chars()) as $index => $group) {
             if ($index > 0 && !$ctx->state->budget->canCall() && !$ctx->stop->requested()) {
                 break;
             }
@@ -70,6 +76,9 @@ final readonly class CheckStage implements ResearchStage
                 return StageEnds::model($ctx, 'checker');
             }
             $verdicts += $parsed;
+        }
+        foreach ($carried as $item) {
+            $verdicts[$item['id']] = ['verdict' => 'supported', 'part' => ''];
         }
 
         $counts = $this->counts($sorted, $verdicts);
@@ -117,9 +126,9 @@ final readonly class CheckStage implements ResearchStage
         $ask = [];
         $number = 0;
         foreach (DraftSentences::split($report) as $sentence) {
-            $bare = trim((string) preg_replace(DraftSentences::MARKER, '', $sentence));
-            $bare = trim((string) preg_replace('/\s+/u', ' ', $bare));
-            $reason = $flagged[PassageText::normalise($bare)] ?? null;
+            $key = PassageText::normalise((string) preg_replace(DraftSentences::MARKER, '', $sentence));
+            $bare = DraftSentences::bare($sentence);
+            $reason = $flagged[$key] ?? null;
             if (null !== $reason) {
                 $drop[] = ['sentence' => $sentence, 'text' => $bare];
                 continue;

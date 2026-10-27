@@ -317,6 +317,26 @@ final class EvidenceLedger
         );
     }
 
+    /**
+     * Drops searches already recorded for these points, so a refresh can run them again.
+     *
+     * @param list<string> $pointIds
+     */
+    public function dropQueries(array $pointIds): void
+    {
+        if ([] === $pointIds) {
+            return;
+        }
+        $drop = array_fill_keys($pointIds, true);
+        $kept = [];
+        foreach ($this->queries as $query) {
+            if (!isset($drop[$query->pointId])) {
+                $kept[] = $query;
+            }
+        }
+        $this->queries = $kept;
+    }
+
     public function addLead(string $sourceId, string $fromId, string $pointId, string $anchor): void
     {
         $this->leads[] = new SourceLead(

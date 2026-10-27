@@ -10,9 +10,10 @@ use App\Service\Research\Run\Ledger\PassageText;
  * Splits a draft into the statements the fact-check looks at. Headings,
  * the sources section, table rules and table headers are skipped. A list
  * marker such as "1." or "-" is not part of a statement, the dot in
- * "12. März", "Mar. 12", "Art. 5" or "z. B." does not end one, and
- * markers that stand after the full stop belong to the sentence before
- * them.
+ * "12. März", "Mar. 12", "Art. 5" or "z. B." does not end one, a part
+ * that starts with a comma or a small letter (after "..." inside a quote)
+ * continues the sentence, and markers that stand after the full stop
+ * belong to the sentence before them.
  */
 final class DraftSentences
 {
@@ -20,8 +21,9 @@ final class DraftSentences
 
     private const SOURCES = '/^#{1,6}\s*(?:sources?|references?|quellen|literatur|fuentes|referencias|r[ée]f[ée]rences|kaynaklar|kaynak[çc]a)\b/iu';
     private const ABBREVIATION_END = '/(?:\b(?:Art|Abs|Buchst|Bst|Nr|Ziff|lit|Kap|Rn|Anh|bzw|ca|vgl|ggf|Mio|Mrd|etc|vs|No|Vol|Sec|Ch|pp|ff|Dr|Prof|St|Mr|Mrs|Ms|Mme|cf|al)|\b\p{L}|(?<![\d.])\d{1,2})\.$/u';
+    private const CONTINUES = '/^(?:[,;:)\]]|\p{Ll})/u';
     private const LIST_MARKER = '/^(?:[-*+•]|\d{1,3}[.)])\s+/u';
-    private const TABLE_RULE = '/^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?$/';
+    public const TABLE_RULE = '/^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?$/';
 
     /**
      * @return list<string>
@@ -72,9 +74,18 @@ final class DraftSentences
         return $out;
     }
 
+    /** The sentence without citation markers and the space they left before punctuation. */
+    public static function bare(string $sentence): string
+    {
+        $text = (string) preg_replace(self::MARKER, '', $sentence);
+        $text = (string) preg_replace('/\s+([,.;:!?])/u', '$1', $text);
+
+        return trim((string) preg_replace('/\s+/u', ' ', $text));
+    }
+
     private static function dotInsideSentence(string $before, string $after): bool
     {
-        if (1 === preg_match(self::ABBREVIATION_END, $before)) {
+        if (1 === preg_match(self::CONTINUES, $after) || 1 === preg_match(self::ABBREVIATION_END, $before)) {
             return true;
         }
 

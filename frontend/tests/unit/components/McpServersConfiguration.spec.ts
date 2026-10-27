@@ -42,8 +42,14 @@ const {
   mockDisconnectOAuth,
   mockConfirm,
   mockPush,
+  mockCreate,
+  mockUpdate,
+  mockStartOAuth,
   authState,
 } = vi.hoisted(() => ({
+  mockCreate: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockStartOAuth: vi.fn(),
   mockList: vi.fn(),
   mockGetPrompts: vi.fn(),
   mockCreatePrompt: vi.fn(),
@@ -58,12 +64,12 @@ const {
 vi.mock('@/services/api/mcpServersApi', () => ({
   mcpServersApi: {
     list: mockList,
-    create: vi.fn(),
-    update: vi.fn(),
+    create: mockCreate,
+    update: mockUpdate,
     remove: vi.fn(),
     test: vi.fn(),
     tools: vi.fn(),
-    startOAuth: vi.fn(),
+    startOAuth: mockStartOAuth,
     disconnectOAuth: mockDisconnectOAuth,
   },
 }))
@@ -536,5 +542,192 @@ describe('McpServersConfiguration — OAuth disconnect', () => {
     // Connect is gated on the flag, Disconnect is not.
     expect(wrapper.find('[data-testid="btn-mcp-oauth-3"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-mcp-oauth-disconnect-3"]').exists()).toBe(true)
+  })
+})
+
+describe('McpServersConfiguration — address and saved key', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [mockServer],
+    })
+    mockGetPrompts.mockResolvedValue([])
+  })
+
+  const editUrl = async (url: string) => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+    await wrapper.find('[data-testid="btn-mcp-edit-3"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="input-mcp-url"]').setValue(url)
+    return wrapper
+  }
+
+  it('says the saved key goes when the host changes', async () => {
+    const wrapper = await editUrl('https://other.example.com/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-key"]').text()).toContain(
+      'removes the saved auth header value'
+    )
+  })
+
+  it('stays quiet for a new path on the same host', async () => {
+    const wrapper = await editUrl('https://web.synaplan.com/v2/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-key"]').exists()).toBe(false)
+  })
+
+  it('stays quiet when there is no saved key', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [{ ...mockServer, has_auth_token: false }],
+    })
+    const wrapper = await editUrl('https://other.example.com/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-key"]').exists()).toBe(false)
+  })
+})
+
+describe('McpServersConfiguration — sign in to your own server (#2823)', () => {
+  const signInRow = {
+    ...mockServer,
+    id: 7,
+    name: 'Company wiki',
+    url: 'https://wiki.example.com/mcp',
+    auth_header: '',
+    has_auth_token: false,
+    auth_mode: 'oauth',
+    oauth_status: 'connected',
+    oauth_sign_in_host: 'auth.example.com',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetPrompts.mockResolvedValue([])
+  })
+
+  it('lets Custom choose sign-in, keeps the address editable and signs in on save', async () => {
+    mockList.mockResolvedValue({ clientEnabled: true, oauthConnectorsEnabled: true, servers: [] })
+    mockCreate.mockResolvedValue({ ...signInRow, oauth_status: 'not_connected' })
+    mockStartOAuth.mockRejectedValue(new Error('stop before leaving the page'))
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-mcp-add"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="input-mcp-name"]').setValue('Company wiki')
+    await wrapper.get('[data-testid="input-mcp-url"]').setValue('https://wiki.example.com/mcp')
+    await wrapper.get('[data-testid="radio-mcp-auth-oauth"]').setValue(true)
+
+    expect(wrapper.find('[data-testid="input-mcp-auth-token"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="input-mcp-url"]').attributes('readonly')).toBeUndefined()
+    expect(wrapper.get('[data-testid="btn-mcp-save"]').text()).toBe('Save and sign in')
+
+    await wrapper.get('[data-testid="btn-mcp-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockCreate.mock.calls[0][0]
+    expect(payload.auth_mode).toBe('oauth')
+    expect(payload).not.toHaveProperty('auth_token')
+    expect(mockStartOAuth).toHaveBeenCalledWith(7)
+  })
+
+  it('shows where a sign-in server signs people in', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [signInRow],
+    })
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="mcp-sign-in-host-7"]').text()).toBe(
+      'Signs in at auth.example.com'
+    )
+  })
+
+  it('still lets a sign-in server be edited after an administrator turned sign-in off', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [signInRow],
+    })
+    mockUpdate.mockResolvedValue({ ...signInRow, name: 'Wiki' })
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-mcp-edit-7"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="mcp-auth-locked"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="input-mcp-name"]').setValue('Wiki')
+    await wrapper.get('[data-testid="btn-mcp-save"]').trigger('click')
+    await flushPromises()
+
+    expect(mockUpdate.mock.calls[0][1]).not.toHaveProperty('auth_mode')
+    expect(mockStartOAuth).not.toHaveBeenCalled()
+  })
+
+  it('saves a rename of a signed-in server without a new sign-in', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [signInRow],
+    })
+    mockUpdate.mockResolvedValue({ ...signInRow, name: 'Wiki' })
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-mcp-edit-7"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="input-mcp-name"]').setValue('Wiki')
+    expect(wrapper.get('[data-testid="btn-mcp-save"]').text()).toBe('Save')
+    await wrapper.get('[data-testid="btn-mcp-save"]').trigger('click')
+    await flushPromises()
+
+    expect(mockUpdate).toHaveBeenCalled()
+    expect(mockStartOAuth).not.toHaveBeenCalled()
+  })
+
+  it('says a new address signs the server out', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [signInRow],
+    })
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-mcp-edit-7"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="input-mcp-url"]').setValue('https://wiki.example.com/v2/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-sign-in"]').exists()).toBe(true)
+  })
+})
+
+describe('McpServersConfiguration — declining the sign-in host', () => {
+  it('reloads the list so the row shows what is stored now', async () => {
+    vi.clearAllMocks()
+    const signInRow = { ...mockServer, auth_mode: 'oauth', oauth_status: 'connected' }
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [signInRow],
+    })
+    mockGetPrompts.mockResolvedValue([])
+    mockStartOAuth.mockResolvedValue('https://auth.other.example/authorize')
+    mockConfirm.mockResolvedValue(false)
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+    expect(mockList).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="btn-mcp-oauth-3"]').trigger('click')
+    await flushPromises()
+
+    expect(mockConfirm).toHaveBeenCalled()
+    expect(mockList).toHaveBeenCalledTimes(2)
   })
 })
