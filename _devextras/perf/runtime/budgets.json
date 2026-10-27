@@ -28,9 +28,9 @@
       "id": "pipeline_overhead",
       "metric": "pipeline.p95_ms",
       "max": 1,
-      "enforce": false,
+      "enforce": true,
       "label": "Pipeline overhead per AI call",
-      "note": "AU10 onward. Not measured by this target yet."
+      "note": "AU10 onward: 1,000 calls with the default hooks and a no-op provider, <= 1 ms p95."
     },
     {
       "id": "gateway_ttft",

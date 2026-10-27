@@ -130,6 +130,7 @@ fi
 
 compose exec -T backend mkdir -p /tmp/perf-runtime
 compose cp "$DIR/mint_key.php" backend:/tmp/perf-runtime/mint_key.php
+compose cp "$DIR/pipeline_overhead.php" backend:/tmp/perf-runtime/pipeline_overhead.php
 compose cp "$DIR/worker-mode.Caddyfile" backend:/tmp/perf-worker.Caddyfile
 
 set +e
@@ -206,6 +207,9 @@ echo "Measuring health and runtime config..."
 py microreq.py --json --base http://synaplan-backend:8090 --path /api/health --clients 1 --requests 100 >"$WORK/health1.json"
 py microreq.py --json --base http://synaplan-backend:8090 --path /api/health --clients 8 --requests 100 >"$WORK/health8.json"
 py microreq.py --json --base http://synaplan-backend:8090 --path /api/v1/config/runtime --clients 4 --requests 40 >"$WORK/runtime.json"
+
+echo "Measuring AI call pipeline overhead (1000 calls)..."
+compose exec -T backend php /tmp/perf-runtime/pipeline_overhead.php 1000 >"$WORK/pipeline.json"
 
 echo "Measuring test-model gateway latency..."
 set +e
