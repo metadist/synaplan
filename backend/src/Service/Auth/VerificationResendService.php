@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Auth;
 
 use App\Entity\EmailVerificationAttempt;
+use App\Entity\VerificationToken;
 use App\Model\VerificationResendResult;
 use App\Model\VerificationResendStatus;
 use App\Repository\EmailVerificationAttemptRepository;
@@ -60,6 +61,7 @@ final readonly class VerificationResendService
             return new VerificationResendResult(VerificationResendStatus::Accepted);
         }
 
+        $token = null;
         try {
             $token = $this->tokens->createToken($user, 'email_verification', 86400);
             $sent = $this->mail->sendVerificationEmail($user->getMail(), $token->getToken(), $user->getLocale());
@@ -69,11 +71,13 @@ final readonly class VerificationResendService
                 'email' => $email,
                 'error' => $e->getMessage(),
             ]);
+            $this->discardToken($token);
 
             return new VerificationResendResult(VerificationResendStatus::Failed);
         }
 
         if (!$sent) {
+            $this->discardToken($token);
             $this->logger->warning('Verification email NOT delivered: mail transport is not configured', [
                 'user_id' => $user->getId(),
                 'email' => $email,
@@ -149,6 +153,22 @@ final readonly class VerificationResendService
         }
 
         return $attempt;
+    }
+
+    private function discardToken(?VerificationToken $token): void
+    {
+        if (null === $token) {
+            return;
+        }
+
+        try {
+            $this->em->remove($token);
+            $this->em->flush();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to discard unsent verification token', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function cooldownMinutes(): int
