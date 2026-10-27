@@ -154,7 +154,7 @@ final readonly class LeadStage
             return false;
         }
         foreach ($ctx->state->ledger->sources() as $source) {
-            if (Source::WEB === $source->kind && Source::FOUND === $source->status && null !== $source->url) {
+            if (Source::FOUND === $source->status && (null !== $source->url || (Source::FILE === $source->kind && null !== $source->fileId))) {
                 return true;
             }
         }

@@ -110,7 +110,7 @@ final readonly class LeadRead
     {
         foreach ($ids as $id) {
             $source = $ctx->state->ledger->source($id);
-            if (null === $source || Source::WEB !== $source->kind || null === $source->url) {
+            if (null === $source || !$this->read->canOpen($source)) {
                 return 'unknown_id';
             }
             if (!in_array($source->status, $statuses, true)) {
