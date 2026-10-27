@@ -90,17 +90,19 @@ final readonly class CloudFileStatus
     private function fresh(User $user, ?PlatformInstance $platform, array $items): array
     {
         $ids = array_values(array_unique(array_map(static fn (array $item): string => $item['id'], $items)));
-        $copies = $platform instanceof PlatformInstance ? $this->withoutDeletedFilter(
-            fn (): array => $this->files->findCopiesOfRemotes($platform->getClient(), $ids, $platform->getInstanceId()),
-        ) : [];
         $byId = [];
-        foreach ($copies as $file) {
-            if ($file->getUserId() !== (int) $user->getId() || !$platform instanceof PlatformInstance || !$this->belongsTo($file, $platform)) {
-                continue;
-            }
-            $sourceId = $file->getSourceId();
-            if (null !== $sourceId && !isset($byId[$sourceId])) {
-                $byId[$sourceId] = $file;
+        if ($platform instanceof PlatformInstance) {
+            $copies = $this->withoutDeletedFilter(
+                fn (): array => $this->files->findCopiesOfRemotes($platform->getClient(), $ids, $platform->getInstanceId()),
+            );
+            foreach ($copies as $file) {
+                if ($file->getUserId() !== (int) $user->getId() || !$this->belongsTo($file, $platform)) {
+                    continue;
+                }
+                $sourceId = $file->getSourceId();
+                if (null !== $sourceId && !isset($byId[$sourceId])) {
+                    $byId[$sourceId] = $file;
+                }
             }
         }
 

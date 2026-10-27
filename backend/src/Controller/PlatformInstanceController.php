@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\File\CloudFilesConfig;
 use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
 use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
 use App\Service\PlatformLink\Exception\PlatformLinkLimitException;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
-use App\Service\File\CloudFilesConfig;
 use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;

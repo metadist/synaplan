@@ -766,7 +766,7 @@ class FileRepository extends ServiceEntityRepository
             ->andWhere('f.sourceId IN (:ids)')
             ->andWhere('f.sourceInstance = :instance OR f.sourceInstance IS NULL')
             ->setParameter('source', $source)
-            ->setParameter('ids', array_values($sourceIds))
+            ->setParameter('ids', $sourceIds)
             ->setParameter('instance', $instanceId)
             ->getQuery()
             ->getResult();
