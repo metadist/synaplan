@@ -13,6 +13,7 @@ final readonly class RerankOptions
         public int $latencyBudgetMs = 800,
         public int $maxCandidateChars = 2000,
         public ?string $modelKey = null,
+        public ?int $userId = null,
     ) {
     }
 }

@@ -15,6 +15,8 @@ final readonly class ChatToolLoopResult
         public string $content,
         public DocumentSession $session,
         public array $usage = [],
+        public bool $facadeMetered = false,
+        public ?string $facadeChargedCost = null,
     ) {
     }
 }

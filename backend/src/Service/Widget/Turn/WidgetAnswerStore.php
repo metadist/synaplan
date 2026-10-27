@@ -10,6 +10,7 @@ use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\AiResponseSanitizer;
 use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Widget\WidgetRealtimeBroadcaster;
 use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -88,16 +89,13 @@ final readonly class WidgetAnswerStore
         }
         $this->sessions->generateTitleIfNeeded($session, $turn->owner->getId());
 
-        $this->rateLimits->recordUsage($turn->owner, 'MESSAGES', [
-            'provider' => $metadata['provider'] ?? null,
-            'model' => $metadata['model'] ?? null,
-            'model_id' => $metadata['model_id'] ?? null,
-            'usage' => $metadata['usage'] ?? [],
-            'channel' => 'WIDGET',
-            'files' => $stored->fileIds,
-            'response_text' => $answer,
-            'input_text' => $stored->message->getText(),
-        ]);
+        $this->rateLimits->recordUsage($turn->owner, 'MESSAGES', FacadeMeteredChat::messages(
+            $metadata,
+            'WIDGET',
+            $stored->message->getText(),
+            $answer,
+            ['channel' => 'WIDGET', 'files' => $stored->fileIds],
+        ));
     }
 
     /**

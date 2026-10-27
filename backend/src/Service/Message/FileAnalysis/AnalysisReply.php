@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Message\FileAnalysis;
 
 use App\AI\Service\AiFacade;
+use App\Service\Usage\FacadeMeteredChat;
 
 /**
  * How a file-analysis answer leaves the handler: returned as `content`
@@ -53,6 +54,8 @@ final readonly class AnalysisReply
      */
     public function fromModel(array $response, array $metadata): array
     {
+        $metadata = FacadeMeteredChat::stamp($metadata, $response);
+
         return null === $this->stream
             ? ['content' => $response['content'], 'metadata' => $metadata]
             : ['metadata' => $metadata];

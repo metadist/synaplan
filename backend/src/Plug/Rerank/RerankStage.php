@@ -65,6 +65,7 @@ final readonly class RerankStage
         $options = new RerankOptions(
             latencyBudgetMs: $this->config->rerankLatencyBudgetMs(),
             maxCandidateChars: $this->config->rerankMaxCandidateChars(),
+            userId: null !== $user ? (int) $user->getId() : null,
         );
 
         $started = hrtime(true);

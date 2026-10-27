@@ -7,6 +7,7 @@ namespace App\Service\Chat\Stream;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
@@ -39,19 +40,18 @@ final readonly class StreamUsageRecorder
      */
     public function recordStreamedReply(StreamTurnRequest $turn, StreamTurnState $state, Message $outgoing, array $metadata, array $classification, string $finalText, ?File $generatedFile): StreamUsage
     {
-        $recorded = $this->rateLimitService->recordUsage($turn->caller->user, 'MESSAGES', [
-            'provider' => $metadata['provider'] ?? 'unknown',
-            'model' => $metadata['model'] ?? 'unknown',
-            'model_id' => $metadata['model_id'] ?? null,
-            'usage' => $metadata['usage'] ?? [],
-            'latency' => $metadata['latency'] ?? 0,
-            'chat_id' => $state->chatId,
-            'source' => $turn->caller->source(),
-            'response_text' => $finalText,
-            'input_text' => $state->messageText,
-            'agentId' => $turn->options->agent?->agentId,
-            'agentVersionId' => $turn->options->agent?->versionId,
-        ]);
+        $recorded = $this->rateLimitService->recordUsage($turn->caller->user, 'MESSAGES', FacadeMeteredChat::messages(
+            $metadata,
+            $turn->caller->source(),
+            $state->messageText,
+            $finalText,
+            [
+                'latency' => $metadata['latency'] ?? 0,
+                'chat_id' => $state->chatId,
+                'agentId' => $turn->options->agent?->agentId,
+                'agentVersionId' => $turn->options->agent?->versionId,
+            ],
+        ));
 
         $chat = $this->chatPayload($outgoing, $recorded, $metadata);
         $extra = $this->contextUsage($classification, $metadata, $state->incoming());
@@ -76,19 +76,18 @@ final readonly class StreamUsageRecorder
     public function recordBufferedReply(StreamTurnRequest $turn, StreamTurnState $state, Message $outgoing, array $metadata, array $classification, string $content): StreamUsage
     {
         $incoming = $state->incoming();
-        $recorded = $this->rateLimitService->recordUsage($turn->caller->user, 'MESSAGES', [
-            'provider' => $metadata['provider'] ?? 'unknown',
-            'model' => $metadata['model'] ?? 'unknown',
-            'model_id' => $metadata['model_id'] ?? null,
-            'usage' => $metadata['usage'] ?? [],
-            'latency' => $metadata['latency'] ?? 0,
-            'chat_id' => $state->chat?->getId(),
-            'source' => $turn->caller->source(),
-            'response_text' => $content,
-            'input_text' => $incoming->getText(),
-            'agentId' => $turn->options->agent?->agentId,
-            'agentVersionId' => $turn->options->agent?->versionId,
-        ]);
+        $recorded = $this->rateLimitService->recordUsage($turn->caller->user, 'MESSAGES', FacadeMeteredChat::messages(
+            $metadata,
+            $turn->caller->source(),
+            $incoming->getText(),
+            $content,
+            [
+                'latency' => $metadata['latency'] ?? 0,
+                'chat_id' => $state->chat?->getId(),
+                'agentId' => $turn->options->agent?->agentId,
+                'agentVersionId' => $turn->options->agent?->versionId,
+            ],
+        ));
 
         $chat = $this->chatPayload($outgoing, $recorded, $metadata);
         $extra = $this->contextUsage($classification, $metadata, $incoming);
@@ -140,13 +139,31 @@ final readonly class StreamUsageRecorder
      */
     private function chatPayload(Message $message, RecordedUsage $recorded, array $metadata): ?array
     {
-        if ($recorded->totalTokens <= 0 && (float) $recorded->chargedCost <= 0.0) {
+        $charged = FacadeMeteredChat::chargedCost($metadata);
+        if (null !== $charged) {
+            $message->setMeta('ai_chat_cost', $charged);
+        }
+
+        if ($recorded->totalTokens <= 0 && (float) $recorded->chargedCost <= 0.0 && null === $charged) {
             return null;
         }
 
-        $recorded->attachChatCost($message);
+        if (null === $charged) {
+            $recorded->attachChatCost($message);
+        }
 
-        return $recorded->toMessageUsage(self::label($metadata['provider'] ?? null), self::label($metadata['model'] ?? null), 'LLM');
+        $payload = $recorded->toMessageUsage(self::label($metadata['provider'] ?? null), self::label($metadata['model'] ?? null), 'LLM');
+        if (null === $charged) {
+            return $payload;
+        }
+
+        $usage = is_array($metadata['usage'] ?? null) ? $metadata['usage'] : [];
+        $payload['cost'] = $charged;
+        $payload['promptTokens'] = (int) ($usage['prompt_tokens'] ?? 0);
+        $payload['completionTokens'] = (int) ($usage['completion_tokens'] ?? 0);
+        $payload['totalTokens'] = (int) ($usage['total_tokens'] ?? ($payload['promptTokens'] + $payload['completionTokens']));
+
+        return $payload;
     }
 
     /**

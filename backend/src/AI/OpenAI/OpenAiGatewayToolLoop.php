@@ -309,6 +309,8 @@ final readonly class OpenAiGatewayToolLoop
             'model' => $result['model'] ?? ($options['model'] ?? 'unknown'),
             'usage' => $usage ?? (is_array($result['usage'] ?? null) ? $result['usage'] : []),
             'loop_notes' => $notes,
+            'facade_metered' => $result['facade_metered'] ?? false,
+            'facade_charged_cost' => $result['facade_charged_cost'] ?? null,
         ];
     }
 

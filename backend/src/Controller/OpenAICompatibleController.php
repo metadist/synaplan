@@ -26,6 +26,7 @@ use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\Usage\FacadeMeteredChat;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -371,15 +372,9 @@ class OpenAICompatibleController extends AbstractController
                 $responseText = trim($responseText."\n".implode("\n", $loopNotes));
             }
 
-            $this->recordChatUsage($user, [
-                'provider' => $result['provider'] ?? 'unknown',
-                'model' => $result['model'] ?? 'unknown',
+            $this->recordChatUsage($user, FacadeMeteredChat::messages($result, 'OPENAI_API', $this->lastUserText($messages), $responseText, [
                 'model_id' => $dbModelId,
-                'usage' => $result['usage'] ?? [],
-                'response_text' => $responseText,
-                'input_text' => $this->lastUserText($messages),
-                'source' => 'OPENAI_API',
-            ]);
+            ]));
 
             $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText, false, $incognito);
 
@@ -586,15 +581,9 @@ class OpenAICompatibleController extends AbstractController
                     $responseText = trim($responseText."\n".implode("\n", $loopNotes));
                 }
 
-                $this->recordChatUsage($user, [
-                    'provider' => $streamMetadata['provider'] ?? 'unknown',
-                    'model' => $streamMetadata['model'] ?? 'unknown',
+                $this->recordChatUsage($user, FacadeMeteredChat::messages($streamMetadata, 'OPENAI_API', $this->lastUserText($messages), $responseText, [
                     'model_id' => $dbModelId,
-                    'usage' => $streamMetadata['usage'] ?? [],
-                    'source' => 'OPENAI_API',
-                    'input_text' => $this->lastUserText($messages),
-                    'response_text' => $responseText,
-                ]);
+                ]));
 
                 $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText, $clientGone, $incognito);
             } catch (\Throwable $e) {

@@ -25,11 +25,14 @@ use App\Service\ModelConfigService;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\Stt\SpeechLanguageContext;
 use App\Service\Stt\TranscriptionLanguageDecider;
+use App\Service\Usage\AiChatUsageMeter;
+use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 class AiFacade
 {
@@ -47,6 +50,8 @@ class AiFacade
 
     /** @var array<string, array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}> */
     private array $embedCache = [];
+
+    private ?AiChatUsageMeter $usageMeter = null;
 
     public function __construct(
         private ProviderRegistry $registry,
@@ -71,6 +76,16 @@ class AiFacade
         private StructuredOutputRecovery $structuredOutputRecovery = new StructuredOutputRecovery(),
         private ?SpeechLanguageContext $speechLanguages = null,
     ) {
+    }
+
+    /**
+     * Every chat is metered here. A setter keeps the constructor at its
+     * current size; tests that build the facade by hand simply do not meter.
+     */
+    #[Required]
+    public function setUsageMeter(AiChatUsageMeter $usageMeter): void
+    {
+        $this->usageMeter = $usageMeter;
     }
 
     /**
@@ -105,47 +120,6 @@ class AiFacade
     }
 
     /**
-     * Sanitize UTF-8 in messages to prevent encoding errors.
-     */
-    private function sanitizeMessages(array $messages): array
-    {
-        return array_map(function ($message) {
-            if (is_array($message)) {
-                foreach ($message as $key => $value) {
-                    if (is_string($value)) {
-                        // Remove invalid UTF-8 characters
-                        $message[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-                        // Remove null bytes and other problematic characters
-                        $message[$key] = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $message[$key]);
-                    } elseif (is_array($value)) {
-                        // Handle nested arrays (e.g., for vision messages with image_url)
-                        $message[$key] = $this->sanitizeNestedArray($value);
-                    }
-                }
-            }
-
-            return $message;
-        }, $messages);
-    }
-
-    /**
-     * Recursively sanitize nested arrays.
-     */
-    private function sanitizeNestedArray(array $arr): array
-    {
-        foreach ($arr as $key => $value) {
-            if (is_string($value)) {
-                $arr[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-                $arr[$key] = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $arr[$key]);
-            } elseif (is_array($value)) {
-                $arr[$key] = $this->sanitizeNestedArray($value);
-            }
-        }
-
-        return $arr;
-    }
-
-    /**
      * Chat: Messages-Array or simple prompt.
      *
      * @param array|string $messages Messages array or simple string prompt
@@ -170,8 +144,7 @@ class AiFacade
             $messages = [['role' => 'user', 'content' => $messages]];
         }
 
-        // Sanitize UTF-8 to prevent encoding errors
-        $messages = $this->sanitizeMessages($messages);
+        $messages = Utf8MessageSanitizer::apply($messages);
 
         $this->logger->info('AI chat request', [
             'provider' => $provider->getName(),
@@ -229,7 +202,7 @@ class AiFacade
             $out['finish_reason'] = $response['finish_reason'];
         }
 
-        return $out;
+        return $this->withUsage($out, $messages, $options, $userId);
     }
 
     /**
@@ -365,8 +338,7 @@ class AiFacade
             $messages = [['role' => 'user', 'content' => $messages]];
         }
 
-        // Sanitize UTF-8 to prevent encoding errors
-        $messages = $this->sanitizeMessages($messages);
+        $messages = Utf8MessageSanitizer::apply($messages);
 
         $this->logger->info('🔵 AiFacade: Starting chat stream', [
             'provider' => $provider->getName(),
@@ -405,7 +377,7 @@ class AiFacade
             throw new ProviderException('AI provider failed for streaming', 'unknown', null, 0, $e);
         }
 
-        return [
+        $streamed = $this->withUsage([
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $streamResult['usage'] ?? [],
@@ -416,7 +388,27 @@ class AiFacade
             // never see a routing hand-off as if it were answer text.
             'tool_calls' => $streamResult['tool_calls'] ?? [],
             'finish_reason' => is_string($streamResult['finish_reason'] ?? null) ? $streamResult['finish_reason'] : null,
-        ];
+        ], $messages, $options, $userId);
+
+        return $streamed;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @param list<mixed>          $messages
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function withUsage(array $response, array $messages, array $options, ?int $userId): array
+    {
+        $recorded = $this->usageMeter?->record($userId, $response, $messages, $options);
+        if ($recorded instanceof RecordedUsage) {
+            $response['facade_metered'] = true;
+            $response['facade_charged_cost'] = $recorded->chargedCost;
+        }
+
+        return $response;
     }
 
     /**

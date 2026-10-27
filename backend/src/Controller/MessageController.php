@@ -23,6 +23,7 @@ use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\Stt\SpeechFailure;
+use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -273,23 +274,16 @@ class MessageController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
 
-            // Record usage with full metadata. Reuse the model id resolved
-            // above (same DEFAULTMODEL/CHAT lookup the facade uses).
             $resolvedModelId = $modelId;
 
-            $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
-                'provider' => $aiResponse['provider'] ?? 'unknown',
-                'model' => $aiResponse['model'] ?? 'unknown',
-                'model_id' => $resolvedModelId,
-                'usage' => $aiResponse['usage'] ?? [],
-                'input_text' => $messageText,
-                'response_text' => $responseText,
-                'source' => 'WEB',
-            ]);
-            $recordedChatUsage->attachChatCost($outgoingMessage);
-
-            // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
-            // Only StreamController (which uses MessageProcessor) has sorting model metadata
+            $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages(
+                $aiResponse,
+                'WEB',
+                $messageText,
+                $responseText,
+                ['model_id' => $resolvedModelId],
+            ));
+            FacadeMeteredChat::attach($outgoingMessage, $recordedChatUsage, $aiResponse);
 
             // Update incoming message status
             $incomingMessage->setStatus('complete');

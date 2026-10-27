@@ -95,7 +95,7 @@ final readonly class DocumentEditCoordinator
         }
 
         if (!$session->hasMutations()) {
-            return new DocumentEditResult($loopResult->content, null, $session->operations, $loopResult->usage, null, $fidelityLossy);
+            return new DocumentEditResult($loopResult->content, null, $session->operations, $loopResult->usage, null, $fidelityLossy, $loopResult->facadeMetered, $loopResult->facadeChargedCost);
         }
 
         $wasExisting = null !== $session->fileId;
@@ -111,7 +111,7 @@ final readonly class DocumentEditCoordinator
             $content = '__FILE_GENERATED__:'.$file->getFileName();
         }
 
-        return new DocumentEditResult($content, $file, $session->operations, $loopResult->usage, $version, $fidelityLossy);
+        return new DocumentEditResult($content, $file, $session->operations, $loopResult->usage, $version, $fidelityLossy, $loopResult->facadeMetered, $loopResult->facadeChargedCost);
     }
 
     /**

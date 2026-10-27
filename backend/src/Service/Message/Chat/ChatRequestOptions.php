@@ -11,6 +11,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Model;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
+use App\Service\Usage\AiChatUsageMeter;
 
 /**
  * The provider options of a chat turn, apart from its messages: provider and
@@ -154,8 +155,14 @@ final readonly class ChatRequestOptions
     {
         $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $turn->profile, $turn->message->getUserId());
         $aiOptions = $this->applyReasoningLevel($aiOptions, $model->model, $options);
+        $aiOptions = $this->applyLocalThinkingBudget($aiOptions);
+        // Live voice folds this answer into its own session row. Metering it
+        // again in the facade would bill the same tokens twice.
+        if ($turn->isLiveVoice()) {
+            $aiOptions[AiChatUsageMeter::CALLER_METERS] = true;
+        }
 
-        return $this->applyLocalThinkingBudget($aiOptions);
+        return $aiOptions;
     }
 
     /**

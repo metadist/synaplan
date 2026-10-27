@@ -66,7 +66,7 @@ final readonly class SearchInterpreter
         }
 
         $model = $this->searchModels->aiModel($user->getId());
-        $options = ['temperature' => self::TEMPERATURE];
+        $options = ['temperature' => self::TEMPERATURE, 'caller_meters' => true];
         if (null !== $model) {
             $options['provider'] = strtolower($model->getService());
             $options['model'] = $model->getProviderId() ?: $model->getName();

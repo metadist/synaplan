@@ -523,7 +523,7 @@ final readonly class MessagesGateway
             $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $emit);
         }
 
-        if ($usage->outputTokens > 0 || $usage->inputTokens > 0) {
+        if ($usage->shouldMeter()) {
             $this->recordUsage($user, $prepared, $usage, null);
         }
 
