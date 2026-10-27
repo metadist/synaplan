@@ -23,7 +23,7 @@
         "src/AI/Provider/TestProvider.php": 1044,
         "src/AI/Provider/TritonProvider.php": 844,
         "src/AI/Provider/XaiProvider.php": 1791,
-        "src/AI/Service/AiFacade.php": 1053,
+        "src/AI/Service/AiFacade.php": 1070,
         "src/Command/SyncModelPricesCommand.php": 1382,
         "src/Controller/AdminController.php": 1000,
         "src/Controller/AgentController.php": 921,

@@ -68,7 +68,7 @@ final readonly class AiCallOptions
         return \is_string($language) ? $language : null;
     }
 
-    public function withDeadline(AiCallDeadline $deadline): self
+    public function withDeadline(?AiCallDeadline $deadline): self
     {
         return new self(
             modelId: $this->modelId,

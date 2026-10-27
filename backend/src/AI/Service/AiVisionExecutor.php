@@ -11,6 +11,7 @@ use App\AI\Pipeline\AiCallContext;
 use App\AI\Pipeline\AiCallOptions;
 use App\AI\Pipeline\AiCallPayload;
 use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\AiCallRefusedException;
 use App\AI\Pipeline\AiCallSource;
 use App\AI\Pipeline\AiCapability;
 use App\Service\ModelConfigService;
@@ -70,6 +71,8 @@ final readonly class AiVisionExecutor
 
             try {
                 return $this->attemptCandidate($provider, $imagePath, $prompt, $userId, $candidateOptions);
+            } catch (AiCallRefusedException $refused) {
+                throw $refused;
             } catch (ProviderException $e) {
                 $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [
                     'provider' => $provider->getName(),

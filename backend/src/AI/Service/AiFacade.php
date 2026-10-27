@@ -983,8 +983,25 @@ class AiFacade
             'supports_streaming' => $provider->supportsStreaming(),
         ]);
 
+        $call = new AiCall(
+            capability: AiCapability::SynthesizeStream,
+            provider: $provider->getName(),
+            model: $this->reportedModel($provider, $options, 'text_to_speech'),
+            context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
+            payload: AiCallPayload::speechText($text),
+            options: AiCallOptions::fromArray($options + ['skip_model_health' => true], stream: true),
+        );
+        $charCount = mb_strlen($text);
+        $streamedGenerator = $this->pipeline()->streamGenerator(
+            $call,
+            static function (AiCall $c) use ($provider): \Generator {
+                return $provider->synthesizeStream((string) $c->payload->prompt, array_diff_key($c->options->providerOptions, ['skip_model_health' => true]));
+            },
+            static fn (): AiUsage => new AiUsage(characterCount: $charCount),
+        );
+
         return [
-            'generator' => $provider->synthesizeStream($text, $options),
+            'generator' => $streamedGenerator,
             'contentType' => $provider->getStreamContentType($options),
             'provider' => $provider->getName(),
             'supportsStreaming' => $provider->supportsStreaming(),

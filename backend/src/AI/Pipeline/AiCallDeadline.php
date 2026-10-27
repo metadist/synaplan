@@ -22,11 +22,16 @@ final readonly class AiCallDeadline
     /**
      * @param (\Closure(): int)|null $clockNs
      */
-    public static function start(int $budgetMs, ?\Closure $clockNs = null): self
+    public static function start(int $budgetMs, ?\Closure $clockNs = null, ?self $inherited = null): self
     {
         $now = null !== $clockNs ? $clockNs() : hrtime(true);
+        $effectiveBudgetMs = max(1, $budgetMs);
+        if (null !== $inherited) {
+            $inheritedRemainingMs = (int) floor($inherited->remainingSeconds($clockNs) * 1000.0);
+            $effectiveBudgetMs = max(1, min($effectiveBudgetMs, $inheritedRemainingMs));
+        }
 
-        return new self($now, max(1, $budgetMs));
+        return new self($now, $effectiveBudgetMs);
     }
 
     /**

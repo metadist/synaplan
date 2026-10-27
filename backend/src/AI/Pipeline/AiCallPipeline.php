@@ -166,25 +166,7 @@ final readonly class AiCallPipeline
         $ttftMs = null;
 
         $wrappedChunk = function (mixed $rawChunk) use (&$call, $onChunk, $providerStart, &$ttftMs): void {
-            $normalized = StreamChunk::fromProviderChunk($rawChunk);
-            if (null === $ttftMs && 'content' === $normalized->type && '' !== $normalized->content) {
-                $ttftMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
-            }
-
-            foreach ($this->hooks as ['hook' => $hook, 'attr' => $attr]) {
-                if (!$hook instanceof StreamingAiCallHookInterface || !$this->isHookActive($attr)) {
-                    continue;
-                }
-                try {
-                    $hook->onChunk($call, $normalized);
-                } catch (\Throwable $e) {
-                    $this->logger->warning('AI streaming hook onChunk failed', [
-                        'hook' => $hook::class,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
+            $this->observeStreamChunk($call, $rawChunk, $providerStart, $ttftMs);
             $onChunk($rawChunk);
         };
 
@@ -231,11 +213,104 @@ final readonly class AiCallPipeline
     }
 
     /**
+     * Wrap a lazy `\Generator` stream (`synthesizeStream`) in the pipeline
+     * lifecycle so chunks yield lazily to the caller without buffering.
+     *
+     * @param callable(AiCall): \Generator           $transport
+     * @param (callable(mixed): (AiUsage|null))|null $usageExtractor
+     */
+    public function streamGenerator(AiCall $call, callable $transport, ?callable $usageExtractor = null): \Generator
+    {
+        [$call, $refusal, $hooksBeforeMs] = $this->runBefore($call);
+        if (null !== $refusal) {
+            $result = new AiCallResult(
+                outcome: AiCallOutcome::Refused,
+                value: null,
+                usage: null,
+                timings: new AiCallTimings(hooksBeforeMs: $hooksBeforeMs),
+                failureClass: $refusal->toThrowable()::class,
+                exception: $refusal->toThrowable(),
+            );
+            $this->runAfter($call, $result);
+
+            throw $refusal->toThrowable();
+        }
+
+        $providerStart = ($this->clockNs)();
+        $ttftMs = null;
+
+        try {
+            $generator = $transport($call);
+            foreach ($generator as $rawChunk) {
+                $this->observeStreamChunk($call, $rawChunk, $providerStart, $ttftMs);
+                yield $rawChunk;
+            }
+            $value = $generator->getReturn();
+            $providerMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
+        } catch (StreamCancelledException $cancelled) {
+            $providerMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
+            $this->runAfter($call, new AiCallResult(
+                outcome: AiCallOutcome::Cancelled,
+                value: null,
+                usage: null,
+                timings: new AiCallTimings(hooksBeforeMs: $hooksBeforeMs, ttftMs: $ttftMs, providerMs: $providerMs),
+                failureClass: $cancelled::class,
+                exception: $cancelled,
+            ));
+
+            throw $cancelled;
+        } catch (\Throwable $error) {
+            $providerMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
+            $this->runAfter($call, new AiCallResult(
+                outcome: AiCallOutcome::Failed,
+                value: null,
+                usage: null,
+                timings: new AiCallTimings(hooksBeforeMs: $hooksBeforeMs, ttftMs: $ttftMs, providerMs: $providerMs),
+                failureClass: $error::class,
+                exception: $error,
+            ));
+
+            throw $error;
+        }
+
+        $usage = null !== $usageExtractor ? $usageExtractor($value) : self::defaultUsage($value);
+        $this->runAfter($call, new AiCallResult(
+            outcome: AiCallOutcome::Ok,
+            value: $value,
+            usage: $usage,
+            timings: new AiCallTimings(hooksBeforeMs: $hooksBeforeMs, ttftMs: $ttftMs, providerMs: $providerMs),
+        ));
+    }
+
+    private function observeStreamChunk(AiCall $call, mixed $rawChunk, int $providerStart, ?float &$ttftMs): void
+    {
+        $normalized = StreamChunk::fromProviderChunk($rawChunk);
+        if (null === $ttftMs && 'content' === $normalized->type && '' !== $normalized->content) {
+            $ttftMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
+        }
+
+        foreach ($this->hooks as ['hook' => $hook, 'attr' => $attr]) {
+            if (!$hook instanceof StreamingAiCallHookInterface || !$this->isHookActive($attr)) {
+                continue;
+            }
+            try {
+                $hook->onChunk($call, $normalized);
+            } catch (\Throwable $e) {
+                $this->logger->warning('AI streaming hook onChunk failed', [
+                    'hook' => $hook::class,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
      * @return array{0: AiCall, 1: ?AiCallRefusal, 2: float}
      */
     private function runBefore(AiCall $call): array
     {
         $totalNs = 0;
+        $inheritedDeadline = $call->options->deadline;
 
         foreach ($this->hooks as ['hook' => $hook, 'attr' => $attr]) {
             if (!$this->isHookActive($attr)) {
@@ -243,8 +318,8 @@ final readonly class AiCallPipeline
             }
 
             $callForHook = $attr->blocking
-                ? $call->withOptions($call->options->withDeadline(AiCallDeadline::start($attr->budgetMs, $this->clockNs)))
-                : $call;
+                ? $call->withOptions($call->options->withDeadline(AiCallDeadline::start($attr->budgetMs, $this->clockNs, $inheritedDeadline)))
+                : $call->withOptions($call->options->withDeadline($inheritedDeadline));
 
             $startNs = ($this->clockNs)();
             try {
@@ -255,7 +330,7 @@ final readonly class AiCallPipeline
                 $this->logHookException($hook, 'before', $e);
 
                 if (HookFailure::Closed === $attr->onError) {
-                    return [$call, AiCallRefusal::policy($call->provider), $totalNs / 1_000_000.0];
+                    return [$call->withOptions($call->options->withDeadline($inheritedDeadline)), AiCallRefusal::policy($call->provider), $totalNs / 1_000_000.0];
                 }
 
                 continue;
@@ -268,15 +343,15 @@ final readonly class AiCallPipeline
             if ($elapsedMs > $attr->budgetMs) {
                 $this->logHookTimeout($hook, 'before', $attr->budgetMs, $elapsedMs, $call);
                 if (HookFailure::Closed === $attr->onError) {
-                    return [$call, AiCallRefusal::policy($call->provider), $totalNs / 1_000_000.0];
+                    return [$call->withOptions($call->options->withDeadline($inheritedDeadline)), AiCallRefusal::policy($call->provider), $totalNs / 1_000_000.0];
                 }
             }
 
             if ($next instanceof AiCallRefusal) {
-                return [$call, $next, $totalNs / 1_000_000.0];
+                return [$call->withOptions($call->options->withDeadline($inheritedDeadline)), $next, $totalNs / 1_000_000.0];
             }
 
-            $call = $next;
+            $call = $next->withOptions($next->options->withDeadline($inheritedDeadline));
         }
 
         return [$call, null, $totalNs / 1_000_000.0];
@@ -285,15 +360,20 @@ final readonly class AiCallPipeline
     private function runAfter(AiCall $call, AiCallResult $result): AiCallResult
     {
         $totalNs = 0;
+        $inheritedDeadline = $call->options->deadline;
 
         foreach ($this->hooks as ['hook' => $hook, 'attr' => $attr]) {
             if (!$this->isHookActive($attr)) {
                 continue;
             }
 
+            $callForHook = $attr->blocking
+                ? $call->withOptions($call->options->withDeadline(AiCallDeadline::start($attr->budgetMs, $this->clockNs, $inheritedDeadline)))
+                : $call->withOptions($call->options->withDeadline($inheritedDeadline));
+
             $startNs = ($this->clockNs)();
             try {
-                $hook->after($call, $result);
+                $hook->after($callForHook, $result);
             } catch (\Throwable $e) {
                 $this->logHookException($hook, 'after', $e);
             }
