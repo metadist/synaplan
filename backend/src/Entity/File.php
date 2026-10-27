@@ -18,6 +18,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE'], name: 'idx_file_user_source')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE', 'BSOURCEID'], name: 'idx_file_user_source_sid')]
+#[ORM\Index(columns: ['BSOURCE', 'BSOURCEINSTANCE', 'BSOURCEID'], name: 'idx_file_source_instance')]
 #[ORM\Index(columns: ['BUSERID', 'BGROUPKEY'], name: 'idx_file_user_group')]
 #[ORM\Index(columns: ['BUSERID', 'BVECTORSTATE'], name: 'idx_file_user_vstate')]
 #[ORM\Index(columns: ['BUSERID', 'BINCOMING'], name: 'idx_file_user_incoming')]
@@ -195,6 +196,13 @@ class File
      */
     #[ORM\Column(name: 'BSOURCEID', length: 255, nullable: true)]
     private ?string $sourceId = null;
+
+    /**
+     * Platform instance this cloud file came from. Null for rows written
+     * before the column, and for uploads that are not a cloud identity.
+     */
+    #[ORM\Column(name: 'BSOURCEINSTANCE', length: 64, nullable: true)]
+    private ?string $sourceInstance = null;
 
     /**
      * External version/etag captured at ingest. A differing etag reported later
@@ -493,6 +501,19 @@ class File
     {
         $sourceId = null !== $sourceId ? trim($sourceId) : null;
         $this->sourceId = ('' === $sourceId) ? null : $sourceId;
+
+        return $this;
+    }
+
+    public function getSourceInstance(): ?string
+    {
+        return $this->sourceInstance;
+    }
+
+    public function setSourceInstance(?string $sourceInstance): self
+    {
+        $sourceInstance = null !== $sourceInstance ? trim($sourceInstance) : null;
+        $this->sourceInstance = ('' === $sourceInstance) ? null : $sourceInstance;
 
         return $this;
     }

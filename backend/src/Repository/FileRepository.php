@@ -345,9 +345,10 @@ class FileRepository extends ServiceEntityRepository
         ?string $sourceId,
         ?string $groupKey,
         ?string $originalName,
+        ?string $sourceInstance = null,
     ): ?File {
         if (null !== $sourceId && '' !== trim($sourceId)) {
-            return $this->createQueryBuilder('f')
+            $qb = $this->createQueryBuilder('f')
                 ->where('f.userId = :userId')
                 ->andWhere('f.source = :source')
                 ->andWhere('f.sourceId = :sourceId')
@@ -355,9 +356,10 @@ class FileRepository extends ServiceEntityRepository
                 ->setParameter('source', $source)
                 ->setParameter('sourceId', trim($sourceId))
                 ->orderBy('f.id', 'DESC')
-                ->setMaxResults(1)
-                ->getQuery()
-                ->getOneOrNullResult();
+                ->setMaxResults(1);
+            $this->restrictInstance($qb, $sourceInstance);
+
+            return $this->claim($qb->getQuery()->getOneOrNullResult(), $userId, $source, $sourceInstance);
         }
 
         if (null !== $originalName && '' !== trim($originalName)) {
@@ -388,23 +390,29 @@ class FileRepository extends ServiceEntityRepository
      *
      * @return array<string, File>
      */
-    public function findByUserSourceIds(int $userId, string $source, array $sourceIds): array
+    public function findByUserSourceIds(int $userId, string $source, array $sourceIds, ?string $sourceInstance = null): array
     {
         $sourceIds = array_values(array_filter(array_map('trim', $sourceIds), static fn (string $s): bool => '' !== $s));
         if ([] === $sourceIds) {
             return [];
         }
 
-        $rows = $this->createQueryBuilder('f')
+        $qb = $this->createQueryBuilder('f')
             ->where('f.userId = :userId')
             ->andWhere('f.source = :source')
             ->andWhere('f.sourceId IN (:sourceIds)')
             ->setParameter('userId', $userId)
             ->setParameter('source', $source)
             ->setParameter('sourceIds', $sourceIds)
-            ->orderBy('f.id', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('f.id', 'ASC');
+        $this->restrictInstance($qb, $sourceInstance);
+        $rows = $qb->getQuery()->getResult();
+        foreach ($rows as $index => $row) {
+            $claimed = $this->claim($row, $userId, $source, $sourceInstance);
+            if (!$claimed instanceof File) {
+                unset($rows[$index]);
+            }
+        }
 
         $map = [];
         foreach ($rows as $file) {
@@ -415,6 +423,46 @@ class FileRepository extends ServiceEntityRepository
         }
 
         return $map;
+    }
+
+    private function restrictInstance(QueryBuilder $qb, ?string $sourceInstance): void
+    {
+        if (null === $sourceInstance || '' === $sourceInstance) {
+            $qb->andWhere('f.sourceInstance IS NULL');
+
+            return;
+        }
+
+        $qb->andWhere('f.sourceInstance = :sourceInstance OR f.sourceInstance IS NULL')
+            ->setParameter('sourceInstance', $sourceInstance);
+    }
+
+    private function claim(?File $file, int $userId, string $source, ?string $sourceInstance): ?File
+    {
+        if (!$file instanceof File || null === $sourceInstance || '' === $sourceInstance || $file->getSourceInstance() === $sourceInstance) {
+            return $file;
+        }
+        if (null !== $file->getSourceInstance() || !$this->mayClaimUnscoped($userId, $source, $sourceInstance)) {
+            return null;
+        }
+        $file->setSourceInstance($sourceInstance);
+
+        return $file;
+    }
+
+    private function mayClaimUnscoped(int $userId, string $source, string $sourceInstance): bool
+    {
+        /** @var list<array{instanceId: string}> $rows */
+        $rows = $this->getEntityManager()->createQuery(
+            'SELECT e.instanceId FROM App\Entity\ExternalIdentity e WHERE e.userId = :user AND e.source = :source'
+        )->setParameter('user', $userId)->setParameter('source', $source)->setMaxResults(2)->getResult();
+        if (1 !== count($rows)) {
+            return false;
+        }
+
+        $only = (string) $rows[0]['instanceId'];
+
+        return '' === $only || $only === $sourceInstance;
     }
 
     /**
