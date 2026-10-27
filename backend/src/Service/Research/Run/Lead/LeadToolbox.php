@@ -17,8 +17,8 @@ use App\Service\Research\Run\Stage\StageResult;
 
 /**
  * The tools the lead may call. Each one enforces the budget itself. Asking
- * the person ends the turn and the run waits with no worker. File search
- * waits for the knowledge source (RS9). A model that calls it anyway is refused.
+ * the person ends the turn and the run waits with no worker. A source the
+ * run did not turn on is refused.
  */
 final readonly class LeadToolbox
 {
@@ -31,17 +31,30 @@ final readonly class LeadToolbox
     /**
      * @return list<ToolDefinition>
      */
-    public function definitions(): array
+    public function definitions(StageContext $ctx): array
     {
         $point = ['type' => 'string', 'description' => 'Id of the plan point, for example p1.'];
         $source = ['type' => 'string', 'description' => 'Source id from a search result, for example s3.'];
+        $scopes = [];
+        if ($ctx->webOn()) {
+            $scopes[] = 'web';
+        }
+        if ($ctx->filesOn()) {
+            $scopes[] = 'files';
+        }
+        if ($ctx->webOn() && $ctx->filesOn()) {
+            $scopes[] = 'both';
+        }
+        $search = $ctx->filesOn()
+            ? 'Search for one plan point on the sources this run turned on. Returns short results with source ids, never the page or the file.'
+            : 'Search the web for one plan point. Returns short results with source ids, never the page.';
 
         return [
-            new ToolDefinition('search', 'Search the web for one plan point. Returns short results with source ids, never the page.', ResearchJsonSchema::object([
+            new ToolDefinition('search', $search, ResearchJsonSchema::object([
                 'point' => $point,
                 'query' => ['type' => 'string', 'maxLength' => 200, 'description' => 'A short search query. Never repeat an earlier one.'],
                 'language' => ['type' => 'string', 'description' => 'Two-letter language code of the query, for example en.'],
-                'scope' => ResearchJsonSchema::enum(['web']),
+                'scope' => ResearchJsonSchema::enum([] === $scopes ? ['web'] : $scopes),
             ], ['point', 'query', 'language', 'scope'])),
             new ToolDefinition('read_sources', 'Read found sources and return evidence cards for one plan point.', ResearchJsonSchema::object([
                 'ids' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => $source],

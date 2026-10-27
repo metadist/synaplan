@@ -6,14 +6,15 @@ namespace App\Service\Research\Run;
 
 use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Service\RAG\RagScopeResolver;
 use Psr\Clock\ClockInterface;
 
 /**
  * Opens, lists, stops and deletes a research run.
  *
  * Model hints, a world and starting pages are accepted on the request and
- * not applied yet: the run uses the installation's models. Reading whole
- * documents stays off.
+ * not applied yet: the run uses the installation's models. The chosen
+ * sources are applied. Reading whole documents stays off.
  *
  * Every change to a run that already exists goes through the unit's claim,
  * so a worker or the reaper that acts at the same moment is never overwritten.
@@ -31,6 +32,7 @@ final readonly class ResearchRunService
         private ClockInterface $clock,
         private ResearchReportPoster $reports,
         private ?ResearchSavedTaskSignal $savedTasks = null,
+        private ?RagScopeResolver $scopes = null,
         private ?ResearchBudgetStore $budgets = null,
     ) {
     }
@@ -41,8 +43,22 @@ final readonly class ResearchRunService
     public function start(User $user, array $body, bool $session, ?string $idempotencyKey): ResearchRunState
     {
         $request = ResearchRequest::fromBody($body, $session, $user, $this->chats);
+        $this->checkFolders($user, $request->sources);
 
         return $this->open($user, $request, $this->idempotencyKey($idempotencyKey), null, null);
+    }
+
+    /**
+     * A shared folder the caller cannot use is refused at the start, so the
+     * run never looks like it searched a folder it skipped.
+     */
+    private function checkFolders(User $user, ResearchSources $sources): void
+    {
+        foreach ($sources->knowledge as $key) {
+            if (null !== $this->scopes && !$this->scopes->canUsePickerKey($user->getId() ?? 0, $key)) {
+                throw new ResearchRejected(400, 'invalid', 'sources', 'A chosen folder is not shared with you. Research did not start.');
+            }
+        }
     }
 
     /**
@@ -195,7 +211,12 @@ final readonly class ResearchRunService
 
         return $this->open(
             $user,
-            new ResearchRequest($question, $plan->depth, $state->ref->chatId),
+            new ResearchRequest(
+                $question,
+                $plan->depth,
+                $state->ref->chatId,
+                ResearchSources::fromStored($state->sourcesOn, $state->knowledgeKeys),
+            ),
             $key,
             $state->ref->id,
             $plan,
@@ -255,6 +276,8 @@ final readonly class ResearchRunService
         );
         $state->parent = $parent;
         $state->idempotencyKey = $idempotencyKey;
+        $state->sourcesOn = $request->sources->label();
+        $state->knowledgeKeys = $request->sources->knowledge;
         if (null !== $task) {
             $state->savedTaskRunId = $task->runId;
             $state->savedTaskNodeId = $task->nodeId;

@@ -312,6 +312,20 @@ PROMPT;
         $this->assertSame(true, $result['BMULTI']);
     }
 
+    public function testVotesMultiStepWhenTheMessageNamesAConnectedSystem(): void
+    {
+        $this->sortSystemPrompt .= "\n\n## Connected systems of this user\n- \"Notion\" (connected data source)\n";
+
+        $this->assertSame(true, $this->classifyMessage('Finde die Notion Seite zu Synaplan')['BMULTI']);
+    }
+
+    public function testAConnectedSystemHintDoesNotVoteMultiStepForAnUnrelatedQuestion(): void
+    {
+        $this->sortSystemPrompt .= "\n\n## Connected systems of this user\n- \"Notion\" (connected data source)\n";
+
+        $this->assertSame(false, $this->classifyMessage('What is the capital of France?')['BMULTI']);
+    }
+
     public function testVotesMultiStepForTheWebSearchPlanPrefix(): void
     {
         $result = $this->classifyMessage('websearch: what happened in AI this week?');

@@ -670,6 +670,9 @@
     "stop": "Stop",
     "rendering": "Rendering…",
     "searchSummary": "Searched the web · {count} source | Searched the web · {count} sources",
+    "searchedInstead": "Nothing for “{original}” — searched “{matched}” instead.",
+    "searchedNothing": "Searched: {queries} — nothing found.",
+    "searchingAgain": "Searching again…",
     "retryWith": "Retry with {model}",
     "state": {
       "pending": "Queued",
@@ -702,6 +705,7 @@
       "web_search": "Web search",
       "url_fetch": "Reading web page",
       "mcp_fetch": "Fetching connected data",
+      "mcp_action": "Changing connected data",
       "email_search": "Searching your emails",
       "file_analysis": "File analysis",
       "image_generation": "Image",
@@ -715,6 +719,7 @@
       "save_to_folder": "Save to folder",
       "code_run": "Working with your file",
       "folder_fetch": "Reading files",
+      "save_to_notion": "Save to Notion",
       "research": "Research"
     },
     "copyText": "Copy content",

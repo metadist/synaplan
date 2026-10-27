@@ -100,12 +100,13 @@ final readonly class TaskPlanner
     public function plan(Message $message, array $conversationHistory = [], ?int $userId = null, array $options = []): TaskPlanResult
     {
         $language = $message->getLanguage() ?: 'en';
-
+        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        $adjustTopic = $this->topicForPlanAdjust($message, $options);
         $promptRow = $this->promptRepository->findByTopic('tools:plan', 0);
         if (!$promptRow) {
             $this->logger->warning('TaskPlanner: tools:plan prompt missing, falling back to single chat');
 
-            return $this->fallback($language, ['tools:plan prompt missing']);
+            return $this->fallback($language, ['tools:plan prompt missing'], message: $message, userId: $userId, allowed: $allowed, topic: $adjustTopic);
         }
 
         $modelId = $this->modelConfigService->getDefaultModel('PLAN', $userId)
@@ -142,7 +143,7 @@ final readonly class TaskPlanner
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fallback($language, ['planner model call failed: '.$e->getMessage()], $modelId);
+            return $this->fallback($language, ['planner model call failed: '.$e->getMessage()], $modelId, message: $message, userId: $userId, allowed: $allowed, topic: $adjustTopic);
         }
 
         $decoded = $this->decodeJson($raw);
@@ -157,35 +158,25 @@ final readonly class TaskPlanner
             }
         }
         if (null === $decoded) {
-            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
+            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
-        // A node that reads `$nX.text` but forgot to list nX in depends_on
-        // may be scheduled before nX and answer from an empty reference.
-        // Complete the edges from the references themselves (#mcp-handover).
-        $repaired = TaskPlanNormalizer::missingDependencies($decoded);
-        if ([] !== $repaired) {
-            $this->logger->info('TaskPlanner: inferred missing depends_on edges from $nX references', [
-                'added' => $repaired,
-            ]);
-            $decoded = TaskPlanNormalizer::inferDependencies($decoded);
-        }
-
-        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        $decoded = $this->withInferredDependencies($decoded);
+        $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, $adjustTopic);
         $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
             $this->logger->info('TaskPlanner: plan failed validation, falling back', [
                 'errors' => $errors,
             ]);
 
-            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage);
+            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
         try {
             /** @var array<string, mixed> $decoded */
             $plan = TaskPlan::fromArray($decoded, $this->validator, $allowed);
         } catch (\Throwable $e) {
-            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage);
+            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
         return new TaskPlanResult(
@@ -196,6 +187,28 @@ final readonly class TaskPlanner
             errors: [],
             planningUsage: $planningUsage,
         );
+    }
+
+    /**
+     * A node that reads `$nX.text` but forgot to list nX in depends_on
+     * may be scheduled before nX and answer from an empty reference.
+     * Complete the edges from the references themselves (#mcp-handover).
+     *
+     * @param array<string, mixed> $decoded
+     *
+     * @return array<string, mixed>
+     */
+    private function withInferredDependencies(array $decoded): array
+    {
+        $repaired = TaskPlanNormalizer::missingDependencies($decoded);
+        if ([] === $repaired) {
+            return $decoded;
+        }
+        $this->logger->info('TaskPlanner: inferred missing depends_on edges from $nX references', [
+            'added' => $repaired,
+        ]);
+
+        return TaskPlanNormalizer::inferDependencies($decoded);
     }
 
     /**
@@ -243,9 +256,9 @@ final readonly class TaskPlanner
     }
 
     /**
-     * @param list<string> $errors
-     *
-     * @phpstan-param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
+     * @param list<string>                                                                                                                            $errors
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown?: bool}|null $planningUsage
+     * @param list<string>|null                                                                                                                       $allowed
      */
     private function fallback(
         string $language,
@@ -253,9 +266,32 @@ final readonly class TaskPlanner
         ?int $modelId = null,
         string $raw = '',
         ?array $planningUsage = null,
+        ?Message $message = null,
+        ?int $userId = null,
+        ?array $allowed = null,
+        string $topic = '',
     ): TaskPlanResult {
+        $plan = TaskPlan::singleChatPlan($language);
+        if (null !== $message) {
+            $payload = $this->skillCatalog->adjustPlan(
+                $plan->toArray(),
+                (string) $message->getText(),
+                $userId,
+                $allowed,
+                '' !== $topic ? $topic : (string) $message->getTopic(),
+            );
+            try {
+                $plan = TaskPlan::fromArray($payload, $this->validator, $allowed);
+            } catch (\Throwable $e) {
+                $this->logger->info('TaskPlanner: repaired plan was not valid, keeping the chat fallback', [
+                    'error' => $e->getMessage(),
+                ]);
+                $plan = TaskPlan::singleChatPlan($language);
+            }
+        }
+
         return new TaskPlanResult(
-            TaskPlan::singleChatPlan($language),
+            $plan,
             fallback: true,
             modelId: $modelId,
             rawResponse: $raw,
@@ -447,6 +483,33 @@ final readonly class TaskPlanner
         }
 
         return $context;
+    }
+
+    /**
+     * The topic a plan adjuster may gate on. A new chat message still carries
+     * the placeholder `CHAT` when planning runs; the classified topic is the
+     * one that owns the tool flags.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function topicForPlanAdjust(Message $message, array $options): string
+    {
+        $topic = $message->getTopic();
+        if (!$this->isPlaceholderTopic($topic)) {
+            return $topic;
+        }
+        $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+        $classified = $classification['topic'] ?? null;
+        if (is_string($classified) && !$this->isPlaceholderTopic($classified)) {
+            return $classified;
+        }
+
+        return 'general';
+    }
+
+    private function isPlaceholderTopic(string $topic): bool
+    {
+        return '' === $topic || 'unknown' === strtolower($topic) || in_array($topic, ['CHAT', 'CONTINUE'], true);
     }
 
     /**

@@ -59,6 +59,16 @@ final class ResearchRunState
     /** The step in that saved task. */
     public ?string $savedTaskNodeId = null;
 
+    /** web, files, or both. A run started before this field existed searches the web. */
+    public string $sourcesOn = 'web';
+
+    /**
+     * Knowledge folders the person chose. Empty when files means the library.
+     *
+     * @var list<string>
+     */
+    public array $knowledgeKeys = [];
+
     /**
      * The report file, set when it is saved. Not stored: the resume reads it
      * in the same request that wrote the file.
@@ -130,6 +140,8 @@ final class ResearchRunState
             'replies' => $this->replies,
             'saved_task_run_id' => $this->savedTaskRunId,
             'saved_task_node_id' => $this->savedTaskNodeId,
+            'sources_on' => $this->sourcesOn,
+            'knowledge_keys' => $this->knowledgeKeys,
         ];
     }
 
@@ -226,6 +238,9 @@ final class ResearchRunState
         $state->savedTaskRunId = is_numeric($taskRun) && (int) $taskRun > 0 ? (int) $taskRun : null;
         $taskNode = $data['saved_task_node_id'] ?? null;
         $state->savedTaskNodeId = is_string($taskNode) && '' !== $taskNode ? $taskNode : null;
+        $sourcesOn = $data['sources_on'] ?? 'web';
+        $state->sourcesOn = is_string($sourcesOn) && '' !== $sourcesOn ? $sourcesOn : 'web';
+        $state->knowledgeKeys = self::knowledgeKeys($data['knowledge_keys'] ?? null);
 
         return $state;
     }
@@ -277,6 +292,24 @@ final class ResearchRunState
         }
 
         return $replies;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function knowledgeKeys(mixed $rows): array
+    {
+        if (!is_array($rows)) {
+            return [];
+        }
+        $keys = [];
+        foreach ($rows as $row) {
+            if (is_string($row) && '' !== $row) {
+                $keys[] = $row;
+            }
+        }
+
+        return $keys;
     }
 
     private static function stamp(\DateTimeImmutable $moment): string

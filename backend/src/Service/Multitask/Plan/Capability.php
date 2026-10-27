@@ -87,6 +87,9 @@ enum Capability: string
     /** Put generated files into a connected WebDAV/Nextcloud folder (FileSendService / WebDavDestinationProvider). */
     case SaveToFolder = 'save_to_folder';
 
+    /** Put a step's text and files on a new Notion page (NotionGateway / NotionFileUpload). */
+    case SaveToNotion = 'save_to_notion';
+
     /** Final assembly of text + N file attachments into one OUT message (ResultAssembler, no model). */
     case ComposeReply = 'compose_reply';
 
@@ -170,7 +173,7 @@ enum Capability: string
             self::DocumentGeneration, self::DocumentExport, self::DocumentCombine => 'document',
             self::CalendarEvent => 'document',
             self::EmailMe => 'email',
-            self::SaveToFolder => 'folder',
+            self::SaveToFolder, self::SaveToNotion => 'folder',
             self::ComposeReply => 'hidden',
             self::ToolCall => 'search',
             self::OutboundWebhook => 'email',
@@ -212,6 +215,7 @@ enum Capability: string
             self::CalendarEvent,
             self::EmailMe,
             self::SaveToFolder,
+            self::SaveToNotion,
             self::ComposeReply,
             self::ToolCall,
             self::OutboundWebhook,

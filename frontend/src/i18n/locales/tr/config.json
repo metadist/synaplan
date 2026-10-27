@@ -131,6 +131,7 @@
         "saves": {
           "email": "sana bir e-posta",
           "folder": "bağlı klasörde bir dosya",
+          "notion": "yeni bir Notion sayfası",
           "calendar": "bir takvim girişi",
           "reply": "sohbette bir yanıt"
         }

@@ -11,6 +11,7 @@ import { mcpServersApi } from '@/services/api/mcpServersApi'
 import { customToolsApi } from '@/services/api/customToolsApi'
 import { desktopApi } from '@/services/api/desktopApi'
 import { listApiKeys } from '@/services/api/apiKeysApi'
+import { notionAppApi } from '@/services/api/notionAppApi'
 import type { AppDefinition } from './catalog'
 
 const DAV_TYPES = new Set(['webdav', 'caldav'])
@@ -48,6 +49,30 @@ export async function loadConnectedAppIds(apps: readonly AppDefinition[]): Promi
     'custom-tools': async () => (await customToolsApi.list()).length > 0,
     desktop: async () => (await desktopApi.listDevices()).length > 0,
     api: async () => ((await listApiKeys()).api_keys ?? []).length > 0,
+    notion: async () => (await notionAppApi.status()).status === 'connected',
+  }
+
+  const results = await Promise.all(
+    apps.map(async (app) => {
+      const check = checks[app.id]
+      if (!check) return null
+      try {
+        return (await check()) ? app.id : null
+      } catch {
+        return null
+      }
+    })
+  )
+  return new Set(results.filter((id): id is string => id !== null))
+}
+
+/**
+ * Apps whose connection stopped working and needs the person to sign in again.
+ * A failed request means "unknown", never "needs attention".
+ */
+export async function loadAttentionAppIds(apps: readonly AppDefinition[]): Promise<Set<string>> {
+  const checks: Record<string, () => Promise<boolean>> = {
+    notion: async () => (await notionAppApi.status()).status === 'reauth_required',
   }
 
   const results = await Promise.all(

@@ -15,5 +15,6 @@ export const fileSourceSchema = z.enum([
   'api',
   'generated',
   'compute',
+  'notion',
 ])
 export type FileSource = z.infer<typeof fileSourceSchema>

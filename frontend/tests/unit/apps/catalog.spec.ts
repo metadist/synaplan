@@ -7,6 +7,8 @@ const runtime = vi.hoisted(() => ({
   higgsfield: false,
   gateway: false,
   isAdmin: false,
+  notion: false,
+  notionDown: false,
 }))
 
 vi.mock('@/composables/useModuleFeature', () => ({
@@ -31,6 +33,24 @@ vi.mock('@/services/api/m365Api', () => ({
 vi.mock('@/services/api/dropboxApi', () => ({
   dropboxApi: { status: async () => ({ available: false }) },
 }))
+vi.mock('@/services/api/notionAppApi', async () => {
+  const { ApiError } = await import('@/services/api/httpClient')
+  return {
+    notionAppApi: {
+      status: async () => {
+        if (!runtime.notion) throw new ApiError(404, 'Not Found')
+        if (runtime.notionDown) throw new ApiError(503, 'Unavailable')
+        return {
+          success: true,
+          status: 'not_connected',
+          server_id: null,
+          allow_write: false,
+          write_auto: false,
+        }
+      },
+    },
+  }
+})
 
 import { APPS, appMessageKey, availableApps, findApp } from '@/apps/catalog'
 import { appRouteGuard } from '@/router/appGuards'
@@ -46,6 +66,8 @@ describe('apps catalog', () => {
     runtime.higgsfield = false
     runtime.gateway = false
     runtime.isAdmin = false
+    runtime.notion = false
+    runtime.notionDown = false
   })
 
   it('keeps ids unique and URL-safe', () => {
@@ -68,6 +90,7 @@ describe('apps catalog', () => {
     expect(ids).not.toContain('nextcloud')
     expect(ids).not.toContain('claude-code')
     expect(ids).not.toContain('microsoft365')
+    expect(ids).not.toContain('notion')
     expect(ids).toContain('email')
     expect(ids).toContain('mcp')
   })
@@ -78,6 +101,22 @@ describe('apps catalog', () => {
     expect(ids).toContain('microsoft365')
     expect(ids).toContain('dropbox')
     expect(ids).toContain('claude-code')
+    expect(ids).not.toContain('notion')
+  })
+
+  it('shows Notion only when its status endpoint answers', async () => {
+    runtime.notion = true
+    runtime.isAdmin = true
+    const ids = (await availableApps()).map((app) => app.id)
+    expect(ids).toContain('notion')
+    expect(await appRouteGuard(routeTo('notion'))).toBe(true)
+  })
+
+  it('keeps Notion listed when its status endpoint is only briefly down', async () => {
+    runtime.notion = true
+    runtime.notionDown = true
+    const ids = (await availableApps()).map((app) => app.id)
+    expect(ids).toContain('notion')
   })
 
   it('treats unknown and switched-off apps as unknown URLs', async () => {

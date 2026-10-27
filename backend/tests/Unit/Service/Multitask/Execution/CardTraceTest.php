@@ -42,4 +42,28 @@ final class CardTraceTest extends TestCase
 
         self::assertSame(['ask_user' => ['question' => 'Which?']], $fields);
     }
+
+    public function testRecoveryIsCappedAndDroppedWhenItIsNotASearchSummary(): void
+    {
+        $fields = CardTrace::fromResult(NodeResult::ok('{"results":[]}', [], [
+            'recovery' => [
+                'attempts' => [
+                    ['query' => '  Metadsit  ', 'hits' => 0],
+                    ['query' => 'Metadist', 'hits' => 2],
+                    'nope',
+                ],
+                'matched_query' => 'Metadist',
+                'empty' => false,
+            ],
+        ]));
+
+        self::assertSame([
+            'attempts' => [
+                ['query' => 'Metadsit', 'hits' => 0],
+                ['query' => 'Metadist', 'hits' => 2],
+            ],
+            'matched_query' => 'Metadist',
+        ], $fields['recovery']);
+        self::assertSame([], CardTrace::fromArray(['recovery' => ['attempts' => []]]));
+    }
 }

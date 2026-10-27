@@ -670,6 +670,9 @@
     "stop": "Arrêter",
     "rendering": "Rendu…",
     "searchSummary": "Recherche sur le Web · {count} source | Recherche sur le Web · {count} sources",
+    "searchedInstead": "Rien pour « {original} ». Recherche de « {matched} » à la place.",
+    "searchedNothing": "Recherché : {queries} — rien trouvé.",
+    "searchingAgain": "Nouvelle recherche…",
     "retryWith": "Réessayer avec {model}",
     "state": {
       "pending": "En file",
@@ -702,6 +705,7 @@
       "web_search": "Recherche Web",
       "url_fetch": "Lecture de la page web",
       "mcp_fetch": "Récupération des données connectées",
+      "mcp_action": "Modification des données connectées",
       "email_search": "Recherche dans vos e-mails",
       "file_analysis": "Analyse de fichier",
       "image_generation": "Image",
@@ -715,6 +719,7 @@
       "save_to_folder": "Enregistrer dans le dossier",
       "code_run": "Travail sur votre fichier",
       "folder_fetch": "Lecture de fichiers",
+      "save_to_notion": "Enregistrer dans Notion",
       "research": "Recherche"
     },
     "copyText": "Copier le contenu",

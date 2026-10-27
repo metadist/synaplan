@@ -39,6 +39,7 @@ import {
   downloadMediaUrl,
   fetchMediaBlob,
   needsAuthenticatedMediaFetch,
+  isExternalMediaUrl,
   resolveMediaUrl,
   useMediaSrc,
 } from '@/services/api/mediaAuth'
@@ -129,6 +130,22 @@ describe('mediaAuth', () => {
     it('never rewrites /up/ on web', () => {
       auth.token = 'tok'
       expect(resolveMediaUrl('/up/13/000/cat.png')).toBe('/up/13/000/cat.png')
+    })
+  })
+
+  describe('isExternalMediaUrl', () => {
+    it('treats a Notion https link as external and a Synaplan path as local', () => {
+      expect(
+        isExternalMediaUrl('https://prod-files-secure.s3.us-west-2.amazonaws.com/shot.png')
+      ).toBe(true)
+      expect(isExternalMediaUrl(UPLOAD_PATH)).toBe(false)
+      expect(isExternalMediaUrl('data:image/png;base64,AAA')).toBe(false)
+    })
+
+    it('keeps the native API host local', () => {
+      runtime.native = true
+      expect(isExternalMediaUrl(UPLOAD_PATH)).toBe(false)
+      expect(isExternalMediaUrl('https://cdn.example.com/a.png')).toBe(true)
     })
   })
 

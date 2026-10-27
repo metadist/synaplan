@@ -245,7 +245,8 @@
       "widget": "Widget",
       "api": "API",
       "generated": "Généré par l’IA",
-      "compute": "Travail sur fichiers"
+      "compute": "Travail sur fichiers",
+      "notion": "Notion"
     },
     "vectorState": {
       "vectorized": "Recherchable par l’IA",
@@ -363,7 +364,17 @@
       "dismiss": "Compris",
       "reopen": "Qu’est-ce que c’est ?"
     },
-    "searchIntro": "Posez une question avec vos mots et voyez quels passages de vos fichiers y répondent."
+    "searchIntro": "Posez une question avec vos mots et voyez quels passages de vos fichiers y répondent.",
+    "notion": {
+      "action": "Ajouter à une page Notion",
+      "title": "Ajouter à une page Notion",
+      "message": "Collez le lien de la page Notion qui doit recevoir « {file} ». Il est ajouté à la fin de la page.",
+      "placeholder": "https://www.notion.so/…",
+      "confirm": "Ajouter à la page",
+      "done": "« {file} » a été ajouté à « {page} » dans Notion. Le fichier reste aussi ici.",
+      "open": "Ouvrir dans Notion",
+      "failed": "Le fichier n’a pas été ajouté à Notion. Rien n’a été modifié. Réessayez."
+    }
   },
   "vectorStorage": {
     "intro": "Un aperçu de votre stockage vectoriel — combien de fichiers ont été indexés et combien de vecteurs (extraits) sont stockés pour la recherche sémantique.",

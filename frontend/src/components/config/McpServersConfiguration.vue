@@ -399,7 +399,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
@@ -423,6 +423,7 @@ import { useAuthStore } from '@/stores/auth'
 const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
+const router = useRouter()
 const { connectingId, start: startOAuth, finish: finishSignIn } = useMcpSignInStart(() => load())
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
@@ -622,6 +623,10 @@ const startCreate = () => {
 }
 
 const startCreateFromTemplate = (key: string) => {
+  if (key === 'notion') {
+    void router.push('/apps/notion')
+    return
+  }
   startCreate()
   applyTemplate(key)
 }

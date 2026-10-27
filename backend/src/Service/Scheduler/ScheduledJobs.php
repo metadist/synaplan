@@ -35,6 +35,7 @@ final class ScheduledJobs
         ],
         self::LANE_TASKS => [
             'app:saved-tasks:tick',
+            'app:notion-watches:poll',
         ],
         self::LANE_HOURLY => [
             'app:files:reap-ephemeral',

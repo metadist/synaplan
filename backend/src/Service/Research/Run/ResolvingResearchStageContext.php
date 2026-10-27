@@ -44,6 +44,7 @@ final readonly class ResolvingResearchStageContext implements ResearchStageConte
             $now,
             new ResearchStop(false, fn (): bool => $this->store->stopRequested($runId)),
             new ResearchWriteNow(false, fn (): bool => $this->store->writeNowRequested($runId)),
+            sourcesOn: $state->sourcesOn,
         );
     }
 }

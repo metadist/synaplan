@@ -683,6 +683,10 @@ run_scheduler_tasks_lane() {
 
     # No cap: the command runs due AI tasks inline, and killing it would strand a run.
     run_scheduler_job 0 bin/console --env="$env" app:saved-tasks:tick --no-interaction
+
+    # Followed Notion pages: refreshes searchable copies and starts saved
+    # tasks on a change. A no-op when nobody follows a page.
+    run_scheduler_job 600 bin/console --env="$env" app:notion-watches:poll --no-interaction
 }
 
 # shellcheck disable=SC2317

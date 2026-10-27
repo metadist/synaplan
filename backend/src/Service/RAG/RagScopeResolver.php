@@ -104,6 +104,18 @@ final readonly class RagScopeResolver
         return $this->canUseFolder($userId, $ownerId, $groupKey);
     }
 
+    /**
+     * A shared-folder picker key the caller may search. A plain folder key
+     * names the caller's own folder and is always allowed. Unlike resolve(),
+     * a refused picker does not fall back to the caller's whole library.
+     */
+    public function canUsePickerKey(int $userId, string $groupKey): bool
+    {
+        $picker = self::parseSharedPicker($groupKey);
+
+        return null === $picker || $this->canUse($userId, $picker[0], $picker[1]);
+    }
+
     public static function sharedPickerKey(int $ownerId, string $folder): string
     {
         return self::PICKER_PREFIX.$ownerId.':'.$folder;

@@ -432,6 +432,37 @@ final class RunnersTest extends TestCase
         self::assertStringNotContainsString('does-not-exist', $capturedSystem);
     }
 
+    public function testChatAnswerFollowsTheQuestionLanguageNotTheSource(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $capturedSystem = null;
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$capturedSystem): array {
+            $capturedSystem = $messages[0]['content'] ?? null;
+            $cb('ok');
+
+            return [];
+        });
+
+        $promptService = $this->createMock(PromptService::class);
+        $promptService->method('getPromptWithMetadata')->willReturn(null);
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultModel')->willReturn(76);
+        $modelConfig->method('getProviderForModel')->willReturn('groq');
+        $modelConfig->method('getModelName')->willReturn('gpt-oss-120b');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class));
+        $question = 'Moin, was steht auf der Metadist GmbH Seite in Notion?';
+        $node = new TaskNode('n2', Capability::Chat, ['n1'], ['text' => "Summarize this English page:\nThe workspace for the Metadist group."]);
+
+        $result = $runner->run($node, new NodeContext($this->message($question), [], 1, ['language' => 'de']));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertIsString($capturedSystem);
+        self::assertStringContainsString('German', $capturedSystem);
+        self::assertStringNotContainsString($question, $capturedSystem);
+        self::assertStringContainsString('Do not switch to their language.', $capturedSystem);
+    }
+
     public function testChatRunnerUsesTopicPinnedModelWhenUserDidNotSelectOne(): void
     {
         $aiFacade = $this->createMock(AiFacade::class);

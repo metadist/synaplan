@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Message\ContinueSavedTaskAfterResearch;
 use App\Repository\ChatRepository;
 use App\Repository\ConfigRepository;
+use App\Service\RAG\RagScopeResolver;
 use App\Service\Research\Run\Ledger\PlanPoint;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchDepth;
@@ -83,6 +84,25 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         } catch (ResearchRejected $rejected) {
             self::assertSame('chat_id', $rejected->field);
         }
+    }
+
+    public function testAStartWithASharedFolderTheCallerCannotUseIsRefused(): void
+    {
+        $scopes = $this->createStub(RagScopeResolver::class);
+        $scopes->method('canUsePickerKey')->willReturnCallback(static fn (int $userId, string $key): bool => 'DESKTOP:1' === $key);
+        $runs = new ResearchRunService($this->store, $this->bus, $this->events, new ResearchConfig($this->createStub(ConfigRepository::class), '1'), $this->chats(), $this->clock, $this->reports, null, $scopes);
+
+        try {
+            $runs->start($this->user, $this->body() + ['sources' => ['knowledge' => ['DESKTOP:1', 'shared:9:Team']]], true, null);
+            self::fail('A folder that is not shared with the caller must not start a run.');
+        } catch (ResearchRejected $rejected) {
+            self::assertSame(400, $rejected->status);
+            self::assertSame('sources', $rejected->field);
+        }
+        self::assertCount(0, $this->bus->sent);
+
+        $started = $runs->start($this->user, $this->body() + ['sources' => ['knowledge' => ['DESKTOP:1']]], true, null);
+        self::assertSame(['DESKTOP:1'], $started->knowledgeKeys);
     }
 
     public function testListAndDeleteStayOnTheCallersRuns(): void

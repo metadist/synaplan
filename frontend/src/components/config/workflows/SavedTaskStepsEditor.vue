@@ -43,7 +43,7 @@
           />
         </div>
 
-        <StepPicker v-model="picked" :tools="tools" />
+        <StepPicker v-model="picked" :tools="tools" :notion="notionConnected" />
         <button
           type="button"
           class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
@@ -79,6 +79,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { toolsApi, type RegistryTool } from '@/services/api/toolsApi'
+import { notionAppApi } from '@/services/api/notionAppApi'
 import StepPicker from './StepPicker.vue'
 import StepRow from './StepRow.vue'
 import {
@@ -107,6 +108,7 @@ const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const steps = ref<AuthoredStep[]>([])
 const tools = ref<RegistryTool[]>([])
+const notionConnected = ref(false)
 const picked = ref('chat')
 const saving = ref(false)
 const error = ref('')
@@ -123,6 +125,11 @@ watch(
       )
     } catch {
       tools.value = []
+    }
+    try {
+      notionConnected.value = (await notionAppApi.status()).status === 'connected'
+    } catch {
+      notionConnected.value = false
     }
   },
   { immediate: true }

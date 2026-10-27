@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
+use App\Service\Mcp\Notion\NotionActivityLog;
+use App\Service\Mcp\Notion\NotionWriteGuard;
 use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
@@ -43,6 +45,7 @@ final readonly class McpClient
         private McpClientConfig $config,
         private LoggerInterface $logger,
         private ?McpOAuthTokenProvider $oauthTokens = null,
+        private ?NotionActivityLog $notionActivity = null,
     ) {
     }
 
@@ -97,6 +100,12 @@ final readonly class McpClient
      */
     public function callTool(McpServerConfig $server, string $tool, array $arguments): array
     {
+        $arguments = NotionWriteGuard::normalize($server->getUrl(), $tool, $arguments);
+        $refusal = NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
+        if (null !== $refusal) {
+            throw new McpClientException($refusal);
+        }
+
         $result = $this->withSession(
             $server,
             fn (string $url, array $headers): array => $this->request($url, $headers, 'tools/call', [
@@ -112,10 +121,13 @@ final readonly class McpClient
             }
         }
 
-        return [
+        $answer = [
             'content' => $content,
             'isError' => (bool) ($result['isError'] ?? false),
         ];
+        $this->notionActivity?->recordToolCall($server, $tool, $arguments, $answer);
+
+        return $answer;
     }
 
     /**

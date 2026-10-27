@@ -46,6 +46,7 @@ const icon = computed(() => {
     api: 'mdi:api',
     generated: 'mdi:auto-fix',
     compute: 'mdi:file-cog-outline',
+    notion: 'simple-icons:notion',
   }
   return map[props.source] ?? 'mdi:tray-arrow-up'
 })

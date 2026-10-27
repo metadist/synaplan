@@ -174,6 +174,20 @@ final class McpActionRunnerTest extends TestCase
         self::assertTrue($result->metadata['mcp']['write']);
     }
 
+    public function testUnresolvedPlaceholderIsNeverSent(): void
+    {
+        $node = new TaskNode('n2', Capability::McpAction, [], ['arguments' => ['title' => '$n1.page_title', 'content' => 'x']], [
+            'server_id' => 5,
+            'tool' => 'create_page',
+        ]);
+
+        $result = $this->runner()->run($node, $this->context());
+
+        self::assertFalse($result->isSuccessful());
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString('nothing was sent to Confluence and nothing was changed', (string) $result->error);
+    }
+
     public function testServerWithoutWriteOptInIsRefused(): void
     {
         $result = $this->runner(server: $this->server(allowWrite: false))

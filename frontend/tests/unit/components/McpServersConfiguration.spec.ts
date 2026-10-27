@@ -41,6 +41,7 @@ const {
   mockUpdateConfigValue,
   mockDisconnectOAuth,
   mockConfirm,
+  mockPush,
   mockCreate,
   mockUpdate,
   mockStartOAuth,
@@ -56,6 +57,7 @@ const {
   mockUpdateConfigValue: vi.fn(),
   mockDisconnectOAuth: vi.fn(),
   mockConfirm: vi.fn(),
+  mockPush: vi.fn(),
   authState: { isAdmin: false },
 }))
 
@@ -75,7 +77,7 @@ vi.mock('@/services/api/mcpServersApi', () => ({
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
   useRoute: () => ({ query: {} }),
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: mockPush }),
 }))
 
 vi.mock('@/services/api/promptsApi', () => ({
@@ -372,7 +374,7 @@ describe('McpServersConfiguration — add-server templates', () => {
     expect(wrapper.find('[data-testid="btn-mcp-template-higgsfield"]').exists()).toBe(false)
   })
 
-  it('prefills and locks the Notion URL when OAuth connectors are on', async () => {
+  it('opens the Notion app instead of a second MCP form', async () => {
     mockList.mockResolvedValue({
       clientEnabled: true,
       oauthConnectorsEnabled: true,
@@ -386,8 +388,25 @@ describe('McpServersConfiguration — add-server templates', () => {
     await wrapper.find('[data-testid="btn-mcp-template-notion"]').trigger('click')
     await flushPromises()
 
+    expect(mockPush).toHaveBeenCalledWith('/apps/notion')
+    expect(wrapper.find('[data-testid="input-mcp-url"]').exists()).toBe(false)
+  })
+
+  it('prefills and locks the Higgsfield URL when OAuth connectors are on', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [],
+    })
+
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="btn-mcp-template-higgsfield"]').trigger('click')
+    await flushPromises()
+
     const url = wrapper.find('[data-testid="input-mcp-url"]').element as HTMLInputElement
-    expect(url.value).toBe('https://mcp.notion.com/mcp')
+    expect(url.value).toBe('https://mcp.higgsfield.ai/mcp')
     expect(url.readOnly).toBe(true)
     expect(wrapper.find('[data-testid="input-mcp-auth-token"]').exists()).toBe(false)
   })

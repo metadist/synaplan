@@ -7,6 +7,7 @@ namespace App\Service\Multitask\Execution;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
 use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
+use App\Service\Multitask\Execution\Recovery\SearchRecovery;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -56,6 +57,7 @@ final readonly class DagExecutor
         private MediaNodeDispatcher $mediaDispatcher,
         private MultitaskRoutingConfig $config,
         private LoggerInterface $logger,
+        private SearchRecovery $searchRecovery,
     ) {
     }
 
@@ -134,7 +136,7 @@ final readonly class DagExecutor
                 continue;
             }
 
-            $this->runNodeInline($context, $node, $progressCallback);
+            $this->runNodeInline($plan, $context, $node, $progressCallback);
         }
     }
 
@@ -193,7 +195,7 @@ final readonly class DagExecutor
                         $this->emitState($progressCallback, $node, 'running');
                         $progressed = true;
                     } else {
-                        $this->runNodeInline($context, $node, $progressCallback);
+                        $this->runNodeInline($plan, $context, $node, $progressCallback);
                         $progressed = true;
                     }
                 }
@@ -223,7 +225,7 @@ final readonly class DagExecutor
      * Run a node synchronously in the current process (text/other; and the media
      * fallback in sequential mode). Sets the result and emits files + state.
      */
-    private function runNodeInline(NodeContext $context, TaskNode $node, ?callable $progressCallback): void
+    private function runNodeInline(TaskPlan $plan, NodeContext $context, TaskNode $node, ?callable $progressCallback): void
     {
         $runner = $this->registry->get($node->capability);
         if (null === $runner) {
@@ -244,6 +246,14 @@ final readonly class DagExecutor
 
         try {
             $result = $runner->run($node, $context);
+            $result = $this->searchRecovery->recover(
+                $runner,
+                $node,
+                $context,
+                $result,
+                fn (string $query) => $this->emitState($progressCallback, $node, 'running', ['retrying' => true, 'query' => $query]),
+                $plan,
+            );
         } catch (StreamCancelledException $e) {
             // Pressing Stop ends the whole turn, not one node. Demoting it to a
             // failed node result would strip the `cancelled` marker the caller
@@ -381,7 +391,7 @@ final readonly class DagExecutor
             $merged,
         );
 
-        $this->runNodeInline($context, $resumed, $progressCallback);
+        $this->runNodeInline($plan, $context, $resumed, $progressCallback);
         $this->executeSequential($plan, $context, $progressCallback);
 
         return $this->assembler->assemble($plan, $context);

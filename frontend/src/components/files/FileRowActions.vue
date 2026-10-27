@@ -17,6 +17,8 @@
 </template>
 
 <script setup lang="ts">
+import { h } from 'vue'
+import { Icon } from '@iconify/vue'
 import {
   ArrowDownTrayIcon,
   ChatBubbleLeftRightIcon,
@@ -31,7 +33,7 @@ import {
  * never ship two icons (U9/U12).
  */
 export interface FileRowAction {
-  id: 'openInChat' | 'preview' | 'download' | 'delete'
+  id: 'openInChat' | 'preview' | 'download' | 'sendToNotion' | 'delete'
   title: string
   testid?: string
   disabled?: boolean
@@ -46,6 +48,8 @@ const ACTION_ICONS = {
   openInChat: ChatBubbleLeftRightIcon,
   preview: EyeIcon,
   download: ArrowDownTrayIcon,
+  sendToNotion: (props: Record<string, unknown>) =>
+    h(Icon, { ...props, icon: 'simple-icons:notion' }),
   delete: TrashIcon,
 } as const
 

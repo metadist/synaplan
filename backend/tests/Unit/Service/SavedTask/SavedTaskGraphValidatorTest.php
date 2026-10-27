@@ -33,6 +33,21 @@ final class SavedTaskGraphValidatorTest extends TestCase
         $this->assertNotEmpty($errors);
     }
 
+    public function testSaveToNotionNeedsANotionPageLink(): void
+    {
+        $graph = static fn (string $page): array => [
+            'version' => 1,
+            'trigger' => ['id' => 't1', 'type' => 'manual'],
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'chat', 'depends_on' => []],
+                ['id' => 'n2', 'capability' => 'save_to_notion', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text'], 'params' => ['page' => $page]],
+            ],
+        ];
+
+        $this->assertContains('step[1] needs the link of a Notion page', $this->validator->validate($graph('https://example.com/page'), 'manual', null));
+        $this->assertNotContains('step[1] needs the link of a Notion page', $this->validator->validate($graph('https://www.notion.so/Reports-39797ad60eb3806db59eef7653838664'), 'manual', null));
+    }
+
     public function testRejectsCycle(): void
     {
         $errors = $this->validator->validate(

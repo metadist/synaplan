@@ -74,6 +74,16 @@ const title = computed(() => `taskPlan.capability.${props.card.capability}`)
 
 const isMediaKind = computed(() => ['image', 'video', 'audio'].includes(props.card.kind))
 
+// A fetch step can return a picture without itself being an image step.
+// The file event records that on mediaType; the card kind stays the step.
+const renderedMediaKind = computed(() => {
+  const media = (props.card.mediaType ?? '').toLowerCase()
+  if (media === 'image' || media === 'video' || media === 'audio') {
+    return media
+  }
+  return props.card.kind
+})
+
 const showSkeleton = computed(
   () =>
     isMediaKind.value &&
@@ -141,6 +151,21 @@ const toggleCollapsed = () => {
 // copy their query plus the visible source summary; media cards expose download
 // and lightbox actions through TaskCardMedia.
 const { t } = useI18n()
+
+const recoveryLine = computed(() => {
+  const recovery = props.card.recovery
+  if (!recovery || recovery.attempts.length === 0) return ''
+  const original = recovery.attempts[0]?.query ?? ''
+  if (recovery.matchedQuery && original && recovery.matchedQuery !== original) {
+    return t('taskPlan.searchedInstead', { original, matched: recovery.matchedQuery })
+  }
+  if (recovery.empty) {
+    return t('taskPlan.searchedNothing', {
+      queries: recovery.attempts.map((attempt) => attempt.query).join(', '),
+    })
+  }
+  return ''
+})
 
 /** A research step pauses the run like an approval, but nobody has to decide anything. */
 const researchRunning = computed(
@@ -348,6 +373,21 @@ const outputShown = computed(() =>
       </span>
     </div>
 
+    <p
+      v-if="card.retrying && card.state === 'running'"
+      class="text-sm txt-secondary break-words mb-2"
+      data-testid="task-card-searching-again"
+    >
+      {{ $t('taskPlan.searchingAgain') }}
+    </p>
+    <p
+      v-else-if="recoveryLine"
+      class="text-sm txt-secondary break-words mb-2"
+      data-testid="task-card-recovery"
+    >
+      {{ recoveryLine }}
+    </p>
+
     <!-- Live render progress (video/image) -->
     <div v-if="showProgress" class="task-card__progress mb-2" data-testid="task-card-progress">
       <div class="task-card__progress-track">
@@ -495,7 +535,7 @@ const outputShown = computed(() =>
       </div>
 
       <!-- Resolved media: never collapsed; download + image lightbox (#1229) -->
-      <TaskCardMedia v-if="card.url" :kind="card.kind" :url="card.url" />
+      <TaskCardMedia v-if="card.url" :kind="renderedMediaKind" :url="card.url" />
 
       <!-- Media skeleton while waiting -->
       <div

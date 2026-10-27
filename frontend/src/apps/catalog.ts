@@ -6,6 +6,8 @@ import { isHiggsfieldAccountsEnabled, loadGatewayEnabled } from '@/composables/u
 import { useAuthStore } from '@/stores/auth'
 import { m365Api } from '@/services/api/m365Api'
 import { dropboxApi } from '@/services/api/dropboxApi'
+import { notionAppApi } from '@/services/api/notionAppApi'
+import { ApiError } from '@/services/api/httpClient'
 
 export type AppCategory = 'messengers' | 'website' | 'email' | 'files' | 'ai' | 'developer'
 
@@ -45,6 +47,19 @@ async function providerAvailable(status: () => Promise<{ available: boolean }>):
 }
 
 const always = (): boolean => true
+
+/**
+ * Flag off is a 404, so the app is absent for everyone, including admins (U11).
+ * Any other failure keeps the app listed; its panel offers a retry.
+ */
+async function notionAvailable(): Promise<boolean> {
+  try {
+    await notionAppApi.status()
+    return true
+  } catch (err) {
+    return !(err instanceof ApiError && err.status === 404)
+  }
+}
 
 export const APPS: readonly AppDefinition[] = [
   {
@@ -105,6 +120,13 @@ export const APPS: readonly AppDefinition[] = [
     available: always,
     panel: () => import('@/components/config/ConnectionsConfiguration.vue'),
     panelProps: { provider: 'dav' },
+  },
+  {
+    id: 'notion',
+    category: 'files',
+    icon: 'simple-icons:notion',
+    available: notionAvailable,
+    panel: () => import('@/components/apps/panels/NotionAppPanel.vue'),
   },
   {
     id: 'nextcloud',

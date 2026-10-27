@@ -44,6 +44,7 @@ class File
         'api',
         'generated',
         'compute',
+        'notion',
     ];
 
     /**

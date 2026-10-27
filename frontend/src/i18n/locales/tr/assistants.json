@@ -138,7 +138,8 @@
       "document_generation": "Bir belge yaz",
       "image_generation": "Bir görsel oluştur",
       "calendar_event": "Takvim etkinliği oluştur",
-      "save_to_folder": "Bir klasöre kaydet"
+      "save_to_folder": "Bir klasöre kaydet",
+      "save_to_notion": "Notion’a kaydet"
     },
     "advancedSettings": "Gelişmiş ayarlar",
     "advancedSettingsHint": "Yaratıcılık, uzunluk, dil ve isteğe bağlı yanıt biçimi.",

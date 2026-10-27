@@ -7,7 +7,9 @@ namespace App\Tests\Integration\Controller;
 use App\Entity\Config;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
+use App\Service\Mcp\McpOAuthConsentService;
 use App\Service\Mcp\McpOAuthState;
+use App\Service\OAuth\OAuthStateService;
 use App\Service\Security\EncryptionService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -285,6 +287,35 @@ class McpServerConfigControllerTest extends WebTestCase
         self::assertTrue($response->isRedirection());
         // Flag ships off, so the public callback refuses the exchange first.
         self::assertStringContainsString('oauth_error=disabled', (string) $response->headers->get('Location'));
+    }
+
+    public function testOauthCallbackUsesOnlyWhitelistedReturnPaths(): void
+    {
+        /** @var OAuthStateService $state */
+        $state = static::getContainer()->get(OAuthStateService::class);
+        $this->client->getCookieJar()->clear();
+
+        $allowed = $state->generateState(McpOAuthConsentService::PROVIDER, [
+            'return_to' => '/apps/notion',
+            'owner_id' => 1,
+            'server_id' => 1,
+            'pkce_nonce' => 'nonce',
+        ]);
+        $this->client->request('GET', '/api/v1/mcp-servers/oauth/callback?code=x&state='.urlencode($allowed));
+        $location = (string) $this->client->getResponse()->headers->get('Location');
+        self::assertStringContainsString('/apps/notion?', $location);
+        self::assertStringContainsString('oauth_error=', $location);
+
+        $rejected = $state->generateState(McpOAuthConsentService::PROVIDER, [
+            'return_to' => 'https://evil.example/phish',
+            'owner_id' => 1,
+            'server_id' => 1,
+            'pkce_nonce' => 'nonce-2',
+        ]);
+        $this->client->request('GET', '/api/v1/mcp-servers/oauth/callback?code=x&state='.urlencode($rejected));
+        $fallback = (string) $this->client->getResponse()->headers->get('Location');
+        self::assertStringContainsString('/channels/mcp?', $fallback);
+        self::assertStringNotContainsString('evil.example', $fallback);
     }
 
     public function testListReportsOauthConnectorsFlag(): void

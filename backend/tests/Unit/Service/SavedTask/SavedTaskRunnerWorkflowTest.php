@@ -13,6 +13,7 @@ use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
 use App\Service\Multitask\Execution\Parallel\MediaNodeJob;
 use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
 use App\Service\Multitask\Execution\Parallel\SettledMediaNodeJob;
+use App\Service\Multitask\Execution\Recovery\SearchRecovery;
 use App\Service\Multitask\Execution\ResultAssembler;
 use App\Service\Multitask\Execution\RunnerRegistry;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -197,12 +198,16 @@ final class SavedTaskRunnerWorkflowTest extends TestCase
             }
         };
 
+        $recovery = $this->createMock(SearchRecovery::class);
+        $recovery->method('recover')->willReturnArgument(3);
+
         return new DagExecutor(
             new RunnerRegistry([$runner]),
             new ResultAssembler(),
             $dispatcher,
             $config,
             $this->createMock(LoggerInterface::class),
+            $recovery,
         );
     }
 

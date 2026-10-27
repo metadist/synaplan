@@ -763,7 +763,8 @@
       "email_me": "M’envoyer le résultat",
       "tool_call": "Utiliser un outil connecté",
       "condition": "Ne continuer que si…",
-      "outbound_webhook": "Envoyer à un autre système"
+      "outbound_webhook": "Envoyer à un autre système",
+      "save_to_notion": "Enregistrer dans Notion"
     },
     "kindHints": {
       "email_search": "Regarde dans la boîte connectée.",
@@ -772,7 +773,8 @@
       "email_me": "Vous envoie un e-mail.",
       "tool_call": "Exécute un outil déjà connecté.",
       "condition": "Arrête les étapes suivantes si la valeur ne correspond pas.",
-      "outbound_webhook": "Envoie le résultat à une adresse https."
+      "outbound_webhook": "Envoie le résultat à une adresse https.",
+      "save_to_notion": "Crée une nouvelle page sous une page Notion de votre choix."
     },
     "empty": "Pas encore d’étapes. Ajoutez-en une pour commencer.",
     "stepN": "Étape {n}",
@@ -794,7 +796,10 @@
     "useTemplateConfirm": "Créer votre propre copie ? Elle reste désactivée jusqu’à ce que vous l’activiez. Une nouvelle adresse est créée si un autre système peut démarrer cette tâche.",
     "useTemplateDone": "Copie créée. Elle est désactivée jusqu’à ce que vous l’activiez.",
     "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’assistant, l’outil ou la connexion manquant avant de l’activer.",
-    "useTemplateNeedsSetupItems": "Copie créée et laissée désactivée. Encore nécessaire : {items}."
+    "useTemplateNeedsSetupItems": "Copie créée et laissée désactivée. Encore nécessaire : {items}.",
+    "notionPage": "Page Notion",
+    "notionPageHint": "Collez le lien de la page. Chaque exécution ajoute une nouvelle page en dessous.",
+    "notionTitle": "Titre de la page (facultatif)"
   },
   "tours": {
     "common": {
@@ -1052,6 +1057,13 @@
         "about": "Enregistrez votre clé et votre secret Higgsfield. Les images et vidéos créées dans le chat sont alors facturées sur votre compte Higgsfield.",
         "stop": "Supprimez votre clé ci-dessous."
       },
+      "notion": {
+        "name": "Notion",
+        "tagline": "Lisez et modifiez vos pages Notion dans le chat.",
+        "about": "Une fois Notion connecté, l'IA peut lire vos pages. L'écriture est un réglage à part. La suppression, le déplacement et l'écrasement restent bloqués.",
+        "stop": "Déconnectez ci-dessous. L'IA ne pourra plus lire ni modifier Notion. Les pages déjà créées restent.",
+        "who": "Vous seul. Un administrateur peut aussi partager sa propre connexion avec tout le monde ici, en lecture seule ; cette page indique quand c'est activé."
+      },
       "mcp": {
         "name": "Serveurs d'outils (MCP)",
         "tagline": "Donnez à l'IA les outils de n'importe quel serveur MCP.",
@@ -1077,6 +1089,99 @@
         "stop": "Révoquez la clé ci-dessous. Elle cesse immédiatement de fonctionner."
       }
     },
+    "notion": {
+      "loading": "Chargement de Notion…",
+      "loadFailed": "Notion n'a pas pu être chargé. Rien n'a été modifié.",
+      "retry": "Réessayer",
+      "notConnected": "Connectez Notion pour que l'IA puisse lire vos pages dans le chat.",
+      "connect": "Connecter Notion",
+      "connectFailed": "Notion n'a pas été connecté. Rien n'a été modifié. Réessayez.",
+      "reconnectTitle": "Notion doit être connecté à nouveau avant que l'IA puisse l'utiliser.",
+      "reconnect": "Reconnecter",
+      "connected": "Notion est connecté.",
+      "connectedAs": "Connecté à l'espace de travail Notion {workspace} en tant que {account}.",
+      "connectedAsAccount": "Connecté à Notion en tant que {account}.",
+      "scope": "L'IA ne voit que ce que ce compte Notion peut voir.",
+      "writeLabel": "L'IA peut modifier Notion",
+      "writeOn": "L'IA peut créer et modifier des pages dans Notion sans demander à chaque fois. Elle ne peut ni supprimer, ni déplacer, ni écraser de pages.",
+      "writeOff": "L'IA peut lire Notion. Elle ne changera rien.",
+      "writeSavedOn": "L'IA peut maintenant créer et modifier des pages Notion sans demander. Elle ne peut toujours ni supprimer, ni déplacer, ni écraser de pages.",
+      "writeSavedOff": "L'écriture est désactivée. L'IA peut encore lire Notion et ne changera rien.",
+      "writeFailed": "Le réglage n'a pas été enregistré. Notion n'a pas été modifié. Réessayez.",
+      "examplesTitle": "Essayez l'une de ces phrases dans le chat",
+      "exampleRead": "Résumez ma page Feuille de route",
+      "exampleWrite": "Créez une page appelée Notes de réunion",
+      "tryChat": "Essayer dans le chat",
+      "disconnect": "Déconnecter",
+      "disconnectTitle": "Déconnecter Notion ?",
+      "disconnectMessage": "L'IA ne pourra plus lire ni modifier Notion. Les pages déjà dans Notion restent. Vous pourrez reconnecter plus tard.",
+      "disconnectMessageShared": "L'IA ne pourra plus lire ni modifier Notion, et toutes les personnes avec qui vous partagez cette connexion perdront aussi l'accès en lecture. Les pages déjà dans Notion restent. Vous pourrez reconnecter plus tard.",
+      "disconnected": "Notion est déconnecté. Rien n'a été modifié dans Notion.",
+      "disconnectFailed": "Notion est toujours connecté. Rien n'a été modifié. Réessayez.",
+      "exampleMeetings": "Qu’avons-nous décidé cette semaine dans mes réunions sur Notion ?",
+      "exampleDatabase": "Affiche les lignes ouvertes de ma base de données Tâches dans Notion",
+      "activity": {
+        "title": "Modifié récemment par Synaplan",
+        "loadFailed": "La liste n’a pas pu être chargée. Rien n’a été modifié.",
+        "empty": "Les pages que Synaplan crée ou modifie dans Notion apparaissent ici.",
+        "action": {
+          "created": "Créée",
+          "updated": "Modifiée",
+          "file": "Fichier ajouté"
+        }
+      },
+      "watches": {
+        "title": "Pages suivies",
+        "intro": "Synaplan vérifie ces pages environ toutes les 15 minutes et agit quand l’une change.",
+        "loadFailed": "Les pages suivies n’ont pas pu être chargées. Rien n’a été modifié.",
+        "empty": "Collez ci-dessous le lien d’une page Notion pour la garder consultable ou lancer une tâche enregistrée quand elle change.",
+        "pageLabel": "Lien de la page Notion",
+        "pagePlaceholder": "https://www.notion.so/…",
+        "actionLabel": "Quand la page change",
+        "actionSearchable": "Garder une copie consultable dans mes fichiers",
+        "actionTask": "Lancer une tâche enregistrée",
+        "folderLabel": "Dossier",
+        "taskLabel": "Tâche enregistrée",
+        "noTasks": "Vous n’avez pas encore de tâche enregistrée que vous lancez vous-même.",
+        "openTasks": "Ouvrir les tâches enregistrées",
+        "add": "Suivre la page",
+        "openCopy": "Ouvrir la copie dans Fichiers",
+        "pause": "Mettre en pause",
+        "resume": "Reprendre",
+        "remove": "Ne plus suivre",
+        "limit": "Vous suivez {count} pages, le maximum autorisé. Retirez-en une pour en ajouter une autre.",
+        "paused": "En pause. Synaplan ne vérifie pas cette page.",
+        "describeTask": "Lance « {task} » quand la page change.",
+        "describeSearchable": "Consultable dans le dossier « {folder} ».",
+        "notChecked": "Pas encore vérifiée.",
+        "checked": "Vérifiée {time}. Aucun changement depuis l’ajout.",
+        "changed": "Vérifiée {time}. Dernier changement {changed}.",
+        "addedWithError": "La page est suivie, mais la première vérification a échoué. La raison est indiquée dans la liste.",
+        "addedTask": "La page est suivie. La tâche enregistrée se lancera au prochain changement.",
+        "addedSearchable": "La page est suivie. Sa copie se trouve dans le dossier « {folder} » de Fichiers.",
+        "addFailed": "La page n’est pas suivie. Rien n’a été modifié. Réessayez.",
+        "pausedToast": "En pause. Synaplan arrête de vérifier cette page.",
+        "resumedToast": "Reprise. Synaplan a vérifié la page tout de suite.",
+        "saveFailed": "La modification n’a pas été enregistrée. Réessayez.",
+        "removeTitle": "Ne plus suivre cette page ?",
+        "removeSearchable": "Synaplan arrête de vérifier la page. La copie reste dans vos fichiers jusqu’à ce que vous la supprimiez. Rien ne change dans Notion.",
+        "removeTask": "Synaplan arrête de vérifier la page et ne lancera plus la tâche enregistrée pour elle. La tâche elle-même reste. Rien ne change dans Notion.",
+        "removed": "Synaplan ne suit plus cette page. Rien n’a été modifié dans Notion."
+      },
+      "sharing": {
+        "label": "Partager avec tout le monde ici, en lecture seule",
+        "on": "Les personnes sans connexion Notion à elles peuvent laisser l’IA lire ce que ce compte Notion voit. Personne ne peut modifier Notion par ce biais.",
+        "off": "Vous seul utilisez cette connexion.",
+        "savedOn": "Partagée. Tout le monde ici peut laisser l’IA lire Notion via votre connexion. Personne ne peut modifier Notion par ce biais.",
+        "savedOff": "Le partage est désactivé. Vous seul utilisez cette connexion désormais.",
+        "failed": "Le réglage de partage n’a pas été enregistré. Rien n’a été modifié. Réessayez.",
+        "memberNote": "{owner} partage une connexion Notion. L’IA peut lire Notion avec elle, mais jamais rien modifier.",
+        "use": "L’utiliser dans le chat",
+        "connectOwn": "Connecter mon propre Notion",
+        "usingToast": "Le chat peut maintenant lire Notion via la connexion partagée.",
+        "useFailed": "Le chat ne peut pas utiliser la connexion partagée. Rien n’a été modifié. Réessayez."
+      }
+    },
     "linkedSteps": {
       "title": "Comment connecter",
       "install": "Installez l’application Synaplan dans {client}.",
@@ -1092,6 +1197,7 @@
       "watched": "les dossiers que vous surveillez",
       "allowed": "les dossiers que vous surveillez, {folders}",
       "all": "tous vos fichiers"
-    }
+    },
+    "needsAttention": "Se reconnecter"
   }
 }

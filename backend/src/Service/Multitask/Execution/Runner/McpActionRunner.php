@@ -9,12 +9,18 @@ use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Mcp\AtlassianToolArguments;
+use App\Service\Mcp\McpArgumentSchema;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\McpToolRegistry;
+use App\Service\Mcp\Notion\NotionFetchArguments;
+use App\Service\Mcp\Notion\NotionPageWrite;
+use App\Service\Mcp\Notion\NotionToolHints;
+use App\Service\Mcp\Notion\NotionWriteGuard;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StructuredField;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
@@ -82,6 +88,7 @@ final readonly class McpActionRunner implements TaskRunner
                 Capability::McpAction,
                 'Perform a WRITE action on one of the user\'s connected external systems — e.g. create a Confluence page, create a Jira ticket. ONLY when the user explicitly asks to create/update something there. Set params.server_id and params.tool from the write-enabled connections listed below; pass the tool arguments in inputs.arguments. ONLY use a server/tool listed below — if none fits, do NOT emit mcp_action.',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->renderToolSubCatalog($userId, $context),
+                planAdjuster: fn (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array => $this->adjustNotionTitlePlan($payload, $messageText, $userId, $allowed, $topic),
                 enabledFlag: MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED,
                 enabledDefault: false,
                 requiresDynamicNote: true,
@@ -125,15 +132,26 @@ final readonly class McpActionRunner implements TaskRunner
             return NodeResult::failed(sprintf("the tool '%s' does not exist on this connection", $tool));
         }
         if ($this->isDestructiveTool($catalogTool['annotations'])) {
-            return NodeResult::failed(sprintf("the tool '%s' declares itself destructive and is not allowed", $tool));
+            return NodeResult::failed(sprintf("the tool '%s' declares itself destructive and is not allowed", $tool), $this->callMetadata($serverId, $server->getName(), $tool));
         }
 
-        $arguments = $this->atlassianArguments->complete(
-            $server,
-            $catalogTool,
-            $this->resolveArguments($node, $context),
-            (string) $context->message->getText(),
+        $sourceText = (string) $context->message->getText();
+        $arguments = McpArgumentSchema::clean(
+            (new NotionPageWrite($this->client, $this->toolRegistry, new NotionFetchArguments($this->logger), $this->logger))
+                ->complete(
+                    $server,
+                    $catalogTool,
+                    $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
+                    $sourceText,
+                ),
+            $catalogTool['inputSchema'],
         );
+        $refusal = StructuredField::hasUnresolved($arguments)
+            ? sprintf('The earlier step did not say which item to change, so nothing was sent to %s and nothing was changed.', $server->getName())
+            : NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
+        if (null !== $refusal) {
+            return NodeResult::reportableFailure($refusal, $this->callMetadata($serverId, $server->getName(), $tool));
+        }
 
         $gated = $this->consultGate($context, $node, $serverId, $tool, $arguments);
         if (null !== $gated) {
@@ -262,11 +280,13 @@ final readonly class McpActionRunner implements TaskRunner
             }
 
             $tools = [];
+            $notion = NotionToolHints::HOST === strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST));
             foreach ($entry['tools'] as $tool) {
                 if (!$this->isMutatingTool($tool['annotations']) || $this->isDestructiveTool($tool['annotations'])) {
                     continue;
                 }
                 $tools[] = $tool['name'].$this->renderArgumentHint($tool['inputSchema'])
+                    .NotionPageWrite::argumentHint($server->getUrl(), $tool['name'])
                     .('' !== $tool['description'] ? ' — '.$this->oneLine($tool['description']) : '');
             }
             if ([] === $tools) {
@@ -277,6 +297,9 @@ final readonly class McpActionRunner implements TaskRunner
             foreach ($tools as $toolLine) {
                 $lines[] = '      - '.$toolLine;
             }
+            if ($notion) {
+                $lines[] = '    When the user names a Notion page by its title and asks to change that title, emit mcp_fetch with the search tool first (query = the current title), then this update-page tool. page_id is one page id from the search result, never the title. command is update_properties. properties.title is the new title. Do not ask for a URL. To add text to a page use command insert_content with content (Markdown); to change existing text use update_content with content_updates. Never use replace_content. To add a row to a database, fetch the database first and pass its collection:// URL as parent.data_source_id to create-pages.';
+            }
         }
 
         if ([] === $lines) {
@@ -284,6 +307,79 @@ final readonly class McpActionRunner implements TaskRunner
         }
 
         return "  Write-enabled connections for this user:\n".implode("\n", $lines);
+    }
+
+    /**
+     * A title change that only names the page still needs a search, then
+     * update-page. The model often emits a chat node instead, because it
+     * has no page id yet.
+     *
+     * @param array<string, mixed> $payload
+     * @param list<string>|null    $allowed
+     *
+     * @return array<string, mixed>
+     */
+    private function adjustNotionTitlePlan(array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array
+    {
+        if (!(new \ReflectionProperty(self::class, 'clientConfig'))->isInitialized($this)) {
+            return $payload;
+        }
+        if (null !== $allowed && (!in_array(Capability::McpFetch->value, $allowed, true) || !in_array(Capability::McpAction->value, $allowed, true))) {
+            return $payload;
+        }
+        if (null === $userId || $userId <= 0
+            || !$this->clientConfig->isClientEnabled($userId)
+            || !$this->routingConfig->isFeatureEnabled(MultitaskRoutingConfig::KEY_MCP_FETCH_ENABLED, $userId, false)
+            || !$this->routingConfig->isFeatureEnabled(MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED, $userId, false)) {
+            return $payload;
+        }
+        if ('' === $topic || 'unknown' === strtolower($topic) || in_array($topic, ['CHAT', 'CONTINUE'], true)) {
+            $topic = 'general';
+        }
+
+        $server = null;
+        foreach ($this->servers->findEnabledByUser($userId) as $candidate) {
+            if (!$candidate->allowsWrite()) {
+                continue;
+            }
+            if (NotionToolHints::HOST !== strtolower((string) parse_url($candidate->getUrl(), PHP_URL_HOST))) {
+                continue;
+            }
+            if (!$this->topicAllowsServer($userId, ['topic' => $topic], (int) $candidate->getId())) {
+                continue;
+            }
+            $server = $candidate;
+            break;
+        }
+        if (null === $server) {
+            return $payload;
+        }
+
+        $search = null;
+        $update = null;
+        foreach ($this->toolRegistry->toolsFor($server) as $tool) {
+            $bare = strtolower($tool['name']);
+            $bare = str_starts_with($bare, 'notion-') ? substr($bare, strlen('notion-')) : $bare;
+            if ('search' === $bare && null === $search) {
+                $search = $tool['name'];
+            }
+            if ('update-page' === $bare && null === $update) {
+                $update = $tool['name'];
+            }
+        }
+        if (null === $search || null === $update) {
+            return $payload;
+        }
+
+        $next = NotionPageWrite::install($payload, $messageText, (int) $server->getId(), $search, $update);
+        if ($next !== $payload) {
+            $this->logger->info('McpActionRunner: planned a Notion search before the title change', [
+                'user_id' => $userId,
+                'server_id' => $server->getId(),
+            ]);
+        }
+
+        return $next;
     }
 
     /**

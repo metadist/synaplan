@@ -239,4 +239,26 @@ final class NodeContextTest extends TestCase
         self::assertSame(['path' => 'a.png', 'type' => 'image'], $ctx->resolve('$n1.file'));
         self::assertSame([['path' => 'a.png', 'type' => 'image']], $ctx->resolve('$n1.files'));
     }
+
+    public function testNamedFieldReadsTheFirstSearchResult(): void
+    {
+        $ctx = $this->context($this->message());
+        $ctx->setResult('n1', NodeResult::ok('{"results":[{"id":"39797ad6-0000","title":"Metadist GmbH","url":"https://app.notion.com/p/x","type":"page"}]}'));
+
+        self::assertSame('39797ad6-0000', $ctx->resolve('$n1.page_id'));
+        self::assertSame('https://app.notion.com/p/x', $ctx->resolve('$n1.url'));
+        self::assertSame(
+            ['page_id' => '39797ad6-0000', 'properties' => ['title' => 'Synaplan']],
+            $ctx->resolve(['page_id' => '$n1.page_id', 'properties' => ['title' => 'Synaplan']]),
+        );
+    }
+
+    public function testNamedFieldStaysLiteralWhenItCannotBeRead(): void
+    {
+        $ctx = $this->context($this->message());
+        $ctx->setResult('n1', NodeResult::ok('plain prose, no JSON'));
+
+        self::assertSame('$n1.page_id', $ctx->resolve('$n1.page_id'));
+        self::assertSame('$5.00', $ctx->resolve('$5.00'));
+    }
 }

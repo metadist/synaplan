@@ -11,7 +11,9 @@ use App\Repository\SavedTaskRepository;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\AuthoredSavedTaskPlans;
 use App\Service\Multitask\ClassificationPlanMapper;
+use App\Service\Multitask\ConnectedSystemMention;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -75,6 +77,18 @@ final class TaskPlanExecutorTest extends TestCase
             'partial_failure' => false,
             'all_failed' => false,
         ], $overrides);
+    }
+
+    private function savedTaskPlans(SavedTaskConfig $config, SavedTaskRepository $tasks, PromptRepository $prompts): AuthoredSavedTaskPlans
+    {
+        return new AuthoredSavedTaskPlans(
+            $config,
+            $tasks,
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->modelConfigService,
+            $this->createMock(LoggerInterface::class),
+        );
     }
 
     private function message(): Message&MockObject
@@ -651,10 +665,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->modelConfigService,
             $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
-            new SavedTaskConfig($configRepo),
-            $savedTasks,
-            $prompts,
-            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->savedTaskPlans(new SavedTaskConfig($configRepo), $savedTasks, $prompts),
         );
 
         $this->planner->expects(self::never())->method('plan');
@@ -707,10 +718,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->modelConfigService,
             $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
-            new SavedTaskConfig($configRepo),
-            $savedTasks,
-            $prompts,
-            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->savedTaskPlans(new SavedTaskConfig($configRepo), $savedTasks, $prompts),
         );
 
         $this->dagExecutor->method('execute')->willReturn($this->assembled([
@@ -1008,10 +1016,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->modelConfigService,
             $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
-            new SavedTaskConfig($configRepo),
-            $savedTasks,
-            $prompts,
-            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->savedTaskPlans(new SavedTaskConfig($configRepo), $savedTasks, $prompts),
         );
 
         // The pinned graph is used verbatim: no planner round-trip, DAG runs.
@@ -1071,10 +1076,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->modelConfigService,
             $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
-            new SavedTaskConfig($configRepo),
-            $savedTasks,
-            $prompts,
-            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->savedTaskPlans(new SavedTaskConfig($configRepo), $savedTasks, $prompts),
         );
 
         $this->planner->expects(self::never())->method('plan');
@@ -1118,10 +1120,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->modelConfigService,
             $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
-            new SavedTaskConfig($configRepo),
-            $savedTasks,
-            $this->createMock(PromptRepository::class),
-            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->savedTaskPlans(new SavedTaskConfig($configRepo), $savedTasks, $this->createMock(PromptRepository::class)),
         );
 
         $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult(TaskPlan::fromArray([
@@ -1169,6 +1168,46 @@ final class TaskPlanExecutorTest extends TestCase
         );
 
         self::assertSame(['content' => 'router answer'], $result);
+    }
+
+    public function testNamingAConnectedSourcePlansDespiteASingleStepVote(): void
+    {
+        $mentions = $this->createMock(ConnectedSystemMention::class);
+        $mentions->expects(self::once())
+            ->method('mentioned')
+            ->with(7, 'Finde die Notion Seite', self::callback(static fn (array $classification): bool => 'general' === ($classification['topic'] ?? null)))
+            ->willReturn(true);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            null,
+            $mentions,
+        );
+
+        $this->planner->expects(self::once())
+            ->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('de'), fallback: false, modelId: 76));
+        $this->router->method('routeStream')->willReturn(['content' => 'planned']);
+
+        $message = $this->message();
+        $message->method('getText')->willReturn('Finde die Notion Seite');
+
+        $result = $executor->executeStream(
+            $message,
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'de', 'source' => 'ai_sorting', 'multi_step' => false],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'planned'], $result);
     }
 
     public function testSorterVoteOfMultipleStepsStillPlans(): void
@@ -1288,10 +1327,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->modelConfigService,
             $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
-            new SavedTaskConfig($this->createMock(ConfigRepository::class)),
-            $this->createMock(SavedTaskRepository::class),
-            $prompts,
-            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+            $this->savedTaskPlans(new SavedTaskConfig($this->createMock(ConfigRepository::class)), $this->createMock(SavedTaskRepository::class), $prompts),
         );
 
         $this->planner->method('plan')

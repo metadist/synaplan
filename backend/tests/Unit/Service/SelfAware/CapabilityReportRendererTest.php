@@ -82,6 +82,40 @@ final class CapabilityReportRendererTest extends TestCase
         $this->assertStringContainsString($modelLine, $truncated);
     }
 
+    public function testConnectedSourcesAreNamedAndStayInsideTheBudget(): void
+    {
+        $renderer = new CapabilityReportRenderer();
+        $report = $this->fullReport(isAdmin: false, billingEnabled: false);
+
+        $rendered = $renderer->render($report, null, ['Notion', 'Notion "prod"']);
+
+        $this->assertLessThanOrEqual(CapabilityReportRenderer::MAX_CHARS, strlen($rendered));
+        $this->assertStringContainsString('CONNECTED SOURCES: "Notion", "Notion \"prod\""', $rendered);
+        $this->assertStringContainsString('Never tell the user to connect a source that is listed as connected.', $rendered);
+        $this->assertLessThan(strpos($rendered, 'AVAILABLE NOW:'), strpos($rendered, 'CONNECTED SOURCES:'));
+        $this->assertStringNotContainsString('CONNECTED SOURCES:', $renderer->render($report));
+    }
+
+    public function testConnectedSourcesSurviveTruncation(): void
+    {
+        $facts = [];
+        for ($i = 0; $i < 60; ++$i) {
+            $facts[] = new CapabilityFact('fact-'.$i, 'Capability number '.$i, CapabilityState::Available, 'with a fairly long detail string', null, null, null);
+        }
+        $names = [];
+        for ($i = 0; $i < 10; ++$i) {
+            $names[] = 'Source '.$i;
+        }
+
+        $rendered = (new CapabilityReportRenderer())->render(new CapabilityReport($facts, '4.9.0', false, false), null, $names);
+
+        $this->assertLessThanOrEqual(CapabilityReportRenderer::MAX_CHARS, strlen($rendered));
+        $this->assertStringEndsWith('…', $rendered);
+        $this->assertStringContainsString('CONNECTED SOURCES: "Source 0"', $rendered);
+        $this->assertStringContainsString(', …', $rendered);
+        $this->assertStringNotContainsString('"Source 8"', $rendered);
+    }
+
     public function testOmittingTheModelLineKeepsThePreviousBlock(): void
     {
         $renderer = new CapabilityReportRenderer();

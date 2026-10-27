@@ -21,6 +21,8 @@ use App\Service\Multitask\Plan\TaskNode;
  *   - "$nX.text"           → upstream node X text
  *   - "$nX.file"           → upstream node X first file descriptor
  *   - "$nX.files"          → upstream node X all file descriptors
+ *   - "$nX.<field>"        → that field of node X's JSON output, or of its
+ *                            first result row ({@see StructuredField})
  *   - anything else        → literal value (passed through unchanged)
  *   - a list of the above   → resolved element-wise
  *
@@ -37,6 +39,9 @@ use App\Service\Multitask\Plan\TaskNode;
  */
 final class NodeContext
 {
+    /** Hard stop so one request cannot keep widening empty searches. */
+    public const MAX_RECOVERY_PER_TURN = 4;
+
     /**
      * Field names planners use for a node's text output besides `text`. All
      * resolve to {@see NodeResult::$text}; `file`/`files` keep their meaning.
@@ -54,6 +59,9 @@ final class NodeContext
 
     /** @var array<string, true> node ids that emitted at least one text chunk */
     private array $streamedNodeIds = [];
+
+    /** Extra read calls already spent widening empty searches in this turn. */
+    private int $recoveryAttempts = 0;
 
     /** @var (callable(string, array<string, mixed>): void)|null sink for live media progress: (nodeId, progress) */
     private $progressSink;
@@ -188,6 +196,17 @@ final class NodeContext
         return isset($this->approvedNodeIds[$nodeId]);
     }
 
+    /** Whether this turn may run one more widened read. */
+    public function canSpendRecovery(): bool
+    {
+        return $this->recoveryAttempts < self::MAX_RECOVERY_PER_TURN;
+    }
+
+    public function spendRecovery(): void
+    {
+        ++$this->recoveryAttempts;
+    }
+
     public function setResult(string $nodeId, NodeResult $result): void
     {
         $this->results[$nodeId] = $result;
@@ -250,6 +269,13 @@ final class NodeContext
                 '$message.files' === $value => $this->messageFiles(),
                 default => $this->resolveNodeRef($value),
             };
+        }
+
+        // Named field of an upstream JSON result (`$n1.page_id`, `$n1.url`).
+        // Only when that node ran, so a literal like "$5.00" stays as it is.
+        if (1 === preg_match('/^\$(?<id>[A-Za-z0-9_]+)\.(?<field>[A-Za-z_][A-Za-z0-9_]*)$/', $value, $m)
+            && isset($this->results[$m['id']])) {
+            return StructuredField::from($this->results[$m['id']]->text, $m['field']) ?? $value;
         }
 
         // Prose interpolation: the planner may embed a reference token inside a

@@ -595,6 +595,7 @@
         "saves": {
           "email": "un e-mail pour vous",
           "folder": "un fichier dans le dossier connecté",
+          "notion": "une nouvelle page Notion",
           "calendar": "une entrée de calendrier",
           "reply": "une réponse dans le chat"
         }

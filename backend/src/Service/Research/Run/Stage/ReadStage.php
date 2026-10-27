@@ -66,15 +66,21 @@ final readonly class ReadStage implements ResearchStage
             if (isset($seen[$source->id])) {
                 continue;
             }
-            if (Source::WEB === $source->kind && null !== $source->url) {
-                return $source;
-            }
-            if (Source::FILE === $source->kind && null !== $source->fileId && null !== $this->filePages) {
+            if ($this->canOpen($source)) {
                 return $source;
             }
         }
 
         return null;
+    }
+
+    public function canOpen(Source $source): bool
+    {
+        if (Source::WEB === $source->kind) {
+            return null !== $source->url;
+        }
+
+        return Source::FILE === $source->kind && null !== $source->fileId && null !== $this->filePages;
     }
 
     /**
@@ -99,7 +105,7 @@ final readonly class ReadStage implements ResearchStage
                 return new StageResult('write');
             }
             $source = $ctx->state->ledger->source($id);
-            if (null === $source || null === $source->url) {
+            if (null === $source || !$this->canOpen($source)) {
                 $blocked[] = ['id' => $id, 'reason' => 'That source cannot be read.'];
                 continue;
             }
