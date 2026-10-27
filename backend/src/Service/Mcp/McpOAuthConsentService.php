@@ -61,14 +61,26 @@ final readonly class McpOAuthConsentService
         if ($server->getUserId() !== $ownerId) {
             throw new McpOAuthException('Server not found');
         }
+        if (!$this->config->isClientEnabled($ownerId)) {
+            throw new McpOAuthException('Calls to MCP servers are turned off');
+        }
 
         $startUrl = $server->getUrl();
         $discovered = $this->discovery->discover($startUrl);
         $existing = $server->getDecryptedOAuthState($this->encryption);
 
+        // A server that now names another resource or authorization server
+        // starts from scratch: tokens from the old one never carry over.
+        if ($existing->resource !== $discovered->resource
+            || $existing->authorizationEndpoint !== $discovered->authorizationEndpoint
+            || $existing->tokenEndpoint !== $discovered->tokenEndpoint
+        ) {
+            $existing = new McpOAuthState();
+        }
+
         $clientId = $existing->clientId;
         $supportsRefresh = $existing->supportsRefresh;
-        $needsRegister = '' === $clientId || $existing->resource !== $discovered->resource;
+        $needsRegister = '' === $clientId;
 
         if ($needsRegister) {
             $registered = $this->registration->register(
@@ -108,6 +120,7 @@ final readonly class McpOAuthConsentService
             'owner_id' => $ownerId,
             'server_id' => $server->getId(),
             'server_url' => $startUrl,
+            'issuer' => $discovered->issuer,
         ]);
         $item->expiresAfter(self::VERIFIER_TTL_SECONDS);
         $this->cache->save($item);
@@ -127,7 +140,7 @@ final readonly class McpOAuthConsentService
      * @throws McpOAuthException
      * @throws OAuthException
      */
-    public function complete(string $code, string $stateToken): McpServerConfig
+    public function complete(string $code, string $stateToken, ?string $issuer = null): McpServerConfig
     {
         if (!$this->config->isOAuthConnectorsEnabled()) {
             throw new McpOAuthException('Connecting with a sign-in is disabled by an administrator');
@@ -159,6 +172,10 @@ final readonly class McpOAuthConsentService
         $verifier = $pending['verifier'];
 
         $oauthState = $server->getDecryptedOAuthState($this->encryption);
+        // RFC 9207: an answer that names another issuer is not ours to redeem.
+        if (null !== $issuer && $issuer !== $pending['issuer']) {
+            throw new McpOAuthException('The sign-in answer came from a different authorization server. Please start again.');
+        }
         $tokens = $this->oauth->exchangeCode($this->toProviderConfig($oauthState), $code, $verifier);
 
         $status = McpOAuthState::STATUS_CONNECTED;
@@ -205,13 +222,24 @@ final readonly class McpOAuthConsentService
             clientSecret: '',
             redirectUri: $this->redirectUri(),
             scopes: $state->scopes,
-            extraAuthorizeParams: ['prompt' => 'consent'],
+            extraAuthorizeParams: ['prompt' => 'consent'] + self::resourceParam($state),
             includeScopeInTokenRequests: false,
+            extraTokenParams: self::resourceParam($state),
         );
     }
 
     /**
-     * @return array{verifier: string, server_url: string}
+     * RFC 8707: the token is issued for this MCP server only.
+     *
+     * @return array<string, string>
+     */
+    public static function resourceParam(McpOAuthState $state): array
+    {
+        return '' === $state->resource ? [] : ['resource' => $state->resource];
+    }
+
+    /**
+     * @return array{verifier: string, server_url: string, issuer: string}
      */
     private function consumeVerifier(string $nonce, int $ownerId, int $serverId): array
     {
@@ -234,7 +262,11 @@ final readonly class McpOAuthConsentService
             throw new McpOAuthException('The sign-in attempt could not be verified. Please start again.');
         }
 
-        return ['verifier' => $stored['verifier'], 'server_url' => $stored['server_url']];
+        return [
+            'verifier' => $stored['verifier'],
+            'server_url' => $stored['server_url'],
+            'issuer' => is_string($stored['issuer'] ?? null) ? $stored['issuer'] : '',
+        ];
     }
 
     private function verifierKey(string $nonce): string

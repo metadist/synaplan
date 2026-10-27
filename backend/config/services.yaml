@@ -966,12 +966,37 @@ services:
         arguments:
             $frontendUrl: '%env(FRONTEND_URL)%'
 
+    # Outbound MCP traffic checks the resolved address on every connection,
+    # so a host name that later resolves into a private range is refused.
+    mcp.http_client:
+        class: Symfony\Component\HttpClient\NoPrivateNetworkHttpClient
+        arguments: ['@http_client']
+
+    mcp.oauth_client:
+        class: App\Service\OAuth\OAuthClient
+        arguments:
+            $httpClient: '@mcp.http_client'
+
+    App\Service\Mcp\McpClient:
+        arguments:
+            $httpClient: '@mcp.http_client'
+
+    App\Service\Mcp\McpOAuthDiscovery:
+        arguments:
+            $httpClient: '@mcp.http_client'
+
+    App\Service\Mcp\McpOAuthRegistration:
+        arguments:
+            $httpClient: '@mcp.http_client'
+
     App\Service\Mcp\McpOAuthConsentService:
         arguments:
+            $oauth: '@mcp.oauth_client'
             $appUrl: '%env(APP_URL)%'
 
     App\Service\Mcp\McpOAuthTokenProvider:
         arguments:
+            $oauth: '@mcp.oauth_client'
             $appUrl: '%env(APP_URL)%'
 
     App\Controller\McpOAuthController:

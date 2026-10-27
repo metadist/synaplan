@@ -198,6 +198,58 @@ final class OAuthClientTest extends TestCase
         self::assertSame('public-id', $body['client_id']);
     }
 
+    public function testTokenRequestsCarryTheProvidersTokenParams(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse((string) json_encode(['access_token' => 'at', 'refresh_token' => 'rt', 'expires_in' => 60]), ['http_code' => 200]),
+            new MockResponse((string) json_encode(['access_token' => 'at2', 'expires_in' => 60]), ['http_code' => 200]),
+        ], $captured);
+        $mcp = new OAuthProviderConfig(
+            provider: 'mcp',
+            authorizeUrl: 'https://auth.example.com/authorize',
+            tokenUrl: 'https://auth.example.com/token',
+            clientId: 'client-id',
+            clientSecret: '',
+            redirectUri: 'https://app.example/callback',
+            scopes: [],
+            extraTokenParams: ['resource' => 'https://mcp.example.com/mcp'],
+        );
+
+        $client->exchangeCode($mcp, 'the-code', 'the-verifier');
+        $client->refresh($mcp, 'rt');
+
+        foreach ($captured as $request) {
+            parse_str($request['options']['body'], $body);
+            self::assertSame('https://mcp.example.com/mcp', $body['resource']);
+        }
+        self::assertCount(2, $captured);
+    }
+
+    public function testOtherProvidersSendNoResource(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse((string) json_encode(['access_token' => 'at', 'expires_in' => 60]), ['http_code' => 200]),
+        ], $captured);
+
+        $client->exchangeCode($this->provider(), 'the-code', 'the-verifier');
+
+        parse_str($captured[0]['options']['body'], $body);
+        self::assertArrayNotHasKey('resource', $body);
+    }
+
+    public function testOversizedTokenAnswerIsRefused(): void
+    {
+        $client = $this->client([
+            new MockResponse(str_repeat(' ', 300_000).'{}', ['http_code' => 200]),
+        ]);
+
+        $this->expectException(OAuthException::class);
+
+        $client->exchangeCode($this->provider(), 'the-code', 'the-verifier');
+    }
+
     public function testRefreshWithoutAStoredTokenAsksForConsent(): void
     {
         $this->expectException(OAuthReauthRequiredException::class);

@@ -14,7 +14,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class McpOAuthRegistration
 {
-    private const TIMEOUT_SECONDS = 15;
     private const CLIENT_NAME = 'Synaplan';
 
     public function __construct(
@@ -35,6 +34,7 @@ final readonly class McpOAuthRegistration
         if ($this->ssrfGuard->isBlockedUrl($registrationEndpoint)) {
             throw new McpOAuthException('Registration endpoint is not allowed');
         }
+        McpOAuthDiscovery::requireHttps($registrationEndpoint, 'The registration endpoint');
 
         $body = [
             'client_name' => self::CLIENT_NAME,
@@ -55,9 +55,7 @@ final readonly class McpOAuthRegistration
                     'Accept' => 'application/json',
                 ],
                 'json' => $body,
-                'timeout' => self::TIMEOUT_SECONDS,
-                'max_redirects' => 0,
-            ]);
+            ] + McpOAuthDiscovery::boundedOptions());
             $status = $response->getStatusCode();
             $raw = $response->getContent(false);
         } catch (\Throwable $e) {

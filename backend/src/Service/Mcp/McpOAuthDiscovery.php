@@ -19,6 +19,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final readonly class McpOAuthDiscovery
 {
     private const TIMEOUT_SECONDS = 15;
+    public const MAX_DURATION_SECONDS = 10;
+    public const MAX_BODY_BYTES = 262_144;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -36,22 +38,35 @@ final readonly class McpOAuthDiscovery
         if ($this->ssrfGuard->isBlockedUrl($mcpUrl)) {
             throw new McpOAuthException('MCP server URL is not allowed (private or invalid target)');
         }
+        self::requireHttps($mcpUrl, 'The MCP server address');
 
         $prm = $this->fetchProtectedResourceMetadata($mcpUrl);
 
-        $resource = is_string($prm['resource'] ?? null) ? $prm['resource'] : $mcpUrl;
+        // RFC 9728 §3.3: the metadata must describe this server, not another one.
+        $resource = is_string($prm['resource'] ?? null) && '' !== $prm['resource'] ? $prm['resource'] : $mcpUrl;
+        if (!self::resourceCovers($resource, $mcpUrl)) {
+            throw new McpOAuthException('The sign-in metadata names a different server than this address');
+        }
+
         $authServers = $prm['authorization_servers'] ?? [];
         if (!is_array($authServers) || [] === $authServers || !is_string($authServers[0] ?? null) || '' === $authServers[0]) {
             throw new McpOAuthException('The server did not advertise an authorization server');
         }
 
-        $issuer = rtrim($authServers[0], '/');
+        $issuer = $authServers[0];
         if ($this->ssrfGuard->isBlockedUrl($issuer)) {
             throw new McpOAuthException('Authorization server URL is not allowed');
         }
+        self::requireHttps($issuer, 'The authorization server');
 
-        $asUrl = $issuer.'/.well-known/oauth-authorization-server';
+        $asUrl = rtrim($issuer, '/').'/.well-known/oauth-authorization-server';
         $as = $this->getJson($asUrl, 'authorization server metadata');
+
+        // RFC 8414 §3.3: the metadata must be the named issuer's own.
+        $advertisedIssuer = is_string($as['issuer'] ?? null) ? $as['issuer'] : '';
+        if ($advertisedIssuer !== $issuer) {
+            throw new McpOAuthException('The authorization server metadata belongs to a different issuer');
+        }
 
         $authorize = is_string($as['authorization_endpoint'] ?? null) ? $as['authorization_endpoint'] : '';
         $token = is_string($as['token_endpoint'] ?? null) ? $as['token_endpoint'] : '';
@@ -67,6 +82,7 @@ final readonly class McpOAuthDiscovery
             if ($this->ssrfGuard->isBlockedUrl($endpoint)) {
                 throw new McpOAuthException('An OAuth endpoint on this server is not allowed');
             }
+            self::requireHttps($endpoint, 'An OAuth endpoint on this server');
         }
 
         $methods = $as['code_challenge_methods_supported'] ?? [];
@@ -90,7 +106,62 @@ final readonly class McpOAuthDiscovery
             registrationEndpoint: $register,
             scopes: $scopes,
             supportsRefreshGrant: $supportsRefresh,
+            issuer: $issuer,
         );
+    }
+
+    /**
+     * Request options every sign-in fetch shares: no redirects, a hard total
+     * duration and a body cap, so a slow or oversized answer cannot hold a
+     * PHP worker.
+     *
+     * @return array<string, mixed>
+     */
+    public static function boundedOptions(): array
+    {
+        return [
+            'timeout' => self::TIMEOUT_SECONDS,
+            'max_duration' => self::MAX_DURATION_SECONDS,
+            'max_redirects' => 0,
+            'on_progress' => static function (int $downloaded, int $total): void {
+                if ($downloaded > self::MAX_BODY_BYTES || $total > self::MAX_BODY_BYTES) {
+                    throw new McpOAuthException('The sign-in server sent a response that is too large');
+                }
+            },
+        ];
+    }
+
+    /**
+     * @throws McpOAuthException
+     */
+    public static function requireHttps(string $url, string $what): void
+    {
+        if ('https' !== strtolower((string) parse_url($url, PHP_URL_SCHEME))) {
+            throw new McpOAuthException($what.' must use https for sign-in');
+        }
+    }
+
+    private static function resourceCovers(string $resource, string $mcpUrl): bool
+    {
+        $r = parse_url($resource);
+        $m = parse_url($mcpUrl);
+        if (!is_array($r) || !is_array($m)) {
+            return false;
+        }
+
+        $originOf = static function (array $p): string {
+            $scheme = strtolower((string) ($p['scheme'] ?? ''));
+
+            return $scheme.'://'.strtolower((string) ($p['host'] ?? '')).':'.($p['port'] ?? ('https' === $scheme ? 443 : 80));
+        };
+        if ($originOf($r) !== $originOf($m)) {
+            return false;
+        }
+
+        $resourcePath = rtrim($r['path'] ?? '', '/');
+        $mcpPath = rtrim($m['path'] ?? '', '/');
+
+        return '' === $resourcePath || $mcpPath === $resourcePath || str_starts_with($mcpPath, $resourcePath.'/');
     }
 
     /**
@@ -156,9 +227,7 @@ final readonly class McpOAuthDiscovery
                         'clientInfo' => ['name' => 'synaplan-mcp-client', 'version' => '1.0'],
                     ],
                 ],
-                'timeout' => self::TIMEOUT_SECONDS,
-                'max_redirects' => 0,
-            ]);
+            ] + self::boundedOptions());
             $www = $response->getHeaders(false)['www-authenticate'][0] ?? '';
         } catch (\Throwable $e) {
             $this->logger->info('McpOAuthDiscovery: initialize probe failed', ['error' => $e->getMessage()]);
@@ -188,6 +257,7 @@ final readonly class McpOAuthDiscovery
      */
     private function getJson(string $url, string $label): array
     {
+        self::requireHttps($url, 'The '.$label.' address');
         if ($this->ssrfGuard->isBlockedUrl($url)) {
             throw new McpOAuthException(sprintf('The %s URL is not allowed', $label));
         }
@@ -195,9 +265,7 @@ final readonly class McpOAuthDiscovery
         try {
             $response = $this->httpClient->request('GET', $url, [
                 'headers' => ['Accept' => 'application/json'],
-                'timeout' => self::TIMEOUT_SECONDS,
-                'max_redirects' => 0,
-            ]);
+            ] + self::boundedOptions());
             $status = $response->getStatusCode();
             $raw = $response->getContent(false);
         } catch (\Throwable $e) {
