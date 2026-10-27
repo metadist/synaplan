@@ -269,7 +269,7 @@
       "unknownKey": "Este archivo tiene un campo que este Synaplan no reconoce ({detail})",
       "needsModel": "Necesita un modelo — elija uno después de importar ({key})",
       "needsKey": "Necesita una clave — añádala en Conexiones ({key})",
-      "needsCredential": "Necesita un inicio de sesión o una clave — añádalo en Apps › Servidores MCP después de importar ({key})",
+      "needsCredential": "Necesita un inicio de sesión o una clave — añádalo después de importar ({key})",
       "needsMcpServer": "Necesita un servidor MCP llamado {detail}",
       "needsMailbox": "Necesita un buzón — conéctelo después de importar ({key})",
       "needsWidget": "Necesita un widget del sitio — conéctelo después de importar ({key})",

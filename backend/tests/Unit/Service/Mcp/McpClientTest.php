@@ -288,7 +288,14 @@ final class McpClientTest extends TestCase
     {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturn('1');
-        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo = $this->createStub(McpServerConfigRepository::class);
+        $repo->method('storeOAuthStateAt')->willReturnCallback(
+            static function (McpServerConfig $server, string $url, string $encrypted): bool {
+                (new \ReflectionProperty(McpServerConfig::class, 'oauth'))->setValue($server, $encrypted);
+
+                return true;
+            }
+        );
 
         return new McpOAuthTokenProvider(
             new McpClientConfig($configRepo),

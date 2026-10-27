@@ -264,9 +264,14 @@ class McpServerConfig
         return is_array($decoded) ? McpOAuthState::fromArray($decoded) : new McpOAuthState();
     }
 
+    public static function encryptOAuthState(McpOAuthState $state, EncryptionService $encryptionService): string
+    {
+        return $encryptionService->encrypt(json_encode($state->toArray(), JSON_THROW_ON_ERROR));
+    }
+
     public function setDecryptedOAuthState(McpOAuthState $state, EncryptionService $encryptionService): self
     {
-        $this->oauth = $encryptionService->encrypt(json_encode($state->toArray(), JSON_THROW_ON_ERROR));
+        $this->oauth = self::encryptOAuthState($state, $encryptionService);
         $this->touch();
 
         return $this;
@@ -299,13 +304,13 @@ class McpServerConfig
 
     private static function normalizedAddress(string $url): string
     {
-        $url = rtrim(trim($url), '/');
+        $url = trim($url);
         $origin = self::origin($url);
         if ('' === $origin) {
             return $url;
         }
 
-        $path = (string) parse_url($url, PHP_URL_PATH);
+        $path = rtrim((string) parse_url($url, PHP_URL_PATH), '/');
         $query = parse_url($url, PHP_URL_QUERY);
 
         return $origin.$path.(is_string($query) ? '?'.$query : '');

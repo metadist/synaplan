@@ -269,7 +269,7 @@
       "unknownKey": "Diese Datei hat ein Feld, das dieses Synaplan nicht kennt ({detail})",
       "needsModel": "Braucht ein Modell — nach dem Import eines wählen ({key})",
       "needsKey": "Braucht einen Schlüssel — unter Verbindungen hinzufügen ({key})",
-      "needsCredential": "Braucht eine Anmeldung oder einen Schlüssel — nach dem Import unter Apps › MCP-Server hinzufügen ({key})",
+      "needsCredential": "Braucht eine Anmeldung oder einen Schlüssel — nach dem Import hinzufügen ({key})",
       "needsMcpServer": "Braucht einen MCP-Server namens {detail}",
       "needsMailbox": "Braucht ein Postfach — nach dem Import verbinden ({key})",
       "needsWidget": "Braucht ein Website-Widget — nach dem Import verbinden ({key})",

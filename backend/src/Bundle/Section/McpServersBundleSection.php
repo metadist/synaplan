@@ -77,7 +77,9 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
             if (McpServerConfig::AUTH_MODE_NONE !== $authMode) {
                 $rows[] = new ChecklistItem('needsCredential', $key, $name);
             }
-            if (true === ($item['allowWrite'] ?? false)) {
+            // Import keeps an existing server's own write switch; only say "off" where it is.
+            $writesStayOff = null === $existing || !$existing->allowsWrite();
+            if (true === ($item['allowWrite'] ?? false) && $writesStayOff) {
                 $rows[] = new ChecklistItem('writeOff', $key, $name);
             }
         }

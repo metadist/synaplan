@@ -269,7 +269,7 @@
       "unknownKey": "Bu dosyada bu Synaplan’ın tanımadığı bir alan var ({detail})",
       "needsModel": "Bir model gerekli — içe aktardıktan sonra seçin ({key})",
       "needsKey": "Bir anahtar gerekli — Bağlantılar altına ekleyin ({key})",
-      "needsCredential": "Bir oturum açma veya anahtar gerekli — içe aktardıktan sonra Uygulamalar › MCP Sunucuları altına ekleyin ({key})",
+      "needsCredential": "Bir oturum açma veya anahtar gerekli — içe aktardıktan sonra ekleyin ({key})",
       "needsMcpServer": "{detail} adlı bir MCP sunucusu gerekli",
       "needsMailbox": "Bir posta kutusu gerekli — içe aktardıktan sonra bağlayın ({key})",
       "needsWidget": "Bir site widget’ı gerekli — içe aktardıktan sonra bağlayın ({key})",

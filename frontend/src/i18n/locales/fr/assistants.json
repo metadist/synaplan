@@ -269,7 +269,7 @@
       "unknownKey": "Ce fichier a un champ que ce Synaplan ne connaît pas ({detail})",
       "needsModel": "Il manque un modèle — choisissez-en un après l’import ({key})",
       "needsKey": "Il manque une clé — ajoutez-la dans Connexions ({key})",
-      "needsCredential": "Il manque une connexion ou une clé — ajoutez-la dans Apps › Serveurs MCP après l’import ({key})",
+      "needsCredential": "Il manque une connexion ou une clé — ajoutez-la après l’import ({key})",
       "needsMcpServer": "Il manque un serveur MCP nommé {detail}",
       "needsMailbox": "Il manque une boîte mail — connectez-en une après l’import ({key})",
       "needsWidget": "Il manque un widget de site — connectez-en un après l’import ({key})",

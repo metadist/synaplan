@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Entity\McpServerConfig;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -54,6 +55,39 @@ class McpServerConfigRepository extends ServiceEntityRepository
         if ($flush) {
             $this->getEntityManager()->flush();
         }
+    }
+
+    /**
+     * Stores a sign-in only while the row still has the address the sign-in
+     * started with (and, unless $startingSignIn, still uses sign-in). A
+     * concurrent edit wins: nothing is written and false is returned. The
+     * entity is reloaded either way so a later flush cannot write stale
+     * fields back.
+     */
+    public function storeOAuthStateAt(
+        McpServerConfig $server,
+        string $expectedUrl,
+        string $encryptedState,
+        bool $startingSignIn = false,
+    ): bool {
+        $sql = $startingSignIn
+            // BAUTHTOKEN first: assignments run left to right and must see the old mode.
+            ? "UPDATE BMCPSERVERS SET BAUTHTOKEN = IF(BAUTHMODE = 'oauth', BAUTHTOKEN, ''), BAUTHMODE = 'oauth', BOAUTH = :state, BUPDATED = :updated
+               WHERE BID = :id AND BINARY BURL = :url"
+            : "UPDATE BMCPSERVERS SET BOAUTH = :state, BUPDATED = :updated
+               WHERE BID = :id AND BINARY BURL = :url AND BAUTHMODE = 'oauth'";
+
+        $em = $this->getEntityManager();
+        $statement = $em->getConnection()->prepare($sql);
+        $statement->bindValue('state', $encryptedState);
+        $statement->bindValue('updated', date('YmdHis'));
+        $statement->bindValue('id', (int) $server->getId(), ParameterType::INTEGER);
+        $statement->bindValue('url', $expectedUrl);
+        $statement->executeStatement();
+
+        $em->refresh($server);
+
+        return $server->getUrl() === $expectedUrl && $server->isOAuth();
     }
 
     public function remove(McpServerConfig $config, bool $flush = true): void

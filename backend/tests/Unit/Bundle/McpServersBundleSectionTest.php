@@ -98,6 +98,19 @@ final class McpServersBundleSectionTest extends TestCase
         self::assertContains('writeOff:Wiki', $codes);
     }
 
+    public function testPreviewDoesNotPromiseOffWhenThePersonAlreadyAllowsWrites(): void
+    {
+        $repo = $this->createStub(McpServerConfigRepository::class);
+        $repo->method('findByUser')->willReturn([$this->existing('https://api.github.example/mcp', allowWrite: true)]);
+
+        $preview = $this->section($repo)->preview([
+            ['key' => 'GitHub', 'name' => 'GitHub', 'url' => 'https://api.github.example/mcp', 'authMode' => 'none', 'allowWrite' => true],
+        ], self::USER_ID);
+
+        $codes = array_column($preview->toArray()['items'], 'code');
+        self::assertNotContains('writeOff', $codes);
+    }
+
     /**
      * @param list<McpServerConfig> $servers
      */

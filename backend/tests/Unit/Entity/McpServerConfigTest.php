@@ -57,6 +57,15 @@ final class McpServerConfigTest extends TestCase
         self::assertSame('at-1', $server->getDecryptedOAuthState($this->encryption)->accessToken);
     }
 
+    public function testAChangedQueryIsAnotherAddress(): void
+    {
+        $server = $this->oauth('https://mcp.example.com/mcp?tenant=alpha');
+
+        $server->setUrl('https://mcp.example.com/mcp?tenant=alpha/');
+
+        self::assertSame('', $server->getDecryptedOAuthState($this->encryption)->accessToken);
+    }
+
     public function testAnyAddressChangeDropsTheSignIn(): void
     {
         $server = $this->oauth('https://mcp.example.com/mcp');
