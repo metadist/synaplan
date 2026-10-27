@@ -179,7 +179,6 @@
         "src/Controller/WidgetPublicController.php::WidgetPublicController::processWidgetFile": 110,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::upload": 136,
         "src/Controller/WidgetSessionController.php::WidgetSessionController::get": 126,
-        "src/Mcp/McpServerFactory.php::McpServerFactory::build": 158,
         "src/MessageHandler/ExtractMemoriesCommandHandler.php::ExtractMemoriesCommandHandler::__invoke": 278,
         "src/MessageHandler/ReVectorizeMessageHandler.php::ReVectorizeMessageHandler::__invoke": 107,
         "src/Service/Config/FeatureStatusReporter.php::FeatureStatusReporter::build": 334,

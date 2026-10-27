@@ -33,13 +33,58 @@ final class McpControllerTest extends WebTestCase
         $this->createAdminUserWithApiKey();
     }
 
-    public function testRejectsUnauthenticatedRequests(): void
+    public function testUnauthenticatedDiscoveryListsPublicTools(): void
     {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize(anonymous: true);
+        self::assertNotSame('', $sessionId);
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'tools/list',
+                'params' => new \stdClass(),
+            ],
+            $sessionId,
+            anonymous: true,
+        );
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertArrayHasKey('result', $result, json_encode($result));
+        $toolNames = array_map(static fn (array $t): string => $t['name'], $result['result']['tools']);
+        self::assertContains('synaplan_chat', $toolNames);
+        self::assertContains('rag_search', $toolNames);
+        self::assertContains('memory_search', $toolNames);
+        self::assertNotContains('recent_errors', $toolNames);
+        self::assertNotContains('agent_checkin', $toolNames);
+    }
+
+    public function testUnauthenticatedToolCallIsRejected(): void
+    {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize(anonymous: true);
+
         $this->client->request(
             'POST',
             '/mcp',
-            server: ['CONTENT_TYPE' => 'application/json'],
-            content: (string) json_encode($this->initializePayload()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json, text/event-stream',
+                'HTTP_MCP_PROTOCOL_VERSION' => self::PROTOCOL_VERSION,
+                'HTTP_MCP_SESSION_ID' => $sessionId,
+            ],
+            content: (string) json_encode([
+                'jsonrpc' => '2.0',
+                'id' => 3,
+                'method' => 'tools/call',
+                'params' => [
+                    'name' => 'rag_search',
+                    'arguments' => ['query' => 'secret'],
+                ],
+            ]),
         );
 
         $response = $this->client->getResponse();
@@ -48,6 +93,22 @@ final class McpControllerTest extends WebTestCase
             'resource_metadata=',
             (string) $response->headers->get('WWW-Authenticate'),
         );
+        self::assertStringNotContainsString('result', (string) $response->getContent());
+    }
+
+    public function testInvalidApiKeyDoesNotOpenDiscovery(): void
+    {
+        $this->client->request(
+            'POST',
+            '/mcp',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_API_KEY' => 'sk_not_a_real_key_000000000000',
+            ],
+            content: (string) json_encode($this->initializePayload()),
+        );
+
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
     }
 
     public function testUnknownSessionReturnsJsonRpcErrorNot500(): void
@@ -334,9 +395,9 @@ final class McpControllerTest extends WebTestCase
     /**
      * Runs the initialize handshake and returns the negotiated session id.
      */
-    private function initialize(?string $apiKey = null): string
+    private function initialize(?string $apiKey = null, bool $anonymous = false): string
     {
-        $result = $this->jsonRpc($this->initializePayload(), null, $apiKey);
+        $result = $this->jsonRpc($this->initializePayload(), null, $apiKey, $anonymous);
 
         self::assertArrayHasKey('result', $result, json_encode($result));
         self::assertArrayHasKey('serverInfo', $result['result']);
@@ -350,14 +411,16 @@ final class McpControllerTest extends WebTestCase
      *
      * @return array<string, mixed>
      */
-    private function jsonRpc(array $payload, ?string $sessionId, ?string $apiKey = null): array
+    private function jsonRpc(array $payload, ?string $sessionId, ?string $apiKey = null, bool $anonymous = false): array
     {
         $server = [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json, text/event-stream',
-            'HTTP_X_API_KEY' => $apiKey ?? self::API_KEY,
             'HTTP_MCP_PROTOCOL_VERSION' => self::PROTOCOL_VERSION,
         ];
+        if (!$anonymous) {
+            $server['HTTP_X_API_KEY'] = $apiKey ?? self::API_KEY;
+        }
         if (null !== $sessionId) {
             $server['HTTP_MCP_SESSION_ID'] = $sessionId;
         }

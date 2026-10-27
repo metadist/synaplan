@@ -50,9 +50,10 @@ use Symfony\Component\Cache\Psr16Cache;
  *
  * Design notes:
  *  - The server is rebuilt for every HTTP request so the registered tool
- *    closures can capture the authenticated {@see User}; authorization is always
- *    enforced per request by the Symfony `mcp` firewall, never by the MCP
- *    session. The MCP session only carries protocol plumbing (request counters,
+ *    closures can capture the authenticated {@see User}. `initialize` and
+ *    `tools/list` are public ({@see McpAnonymousAccess}); every other method
+ *    requires the Symfony `mcp` firewall user. The MCP session only carries
+ *    protocol plumbing (request counters,
  *    outgoing queues) and is persisted in the shared cache so the
  *    initialize → tools/list → tools/call round-trip survives across the
  *    stateless HTTP requests.
@@ -110,117 +111,8 @@ final class McpServerFactory
      */
     public function build(User $user, ?DesktopDevice $device = null): Server
     {
-        $builder = Server::builder()
-            ->setServerInfo(
-                self::SERVER_NAME,
-                self::SERVER_VERSION,
-                'Synaplan MCP server — knowledge retrieval (RAG) and user memories.',
-            )
-            ->setInstructions(
-                'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
-                .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
-                .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
-                .'store long-term memories; file_ingest to add documents to the knowledge base; and '
-                .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
-                .'Documents and memories are also available as resources, and task prompts as MCP '
-                .'prompts. Everything is scoped to the authenticated Synaplan account.',
-            )
-            ->setLogger($this->logger)
-            ->setSession($this->sessionStore())
-            ->addTool(
-                $this->chatHandler($user, $device),
-                'synaplan_chat',
-                'Synaplan chat',
-                'Send a message through Synaplan\'s full AI pipeline — intent classification, '
-                .'web search, RAG over the user\'s documents, long-term memories, and inference — '
-                .'and return the synthesized answer. This is richer than a raw model call: it uses '
-                .'the authenticated account\'s knowledge base and memories.',
-                // Not read-only (creates a message record), additive only, may reach the
-                // open web via the pipeline's web-search step.
-                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, openWorldHint: true),
-                self::chatSchema(),
-            )
-            ->addTool(
-                $this->ragSearchHandler($user),
-                'rag_search',
-                'RAG knowledge search',
-                'Semantic search across the authenticated user\'s vectorized documents and '
-                .'knowledge base. Returns the most relevant text chunks with similarity scores.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::ragSearchSchema(),
-            )
-            ->addTool(
-                $this->memorySearchHandler($user),
-                'memory_search',
-                'User memory search',
-                'Search the authenticated user\'s stored long-term memories (preferences, '
-                .'facts, context) using semantic similarity.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::memorySearchSchema(),
-            )
-            ->addTool(
-                $this->memoryAddHandler($user),
-                'memory_add',
-                'Add a user memory',
-                'Store a new long-term memory for the authenticated user — a durable fact or '
-                .'preference that Synaplan will recall in future conversations.',
-                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
-                self::memoryAddSchema(),
-            )
-            ->addTool(
-                $this->fileIngestHandler($user),
-                'file_ingest',
-                'Ingest a document for RAG',
-                'Add a text document to the authenticated user\'s knowledge base. The content is '
-                .'chunked, embedded, and stored so it becomes retrievable via rag_search.',
-                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
-                self::fileIngestSchema(),
-            )
-            ->addTool(
-                $this->ragSimilarHandler($user),
-                'rag_similar',
-                'Find similar chunks',
-                'Find document chunks similar to a given source message/document id (the '
-                .'`message_id` returned by rag_search).',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::ragSimilarSchema(),
-            )
-            ->addTool(
-                $this->listChatsHandler($user),
-                'list_chats',
-                'List chats',
-                'List the authenticated user\'s conversations (most recently updated first).',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::listChatsSchema(),
-            )
-            ->addTool(
-                $this->getMessagesHandler($user),
-                'get_messages',
-                'Get chat messages',
-                'Return the messages of one of the user\'s chats, in chronological order.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::getMessagesSchema(),
-            )
-            ->addTool(
-                $this->listPromptsHandler($user),
-                'list_prompts',
-                'List task prompts',
-                'List the user\'s available Synaplan task prompts (internal `tools:*` prompts excluded).',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::listPromptsSchema(),
-            );
-
-        if (null !== $this->assistantAliases) {
-            $builder->addTool(
-                $this->listAssistantsHandler($user, $device),
-                'list_assistants',
-                'List assistants',
-                'List assistants the authenticated user may use from a connected app. '
-                .'Each row includes slug, name, description, version and origin.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::listAssistantsSchema(),
-            );
-        }
+        $builder = $this->newBuilder();
+        $this->registerPublicTools($builder, $this->authenticatedHandlers($user, $device));
 
         $builder
             ->addResourceTemplate(
@@ -265,6 +157,94 @@ final class McpServerFactory
         $this->registerPrompts($builder, $user);
 
         return $builder->build();
+    }
+
+    /**
+     * Public catalog for unauthenticated discovery. Handlers refuse; the
+     * controller rejects tools/call before this server runs.
+     */
+    public function buildDiscovery(): Server
+    {
+        $builder = $this->newBuilder();
+        $this->registerPublicTools($builder, $this->discoveryHandlers());
+
+        return $builder->build();
+    }
+
+    private function newBuilder(): Builder
+    {
+        return Server::builder()
+            ->setServerInfo(
+                self::SERVER_NAME,
+                self::SERVER_VERSION,
+                'Synaplan MCP server — knowledge retrieval (RAG) and user memories.',
+            )
+            ->setInstructions(
+                'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
+                .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
+                .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
+                .'store long-term memories; file_ingest to add documents to the knowledge base; and '
+                .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
+                .'Documents and memories are also available as resources, and task prompts as MCP '
+                .'prompts. Everything is scoped to the authenticated Synaplan account. '
+                .'Calling a tool requires an API key.',
+            )
+            ->setLogger($this->logger)
+            ->setSession($this->sessionStore());
+    }
+
+    /**
+     * @param array<string, \Closure> $handlers
+     */
+    private function registerPublicTools(Builder $builder, array $handlers): void
+    {
+        (new McpPublicTools())->register($builder, $handlers, null !== $this->assistantAliases);
+    }
+
+    /**
+     * @return array<string, \Closure>
+     */
+    private function authenticatedHandlers(User $user, ?DesktopDevice $device): array
+    {
+        $handlers = [
+            'synaplan_chat' => $this->chatHandler($user, $device),
+            'rag_search' => $this->ragSearchHandler($user),
+            'memory_search' => $this->memorySearchHandler($user),
+            'memory_add' => $this->memoryAddHandler($user),
+            'file_ingest' => $this->fileIngestHandler($user),
+            'rag_similar' => $this->ragSimilarHandler($user),
+            'list_chats' => $this->listChatsHandler($user),
+            'get_messages' => $this->getMessagesHandler($user),
+            'list_prompts' => $this->listPromptsHandler($user),
+        ];
+        if (null !== $this->assistantAliases) {
+            $handlers['list_assistants'] = $this->listAssistantsHandler($user, $device);
+        }
+
+        return $handlers;
+    }
+
+    /**
+     * @return array<string, \Closure>
+     */
+    private function discoveryHandlers(): array
+    {
+        $refuse = static function (mixed ...$arguments): never {
+            throw new ToolCallException('Authentication required.');
+        };
+
+        return [
+            'synaplan_chat' => $refuse,
+            'rag_search' => $refuse,
+            'memory_search' => $refuse,
+            'memory_add' => $refuse,
+            'file_ingest' => $refuse,
+            'rag_similar' => $refuse,
+            'list_chats' => $refuse,
+            'get_messages' => $refuse,
+            'list_prompts' => $refuse,
+            'list_assistants' => $refuse,
+        ];
     }
 
     /**
@@ -1162,7 +1142,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function ragSimilarSchema(): array
+    public static function ragSimilarSchema(): array
     {
         return [
             'type' => 'object',
@@ -1188,7 +1168,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function listChatsSchema(): array
+    public static function listChatsSchema(): array
     {
         return [
             'type' => 'object',
@@ -1208,7 +1188,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function getMessagesSchema(): array
+    public static function getMessagesSchema(): array
     {
         return [
             'type' => 'object',
@@ -1233,7 +1213,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function listPromptsSchema(): array
+    public static function listPromptsSchema(): array
     {
         return [
             'type' => 'object',
@@ -1245,7 +1225,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function chatSchema(): array
+    public static function chatSchema(): array
     {
         return [
             'type' => 'object',
@@ -1276,7 +1256,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function listAssistantsSchema(): array
+    public static function listAssistantsSchema(): array
     {
         return [
             'type' => 'object',
@@ -1288,7 +1268,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function ragSearchSchema(): array
+    public static function ragSearchSchema(): array
     {
         return [
             'type' => 'object',
@@ -1324,7 +1304,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function fileIngestSchema(): array
+    public static function fileIngestSchema(): array
     {
         return [
             'type' => 'object',
@@ -1352,7 +1332,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function memoryAddSchema(): array
+    public static function memoryAddSchema(): array
     {
         return [
             'type' => 'object',
@@ -1380,7 +1360,7 @@ final class McpServerFactory
     /**
      * @return array<string, mixed>
      */
-    private static function memorySearchSchema(): array
+    public static function memorySearchSchema(): array
     {
         return [
             'type' => 'object',

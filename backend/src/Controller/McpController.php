@@ -7,9 +7,11 @@ namespace App\Controller;
 use App\Entity\ApiKey;
 use App\Entity\DesktopDevice;
 use App\Entity\User;
+use App\Mcp\McpAnonymousAccess;
 use App\Mcp\McpServerFactory;
 use App\Repository\DesktopDeviceRepository;
 use GuzzleHttp\Psr7\ServerRequest;
+use Mcp\Server;
 use Mcp\Server\Transport\Http\Middleware\DnsRebindingProtectionMiddleware;
 use Mcp\Server\Transport\Http\Middleware\ProtocolVersionMiddleware;
 use Mcp\Server\Transport\StreamableHttpTransport;
@@ -27,10 +29,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Model Context Protocol (MCP) server endpoint.
  *
  * Exposes Synaplan capabilities to external MCP hosts (Claude, Cursor, …) over
- * the spec's Streamable HTTP transport. Authentication is handled by the
- * dedicated `mcp` Symfony firewall (API key or OIDC bearer) — this controller
- * only runs once a user is authenticated and drives the official `mcp/sdk`
- * server with a per-request, user-scoped tool catalog.
+ * the spec's Streamable HTTP transport. API key or OIDC bearer authenticates
+ * a user when one is presented. `initialize` and `tools/list` are public so a
+ * registry can read the tool catalog; every other method without a user is
+ * rejected with 401 and the RFC 9728 challenge.
  *
  * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports/streamable-http
  */
@@ -45,6 +47,7 @@ class McpController extends AbstractController
         private readonly LoggerInterface $logger,
         private readonly string $appUrl,
         private readonly string $oidcDiscoveryUrl,
+        private readonly McpAnonymousAccess $anonymousAccess,
         string $mcpAllowedHosts,
     ) {
         $this->extraAllowedHosts = array_values(array_filter(array_map(
@@ -60,9 +63,7 @@ class McpController extends AbstractController
             return new Response('', Response::HTTP_NO_CONTENT, ['Allow' => 'POST, DELETE, OPTIONS']);
         }
 
-        // The firewall guarantees authentication for POST/DELETE; this is a
-        // defensive belt-and-braces check.
-        if (!$user instanceof User) {
+        if (!$user instanceof User && !$this->anonymousAccess->allows($request)) {
             return $this->unauthorized();
         }
 
@@ -77,10 +78,10 @@ class McpController extends AbstractController
             ],
         );
 
-        $device = $this->resolveDesktopDevice($request);
+        $device = $user instanceof User ? $this->resolveDesktopDevice($request) : null;
 
         try {
-            $psrResponse = $this->serverFactory->build($user, $device)->run($transport);
+            $psrResponse = $this->serverFor($user, $device)->run($transport);
         } catch (\InvalidArgumentException $e) {
             // A malformed / unknown `Mcp-Session-Id` makes the SDK throw while
             // parsing the header (Uuid::fromString) instead of producing a
@@ -98,6 +99,15 @@ class McpController extends AbstractController
         }
 
         return $this->toSymfonyResponse($psrResponse);
+    }
+
+    private function serverFor(?User $user, ?DesktopDevice $device): Server
+    {
+        if ($user instanceof User) {
+            return $this->serverFactory->build($user, $device);
+        }
+
+        return $this->serverFactory->buildDiscovery();
     }
 
     /**
