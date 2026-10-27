@@ -315,6 +315,73 @@ final class PlatformLinkController extends AbstractController
         return $this->json($result);
     }
 
+    #[Route('/sso/background-key', name: 'sso_background_key', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/platform-links/sso/background-key',
+        operationId: 'platformSsoBackgroundKey',
+        summary: 'Mint the key used while the person is away',
+        description: 'Requires the person\'s live bearer token and the instance credential, and an active organisation-login identity. Scopes are exactly files, rag and cloud:watch. The plaintext key is returned once; a later call returns the same key id without it.',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['external_id'],
+                properties: [
+                    new OA\Property(property: 'external_id', type: 'string', example: 'ada', description: 'The platform user id.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Key minted, or the existing key named again',
+                content: new OA\JsonContent(
+                    required: ['success', 'api_key_id', 'scopes'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'api_key_id', type: 'integer'),
+                        new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string'), example: ['files', 'rag', 'cloud:watch']),
+                        new OA\Property(property: 'key', type: 'string', description: 'Plaintext key. Present only on the first mint.'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Bearer token or instance credential missing'),
+            new OA\Response(response: 403, description: 'Not bound, turned off, or not organisation login'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function ssoBackgroundKey(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user?->getId());
+        if (!$user instanceof User) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!is_array($request->attributes->get(OidcBearerAuthenticator::CLAIMS_ATTRIBUTE))) {
+            return $this->json(['success' => false, 'error' => 'unauthorized', 'code' => 'unauthorized', 'message' => 'Organisation login is required.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $body = $this->jsonBody($request);
+
+        try {
+            $result = $this->sso->backgroundKey(
+                $user,
+                $this->azp($request),
+                $this->credential($request),
+                is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
+                $request->getClientIp() ?? '',
+            );
+        } catch (PlatformSsoException $e) {
+            return $this->ssoError($e);
+        }
+
+        return $this->json($result);
+    }
+
     #[Route('/identities/adopt', name: 'identities_adopt', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/platform-links/identities/adopt',

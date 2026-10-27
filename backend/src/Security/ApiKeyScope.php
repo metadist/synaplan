@@ -91,6 +91,12 @@ final class ApiKeyScope
     public const PLATFORM_MEMORIES = 'memories';
 
     /**
+     * Unattended watches and trials. Existing linked and provisioned keys
+     * never gain this; a person grants it on purpose.
+     */
+    public const PLATFORM_WATCH = 'cloud:watch';
+
+    /**
      * Routes outside the prefix map that the platform-link apps call with a
      * person's key: summarize and translate, chat, media, and the memory
      * check before a chat (provisioned keys never carry `memories`). Exact
@@ -105,6 +111,8 @@ final class ApiKeyScope
         'POST /v1/chat/completions' => [self::PLATFORM_CHAT],
         'GET /api/v1/config/memory-service/check' => [self::PLATFORM_CHAT, self::PLATFORM_MEMORIES],
         'POST /api/v1/platform-links/identities/adopt' => [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG],
+        'POST /api/v1/cloud/status' => [self::PLATFORM_FILES],
+        'POST /api/v1/cloud/trials' => [self::PLATFORM_WATCH],
     ];
 
     /**
@@ -246,6 +254,45 @@ final class ApiKeyScope
     }
 
     /**
+     * The only scopes a background key carries: upload watched files and
+     * run the person's watches. No chat, no memories.
+     *
+     * @return list<string>
+     */
+    public static function backgroundKeyScopes(): array
+    {
+        return [self::PLATFORM_FILES, self::PLATFORM_RAG, self::PLATFORM_WATCH];
+    }
+
+    /**
+     * Pinning a chat turn into a watch is a signed-in action in Synaplan.
+     * Every API key is refused, including a legacy or `*` key. Every method
+     * is refused: `$method` is part of the call shape and is not a filter.
+     */
+    public static function isSessionOnly(string $method, string $path): bool
+    {
+        return self::matchesPrefix(self::decodedPath($path), '/api/v1/cloud/watches/from-message');
+    }
+
+    /**
+     * Symfony matches the decoded path. One decode is not enough for a
+     * double-encoded segment (`%2566` → `%66` → `f`).
+     */
+    private static function decodedPath(string $path): string
+    {
+        $current = $path;
+        for ($i = 0; $i < 3; ++$i) {
+            $next = rawurldecode($current);
+            if ($next === $current) {
+                return $current;
+            }
+            $current = $next;
+        }
+
+        return $current;
+    }
+
+    /**
      * A Synaplan Demo key: the scope list is exactly `['freeapi']`. Only such a
      * key is ever gated by the Demo plugin.
      *
@@ -327,6 +374,9 @@ final class ApiKeyScope
      *   POST /api/v1/summary/generate, POST /api/v1/media/generate,
      *   POST /v1/chat/completions → also chat (exact routes, PLATFORM_ROUTES)
      *   POST /api/v1/platform-links/identities/adopt → chat, files or rag
+     *   POST /api/v1/cloud/status, GET /api/v1/cloud/files → files
+     *   /api/v1/cloud/watches (not from-message), POST /api/v1/cloud/trials → cloud:watch
+     *   POST /api/v1/cloud/watches/from-message → no key (session only)
      *   GET /api/v1/config/memory-service/check → chat OR memories
      *   /api/v1/auth/me          → any key except one naming `freeapi`
      *                              (self-service identity, see SELF_SERVICE_PATHS)
@@ -340,6 +390,10 @@ final class ApiKeyScope
     public static function allows(array $scopes, string $path, string $method = ''): bool
     {
         $normalized = self::normalize($scopes);
+
+        if (self::isSessionOnly($method, $path)) {
+            return false;
+        }
 
         // A Demo key belongs to the shared Demo account; "who am I" would hand
         // that account's identity to every install holding a key.
@@ -419,10 +473,21 @@ final class ApiKeyScope
             return [self::DESKTOP_FILES, self::ADDIN_FILES, self::PLATFORM_FILES];
         }
 
+        $path = self::decodedPath($path);
+
+        if (self::isSessionOnly($method, $path)) {
+            return [];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/cloud/watches')) {
+            return [self::PLATFORM_WATCH];
+        }
+
         if ('POST' === strtoupper($method) && '/api/v1/cloud/status' === $path) {
             return [self::PLATFORM_FILES];
         }
-        if ('GET' === strtoupper($method) && 1 === preg_match('#^/api/v1/cloud/files/[^/]+$#', $path)) {
+
+        if ('GET' === strtoupper($method) && self::matchesPrefix($path, '/api/v1/cloud/files')) {
             return [self::PLATFORM_FILES];
         }
 
