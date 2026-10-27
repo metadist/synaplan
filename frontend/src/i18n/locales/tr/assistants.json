@@ -269,13 +269,16 @@
       "unknownKey": "Bu dosyada bu Synaplan’ın tanımadığı bir alan var ({detail})",
       "needsModel": "Bir model gerekli — içe aktardıktan sonra seçin ({key})",
       "needsKey": "Bir anahtar gerekli — Bağlantılar altına ekleyin ({key})",
+      "needsCredential": "Bir oturum açma veya anahtar gerekli — içe aktardıktan sonra ekleyin ({key})",
       "needsMcpServer": "{detail} adlı bir MCP sunucusu gerekli",
       "needsMailbox": "Bir posta kutusu gerekli — içe aktardıktan sonra bağlayın ({key})",
       "needsWidget": "Bir site widget’ı gerekli — içe aktardıktan sonra bağlayın ({key})",
       "needsWhatsapp": "Bir WhatsApp numarası gerekli — içe aktardıktan sonra bağlayın ({key})",
       "schedulesOff": "Zamanlamalar siz açana kadar kapalı ({key})",
+      "writeOff": "{detail} için yazma işlemleri kapalı kalır — isterseniz kendiniz açın",
       "droppedFolders": "Paylaşılan klasörler dahil edilmedi ({key})",
       "conflict": "Zaten var — değiştirmezseniz atlanır ({key})",
+      "addressDiffers": "{detail} adlı bir sunucunuz zaten başka bir adreste var — olduğu gibi kalır, bu atlanır",
       "skipped": "Atlandı ({key})"
     },
     "publishedOnly": "Yalnızca yayınlanmış asistanlar dahildir. Taslaklar bu hesapta kalır."

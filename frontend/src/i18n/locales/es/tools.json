@@ -303,6 +303,7 @@
     "emptyHint": "Empieza con un formulario en blanco o elige un sistema conocido para rellenar el nombre y los valores por defecto. Puedes cambiar o borrar esa elección en cualquier momento.",
     "nameLabel": "Nombre",
     "urlLabel": "URL del servidor",
+    "addressDropsKey": "Al guardar otro host se elimina el valor de la cabecera de autenticación guardado. Vuelva a introducirlo abajo.",
     "authHeaderLabel": "Nombre de la cabecera de autenticación (opcional)",
     "authTokenLabel": "Valor de la cabecera de autenticación",
     "authTokenPlaceholder": "p. ej. Bearer sk-…",

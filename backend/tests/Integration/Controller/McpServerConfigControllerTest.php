@@ -128,6 +128,30 @@ class McpServerConfigControllerTest extends WebTestCase
         $this->createdIds = [];
     }
 
+    public function testTheSavedKeyStaysWithItsHost(): void
+    {
+        $data = $this->request('POST', '/api/v1/mcp-servers', [
+            'name' => 'CRM address test',
+            'url' => 'https://crm.example.com/mcp',
+            'auth_header' => 'Authorization',
+            'auth_token' => 'Bearer key-1',
+        ]);
+        $serverId = (int) $data['server']['id'];
+        $this->createdIds[] = $serverId;
+
+        $pathOnly = $this->request('PATCH', "/api/v1/mcp-servers/{$serverId}", ['url' => 'https://crm.example.com/v2/mcp']);
+        self::assertTrue($pathOnly['server']['has_auth_token'], 'a new path on the same host keeps the key');
+
+        $otherHost = $this->request('PATCH', "/api/v1/mcp-servers/{$serverId}", ['url' => 'https://crm.example.org/mcp']);
+        self::assertFalse($otherHost['server']['has_auth_token'], 'another host never receives the saved key');
+
+        $withKey = $this->request('PATCH', "/api/v1/mcp-servers/{$serverId}", [
+            'url' => 'https://crm.example.net/mcp',
+            'auth_token' => 'Bearer key-2',
+        ]);
+        self::assertTrue($withKey['server']['has_auth_token'], 'a key sent with the new host is kept');
+    }
+
     public function testPrivateUrlIsRejected(): void
     {
         $data = $this->request('POST', '/api/v1/mcp-servers', [

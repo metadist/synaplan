@@ -303,6 +303,7 @@
     "emptyHint": "Boş bir formla başlayın veya adı ve varsayılanları doldurmak için bilinen bir sistem seçin. Bu seçimi istediğiniz zaman değiştirebilir veya temizleyebilirsiniz.",
     "nameLabel": "Ad",
     "urlLabel": "Sunucu URL'si",
+    "addressDropsKey": "Farklı bir ana makine kaydetmek, kayıtlı kimlik doğrulama başlığı değerini siler. Aşağıya yeniden girin.",
     "authHeaderLabel": "Kimlik doğrulama başlığı adı (isteğe bağlı)",
     "authTokenLabel": "Kimlik doğrulama başlığı değeri",
     "authTokenPlaceholder": "örn. Bearer sk-…",

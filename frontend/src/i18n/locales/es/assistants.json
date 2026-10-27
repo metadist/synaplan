@@ -269,13 +269,16 @@
       "unknownKey": "Este archivo tiene un campo que este Synaplan no reconoce ({detail})",
       "needsModel": "Necesita un modelo — elija uno después de importar ({key})",
       "needsKey": "Necesita una clave — añádala en Conexiones ({key})",
+      "needsCredential": "Necesita un inicio de sesión o una clave — añádalo después de importar ({key})",
       "needsMcpServer": "Necesita un servidor MCP llamado {detail}",
       "needsMailbox": "Necesita un buzón — conéctelo después de importar ({key})",
       "needsWidget": "Necesita un widget del sitio — conéctelo después de importar ({key})",
       "needsWhatsapp": "Necesita un número de WhatsApp — conéctelo después de importar ({key})",
       "schedulesOff": "Las programaciones están apagadas hasta que las active ({key})",
+      "writeOff": "Las acciones de escritura quedan desactivadas para {detail} — actívelas usted si las necesita",
       "droppedFolders": "Las carpetas compartidas no se incluyeron ({key})",
       "conflict": "Ya existe — se omitirá salvo que lo reemplace ({key})",
+      "addressDiffers": "Ya tiene un servidor llamado {detail} con otra dirección — se queda como está y este se omite",
       "skipped": "Omitido ({key})"
     },
     "publishedOnly": "Solo se incluyen los asistentes publicados. Los borradores se quedan en esta cuenta."

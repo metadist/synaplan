@@ -300,6 +300,7 @@
     "emptyHint": "Starte mit einem leeren Formular oder wähle ein bekanntes System, um Name und Vorgaben vorauszufüllen. Die Wahl kannst du jederzeit ändern oder wieder aufheben.",
     "nameLabel": "Name",
     "urlLabel": "Server-URL",
+    "addressDropsKey": "Wenn Sie einen anderen Host speichern, wird der gespeicherte Auth-Header-Wert entfernt. Geben Sie ihn unten erneut ein.",
     "authHeaderLabel": "Auth-Header-Name (optional)",
     "authTokenLabel": "Auth-Header-Wert",
     "authTokenPlaceholder": "z. B. Bearer sk-…",

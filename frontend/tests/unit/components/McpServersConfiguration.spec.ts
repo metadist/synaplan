@@ -519,3 +519,49 @@ describe('McpServersConfiguration — OAuth disconnect', () => {
     expect(wrapper.find('[data-testid="btn-mcp-oauth-disconnect-3"]').exists()).toBe(true)
   })
 })
+
+describe('McpServersConfiguration — address and saved key', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [mockServer],
+    })
+    mockGetPrompts.mockResolvedValue([])
+  })
+
+  const editUrl = async (url: string) => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+    await wrapper.find('[data-testid="btn-mcp-edit-3"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="input-mcp-url"]').setValue(url)
+    return wrapper
+  }
+
+  it('says the saved key goes when the host changes', async () => {
+    const wrapper = await editUrl('https://other.example.com/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-key"]').text()).toContain(
+      'removes the saved auth header value'
+    )
+  })
+
+  it('stays quiet for a new path on the same host', async () => {
+    const wrapper = await editUrl('https://web.synaplan.com/v2/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-key"]').exists()).toBe(false)
+  })
+
+  it('stays quiet when there is no saved key', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [{ ...mockServer, has_auth_token: false }],
+    })
+    const wrapper = await editUrl('https://other.example.com/mcp')
+
+    expect(wrapper.find('[data-testid="mcp-address-drops-key"]').exists()).toBe(false)
+  })
+})

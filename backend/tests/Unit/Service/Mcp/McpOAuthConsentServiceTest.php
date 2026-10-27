@@ -17,6 +17,7 @@ use App\Service\Mcp\McpOAuthState;
 use App\Service\OAuth\OAuthClient;
 use App\Service\OAuth\OAuthStateService;
 use App\Service\Security\EncryptionService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -29,8 +30,8 @@ final class McpOAuthConsentServiceTest extends TestCase
     {
         $encryption = new EncryptionService('test-secret', new NullLogger());
         $server = $this->server();
-        $repo = $this->createMock(McpServerConfigRepository::class);
-        $repo->expects(self::once())->method('save')->with($server);
+        $repo = $this->storingRepository();
+        $repo->expects(self::once())->method('storeOAuthStateAt');
 
         $service = $this->service($encryption, $repo, $this->tokenClient([]));
 
@@ -62,6 +63,7 @@ final class McpOAuthConsentServiceTest extends TestCase
         $cache = new ArrayAdapter();
         $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
         $server = $this->server();
+        $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
         $server->setDecryptedOAuthState(new McpOAuthState(
             resource: 'https://mcp.notion.com/mcp',
             authorizationEndpoint: 'https://mcp.notion.com/authorize',
@@ -70,9 +72,9 @@ final class McpOAuthConsentServiceTest extends TestCase
             scopes: ['default'],
         ), $encryption);
 
-        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo = $this->storingRepository();
         $repo->method('findByIdAndUser')->willReturn($server);
-        $repo->expects(self::once())->method('save');
+        $repo->expects(self::once())->method('storeOAuthStateAt');
 
         $oauth = $this->tokenClient([
             new MockResponse((string) json_encode([
@@ -86,7 +88,12 @@ final class McpOAuthConsentServiceTest extends TestCase
 
         $nonce = bin2hex(random_bytes(16));
         $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', $nonce));
-        $item->set(['verifier' => 'the-verifier', 'owner_id' => 7, 'server_id' => 42]);
+        $item->set([
+            'verifier' => 'the-verifier',
+            'owner_id' => 7,
+            'server_id' => 42,
+            'server_url' => 'https://mcp.notion.com/mcp',
+        ]);
         $cache->save($item);
 
         $signed = $stateService->generateState(McpOAuthConsentService::PROVIDER, [
@@ -101,6 +108,146 @@ final class McpOAuthConsentServiceTest extends TestCase
         self::assertSame('at-1', $stored->accessToken);
         self::assertSame('rt-1', $stored->refreshToken);
         self::assertSame(McpOAuthState::STATUS_CONNECTED, $stored->status);
+    }
+
+    public function testStartRemembersTheAddressForTheCallback(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $cache = new ArrayAdapter();
+        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $server = $this->server();
+
+        $service = $this->service(
+            $encryption,
+            $this->storingRepository(),
+            $this->tokenClient([]),
+            cache: $cache,
+            state: $stateService,
+        );
+
+        $url = $service->start($server, 7);
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $payload = $stateService->validateState((string) $query['state'], McpOAuthConsentService::PROVIDER);
+        self::assertIsArray($payload);
+        $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', (string) $payload['pkce_nonce']));
+        self::assertTrue($item->isHit());
+        self::assertSame('https://mcp.notion.com/mcp', $item->get()['server_url']);
+    }
+
+    public function testCompleteIsRefusedWhenTheAddressChangedSinceStart(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $cache = new ArrayAdapter();
+        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $server = $this->server();
+        $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $server->setUrl('https://mcp.other.example/mcp');
+
+        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo->method('findByIdAndUser')->willReturn($server);
+        $repo->expects(self::never())->method('storeOAuthStateAt');
+
+        $service = $this->service($encryption, $repo, $this->tokenClient([]), cache: $cache, state: $stateService);
+
+        $nonce = bin2hex(random_bytes(16));
+        $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', $nonce));
+        $item->set([
+            'verifier' => 'the-verifier',
+            'owner_id' => 7,
+            'server_id' => 42,
+            'server_url' => 'https://mcp.notion.com/mcp',
+        ]);
+        $cache->save($item);
+
+        $signed = $stateService->generateState(McpOAuthConsentService::PROVIDER, [
+            'owner_id' => 7,
+            'server_id' => 42,
+            'pkce_nonce' => $nonce,
+        ]);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/address changed/');
+
+        $service->complete('the-code', $signed);
+    }
+
+    public function testStartStoresNothingWhenTheAddressChangedMeanwhile(): void
+    {
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/address changed/');
+
+        $this->service(
+            new EncryptionService('test-secret', new NullLogger()),
+            $this->storingRepository(stores: false),
+            $this->tokenClient([]),
+        )->start($this->server(), 7);
+    }
+
+    public function testCompleteIsRefusedWhenTheServerNoLongerUsesSignIn(): void
+    {
+        [$service, $signed] = $this->pendingCallback($this->server(), $this->createMock(McpServerConfigRepository::class));
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/no longer uses sign-in/');
+
+        $service->complete('the-code', $signed);
+    }
+
+    public function testCompleteStoresNothingWhenAnEditWinsTheRace(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $server = $this->server();
+        $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $server->setDecryptedOAuthState(new McpOAuthState(
+            resource: 'https://mcp.notion.com/mcp',
+            tokenEndpoint: 'https://mcp.notion.com/token',
+            clientId: 'atcl-new',
+        ), $encryption);
+
+        [$service, $signed] = $this->pendingCallback($server, $this->storingRepository(stores: false), [
+            new MockResponse((string) json_encode(['access_token' => 'at-1', 'expires_in' => 3600]), ['http_code' => 200]),
+        ], $encryption);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/address changed/');
+
+        $service->complete('the-code', $signed);
+    }
+
+    /**
+     * @param list<MockResponse> $tokenResponses
+     *
+     * @return array{0: McpOAuthConsentService, 1: string}
+     */
+    private function pendingCallback(
+        McpServerConfig $server,
+        McpServerConfigRepository&MockObject $repo,
+        array $tokenResponses = [],
+        ?EncryptionService $encryption = null,
+    ): array {
+        $cache = new ArrayAdapter();
+        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $repo->method('findByIdAndUser')->willReturn($server);
+
+        $service = $this->service(
+            $encryption ?? new EncryptionService('test-secret', new NullLogger()),
+            $repo,
+            $this->tokenClient($tokenResponses),
+            cache: $cache,
+            state: $stateService,
+        );
+
+        $nonce = bin2hex(random_bytes(16));
+        $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', $nonce));
+        $item->set(['verifier' => 'v', 'owner_id' => 7, 'server_id' => 42, 'server_url' => $server->getUrl()]);
+        $cache->save($item);
+
+        return [$service, $stateService->generateState(McpOAuthConsentService::PROVIDER, [
+            'owner_id' => 7,
+            'server_id' => 42,
+            'pkce_nonce' => $nonce,
+        ])];
     }
 
     public function testReplayedCallbackIsRejected(): void
@@ -187,5 +334,28 @@ final class McpOAuthConsentServiceTest extends TestCase
         $ref->setValue($server, 42);
 
         return $server;
+    }
+
+    /**
+     * A repository whose conditional sign-in write behaves like the real one
+     * when the row is unchanged: it stores the state on the entity.
+     */
+    private function storingRepository(bool $stores = true): McpServerConfigRepository&MockObject
+    {
+        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo->method('storeOAuthStateAt')->willReturnCallback(
+            static function (McpServerConfig $server, string $url, string $encrypted, bool $startingSignIn = false) use ($stores): bool {
+                if ($stores) {
+                    (new \ReflectionProperty(McpServerConfig::class, 'oauth'))->setValue($server, $encrypted);
+                    if ($startingSignIn) {
+                        (new \ReflectionProperty(McpServerConfig::class, 'authMode'))->setValue($server, McpServerConfig::AUTH_MODE_OAUTH);
+                    }
+                }
+
+                return $stores;
+            }
+        );
+
+        return $repo;
     }
 }

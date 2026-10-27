@@ -103,10 +103,13 @@ final readonly class McpOAuthTokenProvider
                 includeScopeInTokenRequests: false,
             );
 
+            $url = $server->getUrl();
             $tokens = $this->oauth->refresh($provider, $state->refreshToken);
             $updated = $state->withTokens($tokens->accessToken, $tokens->refreshToken, $tokens->expiresAt);
-            $server->setDecryptedOAuthState($updated, $this->encryption);
-            $this->servers->save($server);
+            // The refresh is a network call: an edit that landed meanwhile wins.
+            if (!$this->servers->storeOAuthStateAt($server, $url, McpServerConfig::encryptOAuthState($updated, $this->encryption))) {
+                throw new McpOAuthReauthRequiredException('This server changed while its sign-in was renewed. Please sign in again.');
+            }
 
             return $tokens->accessToken;
         } catch (OAuthReauthRequiredException $e) {
@@ -128,7 +131,10 @@ final readonly class McpOAuthTokenProvider
     public function markReauthRequired(McpServerConfig $server, ?McpOAuthState $state = null): void
     {
         $state ??= $server->getDecryptedOAuthState($this->encryption);
-        $server->setDecryptedOAuthState($state->withStatus(McpOAuthState::STATUS_REAUTH_REQUIRED), $this->encryption);
-        $this->servers->save($server);
+        $this->servers->storeOAuthStateAt(
+            $server,
+            $server->getUrl(),
+            McpServerConfig::encryptOAuthState($state->withStatus(McpOAuthState::STATUS_REAUTH_REQUIRED), $this->encryption),
+        );
     }
 }

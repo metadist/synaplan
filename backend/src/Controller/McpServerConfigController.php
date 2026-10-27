@@ -422,6 +422,11 @@ final class McpServerConfigController extends AbstractController
         if (array_key_exists('auth_header', $data) && is_string($data['auth_header'])) {
             $server->setAuthHeader(trim($data['auth_header']));
         }
+        // After the address and the mode: changing either drops the stored
+        // credential, and a key sent in the same request must survive that.
+        if (array_key_exists('auth_mode', $data) && is_string($data['auth_mode'])) {
+            $server->setAuthMode($data['auth_mode']);
+        }
         // The auth value is write-only: absent key = keep the stored secret;
         // empty string = clear it; anything else = replace it.
         if (array_key_exists('auth_token', $data) && is_string($data['auth_token'])) {
@@ -432,9 +437,6 @@ final class McpServerConfigController extends AbstractController
         }
         if (array_key_exists('allow_write', $data)) {
             $server->setAllowWrite((bool) $data['allow_write']);
-        }
-        if (array_key_exists('auth_mode', $data) && is_string($data['auth_mode'])) {
-            $server->setAuthMode($data['auth_mode']);
         }
     }
 
