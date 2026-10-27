@@ -73,6 +73,16 @@ const title = computed(() => `taskPlan.capability.${props.card.capability}`)
 
 const isMediaKind = computed(() => ['image', 'video', 'audio'].includes(props.card.kind))
 
+// A fetch step can return a picture without itself being an image step.
+// The file event records that on mediaType; the card kind stays the step.
+const renderedMediaKind = computed(() => {
+  const media = (props.card.mediaType ?? '').toLowerCase()
+  if (media === 'image' || media === 'video' || media === 'audio') {
+    return media
+  }
+  return props.card.kind
+})
+
 const showSkeleton = computed(
   () =>
     isMediaKind.value &&
@@ -503,7 +513,7 @@ const outputShown = computed(() =>
       </div>
 
       <!-- Resolved media: never collapsed; download + image lightbox (#1229) -->
-      <TaskCardMedia v-if="card.url" :kind="card.kind" :url="card.url" />
+      <TaskCardMedia v-if="card.url" :kind="renderedMediaKind" :url="card.url" />
 
       <!-- Media skeleton while waiting -->
       <div

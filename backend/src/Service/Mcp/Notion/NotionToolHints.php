@@ -22,6 +22,7 @@ final class NotionToolHints
     private const READ = [
         'search',
         'fetch',
+        'get-file-download-urls',
         'get-comments',
         'get-users',
         'get-teams',

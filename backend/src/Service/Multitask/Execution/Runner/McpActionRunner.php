@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Mcp\AtlassianToolArguments;
+use App\Service\Mcp\McpArgumentSchema;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
@@ -134,13 +135,16 @@ final readonly class McpActionRunner implements TaskRunner
         }
 
         $sourceText = (string) $context->message->getText();
-        $arguments = (new NotionPageWrite($this->client, $this->toolRegistry, new NotionFetchArguments($this->logger), $this->logger))
-            ->complete(
-                $server,
-                $catalogTool,
-                $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
-                $sourceText,
-            );
+        $arguments = McpArgumentSchema::clean(
+            (new NotionPageWrite($this->client, $this->toolRegistry, new NotionFetchArguments($this->logger), $this->logger))
+                ->complete(
+                    $server,
+                    $catalogTool,
+                    $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
+                    $sourceText,
+                ),
+            $catalogTool['inputSchema'],
+        );
         $refusal = StructuredField::hasUnresolved($arguments)
             ? sprintf('The earlier step did not say which item to change, so nothing was sent to %s and nothing was changed.', $server->getName())
             : NotionPageWrite::refusal($server->getUrl(), $tool, $arguments);
@@ -328,7 +332,7 @@ final readonly class McpActionRunner implements TaskRunner
             || !$this->routingConfig->isFeatureEnabled(MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED, $userId, false)) {
             return $payload;
         }
-        if ('' === $topic || 'UNKNOWN' === $topic) {
+        if ('' === $topic || 'unknown' === strtolower($topic) || in_array($topic, ['CHAT', 'CONTINUE'], true)) {
             $topic = 'general';
         }
 

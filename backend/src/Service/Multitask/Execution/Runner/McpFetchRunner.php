@@ -7,11 +7,15 @@ namespace App\Service\Multitask\Execution\Runner;
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\AtlassianToolArguments;
+use App\Service\Mcp\McpArgumentSchema;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
+use App\Service\Mcp\Notion\NotionImageAttach;
+use App\Service\Mcp\Notion\NotionImagePlan;
+use App\Service\Mcp\Notion\NotionToolHints;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -56,6 +60,7 @@ final readonly class McpFetchRunner implements TaskRunner
         private LoggerInterface $logger,
         private AtlassianToolArguments $atlassianArguments,
         private NotionFetchArguments $notionFetch,
+        private NotionImageAttach $images,
     ) {
     }
 
@@ -77,6 +82,8 @@ final readonly class McpFetchRunner implements TaskRunner
                 enabledFlag: MultitaskRoutingConfig::KEY_MCP_FETCH_ENABLED,
                 enabledDefault: false,
                 requiresDynamicNote: true,
+                available: null,
+                planAdjuster: fn (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array => $this->adjustNotionImagePlan($payload, $messageText, $userId, $allowed, $topic),
             ),
         ];
     }
@@ -119,12 +126,23 @@ final readonly class McpFetchRunner implements TaskRunner
         }
 
         $sourceText = (string) $context->message->getText();
-        $arguments = $this->notionFetch->complete(
-            $server,
-            $catalogTool,
-            $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
-            $sourceText,
+        $arguments = McpArgumentSchema::clean(
+            $this->notionFetch->complete(
+                $server,
+                $catalogTool,
+                $this->atlassianArguments->complete($server, $catalogTool, $this->resolveArguments($node, $context), $sourceText),
+                $sourceText,
+            ),
+            $catalogTool['inputSchema'],
         );
+
+        if ($this->images->applies($server->getUrl(), $tool, $arguments)) {
+            if ($userId <= 0) {
+                return NodeResult::failed('this data connection is not available');
+            }
+
+            return $this->images->attach($server, $tool, $arguments, $userId);
+        }
 
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
@@ -282,6 +300,78 @@ final readonly class McpFetchRunner implements TaskRunner
     }
 
     /**
+     * An image the person wants from Notion still needs a fresh search. A
+     * chat-only plan, including the fallback after an earlier Notion turn,
+     * never reaches the connection.
+     *
+     * @param array<string, mixed> $payload
+     * @param list<string>|null    $allowed
+     *
+     * @return array<string, mixed>
+     */
+    private function adjustNotionImagePlan(array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array
+    {
+        if (!(new \ReflectionProperty(self::class, 'clientConfig'))->isInitialized($this)) {
+            return $payload;
+        }
+        if (null !== $allowed && (!in_array(Capability::McpFetch->value, $allowed, true) || !in_array(Capability::ComposeReply->value, $allowed, true))) {
+            return $payload;
+        }
+        if (null === $userId || $userId <= 0
+            || !$this->clientConfig->isClientEnabled($userId)
+            || !$this->routingConfig->isFeatureEnabled(MultitaskRoutingConfig::KEY_MCP_FETCH_ENABLED, $userId, false)) {
+            return $payload;
+        }
+        // The stream writes CHAT before classification. That is not a prompt
+        // topic, so it must not hide a connection the person named.
+        if (self::isPlaceholderTopic($topic)) {
+            $topic = 'general';
+        }
+
+        $server = null;
+        foreach ($this->servers->findEnabledByUser($userId) as $candidate) {
+            if (NotionToolHints::HOST !== strtolower((string) parse_url($candidate->getUrl(), PHP_URL_HOST))) {
+                continue;
+            }
+            if (!$this->topicAllowsServer($userId, ['topic' => $topic], (int) $candidate->getId())) {
+                continue;
+            }
+            $server = $candidate;
+            break;
+        }
+        if (null === $server || !NotionImagePlan::mentions($messageText, $server->getName())) {
+            return $payload;
+        }
+
+        $search = null;
+        $urls = null;
+        foreach ($this->toolRegistry->toolsFor($server) as $tool) {
+            $bare = strtolower($tool['name']);
+            $bare = str_starts_with($bare, 'notion-') ? substr($bare, strlen('notion-')) : $bare;
+            if ('search' === $bare && null === $search) {
+                $search = $tool['name'];
+            }
+            if (NotionImagePlan::URLS_TOOL === $bare && null === $urls) {
+                $urls = $tool['name'];
+            }
+        }
+        if (null === $search || null === $urls) {
+            return $payload;
+        }
+
+        return NotionImagePlan::install($payload, $messageText, (int) $server->getId(), $search, $urls, $server->getName(), $allowed);
+    }
+
+    /**
+     * Topics written before classification. `unknown` in any case; the others
+     * only as written, so a user's prompt named `chat` keeps its topic.
+     */
+    private static function isPlaceholderTopic(string $topic): bool
+    {
+        return '' === $topic || 'unknown' === strtolower($topic) || in_array($topic, ['CHAT', 'CONTINUE'], true);
+    }
+
+    /**
      * @param array<string, mixed> $classification
      */
     private function topicAllowsServer(?int $userId, array $classification, int $serverId): bool
@@ -418,12 +508,38 @@ final readonly class McpFetchRunner implements TaskRunner
      */
     private function renderArgumentHint(array $inputSchema): string
     {
-        $properties = is_array($inputSchema['properties'] ?? null) ? array_keys($inputSchema['properties']) : [];
+        $properties = is_array($inputSchema['properties'] ?? null) ? $inputSchema['properties'] : [];
         if ([] === $properties) {
             return '';
         }
 
-        return '('.implode(', ', array_slice(array_map('strval', $properties), 0, 6)).')';
+        $required = [];
+        foreach (is_array($inputSchema['required'] ?? null) ? $inputSchema['required'] : [] as $name) {
+            if (is_string($name)) {
+                $required[$name] = true;
+            }
+        }
+        $must = [];
+        $optional = [];
+        foreach ($properties as $name => $schema) {
+            if (!is_string($name)) {
+                continue;
+            }
+            if (isset($required[$name])) {
+                $must[] = $name;
+            } else {
+                $optional[] = $name;
+            }
+        }
+        $parts = [];
+        if ([] !== $must) {
+            $parts[] = implode(', ', array_slice($must, 0, 6));
+        }
+        if ([] !== $optional) {
+            $parts[] = 'optional: '.implode(', ', array_slice($optional, 0, 6));
+        }
+
+        return '('.implode('; ', $parts).')';
     }
 
     private function oneLine(string $text): string

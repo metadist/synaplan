@@ -12,11 +12,13 @@ use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Service\File\FileStorageService;
 use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
+use App\Service\Mcp\Notion\NotionImageAttach;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -48,7 +50,7 @@ final class McpFetchRunnerTest extends TestCase
 
     /** @var list<array<string, mixed>> */
     private array $serverTools = [
-        ['name' => 'search_customers', 'description' => 'Find CRM customers', 'inputSchema' => ['properties' => ['query' => ['type' => 'string']]], 'annotations' => []],
+        ['name' => 'search_customers', 'description' => 'Find CRM customers', 'inputSchema' => ['properties' => ['query' => ['type' => 'string'], 'limit' => ['type' => 'integer']], 'required' => ['query']], 'annotations' => []],
         ['name' => 'delete_customer', 'description' => 'Remove a customer', 'inputSchema' => [], 'annotations' => ['readOnlyHint' => false]],
     ];
 
@@ -73,6 +75,7 @@ final class McpFetchRunnerTest extends TestCase
         bool $toolIsError = false,
         ?LoggerInterface $logger = null,
         int $httpStatus = 200,
+        ?FileStorageService $storage = null,
     ): McpFetchRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
@@ -80,8 +83,20 @@ final class McpFetchRunnerTest extends TestCase
         );
 
         $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError, $httpStatus): MockResponse {
+            if ('GET' === $method) {
+                return new MockResponse("\x89PNG\r\n\x1a\n", [
+                    'http_code' => 200,
+                    'response_headers' => ['content-type' => 'image/png', 'content-length' => '8'],
+                ]);
+            }
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
+            $toolName = is_array($body['params'] ?? null) ? (string) ($body['params']['name'] ?? '') : '';
+            $text = match ($toolName) {
+                'notion-fetch' => '<image source="notion-file-block://a/b?name=shot.png" />',
+                'notion-get-file-download-urls' => '{"files":[{"url":"https://8.8.8.8/shot.png"}]}',
+                default => $callToolResultText,
+            };
 
             if ('tools/call' === $rpcMethod && is_array($body['params']['arguments'] ?? null)) {
                 $this->lastCallArguments = $body['params']['arguments'];
@@ -89,7 +104,7 @@ final class McpFetchRunnerTest extends TestCase
 
             $result = match ($rpcMethod) {
                 'tools/list' => ['tools' => $this->serverTools],
-                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => $toolIsError],
+                'tools/call' => ['content' => [['type' => 'text', 'text' => $text]], 'isError' => $toolIsError],
                 default => [],
             };
 
@@ -100,8 +115,9 @@ final class McpFetchRunnerTest extends TestCase
         };
 
         $clientConfig = new McpClientConfig($configRepo);
+        $http = new MockHttpClient($httpFactory);
         $client = new McpClient(
-            new MockHttpClient($httpFactory),
+            $http,
             new SsrfGuard(),
             new EncryptionService('test-secret', new NullLogger()),
             $clientConfig,
@@ -125,6 +141,14 @@ final class McpFetchRunnerTest extends TestCase
             $logger ?? new NullLogger(),
             new AtlassianToolArguments($client, new NullLogger()),
             new NotionFetchArguments(new NullLogger()),
+            new NotionImageAttach(
+                $client,
+                $http,
+                new SsrfGuard(),
+                $storage ?? $this->createMock(FileStorageService::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
         );
     }
 
@@ -178,6 +202,61 @@ final class McpFetchRunnerTest extends TestCase
         self::assertStringContainsString('Acme GmbH, last order #42', (string) $result->text);
         self::assertSame('Company CRM · search_customers', $result->metadata['query']);
         self::assertSame(3, $result->metadata['mcp']['server_id']);
+    }
+
+    public function testEmptyOptionalArgumentsAreNotSent(): void
+    {
+        $this->serverTools = [[
+            'name' => 'notion-search',
+            'description' => 'Search Notion',
+            'inputSchema' => [
+                'properties' => [
+                    'query' => ['type' => 'string'],
+                    'query_type' => ['type' => 'string', 'enum' => ['internal', 'user']],
+                    'filters' => ['type' => 'object'],
+                ],
+                'required' => ['query'],
+            ],
+            'annotations' => [],
+        ]];
+        $node = new TaskNode('n1', Capability::McpFetch, [], [
+            'arguments' => ['query' => 'Bild', 'query_type' => '', 'filters' => []],
+        ], ['server_id' => 3, 'tool' => 'notion-search']);
+
+        $result = $this->runner()->run($node, $this->context());
+
+        self::assertTrue($result->isSuccessful(), (string) $result->error);
+        self::assertSame(['query' => 'Bild'], $this->lastCallArguments);
+    }
+
+    public function testAnImageFromNotionIsAttachedAsAFile(): void
+    {
+        $this->serverTools = [[
+            'name' => 'notion-get-file-download-urls',
+            'description' => 'Download a Notion file',
+            'inputSchema' => ['properties' => ['references' => ['type' => 'array']], 'required' => ['references']],
+            'annotations' => ['readOnlyHint' => true],
+        ]];
+        $server = $this->server();
+        $server->setName('Notion')->setUrl('https://mcp.notion.com/mcp');
+        $storage = $this->createMock(FileStorageService::class);
+        $storage->method('storeRawContent')->willReturn([
+            'success' => true,
+            'path' => '7/shot.png',
+            'size' => 8,
+            'mime' => 'image/png',
+            'error' => null,
+        ]);
+        $node = new TaskNode('n2', Capability::McpFetch, [], [
+            'arguments' => ['pages' => '{"results":[{"id":"p1","title":"Synaplan","type":"page"}]}'],
+        ], ['server_id' => 3, 'tool' => 'notion-get-file-download-urls']);
+
+        $result = $this->runner(server: $server, storage: $storage)->run($node, $this->context());
+
+        self::assertTrue($result->isSuccessful(), (string) $result->error);
+        self::assertSame('shot.png', $result->files[0]['name'] ?? null);
+        self::assertSame('image', $result->files[0]['type'] ?? null);
+        self::assertStringContainsString('Synaplan', (string) $result->text);
     }
 
     public function testDisabledFlagsFailTheNode(): void
@@ -242,7 +321,7 @@ final class McpFetchRunnerTest extends TestCase
         $note = ($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => ['tool_mcp' => true]]);
         self::assertIsString($note);
         self::assertStringContainsString('server_id 3 "Company CRM"', $note);
-        self::assertStringContainsString('search_customers(query)', $note);
+        self::assertStringContainsString('search_customers(query; optional: limit)', $note);
         self::assertStringNotContainsString('delete_customer', $note, 'mutating tools must not be offered to the planner');
 
         // Topic without tool_mcp → the block stays invisible.

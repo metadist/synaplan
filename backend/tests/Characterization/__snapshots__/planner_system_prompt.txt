@@ -266,8 +266,11 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    not in the capability list or no listed tool fits — use `chat` or
    `web_search` instead. A search argument is only the distinctive name
    or title the user gave — no extra filter, date or word they did not
-   say. Do NOT add a second search node to retry an empty result: a read
-   that comes back empty is broadened on its own (at most two further
+   say. Leave out optional arguments you do not need; never send empty
+   values. A new search or fetch request to a named connected system
+   always plans a fresh read step. Earlier results in the thread are not
+   current. Do NOT add a second search node to retry an empty result: a
+   read that comes back empty is broadened on its own (at most two further
    tries) and the answer names which wording matched.
 9d. The user explicitly asks about their OWN emails/mailbox ("search my
    emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?") AND

@@ -101,12 +101,12 @@ final readonly class TaskPlanner
     {
         $language = $message->getLanguage() ?: 'en';
         $allowed = $this->allowedCapabilitiesFromOptions($options);
-
+        $adjustTopic = $this->topicForPlanAdjust($message, $options);
         $promptRow = $this->promptRepository->findByTopic('tools:plan', 0);
         if (!$promptRow) {
             $this->logger->warning('TaskPlanner: tools:plan prompt missing, falling back to single chat');
 
-            return $this->fallback($language, ['tools:plan prompt missing'], message: $message, userId: $userId, allowed: $allowed);
+            return $this->fallback($language, ['tools:plan prompt missing'], message: $message, userId: $userId, allowed: $allowed, topic: $adjustTopic);
         }
 
         $modelId = $this->modelConfigService->getDefaultModel('PLAN', $userId)
@@ -142,7 +142,7 @@ final readonly class TaskPlanner
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fallback($language, ['planner model call failed: '.$e->getMessage()], $modelId, message: $message, userId: $userId, allowed: $allowed);
+            return $this->fallback($language, ['planner model call failed: '.$e->getMessage()], $modelId, message: $message, userId: $userId, allowed: $allowed, topic: $adjustTopic);
         }
 
         $decoded = $this->decodeJson($raw);
@@ -157,7 +157,7 @@ final readonly class TaskPlanner
             }
         }
         if (null === $decoded) {
-            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage, $message, $userId, $allowed);
+            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
         // A node that reads `$nX.text` but forgot to list nX in depends_on
@@ -171,21 +171,21 @@ final readonly class TaskPlanner
             $decoded = TaskPlanNormalizer::inferDependencies($decoded);
         }
 
-        $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, (string) $message->getTopic());
+        $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, $adjustTopic);
         $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
             $this->logger->info('TaskPlanner: plan failed validation, falling back', [
                 'errors' => $errors,
             ]);
 
-            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage, $message, $userId, $allowed);
+            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
         try {
             /** @var array<string, mixed> $decoded */
             $plan = TaskPlan::fromArray($decoded, $this->validator, $allowed);
         } catch (\Throwable $e) {
-            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage, $message, $userId, $allowed);
+            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage, $message, $userId, $allowed, $adjustTopic);
         }
 
         return new TaskPlanResult(
@@ -256,6 +256,7 @@ final readonly class TaskPlanner
         ?Message $message = null,
         ?int $userId = null,
         ?array $allowed = null,
+        string $topic = '',
     ): TaskPlanResult {
         $plan = TaskPlan::singleChatPlan($language);
         if (null !== $message) {
@@ -264,7 +265,7 @@ final readonly class TaskPlanner
                 (string) $message->getText(),
                 $userId,
                 $allowed,
-                (string) $message->getTopic(),
+                '' !== $topic ? $topic : (string) $message->getTopic(),
             );
             try {
                 $plan = TaskPlan::fromArray($payload, $this->validator, $allowed);
@@ -454,6 +455,33 @@ final readonly class TaskPlanner
         }
 
         return $context;
+    }
+
+    /**
+     * The topic a plan adjuster may gate on. A new chat message still carries
+     * the placeholder `CHAT` when planning runs; the classified topic is the
+     * one that owns the tool flags.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function topicForPlanAdjust(Message $message, array $options): string
+    {
+        $topic = $message->getTopic();
+        if (!$this->isPlaceholderTopic($topic)) {
+            return $topic;
+        }
+        $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+        $classified = $classification['topic'] ?? null;
+        if (is_string($classified) && !$this->isPlaceholderTopic($classified)) {
+            return $classified;
+        }
+
+        return 'general';
+    }
+
+    private function isPlaceholderTopic(string $topic): bool
+    {
+        return '' === $topic || 'unknown' === strtolower($topic) || in_array($topic, ['CHAT', 'CONTINUE'], true);
     }
 
     /**
