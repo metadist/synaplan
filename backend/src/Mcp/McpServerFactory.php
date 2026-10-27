@@ -50,9 +50,10 @@ use Symfony\Component\Cache\Psr16Cache;
  *
  * Design notes:
  *  - The server is rebuilt for every HTTP request so the registered tool
- *    closures can capture the authenticated {@see User}; authorization is always
- *    enforced per request by the Symfony `mcp` firewall, never by the MCP
- *    session. The MCP session only carries protocol plumbing (request counters,
+ *    closures can capture the authenticated {@see User}. `initialize` and
+ *    `tools/list` are public ({@see McpAnonymousAccess}); every other method
+ *    requires the Symfony `mcp` firewall user. The MCP session only carries
+ *    protocol plumbing (request counters,
  *    outgoing queues) and is persisted in the shared cache so the
  *    initialize → tools/list → tools/call round-trip survives across the
  *    stateless HTTP requests.
@@ -67,6 +68,17 @@ final class McpServerFactory
     private const SERVER_NAME = 'Synaplan';
     private const SERVER_VERSION = '0.1.0';
     private const SESSION_TTL_SECONDS = 3600;
+
+    private const INSTRUCTIONS = 'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
+        .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
+        .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
+        .'store long-term memories; file_ingest to add documents to the knowledge base; and '
+        .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
+        .'Documents and memories are also available as resources, and task prompts as MCP '
+        .'prompts. Everything is scoped to the authenticated Synaplan account.';
+
+    private const DISCOVERY_INSTRUCTIONS = 'This session is not signed in: it lists the tools only. '
+        .'Connect with a Synaplan API key or your Synaplan account to call them.';
 
     /** Cap resource bodies so a single large document can't produce a huge MCP response. */
     private const MAX_RESOURCE_CHARS = 100000;
@@ -110,117 +122,8 @@ final class McpServerFactory
      */
     public function build(User $user, ?DesktopDevice $device = null): Server
     {
-        $builder = Server::builder()
-            ->setServerInfo(
-                self::SERVER_NAME,
-                self::SERVER_VERSION,
-                'Synaplan MCP server — knowledge retrieval (RAG) and user memories.',
-            )
-            ->setInstructions(
-                'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
-                .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
-                .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
-                .'store long-term memories; file_ingest to add documents to the knowledge base; and '
-                .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
-                .'Documents and memories are also available as resources, and task prompts as MCP '
-                .'prompts. Everything is scoped to the authenticated Synaplan account.',
-            )
-            ->setLogger($this->logger)
-            ->setSession($this->sessionStore())
-            ->addTool(
-                $this->chatHandler($user, $device),
-                'synaplan_chat',
-                'Synaplan chat',
-                'Send a message through Synaplan\'s full AI pipeline — intent classification, '
-                .'web search, RAG over the user\'s documents, long-term memories, and inference — '
-                .'and return the synthesized answer. This is richer than a raw model call: it uses '
-                .'the authenticated account\'s knowledge base and memories.',
-                // Not read-only (creates a message record), additive only, may reach the
-                // open web via the pipeline's web-search step.
-                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, openWorldHint: true),
-                self::chatSchema(),
-            )
-            ->addTool(
-                $this->ragSearchHandler($user),
-                'rag_search',
-                'RAG knowledge search',
-                'Semantic search across the authenticated user\'s vectorized documents and '
-                .'knowledge base. Returns the most relevant text chunks with similarity scores.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::ragSearchSchema(),
-            )
-            ->addTool(
-                $this->memorySearchHandler($user),
-                'memory_search',
-                'User memory search',
-                'Search the authenticated user\'s stored long-term memories (preferences, '
-                .'facts, context) using semantic similarity.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::memorySearchSchema(),
-            )
-            ->addTool(
-                $this->memoryAddHandler($user),
-                'memory_add',
-                'Add a user memory',
-                'Store a new long-term memory for the authenticated user — a durable fact or '
-                .'preference that Synaplan will recall in future conversations.',
-                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
-                self::memoryAddSchema(),
-            )
-            ->addTool(
-                $this->fileIngestHandler($user),
-                'file_ingest',
-                'Ingest a document for RAG',
-                'Add a text document to the authenticated user\'s knowledge base. The content is '
-                .'chunked, embedded, and stored so it becomes retrievable via rag_search.',
-                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
-                self::fileIngestSchema(),
-            )
-            ->addTool(
-                $this->ragSimilarHandler($user),
-                'rag_similar',
-                'Find similar chunks',
-                'Find document chunks similar to a given source message/document id (the '
-                .'`message_id` returned by rag_search).',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::ragSimilarSchema(),
-            )
-            ->addTool(
-                $this->listChatsHandler($user),
-                'list_chats',
-                'List chats',
-                'List the authenticated user\'s conversations (most recently updated first).',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::listChatsSchema(),
-            )
-            ->addTool(
-                $this->getMessagesHandler($user),
-                'get_messages',
-                'Get chat messages',
-                'Return the messages of one of the user\'s chats, in chronological order.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::getMessagesSchema(),
-            )
-            ->addTool(
-                $this->listPromptsHandler($user),
-                'list_prompts',
-                'List task prompts',
-                'List the user\'s available Synaplan task prompts (internal `tools:*` prompts excluded).',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::listPromptsSchema(),
-            );
-
-        if (null !== $this->assistantAliases) {
-            $builder->addTool(
-                $this->listAssistantsHandler($user, $device),
-                'list_assistants',
-                'List assistants',
-                'List assistants the authenticated user may use from a connected app. '
-                .'Each row includes slug, name, description, version and origin.',
-                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
-                self::listAssistantsSchema(),
-            );
-        }
+        $builder = $this->newBuilder();
+        $this->registerPublicTools($builder, $this->authenticatedHandlers($user, $device));
 
         $builder
             ->addResourceTemplate(
@@ -265,6 +168,62 @@ final class McpServerFactory
         $this->registerPrompts($builder, $user);
 
         return $builder->build();
+    }
+
+    /**
+     * Public catalog for unauthenticated discovery. Handlers refuse; the
+     * controller rejects tools/call before this server runs.
+     */
+    public function buildDiscovery(): Server
+    {
+        $builder = $this->newBuilder(self::INSTRUCTIONS.' '.self::DISCOVERY_INSTRUCTIONS);
+        (new McpPublicTools())->registerDiscovery($builder, null !== $this->assistantAliases);
+
+        return $builder->build();
+    }
+
+    private function newBuilder(string $instructions = self::INSTRUCTIONS): Builder
+    {
+        return Server::builder()
+            ->setServerInfo(
+                self::SERVER_NAME,
+                self::SERVER_VERSION,
+                'Synaplan MCP server — knowledge retrieval (RAG) and user memories.',
+            )
+            ->setInstructions($instructions)
+            ->setLogger($this->logger)
+            ->setSession($this->sessionStore());
+    }
+
+    /**
+     * @param array<string, \Closure> $handlers
+     */
+    private function registerPublicTools(Builder $builder, array $handlers): void
+    {
+        (new McpPublicTools())->register($builder, $handlers, null !== $this->assistantAliases);
+    }
+
+    /**
+     * @return array<string, \Closure>
+     */
+    private function authenticatedHandlers(User $user, ?DesktopDevice $device): array
+    {
+        $handlers = [
+            'synaplan_chat' => $this->chatHandler($user, $device),
+            'rag_search' => $this->ragSearchHandler($user),
+            'memory_search' => $this->memorySearchHandler($user),
+            'memory_add' => $this->memoryAddHandler($user),
+            'file_ingest' => $this->fileIngestHandler($user),
+            'rag_similar' => $this->ragSimilarHandler($user),
+            'list_chats' => $this->listChatsHandler($user),
+            'get_messages' => $this->getMessagesHandler($user),
+            'list_prompts' => $this->listPromptsHandler($user),
+        ];
+        if (null !== $this->assistantAliases) {
+            $handlers['list_assistants'] = $this->listAssistantsHandler($user, $device);
+        }
+
+        return $handlers;
     }
 
     /**
@@ -1155,253 +1114,6 @@ final class McpServerFactory
                     'description' => 'Maximum number of events to return in recent mode (1-200).',
                 ],
             ],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function ragSimilarSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'message_id' => [
-                    'type' => 'integer',
-                    'description' => 'The source document/message id to find similar chunks for '
-                        .'(use a `message_id` returned by rag_search).',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 50,
-                    'default' => 10,
-                    'description' => 'Maximum number of similar chunks to return (1-50).',
-                ],
-            ],
-            'required' => ['message_id'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function listChatsSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 200,
-                    'default' => 50,
-                    'description' => 'Maximum number of chats to return (1-200).',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function getMessagesSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'chat_id' => [
-                    'type' => 'integer',
-                    'description' => 'The id of the chat (from list_chats) to read messages from.',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 100,
-                    'default' => 50,
-                    'description' => 'Maximum number of (most recent) messages to return (1-100).',
-                ],
-            ],
-            'required' => ['chat_id'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function listPromptsSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => new \stdClass(),
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function chatSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'message' => [
-                    'type' => 'string',
-                    'description' => 'The message or question to send through Synaplan\'s full AI '
-                        .'pipeline (classification, web search, RAG over the user\'s documents, '
-                        .'memories, and inference).',
-                ],
-                'chat_id' => [
-                    'type' => ['integer', 'null'],
-                    'description' => 'Optional existing chat id (from list_chats) to continue a '
-                        .'conversation. Omit to start a new chat.',
-                ],
-                'agentId' => [
-                    'type' => ['string', 'integer', 'null'],
-                    'description' => 'Optional assistant id or slug (see list_assistants). Pins the reply '
-                        .'to that assistant; fails when it is not published, not usable by you, '
-                        .'or does not allow connected apps.',
-                ],
-            ],
-            'required' => ['message'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function listAssistantsSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => new \stdClass(),
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function ragSearchSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'query' => [
-                    'type' => 'string',
-                    'description' => 'Natural-language search query.',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 50,
-                    'default' => 10,
-                    'description' => 'Maximum number of chunks to return (1-50).',
-                ],
-                'min_score' => [
-                    'type' => 'number',
-                    'minimum' => 0,
-                    'maximum' => 1,
-                    'default' => 0.3,
-                    'description' => 'Minimum similarity score (0-1) a chunk must reach to be returned.',
-                ],
-                'group_key' => [
-                    'type' => ['string', 'null'],
-                    'description' => 'Optional document group key to scope the search to a single document/collection.',
-                ],
-            ],
-            'required' => ['query'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function fileIngestSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'name' => [
-                    'type' => 'string',
-                    'description' => 'A human-readable name/title for the document.',
-                ],
-                'content' => [
-                    'type' => 'string',
-                    'description' => 'The text content to ingest. It is chunked, embedded, and made '
-                        .'retrievable via rag_search.',
-                ],
-                'group_key' => [
-                    'type' => ['string', 'null'],
-                    'description' => 'Optional group key to scope the document. Pass the same value to '
-                        .'rag_search to retrieve only this group; omit it to search the whole corpus.',
-                ],
-            ],
-            'required' => ['name', 'content'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function memoryAddSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'category' => [
-                    'type' => 'string',
-                    'description' => 'Category for the memory, e.g. preferences, work, personal, health.',
-                ],
-                'key' => [
-                    'type' => 'string',
-                    'minLength' => 3,
-                    'description' => 'Short identifier for the memory (min 3 characters), e.g. tech_stack.',
-                ],
-                'value' => [
-                    'type' => 'string',
-                    'minLength' => 1,
-                    'description' => 'The fact or preference to remember.',
-                ],
-            ],
-            'required' => ['category', 'key', 'value'],
-            'additionalProperties' => false,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function memorySearchSchema(): array
-    {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'query' => [
-                    'type' => 'string',
-                    'description' => 'Natural-language query describing the memory to look up.',
-                ],
-                'category' => [
-                    'type' => ['string', 'null'],
-                    'description' => 'Optional category filter (e.g. preferences, work, personal).',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => 50,
-                    'default' => 5,
-                    'description' => 'Maximum number of memories to return (1-50).',
-                ],
-            ],
-            'required' => ['query'],
             'additionalProperties' => false,
         ];
     }

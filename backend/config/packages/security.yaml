@@ -26,9 +26,9 @@ security:
                 - App\Security\ApiKeyAuthenticator
 
         # Model Context Protocol (MCP) Streamable HTTP endpoint.
-        # Authenticated by Synaplan API keys (sk_*) or OIDC bearer tokens;
-        # unauthenticated requests get a spec-compliant 401 + WWW-Authenticate
-        # pointing at the RFC 9728 metadata document.
+        # API key (sk_*) or OIDC bearer when the request presents one.
+        # initialize and tools/list are public; McpController rejects every
+        # other method without a user (401 + WWW-Authenticate → RFC 9728).
         mcp:
             pattern: ^/mcp
             stateless: true
@@ -75,11 +75,12 @@ security:
         # on POST /v1/chat/completions and GET /v1/models only.
         - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
 
-        # MCP: public discovery (RFC 9728 metadata) + CORS preflight; the
-        # endpoint itself requires authentication.
+        # MCP: RFC 9728 metadata, and the endpoint itself. The controller
+        # allows initialize + tools/list without a user and rejects the rest.
+        # Anchored so a future route under /mcp/ does not become public too.
         - { path: ^/\.well-known/oauth-protected-resource, roles: PUBLIC_ACCESS }
         - { path: ^/\.well-known/synaplan-federation, roles: PUBLIC_ACCESS }
-        - { path: ^/mcp, methods: [OPTIONS], roles: PUBLIC_ACCESS }
+        - { path: ^/mcp$, roles: PUBLIC_ACCESS }
         - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
         # Public API documentation (Swagger)
