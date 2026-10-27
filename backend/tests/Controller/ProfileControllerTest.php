@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\User;
+use App\Repository\ConfigRepository;
 use App\Service\Auth\TokenService;
+use App\Service\Billing\PayFirst\PayFirstConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -318,6 +320,54 @@ class ProfileControllerTest extends WebTestCase
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testAPasswordlessAccountCanSetOneWhilePayFirstIsOn(): void
+    {
+        $_ENV['MAILER_DSN'] = 'null://default';
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, PayFirstConfig::CONFIG_GROUP, PayFirstConfig::KEY, 'true');
+        $this->em->flush();
+
+        $user = new User();
+        $user->setMail('nopw-'.bin2hex(random_bytes(3)).'@example.com');
+        $user->setUserLevel('PRO');
+        $user->setProviderId('local');
+        $user->setEmailVerified(true);
+        $user->setCreated(date('YmdHis'));
+        $this->em->persist($user);
+        $this->em->flush();
+        $token = static::getContainer()->get(TokenService::class)->generateAccessToken($user);
+        $this->client->getCookieJar()->clear();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/profile/password/initial',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$token, 'CONTENT_TYPE' => 'text/plain'],
+            'not-json'
+        );
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+
+        $this->client->request(
+            'POST',
+            '/api/v1/profile/password/initial',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$token, 'CONTENT_TYPE' => 'application/json'],
+            json_encode(['newPassword' => 'NewSecure1'], JSON_THROW_ON_ERROR)
+        );
+
+        $this->assertResponseIsSuccessful();
+        $this->em->clear();
+        $fresh = $this->em->find(User::class, $user->getId());
+        self::assertInstanceOf(User::class, $fresh);
+        self::assertTrue($fresh->canChangePassword());
+        $this->em->remove($fresh);
+        $this->em->flush();
+        $config->setValue(0, PayFirstConfig::CONFIG_GROUP, PayFirstConfig::KEY, 'false');
+        $this->em->flush();
     }
 
     public function testAdminCanChangeOwnSignInEmail(): void
