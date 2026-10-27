@@ -218,6 +218,43 @@ class FileRepositoryTest extends KernelTestCase
         self::assertNull($this->repository->findForOverwrite((int) $two->getId(), 'nextcloud', '5678', null, null, 'inst-a'));
     }
 
+    public function testAnExactInstanceMatchWinsOverANewerUnscopedRow(): void
+    {
+        $user = $this->createUser('exact');
+        $this->identity($user, 'nextcloud', 'inst-a');
+        $this->identity($user, 'nextcloud', 'inst-b');
+        $scoped = $this->createFile($user, 'scoped.txt');
+        $scoped->setSource('nextcloud');
+        $scoped->setSourceId('5678');
+        $scoped->setSourceInstance('inst-a');
+        $newer = $this->createFile($user, 'newer.txt');
+        $newer->setSource('nextcloud');
+        $newer->setSourceId('5678');
+        $this->em->flush();
+
+        $found = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', '5678', null, null, 'inst-a');
+        self::assertSame($scoped->getId(), $found?->getId());
+
+        $byName = $this->repository->findForOverwrite((int) $user->getId(), 'nextcloud', null, null, 'scoped.txt', 'inst-b');
+        self::assertNull($byName);
+    }
+
+    public function testCheckStalePersistsAClaimedInstance(): void
+    {
+        $user = $this->createUser('stale-claim');
+        $this->identity($user, 'nextcloud', 'inst-only');
+        $file = $this->createFile($user, 'claim.txt');
+        $file->setSource('nextcloud');
+        $file->setSourceId('99');
+        $this->em->flush();
+
+        $check = static::getContainer()->get(\App\Service\File\SourceStaleCheck::class);
+        $check->check((int) $user->getId(), 'nextcloud', [['source_id' => '99', 'source_etag' => null]], 'inst-only');
+        $this->em->clear();
+        $reloaded = $this->em->find(File::class, $file->getId());
+        self::assertSame('inst-only', $reloaded?->getSourceInstance());
+    }
+
     private function identity(User $user, string $source, string $instanceId): void
     {
         $row = (new ExternalIdentity())

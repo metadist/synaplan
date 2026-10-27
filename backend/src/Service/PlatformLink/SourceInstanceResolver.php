@@ -43,8 +43,11 @@ final readonly class SourceInstanceResolver
         if (!is_string($azp) || '' === $azp) {
             return null;
         }
-        $instance = $this->instances->findOneBy(['oidcClientId' => $azp]);
+        $matches = array_values(array_filter(
+            $this->instances->findBy(['oidcClientId' => $azp]),
+            static fn (PlatformInstance $instance): bool => $instance->isActive(),
+        ));
 
-        return $instance instanceof PlatformInstance ? $instance->getInstanceId() : null;
+        return 1 === count($matches) ? $matches[0]->getInstanceId() : null;
     }
 }

@@ -60,6 +60,8 @@ final readonly class SourceStaleCheck
             ];
         }
 
+        $this->fileRepository->flush();
+
         return ['results' => $results, 'counts' => $counts];
     }
 

@@ -354,12 +354,10 @@ class FileRepository extends ServiceEntityRepository
                 ->andWhere('f.sourceId = :sourceId')
                 ->setParameter('userId', $userId)
                 ->setParameter('source', $source)
-                ->setParameter('sourceId', trim($sourceId))
-                ->orderBy('f.id', 'DESC')
-                ->setMaxResults(1);
-            $this->restrictInstance($qb, $sourceInstance);
+                ->setParameter('sourceId', trim($sourceId));
+            $this->preferExactInstance($qb, $sourceInstance);
 
-            return $this->claim($qb->getQuery()->getOneOrNullResult(), $userId, $source, $sourceInstance);
+            return $this->claim($qb->setMaxResults(1)->getQuery()->getOneOrNullResult(), $userId, $source, $sourceInstance);
         }
 
         if (null !== $originalName && '' !== trim($originalName)) {
@@ -374,8 +372,9 @@ class FileRepository extends ServiceEntityRepository
             if (null !== $groupKey && '' !== $groupKey) {
                 $qb->andWhere('f.groupKey = :groupKey')->setParameter('groupKey', $groupKey);
             }
+            $this->preferExactInstance($qb, $sourceInstance);
 
-            return $qb->orderBy('f.id', 'DESC')->setMaxResults(1)->getQuery()->getOneOrNullResult();
+            return $this->claim($qb->setMaxResults(1)->getQuery()->getOneOrNullResult(), $userId, $source, $sourceInstance);
         }
 
         return null;
@@ -423,6 +422,20 @@ class FileRepository extends ServiceEntityRepository
         }
 
         return $map;
+    }
+
+    private function preferExactInstance(QueryBuilder $qb, ?string $sourceInstance): void
+    {
+        $this->restrictInstance($qb, $sourceInstance);
+        if (null === $sourceInstance || '' === $sourceInstance) {
+            $qb->orderBy('f.id', 'DESC');
+
+            return;
+        }
+
+        $qb->addSelect('CASE WHEN f.sourceInstance = :sourceInstance THEN 0 ELSE 1 END AS HIDDEN preferExact')
+            ->orderBy('preferExact', 'ASC')
+            ->addOrderBy('f.id', 'DESC');
     }
 
     private function restrictInstance(QueryBuilder $qb, ?string $sourceInstance): void
