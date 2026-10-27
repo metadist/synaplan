@@ -7,6 +7,7 @@ namespace App\Service\Research\Run;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use Psr\Clock\ClockInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Opens, lists, stops and deletes a research run.
@@ -30,6 +31,8 @@ final readonly class ResearchRunService
         private ChatRepository $chats,
         private ClockInterface $clock,
         private ResearchReportPoster $reports,
+        #[Autowire(lazy: true)]
+        private ?ResearchSavedTaskResume $savedTasks = null,
     ) {
     }
 
@@ -155,6 +158,7 @@ final readonly class ResearchRunService
         }
         $this->events->append($stopped->ref->id, 'stopped', ['outcome' => $outcome->toArray()]);
         $this->reports->deliver($stopped);
+        $this->savedTasks?->after($stopped);
 
         return $stopped;
     }

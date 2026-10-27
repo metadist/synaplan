@@ -165,6 +165,13 @@ final readonly class SavedTaskResumeService
         return $run;
     }
 
+    public function isRunning(int $runId): bool
+    {
+        $run = $this->runs->find($runId);
+
+        return $run instanceof SavedTaskRun && SavedTaskRun::STATUS_RUNNING === $run->getStatus();
+    }
+
     /**
      * The research step finished. Continue the saved task with the report, or
      * fail the step with its sentence. A run that is no longer waiting is left

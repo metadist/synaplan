@@ -32,6 +32,7 @@ final readonly class ResearchReaper
         private ClockInterface $clock,
         private LoggerInterface $logger,
         private ResearchReportPoster $reports,
+        private ?ResearchSavedTaskResume $savedTasks = null,
     ) {
     }
 
@@ -245,6 +246,7 @@ final readonly class ResearchReaper
         $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, $change);
         if (null !== $saved && $saved->status->isTerminal()) {
             $this->reports->deliver($saved);
+            $this->savedTasks?->after($saved);
         }
 
         return $saved;

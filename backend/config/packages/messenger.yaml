@@ -140,6 +140,7 @@ framework:
             # One research unit, then the worker returns. The next unit waits
             # on a delay so a long run cannot pin the queue.
             'App\Message\RunResearchUnit': async_ai_high
+            'App\Message\ContinueSavedTaskAfterResearch': async_ai_high
             # Finished chat turn → realtime fan-out. Off the HTTP stream so a
             # slow gateway cannot hold the reply, and one worker broadcast
             # reaches the owner plus current share subjects.
