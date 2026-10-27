@@ -43,7 +43,7 @@ final readonly class McpOAuthDiscovery
         $prm = $this->fetchProtectedResourceMetadata($mcpUrl);
 
         // RFC 9728 §3.3: the metadata must describe this server, not another one.
-        $resource = is_string($prm['resource'] ?? null) && '' !== $prm['resource'] ? rtrim($prm['resource'], '/') : $mcpUrl;
+        $resource = is_string($prm['resource'] ?? null) && '' !== $prm['resource'] ? $prm['resource'] : $mcpUrl;
         if (!self::resourceCovers($resource, $mcpUrl)) {
             throw new McpOAuthException('The sign-in metadata names a different server than this address');
         }
@@ -53,17 +53,17 @@ final readonly class McpOAuthDiscovery
             throw new McpOAuthException('The server did not advertise an authorization server');
         }
 
-        $issuer = rtrim($authServers[0], '/');
+        $issuer = $authServers[0];
         if ($this->ssrfGuard->isBlockedUrl($issuer)) {
             throw new McpOAuthException('Authorization server URL is not allowed');
         }
         self::requireHttps($issuer, 'The authorization server');
 
-        $asUrl = $issuer.'/.well-known/oauth-authorization-server';
+        $asUrl = rtrim($issuer, '/').'/.well-known/oauth-authorization-server';
         $as = $this->getJson($asUrl, 'authorization server metadata');
 
         // RFC 8414 §3.3: the metadata must be the named issuer's own.
-        $advertisedIssuer = is_string($as['issuer'] ?? null) ? rtrim($as['issuer'], '/') : '';
+        $advertisedIssuer = is_string($as['issuer'] ?? null) ? $as['issuer'] : '';
         if ($advertisedIssuer !== $issuer) {
             throw new McpOAuthException('The authorization server metadata belongs to a different issuer');
         }
@@ -257,6 +257,7 @@ final readonly class McpOAuthDiscovery
      */
     private function getJson(string $url, string $label): array
     {
+        self::requireHttps($url, 'The '.$label.' address');
         if ($this->ssrfGuard->isBlockedUrl($url)) {
             throw new McpOAuthException(sprintf('The %s URL is not allowed', $label));
         }

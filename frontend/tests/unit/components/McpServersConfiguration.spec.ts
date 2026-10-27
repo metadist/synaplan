@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import McpServersConfiguration from '@/components/config/McpServersConfiguration.vue'
+import { mcpServersApi } from '@/services/api/mcpServersApi'
 
 /**
  * The "task usage" panel closes the worst MCP onboarding gap: a connected
@@ -563,5 +564,29 @@ describe('McpServersConfiguration — address and saved key', () => {
     const wrapper = await editUrl('https://other.example.com/mcp')
 
     expect(wrapper.find('[data-testid="mcp-address-drops-key"]').exists()).toBe(false)
+  })
+})
+
+describe('McpServersConfiguration — declining the sign-in host', () => {
+  it('reloads the list so the row shows what is stored now', async () => {
+    vi.clearAllMocks()
+    const signInRow = { ...mockServer, auth_mode: 'oauth', oauth_status: 'connected' }
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [signInRow],
+    })
+    mockGetPrompts.mockResolvedValue([])
+    vi.mocked(mcpServersApi.startOAuth).mockResolvedValue('https://auth.other.example/authorize')
+    mockConfirm.mockResolvedValue(false)
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+    expect(mockList).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="btn-mcp-oauth-3"]').trigger('click')
+    await flushPromises()
+
+    expect(mockConfirm).toHaveBeenCalled()
+    expect(mockList).toHaveBeenCalledTimes(2)
   })
 })

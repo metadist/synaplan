@@ -173,7 +173,7 @@ final readonly class McpOAuthConsentService
 
         $oauthState = $server->getDecryptedOAuthState($this->encryption);
         // RFC 9207: an answer that names another issuer is not ours to redeem.
-        if (null !== $issuer && rtrim($issuer, '/') !== $pending['issuer']) {
+        if (null !== $issuer && $issuer !== $pending['issuer']) {
             throw new McpOAuthException('The sign-in answer came from a different authorization server. Please start again.');
         }
         $tokens = $this->oauth->exchangeCode($this->toProviderConfig($oauthState), $code, $verifier);

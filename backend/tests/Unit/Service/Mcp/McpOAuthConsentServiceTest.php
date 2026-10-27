@@ -276,6 +276,20 @@ final class McpOAuthConsentServiceTest extends TestCase
         $service->complete('the-code', $signed, 'https://evil.example.com');
     }
 
+    public function testCallbackIssuerIsComparedExactly(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo->expects(self::never())->method('storeOAuthStateAt');
+
+        [$service, $signed] = $this->pendingCallback($this->signInServer($encryption), $repo, [], $encryption);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/different authorization server/');
+
+        $service->complete('the-code', $signed, 'https://mcp.notion.com/');
+    }
+
     private function signInServer(EncryptionService $encryption): McpServerConfig
     {
         $server = $this->server();

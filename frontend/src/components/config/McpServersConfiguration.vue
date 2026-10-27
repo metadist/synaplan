@@ -766,6 +766,8 @@ const startOAuth = async (server: McpServer) => {
         error(t('mcpServers.connectFailed'))
       }
       connectingId.value = null
+      // Starting a sign-in may already have dropped an outdated one; show what is stored.
+      await load()
       return
     }
     window.location.assign(url)

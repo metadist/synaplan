@@ -219,6 +219,42 @@ final class McpOAuthDiscoveryTest extends TestCase
         $discovery->discover('https://mcp.example.com/mcp');
     }
 
+    public function testPlainHttpMetadataLinkIsRefused(): void
+    {
+        $discovery = $this->discovery([
+            new MockResponse('{}', [
+                'http_code' => 401,
+                'response_headers' => ['www-authenticate' => 'Bearer resource_metadata="http://mcp.example.com/.well-known/oauth-protected-resource/mcp"'],
+            ]),
+        ]);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/https/');
+
+        $discovery->discover('https://mcp.example.com/mcp');
+    }
+
+    public function testTheAdvertisedResourceIsSentBackUnchanged(): void
+    {
+        $result = $this->discovery($this->signInChain(resource: 'https://mcp.example.com/mcp/'))
+            ->discover('https://mcp.example.com/mcp');
+
+        self::assertSame('https://mcp.example.com/mcp/', $result->resource);
+    }
+
+    public function testIssuerIsComparedExactly(): void
+    {
+        $discovery = $this->discovery($this->signInChain(
+            advertisedIssuer: 'https://auth.example.com/tenant/',
+            namedIssuer: 'https://auth.example.com/tenant',
+        ));
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/different issuer/');
+
+        $discovery->discover('https://mcp.example.com/mcp');
+    }
+
     public function testEveryFetchIsBoundedInTimeAndSize(): void
     {
         $captured = [];
@@ -253,6 +289,7 @@ final class McpOAuthDiscoveryTest extends TestCase
         string $resource = 'https://mcp.example.com/mcp',
         string $advertisedIssuer = 'https://auth.example.com',
         string $tokenEndpoint = 'https://auth.example.com/token',
+        string $namedIssuer = 'https://auth.example.com',
     ): array {
         return [
             new MockResponse('{}', [
@@ -261,7 +298,7 @@ final class McpOAuthDiscoveryTest extends TestCase
             ]),
             new MockResponse((string) json_encode([
                 'resource' => $resource,
-                'authorization_servers' => ['https://auth.example.com'],
+                'authorization_servers' => [$namedIssuer],
             ]), ['http_code' => 200]),
             new MockResponse((string) json_encode([
                 'issuer' => $advertisedIssuer,
