@@ -21,6 +21,7 @@ final readonly class McpOAuthDiscoveryResult
         public string $registrationEndpoint,
         public array $scopes,
         public bool $supportsRefreshGrant,
+        public string $issuer = '',
     ) {
     }
 }

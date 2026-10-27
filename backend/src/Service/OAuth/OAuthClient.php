@@ -19,6 +19,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final readonly class OAuthClient
 {
     private const TIMEOUT_SECONDS = 15;
+    private const MAX_RESPONSE_BYTES = 262_144;
 
     /**
      * `invalid_grant` is the spec's "this grant is dead" answer and is the only
@@ -142,6 +143,7 @@ final readonly class OAuthClient
      */
     private function post(OAuthProviderConfig $provider, array $body): array
     {
+        $body = array_merge($body, $provider->extraTokenParams);
         try {
             $response = $this->httpClient->request('POST', $provider->tokenUrl, [
                 'headers' => [
@@ -150,7 +152,13 @@ final readonly class OAuthClient
                 ],
                 'body' => $body,
                 'timeout' => self::TIMEOUT_SECONDS,
+                'max_duration' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 0,
+                'on_progress' => static function (int $downloaded): void {
+                    if ($downloaded > self::MAX_RESPONSE_BYTES) {
+                        throw new OAuthException('The token endpoint answer is too large');
+                    }
+                },
             ]);
 
             $status = $response->getStatusCode();

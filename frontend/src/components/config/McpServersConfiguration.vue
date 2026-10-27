@@ -410,6 +410,7 @@ import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
+import { useMcpSignInTarget } from '@/composables/useMcpSignInTarget'
 import { updateConfigValue } from '@/services/api/adminConfigApi'
 import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
 import McpServerUrlField from '@/components/config/McpServerUrlField.vue'
@@ -427,6 +428,7 @@ import { useAuthStore } from '@/stores/auth'
 const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
+const { decide: decideSignInTarget } = useMcpSignInTarget()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -758,6 +760,14 @@ const startOAuth = async (server: McpServer) => {
   connectingId.value = server.id
   try {
     const url = await mcpServersApi.startOAuth(server.id)
+    const decision = await decideSignInTarget(url, server)
+    if (decision !== 'go') {
+      if (decision === 'refuse') {
+        error(t('mcpServers.connectFailed'))
+      }
+      connectingId.value = null
+      return
+    }
     window.location.assign(url)
   } catch (err) {
     error(err instanceof Error && err.message ? err.message : t('mcpServers.connectFailed'))

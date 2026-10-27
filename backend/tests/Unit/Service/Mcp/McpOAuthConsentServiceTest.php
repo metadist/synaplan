@@ -184,6 +184,60 @@ final class McpOAuthConsentServiceTest extends TestCase
         )->start($this->server(), 7);
     }
 
+    public function testStartIsRefusedWhileMcpCallsAreOff(): void
+    {
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/turned off/');
+
+        $this->service(
+            new EncryptionService('test-secret', new NullLogger()),
+            $this->createStub(McpServerConfigRepository::class),
+            $this->tokenClient([]),
+            clientEnabled: false,
+        )->start($this->server(), 7);
+    }
+
+    public function testConsentUrlNamesTheServerAsResource(): void
+    {
+        $url = $this->service(
+            new EncryptionService('test-secret', new NullLogger()),
+            $this->storingRepository(),
+            $this->tokenClient([]),
+        )->start($this->server(), 7);
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        self::assertSame('https://mcp.notion.com/mcp', $query['resource']);
+    }
+
+    public function testAnotherAuthorizationServerStartsFromScratch(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $server = $this->server();
+        $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $server->setDecryptedOAuthState(new McpOAuthState(
+            resource: 'https://mcp.notion.com/mcp',
+            authorizationEndpoint: 'https://old-issuer.example/authorize',
+            tokenEndpoint: 'https://old-issuer.example/token',
+            clientId: 'old-client',
+            accessToken: 'old-token',
+            refreshToken: 'old-refresh',
+            status: McpOAuthState::STATUS_CONNECTED,
+        ), $encryption);
+
+        $registration = $this->createMock(McpOAuthRegistration::class);
+        $registration->expects(self::once())->method('register')
+            ->willReturn(['client_id' => 'atcl-new', 'supports_refresh' => true]);
+
+        $this->service($encryption, $this->storingRepository(), $this->tokenClient([]), registration: $registration)
+            ->start($server, 7);
+
+        $state = $server->getDecryptedOAuthState($encryption);
+        self::assertSame('atcl-new', $state->clientId);
+        self::assertSame('', $state->accessToken);
+        self::assertSame('', $state->refreshToken);
+        self::assertSame('https://mcp.notion.com/token', $state->tokenEndpoint);
+    }
+
     public function testCompleteIsRefusedWhenTheServerNoLongerUsesSignIn(): void
     {
         [$service, $signed] = $this->pendingCallback($this->server(), $this->createMock(McpServerConfigRepository::class));
@@ -197,6 +251,33 @@ final class McpOAuthConsentServiceTest extends TestCase
     public function testCompleteStoresNothingWhenAnEditWinsTheRace(): void
     {
         $encryption = new EncryptionService('test-secret', new NullLogger());
+
+        [$service, $signed] = $this->pendingCallback($this->signInServer($encryption), $this->storingRepository(stores: false), [
+            new MockResponse((string) json_encode(['access_token' => 'at-1', 'expires_in' => 3600]), ['http_code' => 200]),
+        ], $encryption);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/address changed/');
+
+        $service->complete('the-code', $signed);
+    }
+
+    public function testAnswerFromAnotherIssuerIsRefused(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $repo = $this->createMock(McpServerConfigRepository::class);
+        $repo->expects(self::never())->method('storeOAuthStateAt');
+
+        [$service, $signed] = $this->pendingCallback($this->signInServer($encryption), $repo, [], $encryption);
+
+        $this->expectException(McpOAuthException::class);
+        $this->expectExceptionMessageMatches('/different authorization server/');
+
+        $service->complete('the-code', $signed, 'https://evil.example.com');
+    }
+
+    private function signInServer(EncryptionService $encryption): McpServerConfig
+    {
         $server = $this->server();
         $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
         $server->setDecryptedOAuthState(new McpOAuthState(
@@ -205,14 +286,7 @@ final class McpOAuthConsentServiceTest extends TestCase
             clientId: 'atcl-new',
         ), $encryption);
 
-        [$service, $signed] = $this->pendingCallback($server, $this->storingRepository(stores: false), [
-            new MockResponse((string) json_encode(['access_token' => 'at-1', 'expires_in' => 3600]), ['http_code' => 200]),
-        ], $encryption);
-
-        $this->expectException(McpOAuthException::class);
-        $this->expectExceptionMessageMatches('/address changed/');
-
-        $service->complete('the-code', $signed);
+        return $server;
     }
 
     /**
@@ -240,7 +314,13 @@ final class McpOAuthConsentServiceTest extends TestCase
 
         $nonce = bin2hex(random_bytes(16));
         $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', $nonce));
-        $item->set(['verifier' => 'v', 'owner_id' => 7, 'server_id' => 42, 'server_url' => $server->getUrl()]);
+        $item->set([
+            'verifier' => 'v',
+            'owner_id' => 7,
+            'server_id' => 42,
+            'server_url' => $server->getUrl(),
+            'issuer' => 'https://mcp.notion.com',
+        ]);
         $cache->save($item);
 
         return [$service, $stateService->generateState(McpOAuthConsentService::PROVIDER, [
@@ -283,15 +363,19 @@ final class McpOAuthConsentServiceTest extends TestCase
         bool $oauthEnabled = true,
         ?ArrayAdapter $cache = null,
         ?OAuthStateService $state = null,
+        bool $clientEnabled = true,
+        ?McpOAuthRegistration $registration = null,
     ): McpOAuthConsentService {
-        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo = $this->createStub(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
-            static fn (int $owner, string $group, string $key): string => 'OAUTH_CONNECTORS_ENABLED' === $key
-                ? ($oauthEnabled ? '1' : '0')
-                : '1'
+            static fn (int $owner, string $group, string $key): string => match ($key) {
+                'OAUTH_CONNECTORS_ENABLED' => $oauthEnabled ? '1' : '0',
+                'CLIENT_ENABLED' => $clientEnabled ? '1' : '0',
+                default => '1',
+            }
         );
 
-        $discovery = $this->createMock(McpOAuthDiscovery::class);
+        $discovery = $this->createStub(McpOAuthDiscovery::class);
         $discovery->method('discover')->willReturn(new McpOAuthDiscoveryResult(
             resource: 'https://mcp.notion.com/mcp',
             authorizationEndpoint: 'https://mcp.notion.com/authorize',
@@ -299,10 +383,13 @@ final class McpOAuthConsentServiceTest extends TestCase
             registrationEndpoint: 'https://mcp.notion.com/register',
             scopes: ['default'],
             supportsRefreshGrant: true,
+            issuer: 'https://mcp.notion.com',
         ));
 
-        $registration = $this->createMock(McpOAuthRegistration::class);
-        $registration->method('register')->willReturn(['client_id' => 'atcl-new', 'supports_refresh' => true]);
+        if (null === $registration) {
+            $registration = $this->createStub(McpOAuthRegistration::class);
+            $registration->method('register')->willReturn(['client_id' => 'atcl-new', 'supports_refresh' => true]);
+        }
 
         return new McpOAuthConsentService(
             new McpClientConfig($configRepo),

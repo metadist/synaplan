@@ -101,6 +101,7 @@ final readonly class McpOAuthTokenProvider
                 redirectUri: rtrim($this->appUrl, '/').'/api/v1/mcp-servers/oauth/callback',
                 scopes: $state->scopes,
                 includeScopeInTokenRequests: false,
+                extraTokenParams: McpOAuthConsentService::resourceParam($state),
             );
 
             $url = $server->getUrl();

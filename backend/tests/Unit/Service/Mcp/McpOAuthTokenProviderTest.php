@@ -39,16 +39,17 @@ final class McpOAuthTokenProviderTest extends TestCase
         $repo = $this->storingRepository();
         $repo->expects(self::once())->method('storeOAuthStateAt');
 
-        $provider = $this->provider($encryption, [
-            new MockResponse((string) json_encode([
-                'access_token' => 'new-at',
-                'refresh_token' => 'new-rt',
-                'expires_in' => 3600,
-            ]), ['http_code' => 200]),
-        ], $repo);
+        $answer = new MockResponse((string) json_encode([
+            'access_token' => 'new-at',
+            'refresh_token' => 'new-rt',
+            'expires_in' => 3600,
+        ]), ['http_code' => 200]);
+        $provider = $this->provider($encryption, [$answer], $repo);
 
         self::assertSame('new-at', $provider->accessToken($server));
         self::assertSame('new-at', $server->getDecryptedOAuthState($encryption)->accessToken);
+        parse_str((string) $answer->getRequestOptions()['body'], $body);
+        self::assertSame('https://mcp.notion.com/mcp', $body['resource'], 'the renewed token stays bound to this server');
     }
 
     public function testExpiredGrantWithoutRefreshAsksToReconnect(): void

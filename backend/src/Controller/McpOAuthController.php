@@ -95,6 +95,7 @@ final class McpOAuthController extends AbstractController
             new OA\Parameter(name: 'code', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'state', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'error', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'iss', in: 'query', required: false, description: 'RFC 9207 issuer of the answer; must match the server the sign-in started with', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 302, description: 'Redirect to /channels/mcp with connected={id} or oauth_error={reason}'),
@@ -115,8 +116,10 @@ final class McpOAuthController extends AbstractController
             return $this->resultRedirect(null, 'missing_code');
         }
 
+        $issuer = $request->query->get('iss');
+
         try {
-            $server = $this->consent->complete($code, $state);
+            $server = $this->consent->complete($code, $state, is_string($issuer) && '' !== $issuer ? $issuer : null);
         } catch (McpOAuthException|OAuthException $e) {
             $this->logger->warning('MCP OAuth consent could not be completed', ['reason' => $e->getMessage()]);
 
