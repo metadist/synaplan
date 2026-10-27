@@ -54,6 +54,7 @@ use App\Repository\PromptRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
+use App\Repository\WidgetRepository;
 use App\Service\Api\OpenAiEmbeddingsRequest;
 use App\Service\Api\OpenAiEmbeddingsService;
 use App\Service\Api\OpenAiGatewayModels;
@@ -64,17 +65,19 @@ use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Chat\ProviderTranscriptCapture;
+use App\Service\Chat\Stream\StreamAgentPinResolver;
 use App\Service\Chat\Stream\StreamCaller;
-use App\Service\Chat\Stream\StreamTurnOptions;
-use App\Service\Chat\Stream\StreamTurnRequest;
+use App\Service\Chat\Stream\StreamCallerResolver;
+use App\Service\Chat\Stream\StreamRequestResolver;
 use App\Service\Chat\Stream\StreamTurnState;
 use App\Service\Chat\Stream\StreamUsageRecorder;
-use App\Service\Chat\Stream\StreamUserInput;
 use App\Service\Document\ChatDocumentOutput;
+use App\Service\Email\EmailChatService;
+use App\Service\Email\EmailWebhookIdempotencyService;
 use App\Service\Email\InternalEmailService;
+use App\Service\Email\RawMimeEmailParser;
 use App\Service\Email\Turn\EmailAnswerStore;
-use App\Service\Email\Turn\EmailThread;
-use App\Service\Email\Turn\InboundEmail;
+use App\Service\Email\Turn\InboundEmailIntake;
 use App\Service\Email\Turn\StoredInboundEmail;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\TextChunker;
@@ -95,6 +98,7 @@ use App\Service\Memory\MemoryExtractionService;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Chat\ChatModelChoice;
 use App\Service\Message\Chat\ChatReplyGenerator;
+use App\Service\Message\Chat\ChatRequestOptions;
 use App\Service\Message\Chat\ChatTurn;
 use App\Service\Message\Handler\Media\MediaDownloader;
 use App\Service\Message\MediaPromptExtractor;
@@ -114,8 +118,11 @@ use App\Service\Usage\UsageTaximeterConfig;
 use App\Service\Vision\VisionModelResolver;
 use App\Service\Widget\Turn\StoredVisitorMessage;
 use App\Service\Widget\Turn\WidgetAnswerStore;
-use App\Service\Widget\Turn\WidgetTurn;
+use App\Service\Widget\Turn\WidgetTurnGate;
+use App\Service\Widget\WidgetDomainGuard;
 use App\Service\Widget\WidgetRealtimeBroadcaster;
+use App\Service\Widget\WidgetService;
+use App\Service\Widget\WidgetSessionResolver;
 use App\Service\Widget\WidgetSessionService;
 use App\Tests\Support\MediaGenerationHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -255,17 +262,45 @@ final class AiPathHarness
         $http = new ProviderHttpRecorder([], [self::SECRET]);
         [$facade, $limits, $em, $user] = $this->buildSpine($sdk, $http);
 
-        $limits->checkLimit($user, 'MESSAGES');
+        $callerResolver = $this->createStub(StreamCallerResolver::class);
+        $callerResolver->method('resolve')->willReturn(new StreamCaller($user, 'en'));
+        $agentResolver = $this->createStub(StreamAgentPinResolver::class);
+        $agentResolver->method('resolve')->willReturn(null);
+        $budgetGate = $this->createStub(PremiumFeatureGate::class);
+        $budgetGate->method('isCostBudgetEnforced')->willReturn(true);
+
+        $requestResolver = new StreamRequestResolver(
+            $callerResolver,
+            $agentResolver,
+            $em,
+            $this->createStub(PromptService::class),
+            $limits,
+            $budgetGate,
+            new NullLogger(),
+        );
+        $streamTurn = $requestResolver->resolve(
+            Request::create(
+                '/api/v1/messages/stream',
+                'POST',
+                [],
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['message' => 'What is Synaplan?', 'chatId' => '5', 'trackId' => 42], \JSON_THROW_ON_ERROR),
+            ),
+            $user,
+        );
 
         $generator = $this->chatReplyGenerator($facade, $em);
-        $turn = $this->chatTurn('What is Synaplan?');
+        $turn = $this->chatTurn('What is Synaplan?', ['source' => 'WEB']);
         $choice = new ChatModelChoice(12, 'openai', 'gpt-4o', self::USER_ID, false, false, false, $this->modelEntity(12));
+        $aiOptions = $this->chatRequestOptions($limits)->forStreamedTurn($turn, $choice, ['model_id' => 12], null);
         $chunks = [];
         $reply = $generator->stream(
             $turn,
             $choice,
             [['role' => 'user', 'content' => 'What is Synaplan?']],
-            ['provider' => 'openai', 'model' => 'gpt-4o', 'model_id' => 12],
+            $aiOptions,
             static function (mixed $chunk) use (&$chunks): void {
                 $chunks[] = $chunk;
             },
@@ -273,13 +308,6 @@ final class AiPathHarness
             null,
         );
 
-        $streamTurn = new StreamTurnRequest(
-            new StreamCaller($user, 'en'),
-            '5',
-            42,
-            new StreamUserInput('What is Synaplan?'),
-            new StreamTurnOptions(),
-        );
         $state = new StreamTurnState($streamTurn, new PerfTimer(), ['id' => 12, 'name' => 'gpt-4o', 'provider' => 'openai']);
         $state->incoming = $turn->message;
         $outgoing = $this->message(102, 'Hello from Synaplan.', 'OUT');
@@ -320,16 +348,55 @@ final class AiPathHarness
         $http = new ProviderHttpRecorder([], [self::SECRET]);
         [$facade, $limits, $em, $user] = $this->buildSpine($sdk, $http);
 
-        $limits->checkLimit($user, 'MESSAGES');
+        $rawMime = $this->createStub(RawMimeEmailParser::class);
+        $rawMime->method('looksLikeRawMime')->willReturn(false);
+        $idempotency = $this->createStub(EmailWebhookIdempotencyService::class);
+        $idempotency->method('findDuplicate')->willReturn([
+            'existing' => null,
+            'fingerprint' => 'fp-1',
+            'normalized_message_id' => '<m1@example.com>',
+        ]);
+        $emailChats = $this->createStub(EmailChatService::class);
+        $emailChats->method('parseEmailKeyword')->willReturn(null);
+        $emailChats->method('findOrCreateUserFromEmail')->willReturn([
+            'user' => $user,
+            'is_anonymous' => false,
+        ]);
+
+        $intake = new InboundEmailIntake(
+            $rawMime,
+            $idempotency,
+            $emailChats,
+            $limits,
+            $this->createStub(InternalEmailService::class),
+            $this->createStub(DiscordNotificationService::class),
+            new NullLogger(),
+        );
+        $email = $intake->accept(Request::create(
+            '/api/v1/webhooks/email',
+            'POST',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'from' => 'sender@example.com',
+                'to' => 'smart@synaplan.net',
+                'subject' => 'Opening hours',
+                'body' => 'When do you open on Saturday?',
+                'message_id' => '<m1@example.com>',
+            ], \JSON_THROW_ON_ERROR),
+        ));
 
         $generator = $this->chatReplyGenerator($facade, $em);
-        $turn = $this->chatTurn('When do you open on Saturday?');
+        $turn = $this->chatTurn('When do you open on Saturday?', ['channel' => 'EMAIL']);
         $choice = new ChatModelChoice(12, 'openai', 'gpt-4o', self::USER_ID, false, false, false, $this->modelEntity(12));
+        $aiOptions = $this->chatRequestOptions($limits)->forBufferedTurn($turn, $choice, ['model_id' => 12], null);
         $reply = $generator->complete(
             $turn,
             $choice,
             [['role' => 'user', 'content' => 'When do you open on Saturday?']],
-            ['provider' => 'openai', 'model' => 'gpt-4o', 'model_id' => 12],
+            $aiOptions,
             [],
             null,
         );
@@ -339,18 +406,6 @@ final class AiPathHarness
             new GeneratedFileMetadataNormalizer(),
             $this->createStub(ConversationSummaryRefreshDispatcher::class),
             $em,
-        );
-        $email = new InboundEmail(
-            'sender@example.com',
-            'smart@synaplan.net',
-            'Opening hours',
-            'When do you open on Saturday?',
-            new EmailThread('<m1@example.com>', null, null),
-            null,
-            'fp-1',
-            [],
-            $user,
-            false,
         );
         $chat = $this->createStub(Chat::class);
         $chat->method('getId')->willReturn(5);
@@ -376,17 +431,49 @@ final class AiPathHarness
         $http = new ProviderHttpRecorder([], [self::SECRET]);
         [$facade, $limits, $em, $user] = $this->buildSpine($sdk, $http);
 
-        $limits->checkLimit($user, 'MESSAGES');
+        $widget = new Widget();
+        $widget->setOwnerId(self::USER_ID);
+        $widget->setOwner($user);
+        $widget->setWidgetId('wdg_char_1');
+        $widget->setTaskPromptTopic('tools:widget-default');
+        $widget->setName('Support');
+        $widget->setStatus('active');
+        $widget->setConfig(['aiModelId' => 12]);
+
+        $session = new WidgetSession();
+        $session->setWidgetId('wdg_char_1');
+        $session->setSessionId('sess_1');
+
+        $widgetRepo = $this->createStub(WidgetRepository::class);
+        $widgetRepo->method('findOneByWidgetId')->willReturn($widget);
+        $widgetService = new WidgetService($em, $widgetRepo, $this->createStub(PromptRepository::class), $limits, new NullLogger());
+        $sessionResolver = $this->createStub(WidgetSessionResolver::class);
+        $sessionResolver->method('resolve')->willReturn($session);
+        $sessions = $this->createStub(WidgetSessionService::class);
+        $sessions->method('getOrCreateSession')->willReturn($session);
+        $sessions->method('checkSessionLimit')->willReturn(['allowed' => true, 'remaining' => 10, 'retry_after' => 0, 'reason' => null]);
+
+        $turnGate = new WidgetTurnGate($widgetService, $this->createStub(WidgetDomainGuard::class), $sessionResolver, $sessions, $em);
+        $widgetTurn = $turnGate->admit('wdg_char_1', Request::create(
+            '/api/v1/widget/wdg_char_1/message',
+            'POST',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['sessionId' => 'sess_1', 'text' => 'Need widget help', 'chatId' => 5], \JSON_THROW_ON_ERROR),
+        ));
 
         $generator = $this->chatReplyGenerator($facade, $em);
-        $turn = $this->chatTurn('Need widget help', ['is_widget_mode' => true]);
+        $turn = $this->chatTurn('Need widget help', ['channel' => 'WIDGET', 'is_widget_mode' => true]);
         $choice = new ChatModelChoice(12, 'openai', 'gpt-4o', self::USER_ID, false, false, false, $this->modelEntity(12));
+        $aiOptions = $this->chatRequestOptions($limits)->forStreamedTurn($turn, $choice, ['model_id' => 12], null);
         $chunks = [];
         $reply = $generator->stream(
             $turn,
             $choice,
             [['role' => 'user', 'content' => 'Need widget help']],
-            ['provider' => 'openai', 'model' => 'gpt-4o', 'model_id' => 12],
+            $aiOptions,
             static function (mixed $chunk) use (&$chunks): void {
                 $chunks[] = $chunk;
             },
@@ -394,24 +481,9 @@ final class AiPathHarness
             null,
         );
 
-        $widget = new Widget();
-        $widget->setOwnerId(self::USER_ID);
-        $widget->setOwner($user);
-        $widget->setWidgetId('wdg_char_1');
-        $widget->setTaskPromptTopic('tools:widget-default');
-        $widget->setName('Support');
-
-        $session = new WidgetSession();
-        $session->setWidgetId('wdg_char_1');
-        $session->setSessionId('sess_1');
-
-        $sessions = $this->createStub(WidgetSessionService::class);
-        $sessions->method('getOrCreateSession')->willReturn($session);
-
         $chat = $this->createStub(Chat::class);
         $chat->method('getId')->willReturn(5);
         $stored = new StoredVisitorMessage($chat, $turn->message, []);
-        $widgetTurn = new WidgetTurn($widget, $user, $session, ['aiModelId' => 12], 'Need widget help', [], 5, '', false);
 
         $answerStore = new WidgetAnswerStore(
             $sessions,
@@ -744,6 +816,10 @@ final class AiPathHarness
     {
         $vector = array_fill(0, 1024, 0.125);
         $sdk = new OpenAISdkRecorder([
+            // First: embedBatch fails, triggering VectorizationService::embedWindowResilient()'s
+            // per-chunk AiFacade::embed() fallback so both embedBatch() and embed() are exercised.
+            OpenAIFixtures::error(500, 'Batch endpoint busy', 'server_error'),
+            // Second: the per-chunk AiFacade::embed() call succeeds.
             OpenAIFixtures::json(EmbeddingResponse::fake([
                 'data' => [['object' => 'embedding', 'index' => 0, 'embedding' => $vector]],
                 'usage' => ['prompt_tokens' => 8, 'total_tokens' => 8],
@@ -1399,7 +1475,7 @@ final class AiPathHarness
                 if (str_starts_with($item->getKey(), 'model_health.window.')) {
                     $modelId = (int) substr($item->getKey(), \strlen('model_health.window.'));
                     $value = \is_array($item->get()) ? $item->get() : [];
-                    ($this->record)($modelId, ((int) ($value['fail'] ?? 0)) > 0);
+                    ($this->record)($modelId, null !== ($value['last_kind'] ?? null));
                 }
 
                 return $this->inner->save($item);
@@ -1571,9 +1647,18 @@ final class AiPathHarness
         $user->method('getUserLevel')->willReturn('PRO');
         $user->method('getSubscriptionData')->willReturn([]);
         $user->method('isAdmin')->willReturn(false);
+        $user->method('isActive')->willReturn(true);
         $user->method('isMemoriesEnabled')->willReturn(true);
 
         return $user;
+    }
+
+    private function chatRequestOptions(RateLimitService $limits): ChatRequestOptions
+    {
+        $structuredOutput = $this->createStub(StructuredOutputConfig::class);
+        $structuredOutput->method('isEnabled')->willReturn(true);
+
+        return new ChatRequestOptions($structuredOutput, $limits);
     }
 
     private function userRepository(User $user): UserRepository

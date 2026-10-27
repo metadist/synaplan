@@ -180,40 +180,13 @@ billable call has exactly one writer of its `BUSELOG` row.**
    (`flag: null`): metering cannot be switched off, and the way back from
    that point is a release revert, not a setting.
 
-**The accounting unit stays what it is today.** A turn of the gateways or the
-chat can make several provider calls (every round of a tool loop is one), but
-today it writes **one** `MESSAGES` row with the usage summed over its rounds
-(`GatewayToolLoop` aggregates, `MessagesGateway` writes once), and
-`RateLimitService` counts those rows against message quotas. One row per
-provider call would spend several message allowances on one answer. So:
+**Per-call charging (`AI_CALL`) vs. per-turn message-allowance quotas (`MESSAGES`).**
+After [#2836](https://github.com/metadist/synaplan/pull/2836) (`4db96d6e2`), Synaplan separates per-call model cost/token accounting from per-turn message-allowance quotas:
 
-- `UsageHook` does not write per call. It adds each call's usage to the
-  `TurnUsageLedger` under the call's `turnId`. The ledger is **shared state,
-  not process memory**, because from S5 on one turn's rounds run on different
-  pumps and Messenger workers and are finished by `FinishTurnCommand` in yet
-  another process: a Redis hash `turnusage:{turnId}` (TTL 1 h) with one field
-  per provider call, written with `HSETNX` on the call's `callId`, so a
-  retried or duplicated contribution counts once. Closing is idempotent too:
-  `SET turnusage:{turnId}:closed NX` decides the single writer of the
-  per-turn row, which sums every field present at that moment. In-request
-  turns use the same store, so both modes share one implementation.
-- Each `AiAction` declares its unit: **per turn** (`MESSAGES` on every
-  channel) or **per call** (`SORTING`, `EMBEDDINGS`, `MEMORY_EXTRACTION`,
-  `IMAGES`, `VIDEOS`, `TRANSCRIPTION`, `SPEECH`, …, as today).
-- A per-call action's row is written in the call's after-hook; a per-turn
-  action's row is written once, when the turn's owner closes the ledger
-  (`TurnUsageLedger::close($turnId)`, called where today's single row is
-  written). `key_source`, model and provider of the row follow today's rule
-  for that path.
-- Cost per provider call, when someone needs it, is in the request timeline
-  and the metrics (AU13), never as extra `BUSELOG` rows.
-- Tests: a gateway turn with three MCP rounds, a document tool loop with two
-  rounds and a buffered single call each write exactly today's rows (one
-  `MESSAGES` row with summed tokens for the turns) under `legacy`, `shadow`
-  and `on`; the shadow comparison is per row, not per call; a duplicated
-  contribution and a second close each change nothing. AU30 adds the
-  distributed case: three rounds on two different pumps, the finish on a
-  separate worker — one `MESSAGES` row with the full total.
+- **Per-call model charge (`AI_CALL` and capability actions):** Every chat call through `AiFacade` (including each round of a tool loop, a saved task step, or an internal call unless `caller_meters: true` is set) writes one `AI_CALL` row with that call's tokens, model, provider and cost (`AiChatUsageMeter::record()`, which moves into `UsageHook` in AU11) and stamps `facade_metered: true`, `facade_charged_cost` and `facade_price_known` on the result. Other capability calls write their per-call action (`SORTING`, `MEMORY_EXTRACTION`, `EMBEDDINGS`, `IMAGES`, `VIDEOS`, `TRANSCRIPTION`, `AUDIOS`).
+- **Per-turn message-allowance quota (`MESSAGES`):** A turn of the web chat, widget, email, WhatsApp, Telegram, `/v1/chat/completions`, MCP or Saved Tasks writes **one** `MESSAGES` row per turn so `RateLimitService` counts one message allowance per answer. When the call(s) of that turn were already billed as `AI_CALL` (`facade_metered: true`), `FacadeMeteredChat::messages()` zeros the `MESSAGES` row's tokens and cost so the turn is never double-charged.
+- **Multi-round turns and `TurnUsageLedger`:** A multi-round turn (e.g. a two-round document tool loop or a three-round gateway MCP loop) sums its rounds in `TurnUsageLedger` (shared Redis state `turnusage:{turnId}`, TTL 1 h, `HSETNX` per `callId`, `SET turnusage:{turnId}:closed NX` on close) so the turn's single `MESSAGES` quota row (and, for `/v1/messages` before and after AU12, the turn's aggregated `MessagesUsage` / `facade_charged_cost`) reflects the whole turn while `RateLimitService` still counts one `MESSAGES` row per turn.
+- Tests (AU11): per AU9 path and per mode (`legacy`, `shadow`, `on`), the exact `BUSELOG` rows (`AI_CALL` + zero-cost `MESSAGES` for facade-metered chat turns; one `MESSAGES` row per turn for multi-round turns; one capability row for per-call actions) are written under all three modes; under `shadow`, `UsageHook` compares its computed row against the caller's/meter's row and logs `ai.usage_mismatch` on any difference; a duplicated contribution and a second close each change nothing. AU30 adds the distributed case across pumps and workers.
 
 Non-AI usage rows (`TOOLS`, `MCP_TOOL`, `COMPUTE_RUNS`, `WEB_SEARCH` from tool
 loops, storage, messages-per-hour counters) are not part of this switch; they
@@ -342,7 +315,10 @@ final readonly class AiCallTimings
     ) {}
 }
 
-final readonly class PipelineStreamChunk
+```php
+namespace App\AI\Stream;
+
+final readonly class StreamChunk
 {
     /**
      * @param 'content'|'reasoning'|'tool_call_delta'|'finish'|'raw' $type
@@ -354,8 +330,16 @@ final readonly class PipelineStreamChunk
         public ?string $finishReason = null,
         public array $payload = [],
     ) {}
+
+    /** @param string|array<string, mixed>|self $chunk */
+    public static function fromProviderChunk(string|array|self $chunk): self { /* normalizes plain string or array chunk */ }
+
+    /** @param string|array<string, mixed>|self $chunk */
+    public static function visibleText(string|array|self $chunk): string { /* existing helper preserved */ }
 }
 ```
+
+`App\AI\Stream\StreamChunk` is the single canonical chunk value across `StreamingAiCallHookInterface::onChunk()` (§1.2), `AiCallPipeline::stream()` (§1.7.3) and `StreamDecoderInterface` (§7).
 
 #### 1.7.3 Streaming shape
 
@@ -368,7 +352,7 @@ public function stream(AiCall $call, callable $transport, callable $onChunk): Ai
 ```
 
 1. `before()` hooks run in descending priority order (900 → 100). A `AiCallRefusal` short-circuits before `$transport` is called and still runs `after()` hooks with `AiCallOutcome::Refused`.
-2. `$onChunk` is wrapped by the pipeline: on the first visible chunk (`PipelineStreamChunk::$type === 'content'` and `'' !== $content`) `ttftMs` is stamped from `hrtime(true)`; every chunk is normalized to `PipelineStreamChunk` and passed to each `StreamingAiCallHookInterface::onChunk($call, $chunk)` in descending priority order before forwarding the original chunk to the caller's `$onChunk`.
+2. `$onChunk` is wrapped by the pipeline: every provider chunk is normalized via `StreamChunk::fromProviderChunk($chunk)`; on the first visible chunk (`$normalized->type === 'content'` and `'' !== $normalized->content`) `ttftMs` is stamped from `hrtime(true)`; `$normalized` is passed to each `StreamingAiCallHookInterface::onChunk($call, $normalized)` in descending priority order before forwarding the original `$chunk` to the caller's `$onChunk`.
 3. Cancellation is owned by the caller's `$onChunk` callback (or `$transport`) throwing `StreamCancelledException`. The pipeline catches `StreamCancelledException`, records `AiCallOutcome::Cancelled` (which `CircuitBreakerHook` and `ModelHealthHook` ignore so user stops never trip a breaker), runs `after()` hooks in descending priority order, and rethrows `StreamCancelledException`.
 
 #### 1.7.4 Deadline shape
