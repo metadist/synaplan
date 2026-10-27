@@ -96,7 +96,9 @@ Exit (UX contract §6):
   label; sends `auth_mode` on update only when it changed (D6); after
   `?connected=<id>` scrolls that row into view. The file shrinks.
 - `frontend/src/config/mcpServerTemplates.ts`: no new template. Custom's
-  `hint` mentions the sign-in method.
+  `hint` points at the method choice without naming the methods, so it
+  stays true while sign-in is hidden (D5; the picker renders it whatever
+  the flag).
 
 ### Backend
 
@@ -124,7 +126,7 @@ Exit (UX contract §6):
 | `mcpServers.saveAndSignIn` | Save and sign in |
 | `mcpServers.signInHost` | Signs in at {host} |
 | `mcpServers.oauthConnectedToast` | Signed in to {name}. (was: "Signed in successfully") |
-| `mcpServers.templates.custom.hint` | Paste the https address of any MCP server. Then choose how Synaplan connects: no sign-in, an access key, or signing in with your account. |
+| `mcpServers.templates.custom.hint` | Paste the https address of any MCP server, then choose below how Synaplan connects to it. |
 
 `de`, `es`, `fr`, `tr` in the same pull request.
 

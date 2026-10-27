@@ -61,7 +61,7 @@ Ticked by the owner on 2026-10-27.
 | D6 | [x] **An existing sign-in row while the flag is off** shows its method read-only with one sentence, and can still be renamed, switched off, disconnected and deleted. The backend refuses only a switch *to* `oauth` while the flag is off. | Today the form always sends `auth_mode`, so such a row cannot even be renamed. Undo is a click (bar item 5). |
 | D7 | [x] **Write actions stay off by default** for a custom sign-in server; the person turns them on. | Unchanged default; restated because sign-in servers are often writable. |
 | D8 | [x] **The method and the key fields move into a new `McpServerAuthFields.vue`.** `McpServersConfiguration.vue` does not grow. | It is 789 lines against the 300-line rule. |
-| D9 | [x] **A failed start answers a stable `error_code`.** The page shows one sentence per code in all five locales, never the server's text. Saved-but-not-signed-in says both halves. | U8. The issue's "user-friendly language" criterion. |
+| D9 | [x] **A failed start answers a stable `code`** (the field `httpClient` reads into `ApiError.code`). The page shows one sentence per code in all five locales, never the server's text. Saved-but-not-signed-in says both halves. | U8. The issue's "user-friendly language" criterion. |
 | D10 | [x] **Walks use a real server.** The SSRF guard refuses local addresses, so J-MO-1 runs against (a) Notion's address entered through Custom and (b) a spec-compliant fixture published through a temporary public tunnel (`cloudflared`, installed on the walker's machine only, not a project dependency). A walk that cannot run is a STATUS line that says why. | `_devextras/planning/AGENTS.md`: no invented walks. |
 
 ---
