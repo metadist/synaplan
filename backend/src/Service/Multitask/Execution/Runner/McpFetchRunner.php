@@ -141,7 +141,7 @@ final readonly class McpFetchRunner implements TaskRunner
                 return NodeResult::failed('this data connection is not available');
             }
 
-            return $this->images->attach($server, $tool, $arguments, $userId);
+            return $this->images->attach($server, $tool, $arguments, $this->language($context));
         }
 
         try {
@@ -540,6 +540,17 @@ final readonly class McpFetchRunner implements TaskRunner
         }
 
         return '('.implode('; ', $parts).')';
+    }
+
+    private function language(NodeContext $context): string
+    {
+        $classified = $context->classification['language'] ?? null;
+        if (is_string($classified) && '' !== $classified) {
+            return $classified;
+        }
+        $stored = $context->message->getLanguage();
+
+        return '' !== $stored ? $stored : 'en';
     }
 
     private function oneLine(string $text): string

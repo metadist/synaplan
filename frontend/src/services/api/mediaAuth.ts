@@ -93,6 +93,26 @@ function isBackendMediaUrl(url: string): boolean {
   return isNativeApp() && url.startsWith(`${getNativeApiBaseUrl()}/`)
 }
 
+/** A picture that lives on another host, such as a Notion download link. */
+export function isExternalMediaUrl(url: string): boolean {
+  const resolved = resolveMediaUrl(url)
+  if ('' === resolved || isBackendMediaUrl(resolved)) {
+    return false
+  }
+  return resolved.startsWith('https://') || resolved.startsWith('http://')
+}
+
+/** Open an external media URL in a new tab so the browser loads it from its host. */
+export function openExternalMedia(url: string): void {
+  const link = document.createElement('a')
+  link.href = url
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
 /**
  * True when a media URL cannot simply be assigned to an element/fetched with
  * cookies but needs the Bearer-authenticated `fetchMediaBlob()` path.

@@ -12,7 +12,6 @@ use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
-use App\Service\File\FileStorageService;
 use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
@@ -75,7 +74,6 @@ final class McpFetchRunnerTest extends TestCase
         bool $toolIsError = false,
         ?LoggerInterface $logger = null,
         int $httpStatus = 200,
-        ?FileStorageService $storage = null,
     ): McpFetchRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
@@ -141,14 +139,7 @@ final class McpFetchRunnerTest extends TestCase
             $logger ?? new NullLogger(),
             new AtlassianToolArguments($client, new NullLogger()),
             new NotionFetchArguments(new NullLogger()),
-            new NotionImageAttach(
-                $client,
-                $http,
-                new SsrfGuard(),
-                $storage ?? $this->createMock(FileStorageService::class),
-                $this->createMock(EntityManagerInterface::class),
-                new NullLogger(),
-            ),
+            new NotionImageAttach($client, new SsrfGuard(), new NullLogger()),
         );
     }
 
@@ -175,7 +166,7 @@ final class McpFetchRunnerTest extends TestCase
         return new PromptService($prompts, $metaRepo, $this->createMock(EntityManagerInterface::class), new NullLogger());
     }
 
-    private function context(string $text = 'Look up Acme GmbH in our CRM'): NodeContext
+    private function context(string $text = 'Look up Acme GmbH in our CRM', string $language = 'en'): NodeContext
     {
         $message = $this->createMock(Message::class);
         $message->method('getText')->willReturn($text);
@@ -183,7 +174,9 @@ final class McpFetchRunnerTest extends TestCase
         $message->method('getFiles')->willReturn(new ArrayCollection([]));
         $message->method('getFileText')->willReturn('');
 
-        return new NodeContext($message, [], self::USER_ID, ['topic' => 'general']);
+        $message->method('getLanguage')->willReturn($language);
+
+        return new NodeContext($message, [], self::USER_ID, ['topic' => 'general', 'language' => $language]);
     }
 
     private function node(string $tool = 'search_customers', int $serverId = 3): TaskNode
@@ -229,7 +222,7 @@ final class McpFetchRunnerTest extends TestCase
         self::assertSame(['query' => 'Bild'], $this->lastCallArguments);
     }
 
-    public function testAnImageFromNotionIsAttachedAsAFile(): void
+    public function testAnImageFromNotionIsLinkedNotStored(): void
     {
         $this->serverTools = [[
             'name' => 'notion-get-file-download-urls',
@@ -239,24 +232,17 @@ final class McpFetchRunnerTest extends TestCase
         ]];
         $server = $this->server();
         $server->setName('Notion')->setUrl('https://mcp.notion.com/mcp');
-        $storage = $this->createMock(FileStorageService::class);
-        $storage->method('storeRawContent')->willReturn([
-            'success' => true,
-            'path' => '7/shot.png',
-            'size' => 8,
-            'mime' => 'image/png',
-            'error' => null,
-        ]);
         $node = new TaskNode('n2', Capability::McpFetch, [], [
             'arguments' => ['pages' => '{"results":[{"id":"p1","title":"Synaplan","type":"page"}]}'],
         ], ['server_id' => 3, 'tool' => 'notion-get-file-download-urls']);
 
-        $result = $this->runner(server: $server, storage: $storage)->run($node, $this->context());
+        $result = $this->runner(server: $server)->run($node, $this->context(language: 'de'));
 
         self::assertTrue($result->isSuccessful(), (string) $result->error);
         self::assertSame('shot.png', $result->files[0]['name'] ?? null);
-        self::assertSame('image', $result->files[0]['type'] ?? null);
-        self::assertStringContainsString('Synaplan', (string) $result->text);
+        self::assertSame('https://8.8.8.8/shot.png', $result->files[0]['path'] ?? null);
+        self::assertArrayNotHasKey('local_path', $result->files[0]);
+        self::assertStringContainsString('nicht in deinen Dateien gespeichert', (string) $result->text);
     }
 
     public function testDisabledFlagsFailTheNode(): void

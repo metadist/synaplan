@@ -4,39 +4,27 @@ declare(strict_types=1);
 
 namespace App\Service\Mcp\Notion;
 
-use App\Entity\File;
 use App\Entity\McpServerConfig;
-use App\Service\File\FileStorageService;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Security\SsrfGuard;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Turns a Notion search into the first image on those pages and stores it
- * as a chat file. Notion search returns pages, not pictures: each page is
- * opened, its file reference is resolved to a short-lived URL, and that URL
- * is downloaded only when it is a public https image.
+ * Turns a Notion search into the first image on those pages. The picture
+ * stays on Notion: the chat receives the short-lived download link and
+ * nothing is written to local files.
  */
 final readonly class NotionImageAttach
 {
     public const MAX_PAGES = 5;
 
-    public const MAX_BYTES = 10_485_760;
-
     private const FETCH_TOOL = 'notion-fetch';
-
-    private const MAX_REDIRECTS = 3;
 
     public function __construct(
         private McpClient $client,
-        private HttpClientInterface $http,
         private SsrfGuard $ssrf,
-        private FileStorageService $storage,
-        private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
     }
@@ -62,7 +50,7 @@ final readonly class NotionImageAttach
     /**
      * @param array<string, mixed> $arguments
      */
-    public function attach(McpServerConfig $server, string $tool, array $arguments, int $userId): NodeResult
+    public function attach(McpServerConfig $server, string $tool, array $arguments, string $language = 'en'): NodeResult
     {
         $pages = $this->pages($arguments['pages'] ?? null);
         $looked = 0;
@@ -82,27 +70,27 @@ final readonly class NotionImageAttach
                 continue;
             }
             try {
-                $file = $this->store($server, $tool, $image, $userId);
+                $url = $this->publicUrl($server, $tool, $image, $language);
             } catch (McpClientException $e) {
                 $this->logger->warning('NotionImageAttach: download link failed', [
                     'server_id' => $server->getId(),
                     'error' => $e->getMessage(),
                 ]);
 
-                return NodeResult::reportableFailure('Notion did not return a download link, so nothing was attached.', $this->metadata($server, $tool));
+                return NodeResult::reportableFailure(NotionImageCopy::noLink($language), $this->metadata($server, $tool));
             } catch (\RuntimeException $e) {
                 return NodeResult::reportableFailure($e->getMessage(), $this->metadata($server, $tool));
             }
 
             return NodeResult::ok(
-                sprintf('Found image "%s" on page "%s".', $file['name'], $page['title']),
-                [$file],
+                NotionImageCopy::found($language, $image['name'], $page['title']),
+                [['path' => $url, 'type' => 'image', 'name' => $image['name']]],
                 $this->metadata($server, $tool),
             );
         }
 
         return NodeResult::ok(
-            sprintf('Looked through %d of %d pages and found no image, so nothing was attached.', $looked, self::MAX_PAGES),
+            NotionImageCopy::none($language, $looked, self::MAX_PAGES),
             [],
             $this->metadata($server, $tool),
         );
@@ -198,58 +186,27 @@ final readonly class NotionImageAttach
     }
 
     /**
-     * @param array{url: string, name: string, reference: ?string} $image
+     * The signed Notion URL, checked only for being a public https address.
+     * The bytes stay on Notion so the link the chat shows is the one the
+     * browser loads.
      *
-     * @return array{path: string, type: string, local_path: string, name: string, file_id: int}
+     * @param array{url: string, name: string, reference: ?string} $image
      */
-    private function store(McpServerConfig $server, string $tool, array $image, int $userId): array
+    private function publicUrl(McpServerConfig $server, string $tool, array $image, string $language): string
     {
         $url = $image['url'];
         if (null !== $image['reference']) {
             $text = $this->toolText($server, $tool, ['references' => [$image['reference']]]);
             $url = $this->signedUrl($text) ?? '';
             if ('' === $url) {
-                throw new \RuntimeException('Notion did not return a download link, so nothing was attached.');
+                throw new \RuntimeException(NotionImageCopy::noLink($language));
             }
         }
-        $body = $this->download($url);
-        if (!$this->looksLikeImage($body)) {
-            throw new \RuntimeException('The file from Notion is not an image, so nothing was attached.');
+        if (!str_starts_with($url, 'https://') || $this->ssrf->isBlockedUrl($url)) {
+            throw new \RuntimeException(NotionImageCopy::notPublic($language));
         }
 
-        $extension = strtolower(pathinfo($image['name'], PATHINFO_EXTENSION));
-        $mime = match ($extension) {
-            'jpg', 'jpeg' => 'image/jpeg',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            default => 'image/png',
-        };
-        $stored = $this->storage->storeRawContent($body, $userId, $image['name'], $mime);
-        if (true !== $stored['success'] || '' === $stored['path']) {
-            throw new \RuntimeException('The image could not be saved, so nothing was attached.');
-        }
-
-        $file = new File();
-        $file->setUserId($userId);
-        $file->setFilePath($stored['path']);
-        $file->setFileName($image['name']);
-        $file->setFileSize($stored['size']);
-        $file->setFileMime($mime);
-        $file->setFileType('' !== $extension ? $extension : 'png');
-        $file->setStatus('complete');
-        $file->setSource('chat_attachment');
-        $file->setIncoming(false);
-        $file->setEphemeral(true);
-        $this->em->persist($file);
-        $this->em->flush();
-
-        return [
-            'path' => '/api/v1/files/uploads/'.$stored['path'],
-            'type' => 'image',
-            'local_path' => $stored['path'],
-            'name' => $image['name'],
-            'file_id' => (int) ($file->getId() ?? 0),
-        ];
+        return $url;
     }
 
     /**
@@ -287,73 +244,6 @@ final readonly class NotionImageAttach
         }
 
         return null;
-    }
-
-    private function download(string $url): string
-    {
-        $current = $url;
-        for ($hop = 0; $hop <= self::MAX_REDIRECTS; ++$hop) {
-            if (!str_starts_with($current, 'https://') || $this->ssrf->isBlockedUrl($current)) {
-                throw new \RuntimeException('The image link is not a public address, so nothing was attached.');
-            }
-            try {
-                $response = $this->http->request('GET', $current, [
-                    'timeout' => 20,
-                    'max_redirects' => 0,
-                    'headers' => ['Accept' => 'image/*'],
-                ] + $this->ssrf->pinnedResolveOption($current));
-                $status = $response->getStatusCode();
-            } catch (\Throwable $e) {
-                $this->logger->warning('NotionImageAttach: download failed', ['error' => $e->getMessage()]);
-                throw new \RuntimeException('The image could not be downloaded, so nothing was attached.');
-            }
-            if (in_array($status, [301, 302, 303, 307, 308], true)) {
-                $location = $response->getHeaders(false)['location'][0] ?? '';
-                $next = $this->nextUrl($current, $location);
-                if (null === $next || self::MAX_REDIRECTS === $hop) {
-                    throw new \RuntimeException('The image could not be downloaded, so nothing was attached.');
-                }
-                $current = $next;
-                continue;
-            }
-            if ($status < 200 || $status >= 300) {
-                throw new \RuntimeException('The image could not be downloaded, so nothing was attached.');
-            }
-            $length = (int) ($response->getHeaders(false)['content-length'][0] ?? 0);
-            if ($length > self::MAX_BYTES) {
-                throw new \RuntimeException('The image is larger than 10 MB, so nothing was attached.');
-            }
-            $body = $response->getContent();
-            if (strlen($body) > self::MAX_BYTES) {
-                throw new \RuntimeException('The image is larger than 10 MB, so nothing was attached.');
-            }
-
-            return $body;
-        }
-
-        throw new \RuntimeException('The image could not be downloaded, so nothing was attached.');
-    }
-
-    private function nextUrl(string $current, string $location): ?string
-    {
-        $location = trim($location);
-        if (str_starts_with($location, 'https://')) {
-            return $location;
-        }
-        if (!str_starts_with($location, '/')) {
-            return null;
-        }
-        $host = parse_url($current, PHP_URL_HOST);
-
-        return is_string($host) && '' !== $host ? 'https://'.$host.$location : null;
-    }
-
-    private function looksLikeImage(string $body): bool
-    {
-        return str_starts_with($body, "\x89PNG")
-            || str_starts_with($body, "\xFF\xD8\xFF")
-            || str_starts_with($body, 'GIF8')
-            || (str_starts_with($body, 'RIFF') && str_contains(substr($body, 0, 16), 'WEBP'));
     }
 
     private function fileName(string $reference): ?string
