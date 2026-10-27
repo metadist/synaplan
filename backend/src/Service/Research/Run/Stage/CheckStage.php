@@ -126,9 +126,9 @@ final readonly class CheckStage implements ResearchStage
         $ask = [];
         $number = 0;
         foreach (DraftSentences::split($report) as $sentence) {
-            $bare = trim((string) preg_replace(DraftSentences::MARKER, '', $sentence));
-            $bare = trim((string) preg_replace('/\s+/u', ' ', $bare));
-            $reason = $flagged[PassageText::normalise($bare)] ?? null;
+            $key = PassageText::normalise((string) preg_replace(DraftSentences::MARKER, '', $sentence));
+            $bare = DraftSentences::bare($sentence);
+            $reason = $flagged[$key] ?? null;
             if (null !== $reason) {
                 $drop[] = ['sentence' => $sentence, 'text' => $bare];
                 continue;

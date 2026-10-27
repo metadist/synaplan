@@ -176,23 +176,53 @@ final class CheckReport
 
     private static function cut(string $report, string $sentence): string
     {
-        $pattern = '/(?<!\S)'.preg_quote($sentence, '/').'(?!\S)/u';
+        $quoted = preg_quote($sentence, '/');
+        $line = '/^[ \t]*'.$quoted.'[ \t]*(?:\r?\n|$)/mu';
+        if (1 === preg_match($line, $report)) {
+            return preg_replace($line, '', $report, 1) ?? $report;
+        }
 
-        return preg_replace($pattern, '', $report, 1) ?? $report;
+        return preg_replace('/(?<!\S)'.$quoted.'(?!\S)[ \t]*/u', '', $report, 1) ?? $report;
     }
 
-    /** Drops list markers and blank runs a removed sentence left behind. */
+    /** Drops list markers, tables without rows and blank runs a removed sentence left behind. */
     private static function tidy(string $report): string
     {
+        $lines = self::lines($report);
         $kept = [];
-        foreach (self::lines($report) as $line) {
+        foreach ($lines as $index => $line) {
             $line = rtrim($line);
-            if (1 !== preg_match(self::EMPTY_LIST_ITEM, $line)) {
-                $kept[] = $line;
+            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index)) {
+                continue;
             }
+            if (self::isTableRow($line) && self::headerOfEmptyTable($lines, $index - 1)) {
+                continue;
+            }
+            $kept[] = $line;
         }
 
         return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
+    }
+
+    /**
+     * A table header whose rule line is followed by no row.
+     *
+     * @param list<string> $lines
+     */
+    private static function headerOfEmptyTable(array $lines, int $index): bool
+    {
+        if ($index < 0 || !self::isTableRow($lines[$index] ?? '') || 1 !== preg_match(DraftSentences::TABLE_RULE, trim($lines[$index + 1] ?? ''))) {
+            return false;
+        }
+
+        return !self::isTableRow($lines[$index + 2] ?? '');
+    }
+
+    private static function isTableRow(string $line): bool
+    {
+        $line = trim($line);
+
+        return str_starts_with($line, '|') && str_ends_with($line, '|') && strlen($line) > 1;
     }
 
     /**

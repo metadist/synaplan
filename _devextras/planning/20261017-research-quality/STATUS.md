@@ -73,14 +73,17 @@ nothing. Follow-up costs $0.467 in total, the parents $0.435. `can_add_to_report
 is true only for fu-q: the others are revise, deeper or refresh, where the new
 report replaces the old one.
 
-Found while reading the reports, not fixed here:
+Found while reading the reports, fixed in the same PR (`CheckReportTest`):
 
 - fu-f: after the check removed a sentence, a quote fragment (`,"  "It confirms…`)
-  stays in the report. Removal works on sentences, and a quoted sentence inside
-  a sentence is split badly.
-- fu-t: the check removed the translated first sentence, so the report starts with
-  a space. Translated sentences count as changed and are checked again, which is
-  correct, but four of fourteen fell out.
+  stayed in the report. The split broke after "..." inside a quote; a part that
+  starts with a comma or a small letter now continues the sentence. Not confirmed
+  items lost the space a removed citation left before a comma (`June 2014 ,`).
+- fu-t: the check removed the translated first sentence, and the report started
+  with a space. A removal now takes the space after it, a statement that fills a
+  line takes the line, and a table left with no row is dropped. Translated
+  sentences count as changed and are checked again, which is correct; four of
+  fourteen fell out.
 
 RS10 exit met: tests green, the follow-up rows scored here.
 
