@@ -16,6 +16,8 @@ use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchRejected;
 use App\Service\Research\Run\ResearchRunService;
+use App\Service\Research\Run\ResearchRunState;
+use App\Service\Research\Run\ResearchTaskHandover;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -31,6 +33,7 @@ final readonly class ResearchRunner implements TaskRunner
         private ResearchConfig $research,
         private MultitaskRoutingConfig $routing,
         private LoggerInterface $logger,
+        private ResearchTaskHandover $handover,
     ) {
     }
 
@@ -109,10 +112,33 @@ final readonly class ResearchRunner implements TaskRunner
 
             return NodeResult::failed('Research did not start. Nothing was searched.');
         }
+        if ($state->status->isTerminal()) {
+            return $this->fromFinishedRun($state);
+        }
 
         return NodeResult::waitingApproval(0, [], [
             'research' => ['run_id' => $state->ref->id],
         ]);
+    }
+
+    /**
+     * The run was already finished when this step asked for it, so the task
+     * continues now instead of waiting for a hand-over that already happened.
+     */
+    private function fromFinishedRun(ResearchRunState $state): NodeResult
+    {
+        $args = $this->handover->args($state);
+        $report = $args['research_report'] ?? null;
+        if (is_string($report) && '' !== $report) {
+            return NodeResult::ok($report, $this->fileList($args['research_files'] ?? []), [
+                'research' => ['run_id' => $state->ref->id],
+            ]);
+        }
+        $failed = $args['research_failed'] ?? null;
+
+        return NodeResult::failed(is_string($failed) && '' !== trim($failed)
+            ? trim($failed)
+            : 'Research did not finish, so the next step did not run.');
     }
 
     private function question(TaskNode $node, NodeContext $context): string
@@ -159,7 +185,14 @@ final readonly class ResearchRunner implements TaskRunner
      */
     private function files(TaskNode $node): array
     {
-        $raw = $node->params['research_files'] ?? [];
+        return $this->fileList($node->params['research_files'] ?? []);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fileList(mixed $raw): array
+    {
         if (!is_array($raw)) {
             return [];
         }

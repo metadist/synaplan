@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Entity\User;
+use App\Message\ContinueSavedTaskAfterResearch;
 use App\Repository\UserRepository;
 use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
@@ -18,6 +19,9 @@ use App\Service\Research\Run\ResearchStatus;
 use App\Service\SavedTask\SavedTaskResumeService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class ResearchSavedTaskResumeTest extends TestCase
@@ -68,8 +72,26 @@ final class ResearchSavedTaskResumeTest extends TestCase
         $this->resume($tasks)->after($state);
     }
 
-    private function resume(SavedTaskResumeService $tasks): ResearchSavedTaskResume
+    public function testAFinishWhileTheTaskIsStillStartingIsTriedAgain(): void
     {
+        $state = $this->state(ResearchOutcome::COMPLETE);
+        $state->ledger->setReport('The last boat is at 18:00.');
+        $tasks = $this->createStub(SavedTaskResumeService::class);
+        $tasks->method('completeWaitingResearch')->willReturn(null);
+        $tasks->method('isRunning')->willReturn(true);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->with(
+            self::callback(static fn (ContinueSavedTaskAfterResearch $message): bool => 1 === $message->attempt() && $message->runId() === $state->ref->id),
+            self::callback(static fn (array $stamps): bool => ($stamps[0] ?? null) instanceof DelayStamp),
+        )->willReturn(new Envelope(new ContinueSavedTaskAfterResearch($state->ref->id, 1)));
+
+        $this->resume($tasks, $bus)->after($state);
+    }
+
+    private function resume(
+        SavedTaskResumeService $tasks,
+        ?MessageBusInterface $bus = null,
+    ): ResearchSavedTaskResume {
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $user = $this->createStub(User::class);
@@ -77,7 +99,13 @@ final class ResearchSavedTaskResumeTest extends TestCase
         $users = $this->createStub(UserRepository::class);
         $users->method('find')->willReturn($user);
 
-        return new ResearchSavedTaskResume($tasks, new ResearchOutcomeText($translator), $users, new NullLogger());
+        return new ResearchSavedTaskResume(
+            $tasks,
+            new ResearchOutcomeText($translator),
+            $users,
+            new NullLogger(),
+            $bus,
+        );
     }
 
     private function state(string $code): ResearchRunState
