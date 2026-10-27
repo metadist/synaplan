@@ -48,6 +48,13 @@
             </button>
           </div>
         </div>
+        <p
+          v-if="errorPlace === 'switch' && saveError"
+          class="text-sm text-red-600 dark:text-red-400 mt-3"
+          role="alert"
+        >
+          {{ saveError }}
+        </p>
       </section>
 
       <section class="surface-card rounded-lg p-4 mb-6">
@@ -185,7 +192,13 @@
           {{ t('adminSetup.research.save') }}
         </button>
         <p v-if="saved" class="text-sm txt-secondary mt-2">{{ t('adminSetup.research.saved') }}</p>
-        <p v-if="saveError" class="text-sm txt-secondary mt-2" role="alert">{{ saveError }}</p>
+        <p
+          v-if="errorPlace === 'save' && saveError"
+          class="text-sm text-red-600 dark:text-red-400 mt-2"
+          role="alert"
+        >
+          {{ saveError }}
+        </p>
       </section>
 
       <section class="surface-card rounded-lg p-4">
@@ -217,6 +230,13 @@
         >
           {{ t('adminSetup.research.sampleButton') }}
         </button>
+        <p
+          v-if="errorPlace === 'sample' && saveError"
+          class="text-sm text-red-600 dark:text-red-400 mt-3"
+          role="alert"
+        >
+          {{ saveError }}
+        </p>
       </section>
     </template>
   </div>
@@ -241,6 +261,7 @@ const loadFailed = ref(false)
 const saving = ref(false)
 const saved = ref(false)
 const saveError = ref('')
+const errorPlace = ref<'switch' | 'save' | 'sample' | ''>('')
 const sampling = ref(false)
 const sampleReady = ref(false)
 const sampleSentence = ref('')
@@ -293,9 +314,11 @@ async function load(): Promise<void> {
 
 async function setEnabled(enabled: boolean): Promise<void> {
   saveError.value = ''
+  errorPlace.value = ''
   try {
     apply(await saveResearchAdmin({ enabled }))
   } catch (error) {
+    errorPlace.value = 'switch'
     saveError.value = errorSentence(error)
   }
 }
@@ -305,6 +328,7 @@ async function save(): Promise<void> {
   saving.value = true
   saved.value = false
   saveError.value = ''
+  errorPlace.value = ''
   try {
     apply(
       await saveResearchAdmin({
@@ -316,6 +340,7 @@ async function save(): Promise<void> {
     )
     saved.value = true
   } catch (error) {
+    errorPlace.value = 'save'
     saveError.value = errorSentence(error)
   } finally {
     saving.value = false
@@ -325,11 +350,13 @@ async function save(): Promise<void> {
 async function sample(): Promise<void> {
   sampling.value = true
   saveError.value = ''
+  errorPlace.value = ''
   try {
     const started = await startResearchSample()
     sampleSentence.value = started.sentence
     sampleReady.value = false
   } catch (error) {
+    errorPlace.value = 'sample'
     saveError.value = errorSentence(error)
   } finally {
     sampling.value = false

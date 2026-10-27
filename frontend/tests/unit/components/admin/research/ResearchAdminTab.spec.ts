@@ -52,6 +52,22 @@ describe('ResearchAdminTab', () => {
     expect(wrapper.text()).toContain('People can no longer start research')
   })
 
+  it('shows a refusal next to the switch', async () => {
+    saveResearchAdmin.mockRejectedValue(new Error('Research is locked by the environment.'))
+    const wrapper = mount(ResearchAdminTab)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="research-admin-turn-on"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="research-admin-status"]').text()).toContain(
+      'Research is locked by the environment.'
+    )
+    expect(
+      wrapper.get('[data-testid="research-admin-save"]').element.parentElement?.textContent
+    ).not.toContain('Research is locked by the environment.')
+  })
+
   it('does not start a sample until the cost is accepted', async () => {
     fetchResearchAdmin.mockResolvedValue({ ...off, enabled: true })
     const wrapper = mount(ResearchAdminTab)
