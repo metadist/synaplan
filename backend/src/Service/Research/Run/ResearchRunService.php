@@ -7,7 +7,6 @@ namespace App\Service\Research\Run;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use Psr\Clock\ClockInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Opens, lists, stops and deletes a research run.
@@ -31,8 +30,7 @@ final readonly class ResearchRunService
         private ChatRepository $chats,
         private ClockInterface $clock,
         private ResearchReportPoster $reports,
-        #[Autowire(lazy: true)]
-        private ?ResearchSavedTaskResume $savedTasks = null,
+        private ?ResearchSavedTaskSignal $savedTasks = null,
     ) {
     }
 
@@ -72,7 +70,8 @@ final readonly class ResearchRunService
             'depth' => $depth,
             'chat_id' => $chatId,
         ], true, $user, $this->chats);
-        $key = 'task-'.$taskRunId.'-'.substr(hash('sha256', $nodeId), 0, 16);
+        // A slash never passes idempotencyKey(), so a client key cannot claim this run.
+        $key = 'saved-task/'.$taskRunId.'/'.substr(hash('sha256', $nodeId), 0, 16);
 
         return $this->open($user, $request, $key, null, null, new ResearchTaskLink($taskRunId, $nodeId));
     }
@@ -206,6 +205,7 @@ final readonly class ResearchRunService
     {
         $state = $this->owned($user, $runId);
         $this->store->delete($state->ref->id);
+        $this->savedTasks?->deleted($state);
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Entity\Chat;
 use App\Entity\User;
+use App\Message\ContinueSavedTaskAfterResearch;
 use App\Repository\ChatRepository;
 use App\Repository\ConfigRepository;
 use App\Service\Research\Run\Ledger\PlanPoint;
@@ -19,8 +20,12 @@ use App\Service\Research\Run\ResearchRejected;
 use App\Service\Research\Run\ResearchRunNotFound;
 use App\Service\Research\Run\ResearchRunService;
 use App\Service\Research\Run\ResearchRunState;
+use App\Service\Research\Run\ResearchSavedTaskSignal;
 use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\ResearchUnitPlan;
+use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ResearchRunServiceTest extends ResearchUnitCase
 {
@@ -300,6 +305,45 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         self::assertInstanceOf(ResearchRunState::class, $stored);
         self::assertSame(4, $stored->savedTaskRunId);
         self::assertSame('n1', $stored->savedTaskNodeId);
+    }
+
+    public function testAClientKeyCannotTakeOverASavedTaskRun(): void
+    {
+        $this->expectException(ResearchRejected::class);
+        $this->runs->start($this->user, $this->body(), true, 'saved-task/4/'.substr(hash('sha256', 'n1'), 0, 16));
+    }
+
+    public function testDeletingASavedTaskRunTellsTheWaitingTask(): void
+    {
+        $sent = [];
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$sent): Envelope {
+            $sent[] = $message;
+
+            return new Envelope($message);
+        });
+        $chat = $this->createStub(Chat::class);
+        $chat->method('getUserId')->willReturn(7);
+        $chats = $this->createStub(ChatRepository::class);
+        $chats->method('find')->willReturn($chat);
+        $runs = new ResearchRunService(
+            $this->store,
+            $this->bus,
+            $this->events,
+            new ResearchConfig($this->createStub(ConfigRepository::class), '1'),
+            $chats,
+            $this->clock,
+            $this->reports,
+            new ResearchSavedTaskSignal($bus, new NullLogger()),
+        );
+        $state = $runs->startForSavedTask($this->user, 'When do the ferries run?', 'quick', 11, 4, 'n1');
+
+        $runs->delete($this->user, $state->ref->id);
+
+        self::assertCount(1, $sent);
+        self::assertInstanceOf(ContinueSavedTaskAfterResearch::class, $sent[0]);
+        self::assertTrue($sent[0]->deleted());
+        self::assertSame(4, $sent[0]->taskRunId());
     }
 
     public function testASavedTaskCannotStartAThoroughResearch(): void

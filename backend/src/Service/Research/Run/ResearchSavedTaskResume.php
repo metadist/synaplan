@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
-use App\Entity\User;
 use App\Message\ContinueSavedTaskAfterResearch;
-use App\Repository\UserRepository;
-use App\Service\SavedTask\SavedTaskResumeService;
+use App\Service\SavedTask\SavedTaskResearchContinuation;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
- * When a research run that belongs to a saved task finishes, continue that
- * task with the report or fail the step with the outcome sentence.
+ * Continues the saved task that waits on a research run: with the report,
+ * or by failing the step with the outcome sentence.
  *
- * Research can finish before the saved task has paused on its step. Then
- * the hand-over is tried again a little later.
+ * Research can end before the saved task has paused on its step, and a
+ * hand-over can fail for a moment. Both are tried again a little later. When
+ * the retries run out, the waiting step fails, so a run never waits forever.
  */
 final readonly class ResearchSavedTaskResume
 {
@@ -26,87 +25,70 @@ final readonly class ResearchSavedTaskResume
     /** Thirty minutes of retries, longer than any saved task run takes to pause. */
     private const MAX_RETRIES = 180;
 
+    private const DELETED = 'The research was deleted, so the next step did not run.';
+
+    private const GAVE_UP = 'The research ended, but this saved task could not continue. The research result is in the chat.';
+
     public function __construct(
-        private SavedTaskResumeService $tasks,
-        private ResearchOutcomeText $outcomes,
-        private UserRepository $users,
+        private SavedTaskResearchContinuation $tasks,
+        private ResearchTaskHandover $handover,
+        private ResearchStateStore $store,
+        private MessageBusInterface $bus,
         private LoggerInterface $logger,
-        private ?MessageBusInterface $bus = null,
-        private ?ResearchStateStore $store = null,
     ) {
     }
 
-    public function retry(string $runId, int $attempt): void
+    public function continue(ContinueSavedTaskAfterResearch $message): void
     {
-        $state = $this->store?->load($runId);
-        if (null !== $state) {
-            $this->after($state, $attempt);
-        }
-    }
-
-    public function after(ResearchRunState $state, int $attempt = 0): void
-    {
-        if (!$state->status->isTerminal() || null === $state->savedTaskRunId || null === $state->savedTaskNodeId) {
-            return;
-        }
-
         try {
-            $run = $this->tasks->completeWaitingResearch(
-                $state->savedTaskRunId,
-                $state->savedTaskNodeId,
-                $this->args($state),
-            );
-            if (null === $run && $this->tasks->isRunning($state->savedTaskRunId)) {
-                $this->later($state, $attempt);
+            $args = $this->args($message);
+            if (null === $args) {
+                return;
+            }
+            $run = $this->tasks->complete($message->taskRunId(), $message->nodeId(), $message->userId(), $args);
+            if (null === $run && $this->tasks->isActive($message->taskRunId())) {
+                $this->later($message, null);
             }
         } catch (\Throwable $e) {
-            $this->logger->warning('Saved task was not continued after research', [
-                'run_id' => $state->ref->id,
-                'saved_task_run_id' => $state->savedTaskRunId,
-                'exception' => $e,
-            ]);
+            $this->later($message, $e);
         }
-    }
-
-    private function later(ResearchRunState $state, int $attempt): void
-    {
-        if (null === $this->bus || $attempt >= self::MAX_RETRIES) {
-            $this->logger->warning('Saved task never paused on its research step', [
-                'run_id' => $state->ref->id,
-                'saved_task_run_id' => $state->savedTaskRunId,
-            ]);
-
-            return;
-        }
-        $this->bus->dispatch(
-            new ContinueSavedTaskAfterResearch($state->ref->id, $attempt + 1),
-            [new DelayStamp(self::RETRY_DELAY_MS)],
-        );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null null while the run has not ended
      */
-    private function args(ResearchRunState $state): array
+    private function args(ContinueSavedTaskAfterResearch $message): ?array
     {
-        $report = trim($state->ledger->report() ?? '');
-        $code = $state->outcome?->code;
-        $finished = in_array($code, [
-            ResearchOutcome::COMPLETE,
-            ResearchOutcome::COMPLETE_PARTIAL,
-            ResearchOutcome::COMPLETE_SNIPPETS_ONLY,
-        ], true);
-        if ($finished && '' !== $report) {
-            $args = ['research_report' => $report];
-            if (is_array($state->reportFile)) {
-                $args['research_files'] = [$state->reportFile];
-            }
-
-            return $args;
+        $state = $message->deleted() ? null : $this->store->load($message->runId());
+        if (null === $state) {
+            return ['research_failed' => self::DELETED];
         }
-        $user = $this->users->find($state->ref->userId);
-        $locale = $user instanceof User ? $user->getLocale() : 'en';
+        if (!$state->status->isTerminal()) {
+            return null;
+        }
+        $state->reportFile ??= $message->reportFile();
 
-        return ['research_failed' => $this->outcomes->sentence($state->outcome, $locale)];
+        return $this->handover->args($state);
+    }
+
+    private function later(ContinueSavedTaskAfterResearch $message, ?\Throwable $error): void
+    {
+        $context = [
+            'run_id' => $message->runId(),
+            'saved_task_run_id' => $message->taskRunId(),
+            'attempt' => $message->attempt(),
+            'exception' => $error,
+        ];
+        if ($message->attempt() < self::MAX_RETRIES) {
+            if (null !== $error) {
+                $this->logger->warning('Saved task was not continued after research; trying again', $context);
+            }
+            $this->bus->dispatch($message->nextAttempt(), [new DelayStamp(self::RETRY_DELAY_MS)]);
+
+            return;
+        }
+
+        $this->logger->error('Saved task was not continued after research; the waiting step fails', $context);
+        $this->tasks->fail($message->taskRunId(), $message->nodeId(), self::GAVE_UP);
     }
 }

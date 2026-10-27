@@ -346,12 +346,6 @@ final class ResultAssembler
         ];
     }
 
-    /**
-     * Whether a card's prose already appears (verbatim, whitespace-normalized)
-     * inside the final answer text (#1229). Containment — not equality — so a
-     * compose_reply that wraps the card text in a connector sentence still
-     * marks the card redundant.
-     */
     private function waitingSentence(TaskPlan $plan, NodeContext $context, string $language): string
     {
         foreach ($plan->nodes as $node) {
@@ -364,6 +358,12 @@ final class ResultAssembler
         return self::WAITING_TEXT[$language] ?? self::WAITING_TEXT['en'];
     }
 
+    /**
+     * Whether a card's prose already appears (verbatim, whitespace-normalized)
+     * inside the final answer text (#1229). Containment — not equality — so a
+     * compose_reply that wraps the card text in a connector sentence still
+     * marks the card redundant.
+     */
     private function isWaitingForApproval(TaskPlan $plan, NodeContext $context): bool
     {
         foreach ($plan->nodes as $node) {

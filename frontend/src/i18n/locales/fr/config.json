@@ -496,7 +496,8 @@
         "completed": "Terminée",
         "failed": "Échouée",
         "cancelled": "Annulée",
-        "waiting_approval": "En attente d’approbation"
+        "waiting_approval": "En attente d’approbation",
+        "waiting_research": "La recherche est en cours"
       },
       "runTrigger": {
         "manual": "lancée par vous",

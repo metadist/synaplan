@@ -117,4 +117,20 @@ final class SkillCatalogTest extends TestCase
 
         self::assertStringNotContainsString('"url_fetch"', $catalog->renderCapabilityList());
     }
+
+    public function testResearchIsOnlyOfferedToASavedTask(): void
+    {
+        $configRepo = $this->createStub(\App\Repository\ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'RESEARCH_ENABLED' === $setting ? '1' : null,
+        );
+        $catalog = new SkillCatalog(
+            SkillCatalogFactory::runners(),
+            new \App\Service\Multitask\MultitaskRoutingConfig($configRepo),
+        );
+
+        // A chat turn has its own research mode; a step there could only fail.
+        self::assertStringNotContainsString('"research"', $catalog->renderCapabilityList(7));
+        self::assertStringContainsString('- "research": ', $catalog->renderCapabilityList(7, ['saved_task' => true]));
+    }
 }

@@ -32,7 +32,7 @@ final readonly class ResearchReaper
         private ClockInterface $clock,
         private LoggerInterface $logger,
         private ResearchReportPoster $reports,
-        private ?ResearchSavedTaskResume $savedTasks = null,
+        private ?ResearchSavedTaskSignal $savedTasks = null,
     ) {
     }
 

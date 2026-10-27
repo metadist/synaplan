@@ -141,6 +141,17 @@ const toggleCollapsed = () => {
 // copy their query plus the visible source summary; media cards expose download
 // and lightbox actions through TaskCardMedia.
 const { t } = useI18n()
+
+/** A research step pauses the run like an approval, but nobody has to decide anything. */
+const researchRunning = computed(
+  () => props.card.capability === 'research' && props.card.state === 'waiting_approval'
+)
+
+const stateLabel = computed(() =>
+  researchRunning.value
+    ? t('taskPlan.state.researchRunning')
+    : t(`taskPlan.state.${props.card.state}`)
+)
 const { success: notifySuccess, error: notifyError } = useNotification()
 const copyContent = computed(() => {
   if (props.card.state !== 'done') return ''
@@ -317,6 +328,12 @@ const outputShown = computed(() =>
           class="w-4 h-4 txt-muted"
         />
         <Icon
+          v-else-if="researchRunning"
+          icon="mdi:loading"
+          class="w-4 h-4 animate-spin"
+          style="color: var(--brand)"
+        />
+        <Icon
           v-else-if="card.state === 'waiting_approval'"
           icon="mdi:hand-back-right-outline"
           class="w-4 h-4 text-[var(--brand)]"
@@ -327,11 +344,7 @@ const outputShown = computed(() =>
           class="w-4 h-4 txt-muted"
         />
         <Icon v-else icon="mdi:clock-outline" class="w-4 h-4 txt-muted" />
-        <span class="txt-muted">{{
-          card.capability === 'research' && card.state === 'waiting_approval'
-            ? $t('taskPlan.state.researchRunning')
-            : $t(`taskPlan.state.${card.state}`)
-        }}</span>
+        <span class="txt-muted">{{ stateLabel }}</span>
       </span>
     </div>
 
@@ -380,11 +393,7 @@ const outputShown = computed(() =>
       {{ card.error }}
     </div>
 
-    <p
-      v-else-if="card.capability === 'research' && card.state === 'waiting_approval'"
-      class="text-sm txt-secondary"
-      data-testid="task-card-research"
-    >
+    <p v-else-if="researchRunning" class="text-sm txt-secondary" data-testid="task-card-research">
       {{ $t('taskPlan.researchContinues') }}
     </p>
 

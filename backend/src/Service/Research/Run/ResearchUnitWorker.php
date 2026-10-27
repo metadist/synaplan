@@ -28,7 +28,7 @@ final readonly class ResearchUnitWorker
         private ResearchEventLog $events,
         private ResearchConfig $config,
         private ResearchReportPoster $reports,
-        private ?ResearchSavedTaskResume $savedTasks = null,
+        private ?ResearchSavedTaskSignal $savedTasks = null,
     ) {
     }
 

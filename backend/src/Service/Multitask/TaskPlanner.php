@@ -395,6 +395,21 @@ final readonly class TaskPlanner
      */
     private function catalogContext(?int $userId, array $options): array
     {
+        $context = $this->topicCatalogContext($userId, $options);
+        if (true === ($options['saved_task'] ?? false)) {
+            $context['saved_task'] = true;
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function topicCatalogContext(?int $userId, array $options): array
+    {
         $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
         $topic = is_string($classification['topic'] ?? null) ? $classification['topic'] : '';
         if ('' === $topic) {

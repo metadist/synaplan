@@ -17,6 +17,6 @@ final readonly class ContinueSavedTaskAfterResearchHandler
 
     public function __invoke(ContinueSavedTaskAfterResearch $message): void
     {
-        $this->resume->retry($message->runId(), $message->attempt());
+        $this->resume->continue($message);
     }
 }

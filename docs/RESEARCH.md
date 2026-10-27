@@ -161,8 +161,18 @@ so the saved-task worker is free. When the report is ready, the next step
 A run that does not finish fails the step with its sentence, and later steps
 skip. The step does not ask questions and cannot be thorough.
 
-The planner does not see the step while the flag is off. Closing the window
-does not stop the research. The report still appears in the chat.
+The planner does not see the step while the flag is off, and never offers it
+to a normal chat turn (that has its own research mode). Closing the window
+does not stop the research. The report still appears in the chat, and so does
+what the later steps produce.
+
+The hand-over runs on the worker (`ContinueSavedTaskAfterResearch`), never in
+the request that stopped the run. Stopping or deleting the research fails the
+waiting step with one sentence. When the hand-over keeps failing for thirty
+minutes, the step fails too, so a saved task never waits forever. Later steps
+run under the unattended policy, because nobody is watching when the report
+arrives. While the run waits, the saved task's approval badge does not count
+it: nothing waits for a decision.
 
 ## Operator
 

@@ -17,6 +17,7 @@ import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import SavedTaskStepsEditor from '@/components/config/workflows/SavedTaskStepsEditor.vue'
 import FolderFetchCard from '@/components/multitask/FolderFetchCard.vue'
 import { folderReadsFromSnapshot } from '@/utils/folderRead'
+import { runStatusCode } from '@/utils/savedTaskRun'
 import {
   savedTasksApi,
   type SavedTask,
@@ -601,7 +602,9 @@ const onRunCopy = async () => {
         class="flex items-start justify-between gap-3 border-b border-light-border/20 dark:border-dark-border/20 pb-2"
       >
         <div class="min-w-0">
-          <span class="font-medium txt-primary">{{ runLabel('runStatus', run.status) }}</span>
+          <span class="font-medium txt-primary">{{
+            runLabel('runStatus', runStatusCode(run))
+          }}</span>
           <span class="txt-secondary"> · {{ runLabel('runTrigger', run.trigger) }}</span>
           <p v-if="run.error" class="txt-secondary mt-1">{{ run.error }}</p>
           <FolderFetchCard
