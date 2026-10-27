@@ -23,6 +23,7 @@ final readonly class ResearchRequest
         public string $question,
         public ResearchDepth $depth,
         public ?int $chatId,
+        public ResearchSources $sources = new ResearchSources(),
     ) {
     }
 
@@ -33,7 +34,12 @@ final readonly class ResearchRequest
     {
         self::checkFields($body);
 
-        return new self(self::question($body), self::depth($body), self::chat($body, $session, $user, $chats));
+        return new self(
+            self::question($body),
+            self::depth($body),
+            self::chat($body, $session, $user, $chats),
+            ResearchSources::fromBody($body),
+        );
     }
 
     /**

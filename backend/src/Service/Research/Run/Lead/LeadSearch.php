@@ -7,20 +7,24 @@ namespace App\Service\Research\Run\Lead;
 use App\AI\ToolCalling\ToolCall;
 use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\Source;
+use App\Service\Research\Run\Stage\ResearchFileHits;
+use App\Service\Research\Run\Stage\ResearchFileSearch;
 use App\Service\Research\Run\Stage\ResearchHit;
 use App\Service\Research\Run\Stage\ResearchPrompts;
 use App\Service\Research\Run\Stage\ResearchSearch;
 use App\Service\Research\Run\Stage\StageContext;
 
 /**
- * One web search the lead asked for. A repeated query, an unknown point, or
- * a spent search budget returns an error and does not search. File search
- * waits for the knowledge source, so a files scope is refused.
+ * One search the lead asked for. A repeated query, an unknown point, a spent
+ * search budget, or a source the run did not turn on returns an error and
+ * does not search.
  */
 final readonly class LeadSearch
 {
-    public function __construct(private ResearchSearch $search)
-    {
+    public function __construct(
+        private ResearchSearch $search,
+        private ?ResearchFileSearch $files = null,
+    ) {
     }
 
     public function run(ToolCall $call, StageContext $ctx): string
@@ -34,18 +38,38 @@ final readonly class LeadSearch
         if (!$this->hasPoint($ctx, $point)) {
             return LeadToolReply::error('unknown_id', $ctx->state->budget);
         }
-        if ('web' !== $scope) {
+        $webAllowed = 'files' !== $scope && $ctx->webOn();
+        $filesAllowed = 'web' !== $scope && $ctx->filesOn() && null !== $this->files;
+        if (!$webAllowed && !$filesAllowed) {
             return LeadToolReply::error('not_allowed', $ctx->state->budget);
         }
-        if ($this->repeated($ctx, $query, $scope)) {
+        $wantWeb = $webAllowed && !$this->repeated($ctx, $query, 'web');
+        $wantFiles = $filesAllowed && !$this->repeated($ctx, $query, 'files');
+        if (!$wantWeb && !$wantFiles) {
             return LeadToolReply::error('repeated_query', $ctx->state->budget);
         }
         if (!$ctx->state->budget->canSearch()) {
             return LeadToolReply::error('budget_used', $ctx->state->budget);
         }
 
-        $found = $this->search->search($query, $this->language($ctx, $call->arguments['language'] ?? null), $ctx->state->budget->extras()->resultsPerSearch, $ctx->state->ref->userId);
+        $rows = [];
+        if ($wantWeb) {
+            $rows = array_merge($rows, $this->web($ctx, $point, $query, $call->arguments['language'] ?? null));
+        }
+        if ($wantFiles) {
+            $rows = array_merge($rows, $this->projectFiles($ctx, $point, $query));
+        }
         $ctx->state->budget->spend('searches');
+
+        return LeadToolReply::ok(['results' => $rows], $ctx->state->budget);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function web(StageContext $ctx, string $point, string $query, mixed $language): array
+    {
+        $found = $this->search->search($query, $this->language($ctx, $language), $ctx->state->budget->extras()->resultsPerSearch, $ctx->state->ref->userId);
         $ctx->state->ledger->addQuery($point, $query, 'web', count($found));
         $ctx->events->append($ctx->state->ref->id, 'search', [
             'point' => $point,
@@ -54,7 +78,23 @@ final readonly class LeadSearch
             'results' => count($found),
         ]);
 
-        return LeadToolReply::ok(['results' => $this->rows($ctx, $found)], $ctx->state->budget);
+        return $this->rows($ctx, $found);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function projectFiles(StageContext $ctx, string $point, string $query): array
+    {
+        if (null === $this->files) {
+            return [];
+        }
+
+        return array_map(static fn (Source $source): array => [
+            'id' => $source->id,
+            'title' => ResearchPrompts::data($source->title),
+            'kind' => 'file',
+        ], ResearchFileHits::gather($this->files, $ctx, $point, $query));
     }
 
     /**

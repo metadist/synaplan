@@ -55,7 +55,7 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
     private function briefPlan(StageContext $ctx): StageResult
     {
         if (null === $ctx->state->ledger->brief()) {
-            if (!$this->search->available($ctx->state->ref->userId)) {
+            if (!$ctx->filesOn() && !$this->search->available($ctx->state->ref->userId)) {
                 return StageEnds::noSources($ctx);
             }
             $opened = $this->brief->run($ctx);

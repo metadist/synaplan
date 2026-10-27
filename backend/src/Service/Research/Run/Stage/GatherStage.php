@@ -63,7 +63,7 @@ final readonly class GatherStage implements ResearchStage
                         $ran[$fileKey] = true;
                     }
                 }
-                if ('files' === $query['scope'] || !$ctx->state->budget->canSearch()) {
+                if ('files' === $query['scope'] || !$ctx->webOn() || !$ctx->state->budget->canSearch()) {
                     continue;
                 }
                 $key = $point->id.'|'.$query['q'];
@@ -102,28 +102,7 @@ final readonly class GatherStage implements ResearchStage
             return;
         }
 
-        $found = $this->files->find($ctx->state->ref->userId, $query, max(1, $ctx->state->budget->sourcesLeft()));
-        $ctx->state->ledger->addQuery($pointId, $query, 'files', count($found));
-        $ctx->events->append($ctx->state->ref->id, 'search', [
-            'point' => $pointId,
-            'query' => $query,
-            'scope' => 'files',
-            'results' => count($found),
-        ]);
-        foreach ($found as $row) {
-            if (!$ctx->state->budget->canRead()) {
-                break;
-            }
-            $before = count($ctx->state->ledger->sources());
-            $id = $ctx->state->ledger->addSource(Source::file($row['file_id'], $row['title']));
-            if (count($ctx->state->ledger->sources()) === $before) {
-                continue;
-            }
-            $source = $ctx->state->ledger->source($id);
-            if (null !== $source) {
-                $ctx->events->append($ctx->state->ref->id, 'source', $source->toEvent());
-            }
-        }
+        ResearchFileHits::gather($this->files, $ctx, $pointId, $query);
     }
 
     /**

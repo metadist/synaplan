@@ -17,10 +17,10 @@ chat message.
 | RD1 | in progress | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1. `make ci-local` passed. Quick set `9RDYA` is recorded below; UC-03-de failed once and passed on the rerun. J-RQ-1 is not walked yet. |
 | RQ2b | done | Starter set and hard set scored 2026-10-23. Hard set (12 new-fact items): spike tool mode and B1+ with web search both reach recall 0.96; uncalibrated citation precision 87.3 % against 64.0 %, at 1.2× cost. Gate missed narrowly (precision under 92 %); owner accepted go by explicit override on 2026-10-23. B4 not run. Judges not yet calibrated by people |
 | RS5 | done | `READ` and `VERIFY` slots, role resolver, `meta.family` and search hosting, [#2688](https://github.com/metadist/synaplan/pull/2688). No production binding (RQ3) |
-| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. P-MIN walked 2026-10-24 except the files-only run, which waits for the knowledge source (RS9) |
+| RS6 | in progress | Engine code merged (#2691, #2697, #2708, #2712). Engine v1 smoke and fairness recorded 2026-10-24. A start request can name `sources.knowledge` (folder keys, or true for the caller's own files) and `sources.library`. File search runs only then. The files-only live walk is still not run |
 | RS7 | done | Starter set 2026-10-26, like the spike: round mode 0.81 across 16 (spike S-R 0.63), tool mode 0.88 across 16 (spike S-T 0.81), same on both repeats. Sonnet conformance 20/20, gpt-oss-120b 12/20. Queue wait in STATUS. The RS6 clause of the exit cannot be measured (no RS6 corpus row); the owner waived it on 2026-10-26. Per-host politeness is not built. Flag stays off |
 | RS8 | done | Free check, checker model, and one thorough revision. Seeded draft 6/6 caught, 0/6 false alarms. Smoke 2026-10-26, tool mode: citation precision 79.8 % without the check (RS7 reports) and 96.0 % with it; fact recall unchanged at 0.78 across 9. Exit met on these numbers, judges not calibrated. Owner merged the exit in #2790. Flag stays off |
-| RS9 | in progress | Keyword plus meaning on Qdrant, same owner scopes, palette fusion unchanged. Keyword words weighted by idf and ranked server-side. Research uses files only when files are a switched-on source (today: never). Document cards are not generated. MariaDB stays meaning-only and the vector storage screen says so. Hybrid recall@5 not measured: the fixture corpus is not in the store. Flag stays off |
+| RS9 | in progress | Keyword plus meaning on Qdrant, same owner scopes, palette fusion unchanged. Keyword words weighted by idf and ranked server-side. A research run searches files only when its start request turned them on (2026-10-27). Document cards are not generated. MariaDB stays meaning-only and the vector storage screen says so. Hybrid recall@5 not measured: the fixture corpus is not in the store. Flag stays off |
 | RS10 | done | Follow-ups reuse the parent sources and continue source, evidence and point numbers. The parent report is kept as the prior report, not copied into the new run. A question is quick and searches once when the findings and the report do not cover it. A revision checks only sentences whose words or citations changed. Deeper is thorough and adds a point per Not confirmed item (up to eight). Refresh reopens sources dated before the time frame. A follow-up on a run that is still going is refused with 409 and a sentence; `Idempotency-Key` works as on start. `stopped_by_admin` keeps the report written so far. Five follow-up rows (`fu-q`, `fu-r`, `fu-d`, `fu-f`, `fu-t`) are in `backend/tests/Eval/research/corpus.json` and are excluded from the fresh-question harness. Scored live 2026-10-27 (`5c10bd764`, Claude Sonnet 5 + gpt-oss-120b): fact recall 1.00 on all five, all `complete`, ids continue. Flag stays off |
 | RQ3 | planned | Bake-off, seeded presets, flag decision |
 | RD2 | planned | `ChatView.vue` split (synaplan-desktop) |
@@ -37,6 +37,27 @@ chat message.
 | RX1 | planned | User docs: quick wins (synaplan-docs) |
 | RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
 | RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-27 — a research run searches only the sources it turned on
+
+No paid run. Cost $0. Research stays off. `DEFAULTMODEL.READ` and `VERIFY` stay unset.
+
+`POST /api/v1/research` keeps `sources`. A list of folder keys in `knowledge` searches those folders. `knowledge: true` (the web files switch) or `library: true` searches the caller's own files; `library` wins over a folder list. Omitting `sources` stays web only. A start that names a shared folder the caller cannot use is refused with 400. A share revoked during the run is skipped from then on, so it never falls back to every file they own. Several folders take turns in the results. The choice is stored on the run, and a follow-up keeps it. The lead's search tool offers files only when that source is on.
+
+These steps are still open. Each one needs a paid model run, and together they pass the 15 € cap, so none of them was started:
+
+- RQ2: B4 and human judge calibration
+- RS1: UC-03 on the full model suite (run `V42D2` was 46/51)
+- RS2: UC-04b on Groq, OpenAI, and Gemini
+- RS3: UC-05e, and UC-06 fact timing
+- RS4: one smoke item whose top 3 include a short PDF, measured with the flag off and on
+- RD1: journey J-RQ-1
+- RS6: the files-only P-MIN walk
+- RS9: recall@5 (the golden corpus is not in the store) and document cards
+- RQ3: the bake-off. No winners, no seeded presets
+- Live walks of RD3–RD9 and the RW3 weekly email
 
 ---
 
