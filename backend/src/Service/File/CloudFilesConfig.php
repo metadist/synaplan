@@ -20,7 +20,20 @@ final readonly class CloudFilesConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private string $envValue = '',
+        private string $birdGlyph = '',
+        private string $eyesGlyph = '',
     ) {
+    }
+
+    /**
+     * @return array{bird: string|null, bird_eyes: string|null}
+     */
+    public function glyphs(): array
+    {
+        return [
+            'bird' => '' === trim($this->birdGlyph) ? null : trim($this->birdGlyph),
+            'bird_eyes' => '' === trim($this->eyesGlyph) ? null : trim($this->eyesGlyph),
+        ];
     }
 
     public function isEnabled(): bool

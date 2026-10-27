@@ -242,7 +242,9 @@
             "details": [],
             "configured_by": {
                 "env": [
-                    "CLOUD_FILES_ENABLED"
+                    "CLOUD_FILES_ENABLED",
+                    "CLOUD_FILES_GLYPH_BIRD",
+                    "CLOUD_FILES_GLYPH_EYES"
                 ],
                 "bconfig": [
                     "CLOUD_FILES.ENABLED"
