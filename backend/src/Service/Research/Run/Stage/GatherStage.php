@@ -63,7 +63,7 @@ final readonly class GatherStage implements ResearchStage
                         $ran[$fileKey] = true;
                     }
                 }
-                if ('files' === $query['scope'] || !$ctx->state->budget->canSearch()) {
+                if ('files' === $query['scope'] || !$ctx->webOn() || !$ctx->state->budget->canSearch()) {
                     continue;
                 }
                 $key = $point->id.'|'.$query['q'];
@@ -102,7 +102,12 @@ final readonly class GatherStage implements ResearchStage
             return;
         }
 
-        $found = $this->files->find($ctx->state->ref->userId, $query, max(1, $ctx->state->budget->sourcesLeft()));
+        $found = $this->files->find(
+            $ctx->state->ref->userId,
+            $query,
+            max(1, $ctx->state->budget->sourcesLeft()),
+            $ctx->state->knowledgeKeys,
+        );
         $ctx->state->ledger->addQuery($pointId, $query, 'files', count($found));
         $ctx->events->append($ctx->state->ref->id, 'search', [
             'point' => $pointId,

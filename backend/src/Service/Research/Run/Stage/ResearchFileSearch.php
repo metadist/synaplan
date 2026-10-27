@@ -21,13 +21,64 @@ final readonly class ResearchFileSearch
     }
 
     /**
+     * @param list<string> $groupKeys empty searches the caller's own files and folders they can use
+     *
      * @return list<array{file_id: int, title: string}>
      */
-    public function find(int $userId, string $query, int $limit): array
+    public function find(int $userId, string $query, int $limit, array $groupKeys = []): array
     {
         $limit = max(1, $limit);
-        $meaning = $this->vectors->semanticSearch($query, $userId, null, $limit, 0.3);
-        $keyword = $this->keywords->find($userId, $query, null, $this->scopes->resolve($userId, null), $limit);
+        $keys = $this->keys($groupKeys);
+        if ([] === $keys) {
+            return $this->once($userId, $query, $limit, null);
+        }
+        $seen = [];
+        $out = [];
+        foreach ($keys as $key) {
+            foreach ($this->once($userId, $query, $limit, $key) as $row) {
+                if (isset($seen[$row['file_id']])) {
+                    continue;
+                }
+                $seen[$row['file_id']] = true;
+                $out[] = $row;
+                if (count($out) >= $limit) {
+                    return $out;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string> $groupKeys
+     *
+     * @return list<string>
+     */
+    private function keys(array $groupKeys): array
+    {
+        $keys = [];
+        foreach ($groupKeys as $key) {
+            $key = trim($key);
+            if ('' !== $key) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @return list<array{file_id: int, title: string}>
+     */
+    private function once(int $userId, string $query, int $limit, ?string $groupKey): array
+    {
+        $scopes = $this->scopesFor($userId, $groupKey);
+        if ([] === $scopes) {
+            return [];
+        }
+        $meaning = $this->vectors->semanticSearch($query, $userId, $groupKey, $limit, 0.3, $scopes);
+        $keyword = $this->keywords->find($userId, $query, $groupKey, $scopes, $limit);
         $seen = [];
         $out = [];
         foreach ($this->hybrid->merge($meaning, $keyword, $limit, $query) as $hit) {
@@ -41,5 +92,21 @@ final readonly class ResearchFileSearch
         }
 
         return $out;
+    }
+
+    /**
+     * A shared folder the caller cannot use is skipped. Searching it through
+     * the normal resolver would fall back to every file the caller owns.
+     *
+     * @return list<\App\Service\RAG\VectorStorage\DTO\RagScope>
+     */
+    private function scopesFor(int $userId, ?string $groupKey): array
+    {
+        $picker = RagScopeResolver::parseSharedPicker($groupKey);
+        if (null !== $picker && !$this->scopes->canUse($userId, $picker[0], $picker[1])) {
+            return [];
+        }
+
+        return $this->scopes->resolve($userId, $groupKey);
     }
 }

@@ -54,7 +54,7 @@ final readonly class LeadStage
             $ctx->state->ref->userId,
             $ctx->roles->lead,
             $this->messages($ctx),
-            $this->tools->definitions(),
+            $this->tools->definitions($ctx),
         );
         if ($turn->called) {
             $this->charge($ctx, $turn);

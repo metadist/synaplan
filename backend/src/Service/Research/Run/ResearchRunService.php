@@ -12,8 +12,8 @@ use Psr\Clock\ClockInterface;
  * Opens, lists, stops and deletes a research run.
  *
  * Model hints, a world and starting pages are accepted on the request and
- * not applied yet: the run uses the installation's models. Reading whole
- * documents stays off.
+ * not applied yet: the run uses the installation's models. The chosen
+ * sources are applied. Reading whole documents stays off.
  *
  * Every change to a run that already exists goes through the unit's claim,
  * so a worker or the reaper that acts at the same moment is never overwritten.
@@ -194,7 +194,12 @@ final readonly class ResearchRunService
 
         return $this->open(
             $user,
-            new ResearchRequest($question, $plan->depth, $state->ref->chatId),
+            new ResearchRequest(
+                $question,
+                $plan->depth,
+                $state->ref->chatId,
+                ResearchSources::fromStored($state->sourcesOn, $state->knowledgeKeys),
+            ),
             $key,
             $state->ref->id,
             $plan,
@@ -254,6 +259,8 @@ final readonly class ResearchRunService
         );
         $state->parent = $parent;
         $state->idempotencyKey = $idempotencyKey;
+        $state->sourcesOn = $request->sources->label();
+        $state->knowledgeKeys = $request->sources->knowledge;
         if (null !== $task) {
             $state->savedTaskRunId = $task->runId;
             $state->savedTaskNodeId = $task->nodeId;

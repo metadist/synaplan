@@ -25,9 +25,20 @@ final class StageContext
     ) {
     }
 
+    /** The person switched the web on. A run that names only files does not search the web. */
+    public function webOn(): bool
+    {
+        return $this->hasSource('web');
+    }
+
     /** The person switched files on as a source; otherwise a run never searches or reads them. */
     public function filesOn(): bool
     {
-        return in_array('files', preg_split('/[\s,]+/', strtolower($this->sourcesOn)) ?: [], true);
+        return $this->hasSource('files');
+    }
+
+    private function hasSource(string $name): bool
+    {
+        return in_array($name, preg_split('/[\s,]+/', strtolower($this->sourcesOn)) ?: [], true);
     }
 }
