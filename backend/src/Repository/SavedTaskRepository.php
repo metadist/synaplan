@@ -167,6 +167,15 @@ class SavedTaskRepository extends ServiceEntityRepository
         ));
     }
 
+    /** @return list<SavedTask> */
+    public function findManual(int $ownerId): array
+    {
+        /** @var list<SavedTask> $rows */
+        $rows = $this->findBy(['ownerId' => $ownerId, 'triggerType' => SavedTask::TRIGGER_MANUAL], ['id' => 'DESC']);
+
+        return $rows;
+    }
+
     public function save(SavedTask $task, bool $flush = true): void
     {
         $this->getEntityManager()->persist($task);

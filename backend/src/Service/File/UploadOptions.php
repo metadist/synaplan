@@ -31,6 +31,7 @@ final readonly class UploadOptions
         public bool $retainSource = true,
         public ?int $vectorizeModelId = null,
         public ?string $sourceInstance = null,
+        public ?bool $keepSynced = null,
     ) {
     }
 

@@ -612,9 +612,8 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
-     * Ephemeral (incognito-session) files older than the given cutoff — the
-     * reaper deletes them from disk and DB as a safety net for sessions the
-     * frontend could not clean up (tab crash, network loss).
+     * Ephemeral files past their deadline. A row with an expiry is removed at
+     * that moment; every other ephemeral file uses the cutoff.
      *
      * @return File[]
      */
@@ -622,7 +621,8 @@ class FileRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('f')
             ->where('f.ephemeral = true')
-            ->andWhere('f.createdAt < :cutoff')
+            ->andWhere('(f.expiresAt IS NOT NULL AND f.expiresAt <= :now) OR (f.expiresAt IS NULL AND f.createdAt < :cutoff)')
+            ->setParameter('now', time())
             ->setParameter('cutoff', $cutoffTimestamp)
             ->orderBy('f.createdAt', 'ASC')
             ->setMaxResults($limit)
@@ -744,5 +744,50 @@ class FileRepository extends ServiceEntityRepository
             'text' => (string) $row['text'],
             'updatedAt' => (int) $row['updatedAt'],
         ], $rows));
+    }
+
+    /**
+     * Copies of these remote ids. A user id limits the query to that owner.
+     * Live rows come before deleted ones, an exact instance before an unscoped row, newest id last.
+     *
+     * @param list<string> $sourceIds
+     *
+     * @return list<File>
+     */
+    public function findCopiesOfRemotes(string $source, array $sourceIds, string $instanceId, ?int $userId = null): array
+    {
+        if ([] === $sourceIds) {
+            return [];
+        }
+        $qb = $this->createQueryBuilder('f')
+            ->where('f.source = :source')
+            ->andWhere('f.sourceId IN (:ids)')
+            ->andWhere('f.sourceInstance = :instance OR f.sourceInstance IS NULL')
+            ->setParameter('source', $source)
+            ->setParameter('ids', $sourceIds)
+            ->setParameter('instance', $instanceId)
+            ->addSelect('CASE WHEN f.sourceDeletedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN liveFirst')
+            ->addSelect('CASE WHEN f.sourceInstance = :instance THEN 0 ELSE 1 END AS HIDDEN exactFirst')
+            ->orderBy('liveFirst', 'ASC')
+            ->addOrderBy('exactFirst', 'ASC')
+            ->addOrderBy('f.id', 'DESC');
+        if (null !== $userId) {
+            $qb->andWhere('f.userId = :userId')->setParameter('userId', $userId);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * @return list<File>
+     */
+    public function findSourceDeletedBefore(int $cutoff): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.sourceDeletedAt IS NOT NULL')
+            ->andWhere('f.sourceDeletedAt <= :cutoff')
+            ->setParameter('cutoff', $cutoff)
+            ->getQuery()
+            ->getResult();
     }
 }

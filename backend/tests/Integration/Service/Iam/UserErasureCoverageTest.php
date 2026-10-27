@@ -20,7 +20,7 @@ final class UserErasureCoverageTest extends KernelTestCase
     private const ORDER = [
         'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'DesktopEraser',
         'UsageLogEraser', 'WidgetEraser', 'ShareEraser', 'AgentEraser',
-        'ApprovalEraser', 'SavedTaskEraser', 'UrlWatchEraser', 'ConversationEraser',
+        'ApprovalEraser', 'SavedTaskEraser', 'CloudWatchEraser', 'UrlWatchEraser', 'ConversationEraser',
         'VoiceSessionEraser', 'FileEraser', 'ComputeEraser', 'InboxEraser',
         'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'SignupCodeUseEraser',
         'MemoryEraser', 'IdentityEraser', 'CredentialEraser', 'ResearchEraser',

@@ -16,6 +16,7 @@ use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\DeliveryNotifier;
+use App\Service\PlatformLink\LifecycleEffect;
 use App\Service\PlatformLink\LinkCodeService;
 use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinkExchangeService;
@@ -86,6 +87,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
             $this->createStub(AuditLogWriter::class),
             $this->createStub(DeliveryNotifier::class),
             new PremiumFeatureGate(new BillingService('', '')),
+            $this->createStub(LifecycleEffect::class),
         );
 
         $result = $service->exchange('pi_aabbccddeeff', 'secret', str_repeat('ab', 16), '127.0.0.1');
@@ -230,6 +232,7 @@ final class PlatformLinkExchangeServiceTest extends TestCase
             $audit ?? $this->createStub(AuditLogWriter::class),
             $this->createStub(DeliveryNotifier::class),
             new PremiumFeatureGate(new BillingService('', '')),
+            $this->createStub(LifecycleEffect::class),
         );
     }
 }

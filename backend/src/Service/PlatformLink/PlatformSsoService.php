@@ -35,6 +35,7 @@ final readonly class PlatformSsoService
         private PremiumFeatureGate $premiumFeatureGate,
         private AuditLogWriter $auditLogWriter,
         private EntityManagerInterface $entityManager,
+        private LifecycleEffect $effects,
     ) {
     }
 
@@ -86,6 +87,7 @@ final readonly class PlatformSsoService
         $row->setStatus(ExternalIdentity::STATUS_ACTIVE);
         $row->setRevokedAt(null);
         $this->entityManager->flush();
+        $this->effects->onResumed($row);
 
         $this->auditLogWriter->record(
             (int) $user->getId(),
@@ -136,6 +138,7 @@ final readonly class PlatformSsoService
             if ($row->ownerTurnedOff()) {
                 $row->setAccess(true, true);
                 $row->setRevokedAt(null);
+                $this->effects->onResumed($row);
             }
 
             $existing = $this->activeBackgroundKey($row);

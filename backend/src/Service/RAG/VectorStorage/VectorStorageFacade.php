@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\RAG\VectorStorage;
 
+use App\Service\File\CloudFileIndexGuard;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\DTO\SearchResult;
 use App\Service\RAG\VectorStorage\DTO\StorageStats;
@@ -18,6 +19,7 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
         private QdrantVectorStorage $qdrantStorage,
         private VectorStorageConfig $config,
         private LoggerInterface $logger,
+        private CloudFileIndexGuard $indexGuard,
     ) {
     }
 
@@ -49,12 +51,36 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
 
     public function storeChunk(VectorChunk $chunk): string
     {
-        return $this->getActiveStorage()->storeChunk($chunk);
+        $stored = '';
+        $this->indexGuard->exclusive($chunk->fileId, function () use ($chunk, &$stored): void {
+            if ($this->indexGuard->allowsWrite($chunk->fileId)) {
+                $stored = $this->getActiveStorage()->storeChunk($chunk);
+            }
+        });
+
+        return $stored;
     }
 
     public function storeChunkBatch(array $chunks): int
     {
-        return $this->getActiveStorage()->storeChunkBatch($chunks);
+        $ids = [];
+        foreach ($chunks as $chunk) {
+            $ids[] = $chunk->fileId;
+        }
+        $stored = 0;
+        $this->indexGuard->exclusiveAll($ids, function () use ($chunks, &$stored): void {
+            $allowed = [];
+            foreach ($chunks as $chunk) {
+                if ($this->indexGuard->allowsWrite($chunk->fileId)) {
+                    $allowed[] = $chunk;
+                }
+            }
+            if ([] !== $allowed) {
+                $stored = $this->getActiveStorage()->storeChunkBatch($allowed);
+            }
+        });
+
+        return $stored;
     }
 
     public function deleteByFile(int $userId, int $fileId): int

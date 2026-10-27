@@ -10,6 +10,7 @@ use App\Module\Channel\TelegramModule;
 use App\Module\Channel\WhatsappModule;
 use App\Module\Chat\ChatArtifactsModule;
 use App\Module\Chat\ResearchModule;
+use App\Module\CloudFiles\CloudFilesModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
@@ -34,6 +35,7 @@ use App\Service\Billing\BillingService;
 use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Feature\FeatureFlagEnv;
+use App\Service\File\CloudFilesConfig;
 use App\Service\FreeApi\FreeApiConfig;
 use App\Service\FreeApi\FreeApiState;
 use App\Service\Iap\AppleReceiptVerifierInterface;
@@ -98,6 +100,7 @@ trait BuildsAllModules
                 new ResearchQueueWait($researchStore, new MockClock()),
             ),
             $this->disabledFreeApi(),
+            new CloudFilesModule(new CloudFilesConfig($this->createStub(ConfigRepository::class), '')),
             // '0' is the one value that turns the watchdog off; unset means on.
             new CapacityModule($this->createStub(CapacityService::class), '0'),
         ];

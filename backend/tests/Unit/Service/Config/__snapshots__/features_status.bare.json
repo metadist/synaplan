@@ -230,6 +230,33 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "cloud_files",
+            "label_key": "modules.cloud_files.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Cloud file state is turned off",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "CLOUD_FILES_ENABLED",
+                    "CLOUD_FILES_GLYPH_BIRD",
+                    "CLOUD_FILES_GLYPH_EYES"
+                ],
+                "bconfig": [
+                    "CLOUD_FILES.ENABLED"
+                ],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [
+                "cloud_status",
+                "watches"
+            ],
+            "docs_anchor": "modules/cloud-files",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "compute",
             "label_key": "modules.compute.label",
             "state": "absent",

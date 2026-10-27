@@ -14,6 +14,7 @@ use App\Service\File\FileStorageService;
 use App\Service\Iam\Erasure\FileEraser;
 use App\Service\Iam\Erasure\UserErasure;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query\FilterCollection;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -49,7 +50,10 @@ final class FileEraserTest extends TestCase
             });
         $files = $this->createStub(FileRepository::class);
         $files->method('findBy')->willReturn([$file]);
+        $filters = $this->createMock(FilterCollection::class);
+        $filters->method('isEnabled')->willReturn(true);
         $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('getFilters')->willReturn($filters);
         $em->method('remove')->willReturnCallback(static function () use (&$order): void {
             $order[] = 'file row';
         });

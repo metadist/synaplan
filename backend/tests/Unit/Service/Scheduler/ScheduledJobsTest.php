@@ -21,12 +21,14 @@ final class ScheduledJobsTest extends TestCase
                 'app:voice:reap-sessions',
                 'app:process-mail-handlers',
                 'app:process-emails',
+                'app:cloud-watches:sweep',
             ],
             'tasks' => [
                 'app:saved-tasks:tick',
             ],
             'hourly' => [
                 'app:files:reap-ephemeral',
+                'app:cloud-files:reap',
                 'app:approvals:expire',
                 'app:models:discover',
                 'app:freeapi:maintain',

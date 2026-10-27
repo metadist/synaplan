@@ -154,6 +154,7 @@ framework:
             # Link revocation is already committed. The notice must not hold
             # that request open while the cloud answers.
             'App\Message\NotifyIdentityRevoked': async_index
+            'App\Message\NotifyWatchesChanged': async_index
 
 when@test:
     framework:

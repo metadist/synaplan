@@ -11,7 +11,14 @@
     role="img"
     data-testid="file-vector-pill"
   >
-    <Icon :icon="variant.icon" class="w-4 h-4" :class="variant.spin && 'animate-spin'" />
+    <CloudGlyph
+      v-if="variant.glyph"
+      :eyes="false"
+      :badge="variant.badge"
+      :size="16"
+      :class="variant.spin && 'animate-spin'"
+    />
+    <Icon v-else :icon="variant.icon" class="w-4 h-4" />
   </span>
 </template>
 
@@ -19,6 +26,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
+import CloudGlyph from '@/components/files/CloudGlyph.vue'
 import type { FileVectorState } from '@/services/filesService'
 
 const props = withDefaults(
@@ -43,24 +51,32 @@ const variant = computed(() => {
       return {
         color: 'text-emerald-600 dark:text-emerald-400',
         icon: 'mdi:check-circle',
+        glyph: true,
+        badge: null,
         spin: false,
       }
     case 'pending':
       return {
         color: 'text-blue-500 dark:text-blue-400',
         icon: 'mdi:loading',
+        glyph: true,
+        badge: 'clock' as const,
         spin: true,
       }
     case 'failed':
       return {
         color: 'text-red-500 dark:text-red-400',
         icon: 'mdi:alert-circle',
+        glyph: true,
+        badge: 'alert' as const,
         spin: false,
       }
     default:
       return {
         color: 'txt-secondary',
         icon: 'mdi:circle-outline',
+        glyph: false,
+        badge: null,
         spin: false,
       }
   }

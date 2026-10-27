@@ -55,6 +55,7 @@ describe('FileVectorPill', () => {
     const el = pill(mountPill({ state: 'vectorized', chunkCount: 12, groupKey: 'Contracts' }))
     expect(el.classes()).toContain('text-emerald-600')
     expect(el.attributes('aria-label')).toBe('Searchable by AI')
+    expect(el.find('[data-testid="cloud-glyph"] svg').exists()).toBe(true)
     expect(el.attributes('title')).toBe('Searchable by AI · Contracts · 12 chunks')
   })
 
