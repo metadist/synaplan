@@ -28,7 +28,7 @@ final readonly class PlatformInstanceService
      *
      * @var list<string>
      */
-    public const CORE_CAPABILITIES = ['deliveries', 'pickups', 'read_scope', 'sso_bind', 'identity_adopt'];
+    public const CORE_CAPABILITIES = ['deliveries', 'pickups', 'read_scope', 'sso_bind', 'identity_adopt', 'lifecycle'];
 
     /** Matches BEXTERNALIDENTITIES.BEXTERNALID (VARCHAR(191)). */
     public const EXTERNAL_ID_MAX_LENGTH = 191;

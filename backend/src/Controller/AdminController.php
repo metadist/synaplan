@@ -557,7 +557,7 @@ class AdminController extends AbstractController
     #[OA\Delete(
         path: '/api/v1/admin/users/{id}',
         summary: 'Delete user',
-        description: 'Delete user account (admin only)',
+        description: 'Delete user account (admin only). An API key gets 409 account_in_use when the account is still used elsewhere.',
         security: [['Bearer' => []]],
         tags: ['Admin']
     )]
