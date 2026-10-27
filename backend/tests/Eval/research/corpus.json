@@ -336,5 +336,95 @@
     "smoke": false,
     "written_by": "rq2",
     "checked_on": "2026-10-22"
+  },
+  {
+    "id": "fu-q",
+    "category": "current",
+    "language": "en",
+    "question": "What is the warranty, using only the sources already in the report?",
+    "depth": "quick",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The answer cites a source that was already in the parent report.", "kind": "fact", "match": ["[e"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "question",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-r",
+    "category": "current",
+    "language": "en",
+    "question": "Make the report shorter and keep every citation that stays.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "A sentence that did not change still carries its citation.", "kind": "fact", "match": ["[e"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "revise",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-d",
+    "category": "current",
+    "language": "en",
+    "question": "Look further into what the report could not confirm.",
+    "depth": "thorough",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "The next plan point continues the parent's numbering.", "kind": "fact", "match": ["p"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "deeper",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-f",
+    "category": "current",
+    "language": "en",
+    "question": "Check the sources again and say what changed.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "A source older than the time frame is read again.", "kind": "fact", "match": ["changed"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "refresh",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
+  },
+  {
+    "id": "fu-t",
+    "category": "current",
+    "language": "de",
+    "question": "Übersetze den Bericht und behalte die Belege.",
+    "depth": "standard",
+    "sources": { "web": true, "knowledge": false },
+    "gold": [
+      { "id": "g1", "assertion": "A translated sentence that replaces one is checked again; a sentence left as it is keeps its citation.", "kind": "fact", "match": ["[e"] }
+    ],
+    "preferred_sources": [],
+    "valid_until": null,
+    "trap": null,
+    "smoke": false,
+    "follow_up": "revise",
+    "written_by": "rs10",
+    "checked_on": "2026-10-27"
   }
 ]

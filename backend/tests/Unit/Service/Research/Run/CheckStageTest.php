@@ -396,6 +396,26 @@ REPORT, 'test:writer', null);
         self::assertSame(['statements' => 1, 'supported' => 0, 'removed' => 1], $ctx->state->ledger->check());
     }
 
+    public function testARevisionChecksOnlyTheSentenceThatChanged(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $this->card($ctx, 'The warranty is two years.');
+        $ctx->state->followUp = 'revise';
+        $ctx->state->priorReport = "The price is 12.40 EUR. [e1]\nThe warranty is two years. [e2]";
+        $ctx->state->ledger->setReport("The price is 12.40 EUR. [e1]\nThe warranty is five years. [e2]");
+        $caller->script[] = $this->verdicts([['c2', 'contradicted']]);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertCount(1, $caller->seen);
+        self::assertStringContainsString('five years', $caller->seen[0]['user']);
+        self::assertStringNotContainsString('12.40', $caller->seen[0]['user']);
+        $report = (string) $ctx->state->ledger->report();
+        self::assertStringContainsString('The price is 12.40 EUR. [e1]', $report);
+        self::assertStringNotContainsString('five years', strstr($report, '## Not confirmed', true) ?: '');
+    }
+
     /**
      * @return array{0: StageContext, 1: ReplayCaller}
      */

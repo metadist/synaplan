@@ -24,6 +24,14 @@ final class CorpusLoaderTest extends TestCase
 
         $this->assertCount(20, $items);
         $this->assertCount(10, $smoke);
+        $followUps = (new CorpusLoader())->followUps($this->corpusPath());
+        $kinds = [];
+        foreach ($followUps as $item) {
+            $kinds[$item->kind] = true;
+            $this->assertNotContains($item->id, $ids);
+        }
+        $this->assertCount(5, $followUps);
+        $this->assertSame(['question', 'revise', 'deeper', 'refresh'], array_keys($kinds));
         $this->assertSame($ids, array_values(array_unique($ids)));
         foreach (CorpusLoader::CATEGORIES as $category) {
             $this->assertArrayHasKey($category, $categories);

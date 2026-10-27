@@ -49,8 +49,13 @@ final readonly class CheckStage implements ResearchStage
 
         $passages = $this->passages($ctx);
         $sorted = $this->sort(CheckReport::withoutNotConfirmed($original), $passages);
+        $ask = $sorted['ask'];
+        $carried = [];
+        if ('revise' === $ctx->state->followUp) {
+            [$ask, $carried] = ChangedSentences::split($ctx->state->priorReport ?? '', $sorted['ask']);
+        }
         $verdicts = [];
-        foreach ($this->batches->groups($sorted['ask'], $this->chars()) as $index => $group) {
+        foreach ($this->batches->groups($ask, $this->chars()) as $index => $group) {
             if ($index > 0 && !$ctx->state->budget->canCall() && !$ctx->stop->requested()) {
                 break;
             }
@@ -70,6 +75,9 @@ final readonly class CheckStage implements ResearchStage
                 return StageEnds::model($ctx, 'checker');
             }
             $verdicts += $parsed;
+        }
+        foreach ($carried as $item) {
+            $verdicts[$item['id']] = ['verdict' => 'supported', 'part' => ''];
         }
 
         $counts = $this->counts($sorted, $verdicts);

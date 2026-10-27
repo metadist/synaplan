@@ -258,6 +258,10 @@ final class ResearchRunServiceTest extends ResearchUnitCase
     public function testAFollowUpKeepsTheParent(): void
     {
         $started = $this->runs->start($this->user, $this->body(), true, null);
+        $parent = $this->store->load($started->ref->id);
+        self::assertInstanceOf(ResearchRunState::class, $parent);
+        $parent->finish(ResearchStatus::Complete, new ResearchOutcome(ResearchOutcome::COMPLETE));
+        $this->store->save($parent);
 
         $next = $this->runs->followUp($this->user, $started->ref->id, [
             'type' => 'deeper',
@@ -265,7 +269,7 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         ]);
 
         self::assertSame($started->ref->id, $next->parent);
-        self::assertSame(ResearchDepth::Standard, $next->ref->depth);
+        self::assertSame(ResearchDepth::Thorough, $next->ref->depth);
         self::assertSame(11, $next->ref->chatId);
     }
 

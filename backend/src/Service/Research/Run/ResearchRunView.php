@@ -38,6 +38,8 @@ final class ResearchRunView
             'depth' => $state->ref->depth->value,
             'question' => $state->ref->question,
             'parent' => $state->parent,
+            'follow_up' => $state->followUp,
+            'can_add_to_report' => 'question' === $state->followUp && $state->status->isTerminal() && null !== $report,
             'stop_requested' => $stopRequested,
             'write_requested' => $writeRequested,
             'queued_since' => $queuedSince,

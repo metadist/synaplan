@@ -236,7 +236,7 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/followups', name: 'api_research_followups', methods: ['POST'])]
     #[Route('/v1/research/{id}/followups', name: 'v1_research_followups', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/research/{id}/followups', summary: 'Start a follow-up research run', description: 'Starts a new run with this one as its parent, at the same depth and in the same chat.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Post(path: '/api/v1/research/{id}/followups', summary: 'Start a follow-up research run', description: 'Starts a new run that keeps this run\'s sources and continues its source, evidence and point numbers. A question is short and searches only when the notes have nothing on it. A revision keeps the report and checks only sentences that changed. A deeper look uses the thorough budget and adds a point for each line under Not confirmed. A refresh checks sources older than the time frame and says what changed. The parent must already have finished. A run that is not the caller\'s is not found.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(
         required: ['type'],
         properties: [
