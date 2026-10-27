@@ -28,7 +28,7 @@ final class ProvisionedAccountPolicy
      *
      * @param list<ExternalIdentity> $identities every identity row of the account
      */
-    public function keepReason(User $user, ExternalIdentity $identity, PlatformInstance $instance, array $identities): ?string
+    public function keepReason(User $user, ExternalIdentity $identity, ?PlatformInstance $instance, array $identities): ?string
     {
         if (!$this->provisionedFor($user, $identity, $instance)) {
             return self::NOT_PROVISIONED;
@@ -64,17 +64,25 @@ final class ProvisionedAccountPolicy
         };
     }
 
-    private function provisionedFor(User $user, ExternalIdentity $identity, PlatformInstance $instance): bool
+    private function provisionedFor(User $user, ExternalIdentity $identity, ?PlatformInstance $instance): bool
     {
         if (AdminUserProvisioningService::PROVIDER_ID !== $user->getProviderId()) {
+            return false;
+        }
+        $mode = $identity->getMode();
+        if (ExternalIdentity::MODE_LINK === $mode || ExternalIdentity::MODE_SSO === $mode) {
             return false;
         }
 
         $details = $user->getUserDetails();
         $source = $details['external_source'] ?? '';
         $externalId = $details['external_id'] ?? '';
-        if (!is_string($source) || !is_string($externalId) || $source !== $instance->getClient()) {
+        $client = $instance instanceof PlatformInstance ? $instance->getClient() : $identity->getSource();
+        if (!is_string($source) || !is_string($externalId) || $source !== $client) {
             return false;
+        }
+        if (!$instance instanceof PlatformInstance) {
+            return $externalId === $identity->getExternalId();
         }
 
         if ($externalId === $identity->getExternalId()) {

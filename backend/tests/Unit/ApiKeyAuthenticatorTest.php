@@ -8,6 +8,7 @@ use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ApiKeyRepository;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiKeyAuthenticator;
 use App\Security\ApiKeyPlanDeniedException;
@@ -37,6 +38,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->authenticator = new ApiKeyAuthenticator(
             $this->apiKeyRepository,
             $this->users,
+            $this->createMock(ExternalIdentityRepository::class),
             $this->logger,
             self::gate(false),
         );
@@ -450,6 +452,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         return new ApiKeyAuthenticator(
             $this->apiKeyRepository,
             $this->users,
+            $this->createMock(ExternalIdentityRepository::class),
             $this->logger,
             self::gate($enabled),
         );

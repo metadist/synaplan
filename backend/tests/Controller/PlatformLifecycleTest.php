@@ -156,6 +156,67 @@ final class PlatformLifecycleTest extends WebTestCase
         self::assertNull($this->em->find(User::class, $sessionTarget->getId()));
     }
 
+    public function testAPausedIdentityRejectsItsKeyUntilItIsEnabled(): void
+    {
+        $instance = $this->register();
+        $user = $this->provision($instance, 'paused', 'password-1');
+        $user->setUserLevel('PRO');
+        $this->em->flush();
+        $entity = $this->em->getRepository(PlatformInstance::class)->findOneBy(['instanceId' => $instance['instance_id']]);
+        self::assertInstanceOf(PlatformInstance::class, $entity);
+        $minted = static::getContainer()->get(AdminUserProvisioningService::class)->mintApiKeyForUser($user, 'cloud', ['files'], $entity);
+        $secret = $minted['plainKey'];
+
+        $this->post($instance, 'paused', 'disabled');
+        $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $secret]);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertSame('platform_disconnected', $this->json()['code']);
+
+        $this->post($instance, 'paused', 'enabled');
+        $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $secret]);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+    }
+
+    public function testALinkedIdentityCannotDeleteTheAccount(): void
+    {
+        $instance = $this->register();
+        $user = $this->provision($instance, 'linked-mode');
+        $row = $this->identity($instance, 'linked-mode');
+        $row->setMode(ExternalIdentity::MODE_LINK);
+        $this->em->flush();
+
+        $this->post($instance, 'linked-mode', 'deleted');
+        self::assertSame('kept', $this->json()['account']);
+        self::assertStringContainsString('not created for this cloud', $this->json()['message']);
+        $this->em->clear();
+        self::assertInstanceOf(User::class, $this->em->find(User::class, $user->getId()));
+    }
+
+    public function testALegacyProvisionedAccountCanStillBeDeletedByAnApiKey(): void
+    {
+        $this->register();
+        $email = 'legacy-'.bin2hex(random_bytes(3)).'@synaplan.internal';
+        $created = static::getContainer()->get(AdminUserProvisioningService::class)->provision('nextcloud', 'legacy-person', $email);
+        $user = $created['user'];
+        $admin = $this->localPerson('legacy-admin');
+        $admin->setUserLevel('ADMIN');
+        $secret = 'sk_'.bin2hex(random_bytes(29));
+        $key = new ApiKey();
+        $key->setOwner($admin);
+        $key->setKey($secret);
+        $key->setName('admin');
+        $key->setStatus('active');
+        $key->setScopes([]);
+        $this->em->persist($key);
+        $this->em->flush();
+
+        $encoded = implode('', array_map(static fn (string $digit): string => '%3'.$digit, str_split((string) $user->getId())));
+        $this->client->request('DELETE', '/api/v1/admin/users/'.$encoded, server: ['HTTP_X_API_KEY' => $secret]);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $this->em->clear();
+        self::assertNull($this->em->find(User::class, $user->getId()));
+    }
+
     public function testInstancesSelfAdvertisesLifecycle(): void
     {
         $instance = $this->register();

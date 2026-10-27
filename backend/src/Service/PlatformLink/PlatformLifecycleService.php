@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\PlatformLink;
 
 use App\Entity\ApiKey;
+use App\Entity\AuditLogEntry;
 use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
 use App\Entity\User;
@@ -15,6 +16,7 @@ use App\Repository\UserRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\UserDeletionService;
 use App\Service\PlatformLink\Exception\PlatformSsoException;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -47,8 +49,17 @@ final readonly class PlatformLifecycleService
     public function deleteCalledByApiKey(User $target, string $ip): array
     {
         $identity = $this->provisionedIdentity($target);
-        if (!$identity instanceof ExternalIdentity || '' === $identity->getInstanceId()) {
+        if (!$identity instanceof ExternalIdentity) {
             return ['deleted' => false, 'message' => $this->policy->sentence(ProvisionedAccountPolicy::NOT_PROVISIONED, null)];
+        }
+
+        if ('' === $identity->getInstanceId()) {
+            $result = $this->finish($identity, null, 'deleted', $ip);
+
+            return [
+                'deleted' => 'deleted' === $result['account'],
+                'message' => $result['message'],
+            ];
         }
 
         $instance = $this->instances->findByInstanceId($identity->getInstanceId());
@@ -82,15 +93,46 @@ final readonly class PlatformLifecycleService
             return $this->answer('absent', ExternalIdentity::STATUS_REVOKED, 'This person is not linked.');
         }
 
+        return $this->finish($row, $instance, $event, $ip);
+    }
+
+    /**
+     * @return array{success: bool, account: string, status: string, message: string}
+     */
+    private function finish(ExternalIdentity $row, ?PlatformInstance $instance, string $event, string $ip): array
+    {
         if ('enabled' === $event && ExternalIdentity::STATUS_REVOKED === $row->getStatus()) {
             throw new PlatformSsoException(Response::HTTP_CONFLICT, 'identity_revoked', 'This person was removed from the cloud.');
         }
 
-        if ($this->already($row, $event)) {
+        /** @var array{success: bool, account: string, status: string, message: string} $result */
+        $result = $this->entityManager->wrapInTransaction(function () use ($row, $instance, $event, $ip): array {
+            $this->entityManager->lock($row, LockMode::PESSIMISTIC_WRITE);
+            $this->entityManager->refresh($row);
+
+            return $this->applyLocked($row, $instance, $event, $ip);
+        });
+
+        return $result;
+    }
+
+    /**
+     * @return array{success: bool, account: string, status: string, message: string}
+     */
+    private function applyLocked(ExternalIdentity $row, ?PlatformInstance $instance, string $event, string $ip): array
+    {
+        $user = $this->users->find($row->getUserId());
+        if ('deleted' === $event && ExternalIdentity::STATUS_REVOKED === $row->getStatus()) {
+            if (!$user instanceof User) {
+                return $this->answer('absent', ExternalIdentity::STATUS_REVOKED, 'This person is not linked.');
+            }
+            if ($this->wasKept($row)) {
+                return $this->answer('unchanged', ExternalIdentity::STATUS_REVOKED, 'Nothing changed.');
+            }
+        } elseif ($this->already($row, $event)) {
             return $this->answer('unchanged', $row->getStatus(), 'Nothing changed.');
         }
 
-        $user = $this->users->find($row->getUserId());
         if (!$user instanceof User) {
             $this->mark($row, ExternalIdentity::STATUS_REVOKED);
 
@@ -113,23 +155,49 @@ final readonly class PlatformLifecycleService
             return $this->answer('kept', ExternalIdentity::STATUS_ACTIVE, 'Synaplan is on again for this person.');
         }
 
+        $this->entityManager->refresh($row);
         $this->revokeBoundKey($row);
         $this->mark($row, ExternalIdentity::STATUS_REVOKED);
-        $this->notifier->identityRevoked($row);
         $this->effects->onDeleted($row);
 
-        $reason = $this->policy->keepReason($user, $row, $instance, $this->identities->findByUserId((int) $user->getId()));
+        $identities = $this->identities->findByUserId((int) $user->getId());
+        $reason = $this->policy->keepReason($user, $row, $instance, $identities);
         if (null !== $reason) {
             $message = $this->policy->sentence($reason, $this->otherHost($user, $row));
             $this->record($user, $row, 'platform_link.account_kept', $ip, ['reason' => $reason, 'message' => $message]);
+            $this->notifier->identityRevoked($row);
+
+            return $this->answer('kept', ExternalIdentity::STATUS_REVOKED, $message);
+        }
+
+        $deleted = $this->deletion->deleteUserIf($user, function (User $fresh) use ($row, $instance): bool {
+            $again = $this->identities->findByUserId((int) $fresh->getId());
+
+            return null === $this->policy->keepReason($fresh, $row, $instance, $again);
+        });
+        if (!$deleted) {
+            $message = $this->policy->sentence(ProvisionedAccountPolicy::ADMIN, null);
+            $this->record($user, $row, 'platform_link.account_kept', $ip, ['reason' => ProvisionedAccountPolicy::ADMIN, 'message' => $message]);
+            $this->notifier->identityRevoked($row);
 
             return $this->answer('kept', ExternalIdentity::STATUS_REVOKED, $message);
         }
 
         $this->record($user, $row, 'platform_link.account_deleted', $ip, []);
-        $this->deletion->deleteUser($user);
+        $this->notifier->identityRevoked($row);
 
         return $this->answer('deleted', ExternalIdentity::STATUS_REVOKED, 'The account was removed.');
+    }
+
+    private function wasKept(ExternalIdentity $row): bool
+    {
+        $found = $this->entityManager->getRepository(AuditLogEntry::class)->findOneBy([
+            'action' => 'platform_link.account_kept',
+            'resourceKind' => 'platform_link',
+            'resourceId' => (string) $row->getId(),
+        ]);
+
+        return $found instanceof AuditLogEntry;
     }
 
     private function already(ExternalIdentity $row, string $event): bool

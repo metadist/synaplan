@@ -10,16 +10,16 @@ use App\Repository\UserRepository;
 use App\Service\PlatformLink\PlatformLifecycleService;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 /**
  * The generic admin delete, when an API key calls it, uses the same rule as
  * lifecycle(deleted). A session admin is left to AdminController, which is
- * already at its size limit.
+ * already at its size limit. The check runs after routing so an encoded id
+ * is the id the controller would have received.
  */
 final readonly class ProvisionedAccountDeleteSubscriber implements EventSubscriberInterface
 {
@@ -33,26 +33,28 @@ final readonly class ProvisionedAccountDeleteSubscriber implements EventSubscrib
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::REQUEST => ['onKernelRequest', 4],
+            KernelEvents::CONTROLLER => ['onController', 0],
         ];
     }
 
-    public function onKernelRequest(RequestEvent $event): void
+    public function onController(ControllerEvent $event): void
     {
-        if (!$event->isMainRequest()) {
-            return;
-        }
-
         $request = $event->getRequest();
-        if (!$request->attributes->get('api_key') instanceof ApiKey || Request::METHOD_DELETE !== $request->getMethod()) {
+        if (!$event->isMainRequest() || !$request->attributes->get('api_key') instanceof ApiKey) {
+            return;
+        }
+        if ('admin_delete_user' !== $request->attributes->get('_route')) {
             return;
         }
 
-        $id = $this->userId($request->getPathInfo());
-        if (null === $id) {
+        $raw = $request->attributes->get('id');
+        if (!is_int($raw) && !(is_string($raw) && ctype_digit($raw))) {
+            $event->setController(static fn (): JsonResponse => new JsonResponse(['error' => 'User not found'], Response::HTTP_NOT_FOUND));
+
             return;
         }
 
+        $id = (int) $raw;
         $admin = $this->tokens->getToken()?->getUser();
         if (!$admin instanceof User || !$admin->isAdmin() || $admin->getId() === $id) {
             return;
@@ -64,26 +66,17 @@ final readonly class ProvisionedAccountDeleteSubscriber implements EventSubscrib
         }
 
         $result = $this->lifecycle->deleteCalledByApiKey($target, $request->getClientIp() ?? '');
-        if ($result['deleted']) {
-            $event->setResponse(new JsonResponse(['success' => true, 'message' => 'User deleted']));
+        $event->setController(static function () use ($result): JsonResponse {
+            if ($result['deleted']) {
+                return new JsonResponse(['success' => true, 'message' => 'User deleted']);
+            }
 
-            return;
-        }
-
-        $event->setResponse(new JsonResponse([
-            'success' => false,
-            'error' => 'account_in_use',
-            'code' => 'account_in_use',
-            'message' => $result['message'],
-        ], Response::HTTP_CONFLICT));
-    }
-
-    private function userId(string $path): ?int
-    {
-        if (1 !== preg_match('#^/api/v1/admin/users/(\d+)$#', $path, $match)) {
-            return null;
-        }
-
-        return (int) $match[1];
+            return new JsonResponse([
+                'success' => false,
+                'error' => 'account_in_use',
+                'code' => 'account_in_use',
+                'message' => $result['message'],
+            ], Response::HTTP_CONFLICT);
+        });
     }
 }

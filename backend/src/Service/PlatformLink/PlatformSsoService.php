@@ -129,6 +129,9 @@ final readonly class PlatformSsoService
         $minted = $this->entityManager->wrapInTransaction(function () use ($row, $user, $instance, $externalId): array {
             $this->entityManager->lock($row, LockMode::PESSIMISTIC_WRITE);
             $this->entityManager->refresh($row);
+            if ($row->isOff()) {
+                throw new PlatformSsoException(Response::HTTP_FORBIDDEN, PlatformDisconnectedException::CODE, PlatformDisconnectedException::MESSAGE);
+            }
 
             $existing = $this->activeBackgroundKey($row);
             if ($existing instanceof ApiKey) {
