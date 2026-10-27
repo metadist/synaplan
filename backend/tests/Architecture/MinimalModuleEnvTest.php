@@ -47,6 +47,7 @@ final class MinimalModuleEnvTest extends TestCase
         'research' => ['RESEARCH_ENABLED'],
         'freeapi' => ['FREEAPI_BASE_URL'],
         'capacity' => ['SYNAPLAN_WATCHDOG'],
+        'cloud_files' => ['CLOUD_FILES_ENABLED'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

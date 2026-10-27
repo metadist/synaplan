@@ -109,6 +109,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "cloud_files": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "compute": {
                     "configured": "bool",
                     "gated": "bool"
@@ -338,6 +342,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "cloud_files": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "compute": {
                     "configured": "bool",
                     "gated": "bool"
@@ -564,6 +572,10 @@
                     "gated": "bool"
                 },
                 "chat_artifacts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "cloud_files": {
                     "configured": "bool",
                     "gated": "bool"
                 },

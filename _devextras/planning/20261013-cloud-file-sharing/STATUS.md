@@ -53,7 +53,7 @@ not a chat message.
 | CF2.6 Nextcloud organisation login | `synaplan-nextcloud` | P1 | planned | only if CF-S2 says yes |
 | CF2.7 OpenCloud registration, consent, bind, Connect mode | `synaplan-opencloud` | P2 | planned | Connect mode is a cut line |
 | CF2.8 ownCloud.online lifecycle, identity rows, admin copy | `synaplan-owncloud-online` | P3 | planned |  |
-| CF2.9 Files remember their cloud | `synaplan` | P1 | planned | D17; schema ask recorded (`BFILES.BSOURCEINSTANCE`, row 40); after CF2.2 |
+| CF2.9 Files remember their cloud | `synaplan` | P1 | **in review** · [#2817](https://github.com/metadist/synaplan/pull/2817) · issue [#2816](https://github.com/metadist/synaplan/issues/2816) | D17; `BFILES.BSOURCEINSTANCE`; stacked on main |
 | CF2.10 Nextcloud identity basics | `synaplan-nextcloud` | P1 | planned | whatever CF-S2 answers: adoption job, lifecycle calls, four-mode admin screen |
 | CF2.11 OpenCloud Apps card | `synaplan` | P2 | planned |  |
 | CF3.1 Copy protocol, ledger, notify key, `identity_revoked` | `synaplan` | P1 | **merged** 2026-10-20 [#2609](https://github.com/metadist/synaplan/pull/2609) | released in 5.5.3; delivery origin narrowed to the registered host or a dev host until CF2.1 |
@@ -66,7 +66,7 @@ not a chat message.
 | CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | P1 | **in review** · [synaplan-nextcloud#75](https://github.com/metadist/synaplan-nextcloud/pull/75) | Walk 2026-10-24 below |
 | CF3.9 ownCloud.online pickup handler, read setting | `synaplan-owncloud-online` | P3 | planned | After CF-S4 |
 | CF3.10 OpenCloud pickup handler, read setting | `synaplan-opencloud` | P2 | planned | After CF-S1, CF-S3 |
-| CF4.1 Status, file detail, source events, re-upload | `synaplan` | P1 | planned | `BKEEPSYNCED`, `reupload` answer |
+| CF4.1 Status, file detail, source events, re-upload | `synaplan` | P1 | **in review** | Stacked on #2817. `cloud_files` default off; `BSOURCEDELETEDAT`, `BKEEPSYNCED`; status, detail, source events, 7-day reaper |
 | CF4.2 Glyph kit | `synaplan` | P1 | planned | drafted by the agent, approved by the product owner |
 | CF4.3 Nextcloud bird, sidebar | `synaplan-nextcloud` | P1 | planned |  |
 | CF4.4 ownCloud.online bird, sidebar | `synaplan-owncloud-online` | P3 | planned |  |

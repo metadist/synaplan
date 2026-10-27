@@ -24,7 +24,7 @@ final class ModuleGateSeederTest extends TestCase
 
         $rows = ModuleGateSeeder::defaultRows($ids);
 
-        $this->assertCount(21, $rows);
+        $this->assertCount(22, $rows);
         $bySetting = [];
         foreach ($rows as $row) {
             $this->assertSame(0, $row['ownerId']);
@@ -35,6 +35,7 @@ final class ModuleGateSeederTest extends TestCase
         $this->assertSame([
             'GATE_CAPACITY',
             'GATE_CHAT_ARTIFACTS',
+            'GATE_CLOUD_FILES',
             'GATE_COMPUTE',
             'GATE_DOCLING',
             'GATE_FEDERATION',

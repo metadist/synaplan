@@ -397,7 +397,7 @@ final readonly class FileUploadService
         $file->setGroupKey($groupKey);
         $file->setStatus('uploaded');
         $file->setSource($options->source);
-        $file->setSourceInstance($options->sourceInstance);
+        $file->setSourceInstance($options->sourceInstance)->setKeepSynced($options->keepSynced ?? false);
         // A cloud upload that names a knowledge folder skips Incoming. Web uploads never land there.
         $file->setIncoming(File::arrivesIncoming($options->source, $groupKey));
         // Preserve the original ".heic" filename for provenance when we
@@ -449,7 +449,7 @@ final readonly class FileUploadService
         $file->setStatus('uploaded');
         $file->setFileText('');
         $file->setSource($options->source);
-        $file->setSourceInstance($options->sourceInstance ?? $file->getSourceInstance());
+        $file->setSourceInstance($options->sourceInstance ?? $file->getSourceInstance())->setKeepSynced($options->keepSynced ?? $file->isKeepSynced())->setSourceDeletedAt(null);
         $file->setOriginalName($options->originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : $file->getOriginalName()));
         $file->setSourceId($options->sourceId ?? $file->getSourceId());
         $file->setSourceEtag($options->sourceEtag);

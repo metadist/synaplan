@@ -483,6 +483,10 @@ final class ApiKeyScope
             return [self::PLATFORM_WATCH];
         }
 
+        if ('POST' === strtoupper($method) && '/api/v1/cloud/status' === $path) {
+            return [self::PLATFORM_FILES];
+        }
+
         if ('GET' === strtoupper($method) && self::matchesPrefix($path, '/api/v1/cloud/files')) {
             return [self::PLATFORM_FILES];
         }
