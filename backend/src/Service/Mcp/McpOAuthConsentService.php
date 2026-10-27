@@ -56,13 +56,13 @@ final readonly class McpOAuthConsentService
     public function start(McpServerConfig $server, int $ownerId): string
     {
         if (!$this->config->isOAuthConnectorsEnabled()) {
-            throw new McpOAuthException('Connecting with a sign-in is disabled by an administrator');
+            throw new McpOAuthException('Connecting with a sign-in is disabled by an administrator', McpOAuthFailure::Disabled);
         }
         if ($server->getUserId() !== $ownerId) {
             throw new McpOAuthException('Server not found');
         }
         if (!$this->config->isClientEnabled($ownerId)) {
-            throw new McpOAuthException('Calls to MCP servers are turned off');
+            throw new McpOAuthException('Calls to MCP servers are turned off', McpOAuthFailure::CallsOff);
         }
 
         $startUrl = $server->getUrl();
@@ -108,7 +108,7 @@ final readonly class McpOAuthConsentService
         );
         $encrypted = McpServerConfig::encryptOAuthState($state, $this->encryption);
         if (!$this->servers->storeOAuthStateAt($server, $startUrl, $encrypted, startingSignIn: true)) {
-            throw new McpOAuthException(self::ADDRESS_CHANGED);
+            throw new McpOAuthException(self::ADDRESS_CHANGED, McpOAuthFailure::ServerChanged);
         }
 
         $verifier = $this->oauth->generateCodeVerifier();
@@ -143,19 +143,19 @@ final readonly class McpOAuthConsentService
     public function complete(string $code, string $stateToken, ?string $issuer = null): McpServerConfig
     {
         if (!$this->config->isOAuthConnectorsEnabled()) {
-            throw new McpOAuthException('Connecting with a sign-in is disabled by an administrator');
+            throw new McpOAuthException('Connecting with a sign-in is disabled by an administrator', McpOAuthFailure::Disabled);
         }
 
         $payload = $this->state->validateState($stateToken, self::PROVIDER);
         if (null === $payload) {
-            throw new McpOAuthException('The sign-in link is invalid or has expired. Please start again.');
+            throw new McpOAuthException('The sign-in link is invalid or has expired. Please start again.', McpOAuthFailure::Expired);
         }
 
         $ownerId = is_numeric($payload['owner_id'] ?? null) ? (int) $payload['owner_id'] : 0;
         $serverId = is_numeric($payload['server_id'] ?? null) ? (int) $payload['server_id'] : 0;
         $nonce = is_string($payload['pkce_nonce'] ?? null) ? $payload['pkce_nonce'] : '';
         if ($ownerId <= 0 || $serverId <= 0 || '' === $nonce) {
-            throw new McpOAuthException('The sign-in link is incomplete. Please start again.');
+            throw new McpOAuthException('The sign-in link is incomplete. Please start again.', McpOAuthFailure::Expired);
         }
 
         $pending = $this->consumeVerifier($nonce, $ownerId, $serverId);
@@ -164,17 +164,17 @@ final readonly class McpOAuthConsentService
             throw new McpOAuthException('Server not found');
         }
         if (!$server->isOAuth()) {
-            throw new McpOAuthException('This server no longer uses sign-in. Please start again.');
+            throw new McpOAuthException('This server no longer uses sign-in. Please start again.', McpOAuthFailure::ServerChanged);
         }
         if (!$server->hasAddress($pending['server_url'])) {
-            throw new McpOAuthException(self::ADDRESS_CHANGED);
+            throw new McpOAuthException(self::ADDRESS_CHANGED, McpOAuthFailure::ServerChanged);
         }
         $verifier = $pending['verifier'];
 
         $oauthState = $server->getDecryptedOAuthState($this->encryption);
         // RFC 9207: an answer that names another issuer is not ours to redeem.
         if (null !== $issuer && $issuer !== $pending['issuer']) {
-            throw new McpOAuthException('The sign-in answer came from a different authorization server. Please start again.');
+            throw new McpOAuthException('The sign-in answer came from a different authorization server. Please start again.', McpOAuthFailure::ExchangeFailed);
         }
         $tokens = $this->oauth->exchangeCode($this->toProviderConfig($oauthState), $code, $verifier);
 
@@ -193,7 +193,7 @@ final readonly class McpOAuthConsentService
         // The exchange is a network call: an edit that landed meanwhile wins.
         $encrypted = McpServerConfig::encryptOAuthState($updated, $this->encryption);
         if (!$this->servers->storeOAuthStateAt($server, $pending['server_url'], $encrypted)) {
-            throw new McpOAuthException(self::ADDRESS_CHANGED);
+            throw new McpOAuthException(self::ADDRESS_CHANGED, McpOAuthFailure::ServerChanged);
         }
 
         $this->logger->info('MCP OAuth consent completed', [
@@ -247,7 +247,7 @@ final readonly class McpOAuthConsentService
         $item = $this->cache->getItem($key);
 
         if (!$item->isHit()) {
-            throw new McpOAuthException('The sign-in attempt has expired or was already used. Please start again.');
+            throw new McpOAuthException('The sign-in attempt has expired or was already used. Please start again.', McpOAuthFailure::Expired);
         }
 
         $stored = $item->get();
@@ -259,7 +259,7 @@ final readonly class McpOAuthConsentService
             || ($stored['owner_id'] ?? null) !== $ownerId
             || ($stored['server_id'] ?? null) !== $serverId
         ) {
-            throw new McpOAuthException('The sign-in attempt could not be verified. Please start again.');
+            throw new McpOAuthException('The sign-in attempt could not be verified. Please start again.', McpOAuthFailure::Expired);
         }
 
         return [

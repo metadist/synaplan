@@ -459,12 +459,25 @@
     "disconnectMessage": "La connexion enregistrée pour « {name} » sera supprimée. Le serveur reste dans votre liste — reconnectez-vous pour l’utiliser.",
     "disconnected": "Connexion retirée",
     "disconnectFailed": "Impossible de retirer la connexion",
-    "oauthError": {
-      "denied": "La connexion a été annulée",
-      "missing_code": "La connexion n’est pas allée jusqu’au bout. Veuillez réessayer.",
+    "signInError": {
+      "disabled": "La connexion avec identification a été désactivée par un administrateur.",
+      "calls_off": "Les appels aux serveurs MCP sont désactivés. Un administrateur peut les activer dans la configuration du système.",
+      "address_not_allowed": "Cette adresse ne peut pas être utilisée. Saisissez l’adresse publique du serveur.",
+      "https_required": "La connexion a besoin d’une adresse sécurisée. Utilisez une adresse qui commence par https://.",
+      "unreachable": "Le serveur n’a pas répondu. Vérifiez l’adresse et réessayez.",
+      "no_signin": "Ce serveur ne propose pas de connexion. S’il vous a donné une clé, utilisez-la.",
+      "metadata_invalid": "La connexion du serveur est configurée de façon incomplète, Synaplan s’est donc arrêté. Demandez à la personne qui gère le serveur de la vérifier.",
+      "no_registration": "Ce serveur ne permet pas à Synaplan de s’enregistrer pour la connexion. Demandez une clé d’accès à la personne qui le gère.",
+      "unsupported_method": "Ce serveur utilise une méthode de connexion que Synaplan ne prend pas en charge. Demandez une clé d’accès à la personne qui le gère.",
+      "registration_refused": "Le serveur a refusé d’enregistrer Synaplan pour la connexion. Réessayez plus tard ou demandez à la personne qui le gère.",
+      "server_changed": "Ce serveur a été modifié pendant la connexion. Cliquez sur Connecter pour recommencer.",
+      "expired": "La connexion a pris trop de temps. Cliquez sur Connecter pour recommencer.",
       "exchange_failed": "Impossible de terminer la connexion. Veuillez réessayer.",
-      "disabled": "La connexion par identifiant est désactivée par un administrateur"
+      "denied": "La connexion a été annulée.",
+      "missing_code": "La connexion n’a pas abouti. Veuillez réessayer.",
+      "unknown": "La connexion n’a pas pu démarrer. Réessayez ou demandez à la personne qui gère le serveur."
     },
+    "savedNotSignedIn": "« {name} » est enregistré, mais vous n’êtes pas encore connecté : {reason}",
     "allowWriteLabel": "Autoriser les actions d’écriture (créer/mettre à jour)",
     "allowWriteHint": "Lorsqu’elles sont activées, l’assistant peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
     "writeBadge": "Écritures autorisées"

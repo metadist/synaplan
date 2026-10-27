@@ -410,7 +410,8 @@ import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
-import { useMcpSignInTarget } from '@/composables/useMcpSignInTarget'
+import { useMcpSignInStart } from '@/composables/useMcpSignInStart'
+import { mcpSignInErrorKey } from '@/components/config/mcpSignInError'
 import { updateConfigValue } from '@/services/api/adminConfigApi'
 import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
 import McpServerUrlField from '@/components/config/McpServerUrlField.vue'
@@ -428,7 +429,7 @@ import { useAuthStore } from '@/stores/auth'
 const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
-const { decide: decideSignInTarget } = useMcpSignInTarget()
+const { connectingId, start: startOAuth } = useMcpSignInStart(() => load())
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -442,7 +443,6 @@ const togglingClient = ref(false)
 const servers = ref<McpServer[]>([])
 const toolsByServer = reactive<Record<number, McpTool[]>>({})
 const testingId = ref<number | null>(null)
-const connectingId = ref<number | null>(null)
 const disconnectingId = ref<number | null>(null)
 
 // Task usage panel: routing topics with their `tool_mcp` opt-in state.
@@ -667,11 +667,13 @@ const save = async () => {
         : await mcpServersApi.create(payload)
     const shouldConnect =
       payload.auth_mode === 'oauth' && saved.id !== undefined && oauthConnectorsEnabled.value
-    success(t('mcpServers.saved'))
+    if (!shouldConnect) {
+      success(t('mcpServers.saved'))
+    }
     closeEditor()
     await load()
     if (shouldConnect) {
-      await startOAuth({ ...saved, id: saved.id })
+      await startOAuth({ ...saved, id: saved.id }, true)
     }
   } catch (err) {
     error(err instanceof Error && err.message ? err.message : t('mcpServers.saveFailed'))
@@ -755,28 +757,6 @@ const disconnectOAuth = async (server: McpServer) => {
   }
 }
 
-const startOAuth = async (server: McpServer) => {
-  if (server.id === undefined) return
-  connectingId.value = server.id
-  try {
-    const url = await mcpServersApi.startOAuth(server.id)
-    const decision = await decideSignInTarget(url, server)
-    if (decision !== 'go') {
-      if (decision === 'refuse') {
-        error(t('mcpServers.connectFailed'))
-      }
-      connectingId.value = null
-      // Starting a sign-in may already have dropped an outdated one; show what is stored.
-      await load()
-      return
-    }
-    window.location.assign(url)
-  } catch (err) {
-    error(err instanceof Error && err.message ? err.message : t('mcpServers.connectFailed'))
-    connectingId.value = null
-  }
-}
-
 const consumeOAuthCallback = async () => {
   const connected = route.query.connected
   const oauthError = route.query.oauth_error
@@ -784,8 +764,7 @@ const consumeOAuthCallback = async () => {
     success(t('mcpServers.oauthConnectedToast'))
     await router.replace({ query: { ...route.query, connected: undefined } })
   } else if (typeof oauthError === 'string' && oauthError !== '') {
-    const key = `mcpServers.oauthError.${oauthError}`
-    error(t(key) === key ? t('mcpServers.oauthError.exchange_failed') : t(key))
+    error(t(mcpSignInErrorKey(oauthError)))
     await router.replace({ query: { ...route.query, oauth_error: undefined } })
   }
 }

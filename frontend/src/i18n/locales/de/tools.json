@@ -382,12 +382,25 @@
     "disconnectMessage": "Die gespeicherte Anmeldung für \"{name}\" wird gelöscht. Der Server bleibt in der Liste — zur Nutzung erneut anmelden.",
     "disconnected": "Anmeldung entfernt",
     "disconnectFailed": "Anmeldung konnte nicht entfernt werden",
-    "oauthError": {
-      "denied": "Anmeldung wurde abgebrochen",
-      "missing_code": "Anmeldung nicht abgeschlossen. Bitte erneut versuchen.",
-      "exchange_failed": "Anmeldung konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
-      "disabled": "Die Anmeldung über den Anbieter ist vom Administrator deaktiviert"
+    "signInError": {
+      "disabled": "Die Verbindung per Anmeldung wurde von einer Administratorin oder einem Administrator ausgeschaltet.",
+      "calls_off": "Aufrufe an MCP-Server sind ausgeschaltet. Eine Administratorin oder ein Administrator kann sie in der Systemkonfiguration einschalten.",
+      "address_not_allowed": "Diese Adresse kann nicht verwendet werden. Geben Sie die öffentliche Adresse des Servers ein.",
+      "https_required": "Die Anmeldung braucht eine sichere Adresse. Verwenden Sie eine Adresse, die mit https:// beginnt.",
+      "unreachable": "Der Server hat nicht geantwortet. Prüfen Sie die Adresse und versuchen Sie es erneut.",
+      "no_signin": "Dieser Server bietet keine Anmeldung an. Wenn Sie einen Schlüssel bekommen haben, verwenden Sie diesen.",
+      "metadata_invalid": "Die Anmeldung des Servers ist unvollständig eingerichtet, deshalb hat Synaplan abgebrochen. Bitten Sie die Betreiber des Servers, sie zu prüfen.",
+      "no_registration": "Dieser Server lässt Synaplan nicht für die Anmeldung registrieren. Bitten Sie die Betreiber um einen Zugangsschlüssel.",
+      "unsupported_method": "Dieser Server verwendet ein Anmeldeverfahren, das Synaplan nicht unterstützt. Bitten Sie die Betreiber um einen Zugangsschlüssel.",
+      "registration_refused": "Der Server hat die Registrierung von Synaplan abgelehnt. Versuchen Sie es später erneut oder fragen Sie die Betreiber.",
+      "server_changed": "Dieser Server wurde während der Anmeldung geändert. Klicken Sie auf Verbinden, um neu zu beginnen.",
+      "expired": "Die Anmeldung hat zu lange gedauert. Klicken Sie auf Verbinden, um neu zu beginnen.",
+      "exchange_failed": "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+      "denied": "Die Anmeldung wurde abgebrochen.",
+      "missing_code": "Die Anmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.",
+      "unknown": "Die Anmeldung konnte nicht starten. Versuchen Sie es erneut oder fragen Sie die Betreiber des Servers."
     },
+    "savedNotSignedIn": "„{name}“ wurde gespeichert, aber Sie sind noch nicht angemeldet: {reason}",
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"
