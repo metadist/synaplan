@@ -68,6 +68,44 @@ final class NotionAppController extends AbstractController
         }
     }
 
+    #[Route('/account', name: 'account', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/apps/notion/account',
+        summary: 'Notion account and workspace of the connection',
+        description: 'Asks Notion who the connection signs in as. Fields are null when Notion is not connected or does not answer; the call never fails for that reason.',
+        security: [['Bearer' => []]],
+        tags: ['Notion'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Account details, or nulls when unknown',
+                content: new OA\JsonContent(
+                    required: ['success', 'workspace_name', 'user_name', 'user_email'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'workspace_name', type: 'string', nullable: true, example: 'Acme'),
+                        new OA\Property(property: 'user_name', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                        new OA\Property(property: 'user_email', type: 'string', nullable: true, example: 'ada@example.com'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Notion is turned off'),
+        ]
+    )]
+    public function account(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            return $this->json($this->notion->account($user->getId()));
+        } catch (NotionAppUnavailableException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        }
+    }
+
     #[Route('/connect', name: 'connect', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/apps/notion/connect',
@@ -112,7 +150,7 @@ final class NotionAppController extends AbstractController
     #[OA\Patch(
         path: '/api/v1/apps/notion',
         summary: 'Allow or stop the AI changing Notion',
-        description: 'One switch. On: the AI may create and edit without asking each time. Off: the AI only reads. Delete and move stay blocked either way.',
+        description: 'One switch. On: the AI may create and edit without asking each time. Off: the AI only reads. Deleting, moving and overwriting stay blocked either way.',
         security: [['Bearer' => []]],
         tags: ['Notion'],
         requestBody: new OA\RequestBody(

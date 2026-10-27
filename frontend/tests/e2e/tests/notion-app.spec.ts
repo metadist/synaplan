@@ -32,6 +32,18 @@ test.describe('@ci Notion app', () => {
         body: JSON.stringify(body),
       })
     })
+    await page.route('**/api/v1/apps/notion/account', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          workspace_name: 'Acme',
+          user_name: 'Ada Lovelace',
+          user_email: 'ada@example.com',
+        }),
+      })
+    })
     await page.route('**/api/v1/mcp-servers/*/oauth/disconnect', async (route) => {
       body = { ...body, status: 'not_connected', allow_write: false, write_auto: false }
       await route.fulfill({
@@ -58,6 +70,9 @@ test.describe('@ci Notion app', () => {
     }
     await page.reload()
     await expect(page.getByTestId('toggle-notion-write')).toBeVisible()
+    await expect(page.getByTestId('text-notion-account')).toHaveText(
+      'Signed in to the Notion workspace Acme as Ada Lovelace (ada@example.com).'
+    )
     await expect(page.getByTestId('text-notion-write-consequence')).toContainText(
       'will not change anything'
     )
@@ -67,7 +82,7 @@ test.describe('@ci Notion app', () => {
       .filter({ has: page.getByTestId('toggle-notion-write') })
       .click()
     await expect(page.getByTestId('text-notion-write-consequence')).toContainText(
-      'cannot delete or move pages'
+      'cannot delete, move or overwrite pages'
     )
 
     await page.getByTestId('btn-notion-disconnect').click()

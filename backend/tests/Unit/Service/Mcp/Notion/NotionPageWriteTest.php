@@ -61,17 +61,34 @@ final class NotionPageWriteTest extends TestCase
         self::assertNull(NotionPageWrite::titles('Moin, was steht auf der Metadist GmbH Seite in Notion?'));
     }
 
-    public function testRefusesCommandsThatCanRemoveContent(): void
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function renameInEveryLocale(): iterable
     {
-        $url = 'https://mcp.notion.com/mcp';
+        yield 'en' => ['Change the title of Roadmap to Plan 2027'];
+        yield 'en rename' => ['Rename the page Roadmap to Plan 2027 please'];
+        yield 'de rename' => ['Benenne die Seite Roadmap in Plan 2027 um'];
+        yield 'es' => ['Cambia el título de la página Roadmap a Plan 2027'];
+        yield 'es rename' => ['¿Puedes renombrar Roadmap a Plan 2027?'];
+        yield 'fr' => ['Change le titre de la page Roadmap en Plan 2027'];
+        yield 'fr rename' => ['Renomme la page Roadmap en Plan 2027 s\'il te plaît'];
+        yield 'tr' => ['Roadmap sayfasının başlığını Plan 2027 olarak değiştir'];
+        yield 'tr quoted' => ['Notion\'da "Roadmap" sayfasını "Plan 2027" olarak yeniden adlandır'];
+    }
 
-        self::assertNull(NotionPageWrite::refusal($url, 'notion-update-page', ['command' => 'update_properties']));
-        self::assertNull(NotionPageWrite::refusal($url, 'notion-update-page', ['command' => 'update_content']));
-        self::assertNotNull(NotionPageWrite::refusal($url, 'notion-update-page', ['command' => 'replace_content']));
-        self::assertNotNull(NotionPageWrite::refusal($url, 'notion-update-page', []));
-        self::assertNotNull(NotionPageWrite::refusal($url, 'notion-update-page', ['command' => 'update_content', 'allow_deleting_content' => true]));
-        self::assertNull(NotionPageWrite::refusal($url, 'notion-create-pages', []));
-        self::assertNull(NotionPageWrite::refusal('https://crm.example.com/mcp', 'notion-update-page', ['command' => 'replace_content']));
+    #[\PHPUnit\Framework\Attributes\DataProvider('renameInEveryLocale')]
+    public function testTitlesInEveryLocale(string $question): void
+    {
+        self::assertSame(['Roadmap', 'Plan 2027'], NotionPageWrite::titles($question));
+    }
+
+    public function testQuestionsAboutTitlesAreNotRenames(): void
+    {
+        self::assertNull(NotionPageWrite::titles('Quel est le titre de la page Roadmap ?'));
+        self::assertNull(NotionPageWrite::titles('¿Cuál es el título de Roadmap?'));
+        self::assertNull(NotionPageWrite::titles('Roadmap sayfasının başlığı ne?'));
+        self::assertNull(NotionPageWrite::titles('Which page title was modified last?'));
     }
 
     public function testRunnerRenamesThePageFromThePastedSearchResult(): void

@@ -945,7 +945,7 @@
       "notion": {
         "name": "Notion",
         "tagline": "Notion sayfalarınızı sohbette okuyun ve düzenleyin.",
-        "about": "Bağladıktan sonra yapay zeka Notion sayfalarınızı okuyabilir. Yazma ayrı bir anahtardır. Silme ve taşıma kapalı kalır.",
+        "about": "Bağladıktan sonra yapay zeka Notion sayfalarınızı okuyabilir. Yazma ayrı bir anahtardır. Silme, taşıma ve üzerine yazma kapalı kalır.",
         "stop": "Aşağıdan bağlantıyı kesin. Yapay zeka artık Notion'u okuyamaz veya değiştiremez. Var olan sayfalar kalır."
       },
       "mcp": {
@@ -983,10 +983,13 @@
       "reconnectTitle": "Yapay zeka kullanabilmeden önce Notion'u yeniden bağlamanız gerekir.",
       "reconnect": "Yeniden bağlayın",
       "connected": "Notion bağlı.",
+      "connectedAs": "{workspace} Notion çalışma alanında {account} olarak oturum açıldı.",
+      "connectedAsAccount": "Notion'da {account} olarak oturum açıldı.",
+      "scope": "Yapay zeka yalnızca bu Notion hesabının görebildiklerini görür.",
       "writeLabel": "Yapay zeka Notion'da değişiklik yapabilir",
-      "writeOn": "Yapay zeka her seferinde sormadan Notion'da sayfa oluşturabilir ve düzenleyebilir. Sayfa silemez veya taşıyamaz.",
+      "writeOn": "Yapay zeka her seferinde sormadan Notion'da sayfa oluşturabilir ve düzenleyebilir. Sayfa silemez, taşıyamaz veya üzerine yazamaz.",
       "writeOff": "Yapay zeka Notion'u okuyabilir. Hiçbir şeyi değiştirmez.",
-      "writeSavedOn": "Yapay zeka artık sormadan Notion sayfaları oluşturabilir ve düzenleyebilir. Silme ve taşıma kapalı kalır.",
+      "writeSavedOn": "Yapay zeka artık sormadan Notion sayfaları oluşturabilir ve düzenleyebilir. Yine de sayfa silemez, taşıyamaz veya üzerine yazamaz.",
       "writeSavedOff": "Yazma kapalı. Yapay zeka Notion'u okumaya devam eder ve hiçbir şeyi değiştirmez.",
       "writeFailed": "Ayar kaydedilmedi. Notion değişmedi. Yeniden deneyin.",
       "examplesTitle": "Sohbette bunlardan birini deneyin",

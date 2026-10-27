@@ -1019,7 +1019,7 @@
       "notion": {
         "name": "Notion",
         "tagline": "Lisez et modifiez vos pages Notion dans le chat.",
-        "about": "Une fois Notion connecté, l'IA peut lire vos pages. L'écriture est un réglage à part. La suppression et le déplacement restent bloqués.",
+        "about": "Une fois Notion connecté, l'IA peut lire vos pages. L'écriture est un réglage à part. La suppression, le déplacement et l'écrasement restent bloqués.",
         "stop": "Déconnectez ci-dessous. L'IA ne pourra plus lire ni modifier Notion. Les pages déjà créées restent."
       },
       "mcp": {
@@ -1057,10 +1057,13 @@
       "reconnectTitle": "Notion doit être connecté à nouveau avant que l'IA puisse l'utiliser.",
       "reconnect": "Reconnecter",
       "connected": "Notion est connecté.",
+      "connectedAs": "Connecté à l'espace de travail Notion {workspace} en tant que {account}.",
+      "connectedAsAccount": "Connecté à Notion en tant que {account}.",
+      "scope": "L'IA ne voit que ce que ce compte Notion peut voir.",
       "writeLabel": "L'IA peut modifier Notion",
-      "writeOn": "L'IA peut créer et modifier des pages dans Notion sans demander à chaque fois. Elle ne peut ni supprimer ni déplacer de pages.",
+      "writeOn": "L'IA peut créer et modifier des pages dans Notion sans demander à chaque fois. Elle ne peut ni supprimer, ni déplacer, ni écraser de pages.",
       "writeOff": "L'IA peut lire Notion. Elle ne changera rien.",
-      "writeSavedOn": "L'IA peut maintenant créer et modifier des pages Notion sans demander. Elle ne peut toujours ni supprimer ni déplacer de pages.",
+      "writeSavedOn": "L'IA peut maintenant créer et modifier des pages Notion sans demander. Elle ne peut toujours ni supprimer, ni déplacer, ni écraser de pages.",
       "writeSavedOff": "L'écriture est désactivée. L'IA peut encore lire Notion et ne changera rien.",
       "writeFailed": "Le réglage n'a pas été enregistré. Notion n'a pas été modifié. Réessayez.",
       "examplesTitle": "Essayez l'une de ces phrases dans le chat",

@@ -53,13 +53,57 @@ final class NotionToolHintsTest extends TestCase
         self::assertTrue($other[0]['annotations']['destructiveHint']);
     }
 
-    public function testLeavesUnknownNotionToolsUntouched(): void
+    public function testHidesUnknownNotionToolsThatDoNotDeclareThemselvesReadOnly(): void
     {
-        $tools = [$this->tool('something-new')];
+        $tools = [
+            $this->tool('notion-something-new'),
+            $this->tool('notion-another-new', ['readOnlyHint' => false, 'destructiveHint' => false]),
+            $this->tool('notion-new-lookup', ['readOnlyHint' => true]),
+        ];
 
         $annotated = $this->hints->apply($this->server('https://mcp.notion.com/mcp'), $tools);
 
-        self::assertSame([], $annotated[0]['annotations']);
+        self::assertTrue($annotated[0]['annotations']['destructiveHint']);
+        self::assertTrue($annotated[1]['annotations']['destructiveHint']);
+        self::assertSame(['readOnlyHint' => true], $annotated[2]['annotations']);
+
+        $other = $this->hints->apply($this->server('https://crm.example.com/mcp'), $tools);
+        self::assertSame([], $other[0]['annotations']);
+    }
+
+    public function testBlocksCalendarAgentAndDeleteToolsEvenWhenNotionCallsThemHarmless(): void
+    {
+        $names = [
+            'notion-delete-databases',
+            'notion-delete-comment',
+            'notion-calendar-create-events',
+            'notion-calendar-list-events',
+            'notion-spawn-session',
+            'notion-create-attachment',
+            'notion-update-folder',
+            'notion-memory-search',
+        ];
+        $tools = array_map(fn (string $name): array => $this->tool($name, ['readOnlyHint' => true]), $names);
+
+        foreach ($this->hints->apply($this->server('https://mcp.notion.com/mcp'), $tools) as $index => $tool) {
+            self::assertTrue($tool['annotations']['destructiveHint'], $names[$index]);
+            self::assertFalse($tool['annotations']['readOnlyHint'], $names[$index]);
+        }
+    }
+
+    public function testNewReadAndWriteToolsGetTheirHintsWhenNotionSendsNone(): void
+    {
+        $read = ['notion-query-meeting-notes', 'notion-query-multiple-data-sources', 'notion-list-recent-pages', 'notion-list-favorite-pages', 'notion-list-page-backlinks', 'notion-get-self', 'notion-get-async-task'];
+        $write = ['notion-update-comment', 'notion-set-discussion-resolved', 'notion-create-folder', 'notion-restore-pages'];
+        $tools = array_map(fn (string $name): array => $this->tool($name), [...$read, ...$write]);
+
+        $annotated = $this->hints->apply($this->server('https://mcp.notion.com/mcp'), $tools);
+
+        foreach ($annotated as $index => $tool) {
+            $isRead = $index < count($read);
+            self::assertSame($isRead, $tool['annotations']['readOnlyHint'], $tool['name']);
+            self::assertFalse($tool['annotations']['destructiveHint'], $tool['name']);
+        }
     }
 
     /**

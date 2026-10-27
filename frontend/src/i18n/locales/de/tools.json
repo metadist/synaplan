@@ -942,7 +942,7 @@
       "notion": {
         "name": "Notion",
         "tagline": "Lies und bearbeite deine Notion-Seiten im Chat.",
-        "about": "Nach dem Verbinden kann die KI deine Notion-Seiten lesen. Schreiben schaltest du extra ein. Löschen und Verschieben bleiben aus.",
+        "about": "Nach dem Verbinden kann die KI deine Notion-Seiten lesen. Schreiben schaltest du extra ein. Löschen, Verschieben und Überschreiben bleiben aus.",
         "stop": "Trenne die Verbindung unten. Die KI kann Notion danach nicht mehr lesen oder ändern. Vorhandene Seiten bleiben."
       },
       "mcp": {
@@ -980,10 +980,13 @@
       "reconnectTitle": "Notion muss erneut verbunden werden, bevor die KI es nutzen kann.",
       "reconnect": "Erneut verbinden",
       "connected": "Notion ist verbunden.",
+      "connectedAs": "Angemeldet im Notion-Workspace {workspace} als {account}.",
+      "connectedAsAccount": "Bei Notion angemeldet als {account}.",
+      "scope": "Die KI sieht nur, was dieser Notion-Account sehen kann.",
       "writeLabel": "Die KI darf in Notion schreiben",
-      "writeOn": "Die KI kann Seiten in Notion anlegen und ändern, ohne jedes Mal zu fragen. Löschen und Verschieben kann sie nicht.",
+      "writeOn": "Die KI kann Seiten in Notion anlegen und ändern, ohne jedes Mal zu fragen. Löschen, Verschieben und Überschreiben kann sie nicht.",
       "writeOff": "Die KI kann Notion lesen. Sie ändert nichts.",
-      "writeSavedOn": "Die KI kann jetzt Notion-Seiten anlegen und ändern, ohne zu fragen. Löschen und Verschieben bleibt gesperrt.",
+      "writeSavedOn": "Die KI kann Notion-Seiten jetzt ohne Nachfrage anlegen und ändern. Löschen, Verschieben und Überschreiben kann sie weiterhin nicht.",
       "writeSavedOff": "Schreiben ist aus. Die KI kann Notion weiter lesen und ändert nichts.",
       "writeFailed": "Die Einstellung wurde nicht gespeichert. Notion wurde nicht geändert. Versuch es erneut.",
       "examplesTitle": "Probier einen Satz im Chat",

@@ -11,6 +11,8 @@ use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpOAuthConsentService;
+use App\Service\Mcp\McpOAuthState;
+use App\Service\Mcp\Notion\NotionAccountReader;
 use App\Service\Mcp\Notion\NotionConnectionService;
 use App\Service\Prompt\PromptService;
 use App\Service\Security\EncryptionService;
@@ -58,11 +60,45 @@ final class NotionConnectionServiceTest extends TestCase
             $prompts,
             $promptService,
             $this->createStub(EntityManagerInterface::class),
+            $this->createStub(NotionAccountReader::class),
         );
 
         $result = $service->connect(4);
 
         self::assertSame('https://mcp.notion.com/authorize?client_id=test', $result['authorize_url']);
         self::assertSame(9, $result['server_id']);
+    }
+
+    public function testAccountIsOnlyAskedForWhileSignedIn(): void
+    {
+        $config = $this->createStub(ConfigRepository::class);
+        $config->method('getValue')->willReturn('1');
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+
+        $signedOut = new McpServerConfig();
+        $signedOut->setUserId(4)->setName('Notion')->setUrl(NotionConnectionService::MCP_URL)->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $signedIn = clone $signedOut;
+        $signedIn->setDecryptedOAuthState(new McpOAuthState(status: McpOAuthState::STATUS_CONNECTED, accessToken: 'at'), $encryption);
+
+        $servers = $this->createStub(McpServerConfigRepository::class);
+        $servers->method('findByUser')->willReturnOnConsecutiveCalls([$signedOut], [$signedIn]);
+
+        $reader = $this->createMock(NotionAccountReader::class);
+        $reader->expects($this->once())->method('read')->with($signedIn)
+            ->willReturn(['workspace_name' => 'Acme', 'user_name' => 'Ada', 'user_email' => 'ada@example.com']);
+
+        $service = new NotionConnectionService(
+            new McpClientConfig($config),
+            $servers,
+            $this->createStub(McpOAuthConsentService::class),
+            $encryption,
+            $this->createStub(PromptRepository::class),
+            $this->createStub(PromptService::class),
+            $this->createStub(EntityManagerInterface::class),
+            $reader,
+        );
+
+        self::assertNull($service->account(4)['workspace_name']);
+        self::assertSame('Acme', $service->account(4)['workspace_name']);
     }
 }

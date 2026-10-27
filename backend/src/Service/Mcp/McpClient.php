@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
-use App\Service\Mcp\Notion\NotionPageWrite;
+use App\Service\Mcp\Notion\NotionWriteGuard;
 use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
@@ -98,7 +98,8 @@ final readonly class McpClient
      */
     public function callTool(McpServerConfig $server, string $tool, array $arguments): array
     {
-        $refusal = NotionPageWrite::refusal($server->getUrl(), $tool, $arguments);
+        $arguments = NotionWriteGuard::normalize($server->getUrl(), $tool, $arguments);
+        $refusal = NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
         if (null !== $refusal) {
             throw new McpClientException($refusal);
         }

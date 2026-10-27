@@ -20,8 +20,8 @@ use Doctrine\ORM\EntityManagerInterface;
  * The Notion app: one hosted MCP connection per user, plus the chat opt-in.
  *
  * Writing is one switch. It sets both the server write opt-in (`allow_write`)
- * and the chat approval skip (`write_auto`). Delete and move stay blocked by
- * tool annotations, not by this switch.
+ * and the chat approval skip (`write_auto`). Delete, move and overwrite stay
+ * blocked by tool annotations and {@see NotionWriteGuard}, not by this switch.
  */
 final readonly class NotionConnectionService
 {
@@ -39,7 +39,24 @@ final readonly class NotionConnectionService
         private PromptRepository $prompts,
         private PromptService $promptService,
         private EntityManagerInterface $entityManager,
+        private NotionAccountReader $account,
     ) {
+    }
+
+    /**
+     * @return array{success: bool, workspace_name: string|null, user_name: string|null, user_email: string|null}
+     *
+     * @throws NotionAppUnavailableException
+     */
+    public function account(int $userId): array
+    {
+        $this->assertAvailable($userId);
+        $server = $this->notionServer($userId);
+        if (null === $server || McpOAuthState::STATUS_CONNECTED !== $this->present($server)['status']) {
+            return ['success' => true, 'workspace_name' => null, 'user_name' => null, 'user_email' => null];
+        }
+
+        return ['success' => true, ...$this->account->read($server)];
     }
 
     /**

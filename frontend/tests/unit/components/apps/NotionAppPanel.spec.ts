@@ -10,20 +10,30 @@ const status = {
   write_auto: false,
 }
 
-const { statusMock, setWriting, connect, disconnectOAuth, confirm, success, error, push } =
-  vi.hoisted(() => ({
-    statusMock: vi.fn(),
-    setWriting: vi.fn(),
-    connect: vi.fn(),
-    disconnectOAuth: vi.fn(),
-    confirm: vi.fn(),
-    success: vi.fn(),
-    error: vi.fn(),
-    push: vi.fn(),
-  }))
+const {
+  statusMock,
+  accountMock,
+  setWriting,
+  connect,
+  disconnectOAuth,
+  confirm,
+  success,
+  error,
+  push,
+} = vi.hoisted(() => ({
+  statusMock: vi.fn(),
+  accountMock: vi.fn(),
+  setWriting: vi.fn(),
+  connect: vi.fn(),
+  disconnectOAuth: vi.fn(),
+  confirm: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+  push: vi.fn(),
+}))
 
 vi.mock('@/services/api/notionAppApi', () => ({
-  notionAppApi: { status: statusMock, setWriting, connect },
+  notionAppApi: { status: statusMock, account: accountMock, setWriting, connect },
 }))
 vi.mock('@/services/api/mcpServersApi', () => ({
   mcpServersApi: { disconnectOAuth },
@@ -53,6 +63,44 @@ describe('NotionAppPanel', () => {
     status.allow_write = false
     status.write_auto = false
     statusMock.mockImplementation(async () => ({ ...status }))
+    accountMock.mockResolvedValue({
+      success: true,
+      workspace_name: null,
+      user_name: null,
+      user_email: null,
+    })
+  })
+
+  it('names the Notion account and workspace the AI uses', async () => {
+    status.status = 'connected'
+    status.server_id = 4
+    accountMock.mockResolvedValue({
+      success: true,
+      workspace_name: 'Acme',
+      user_name: 'Ada Lovelace',
+      user_email: 'ada@example.com',
+    })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.get('[data-testid="text-notion-account"]').text()).toBe(
+      'Signed in to the Notion workspace Acme as Ada Lovelace (ada@example.com).'
+    )
+    expect(wrapper.text()).toContain('The AI sees only what this Notion account can see.')
+  })
+
+  it('still says Notion is connected when the account cannot be read', async () => {
+    status.status = 'connected'
+    status.server_id = 4
+    accountMock.mockRejectedValue(new Error('timeout'))
+    const wrapper = await mountPanel()
+
+    expect(wrapper.get('[data-testid="text-notion-account"]').text()).toBe('Notion is connected.')
+    expect(wrapper.find('[data-testid="toggle-notion-write"]').exists()).toBe(true)
+  })
+
+  it('does not ask Notion for the account before it is connected', async () => {
+    await mountPanel()
+    expect(accountMock).not.toHaveBeenCalled()
   })
 
   it('shows one sentence and a connect button when Notion is not connected', async () => {
@@ -93,7 +141,7 @@ describe('NotionAppPanel', () => {
 
     expect(setWriting).toHaveBeenCalledWith(true)
     expect(wrapper.get('[data-testid="text-notion-write-consequence"]').text()).toContain(
-      'cannot delete or move pages'
+      'cannot delete, move or overwrite pages'
     )
     expect(success).toHaveBeenCalled()
   })

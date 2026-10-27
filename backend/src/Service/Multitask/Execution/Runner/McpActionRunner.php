@@ -17,6 +17,7 @@ use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Mcp\Notion\NotionPageWrite;
 use App\Service\Mcp\Notion\NotionToolHints;
+use App\Service\Mcp\Notion\NotionWriteGuard;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\StructuredField;
@@ -147,7 +148,7 @@ final readonly class McpActionRunner implements TaskRunner
         );
         $refusal = StructuredField::hasUnresolved($arguments)
             ? sprintf('The earlier step did not say which item to change, so nothing was sent to %s and nothing was changed.', $server->getName())
-            : NotionPageWrite::refusal($server->getUrl(), $tool, $arguments);
+            : NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
         if (null !== $refusal) {
             return NodeResult::reportableFailure($refusal, $this->callMetadata($serverId, $server->getName(), $tool));
         }
@@ -297,7 +298,7 @@ final readonly class McpActionRunner implements TaskRunner
                 $lines[] = '      - '.$toolLine;
             }
             if ($notion) {
-                $lines[] = '    When the user names a Notion page by its title and asks to change that title, emit mcp_fetch with the search tool first (query = the current title), then this update-page tool. page_id is one page id from the search result, never the title. command is update_properties. properties.title is the new title. Do not ask for a URL.';
+                $lines[] = '    When the user names a Notion page by its title and asks to change that title, emit mcp_fetch with the search tool first (query = the current title), then this update-page tool. page_id is one page id from the search result, never the title. command is update_properties. properties.title is the new title. Do not ask for a URL. To add text to a page use command insert_content with content (Markdown); to change existing text use update_content with content_updates. Never use replace_content. To add a row to a database, fetch the database first and pass its collection:// URL as parent.data_source_id to create-pages.';
             }
         }
 

@@ -67,7 +67,12 @@
       class="surface-card rounded-2xl p-4 sm:p-5 space-y-5"
       data-testid="section-notion-connected"
     >
-      <p class="txt-primary text-sm">{{ $t('apps.notion.connected') }}</p>
+      <div>
+        <p class="txt-primary text-sm break-words" data-testid="text-notion-account">
+          {{ accountLine }}
+        </p>
+        <p class="txt-secondary text-sm mt-1">{{ $t('apps.notion.scope') }}</p>
+      </div>
 
       <div>
         <label class="inline-flex items-center gap-3 cursor-pointer">
@@ -139,13 +144,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { mcpServersApi } from '@/services/api/mcpServersApi'
-import { notionAppApi, type NotionAppStatus } from '@/services/api/notionAppApi'
+import {
+  notionAppApi,
+  type NotionAppAccount,
+  type NotionAppStatus,
+} from '@/services/api/notionAppApi'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -158,12 +167,33 @@ const loadError = ref(false)
 const saving = ref(false)
 const connecting = ref(false)
 const status = ref<NotionAppStatus | null>(null)
+const account = ref<NotionAppAccount | null>(null)
+
+const accountLine = computed(() => {
+  const name = account.value?.user_name
+  const email = account.value?.user_email
+  const who = name && email ? `${name} (${email})` : (name ?? email)
+  const workspace = account.value?.workspace_name
+  if (who && workspace) return t('apps.notion.connectedAs', { workspace, account: who })
+  if (who) return t('apps.notion.connectedAsAccount', { account: who })
+  return t('apps.notion.connected')
+})
+
+const loadAccount = async () => {
+  try {
+    account.value = await notionAppApi.account()
+  } catch {
+    account.value = null
+  }
+}
 
 const load = async () => {
   loading.value = true
   loadError.value = false
+  account.value = null
   try {
     status.value = await notionAppApi.status()
+    if (status.value.status === 'connected') void loadAccount()
   } catch {
     loadError.value = true
     status.value = null

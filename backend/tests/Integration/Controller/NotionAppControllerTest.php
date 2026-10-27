@@ -120,8 +120,10 @@ class NotionAppControllerTest extends WebTestCase
         $this->setOauthFlag('0');
 
         $this->request('GET', '/api/v1/apps/notion');
-
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+
+        $this->request('GET', '/api/v1/apps/notion/account');
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testStatusWritingAndConnect(): void
@@ -131,6 +133,12 @@ class NotionAppControllerTest extends WebTestCase
         $empty = $this->request('GET', '/api/v1/apps/notion');
         self::assertSame('not_connected', $empty['status']);
         self::assertNull($empty['server_id']);
+
+        $noAccount = $this->request('GET', '/api/v1/apps/notion/account');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertTrue($noAccount['success']);
+        self::assertNull($noAccount['workspace_name']);
+        self::assertNull($noAccount['user_email']);
 
         $missing = $this->request('PATCH', '/api/v1/apps/notion', ['allow_write' => true]);
         self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());

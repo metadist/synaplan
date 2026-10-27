@@ -1019,7 +1019,7 @@
       "notion": {
         "name": "Notion",
         "tagline": "Read and edit your Notion pages in chat.",
-        "about": "After you connect, the AI can read your Notion pages. Writing is a separate switch. Deleting and moving stay off.",
+        "about": "After you connect, the AI can read your Notion pages. Writing is a separate switch. Deleting, moving and overwriting stay off.",
         "stop": "Disconnect below. The AI can no longer read or change Notion. Pages already there stay."
       },
       "mcp": {
@@ -1057,10 +1057,13 @@
       "reconnectTitle": "Notion needs to be connected again before the AI can use it.",
       "reconnect": "Connect again",
       "connected": "Notion is connected.",
+      "connectedAs": "Signed in to the Notion workspace {workspace} as {account}.",
+      "connectedAsAccount": "Signed in to Notion as {account}.",
+      "scope": "The AI sees only what this Notion account can see.",
       "writeLabel": "The AI may change Notion",
-      "writeOn": "The AI can create and edit pages in Notion without asking each time. It cannot delete or move pages.",
+      "writeOn": "The AI can create and edit pages in Notion without asking each time. It cannot delete, move or overwrite pages.",
       "writeOff": "The AI can read Notion. It will not change anything.",
-      "writeSavedOn": "The AI can now create and edit Notion pages without asking. It still cannot delete or move pages.",
+      "writeSavedOn": "The AI can now create and edit Notion pages without asking. It still cannot delete, move or overwrite pages.",
       "writeSavedOff": "Writing is off. The AI can still read Notion and will not change anything.",
       "writeFailed": "The setting was not saved. Notion was not changed. Try again.",
       "examplesTitle": "Try one of these in chat",

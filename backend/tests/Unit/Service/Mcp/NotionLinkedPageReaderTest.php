@@ -90,6 +90,19 @@ final class NotionLinkedPageReaderTest extends TestCase
         self::assertStringContainsString('Notion', $read->prompt());
     }
 
+    public function testClaimsAppNotionLinksButNotOtherNotionServices(): void
+    {
+        $this->servers->method('findEnabledByUser')->willReturn([]);
+
+        $read = $this->reader->read([
+            'https://app.notion.com/p/Roadmap-39797ad60eb3806db59eef7653838664',
+            'https://api.notion.com/v1/pages/abc',
+        ], 1);
+
+        self::assertSame(['https://app.notion.com/p/Roadmap-39797ad60eb3806db59eef7653838664'], $read->handledUrls());
+        self::assertStringContainsString('Connect Notion under Apps', $read->prompt());
+    }
+
     public function testRefusesTheConnectionWhenThisChatCannotUseMcp(): void
     {
         $this->servers->method('findEnabledByUser')->willReturn([$this->server()]);

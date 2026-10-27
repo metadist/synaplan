@@ -6,6 +6,7 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Mcp\Notion\NotionToolHints;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 
@@ -118,6 +119,7 @@ final readonly class NotionLinkedPageReader
 
         return 'notion.so' === $host
             || 'notion.com' === $host
+            || 'app.notion.com' === $host
             || 'notion.site' === $host
             || str_ends_with($host, '.notion.so')
             || str_ends_with($host, '.notion.site');
@@ -137,8 +139,7 @@ final readonly class NotionLinkedPageReader
             if (null !== $allowlist && !in_array((int) $server->getId(), $allowlist, true)) {
                 continue;
             }
-            $host = strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST));
-            if ('mcp.notion.com' !== $host) {
+            if (!NotionToolHints::isNotion($server->getUrl())) {
                 continue;
             }
             if ($this->isConnected($server)) {

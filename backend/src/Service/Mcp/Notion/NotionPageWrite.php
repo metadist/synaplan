@@ -18,8 +18,17 @@ final readonly class NotionPageWrite
 {
     public const UPDATE_TOOL = 'update-page';
 
-    /** Commands of update-page that never remove page content. */
-    private const SAFE_COMMANDS = ['update_properties', 'update_content'];
+    /**
+     * "<title> of <page> to <new>" in de/en/es/fr, "<page> başlığını <new>
+     * olarak değiştir" in tr, and the plain rename verbs. Group 1 is the
+     * current title, group 2 the new one.
+     */
+    private const TITLE_PATTERNS = [
+        '/(?:titel|title|t[íi]tulo|titre)\s+(?:von|of|from|del|de\s+la|de|du)\s+(?:der\s+seite\s+|the\s+page\s+|la\s+p[áa]gina\s+|la\s+page\s+)?(.+?)\s+(?:zu|auf|in|to|into|a|en|por)\s+(.+)$/iu',
+        '/^(.+?)\s+(?:sayfas[ıi]n[ıi]n\s+)?(?:başl[ıi]ğ[ıi]n[ıi]|ad[ıi]n[ıi])\s+(.+?)\s+olarak\s+(?:değiştir|yeniden\s+adland[ıi]r)\w*$/iu',
+        '/(?:rename|renombra(?:r)?|renomme(?:r)?)\s+(?:the\s+page\s+|la\s+p[áa]gina\s+|la\s+page\s+|page\s+|p[áa]gina\s+)?(.+?)\s+(?:to|into|a|como|en)\s+(.+)$/iu',
+        '/benenne\s+(?:die\s+seite\s+)?(.+?)\s+(?:in|zu)\s+(.+?)\s+um$/iu',
+    ];
 
     private const REPLY = 'The Notion update result is below. Answer in the language of the user\'s question. If the update worked, say the page title was changed and to what. If it failed, say the title was not changed and why. Do not ask for a page link.';
 
@@ -38,29 +47,6 @@ final readonly class NotionPageWrite
         }
 
         return ' — page_id is one page id from a search result, never the page title';
-    }
-
-    /**
-     * Why an update-page call must not run, or null when it may. Replacing
-     * the whole page or deleting child content stays out of reach.
-     *
-     * @param array<string, mixed> $arguments
-     */
-    public static function refusal(string $serverUrl, string $toolName, array $arguments): ?string
-    {
-        if (!self::isUpdateTool($serverUrl, $toolName)) {
-            return null;
-        }
-
-        $command = $arguments['command'] ?? null;
-        if (!is_string($command) || !in_array($command, self::SAFE_COMMANDS, true)) {
-            return sprintf("Notion update-page only renames or edits text here; the command '%s' could remove page content and was not sent.", is_string($command) ? $command : '');
-        }
-        if (true === ($arguments['allow_deleting_content'] ?? false)) {
-            return 'Notion update-page was asked to delete page content; that was not sent.';
-        }
-
-        return null;
     }
 
     /**
@@ -176,13 +162,15 @@ final readonly class NotionPageWrite
             return self::pair($quoted[0], $quoted[count($quoted) - 1]);
         }
 
-        $stripped = trim((string) preg_replace('/[?\s]+$/u', '', $text));
-        $stripped = trim((string) preg_replace('/\s+(?:ändern|aendern|umbenennen|bitte)\s*$/iu', '', $stripped));
-        if (1 !== preg_match('/(?:titel|title)\s+(?:von|of|from)\s+(?:der\s+seite\s+|the\s+page\s+)?(.+?)\s+(?:zu|auf|in|to|into)\s+(.+)$/iu', $stripped, $match)) {
-            return null;
+        $stripped = trim((string) preg_replace('/[?!.\s]+$/u', '', $text));
+        $stripped = trim((string) preg_replace('/\s+(?:ändern|aendern|umbenennen|bitte|please|por\s+favor|s\'il\s+(?:te|vous)\s+pla[iî]t|lütfen)\s*$/iu', '', $stripped));
+        foreach (self::TITLE_PATTERNS as $pattern) {
+            if (1 === preg_match($pattern, $stripped, $match)) {
+                return self::pair($match[1], $match[2]);
+            }
         }
 
-        return self::pair($match[1], $match[2]);
+        return null;
     }
 
     /**
@@ -274,26 +262,23 @@ final readonly class NotionPageWrite
 
     private static function isUpdateTool(string $serverUrl, string $toolName): bool
     {
-        return NotionToolHints::HOST === strtolower((string) parse_url($serverUrl, PHP_URL_HOST))
-            && self::UPDATE_TOOL === self::bare($toolName);
+        return NotionToolHints::isNotion($serverUrl) && self::UPDATE_TOOL === self::bare($toolName);
     }
 
     private static function bare(string $name): string
     {
-        $name = strtolower($name);
-
-        return str_starts_with($name, 'notion-') ? substr($name, strlen('notion-')) : $name;
+        return NotionToolHints::bare($name);
     }
 
     private static function isTitleChange(string $text): bool
     {
         $lower = mb_strtolower($text);
-        if (1 === preg_match('/\brename\b|umbenenn/u', $lower)) {
+        if (1 === preg_match('/\brename\b|umbenenn|\bbenenne\b|renombr|renomm|yeniden\s+adland/u', $lower)) {
             return true;
         }
 
-        $mentionsTitle = str_contains($lower, 'titel') || str_contains($lower, 'title');
-        $mentionsChange = 1 === preg_match('/änder|aender|\bchange\b/u', $lower);
+        $mentionsTitle = 1 === preg_match('/titel|title|t[íi]tulo|titre|başl[ıi]ğ|(?<!\p{L})ad[ıi]n[ıi](?!\p{L})/u', $lower);
+        $mentionsChange = 1 === preg_match('/änder|aender|\bchange|cambi|modifi|değiştir/u', $lower);
 
         return $mentionsTitle && $mentionsChange;
     }
@@ -339,9 +324,9 @@ final readonly class NotionPageWrite
     private static function clean(string $title): string
     {
         $title = trim($title, " \t\n\r\0\x0B\"'„“”«»");
-        $title = trim((string) preg_replace('/^(?:die\s+seite|the\s+page|seite|page)\s+/iu', '', $title));
+        $title = trim((string) preg_replace('/^(?:die\s+seite|the\s+page|la\s+p[áa]gina|la\s+page|seite|page|p[áa]gina)\s+/iu', '', $title));
 
-        return trim($title, " \t.?!");
+        return trim($title, " \t.?!¿¡");
     }
 
     private static function usable(string $title): bool
@@ -350,6 +335,6 @@ final readonly class NotionPageWrite
             return false;
         }
 
-        return !in_array(mb_strtolower($title), ['notion', 'seite', 'page', 'titel', 'title'], true);
+        return !in_array(mb_strtolower($title), ['notion', 'seite', 'page', 'página', 'pagina', 'sayfa', 'titel', 'title', 'título', 'titulo', 'titre', 'başlık'], true);
     }
 }

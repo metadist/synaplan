@@ -945,7 +945,7 @@
       "notion": {
         "name": "Notion",
         "tagline": "Lee y edita tus páginas de Notion en el chat.",
-        "about": "Cuando conectas Notion, la IA puede leer tus páginas. Escribir se activa aparte. Borrar y mover siguen desactivados.",
+        "about": "Cuando conectas Notion, la IA puede leer tus páginas. Escribir se activa aparte. Borrar, mover y sobrescribir siguen desactivados.",
         "stop": "Desconecta abajo. La IA ya no podrá leer ni cambiar Notion. Las páginas que ya existen se quedan."
       },
       "mcp": {
@@ -983,10 +983,13 @@
       "reconnectTitle": "Hay que conectar Notion otra vez antes de que la IA pueda usarlo.",
       "reconnect": "Conectar de nuevo",
       "connected": "Notion está conectado.",
+      "connectedAs": "Sesión iniciada en el espacio de trabajo de Notion {workspace} como {account}.",
+      "connectedAsAccount": "Sesión iniciada en Notion como {account}.",
+      "scope": "La IA solo ve lo que esta cuenta de Notion puede ver.",
       "writeLabel": "La IA puede cambiar Notion",
-      "writeOn": "La IA puede crear y editar páginas en Notion sin preguntar cada vez. No puede borrar ni mover páginas.",
+      "writeOn": "La IA puede crear y editar páginas en Notion sin preguntar cada vez. No puede borrar, mover ni sobrescribir páginas.",
       "writeOff": "La IA puede leer Notion. No cambiará nada.",
-      "writeSavedOn": "La IA ya puede crear y editar páginas de Notion sin preguntar. Sigue sin poder borrar ni mover páginas.",
+      "writeSavedOn": "La IA ya puede crear y editar páginas de Notion sin preguntar. Sigue sin poder borrar, mover ni sobrescribir páginas.",
       "writeSavedOff": "Escribir está desactivado. La IA puede seguir leyendo Notion y no cambiará nada.",
       "writeFailed": "No se guardó el ajuste. Notion no cambió. Inténtalo de nuevo.",
       "examplesTitle": "Prueba una de estas frases en el chat",
