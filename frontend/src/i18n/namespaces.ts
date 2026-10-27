@@ -101,6 +101,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'moderation',
     'processing',
     'promoTips',
+    'research',
     'savedPrompts',
     'selfAware',
     'summary',

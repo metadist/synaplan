@@ -78,6 +78,7 @@ and the live-conversation waveform.
 | Open in chat | `ChatBubbleLeftRightIcon` |
 | Upload | `CloudArrowUpIcon` |
 | Search | `MagnifyingGlassIcon` |
+| Research | `DocumentMagnifyingGlassIcon` |
 | Close | `XMarkIcon` |
 | Share | `ShareIcon` |
 | Folder / new folder | `FolderIcon` / `FolderPlusIcon` |

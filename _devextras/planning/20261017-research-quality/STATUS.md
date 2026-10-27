@@ -31,7 +31,7 @@ chat message.
 | RD7 | planned | Add a folder; J-RQ-3 |
 | RD8 | planned | Research team in Models; J-RQ-7 |
 | RD9 | planned | Window closed, notification; J-RQ-4 |
-| RW1 | planned | Research in the web chat; J-RQ-8 |
+| RW1 | in progress | Research in the web chat; J-RQ-8. Composer, card and events handler are in the branch. The `@ci` journey uses request stubs, not a live model run. Flag stays off |
 | RW2 | planned | Admin research settings; J-RQ-10 |
 | RW3 | planned | Research as a Saved Task step |
 | RX1 | planned | User docs: quick wins (synaplan-docs) |

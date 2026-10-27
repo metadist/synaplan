@@ -248,6 +248,17 @@ export const selectors = {
     /** Banner above the composer while an incognito session is active */
     banner: '[data-testid="banner-incognito"]',
   },
+  research: {
+    menu: '[data-testid="btn-tool-research"]',
+    composer: '[data-testid="section-research-composer"]',
+    question: '[data-testid="input-research-question"]',
+    start: '[data-testid="btn-research-start"]',
+    stop: '[data-testid="btn-research-stop"]',
+    card: '[data-testid="card-research"]',
+    factCheck: '[data-testid="text-research-fact-check"]',
+    find: '[data-testid="text-research-find"]',
+    continues: '[data-testid="text-research-continues"]',
+  },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */
     plan: '[data-testid="task-plan"]',

@@ -517,3 +517,9 @@ To add a page: drop the HTML or text file in `pages/`, and add a search JSON
 whose result URL ends with that file name. The synthetic knowledge files for
 the eval corpus come from `app:research:eval --write-documents=DIR`. Upload
 those into the evaluation account; the command does not upload them.
+
+`frontend/tests/e2e/tests/research.spec.ts` (`@ci`, J-RQ-8) does not start a
+research run and does not call a model. The dev stack keeps research off.
+The spec stubs `GET /api/v1/research/capabilities`, start, events and cancel
+with `page.route`, including a 320 px viewport. A 404 from capabilities hides
+the menu entry.

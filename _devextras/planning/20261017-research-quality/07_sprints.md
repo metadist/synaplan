@@ -1056,6 +1056,12 @@ queued for RX3.
 **Exit.** `make ci-local && make test-e2e`, layout E2E green; the five bullets
 of `05` §10.
 
+1. J-RQ-8 is walked in the browser with request stubs (start, progress, stop, reopen). A live model run is not part of this step.
+2. The finished report is the chat message and file already written by the server. The card says to open this chat, Library → Files, or search by title.
+3. Stop, close and failure each have one sentence in en, de, es, fr and tr.
+4. No web and no folders: one sentence and Start stays off. A failed start says to try again. Capabilities 404: the menu entry is absent.
+5. Tokens only, `.design-v2` and `.dark`, and the card at 320 px.
+
 ---
 
 ## RW2 — Research team and budgets under AI infrastructure (ota-candidate)
