@@ -40,14 +40,14 @@ describe('useMcpSignInStart', () => {
     expect(connectingId.value).toBeNull()
   })
 
-  it('says both halves after a save: saved, and not signed in', async () => {
+  it('says both halves after a save: saved, and the sign-in did not start', async () => {
     mockStart.mockRejectedValue(new ApiError(400, 'raw', 'https_required'))
     const { start } = useMcpSignInStart(mockReload)
 
     await start(server, true)
 
     expect(mockError).toHaveBeenCalledWith(
-      'mcpServers.savedNotSignedIn Wiki: mcpServers.signInError.https_required'
+      'mcpServers.savedSignInNotStarted Wiki: mcpServers.signInError.https_required'
     )
   })
 

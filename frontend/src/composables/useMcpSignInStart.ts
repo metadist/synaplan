@@ -17,7 +17,7 @@ export function useMcpSignInStart(reload: () => Promise<void>) {
   const { decide } = useMcpSignInTarget()
   const connectingId = ref<number | null>(null)
 
-  /** `justSaved`: the row exists now, so the message says it was saved and is not signed in. */
+  /** `justSaved`: the message also says the server was saved (an older sign-in may still work). */
   const start = async (server: McpServer, justSaved = false): Promise<void> => {
     if (server.id === undefined) return
     connectingId.value = server.id
@@ -25,7 +25,7 @@ export function useMcpSignInStart(reload: () => Promise<void>) {
       const sentence = t(mcpSignInErrorKey(reason))
       error(
         justSaved
-          ? t('mcpServers.savedNotSignedIn', { name: server.name ?? '', reason: sentence })
+          ? t('mcpServers.savedSignInNotStarted', { name: server.name ?? '', reason: sentence })
           : sentence
       )
       connectingId.value = null

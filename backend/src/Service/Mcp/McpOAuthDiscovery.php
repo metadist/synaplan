@@ -21,6 +21,7 @@ final readonly class McpOAuthDiscovery
     private const TIMEOUT_SECONDS = 15;
     public const MAX_DURATION_SECONDS = 10;
     public const MAX_BODY_BYTES = 262_144;
+    private const MISSING_STATUSES = [404, 410];
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -186,7 +187,7 @@ final readonly class McpOAuthDiscovery
     {
         $challengeUrl = $this->probeResourceMetadata($mcpUrl);
         if (null !== $challengeUrl) {
-            return $this->getJson($challengeUrl, 'protected resource metadata');
+            return $this->getJson($challengeUrl, 'protected resource metadata', McpOAuthFailure::NoSignIn);
         }
 
         $parts = parse_url($mcpUrl);
@@ -209,18 +210,23 @@ final readonly class McpOAuthDiscovery
             $mcpUrl.'/.well-known/oauth-protected-resource',
         ];
 
+        // A missing document means "try the next place"; a server that did not
+        // answer or answered with something broken is the more useful sentence.
+        $failure = null;
         foreach ($candidates as $candidate) {
             if ($this->ssrfGuard->isBlockedUrl($candidate)) {
                 continue;
             }
             try {
-                return $this->getJson($candidate, 'protected resource metadata');
-            } catch (McpOAuthException) {
-                continue;
+                return $this->getJson($candidate, 'protected resource metadata', McpOAuthFailure::NoSignIn);
+            } catch (McpOAuthException $e) {
+                if (McpOAuthFailure::NoSignIn !== $e->reason) {
+                    $failure ??= $e;
+                }
             }
         }
 
-        throw new McpOAuthException('Could not find sign-in information for this MCP server', McpOAuthFailure::NoSignIn);
+        throw $failure ?? new McpOAuthException('Could not find sign-in information for this MCP server', McpOAuthFailure::NoSignIn);
     }
 
     private function probeResourceMetadata(string $mcpUrl): ?string
@@ -268,9 +274,11 @@ final readonly class McpOAuthDiscovery
     }
 
     /**
+     * @param McpOAuthFailure $missing reason when the document is not there (404, 410)
+     *
      * @return array<string, mixed>
      */
-    private function getJson(string $url, string $label): array
+    private function getJson(string $url, string $label, McpOAuthFailure $missing = McpOAuthFailure::MetadataInvalid): array
     {
         self::requireHttps($url, 'The '.$label.' address');
         if ($this->ssrfGuard->isBlockedUrl($url)) {
@@ -288,7 +296,13 @@ final readonly class McpOAuthDiscovery
         }
 
         if ($status < 200 || $status >= 300) {
-            throw new McpOAuthException(sprintf('Could not load %s (HTTP %d)', $label, $status), McpOAuthFailure::MetadataInvalid);
+            $reason = match (true) {
+                in_array($status, self::MISSING_STATUSES, true) => $missing,
+                $status >= 500 => McpOAuthFailure::Unreachable,
+                default => McpOAuthFailure::MetadataInvalid,
+            };
+
+            throw new McpOAuthException(sprintf('Could not load %s (HTTP %d)', $label, $status), $reason);
         }
 
         $decoded = json_decode($raw, true);

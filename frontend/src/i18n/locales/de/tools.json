@@ -400,7 +400,7 @@
       "missing_code": "Die Anmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.",
       "unknown": "Die Anmeldung konnte nicht starten. Versuchen Sie es erneut oder fragen Sie die Betreiber des Servers."
     },
-    "savedNotSignedIn": "„{name}“ wurde gespeichert, aber Sie sind noch nicht angemeldet: {reason}",
+    "savedSignInNotStarted": "„{name}“ wurde gespeichert. Die Anmeldung hat nicht begonnen: {reason}",
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"

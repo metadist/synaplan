@@ -309,6 +309,34 @@ final class McpOAuthDiscoveryTest extends TestCase
         ])->discover('https://mcp.example.com/mcp'));
     }
 
+    public function testWithoutAChallengeTheFallbackKeepsTheMeaningfulReason(): void
+    {
+        $noChallenge = new MockResponse('{}', ['http_code' => 401]);
+        $missing = new MockResponse('', ['http_code' => 404]);
+
+        $this->assertReason(McpOAuthFailure::NoSignIn, fn () => $this->discovery([
+            $noChallenge, $missing, new MockResponse('', ['http_code' => 404]), new MockResponse('', ['http_code' => 404]),
+        ])->discover('https://mcp.example.com/mcp'));
+        $this->assertReason(McpOAuthFailure::Unreachable, fn () => $this->discovery([
+            new MockResponse('{}', ['http_code' => 401]),
+            new MockResponse('', ['error' => 'Connection refused']),
+            new MockResponse('', ['http_code' => 404]),
+            new MockResponse('', ['http_code' => 404]),
+        ])->discover('https://mcp.example.com/mcp'));
+        $this->assertReason(McpOAuthFailure::MetadataInvalid, fn () => $this->discovery([
+            new MockResponse('{}', ['http_code' => 401]),
+            new MockResponse('', ['http_code' => 404]),
+            new MockResponse(str_repeat(' ', McpOAuthDiscovery::MAX_BODY_BYTES + 1).'{}', ['http_code' => 200]),
+            new MockResponse('', ['http_code' => 404]),
+        ])->discover('https://mcp.example.com/mcp'));
+        $this->assertReason(McpOAuthFailure::Unreachable, fn () => $this->discovery([
+            new MockResponse('{}', ['http_code' => 401]),
+            new MockResponse('', ['http_code' => 503]),
+            new MockResponse('', ['http_code' => 404]),
+            new MockResponse('', ['http_code' => 404]),
+        ])->discover('https://mcp.example.com/mcp'));
+    }
+
     private function assertReason(McpOAuthFailure $expected, callable $discover): void
     {
         try {

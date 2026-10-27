@@ -477,7 +477,7 @@
       "missing_code": "Sign-in did not complete. Please try again.",
       "unknown": "Sign-in could not start. Try again, or ask whoever runs the server."
     },
-    "savedNotSignedIn": "Saved \"{name}\", but you're not signed in yet: {reason}",
+    "savedSignInNotStarted": "Saved \"{name}\". Sign-in did not start: {reason}",
     "allowWriteLabel": "Allow write actions (create/update)",
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"

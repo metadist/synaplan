@@ -403,7 +403,7 @@
       "missing_code": "El inicio de sesión no se completó. Inténtelo de nuevo.",
       "unknown": "No se pudo iniciar sesión. Inténtelo de nuevo o pregunte a quien gestiona el servidor."
     },
-    "savedNotSignedIn": "Se guardó «{name}», pero aún no ha iniciado sesión: {reason}",
+    "savedSignInNotStarted": "Se guardó «{name}». El inicio de sesión no comenzó: {reason}",
     "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
     "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
     "writeBadge": "Escritura permitida"

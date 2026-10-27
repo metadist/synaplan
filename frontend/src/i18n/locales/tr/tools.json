@@ -403,7 +403,7 @@
       "missing_code": "Oturum açma tamamlanmadı. Lütfen yeniden deneyin.",
       "unknown": "Oturum açma başlatılamadı. Yeniden deneyin veya sunucuyu yöneten kişiye sorun."
     },
-    "savedNotSignedIn": "\"{name}\" kaydedildi, ancak henüz oturum açmadınız: {reason}",
+    "savedSignInNotStarted": "\"{name}\" kaydedildi. Oturum açma başlamadı: {reason}",
     "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
     "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
     "writeBadge": "Yazma izinli"
