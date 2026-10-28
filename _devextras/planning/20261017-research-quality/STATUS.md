@@ -3,6 +3,8 @@
 > **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
 > [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
 > Do not turn `RESEARCH.ENABLED` on until RV1 and RV8 are merged.
+> RV8 keeps one paid attempt when a model call runs longer than the
+> lease (240 seconds). Renewing only before the call is not enough.
 > OpenAI `/v1/chat/completions` parity stays on this track (RS2, RS3)
 > and becomes one loop on row 22 (AU24), not a third loop.
 

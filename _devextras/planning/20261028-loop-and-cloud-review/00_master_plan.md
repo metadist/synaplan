@@ -1,6 +1,11 @@
 # Loop and cloud-file review — 2026-10-28
 
 **Status:** Plan. §0 is not ticked. No fix starts until the owner ticks it.
+Corrected after the Copilot review of #2856: a silent shadow compare
+is not proof, the Messages stream releases before every provider
+stream, "sent" needs a recorded download, a claimed delivery expires,
+an inbound watch upload is not an own write, and the research lease
+covers the model call itself.
 **Base:** `main` at `fa64e4c82` (28 Oct 2026, 15:28 Europe/Berlin).
 **Rows it guards:** [21 research quality](../20261017-research-quality/00_master_plan.md),
 [22 architecture update](../20261021-architecture-update/00_master_plan.md),
@@ -21,11 +26,13 @@ tracks must fix. The shared tool loop stays on row 22 (AU24).
 | RV4 | A pickup copy remembers its cloud | `backend-only` | fix |
 | RV5 | A repeated folder listing does not spend the limit twice | `backend-only` | fix |
 | RV6 | "Sent" requires the download | `backend-only` | fix |
-| RV7 | A watch ignores the file it just wrote | `backend-only` | fix |
+| RV7 | An inbound watch upload is not marked as our own write | `backend-only` | test |
 | RV8 | A live research step renews its lease | `backend-only` | fix |
 | [`STATUS.md`](./STATUS.md) | Step log | — | — |
 
 One pull request per step, from `main`. Subjects start with `fix`.
+RV7 starts with `test`: the code already leaves the inbound upload
+off the own-write ledger, and the pull request locks that.
 None of these pull requests flips `RESEARCH.ENABLED`, `AI.USAGE_HOOK`,
 or `cloud_files`.
 
@@ -73,17 +80,21 @@ and links platforms. Bird status and watches are APIs for the cloud apps.
 | RV4 pickup copy has no source instance | Yes, wherever platform links are on | — |
 | RV5 listing spends the limit again | Yes, same | — |
 | RV6 delivered without a download | Yes, same | — |
-| RV2 session call-id collision | Billing stays correct in `legacy` and in `shadow` | `AI.USAGE_HOOK=on` under-bills |
+| RV2 session call-id collision | Billing stays correct in `legacy`. `shadow` can miss it: a null `close()` is compared to the caller's own metadata | `AI.USAGE_HOOK=on` under-bills. A clean shadow soak does not prove the hole is closed |
 | RV1 files-only reflect search dropped | No new research run starts | `RESEARCH.ENABLED` |
 | RV8 lost lease pays the step twice | Same | `RESEARCH.ENABLED` |
-| RV7 watch loops on its own upload | Watches 404 | `cloud_files` |
+| RV7 do not mark an inbound watch upload as an own write | Not a live defect. The first draft of this step would have hidden a new version for 10 minutes | `cloud_files` stays off; the regression lands before the flag |
 | Two tool loops disagree | Yes, for `/v1/chat/completions` vs `/v1/messages` | Stays on row 22 AU24. See §4 |
 
-`shadow` still writes the real usage row and then compares. A second
-Messages turn in one session will log `ai.usage_mismatch`. The
-architecture soak (seven days of shadow with zero mismatches) cannot
-go green until RV2. Flipping the hook to `on` before RV2 writes a
-zero-cost row for that second turn.
+`legacy` writes the caller's usage row and does not read the ledger.
+`shadow` writes that same row, then compares. On the second Messages
+turn the turn id is already closed, so `TurnUsageLedger::close()`
+returns null. `AiPipelineMeter::buildShadowMessagesExpectation()`
+then previews the caller's metadata, which is the metadata just
+stored, and the compare matches. No `ai.usage_mismatch` is logged.
+A shadow soak with zero mismatches does not show that this collision
+is fixed. `on` takes `fulfillJoinedOnMode()`, gets the null close,
+and returns a zero-cost receipt.
 
 ---
 
@@ -94,11 +105,11 @@ Proposed. Not ticked.
 | # | Decision | Why |
 | - | -------- | --- |
 | D1 | [ ] **RV4, RV5, RV6 and RV3 go first.** They run with today's flags. | Platform links seed on. The Messages API is the Desktop and Claude Code path. |
-| D2 | [ ] **RV2 merges before `AI.USAGE_HOOK` is set to `on` anywhere.** Shadow may start; it will report the mismatch until RV2. | `on` drops later turns in a session to a zero-cost receipt. |
+| D2 | [ ] **RV2 merges before `AI.USAGE_HOOK` is set to `on`, and before a shadow soak is treated as proof.** A clean shadow run can hide the collision: a reused turn whose `close()` returns null is compared with the caller's own metadata. | `on` drops later turns in a session to a zero-cost receipt. The soak in row 22 does not catch that. |
 | D3 | [ ] **RV1 and RV8 merge before `RESEARCH.ENABLED` is turned on.** | Round mode is the default, and the files-only walk has not been run. |
-| D4 | [ ] **RV7 merges before `cloud_files` is turned on.** | Watches are off today. |
+| D4 | [ ] **RV7 merges before `cloud_files` is turned on.** It is a regression lock: an inbound watch upload is not recorded as an own write. | The first draft of RV7 would have suppressed a real new version for 10 minutes. Watches are off today. |
 | D5 | [ ] **The shared tool executor stays on row 22 (AU24).** This plan does not open a second loop. AU24 must keep the Messages wrap-up prompt and the `TOOLS` usage row, which the OpenAI loop does not have. | Two catalogs already diverged on purpose (`OpenAiGatewayToolCatalog`). Copying one into the other makes that worse. |
-| D6 | [ ] **One `fix` pull request per step, from `main`.** No flag change in the diff. | A flag flip hides whether the fix is the thing that shipped. |
+| D6 | [ ] **One pull request per step, from `main`.** Subject `fix`, except RV7, which is `test`. No flag change in the diff. | A flag flip hides whether the fix is the thing that shipped. |
 
 ---
 
@@ -173,11 +184,18 @@ across requests (a UUID, or the request id plus a counter). The
 session key stays the key for conversation memory. Replace the stale
 `isJoined()` comment.
 
-**Test.** Two `executeComplete` calls with the same session id, hook
-mode `on`, scripted translator. The second usage row is not
-`0.000000` / zero tokens. A third call in one request still sums into
-that request's turn. `legacy` still writes one row per call, as
-`UsageHookTest` already locks.
+**Test.** Two `executeComplete` calls with the same session id and a
+scripted translator.
+
+- Mode `on`: the second usage row is not `0.000000` / zero tokens.
+  This is the proof. A shadow run that logs nothing is not.
+- Mode `shadow` on that same pair: the second compare reads a ledger
+  total for that request (`callCount > 0`). It must not take the
+  null-`close()` path that previews the caller's metadata and then
+  matches. Until the ids are unique, that path is what hides the hole.
+- A third call in one request still sums into that request's turn.
+- `legacy` still writes one row per call, as `UsageHookTest` already
+  locks.
 
 **Do not.** Set `AI.USAGE_HOOK` to `on` or `shadow` in a seeder,
 migration, or env file.
@@ -191,11 +209,18 @@ runs `GatewayToolLoop` for up to 240 seconds and returns the
 connection only when the response ends
 (`StreamedResponseConnectionRelease`, kernel terminate).
 
-**Change.** Release before `executeStream()`, with the same helper
-and the same "first chunk releases again" wrap the chat path uses.
-The test follows `ChatReplyGeneratorConnectionReleaseTest`: the
-connection is closed before the translator is asked for the stream,
-and a later chunk does not require it to be open.
+**Change.** Release before every provider stream in the tool loop,
+not only the first one. `releaseOnFirstCall()` runs once. Between
+rounds `GatewayToolLoop` writes a `TOOLS` usage row
+(`recordUsage` around the native and MCP paths), which opens the
+connection again. The next provider stream must release it before
+it waits. A single wrap around `executeStream()` does not do that.
+
+**Test.** Two tool rounds, with a usage write between them. The
+connection is closed before the first provider stream and again
+before the second. A later SSE chunk does not require it to stay
+open. Follow `ChatReplyGeneratorConnectionReleaseTest` for the
+shape of the assertion.
 
 **Do not.** Close a connection that is inside a transaction. Do not
 release on every SSE chunk.
@@ -247,40 +272,70 @@ Synaplan. Pickups close with `CloudPickupRepository::finishIfOpen()`
 read-modify-write, so two results can also race.
 
 **Change.** `claim()` moves the row from `queued` to `claimed` in
-the same conditional update. `result(delivered)` applies only from
-`claimed` (and the existing late success from `unconfirmed`). A
-result on `queued` leaves the state `queued`. The first terminal
-state wins.
+the same conditional update, and only hands out `download_path`.
+That is not success. `download()` records on the row that the bytes
+were taken, at the moment the ticket is consumed and the file is
+opened. `result(delivered)` applies only when that mark is set.
+A claim followed by `result(delivered)` with no download leaves the
+row unsent.
+
+The same mark gates the other two success paths. `copy()` records
+`delivered` today when the notify response says so
+(`CloudDeliveryService::copy()`, the branch on
+`STATE_DELIVERED`). That response counts only if `download()`
+already ran during the notify. Otherwise the row stays pending.
+A late `result(delivered)` after the sweep marked the row
+`unconfirmed` also requires the download mark. The first terminal
+state still wins. A result on `queued` leaves the state `queued`.
+
+`sweep()` today calls `failQueuedOlderThan()`, which updates only
+`queued` rows. A row that stays `claimed` — the app took the ticket
+and never sent a result — would sit pending forever. The sweep
+fails `claimed` rows on the same clock, with the same unconfirmed
+sentence, whether or not the download was taken.
 
 **Journey.** The copies list (`GET /api/v1/files/copies`, the
-existing Sent to row). No new screen. After a real claim and
-download, the row says sent. After a result that skipped the
-download, the row stays pending until the sweep says it was not
-confirmed. The sentence already on that row is the one the person
-reads. Flag-off for `cloud_files` is unchanged: this path is
+existing Sent to row). No new screen. After a download and a
+result, the row says sent. After a claim, or a result, that never
+downloaded the file, the row stays pending until the sweep says it
+was not confirmed. The sentence already on that row is the one the
+person reads. Flag-off for `cloud_files` is unchanged: this path is
 platform links.
 
 **Test.** `result(delivered)` on a queued row does not change the
-state. After claim, it does. Two concurrent results: one wins, the
-other sees the terminal state.
+state. Claim, then `result(delivered)` without `download()`, does
+not either. Claim, `download()`, then `result(delivered)` does.
+A notify body of `delivered` with no download stays pending. A late
+result after `unconfirmed` without a download stays failed. A
+claimed row with no result ages into unconfirmed. Two concurrent
+results: one wins, the other sees the terminal state.
 
-### RV7 — A watch ignores the file it just wrote
+### RV7 — An inbound watch upload is not marked as our own write
 
 `LoopGuard` suppresses a remote id when a copy-out wrote it in the
 last 10 minutes (`CloudDeliveryRepository::writtenRecently()`).
-`WatchUpload` stores a searchable copy and does not write that
-ledger. The cloud's next change event runs the watch again.
+That key is the remote id, not the version.
 
-**Change.** A watch upload records the same "we wrote this remote
-id" fact the guard already reads, for the same 10 minutes. A
-delivery and a watch upload share that record. Translate's language
-suffix rule stays.
+`WatchUpload` copies a cloud file into Synaplan. It does not write
+back to the cloud. `findVersion()` already answers `already_handled`
+for the same watch, remote id and version. Recording that inbound
+upload as an own write would suppress a genuine new version of the
+same file for ten minutes. The first draft of this step said to do
+that. It is withdrawn.
 
-**Test.** A watch whose upload just recorded remote id `5678` returns
-`own_write` for that id. An upload from a different identity does
-not.
+**Change.** No new own-write record on the inbound upload. A watch
+that later writes a file back to the cloud goes through the copy-out
+ledger the guard already reads. It does not get a second flag on
+the upload. The subject is `test`.
 
-**Do not.** Enable `cloud_files`.
+**Test.** The same remote id with a new version is accepted, not
+returned as `own_write`. The same version is `already_handled`.
+A cloud that sends `own_write=1` is still skipped: that is the app
+saying the write was ours. A recent copy-out of that remote id is
+still `own_write`.
+
+**Do not.** Enable `cloud_files`. Do not mark `WatchUpload::store()`
+as an own write.
 
 ### RV8 — A live research step renews its lease
 
@@ -294,18 +349,33 @@ without the fact-check. Round steps get the remaining budget plus
 four minutes. Write and check steps get four minutes
 (`LEASE_MS = 240_000`).
 
-**Change.** The worker renews the claim before each model call, for
-the same lease length, only while its token still holds the claim.
-A renewal that loses the token stops the step before the next paid
-call. The reaper is unchanged: an actually dead worker is still
-redispatched once and then interrupted. The interrupted outcome
-sentence keeps saying the run was interrupted. It must not read as
-a finished, fact-checked report (the delivery path already prefixes
-a non-complete report with the outcome sentence).
+**Change.** Renewing the claim before the call is not enough. The
+call itself can outlast the lease. `OllamaProvider` waits up to
+300 seconds. Write and check use `LEASE_MS` (240 seconds).
+`StageCall` passes no shorter deadline, so the reaper can
+redispatch while the first worker is still blocked inside that
+one call. The duplicate payment remains.
 
-**Test.** A claim renewed inside the lease is not in
-`expiredClaims()`. A worker whose renewal fails does not call the
-model again. A claim that is not renewed still redispatches once.
+The worker keeps the lease alive for the whole wait, or the call
+cannot run that long. Either:
+
+- a heartbeat renews the claim while the provider call is in
+  progress, only while this token still holds it, or
+- the research caller sets a deadline shorter than the lease, with
+  time left afterwards to checkpoint. A call that hits the deadline
+  stops. It is not a lost worker.
+
+A renewal that loses the token stops the step before the next paid
+call. The reaper is unchanged: a worker that is actually gone is
+still redispatched once and then interrupted. The interrupted
+outcome sentence keeps saying the run was interrupted. It must not
+read as a finished, fact-checked report (the delivery path already
+prefixes a non-complete report with the outcome sentence).
+
+**Test.** One model call whose wait is longer than `LEASE_MS` does
+not produce a second paid attempt. A claim that nobody renews, and
+that has no in-flight call, still redispatches once. A worker whose
+renewal fails does not call the model again.
 
 **Do not.** Lengthen the lease and call that the fix. Turn research
 on.

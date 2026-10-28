@@ -2,11 +2,15 @@
 
 > **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
 > [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
-> Do not set `AI.USAGE_HOOK` to `on` until RV2 is merged. Shadow still
-> bills correctly and will log `ai.usage_mismatch` on the second
-> Messages turn in a session until then. RV3 (the Messages stream
-> holds a database connection) is live now. AU24 keeps the wrap-up
-> prompt and the `TOOLS` usage row when the two tool loops become one.
+> Do not set `AI.USAGE_HOOK` to `on` until RV2 is merged, and do not
+> treat a clean shadow soak as proof that the collision is gone. On a
+> second Messages turn in one session `TurnUsageLedger::close()`
+> returns null. `buildShadowMessagesExpectation()` then compares the
+> caller's own metadata, so no `ai.usage_mismatch` is logged. RV3
+> releases the database connection before every provider stream in
+> the Messages tool loop, including after a `TOOLS` usage write
+> reopens it. AU24 keeps the wrap-up prompt and the `TOOLS` usage row
+> when the two tool loops become one.
 
 Step log for [`00_master_plan.md`](./00_master_plan.md). A walk, a
 measurement and a rollout are entries here, not chat messages.
@@ -105,7 +109,7 @@ Started from `main` at `2b3148c40` ([#2841](https://github.com/metadist/synaplan
 **Proof & regression.**
 - `AiPathCharacterizationTest::testShadowAndOnModesMatchTheBaselineRowsOnEveryJoinedPath`: runs all 19 paths under `legacy`, `shadow`, and `on`, asserting identical `BUSELOG` rows and zero shadow mismatches.
 - `UsageHookTest` (6 tests): two-round document tool loop (`ChatToolLoop`) and three-round gateway MCP tool loop (`OpenAiGatewayToolLoop`) each write one `MESSAGES` quota row with summed `facade_charged_cost` under `legacy`, `shadow`, and `on`; deliberately wrong shadow computation logs `ai.usage_mismatch`; `TurnUsageLedger` deduplicates `callId` contributions (`HSETNX`) and idempotently closes (`SET ... NX`); runtime rollback from `on` to `legacy` keeps one row per call; live voice (`VoiceLiveUsageService`) writes one `VOICE_LIVE` row under all three modes.
-- Soak signal to flip Part 2 (`AI.USAGE_HOOK = on`): 7 days in `shadow` on production with zero `ai.usage_mismatch` events in the event ring (`GET /api/v1/admin/logs?event=ai.usage_mismatch`).
+- Soak signal to flip Part 2 (`AI.USAGE_HOOK = on`): 7 days in `shadow` on production with zero `ai.usage_mismatch` events in the event ring (`GET /api/v1/admin/logs?event=ai.usage_mismatch`). Row 31 RV2: that signal is not proof until the Messages session collision is fixed. A null `close()` compares the caller's own metadata and logs nothing.
 
 ---
 

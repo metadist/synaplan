@@ -7,13 +7,13 @@ here, not a chat message. §0 is not ticked. No fix starts until it is.
 | ---- | ----- | ---- |
 | RV0 | in review | This plan, against `main` `fa64e4c82` |
 | RV1 | planned | Round mode drops `scope: files` |
-| RV2 | planned | Messages session reuses `call-1` once the usage hook is `on` |
-| RV3 | planned | Messages stream holds the database connection. Live today |
+| RV2 | planned | Messages session reuses `call-1` once the usage hook is `on`. A silent shadow compare can hide it |
+| RV3 | planned | Messages stream must release before every provider stream. Live today |
 | RV4 | planned | Pickup copy leaves `BSOURCEINSTANCE` null. Live where platform links are on |
 | RV5 | planned | A repeated listing spends the file limit again. Live, same |
-| RV6 | planned | `delivered` is accepted from `queued`. Live, same |
-| RV7 | planned | A watch does not record its own upload. Waits on `cloud_files` |
-| RV8 | planned | An expired research lease pays the step twice. Waits on `RESEARCH.ENABLED` |
+| RV6 | planned | `delivered` needs a recorded download, and a claimed row must expire. Live, same |
+| RV7 | planned | Regression lock: do not mark an inbound watch upload as an own write. Before `cloud_files` |
+| RV8 | planned | A model call longer than the lease pays the step twice. Waits on `RESEARCH.ENABLED` |
 
 ## 2026-10-28 — review
 
@@ -29,3 +29,15 @@ Rows 9, 21 and 22 in `ROADMAP.md` were behind that commit (cloud files
 "no product code yet", research "plan only", architecture "AU4 in
 progress"). The same change corrects those three state lines. Other
 rows were not re-verified.
+
+## 2026-10-28 — Copilot on #2856
+
+Six findings on the plan, all accepted. No product code. §0 stays
+unticked.
+
+- A null `close()` in shadow compares the caller's own metadata, so a clean soak is not proof of RV2.
+- RV3 releases before every provider stream. A `TOOLS` usage write between rounds reopens the connection.
+- RV6 requires a recorded download before `delivered`, including the notify path in `copy()` and a late result after `unconfirmed`.
+- A claimed delivery with no result expires on the same clock as a queued one.
+- The first draft of RV7 is withdrawn. An inbound watch upload is not an own write. A new version of the same remote id stays accepted.
+- RV8 covers a call that outlasts the 240 second lease. Renewing only before the call leaves the duplicate payment.
