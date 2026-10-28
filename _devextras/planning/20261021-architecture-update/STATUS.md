@@ -1,5 +1,13 @@
 # Architecture update — status
 
+> **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
+> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> Do not set `AI.USAGE_HOOK` to `on` until RV2 is merged. Shadow still
+> bills correctly and will log `ai.usage_mismatch` on the second
+> Messages turn in a session until then. RV3 (the Messages stream
+> holds a database connection) is live now. AU24 keeps the wrap-up
+> prompt and the `TOOLS` usage row when the two tool loops become one.
+
 Step log for [`00_master_plan.md`](./00_master_plan.md). A walk, a
 measurement and a rollout are entries here, not chat messages.
 

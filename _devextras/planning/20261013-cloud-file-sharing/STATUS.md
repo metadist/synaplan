@@ -1,5 +1,11 @@
 # Status — Cloud file sharing
 
+> **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
+> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> RV4, RV5 and RV6 are on the platform-link path, which seeds on.
+> RV7 lands before `cloud_files` is turned on. This track's own
+> remaining steps are unchanged.
+
 Plan of record: [`00_master_plan.md`](./00_master_plan.md). Sprints and
 spikes: [`06_sprints.md`](./06_sprints.md). A walk is a dated entry here
 (date, account, what was clicked, what was found, PR if something was fixed),
