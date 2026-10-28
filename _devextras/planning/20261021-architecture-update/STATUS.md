@@ -20,7 +20,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
 | 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | merged (`a0bb87213`) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
 | 2026-10-27 | AU10 | [#2841](https://github.com/metadist/synaplan/pull/2841) | merged (`2b3148c40`) | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 1,070 lines; pipeline overhead 0.008 ms p95 |
-| 2026-10-28 | AU11 | in progress | branch `fix/au11-usage-hook` | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`) |
+| 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | open | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`) |
+| 2026-10-28 | AU12 | in progress | branch `refactor/au12-join-pipeline` | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes (`CapabilityProbe`, `ProviderModelInventory`) join `AiCallPipeline`; `MessagesGateway` 1,050 → 1,025 lines; `AiPathOnlyThroughPipelineTest` |
 
 ## Baselines
 
@@ -33,6 +34,27 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-28 — AU12: the Messages gateway, live voice and direct provider calls join the pipeline
+
+Started from `fix/au11-usage-hook` (`f78f9a40e`, [#2844](https://github.com/metadist/synaplan/pull/2844)).
+
+**What changed.**
+- `MessagesGateway` wraps its selected `MessagesTranslatorInterface` (`AnthropicPassthroughTranslator`, `OpenAiMessagesTranslator`, `GeminiMessagesTranslator`) in `PipelineMessagesTranslator`, so both direct completions/streams and every round inside `GatewayToolLoop` execute as an `AiCall` (`AiCapability::Passthrough` / `AiCapability::ChatStream`, `AiCallSource::MessagesApi`, joined) through `AiCallPipeline`, while keeping the wire format byte-for-byte identical. Response text and rate-limit header extraction moved to `MessagesResponseText`, shrinking `MessagesGateway.php` from **1,050 → 1,025 lines**.
+- `VoiceLiveUsageService::open()` and `close()` execute an `AiCall(capability: AiCapability::VoiceSession, source: AiCallSource::VoiceLive)` through `AiCallPipeline`.
+- `PerplexityAdapter::maybeAnswer()` calls `AiFacade::chat()` instead of `PerplexityProvider::chat()` directly.
+- `CapabilityProbe::probe()` and `ProviderModelInventory::probe()` execute `AiCall` with `AiCallContext::probe()` (`billable: false`).
+- `AiCallSource::isJoined()` is now `true` for every source (`MessagesApi` and `VoiceLive` included).
+
+**`AiPathOnlyThroughPipelineTest` baseline:**
+- `App\AI\Messages\MessagesGateway` — holds the `@AutowireIterator('app.messages.translator')` locator and wraps the chosen translator in `PipelineMessagesTranslator` before any call.
+- `App\AI\Messages\Tools\GatewayToolLoop` — receives the `PipelineMessagesTranslator` wrapper from `MessagesGateway::executeComplete()` / `executeStream()`.
+
+**Proof, mutation & regression.**
+- Mutation: injected `?PerplexityProvider` back into `PerplexityAdapter::__construct()`; `AiPathOnlyThroughPipelineTest` failed (`App\Plug\WebSearch\Adapter\PerplexityAdapter::$directProvider references App\AI\Provider\PerplexityProvider`); restored.
+- Every characterization snapshot (`AiPathCharacterizationTest` across `legacy`, `shadow`, and `on`, `StreamTranscriptCharacterizationTest`, `MessageTurnCharacterizationTest`, `OpenAIProviderRequestCharacterizationTest`, `GoogleProviderRequestCharacterizationTest`) unchanged.
 
 ---
 
