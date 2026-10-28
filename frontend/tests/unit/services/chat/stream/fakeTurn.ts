@@ -114,6 +114,7 @@ export function fakeMemberTurn(
       showLimit: vi.fn(),
       userLevel: () => 'PRO',
     },
+    research: { adopt: vi.fn() },
     registerIncognitoFile: vi.fn(),
     ...overrides,
   }

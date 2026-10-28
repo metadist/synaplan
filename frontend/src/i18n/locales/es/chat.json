@@ -1074,31 +1074,12 @@
     "deleteConfirm": "/{command} desaparece del menú del chat. Los mensajes ya enviados no cambian."
   },
   "research": {
-    "menu": "Investigar",
-    "menuHint": "Un informe escrito con fuentes, en este chat",
     "title": "Investigar",
-    "questionLabel": "¿Qué quieres averiguar?",
-    "depth": {
-      "standard": "Estándar",
-      "thorough": "A fondo"
-    },
-    "depthHint": {
-      "standard": "Unos {minutes} minutos",
-      "thorough": "Unos {minutes} minutos"
-    },
-    "sourcesLabel": "Fuentes",
-    "sourceWeb": "Web",
-    "sourceFiles": "Carpetas de la biblioteca",
-    "start": "Empezar a investigar",
-    "startNeedsQuestion": "Escribe lo que quieres averiguar.",
-    "startNeedsSource": "Activa la web o añade archivos.",
-    "noSources": "La búsqueda web y las carpetas de la biblioteca están apagadas, así que la investigación no puede empezar.",
     "noChat": "Abre un chat y luego empieza a investigar.",
     "startFailed": "La investigación no pudo empezar. Revisa la pregunta e inténtalo de nuevo.",
     "stopFailed": "La investigación no se pudo detener. Sigue en marcha.",
     "incognito": "La investigación guarda un informe en el chat. Termina primero el chat de incógnito.",
     "close": "Cerrar",
-    "continues": "Puedes cerrar esta ventana. La investigación sigue y el informe aparece en este chat.",
     "stop": "Detener",
     "stopConsequence": "Detener conserva lo ya escrito y no busca más.",
     "stopped": "La investigación se detuvo. Lo ya escrito permanece en este chat. No se buscó nada más.",
@@ -1112,6 +1093,19 @@
     "pointDone": "Hecho",
     "pointOpen": "Aún abierto",
     "pointNotConfirmed": "Sin confirmar",
-    "depthLabel": "¿Qué tan a fondo?"
+    "answerNow": "Responder ahora",
+    "answerNowConsequence": {
+      "reading": "Responder ahora redacta el informe con lo ya leído.",
+      "early": "Responder ahora contesta sin la búsqueda adicional.",
+      "writing": "El informe está casi listo."
+    },
+    "answerNowFailed": "Responder ahora no llegó a la investigación. Sigue en marcha.",
+    "answeredWithout": "Respondido sin la búsqueda adicional.",
+    "lookDeeper": "Investigar a fondo",
+    "lookDeeperHint": "Lee más fuentes y comprueba cada afirmación. Unos {minutes} minutos.",
+    "ceiling": {
+      "quick": "{points} puntos: una consulta breve",
+      "standard": "{points} puntos: una investigación estándar"
+    }
   }
 }

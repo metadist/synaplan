@@ -1074,31 +1074,12 @@
     "deleteConfirm": "/{command} sohbet menüsünden kaldırılır. Daha önce gönderdiğiniz mesajlar olduğu gibi kalır."
   },
   "research": {
-    "menu": "Araştırma",
-    "menuHint": "Kaynaklı yazılı bir rapor, bu sohbette",
     "title": "Araştırma",
-    "questionLabel": "Ne öğrenmek istiyorsun?",
-    "depth": {
-      "standard": "Standart",
-      "thorough": "Ayrıntılı"
-    },
-    "depthHint": {
-      "standard": "Yaklaşık {minutes} dakika",
-      "thorough": "Yaklaşık {minutes} dakika"
-    },
-    "sourcesLabel": "Kaynaklar",
-    "sourceWeb": "Web",
-    "sourceFiles": "Kitaplık klasörleri",
-    "start": "Araştırmayı başlat",
-    "startNeedsQuestion": "Ne öğrenmek istediğini yaz.",
-    "startNeedsSource": "Web'i aç veya dosya ekle.",
-    "noSources": "Web araması ve Kitaplık klasörleri kapalı, bu yüzden araştırma başlayamaz.",
     "noChat": "Bir sohbet aç, sonra araştırmayı başlat.",
     "startFailed": "Araştırma başlatılamadı. Soruyu kontrol edip yeniden dene.",
     "stopFailed": "Araştırma durdurulamadı. Hâlâ sürüyor.",
     "incognito": "Araştırma raporu sohbete kaydeder. Önce gizli sohbeti bitir.",
     "close": "Kapat",
-    "continues": "Bu pencereyi kapatabilirsin. Araştırma sürer ve rapor bu sohbette görünür.",
     "stop": "Durdur",
     "stopConsequence": "Durdurmak şimdiye kadar yazılanı tutar ve başka arama yapmaz.",
     "stopped": "Araştırma durdu. Şimdiye kadar yazılan bu sohbette kalır. Başka arama yapılmadı.",
@@ -1112,6 +1093,19 @@
     "pointDone": "Bitti",
     "pointOpen": "Açık",
     "pointNotConfirmed": "Doğrulanmadı",
-    "depthLabel": "Ne kadar ayrıntılı?"
+    "answerNow": "Şimdi yanıtla",
+    "answerNowConsequence": {
+      "reading": "Şimdi yanıtla, okunanlardan raporu yazar.",
+      "early": "Şimdi yanıtla, ek arama olmadan yanıtlar.",
+      "writing": "Rapor neredeyse hazır."
+    },
+    "answerNowFailed": "Şimdi yanıtla araştırmaya ulaşamadı. Araştırma sürüyor.",
+    "answeredWithout": "Ek arama olmadan yanıtlandı.",
+    "lookDeeper": "Daha derin bak",
+    "lookDeeperHint": "Daha fazla kaynak okur ve her ifadeyi kontrol eder. Yaklaşık {minutes} dakika.",
+    "ceiling": {
+      "quick": "{points} madde — kısa bir bakış",
+      "standard": "{points} madde — standart bir araştırma"
+    }
   }
 }

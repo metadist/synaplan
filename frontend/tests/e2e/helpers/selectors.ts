@@ -249,15 +249,17 @@ export const selectors = {
     banner: '[data-testid="banner-incognito"]',
   },
   research: {
+    /** Removed with automatic research; asserted absent. */
     menu: '[data-testid="btn-tool-research"]',
-    composer: '[data-testid="section-research-composer"]',
-    question: '[data-testid="input-research-question"]',
-    start: '[data-testid="btn-research-start"]',
     stop: '[data-testid="btn-research-stop"]',
+    answerNow: '[data-testid="btn-research-answer-now"]',
+    answerNowConsequence: '[data-testid="text-research-answer-now-consequence"]',
     card: '[data-testid="card-research"]',
+    ceiling: '[data-testid="text-research-ceiling"]',
     factCheck: '[data-testid="text-research-fact-check"]',
     find: '[data-testid="text-research-find"]',
-    continues: '[data-testid="text-research-continues"]',
+    lookDeeper: '[data-testid="btn-look-deeper"]',
+    lookDeeperSection: '[data-testid="section-look-deeper"]',
   },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */

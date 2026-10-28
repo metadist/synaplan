@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { ApiError } from '@/services/api/httpClient'
 import {
+  answerNowResearch,
   cancelResearch,
   fetchResearchCapabilities,
   fetchResearchEvents,
@@ -22,10 +23,15 @@ import { useIncognitoStore } from './incognito'
 
 const POLL_MS = 2000
 
+/** What Look deeper sends: the question, and the last turns so the research knows the chat. */
+export interface LookDeeperInput {
+  question: string
+  context: Array<{ role: 'user' | 'assistant'; text: string }>
+}
+
 export interface ResearchBag {
   available: Ref<boolean | null>
   capabilities: Ref<ResearchCapabilities | null>
-  composerOpen: Ref<boolean>
   starting: Ref<boolean>
   stopping: Ref<boolean>
   startError: Ref<string | null>
@@ -39,7 +45,6 @@ export function createResearchBag(): ResearchBag {
   return {
     available: ref(null),
     capabilities: ref(null),
-    composerOpen: ref(false),
     starting: ref(false),
     stopping: ref(false),
     startError: ref(null),
@@ -56,14 +61,11 @@ export async function ensureCapabilities(bag: ResearchBag): Promise<void> {
   await bag.capabilitiesTask
 }
 
-export function openComposer(bag: ResearchBag): void {
-  bag.startError.value = null
-  bag.composerOpen.value = true
-}
-
-export function closeComposer(bag: ResearchBag): void {
-  bag.composerOpen.value = false
-  bag.startError.value = null
+/** Forget what the server said, so the next question asks again (an admin flipped a switch). */
+export function forgetCapabilities(bag: ResearchBag): void {
+  bag.available.value = null
+  bag.capabilities.value = null
+  bag.capabilitiesTask = null
 }
 
 export function attachChat(bag: ResearchBag, chatId: number | null): void {
@@ -83,10 +85,20 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
   if (saved !== null) void resume(bag, chatId, saved)
 }
 
-export async function beginResearch(
-  bag: ResearchBag,
-  input: { question: string; depth: 'standard' | 'thorough'; web: boolean; knowledge: boolean }
-): Promise<void> {
+/**
+ * The chat started a research on its own (`research_started` on the stream):
+ * show its card at once and follow it, the same way a run of our own is followed.
+ */
+export function adoptRun(bag: ResearchBag, chatId: number, id: string, question: string): void {
+  bag.startError.value = null
+  localStorage.setItem(storageKey(chatId), id)
+  if (bag.boundChatId !== chatId) return
+  bag.progress.value = emptyProgress(id, chatId, question)
+  startPoll(bag)
+}
+
+/** Look deeper under a direct answer: a research sized by its own plan, told the person wants more. */
+export async function lookDeeper(bag: ResearchBag, input: LookDeeperInput): Promise<void> {
   bag.startError.value = null
   const chatId = await chatForResearch()
   if (chatId === null) {
@@ -104,18 +116,32 @@ export async function beginResearch(
 }
 
 export async function stopResearch(bag: ResearchBag): Promise<void> {
+  await endRun(bag, cancelResearch, 'stopFailed')
+}
+
+/** Answer now: the report from what was read, or the plain answer when nothing was read yet. */
+export async function answerNow(bag: ResearchBag): Promise<void> {
+  await endRun(bag, answerNowResearch, 'answerNowFailed')
+}
+
+async function endRun(
+  bag: ResearchBag,
+  send: (id: string) => Promise<Parameters<typeof progressFromRun>[1]>,
+  failure: string
+): Promise<void> {
   const current = bag.progress.value
   if (current === null || isTerminalStatus(current.status) || bag.stopping.value) return
   bag.stopping.value = true
   try {
-    const run = await cancelResearch(current.id)
+    const run = await send(current.id)
     if (bag.progress.value?.id === current.id) {
       bag.progress.value = progressFromRun(current.chatId, run)
-      stopPoll(bag)
+      if (isTerminalStatus(run.status)) stopPoll(bag)
+      else startPoll(bag)
     }
-    await reloadChat(current.chatId)
+    if (isTerminalStatus(run.status)) await reloadChat(current.chatId)
   } catch {
-    bag.startError.value = 'stopFailed'
+    bag.startError.value = failure
   } finally {
     bag.stopping.value = false
   }
@@ -151,21 +177,22 @@ async function chatForResearch(): Promise<number | null> {
   return chat?.id ?? null
 }
 
-async function acceptRun(
-  bag: ResearchBag,
-  chatId: number,
-  input: { question: string; depth: 'standard' | 'thorough'; web: boolean; knowledge: boolean }
-): Promise<void> {
+async function acceptRun(bag: ResearchBag, chatId: number, input: LookDeeperInput): Promise<void> {
+  const capabilities = bag.capabilities.value
   const accepted = await startResearch({
     question: input.question,
-    depth: input.depth,
+    depth: 'auto',
+    hint: 'deeper',
     chat_id: chatId,
-    sources: { web: input.web, knowledge: input.knowledge },
+    sources: {
+      web: capabilities?.web_search_available ?? true,
+      knowledge: capabilities?.knowledge_available ?? false,
+    },
+    context: { turns: input.context.slice(-6) },
   })
   const next = emptyProgress(accepted.id, chatId, input.question)
   next.status = accepted.status
   localStorage.setItem(storageKey(chatId), accepted.id)
-  bag.composerOpen.value = false
   if (bag.boundChatId !== chatId) return
   bag.progress.value = next
   startPoll(bag)

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { autoResearchHandlers } from '@/services/chat/stream/handlers/autoResearch'
 import {
   applyResearchFrame,
   emptyProgress,
@@ -6,6 +7,7 @@ import {
   progressFromRun,
   sourceCounts,
 } from '@/services/chat/stream/handlers/research'
+import { fakeMemberTurn } from './fakeTurn'
 
 const FIXTURE = [
   'id: 1',
@@ -76,5 +78,48 @@ describe('research event handler', () => {
     ])
     expect(sourceCounts(fromRun).blocked).toBe(1)
     expect(fromRun.check?.removed).toBe(1)
+  })
+
+  it('keeps the ceiling an automatic run chose and the outcome it ended with', () => {
+    const planned = applyResearchFrame(emptyProgress('run-3', 7, 'Which visa do I need?'), {
+      seq: 1,
+      event: 'plan',
+      data: { points: [{ id: 'p1', title: 'Visa types' }], ceiling: 'quick' },
+    })
+    const fromRun = progressFromRun(7, {
+      id: 'run-3',
+      status: 'complete',
+      question: 'Which visa do I need?',
+      ceiling: 'quick',
+      outcome: { code: 'answered_without_research' },
+    })
+
+    expect(planned.ceiling).toBe('quick')
+    expect(fromRun.ceiling).toBe('quick')
+    expect(fromRun.outcome).toBe('answered_without_research')
+  })
+})
+
+describe('research_started on the chat stream', () => {
+  it('hands the run the chat started to the turn', () => {
+    const turn = fakeMemberTurn()
+
+    autoResearchHandlers.research_started(
+      {
+        status: 'research_started',
+        metadata: { run_id: 'rr_0123456789abcdef', minutes: 6, why: 'several_parts' },
+      },
+      turn
+    )
+
+    expect(turn.research.adopt).toHaveBeenCalledWith('rr_0123456789abcdef')
+  })
+
+  it('ignores an event without a run id', () => {
+    const turn = fakeMemberTurn()
+
+    autoResearchHandlers.research_started({ status: 'research_started', metadata: {} }, turn)
+
+    expect(turn.research.adopt).not.toHaveBeenCalled()
   })
 })

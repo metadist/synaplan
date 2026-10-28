@@ -9,9 +9,9 @@ chat message.
 | Step | State | Note |
 | ---- | ----- | ---- |
 | AR0 | done | Plan written 2026-10-28; registered as roadmap row 31. §0 unticked. No code. |
-| AR1 | planned | The sorter rates how much a question needs; router corpus and `app:research:router-eval`; gate of `01` §4.2 |
-| AR2 | planned | Depth `auto`, the ceiling from the plan, `hint`, `answer_now`, `RESEARCH.AUTO_ENABLED`, `TOOL_MODE_MODELS` seeded |
-| AR3 | planned | The chat researches on its own: gate, notice, card on the message, Answer now, Look deeper, limit sentences; Tools → Research and `ResearchComposer.vue` removed |
+| AR1 | done | 2026-10-28. `BEFFORT` / `BEFFORT_WHY` in `tools:sort`; router corpus and `app:research:router-eval`; gate passed (entry below) |
+| AR2 | done | 2026-10-28. Depth `auto` with the ceiling from the plan, `hint`, `answer_now`, `RESEARCH.AUTO_ENABLED`, `TOOL_MODE_MODELS` seeded (`Version20261028120000`) |
+| AR3 | done | 2026-10-28. Gate in `MessageProcessor`, notice, `research_started`, card on the message, Answer now, Look deeper, limit sentences; Tools → Research and `ResearchComposer.vue` removed; J-AR-1 walked (entry below) |
 | AR4 | planned | Automatic research switch on the admin tab |
 | AR5 | planned | Gateway: `WEB_SEARCH_MAX_ROUNDS` 2 → 4, effort paragraph, `x-synaplan-effort` / `x-synaplan-research-run` |
 | AR6 | planned | Synaplan Desktop: chip removed, header sent, card attached, Answer now, Look deeper |
@@ -67,3 +67,65 @@ Open for the owner at §0: #4 (seed tool mode for the two Sonnet keys), #9
 (the gateway header name and the 2 → 4 ceiling), #11 (the gate numbers), and
 row 21 #25 (runs per day by plan — becomes a real need once runs start on
 their own).
+
+---
+
+## 2026-10-28 — AR1: router gate passed
+
+`php bin/console app:research:router-eval --user=1` on the dev stack, user
+1's sort model (Anthropic `claude-sonnet-5-5`), corpus
+`backend/tests/Eval/research/router.json` (67 questions):
+
+| Measure | Result | Gate (`01` §4.2) |
+| ------- | ------ | ---------------- |
+| Agreement with the labelled effort | 98.5 % | ≥ 90 % |
+| Over-escalation | 0 % | ≤ 5 % |
+| Under-escalation | 0 % | ≤ 10 % |
+| Reason agreement | 93.9 % | reported |
+| No vote | 0 % | ≤ 2 % |
+| Sorter p50 / p95 | 1 744 / 2 609 ms | reported |
+
+What the first run taught: a dev database seeded before this step still
+held the old `tools:sort` prompt, so every vote was empty. `app:seed`
+(run on every container start) rewrites the prompt; the number above is
+the second run. Existing installs get the same rewrite on their next
+start — there is nothing to do by hand. Cost of the two runs: 134 sort
+calls on Sonnet 5.5, well under one dollar.
+
+## 2026-10-28 — AR2 and AR3 built; J-AR-1 walked
+
+The chat decides on its own. Built and gated locally (`make ci-local`
+equivalents, full PHPUnit with the dev stack's 48 pre-existing
+database-bound failures unchanged, full Vitest, Playwright
+`research.spec.ts` 6/6):
+
+- A question the sorter rates `research` gets one notice sentence in the
+  chat language, a `research_started` event and the run's card on that
+  message; the reply persists `effort` / `effortNotice` so a reload shows
+  the same.
+- **Answer now** is the primary action on the running card and says what
+  happens right now (still reading / already writing / nothing read yet);
+  Stop stays beside it. **Look deeper** sits under a `lookup` answer and
+  under a reply whose research was not started, and sends the question
+  with the last six turns.
+- The limits that keep a research from starting are each one sentence
+  (quiet hours, budget, daily cap, research off); the answer still comes.
+- Tools → Research and `ResearchComposer.vue` are gone; `useResearchStore`
+  lost `beginResearch`/`composerOpen` and gained `adopt`, `lookDeeper`,
+  `answerNow`.
+
+Walked in Chromium (Playwright, headless, dev stack `:5173`), not a
+screenshot: Tools menu opened — no Research entry, on and off; a
+multi-source question typed — notice read, card found on the message with
+the ceiling line "a short look", fact-check present, reload showed the
+same card; Answer now clicked — consequence sentence read, run ended;
+Look deeper clicked under a lookup answer — `POST /api/v1/research`
+carried `depth: auto`, `hint: deeper`; automatic research off — no Look
+deeper; 320 px dark — card fits.
+
+Size ratchet respected by moving code out, never in: `chatTurns.ts`
+(`userTextBefore`, `lookDeeperInput`, `groupMessagesByDay`),
+`messageEffort.ts`, `messageFileDisplay.ts` on the frontend;
+`SorterEffortStub`, `AutoResearchTurn::noticeResult`,
+`PlanStage::announcePlan` on the backend. `TestProvider.php` kept its
+frozen length (one-line call into the stub).

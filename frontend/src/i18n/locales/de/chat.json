@@ -1137,31 +1137,12 @@
     "deleteConfirm": "/{command} verschwindet aus dem Chat-Menü. Bereits gesendete Nachrichten bleiben unverändert."
   },
   "research": {
-    "menu": "Recherche",
-    "menuHint": "Ein schriftlicher Bericht mit Quellen, in diesem Chat",
     "title": "Recherche",
-    "questionLabel": "Was möchtest du herausfinden?",
-    "depth": {
-      "standard": "Standard",
-      "thorough": "Gründlich"
-    },
-    "depthHint": {
-      "standard": "Etwa {minutes} Minuten",
-      "thorough": "Etwa {minutes} Minuten"
-    },
-    "sourcesLabel": "Quellen",
-    "sourceWeb": "Web",
-    "sourceFiles": "Bibliotheksordner",
-    "start": "Recherche starten",
-    "startNeedsQuestion": "Schreib, was du herausfinden möchtest.",
-    "startNeedsSource": "Schalte das Web ein oder füge Dateien hinzu.",
-    "noSources": "Websuche und Bibliotheksordner sind aus, deshalb kann die Recherche nicht starten.",
     "noChat": "Öffne einen Chat und starte dann die Recherche.",
     "startFailed": "Die Recherche konnte nicht starten. Prüfe die Frage und versuche es erneut.",
     "stopFailed": "Die Recherche konnte nicht gestoppt werden. Sie läuft noch.",
     "incognito": "Die Recherche speichert einen Bericht im Chat. Beende zuerst den Inkognito-Chat.",
     "close": "Schließen",
-    "continues": "Du kannst dieses Fenster schließen. Die Recherche läuft weiter, und der Bericht erscheint in diesem Chat.",
     "stop": "Stopp",
     "stopConsequence": "Stoppen behält, was schon geschrieben ist, und sucht nicht weiter.",
     "stopped": "Die Recherche wurde gestoppt. Was schon geschrieben ist, bleibt in diesem Chat. Es wurde nicht weiter gesucht.",
@@ -1175,6 +1156,19 @@
     "pointDone": "Fertig",
     "pointOpen": "Noch offen",
     "pointNotConfirmed": "Nicht bestätigt",
-    "depthLabel": "Wie gründlich?"
+    "answerNow": "Jetzt antworten",
+    "answerNowConsequence": {
+      "reading": "Jetzt antworten schreibt den Bericht aus dem, was schon gelesen ist.",
+      "early": "Jetzt antworten beantwortet die Frage ohne die zusätzliche Suche.",
+      "writing": "Der Bericht ist gleich fertig."
+    },
+    "answerNowFailed": "Jetzt antworten hat die Recherche nicht erreicht. Sie läuft weiter.",
+    "answeredWithout": "Ohne die zusätzliche Suche beantwortet.",
+    "lookDeeper": "Gründlicher nachsehen",
+    "lookDeeperHint": "Liest mehr Quellen und prüft jede Aussage. Etwa {minutes} Minuten.",
+    "ceiling": {
+      "quick": "{points} Punkte — ein kurzer Blick",
+      "standard": "{points} Punkte — eine normale Recherche"
+    }
   }
 }

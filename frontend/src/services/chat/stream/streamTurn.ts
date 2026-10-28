@@ -150,6 +150,11 @@ export interface TurnOutcome {
   userLevel(): string
 }
 
+/** The research the chat started on its own for this turn (`research_started`). */
+export interface TurnResearch {
+  adopt(runId: string): void
+}
+
 export interface MemberTurn extends StreamTurn {
   readonly chatId: number | undefined
   readonly incognito: boolean
@@ -157,6 +162,7 @@ export interface MemberTurn extends StreamTurn {
   readonly memory: MemoryBadges
   readonly chats: ChatActivity
   readonly outcome: TurnOutcome
+  readonly research: TurnResearch
   registerIncognitoFile(fileId: number): void
 }
 

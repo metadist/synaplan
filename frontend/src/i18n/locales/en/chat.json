@@ -1139,31 +1139,12 @@
     "deleteConfirm": "/{command} disappears from the chat menu. Messages you already sent stay as they are."
   },
   "research": {
-    "menu": "Research",
-    "menuHint": "A written report with sources, in this chat",
     "title": "Research",
-    "questionLabel": "What do you want to find out?",
-    "depth": {
-      "standard": "Standard",
-      "thorough": "Thorough"
-    },
-    "depthHint": {
-      "standard": "About {minutes} minutes",
-      "thorough": "About {minutes} minutes"
-    },
-    "sourcesLabel": "Sources",
-    "sourceWeb": "Web",
-    "sourceFiles": "Library folders",
-    "start": "Start research",
-    "startNeedsQuestion": "Write what you want to find out.",
-    "startNeedsSource": "Turn on the web or add files.",
-    "noSources": "Web search and Library folders are both off, so research cannot start.",
     "noChat": "Open a chat, then start research.",
     "startFailed": "Research could not start. Check the question and try again.",
     "stopFailed": "Research could not be stopped. It is still running.",
     "incognito": "Research saves a report in the chat. End the incognito chat first.",
     "close": "Close",
-    "continues": "You can close this window. Research continues, and the report appears in this chat.",
     "stop": "Stop",
     "stopConsequence": "Stopping keeps what was already written and does not search further.",
     "stopped": "Research stopped. What was already written stays in this chat. Nothing further was searched.",
@@ -1177,6 +1158,19 @@
     "pointDone": "Done",
     "pointOpen": "Still open",
     "pointNotConfirmed": "Not confirmed",
-    "depthLabel": "How thorough?"
+    "answerNow": "Answer now",
+    "answerNowConsequence": {
+      "reading": "Answer now writes the report from what was already read.",
+      "early": "Answer now answers the question without the extra look.",
+      "writing": "The report is almost done."
+    },
+    "answerNowFailed": "Answer now did not reach the research. It is still running.",
+    "answeredWithout": "Answered without the extra look.",
+    "lookDeeper": "Look deeper",
+    "lookDeeperHint": "Reads more sources and checks every statement. About {minutes} minutes.",
+    "ceiling": {
+      "quick": "{points} points — a short look",
+      "standard": "{points} points — a standard look"
+    }
   }
 }

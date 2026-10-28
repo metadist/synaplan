@@ -18,9 +18,30 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class StreamMessageMeta
 {
+    /** How much the question needed: answer, lookup or research. */
+    public const EFFORT = 'effort';
+    /** Why a research the question needed was not started (a GateDecision reason). */
+    public const EFFORT_NOTICE = 'effort_notice';
+
     public function __construct(
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * The effort rating and a held-back reason on the reply, so Look deeper
+     * can be offered after a reload.
+     *
+     * @param array<string, mixed> $classification
+     */
+    public function stampEffort(Message $message, array $classification): void
+    {
+        foreach ([self::EFFORT, self::EFFORT_NOTICE] as $key) {
+            $value = $classification[$key] ?? null;
+            if (is_string($value) && '' !== $value) {
+                $message->setMeta($key, $value);
+            }
+        }
     }
 
     public function stampAgentId(Message $message, ?int $agentId, ?int $agentVersionId = null): void

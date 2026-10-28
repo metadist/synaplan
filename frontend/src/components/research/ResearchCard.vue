@@ -22,6 +22,9 @@
     </div>
 
     <p class="text-sm txt-primary" data-testid="text-research-status">{{ statusText }}</p>
+    <p v-if="ceilingText" class="text-sm txt-secondary" data-testid="text-research-ceiling">
+      {{ ceilingText }}
+    </p>
 
     <ul
       v-if="progress.points.length > 0"
@@ -73,26 +76,50 @@
       {{ $t('research.find') }}
     </p>
 
-    <div v-if="!terminal">
-      <button
-        type="button"
-        class="btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="research.stopping"
-        data-testid="btn-research-stop"
-        @click="research.stop()"
-      >
-        {{ $t('research.stop') }}
-      </button>
-      <p class="mt-2 text-sm txt-secondary">{{ $t('research.stopConsequence') }}</p>
+    <div v-if="!terminal" class="flex flex-col gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="research.stopping"
+          data-testid="btn-research-answer-now"
+          @click="research.answerNow()"
+        >
+          {{ $t('research.answerNow') }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="research.stopping"
+          data-testid="btn-research-stop"
+          @click="research.stop()"
+        >
+          {{ $t('research.stop') }}
+        </button>
+      </div>
+      <p class="text-sm txt-secondary" data-testid="text-research-answer-now-consequence">
+        {{ answerNowConsequence }}
+      </p>
+      <p class="text-sm txt-secondary">{{ $t('research.stopConsequence') }}</p>
     </div>
+    <p
+      v-else-if="progress.outcome === 'answered_without_research'"
+      class="text-sm txt-secondary"
+      data-testid="text-research-answered-without"
+    >
+      {{ $t('research.answeredWithout') }}
+    </p>
     <p v-else-if="progress.status === 'stopped'" class="text-sm txt-secondary">
       {{ $t('research.stopped') }}
     </p>
     <p v-else-if="progress.status === 'failed'" class="text-sm text-red-600 dark:text-red-400">
       {{ $t('research.failed') }}
     </p>
-    <p v-if="research.startError === 'stopFailed'" class="text-sm text-red-600 dark:text-red-400">
-      {{ $t('research.stopFailed') }}
+    <p
+      v-if="research.startError === 'stopFailed' || research.startError === 'answerNowFailed'"
+      class="text-sm text-red-600 dark:text-red-400"
+    >
+      {{ $t(`research.${research.startError}`) }}
     </p>
   </section>
 </template>
@@ -123,6 +150,25 @@ const statusText = computed(() => {
     return t('research.queued', { seconds: current.queuedSeconds })
   }
   return t('research.working')
+})
+
+/** What Answer now does right now: the report from what was read, or the plain answer. */
+const answerNowConsequence = computed(() => {
+  const current = progress.value
+  if (!current) return ''
+  if (current.status === 'writing' || current.status === 'checking') {
+    return t('research.answerNowConsequence.writing')
+  }
+  if (counts.value.read > 0) return t('research.answerNowConsequence.reading')
+  return t('research.answerNowConsequence.early')
+})
+
+/** How far an automatic run decided to look, once its plan is known. */
+const ceilingText = computed(() => {
+  const current = progress.value
+  if (!current || current.ceiling === null || current.points.length === 0) return ''
+  if (current.ceiling !== 'quick' && current.ceiling !== 'standard') return ''
+  return t(`research.ceiling.${current.ceiling}`, { points: current.points.length })
 })
 
 function pointLabel(status: string): string {

@@ -427,6 +427,13 @@
             {{ $t('chat.readAloudStopped') }}
           </p>
 
+          <LookDeeperAction
+            v-if="role === 'assistant' && !isStreaming && !isGuestMode"
+            :effort="effort"
+            :effort-notice="effortNotice"
+            @look-deeper="emit('look-deeper')"
+          />
+
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
             class="m-3"
@@ -1162,6 +1169,7 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
+import LookDeeperAction from '@/components/research/LookDeeperAction.vue'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
@@ -1186,6 +1194,7 @@ import type { StreamEventMetadata } from '@/types/chatStream'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
+import { formatFileSize, getFileIcon } from '@/utils/messageFileDisplay'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
@@ -1322,6 +1331,10 @@ interface Props {
   voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
   /** Live reading stopped. Stays visible when the full spoken file arrives. */
   readAloudFailed?: boolean
+  /** How much the question needed (`answer`, `lookup`, `research`); a lookup offers Look deeper. */
+  effort?: string | null
+  /** Why a research the question needed was not started. */
+  effortNotice?: string | null
   searchResults?: Array<{
     title: string
     url: string
@@ -1861,6 +1874,8 @@ const emit = defineEmits<{
   report: [messageId: number]
   'click-memory': [memory: UserMemory]
   continue: []
+  /** Look deeper under a direct answer: start the research the chat skipped. */
+  'look-deeper': []
   mediaJobUpdate: [job: MediaJobInfo]
   mediaJobCompleted: [payload: { url: string; type: string }]
   mediaJobCancel: [jobId: string]
@@ -2188,28 +2203,6 @@ const vClickOutside = {
       document.removeEventListener('click', handler)
     }
   },
-}
-
-// File handling functions
-const getFileIcon = (fileType: string): string => {
-  const type = fileType.toLowerCase()
-  if (['pdf'].includes(type)) return 'mdi:file-pdf-box'
-  if (['doc', 'docx'].includes(type)) return 'mdi:file-word-box'
-  if (['xls', 'xlsx'].includes(type)) return 'mdi:file-excel-box'
-  if (['ppt', 'pptx'].includes(type)) return 'mdi:file-powerpoint-box'
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(type)) return 'mdi:file-image'
-  if (['mp3', 'wav', 'ogg', 'm4a', 'opus'].includes(type)) return 'mdi:file-music'
-  if (['mp4', 'avi', 'mov', 'webm'].includes(type)) return 'mdi:file-video'
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(type)) return 'mdi:folder-zip'
-  if (['txt', 'md'].includes(type)) return 'mdi:file-document-outline'
-  return 'mdi:file-outline'
-}
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
 const downloadFile = async (file: MessageFile) => {

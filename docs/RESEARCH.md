@@ -19,6 +19,50 @@ working, so a run that was already going can still be opened and removed.
 A unit that starts after research was turned off writes what it has found and
 then stops with "Research was turned off on your Synaplan workspace."
 
+## Automatic research
+
+There is no research mode and no menu entry. The chat decides how much a
+question needs, from the same `tools:sort` answer that already carries the
+topic and the web-search vote: `BEFFORT` is `answer`, `lookup` or `research`,
+`BEFFORT_WHY` names the one reason (`several_parts`, `comparison`,
+`procedure`, `current_fact`, `asked_thorough`, `asked_short`, `simple`,
+`deeper`). A sorting model that does not fill the fields counts as no vote,
+and the chat answers directly — an install whose sorter cannot carry the
+rating simply never researches on its own.
+
+When the rating is `research`, the turn starts a run of depth `auto` for the
+person and answers with one sentence: "I am looking through several sources
+for this — about N minutes. The question has several parts." The stream
+carries `research_started` with the run id first, so the card appears under
+the thread at once and follows the run like any other. The report arrives in
+the chat when the run finishes. Only an ordinary signed-in web chat turn
+does this: never a widget, a saved task, an incognito chat, an "Again", a
+turn with a fixed task prompt, or a channel without a chat.
+
+A `research` turn that cannot start a run answers directly and begins with
+why, in the person's language: web search off and no folder on the chat
+(`no_sources`), too many runs going (`too_many`), the usage budget used up
+(`budget`), the plan's research allowance used up (`plan_limit`), or the
+research store not answering (`unavailable`). The reply carries `effort` and
+`effortNotice`, so **Look deeper** is offered under a `lookup` answer and
+under every answer that began with a limit sentence, live and after a
+reload. Look deeper starts a run of depth `auto` with the hint `deeper` and
+the last six turns of the chat as context.
+
+Depth `auto` sizes itself from the plan: after planning, a plan of up to two
+points is capped at the quick budget, a larger plan at the standard budget.
+The plan event carries `ceiling` (`quick` or `standard`) and the minutes the
+run now needs; the run state carries `ceiling` as well. The hint `brief`
+(the sorter said `asked_short`) caps the plan at two points; `deeper` lets
+it grow. An automatic run never asks a question. **Answer now** on the card
+is the `answer_now` input above; **Stop** keeps what was written.
+
+| | |
+| --- | --- |
+| Switch | `BCONFIG` group `RESEARCH`, setting `AUTO_ENABLED`, owner `0`. Installs seed `1` (the seeder adds the missing row on existing installs too). Off, or research off (`RESEARCH_ENABLED=0` included), means the chat answers every question directly and Look deeper is absent. The admin research tab has the switch. |
+| Capabilities | `automatic` (boolean) and `auto_limits { minutes, cost_cap }` from the standard budget. |
+| Eval | `app:research:router-eval --user=<id>` rates the labelled corpus in `backend/tests/Eval/research/router.json` with that account's sorting model. Gate: agreement ≥ 90 %, over-escalation ≤ 5 %, under-escalation ≤ 10 %, no vote ≤ 2 %. |
+
 ## Routes
 
 The same actions are on `/api/v1/research` (signed-in app) and `/v1/research`
@@ -51,6 +95,7 @@ follow-up.
 | revise | required | Rewrites the report from the instruction (shorter, for the board, a translation, a table, one section). A cited sentence with the same words and the same citations keeps its verdict and is not checked again; any other cited sentence is checked. A parent without a report answers 409. |
 | deeper | optional | Uses the thorough budget. Each line under Not confirmed (up to eight; the closing count is not a line) becomes a plan point, and so does the text. With neither, the parent question is searched again. |
 | refresh | optional | Reads sources dated before the start of the brief's time frame again, and sources without a date, and says what changed. With no start date, it reads every source that was already read again. |
+| answer_now | none | Answer now on the card. While sources were read, the run writes the report from them (like write now). Before any source was read, the run ends at once with the outcome `answered_without_research` and the chat answers the question directly. While the report is being written or checked, nothing changes. |
 
 An id that is not the caller's is 404. The session route requires `chat_id`
 and the chat must belong to the caller. The API route rejects `chat_id`; the
@@ -162,7 +207,7 @@ A run that does not finish fails the step with its sentence, and later steps
 skip. The step does not ask questions and cannot be thorough.
 
 The planner does not see the step while the flag is off, and never offers it
-to a normal chat turn (that has its own research mode). Closing the window
+to a normal chat turn (the chat decides on its own when a question needs a research). Closing the window
 does not stop the research. The report still appears in the chat, and so does
 what the later steps produce.
 

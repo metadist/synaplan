@@ -1,5 +1,4 @@
 <template>
-  <ResearchComposer />
   <Teleport v-if="thread" :to="thread">
     <ResearchCard />
   </Teleport>
@@ -15,7 +14,6 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { useResearchStore } from '@/stores/research'
 import ResearchCard from './ResearchCard.vue'
-import ResearchComposer from './ResearchComposer.vue'
 
 const auth = useAuthStore()
 const chats = useChatsStore()

@@ -25,6 +25,10 @@ export interface ResearchProgress {
   snippets: ResearchSnippet[]
   check: { statements: number; supported: number; removed: number } | null
   queuedSeconds: number | null
+  /** How far an automatic run decided to look once it had read the question: `quick` or `standard`. */
+  ceiling: string | null
+  /** Why a finished run ended the way it did (`answered_without_research`, …). */
+  outcome: string | null
   lastSeq: number
 }
 
@@ -52,6 +56,8 @@ export function emptyProgress(id: string, chatId: number, question: string): Res
     snippets: [],
     check: null,
     queuedSeconds: null,
+    ceiling: null,
+    outcome: null,
     lastSeq: 0,
   }
 }
@@ -114,6 +120,7 @@ export function applyResearchFrame(
   if (frame.event === 'plan') {
     next.phase = 'plan'
     next.points = mergePoints(state.points, readPoints(frame.data.points))
+    next.ceiling = typeof frame.data.ceiling === 'string' ? frame.data.ceiling : state.ceiling
     return next
   }
   if (frame.event === 'point') {
@@ -158,6 +165,8 @@ export function progressFromRun(
     sources?: unknown
     evidence?: unknown
     check?: { statements?: number; supported?: number; removed?: number } | null
+    ceiling?: string | null
+    outcome?: { code?: string } | null
   }
 ): ResearchProgress {
   const plan =
@@ -168,6 +177,8 @@ export function progressFromRun(
   progress.status = run.status
   progress.phase = run.status
   progress.queuedSeconds = run.queued_since ?? null
+  progress.ceiling = run.ceiling ?? null
+  progress.outcome = run.outcome?.code ?? null
   progress.points = readPoints(plan).map((point) => ({
     ...point,
     status: point.status || 'open',

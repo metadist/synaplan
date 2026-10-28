@@ -249,6 +249,8 @@
               :document-changes="message.documentChanges"
               :document-fidelity-lossy="message.documentFidelityLossy"
               :voice-reply-failed="message.voiceReplyFailed"
+              :effort="message.effort"
+              :effort-notice="message.effortNotice"
               :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
               :rag-sources="message.ragSources"
@@ -264,7 +266,7 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
-              :schedule-source="userTextBefore(message.id)"
+              :schedule-source="userTextBefore(historyStore.messages, message.id)"
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
@@ -289,6 +291,7 @@
               @report="openReportModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
+              @look-deeper="handleLookDeeper(message)"
               @media-job-update="message.mediaJob = $event"
               @media-job-completed="handleMediaJobCompleted(message, $event)"
               @media-job-cancel="mediaJobsStore.cancel($event)"
@@ -716,6 +719,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useResearchStore } from '@/stores/research'
 import { useSmartSearchStore } from '@/stores/smartSearch'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import {
@@ -750,7 +754,7 @@ import { generatePartId } from '@/utils/mediaParts'
 import { applyReadAloudFailed } from '@/utils/voiceReply'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { stripPastedBlocks } from '@/utils/pastedContent'
-import { scheduleSourceFromParts } from '@/utils/scheduleSource'
+import { groupMessagesByDay, lookDeeperInput, userTextBefore } from '@/utils/chatTurns'
 import { shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
 import { pickEmptyGreetingKey } from '@/utils/emptyGreeting'
 import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
@@ -1080,6 +1084,7 @@ const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
+const researchStore = useResearchStore()
 const incognitoHasMessages = computed(() => historyStore.messages.length > 0)
 
 function onIncognitoSavedContext(event: Event) {
@@ -1634,11 +1639,6 @@ const deleteDialogQueue = ref<Array<UserMemory & { toastId: number }>>([])
 
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
-
-interface MessageGroup {
-  label: string
-  messages: Message[]
-}
 
 const isStreaming = computed(() => {
   return historyStore.messages.some((m) => m.isStreaming === true) || isAudioStreaming.value
@@ -2364,33 +2364,7 @@ watch(queryAgentId, async (id) => {
   await openFreshAssistantChatIfNeeded()
 })
 
-const userTextBefore = (messageId: string | number): string => {
-  const list = historyStore.messages
-  const idx = list.findIndex((row) => row.id === messageId)
-  for (let i = idx - 1; i >= 0; i--) {
-    if (list[i].role !== 'user') continue
-    return scheduleSourceFromParts(list[i].parts)
-  }
-  return ''
-}
-
-const groupedMessages = computed(() => {
-  const groups: MessageGroup[] = []
-  let currentGroup: MessageGroup | null = null
-
-  historyStore.messages.forEach((message) => {
-    const label = getDateLabel(message.timestamp)
-
-    if (!currentGroup || currentGroup.label !== label) {
-      currentGroup = { label, messages: [] }
-      groups.push(currentGroup)
-    }
-
-    currentGroup.messages.push(message)
-  })
-
-  return groups
-})
+const groupedMessages = computed(() => groupMessagesByDay(historyStore.messages, getDateLabel))
 
 const scrollToBottom = (force = false) => {
   if ((force || autoScroll.value) && chatContainer.value) {
@@ -2585,6 +2559,12 @@ function handleMediaJobCompleted(message: Message, payload: { url: string; type:
 function renderStreamingContent(content: string, msgId: string): void {
   const message = historyStore.messages.find((m) => m.id === msgId)
   if (message) paintStreamedAnswer(message, content, processingIndicator, translate)
+}
+
+/** Look deeper under a direct answer: start the research the chat skipped. */
+const handleLookDeeper = (message: Message): void => {
+  const input = lookDeeperInput(historyStore.messages, message.id)
+  if (input) void researchStore.lookDeeper(input)
 }
 
 const handleContinueResponse = async (message: Message) => {
@@ -3168,6 +3148,13 @@ function memberTurnFor(
       showError: (message, durationMs) => showErrorToast(message, durationMs),
       showLimit: (notice) => showLimitOrPaywall(notice),
       userLevel: () => authStore.user?.level || 'NEW',
+    },
+    research: {
+      adopt: (runId) => {
+        const target = chatId ?? currentStreamingChatId
+        if (target === undefined) return
+        researchStore.adopt(target, runId, userTextBefore(historyStore.messages, canvas.messageId))
+      },
     },
     registerIncognitoFile: (fileId) => incognitoStore.registerFile(fileId),
   }

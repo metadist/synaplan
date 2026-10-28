@@ -1139,31 +1139,12 @@
     "deleteConfirm": "/{command} disparaît du menu du chat. Les messages déjà envoyés restent inchangés."
   },
   "research": {
-    "menu": "Recherche",
-    "menuHint": "Un rapport écrit avec des sources, dans ce chat",
     "title": "Recherche",
-    "questionLabel": "Que voulez-vous découvrir ?",
-    "depth": {
-      "standard": "Standard",
-      "thorough": "Approfondi"
-    },
-    "depthHint": {
-      "standard": "Environ {minutes} minutes",
-      "thorough": "Environ {minutes} minutes"
-    },
-    "sourcesLabel": "Sources",
-    "sourceWeb": "Web",
-    "sourceFiles": "Dossiers de la bibliothèque",
-    "start": "Lancer la recherche",
-    "startNeedsQuestion": "Écrivez ce que vous voulez découvrir.",
-    "startNeedsSource": "Activez le web ou ajoutez des fichiers.",
-    "noSources": "La recherche web et les dossiers de la bibliothèque sont désactivés, donc la recherche ne peut pas démarrer.",
     "noChat": "Ouvrez un chat, puis lancez la recherche.",
     "startFailed": "La recherche n'a pas pu démarrer. Vérifiez la question et réessayez.",
     "stopFailed": "La recherche n'a pas pu être arrêtée. Elle continue.",
     "incognito": "La recherche enregistre un rapport dans le chat. Terminez d'abord le chat incognito.",
     "close": "Fermer",
-    "continues": "Vous pouvez fermer cette fenêtre. La recherche continue et le rapport apparaît dans ce chat.",
     "stop": "Arrêter",
     "stopConsequence": "Arrêter conserve ce qui est déjà écrit et ne cherche plus.",
     "stopped": "La recherche est arrêtée. Ce qui était déjà écrit reste dans ce chat. Rien de plus n'a été cherché.",
@@ -1177,6 +1158,19 @@
     "pointDone": "Fait",
     "pointOpen": "Encore ouvert",
     "pointNotConfirmed": "Non confirmé",
-    "depthLabel": "Jusqu'où aller ?"
+    "answerNow": "Répondre maintenant",
+    "answerNowConsequence": {
+      "reading": "Répondre maintenant rédige le rapport à partir de ce qui a déjà été lu.",
+      "early": "Répondre maintenant répond sans la recherche supplémentaire.",
+      "writing": "Le rapport est presque prêt."
+    },
+    "answerNowFailed": "Répondre maintenant n'a pas atteint la recherche. Elle continue.",
+    "answeredWithout": "Répondu sans la recherche supplémentaire.",
+    "lookDeeper": "Approfondir la recherche",
+    "lookDeeperHint": "Lit plus de sources et vérifie chaque affirmation. Environ {minutes} minutes.",
+    "ceiling": {
+      "quick": "{points} points — un coup d'œil rapide",
+      "standard": "{points} points — une recherche standard"
+    }
   }
 }
