@@ -23,7 +23,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | merged (`f029b10fd`) | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`). Live installation set to `shadow` on 2026-10-28 |
 | 2026-10-28 | AU12 | [#2845](https://github.com/metadist/synaplan/pull/2845) | merged (`32ce18e76`) | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes join `AiCallPipeline`; `AiPathOnlyThroughPipelineTest` |
 | 2026-10-28 | AU13 | [#2846](https://github.com/metadist/synaplan/pull/2846) | merged (`74800aed5`) | `AiCallMetricsHook` (200), request timeline, capacity `/requests` and `/ai-calls`. Post-merge cost stamp: [#2849](https://github.com/metadist/synaplan/pull/2849) (`010d689be`) |
-| 2026-10-28 | AU14 | — | in progress | `EgressInventoryTest` freezes today's outbound HTTP stacks. No runtime change. Started from `main` at `010d689be` |
+| 2026-10-28 | AU14 | [#2854](https://github.com/metadist/synaplan/pull/2854) | open | `EgressInventoryTest` freezes today's outbound HTTP stacks. No runtime change. Started from `main` at `010d689be` |
 
 ## 2026-10-28 — AU14 started
 
