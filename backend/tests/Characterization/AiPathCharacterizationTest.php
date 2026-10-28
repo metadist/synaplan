@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Characterization;
 
 use App\AI\Pipeline\UsageHookMode;
+use App\Service\Usage\LegacyUsageWriter;
 use App\Tests\Characterization\Support\AiPathHarness;
 use App\Tests\Characterization\Support\AiPathSnapshot;
 use App\Tests\Characterization\Support\OfflineHttpGuard;
@@ -69,6 +70,7 @@ final class AiPathCharacterizationTest extends TestCase
 
     protected function tearDown(): void
     {
+        LegacyUsageWriter::bind(null);
         OfflineHttpGuard::uninstall();
         if (is_dir($this->uploadDir)) {
             $paths = new \RecursiveIteratorIterator(

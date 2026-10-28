@@ -965,12 +965,12 @@ final class AiPathHarness
         $configRepo = $this->createStub(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(static fn (int $owner, string $group, string $setting): ?string => 'DEFAULTMODEL' === $group && 'WEBANSWER' === $setting ? $sonarBid : null);
 
-        $perplexityChat = new PerplexityProvider(new NullLogger(), self::SECRET, $keyStore, $sdk->factory());
+        [$facade] = $this->buildSpine($sdk, $http);
         $adapter = new PerplexityAdapter(
             new PerplexitySearchClient($http->client(), $keyStore, $plugConfig),
             $configRepo,
             new NullLogger(),
-            $perplexityChat,
+            $facade,
         );
 
         $resultSet = $adapter->search(new WebSearchQuery('Synaplan architecture', wantAnswer: true));
@@ -1102,7 +1102,8 @@ final class AiPathHarness
             new MockResponse('{"error":{"message":"Model not found"}}', ['http_code' => 404, 'response_headers' => ['content-type' => 'application/json']]),
         ], [self::SECRET]);
 
-        $capabilityProbe = new CapabilityProbe($http->client());
+        [$facade] = $this->buildSpine($sdk, $http);
+        $capabilityProbe = new CapabilityProbe($http->client(), $facade->pipeline());
         $endpointProbe = $capabilityProbe->probe([
             'base_url' => 'https://endpoint.example.test/v1',
             'api_key' => self::SECRET,
@@ -1112,7 +1113,7 @@ final class AiPathHarness
         $keyStore = $this->createStub(ProviderKeyStore::class);
         $keyStore->method('getKey')->willReturnCallback(static fn (string $provider): ?string => 'openai' === $provider ? self::SECRET : null);
 
-        $inventory = new ProviderModelInventory($http->client(), $keyStore, new NullLogger());
+        $inventory = new ProviderModelInventory($http->client(), $keyStore, new NullLogger(), $facade->pipeline());
         $availability = $inventory->fetch('openai');
         $singleProbe = $inventory->probe('openai', 'gpt-4o-retired-probe');
 
@@ -1132,7 +1133,7 @@ final class AiPathHarness
      */
     private function runMessagesGatewayCase(OpenAISdkRecorder $sdk, ProviderHttpRecorder $http, string $requestedModel): array
     {
-        [, $limits, , $user, $modelRepo] = $this->buildSpine($sdk, $http);
+        [$facade, $limits, , $user, $modelRepo] = $this->buildSpine($sdk, $http);
 
         $config = $this->createStub(MessagesGatewayConfig::class);
         $config->method('isEnabled')->willReturn(true);
@@ -1213,6 +1214,7 @@ final class AiPathHarness
             new NullLogger(),
             [$passthrough, $openAiTranslator, $geminiTranslator],
         );
+        $gateway->setPipeline($facade->pipeline());
 
         $request = Request::create(
             '/v1/messages',
@@ -1259,9 +1261,11 @@ final class AiPathHarness
             false,
             sdkFactory: $sdk->factory(),
         );
+        $perplexity = new PerplexityProvider(new NullLogger(), self::SECRET, null, $sdk->factory());
 
         $locator = new ServiceLocator([
             'openai' => static fn (): OpenAIProvider => $openAi,
+            'perplexity' => static fn (): PerplexityProvider => $perplexity,
         ]);
         $registry = new ProviderRegistry(
             $locator,

@@ -65,9 +65,6 @@ enum AiCallSource: string
      */
     public function isJoined(): bool
     {
-        return match ($this) {
-            self::MessagesApi, self::VoiceLive => false,
-            default => true,
-        };
+        return true;
     }
 }

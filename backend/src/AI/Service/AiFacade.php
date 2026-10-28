@@ -244,7 +244,7 @@ class AiFacade
         /* @var array<string, mixed> */
         return $this->pipeline()->run(
             $call,
-            static fn (AiCall $c): array => $provider->chat($c->payload->messages, array_diff_key($c->options->providerOptions, ['_bill_to' => true])),
+            static fn (AiCall $c): array => $provider->chat($c->payload->messages, array_diff_key($c->options->providerOptions, ['_bill_to' => true, 'skip_circuit_breaker' => true, 'skip_model_health' => true])),
         )->value;
     }
 

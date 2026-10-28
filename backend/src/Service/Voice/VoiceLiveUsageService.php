@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace App\Service\Voice;
 
+use App\AI\Pipeline\AiCall;
+use App\AI\Pipeline\AiCallContext;
+use App\AI\Pipeline\AiCallOptions;
+use App\AI\Pipeline\AiCallPayload;
+use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\AiCallSource;
+use App\AI\Pipeline\AiCapability;
+use App\AI\Pipeline\AiUsage;
 use App\DTO\CostResult;
 use App\Entity\Model;
 use App\Entity\User;
@@ -16,6 +24,7 @@ use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * One BUSELOG row per live conversation, updated on every tick.
@@ -23,7 +32,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * The row's cost is the voice cost plus the chat model's answers. It feeds
  * the same monthly budget as chat, images and video. There is no minutes quota.
  */
-final readonly class VoiceLiveUsageService
+final class VoiceLiveUsageService
 {
     public const ACTION = 'VOICE_LIVE';
 
@@ -37,14 +46,27 @@ final readonly class VoiceLiveUsageService
     /** Gemini's published audio rate, used as the worst case for per-audio-token models. */
     private const AUDIO_TOKENS_PER_SECOND = 25;
 
+    private ?AiCallPipeline $pipeline = null;
+
     public function __construct(
-        private EntityManagerInterface $em,
-        private VoiceSessionRepository $sessions,
-        private CostCalculationService $costs,
-        private RateLimitService $rateLimit,
-        private PremiumFeatureGate $budgetGate,
-        private ConfigRepository $config,
+        private readonly EntityManagerInterface $em,
+        private readonly VoiceSessionRepository $sessions,
+        private readonly CostCalculationService $costs,
+        private readonly RateLimitService $rateLimit,
+        private readonly PremiumFeatureGate $budgetGate,
+        private readonly ConfigRepository $config,
     ) {
+    }
+
+    #[Required]
+    public function setPipeline(AiCallPipeline $pipeline): void
+    {
+        $this->pipeline = $pipeline;
+    }
+
+    private function pipeline(): AiCallPipeline
+    {
+        return $this->pipeline ??= new AiCallPipeline();
     }
 
     public function open(User $user, Model $model, ?int $chatId, string $client, bool $zeroCost = false, string $transport = 'relay'): VoiceSession
@@ -84,7 +106,26 @@ final readonly class VoiceLiveUsageService
             'media_usage' => ['duration_seconds' => 0],
             'last_tick' => $now,
         ];
-        $useLogId = $this->insertUseLog($user, $model, $metadata, '0.000000', 0, 0, 0, 'running', 0, null);
+        $call = new AiCall(
+            capability: AiCapability::VoiceSession,
+            provider: strtolower($model->getService()),
+            model: $model->getName(),
+            context: new AiCallContext(
+                userId: $userId,
+                source: AiCallSource::VoiceLive,
+                turnId: 'voice-session-'.($session->getId() ?? 0),
+            ),
+            payload: new AiCallPayload(),
+            options: AiCallOptions::fromArray([
+                'model_id' => (int) $model->getId(),
+                'voice_phase' => 'open',
+            ], callerMeters: true),
+        );
+        /** @var int $useLogId */
+        $useLogId = $this->pipeline()->run(
+            $call,
+            fn (): int => $this->insertUseLog($user, $model, $metadata, '0.000000', 0, 0, 0, 'running', 0, null),
+        )->value;
         $session->setUseLogId($useLogId);
         $this->em->flush();
 
@@ -161,9 +202,40 @@ final readonly class VoiceLiveUsageService
         $this->tick($session, $meter, $latencyMs);
         $meta = $this->readMetadata($session);
         $total = $this->money($this->asFloat($meta['voice_cost'] ?? 0) + $this->asFloat($meta['answer_cost'] ?? 0));
-        $session->setStatus('ended')->setEndReason($reason)->setEnded(time());
-        $this->writeUseLog($session, $meta, $total, 0, 0, null, 'success', $latencyMs, true);
-        $this->em->flush();
+        $folded = $this->meterFromSnapshot($meta['voice_meter'] ?? []);
+        $prompt = $folded->textInTokens + $folded->audioInTokens + $folded->audioCacheTokens + $this->asInt($meta['answer_prompt_tokens'] ?? 0);
+        $completion = $folded->textOutTokens + $folded->audioOutTokens + $this->asInt($meta['answer_completion_tokens'] ?? 0);
+
+        $call = new AiCall(
+            capability: AiCapability::VoiceSession,
+            provider: strtolower($session->getProvider()),
+            model: null,
+            context: new AiCallContext(
+                userId: $session->getUserId(),
+                source: AiCallSource::VoiceLive,
+                turnId: 'voice-session-'.($session->getId() ?? 0),
+            ),
+            payload: new AiCallPayload(),
+            options: AiCallOptions::fromArray([
+                'model_id' => $session->getModelId(),
+                'voice_phase' => 'close',
+            ], callerMeters: true),
+        );
+        $this->pipeline()->run(
+            $call,
+            function () use ($session, $reason, $meta, $total, $latencyMs): void {
+                $session->setStatus('ended')->setEndReason($reason)->setEnded(time());
+                $this->writeUseLog($session, $meta, $total, 0, 0, null, 'success', $latencyMs, true);
+                $this->em->flush();
+            },
+            static fn (): AiUsage => new AiUsage(
+                promptTokens: $prompt,
+                completionTokens: $completion,
+                totalTokens: $prompt + $completion,
+                durationSeconds: $folded->seconds,
+                chargedCost: $total,
+            ),
+        );
     }
 
     private function decide(VoiceSession $session, VoiceLiveMeter $meter): VoiceLiveDecision

@@ -11,6 +11,7 @@ use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Vision\VisionPolicy;
+use App\AI\Pipeline\AiCallPipeline;
 use App\AI\Stream\StreamTextCapture;
 use App\Entity\Model;
 use App\Entity\User;
@@ -30,6 +31,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Orchestrates a Messages API request: feature flag, budget, model resolve,
@@ -91,10 +93,12 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     headers?: array<string, string>
  * }
  */
-final readonly class MessagesGateway
+final class MessagesGateway
 {
     private const BUDGET_NOTICE_CACHE_PREFIX = 'messages_gateway_budget_notice_';
     private const BUDGET_NOTICE_TTL = 7200;
+
+    private ?AiCallPipeline $pipeline = null;
 
     /**
      * Plans allowed to use a BYO provider key through the gateway. BYO calls
@@ -118,29 +122,40 @@ final readonly class MessagesGateway
      * @param iterable<MessagesTranslatorInterface> $translators
      */
     public function __construct(
-        private MessagesGatewayConfig $config,
-        private MessagesModelResolver $modelResolver,
-        private ModelRepository $modelRepository,
-        private VisionModelResolver $visionModelResolver,
-        private UserProviderKeyResolver $keyResolver,
-        private RateLimitService $rateLimitService,
-        private PremiumFeatureGate $premiumFeatureGate,
-        private AnthropicPassthroughTranslator $anthropicPassthrough,
-        private GatewayToolCatalog $toolCatalog,
-        private GatewayToolLoop $toolLoop,
-        private WebFetchPolicy $webFetchPolicy,
-        private VisionPolicy $visionPolicy,
-        private MessagesContextInjector $contextInjector,
-        private CacheItemPoolInterface $cache,
-        private MessageBusInterface $messageBus,
-        private LoggerInterface $logger,
+        private readonly MessagesGatewayConfig $config,
+        private readonly MessagesModelResolver $modelResolver,
+        private readonly ModelRepository $modelRepository,
+        private readonly VisionModelResolver $visionModelResolver,
+        private readonly UserProviderKeyResolver $keyResolver,
+        private readonly RateLimitService $rateLimitService,
+        private readonly PremiumFeatureGate $premiumFeatureGate,
+        private readonly AnthropicPassthroughTranslator $anthropicPassthrough,
+        private readonly GatewayToolCatalog $toolCatalog,
+        private readonly GatewayToolLoop $toolLoop,
+        private readonly WebFetchPolicy $webFetchPolicy,
+        private readonly VisionPolicy $visionPolicy,
+        private readonly MessagesContextInjector $contextInjector,
+        private readonly CacheItemPoolInterface $cache,
+        private readonly MessageBusInterface $messageBus,
+        private readonly LoggerInterface $logger,
         #[AutowireIterator('app.messages.translator')]
-        private iterable $translators = [],
-        private ?AgentConfig $agentConfig = null,
-        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
-        private ?DesktopOmittedModel $desktopOmittedModel = null,
-        private ?DesktopAgentConfig $desktopAgentConfig = null,
+        private readonly iterable $translators = [],
+        private readonly ?AgentConfig $agentConfig = null,
+        private readonly ?AgentRuntimeResolver $agentRuntimeResolver = null,
+        private readonly ?DesktopOmittedModel $desktopOmittedModel = null,
+        private readonly ?DesktopAgentConfig $desktopAgentConfig = null,
     ) {
+    }
+
+    #[Required]
+    public function setPipeline(AiCallPipeline $pipeline): void
+    {
+        $this->pipeline = $pipeline;
+    }
+
+    private function pipeline(): AiCallPipeline
+    {
+        return $this->pipeline ??= new AiCallPipeline();
     }
 
     /**
@@ -445,18 +460,21 @@ final readonly class MessagesGateway
             return $this->err(500, 'api_error', 'No translator available.');
         }
 
+        $turnId = 'messages-'.$prepared['session_key'];
+        $pipelined = new PipelineMessagesTranslator($translator, $this->pipeline(), (int) $user->getId(), $prepared['resolved'], $prepared['key_source'], $turnId);
+
         try {
             if ($prepared['tool_loop'] && null !== $prepared['tool_catalog']) {
                 $result = $this->toolLoop->runComplete(
                     $prepared['request_body'],
                     $prepared['translator_context'],
-                    $translator,
+                    $pipelined,
                     $user,
                     $prepared['tool_catalog'],
                     $prepared['replaced_server_tools'],
                 );
             } else {
-                $result = $translator->complete($prepared['request_body'], $prepared['translator_context']);
+                $result = $pipelined->complete($prepared['request_body'], $prepared['translator_context']);
             }
         } catch (\Throwable $e) {
             $this->logger->error('MessagesGateway: complete failed', [
@@ -472,14 +490,14 @@ final readonly class MessagesGateway
         $usage = $result['usage'];
 
         if ($status < 400 && \is_array($body)) {
-            $this->recordUsage($user, $prepared, $usage, $body);
-            $this->dispatchSessionSummary($prepared, $user, $this->extractResponseText($body));
+            $this->recordUsage($user, $prepared, $usage, $body, '', $turnId);
+            $this->dispatchSessionSummary($prepared, $user, MessagesResponseText::extract($body));
             $body = $this->maybeAppendBudgetNoticeNonStream($prepared, $body, $usage);
         }
 
         $responseHeaders = $prepared['headers'];
         if ('user' === $prepared['key_source']) {
-            $responseHeaders = array_merge($responseHeaders, $this->extractUpstreamRateLimitHeaders($result['headers']));
+            $responseHeaders = array_merge($responseHeaders, MessagesResponseText::extractUpstreamRateLimitHeaders($result['headers']));
         }
 
         return [
@@ -507,23 +525,26 @@ final readonly class MessagesGateway
             return new MessagesUsage();
         }
 
+        $turnId = 'messages-'.$prepared['session_key'];
+        $pipelined = new PipelineMessagesTranslator($translator, $this->pipeline(), (int) $user->getId(), $prepared['resolved'], $prepared['key_source'], $turnId);
+
         $capture = StreamTextCapture::wrap($emit);
         if ($prepared['tool_loop'] && null !== $prepared['tool_catalog']) {
             $usage = $this->toolLoop->runStream(
                 $prepared['request_body'],
                 $prepared['translator_context'],
-                $translator,
+                $pipelined,
                 $user,
                 $prepared['tool_catalog'],
                 $capture,
                 $prepared['replaced_server_tools'],
             );
         } else {
-            $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $capture);
+            $usage = $pipelined->stream($prepared['request_body'], $prepared['translator_context'], $capture);
         }
 
         if ($usage->shouldMeter()) {
-            $this->recordUsage($user, $prepared, $usage, null, $capture->text());
+            $this->recordUsage($user, $prepared, $usage, null, $capture->text(), $turnId);
         }
 
         return $usage;
@@ -823,10 +844,10 @@ final readonly class MessagesGateway
      * @param GatewaySuccess            $prepared
      * @param array<string, mixed>|null $responseBody
      */
-    private function recordUsage(User $user, array $prepared, MessagesUsage $usage, ?array $responseBody, string $answerText = ''): void
+    private function recordUsage(User $user, array $prepared, MessagesUsage $usage, ?array $responseBody, string $answerText = '', ?string $turnId = null): void
     {
         $inputText = $this->lastUserText($prepared['request_body']);
-        $responseText = null !== $responseBody ? $this->extractResponseText($responseBody) : $answerText;
+        $responseText = null !== $responseBody ? MessagesResponseText::extract($responseBody) : $answerText;
 
         $metadata = [
             'provider' => $prepared['resolved']['provider'],
@@ -838,9 +859,10 @@ final readonly class MessagesGateway
             'source' => 'MESSAGES_API',
             'key_source' => $prepared['key_source'],
         ];
+        if (null !== $turnId) {
+            $metadata['turn_id'] = $turnId;
+        }
         if ('user' === $prepared['key_source']) {
-            // BYO key: the user pays the provider directly — meter tokens for
-            // statistics but never charge the Synaplan budget.
             $metadata['zero_cost'] = true;
         }
 
@@ -935,25 +957,6 @@ final readonly class MessagesGateway
     }
 
     /**
-     * Concatenated text blocks of an Anthropic-shaped response body.
-     *
-     * @param array<string, mixed> $responseBody
-     */
-    private function extractResponseText(array $responseBody): string
-    {
-        $responseText = '';
-        if (isset($responseBody['content']) && \is_array($responseBody['content'])) {
-            foreach ($responseBody['content'] as $block) {
-                if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
-                    $responseText .= (string) $block['text'];
-                }
-            }
-        }
-
-        return $responseText;
-    }
-
-    /**
      * @param GatewaySuccess       $prepared
      * @param array<string, mixed> $body
      *
@@ -974,35 +977,7 @@ final readonly class MessagesGateway
             return $body;
         }
 
-        $content = $body['content'] ?? [];
-        if (!\is_array($content)) {
-            $content = [];
-        }
-        $content[] = [
-            'type' => 'text',
-            'text' => $this->budgetNoticeText($prepared['budget']),
-        ];
-        $body['content'] = $content;
-
-        return $body;
-    }
-
-    /**
-     * @param array<string, list<string>> $headers
-     *
-     * @return array<string, string>
-     */
-    private function extractUpstreamRateLimitHeaders(array $headers): array
-    {
-        $out = [];
-        foreach ($headers as $name => $values) {
-            $lower = strtolower($name);
-            if (str_starts_with($lower, 'anthropic-ratelimit-') || 'request-id' === $lower || 'retry-after' === $lower) {
-                $out[$name] = $values[0] ?? '';
-            }
-        }
-
-        return $out;
+        return MessagesResponseText::appendBudgetNotice($body, $this->budgetNoticeText($prepared['budget']));
     }
 
     /**
