@@ -19,11 +19,11 @@ here, not a chat message. §0 is not ticked. No fix starts until it is.
 
 Read-only pass of rows 9, 21 and 22 on `main` at `fa64e4c82`. No model
 was called. No flag was changed. #2853 (the architecture target
-picture) landed after that read and does not change the findings. The eight defects are in the master
-plan with the file and the test that proves each one. Three things that
-looked like defects are not: the bird-status cache generation, marking
-a missing chat delivered, and a WebDAV folder of `..` on the person's
-own connection.
+picture) landed after that read and does not change the findings.
+The eight defects are in the master plan with the file and the test
+that proves each one. Three things that looked like defects are not:
+the bird-status cache generation, marking a missing chat delivered,
+and a WebDAV folder of `..` on the person's own connection.
 
 Rows 9, 21 and 22 in `ROADMAP.md` were behind that commit (cloud files
 "no product code yet", research "plan only", architecture "AU4 in
