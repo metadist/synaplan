@@ -451,6 +451,46 @@ final class HookContractTest extends \PHPUnit\Framework\TestCase
         self::assertFalse($transportCalled);
     }
 
+    public function testStreamGeneratorRunsBeforeHooksAndTransportCreationEagerlyBeforeIteration(): void
+    {
+        $afterOutcomes = [];
+        $onAfter = static function (string $outcome) use (&$afterOutcomes): void {
+            $afterOutcomes[] = $outcome;
+        };
+        $hook = new #[AsAiCallHook(priority: 500)] class($onAfter) implements AiCallHookInterface {
+            /** @param \Closure(string): void $onAfter */
+            public function __construct(private readonly \Closure $onAfter)
+            {
+            }
+
+            public function before(AiCall $call): AiCall
+            {
+                return $call;
+            }
+
+            public function after(AiCall $call, AiCallResult $result): void
+            {
+                ($this->onAfter)($result->outcome->value);
+            }
+        };
+
+        $pipeline = new AiCallPipeline([$hook]);
+
+        try {
+            $pipeline->streamGenerator(
+                $this->sampleCall(AiCapability::SynthesizeStream),
+                static function (): \Generator {
+                    throw new ProviderException('Piper TTS unreachable', 'piper');
+                },
+            );
+            self::fail('Expected eager transport failure before generator iteration.');
+        } catch (ProviderException $e) {
+            self::assertSame('Piper TTS unreachable', $e->getMessage());
+        }
+
+        self::assertSame(['failed'], $afterOutcomes);
+    }
+
     private function sampleCall(AiCapability $capability = AiCapability::Chat): AiCall
     {
         return new AiCall(

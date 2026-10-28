@@ -214,7 +214,10 @@ final readonly class AiCallPipeline
 
     /**
      * Wrap a lazy `\Generator` stream (`synthesizeStream`) in the pipeline
-     * lifecycle so chunks yield lazily to the caller without buffering.
+     * lifecycle: `before()` hooks and `$transport($call)` run eagerly when
+     * `streamGenerator()` is called (so provider setup failures throw before
+     * HTTP 200 stream headers are sent), while chunks yield lazily inside the
+     * returned generator.
      *
      * @param callable(AiCall): \Generator           $transport
      * @param (callable(mixed): (AiUsage|null))|null $usageExtractor
@@ -237,10 +240,50 @@ final readonly class AiCallPipeline
         }
 
         $providerStart = ($this->clockNs)();
+        try {
+            $generator = $transport($call);
+        } catch (StreamCancelledException $cancelled) {
+            $providerMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
+            $this->runAfter($call, new AiCallResult(
+                outcome: AiCallOutcome::Cancelled,
+                value: null,
+                usage: null,
+                timings: new AiCallTimings(hooksBeforeMs: $hooksBeforeMs, providerMs: $providerMs),
+                failureClass: $cancelled::class,
+                exception: $cancelled,
+            ));
+
+            throw $cancelled;
+        } catch (\Throwable $error) {
+            $providerMs = (($this->clockNs)() - $providerStart) / 1_000_000.0;
+            $this->runAfter($call, new AiCallResult(
+                outcome: AiCallOutcome::Failed,
+                value: null,
+                usage: null,
+                timings: new AiCallTimings(hooksBeforeMs: $hooksBeforeMs, providerMs: $providerMs),
+                failureClass: $error::class,
+                exception: $error,
+            ));
+
+            throw $error;
+        }
+
+        return $this->iterateStreamGenerator($call, $generator, $providerStart, $hooksBeforeMs, $usageExtractor);
+    }
+
+    /**
+     * @param (callable(mixed): (AiUsage|null))|null $usageExtractor
+     */
+    private function iterateStreamGenerator(
+        AiCall $call,
+        \Generator $generator,
+        int $providerStart,
+        float $hooksBeforeMs,
+        ?callable $usageExtractor,
+    ): \Generator {
         $ttftMs = null;
 
         try {
-            $generator = $transport($call);
             foreach ($generator as $rawChunk) {
                 $this->observeStreamChunk($call, $rawChunk, $providerStart, $ttftMs);
                 yield $rawChunk;
