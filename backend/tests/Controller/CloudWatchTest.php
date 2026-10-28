@@ -136,13 +136,19 @@ final class CloudWatchTest extends WebTestCase
         self::assertSame('Vendor line', $body['shortcuts'][0]['name']);
         self::assertSame('vendor', $body['shortcuts'][0]['command']);
         self::assertSame('Extract the vendor, the date and the total.', $body['shortcuts'][0]['body']);
-        $byKey = [];
+        $invoices = null;
+        $yearCount = null;
         foreach ($body['folders'] as $folder) {
             self::assertIsString($folder['group_key']);
-            $byKey[$folder['group_key']] = $folder['file_count'];
+            if ('Invoices' === $folder['group_key']) {
+                $invoices = $folder['file_count'];
+            }
+            if ('2026' === $folder['group_key']) {
+                $yearCount = $folder['file_count'];
+            }
         }
-        self::assertSame(1, $byKey['Invoices']);
-        self::assertSame(1, $byKey['2026']);
+        self::assertSame(1, $invoices);
+        self::assertSame(1, $yearCount);
         self::assertCount(1, $body['shortcuts']);
         self::assertCount(2, $body['folders']);
     }
