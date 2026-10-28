@@ -34,6 +34,7 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         private ResearchStateStore $store,
         private ResearchOutcomeText $outcomes,
         private LoggerInterface $logger,
+        private ?ResearchDirectAnswer $direct = null,
     ) {
     }
 
@@ -96,7 +97,10 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         $report = trim($state->ledger->report() ?? '');
         $outcome = $state->outcome;
         if ('' === $report) {
-            return $this->outcomes->sentence($outcome, $locale);
+            $sentence = $this->outcomes->sentence($outcome, $locale);
+            $answer = ResearchOutcome::ANSWERED_WITHOUT_RESEARCH === $outcome?->code ? $this->direct?->answer($state) : null;
+
+            return null === $answer ? $sentence : '> '.$sentence."\n\n".$answer;
         }
         if (ResearchOutcome::COMPLETE === $outcome?->code) {
             return $report;

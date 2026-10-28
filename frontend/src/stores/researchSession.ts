@@ -22,11 +22,14 @@ import { useHistoryStore } from './history'
 import { useIncognitoStore } from './incognito'
 
 const POLL_MS = 2000
+/** The server refuses a start with more starting pages than this. */
+const MAX_SEED_SOURCES = 50
 
-/** What Look deeper sends: the question, and the last turns so the research knows the chat. */
+/** What Look deeper sends: the question, the answer's cited pages, and the last turns so the research knows the chat. */
 export interface LookDeeperInput {
   question: string
   context: Array<{ role: 'user' | 'assistant'; text: string }>
+  seedSources: Array<{ url: string; title?: string }>
 }
 
 export interface ResearchBag {
@@ -189,6 +192,7 @@ async function acceptRun(bag: ResearchBag, chatId: number, input: LookDeeperInpu
       knowledge: capabilities?.knowledge_available ?? false,
     },
     context: { turns: input.context.slice(-6) },
+    seed_sources: input.seedSources.slice(0, MAX_SEED_SOURCES),
   })
   const next = emptyProgress(accepted.id, chatId, input.question)
   next.status = accepted.status

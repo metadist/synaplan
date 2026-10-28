@@ -27,7 +27,7 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final readonly class GatewayAutoResearch
 {
-    /** Idempotency prefix: one research per user and question, however often the POST is retried. */
+    /** Idempotency prefix: one research per user and turn, however often the POST is retried. */
     private const KEY_PREFIX = 'gw:';
 
     public function __construct(
@@ -74,11 +74,25 @@ final readonly class GatewayAutoResearch
             turns: AutoResearchGate::turns($history),
             chatId: null,
             assistantId: $options->agentId,
-            idempotencyKey: self::KEY_PREFIX.$userId.':'.substr(sha1($question), 0, 16),
+            idempotencyKey: self::KEY_PREFIX.$userId.':'.self::turnHash($messages, $options),
         ));
         $notice = $decision->startedRun() ? $this->text->notice($decision->minutes, (string) $decision->why, $language) : null;
 
         return new GatewayEffortRating($verdict, $decision, $notice);
+    }
+
+    /**
+     * A retried POST repeats the whole conversation and its options; a new
+     * turn with the same wording carries a longer history, another folder
+     * or another assistant, so it starts its own research.
+     *
+     * @param array<int|string, mixed> $messages
+     */
+    private static function turnHash(array $messages, DesktopTurnOptions $options): string
+    {
+        $turn = json_encode([$messages, $options->ragGroupKey, $options->agentId], \JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        return substr(sha1(false === $turn ? '' : $turn), 0, 16);
     }
 
     /**

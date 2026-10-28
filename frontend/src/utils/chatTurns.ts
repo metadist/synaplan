@@ -23,7 +23,8 @@ export function userTextBefore(messages: Message[], messageId: string | number):
 
 /**
  * What Look deeper under the answer `messageId` sends: the question that
- * answer replied to and the last turns up to and including the answer.
+ * answer replied to, the pages it cited, and the last turns up to and
+ * including the answer.
  * `null` when no user turn precedes the answer.
  */
 export function lookDeeperInput(
@@ -41,7 +42,10 @@ export function lookDeeperInput(
       text: scheduleSourceFromParts(row.parts).slice(0, LOOK_DEEPER_TURN_CHARS),
     }))
     .filter((turn) => turn.text !== '')
-  return { question, context }
+  const seedSources = (messages[idx]?.searchResults ?? [])
+    .filter((result) => result.url !== '')
+    .map((result) => ({ url: result.url, title: result.title }))
+  return { question, context, seedSources }
 }
 
 /** The transcript in day groups, in order; `labelOf` names the day. */

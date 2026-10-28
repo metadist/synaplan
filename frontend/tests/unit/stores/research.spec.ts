@@ -120,6 +120,7 @@ describe('research store · a run the chat started on its own', () => {
     await research.lookDeeper({
       question: 'Which visa do I need?',
       context: [{ role: 'user', text: 'Which visa do I need?' }],
+      seedSources: [{ url: 'https://example.com/visa', title: 'Visa rules' }],
     })
 
     expect(startResearch).toHaveBeenCalledWith(
@@ -128,6 +129,7 @@ describe('research store · a run the chat started on its own', () => {
         depth: 'auto',
         hint: 'deeper',
         chat_id: CHAT_ID,
+        seed_sources: [{ url: 'https://example.com/visa', title: 'Visa rules' }],
       })
     )
     expect(research.progress?.id).toBe('rr_fedcba9876543210')

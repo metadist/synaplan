@@ -30,6 +30,8 @@ export async function startResearch(body: {
   hint?: 'brief' | 'deeper'
   /** The last turns of the chat, newest last, so the research knows what was already said. */
   context?: { turns: Array<{ role: 'user' | 'assistant'; text: string }> }
+  /** Pages the research starts from, such as the cited pages of the answer it deepens. */
+  seed_sources?: Array<{ url: string; title?: string }>
 }): Promise<z.infer<typeof PostApiResearchStartResponseSchema>> {
   return httpClient('/api/v1/research', {
     method: 'POST',
