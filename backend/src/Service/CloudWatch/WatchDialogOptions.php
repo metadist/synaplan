@@ -46,7 +46,9 @@ final readonly class WatchDialogOptions
         }
         $folders = [];
         foreach ($this->files->getGroupCountsByUser($ownerId) as $groupKey => $count) {
-            $folders[] = ['group_key' => $groupKey, 'file_count' => $count];
+            // A numeric name such as "2026" is an int array key in PHP. The
+            // dialog contract says group_key is a string.
+            $folders[] = ['group_key' => (string) $groupKey, 'file_count' => $count];
         }
 
         return [

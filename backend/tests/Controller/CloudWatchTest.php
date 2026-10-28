@@ -109,6 +109,16 @@ final class CloudWatchTest extends WebTestCase
         $file->setStatus('uploaded');
         $file->setGroupKey('Invoices');
         $this->em->persist($file);
+        $year = new File();
+        $year->setUserId($ownerId);
+        $year->setFileName('2026.txt');
+        $year->setFilePath('/uploads/2026.txt');
+        $year->setFileType('txt');
+        $year->setFileSize(4);
+        $year->setFileMime('text/plain');
+        $year->setStatus('uploaded');
+        $year->setGroupKey('2026');
+        $this->em->persist($year);
         $other = $this->person('other-options');
         $foreign = (new SavedPrompt())
             ->setUserId((int) $other->getId())
@@ -126,10 +136,15 @@ final class CloudWatchTest extends WebTestCase
         self::assertSame('Vendor line', $body['shortcuts'][0]['name']);
         self::assertSame('vendor', $body['shortcuts'][0]['command']);
         self::assertSame('Extract the vendor, the date and the total.', $body['shortcuts'][0]['body']);
-        self::assertSame('Invoices', $body['folders'][0]['group_key']);
-        self::assertSame(1, $body['folders'][0]['file_count']);
+        $byKey = [];
+        foreach ($body['folders'] as $folder) {
+            self::assertIsString($folder['group_key']);
+            $byKey[$folder['group_key']] = $folder['file_count'];
+        }
+        self::assertSame(1, $byKey['Invoices']);
+        self::assertSame(1, $byKey['2026']);
         self::assertCount(1, $body['shortcuts']);
-        self::assertCount(1, $body['folders']);
+        self::assertCount(2, $body['folders']);
     }
 
     public function testTheCapRefusesAnotherWatch(): void
