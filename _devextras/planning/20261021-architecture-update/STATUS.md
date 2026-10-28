@@ -20,9 +20,16 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
 | 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | merged (`a0bb87213`) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
 | 2026-10-27 | AU10 | [#2841](https://github.com/metadist/synaplan/pull/2841) | merged (`2b3148c40`) | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 1,070 lines; pipeline overhead 0.008 ms p95 |
-| 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | open | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`) |
-| 2026-10-28 | AU12 | [#2845](https://github.com/metadist/synaplan/pull/2845), stacked on #2844 | open | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes (`CapabilityProbe`, `ProviderModelInventory`) join `AiCallPipeline`; `MessagesGateway` 1,050 → 1,025 lines; `AiPathOnlyThroughPipelineTest` |
-| 2026-10-28 | AU13 | [#2846](https://github.com/metadist/synaplan/pull/2846), stacked on #2845 | open | `AiCallMetricsHook` (200), `RequestTimelineRecorder`, `RequestTimelineDbMiddleware`, `RequestTimelineStore` (`timeline:requests` + `metrics:{serverId}:*`), `GET /api/v1/admin/capacity/requests` and `/ai-calls`; measuring cost 0.1 ms p95 (budget ≤ 0.3 ms) |
+| 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | merged (`f029b10fd`) | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`). Live installation set to `shadow` on 2026-10-28 |
+| 2026-10-28 | AU12 | [#2845](https://github.com/metadist/synaplan/pull/2845) | merged (`32ce18e76`) | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes join `AiCallPipeline`; `AiPathOnlyThroughPipelineTest` |
+| 2026-10-28 | AU13 | [#2846](https://github.com/metadist/synaplan/pull/2846) | merged (`74800aed5`) | `AiCallMetricsHook` (200), request timeline, capacity `/requests` and `/ai-calls`. Post-merge cost stamp: [#2849](https://github.com/metadist/synaplan/pull/2849) (`010d689be`) |
+| 2026-10-28 | AU14 | — | in progress | `EgressInventoryTest` freezes today's outbound HTTP stacks. No runtime change. Started from `main` at `010d689be` |
+
+## 2026-10-28 — AU14 started
+
+Started from `main` at `010d689be` ([#2849](https://github.com/metadist/synaplan/pull/2849)). No runtime code changes. The inventory is the gate for AU15–AU17.
+
+The 2026-10-21 egress map named 9 `curl_init` calls, one `file_get_contents` fallback, and `HttpClient::create()` in `MetaProvider`. The scan also finds two `curl_init` calls in `plugins/synaform` and three `file_get_contents` downloads of an image URL in `OpenAIImageGeneration`. `docs/EGRESS.md` lists every site, including MariaDB, Redis, SMTP, IMAP, Triton gRPC, and the voice sidecar's WebSocket.
 
 ## Baselines
 
