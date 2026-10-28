@@ -21,7 +21,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | merged (`a0bb87213`) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
 | 2026-10-27 | AU10 | [#2841](https://github.com/metadist/synaplan/pull/2841) | merged (`2b3148c40`) | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 1,070 lines; pipeline overhead 0.008 ms p95 |
 | 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | open | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`) |
-| 2026-10-28 | AU12 | in progress | branch `refactor/au12-join-pipeline` | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes (`CapabilityProbe`, `ProviderModelInventory`) join `AiCallPipeline`; `MessagesGateway` 1,050 → 1,025 lines; `AiPathOnlyThroughPipelineTest` |
+| 2026-10-28 | AU12 | [#2845](https://github.com/metadist/synaplan/pull/2845), stacked on #2844 | open | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes (`CapabilityProbe`, `ProviderModelInventory`) join `AiCallPipeline`; `MessagesGateway` 1,050 → 1,025 lines; `AiPathOnlyThroughPipelineTest` |
+| 2026-10-28 | AU13 | stacked on #2845 | in progress | `AiCallMetricsHook` (200), `RequestTimelineRecorder`, `RequestTimelineDbMiddleware`, `RequestTimelineStore` (`timeline:requests` + `metrics:{serverId}:*`), `GET /api/v1/admin/capacity/requests` and `/ai-calls`; measuring cost 0.1 ms p95 (budget ≤ 0.3 ms) |
 
 ## Baselines
 
@@ -34,6 +35,23 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-28 — AU13: every request and AI call is timed from start to end
+
+Started from `refactor/au12-join-pipeline` (`4053a7f6c`, [#2845](https://github.com/metadist/synaplan/pull/2845)).
+
+**What changed.**
+- `AiCallMetricsHook` (priority 200, after `UsageHook` at 300) records every AI call's provider, bounded catalog model (`custom` when unknown), capability, source, TTFT (`ttft_ms`), duration (`duration_ms`), `tokens_in`, `tokens_out`, `cost`, `outcome`, and `hooks_ms` onto `RequestTimelineContext`.
+- `RequestTimelineDbMiddleware` (`#[AsMiddleware]`) accumulates `db_ms` and `db_queries` per request without reading SQL text or parameters.
+- `RequestTimelineRecorder` (`kernel.request`, `kernel.controller`, `kernel.terminate`) builds the allow-listed request record and writes it via `RequestTimelineStore::record()` in a single Redis pipeline (`timeline:requests` ZSET capped at 10,000 entries with 24 h TTL, plus per-server `metrics:{serverId}:*` counter and histogram hashes with 24 h TTL).
+- `AdminCapacityController` adds `GET /api/v1/admin/capacity/requests` and `GET /api/v1/admin/capacity/ai-calls` (backed by `CapacityTimelineService`, registered in `CapacityModule`) with full OpenAPI annotations; `make -C frontend generate-schemas` generated `GetAdminCapacityRequestsResponseSchema` and `GetAdminCapacityAiCallsResponseSchema`, verified with `vue-tsc`.
+
+**Proof, privacy & performance.**
+- `RequestTimelineRecorderTest` (4 tests, 77 assertions): chat stream, gateway call and file upload record shapes and capacity endpoints; bounded labels (`custom` for unknown model, `other` for unknown route); privacy test feeding a prompt, an `sk-…` API key, a Bearer JWT and an email address through the recorder and asserting none appear anywhere in the Redis ZSET or hash state; ring cap (`10,000`) and TTL (`86,400 s`).
+- `HookContractTest` updated to pin `AiCallMetricsHook` at priority `200` (`UsageHook` 300 runs before `AiCallMetricsHook` 200).
+- `make perf-runtime`: pipeline overhead **0.027 ms p95** (budget ≤ 1.0 ms: `ok`); request timeline measuring cost **0.100 ms p95** (budget ≤ 0.3 ms: `ok`).
 
 ---
 

@@ -33,6 +33,14 @@
       "note": "AU10 onward: 1,000 calls with the default hooks and a no-op provider, <= 1 ms p95."
     },
     {
+      "id": "request_timeline_overhead",
+      "metric": "pipeline.timeline_p95_ms",
+      "max": 0.3,
+      "enforce": true,
+      "label": "Request timeline measuring cost per request",
+      "note": "AU13 onward: RequestTimelineRecorder + single Redis pipeline write in kernel.terminate, <= 0.3 ms p95."
+    },
+    {
       "id": "gateway_ttft",
       "metric": "gateway.ttft_p50_ms",
       "max": null,
