@@ -40,6 +40,39 @@ chat message.
 
 ---
 
+## 2026-10-28 — §0 #5 and #15 superseded by adaptive research (row 31)
+
+**Superseded, 2026-10-28:** §0 #5 (people choose Standard or Thorough) and
+#15 (the Research chip on Desktop) are replaced by
+[`20261028-adaptive-research/`](../20261028-adaptive-research/00_master_plan.md):
+the sorter rates every message, the chat starts a run with depth `auto` on
+its own, and the only escapes are **Answer now** during a run and **Look
+deeper** under an answer. Tools → Research, `ResearchComposer.vue` and the
+Desktop chip go in that track's AR3 and AR6. Everything else here stands;
+the engine, the card, the admin tab, follow-ups and the Desktop surfaces are
+what the new track drives. J-RQ-8 (research mode in the web chat) and the
+chip part of J-RQ-2 are no longer journeys to walk; J-RQ-9 and J-RQ-10
+stay. RX2 / RX3 pages that describe a mode are rewritten by that track's
+AX1. No code changed in this entry.
+
+---
+
+## 2026-10-28 — research on by default, RQ3 skipped (owner override)
+
+**Owner decision, 2026-10-28:** RQ3 is skipped and research is turned on
+without the targets of `06` §5. This is an explicit override of §0 #19 and
+#23, not a pass. `ResearchConfigSeeder` seeds `RESEARCH.ENABLED = 1` for new
+installs; migration `Version20261028110000` sets it to `1` on existing
+installs once. `RESEARCH_ENABLED=0` still pins it off, and the minimal
+profile (`backend/.env.minimal`, `docker-compose.minimal.yml`) now pins `0`,
+because an empty value follows the seeded row. `LEAD_MODE` stays `auto` and
+`TOOL_MODE_MODELS` stays `[]`, so runs use round mode. `DEFAULTMODEL.READ`
+and `VERIFY` stay `-1` and fall back as in §0 #4. `MULTITASK.RESEARCH_ENABLED`
+and `WEB_SEARCH.READ_DOCUMENTS` are unchanged (off). No model was called.
+Cost $0.
+
+---
+
 ## 2026-10-27 — Desktop research and the admin tab
 
 synaplan-desktop #50 merged the chat split and the desktop research screens
