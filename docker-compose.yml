@@ -175,7 +175,7 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: node:24@sha256:e2007d1f4e652444f88d9bb196256d2d035269015e3d27a0d47c1d0cb5192a98
+    image: node:26@sha256:b5f0e27e7423ea242b37af44c8c856e28f7e37d4fac23cb430cb618874ff8517
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -252,7 +252,7 @@ services:
   # rendering chunks (native binary + JS heap), which OOM-killed every build
   # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:24@sha256:e2007d1f4e652444f88d9bb196256d2d035269015e3d27a0d47c1d0cb5192a98
+    image: node:26@sha256:b5f0e27e7423ea242b37af44c8c856e28f7e37d4fac23cb430cb618874ff8517
     container_name: synaplan-frontend-widgets
     working_dir: /app
     # Wait for the generated Zod schemas before the first build: src/generated/
@@ -1070,7 +1070,7 @@ services:
   # then set FREEAPI_BASE_URL=http://freeapi-fake:8787 and FEATURE_FREEAPI_ENABLED=true.
   # Canned answers, in-memory state; see _devextras/freeapi-fake/README.md.
   freeapi-fake:
-    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+    image: node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
     container_name: synaplan-freeapi-fake
     profiles: [freeapi-fake]
     restart: unless-stopped
@@ -1147,7 +1147,7 @@ services:
   # and point TELEGRAM_API_BASE_URL at http://telegram-stub:3998 on backend and worker.
   telegram-stub:
     profiles: [telegram-stub]
-    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+    image: node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
     container_name: synaplan-telegram-stub
     user: node
     working_dir: /app
