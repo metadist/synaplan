@@ -945,7 +945,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:dea72d1e22270fe095b68fdf756d2b489d615643c5a2eaebbc5f569181e322d8
+    image: ollama/ollama:latest@sha256:20d1bbfbabe1c97ba4b16301f08a20d8484bcf77047742a3cb71c613d8e12d0b
     container_name: synaplan-ollama
     depends_on:
       backend:
@@ -1124,7 +1124,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin:latest@sha256:4de49392e023fa330f49ecc72a79384359783856ade762272112ed347ab32706
+    image: phpmyadmin:latest@sha256:414db3b5c801a6c9b9f4a6dbd06a9e426dfc7f0a09d02140ae0e483eface5fdd
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db
