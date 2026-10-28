@@ -256,7 +256,7 @@ final class AiPipelineMeter implements ResetInterface
             : $this->activeTurnId;
         unset($metadata['turn_id']);
         $recorded = $rateLimitService->recordUsage($user, $action, $metadata);
-        $this->stampTimelineCost($metadata, $recorded->chargedCost);
+        $this->stampRecordedCost($metadata, $recorded);
 
         if ($this->config->isShadow()) {
             $this->verifyShadow($userId, $action, $metadata, $recorded, $rawTurnId);
@@ -324,9 +324,28 @@ final class AiPipelineMeter implements ResetInterface
         }
 
         $recorded = $rateLimitService->recordUsage($user, $action, $metadata);
-        $this->stampTimelineCost($metadata, $recorded->chargedCost);
+        $this->stampRecordedCost($metadata, $recorded);
 
         return $recorded;
+    }
+
+    /**
+     * A test double of {@see RecordedUsage} has no charged cost. Reading the
+     * property then throws, and the call that was being metered never finishes.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    private function stampRecordedCost(array $metadata, RecordedUsage $recorded): void
+    {
+        $cost = new \ReflectionProperty(RecordedUsage::class, 'chargedCost');
+        if (!$cost->isInitialized($recorded)) {
+            return;
+        }
+        $value = $cost->getValue($recorded);
+        if (!\is_string($value)) {
+            return;
+        }
+        $this->stampTimelineCost($metadata, $value);
     }
 
     /**

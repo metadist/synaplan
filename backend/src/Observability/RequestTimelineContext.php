@@ -44,6 +44,9 @@ final class RequestTimelineContext implements ResetInterface
     /** @var list<array{provider: string, model: string, capability: string, source: string, ttft_ms: ?int, duration_ms: int, tokens_in: int, tokens_out: int, cost: string, outcome: string, hooks_ms: float}> */
     private array $aiCalls = [];
 
+    /** @var list<bool> True once a usage receipt has set the cost of the AI call at the same index */
+    private array $aiCostFinal = [];
+
     /** @var list<array{source: string, kind: string, outcome: string, duration_ms: int}> */
     private array $toolCalls = [];
 
@@ -60,6 +63,7 @@ final class RequestTimelineContext implements ResetInterface
         $this->dbMs = 0.0;
         $this->dbQueries = 0;
         $this->aiCalls = [];
+        $this->aiCostFinal = [];
         $this->toolCalls = [];
         $this->egressCalls = [];
     }
@@ -121,6 +125,7 @@ final class RequestTimelineContext implements ResetInterface
             'outcome' => self::boundedLabel($outcome, 'failed'),
             'hooks_ms' => round(max(0.0, $hooksMs), 3),
         ];
+        $this->aiCostFinal[] = false;
     }
 
     /**
@@ -132,27 +137,58 @@ final class RequestTimelineContext implements ResetInterface
     }
 
     /**
-     * Fill the charged cost onto the newest still-unpriced AI call for this
-     * provider and model. The usage row is written after the metrics hook, so
-     * the hook records tokens first and the writer stamps the cost it just
-     * calculated.
+     * Apply one usage receipt to the trailing run of AI calls for this provider
+     * and model that do not have a receipt yet.
+     *
+     * One call gets the whole charge, replacing a provisional preview. Several
+     * calls (one embedding batch, or several gateway rounds that share a row)
+     * split the charge by their token counts, so the total is not piled onto
+     * the last call and an earlier call is not charged by a later receipt.
      */
     public function stampChargedCost(string $provider, string $model, string $chargedCost): void
     {
         $providerLabel = self::boundedLabel($provider, 'unknown');
         $modelLabel = self::boundedCatalogModel($model);
-        $cost = number_format(max(0.0, (float) $chargedCost), 6, '.', '');
+        $amount = max(0.0, (float) $chargedCost);
 
+        $indexes = [];
         for ($i = \count($this->aiCalls) - 1; $i >= 0; --$i) {
-            if ('0.000000' !== $this->aiCalls[$i]['cost']) {
-                continue;
+            if ($this->aiCostFinal[$i] ?? false) {
+                break;
             }
             if ($this->aiCalls[$i]['provider'] !== $providerLabel || $this->aiCalls[$i]['model'] !== $modelLabel) {
-                continue;
+                break;
             }
-            $this->aiCalls[$i]['cost'] = $cost;
-
+            $indexes[] = $i;
+        }
+        if ([] === $indexes) {
             return;
+        }
+        $indexes = array_reverse($indexes);
+
+        $weights = [];
+        $totalWeight = 0;
+        foreach ($indexes as $index) {
+            $weight = $this->aiCalls[$index]['tokens_in'] + $this->aiCalls[$index]['tokens_out'];
+            $weights[$index] = $weight;
+            $totalWeight += $weight;
+        }
+
+        $remaining = $amount;
+        $last = $indexes[\count($indexes) - 1];
+        $shareCount = \count($indexes);
+        foreach ($indexes as $index) {
+            if ($index === $last) {
+                $share = $remaining;
+            } elseif ($totalWeight > 0) {
+                $share = round($amount * $weights[$index] / $totalWeight, 6);
+                $remaining = round($remaining - $share, 6);
+            } else {
+                $share = round($amount / $shareCount, 6);
+                $remaining = round($remaining - $share, 6);
+            }
+            $this->aiCalls[$index]['cost'] = number_format(max(0.0, $share), 6, '.', '');
+            $this->aiCostFinal[$index] = true;
         }
     }
 
@@ -314,6 +350,7 @@ final class RequestTimelineContext implements ResetInterface
         $this->dbMs = 0.0;
         $this->dbQueries = 0;
         $this->aiCalls = [];
+        $this->aiCostFinal = [];
         $this->toolCalls = [];
         $this->egressCalls = [];
     }
