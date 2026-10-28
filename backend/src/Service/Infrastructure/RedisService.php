@@ -610,6 +610,27 @@ LUA;
         }
     }
 
+    public function hSetNx(string $key, string $field, string $value, ?int $ttlSeconds = null): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $inserted = 1 === (int) $client->hsetnx($this->prefix($key), $field, $value);
+            if ($inserted && null !== $ttlSeconds && $ttlSeconds > 0) {
+                $client->expire($this->prefix($key), $ttlSeconds);
+            }
+
+            return $inserted;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('HSETNX', $key, $e);
+
+            return false;
+        }
+    }
+
     /**
      * Every field of a hash. Null when Redis does not answer, so a caller can
      * tell "no fields" from "no Redis".

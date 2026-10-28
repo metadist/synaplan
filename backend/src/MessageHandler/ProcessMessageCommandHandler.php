@@ -121,7 +121,7 @@ class ProcessMessageCommandHandler
         }
 
         $metadata = is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
-        $this->rateLimits->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages(
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $user, 'MESSAGES', FacadeMeteredChat::messages(
             $metadata,
             'QUEUE',
             $message->getText(),

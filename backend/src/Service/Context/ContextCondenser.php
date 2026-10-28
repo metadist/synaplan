@@ -492,7 +492,7 @@ final class ContextCondenser
                 return;
             }
 
-            $this->rateLimitService->recordUsage($user, self::USAGE_ACTION, [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, self::USAGE_ACTION, [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',

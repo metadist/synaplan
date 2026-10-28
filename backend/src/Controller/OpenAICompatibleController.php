@@ -684,7 +684,7 @@ class OpenAICompatibleController extends AbstractController
     private function recordChatUsage(User $user, array $metadata): void
     {
         try {
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', $metadata);
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MESSAGES', $metadata);
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI-compatible: recordUsage failed', [
                 'error' => $e->getMessage(),

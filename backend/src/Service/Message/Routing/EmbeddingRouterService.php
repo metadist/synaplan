@@ -167,7 +167,7 @@ final readonly class EmbeddingRouterService
         // routing itself is unaffected.
         $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
 
-        $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
             'usage' => $embedResult['usage'] ?? ['prompt_tokens' => 0, 'total_tokens' => 0],
             'provider' => (null !== $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null) ?? 'unknown',
             'model' => (null !== $modelId ? $this->modelConfigService->getModelName($modelId) : null) ?? 'unknown',

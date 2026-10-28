@@ -471,7 +471,7 @@ final readonly class ApiSessionSummaryService
     private function recordSummarizerUsage(User $user, ?int $modelId, array $response, string $summary): void
     {
         try {
-            $this->rateLimitService->recordUsage($user, 'SORTING', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'SORTING', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',

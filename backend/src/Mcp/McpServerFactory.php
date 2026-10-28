@@ -870,7 +870,7 @@ final class McpServerFactory
      */
     private function recordChatUsage(User $user, string $input, string $answer, array $meta): void
     {
-        $this->rateLimit->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages($meta, 'MCP', $input, $answer));
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimit, $user, 'MESSAGES', FacadeMeteredChat::messages($meta, 'MCP', $input, $answer));
 
         $mediaAction = match ($meta['media_type'] ?? null) {
             'image' => 'IMAGES',
@@ -880,7 +880,7 @@ final class McpServerFactory
         };
 
         if (null !== $mediaAction) {
-            $this->rateLimit->recordUsage($user, $mediaAction, [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimit, $user, $mediaAction, [
                 'provider' => $meta['provider'] ?? 'unknown',
                 'model' => $meta['model'] ?? 'unknown',
                 'model_id' => $meta['model_id'] ?? null,

@@ -75,7 +75,7 @@ final readonly class TranscriptionUsageRecorder
         }
 
         try {
-            return $this->rateLimitService->recordUsage($user, self::ACTION, [
+            return LegacyUsageWriter::record($this->rateLimitService, $user, self::ACTION, [
                 'provider' => $provider,
                 'model' => $model,
                 'model_id' => $modelId,

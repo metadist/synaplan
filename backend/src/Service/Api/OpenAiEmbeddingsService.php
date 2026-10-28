@@ -35,7 +35,13 @@ final readonly class OpenAiEmbeddingsService
 
         $model = $this->models->resolve('vectorize', 'VECTORIZE', $request->model, $userId);
         $provider = strtolower($model->getService());
-        $options = ['model' => $model->getProviderId()];
+        $options = [
+            'model' => $model->getProviderId(),
+            'model_id' => (int) $model->getId(),
+            'usage_action' => 'EMBEDDINGS',
+            'usage_source' => 'OPENAI_API',
+            'usage_inputs' => \count($request->inputs),
+        ];
         if (null !== $request->dimensions) {
             $options['dimensions'] = $request->dimensions;
         }
@@ -78,7 +84,7 @@ final readonly class OpenAiEmbeddingsService
     private function recordUsage(User $user, string $provider, string $modelName, int $modelId, array $usage, OpenAiEmbeddingsRequest $request): void
     {
         try {
-            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                 'usage' => $usage,
                 'provider' => $provider,
                 'model' => $modelName,

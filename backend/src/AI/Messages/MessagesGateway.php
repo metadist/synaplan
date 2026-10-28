@@ -845,7 +845,7 @@ final readonly class MessagesGateway
         }
 
         try {
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', $metadata);
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MESSAGES', $metadata);
         } catch (\Throwable $e) {
             $this->logger->error('MessagesGateway: recordUsage failed', [
                 'error' => $e->getMessage(),

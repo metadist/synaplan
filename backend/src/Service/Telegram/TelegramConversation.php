@@ -468,7 +468,7 @@ final readonly class TelegramConversation
     private function recordUsage(TelegramTurn $turn, Message $inbound, array $metadata, string $reply): ?RecordedUsage
     {
         try {
-            return $this->rateLimits->recordUsage(
+            return \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits,
                 $turn->owner,
                 'MESSAGES',
                 FacadeMeteredChat::messages($metadata, 'TELEGRAM', $inbound->getText(), $reply),

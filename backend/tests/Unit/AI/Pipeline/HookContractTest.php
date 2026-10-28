@@ -19,7 +19,9 @@ use App\AI\Pipeline\AiCapability;
 use App\AI\Pipeline\AsAiCallHook;
 use App\AI\Pipeline\Hook\CircuitBreakerHook;
 use App\AI\Pipeline\Hook\ModelHealthHook;
+use App\AI\Pipeline\Hook\RateLimitHook;
 use App\AI\Pipeline\Hook\RequestContextHook;
+use App\AI\Pipeline\Hook\UsageHook;
 use App\AI\Pipeline\HookFailure;
 use App\AI\Pipeline\StreamingAiCallHookInterface;
 use App\AI\Service\AiFacade;
@@ -52,10 +54,14 @@ final class HookContractTest extends \PHPUnit\Framework\TestCase
         }
 
         self::assertSame(900, $byClass[RequestContextHook::class]->priority);
+        self::assertSame(800, $byClass[RateLimitHook::class]->priority);
         self::assertSame(700, $byClass[CircuitBreakerHook::class]->priority);
         self::assertSame(600, $byClass[ModelHealthHook::class]->priority);
-        self::assertGreaterThan($byClass[CircuitBreakerHook::class]->priority, $byClass[RequestContextHook::class]->priority);
+        self::assertSame(300, $byClass[UsageHook::class]->priority);
+        self::assertGreaterThan($byClass[RateLimitHook::class]->priority, $byClass[RequestContextHook::class]->priority);
+        self::assertGreaterThan($byClass[CircuitBreakerHook::class]->priority, $byClass[RateLimitHook::class]->priority);
         self::assertGreaterThan($byClass[ModelHealthHook::class]->priority, $byClass[CircuitBreakerHook::class]->priority);
+        self::assertGreaterThan($byClass[UsageHook::class]->priority, $byClass[ModelHealthHook::class]->priority);
     }
 
     public function testNonBlockingHooksDoNotInjectForbiddenServices(): void

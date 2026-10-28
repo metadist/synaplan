@@ -186,7 +186,7 @@ PROMPT;
             $aiOptions = [
                 'temperature' => 0.3, // Low temperature for consistent extraction
                 'model' => $extractionConfig['model'],
-                'provider' => $extractionConfig['provider'], 'caller_meters' => true,
+                'provider' => $extractionConfig['provider'], 'caller_meters' => true, 'usage_action' => 'MEMORY_EXTRACTION',
             ];
 
             if ($this->structuredOutputConfig->isEnabled($message->getUserId())) {
@@ -206,7 +206,7 @@ PROMPT;
 
             /** @var User $user */
             $user = $this->entityManager->getReference(User::class, $message->getUserId());
-            $this->rateLimitService->recordUsage($user, 'MEMORY_EXTRACTION', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MEMORY_EXTRACTION', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $extractionConfig['model_id'] ?? null,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization;
 
+use App\AI\Pipeline\UsageHookMode;
 use App\Tests\Characterization\Support\AiPathHarness;
 use App\Tests\Characterization\Support\AiPathSnapshot;
 use App\Tests\Characterization\Support\OfflineHttpGuard;
@@ -90,5 +91,31 @@ final class AiPathCharacterizationTest extends TestCase
         self::assertSame(self::EXPECTED_PATHS, array_keys($actual));
 
         AiPathSnapshot::assertSame(self::SNAPSHOT, $actual, 'AI call paths');
+    }
+
+    public function testShadowAndOnModesMatchTheBaselineRowsOnEveryJoinedPath(): void
+    {
+        $legacyHarness = new AiPathHarness($this, $this->uploadDir, UsageHookMode::Legacy);
+        $legacy = $legacyHarness->runAll();
+
+        $shadowHarness = new AiPathHarness($this, $this->uploadDir, UsageHookMode::Shadow);
+        $shadow = $shadowHarness->runAll();
+        self::assertSame([], $shadowHarness->mismatches(), 'Shadow mode reported an unexpected mismatch.');
+
+        $onHarness = new AiPathHarness($this, $this->uploadDir, UsageHookMode::On);
+        $on = $onHarness->runAll();
+
+        foreach (self::EXPECTED_PATHS as $path) {
+            self::assertSame(
+                $legacy[$path]['buselog'],
+                $shadow[$path]['buselog'],
+                sprintf('Shadow mode changed BUSELOG rows for path %s.', $path),
+            );
+            self::assertSame(
+                $legacy[$path]['buselog'],
+                $on[$path]['buselog'],
+                sprintf('On mode changed BUSELOG rows for path %s.', $path),
+            );
+        }
     }
 }

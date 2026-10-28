@@ -561,7 +561,7 @@ PROMPT;
 
             $owner = $this->userRepository->find($userId);
             if ($owner) {
-                $this->rateLimitService->recordUsage($owner, 'WIDGET_SUMMARY', [
+                \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $owner, 'WIDGET_SUMMARY', [
                     'provider' => $result['provider'] ?? 'unknown',
                     'model' => $result['model'] ?? 'unknown',
                     'model_id' => $modelConfig['model_id'],

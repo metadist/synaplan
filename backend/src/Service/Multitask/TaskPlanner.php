@@ -231,7 +231,7 @@ final readonly class TaskPlanner
                 return null;
             }
 
-            $recorded = $this->rateLimitService->recordUsage($user, 'PLANNING', [
+            $recorded = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'PLANNING', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',

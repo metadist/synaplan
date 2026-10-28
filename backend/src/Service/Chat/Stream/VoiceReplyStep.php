@@ -183,7 +183,7 @@ final readonly class VoiceReplyStep
     private function recordUsage(StreamCompleteEvent $event, Message $outgoing, User $user, array $speech): void
     {
         try {
-            $recorded = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
+            $recorded = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'AUDIOS', [
                 'provider' => $speech['provider'] ?? 'unknown',
                 'model' => $speech['model'] ?? 'unknown',
                 'model_id' => $speech['modelId'],

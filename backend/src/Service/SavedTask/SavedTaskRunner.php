@@ -514,7 +514,7 @@ final readonly class SavedTaskRunner
     private function recordRun(User $user, array $result, Chat $chat, string $text): void
     {
         $metadata = is_array($result['response']['metadata'] ?? null) ? $result['response']['metadata'] : [];
-        $this->rateLimits->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages(
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $user, 'MESSAGES', FacadeMeteredChat::messages(
             $metadata,
             'SAVED_TASK',
             $text,

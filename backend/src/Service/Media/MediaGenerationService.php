@@ -836,7 +836,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             }
         }
 
-        $this->rateLimitService->recordUsage($user, $action, [
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, $action, [
             'provider' => $provider ?? 'unknown',
             'model' => $modelName ?? 'unknown',
             'model_id' => $modelId,

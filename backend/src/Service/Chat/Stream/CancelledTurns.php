@@ -211,7 +211,7 @@ final readonly class CancelledTurns
         try {
             $cancelledModelId = $incoming->getMeta('ai_chat_model_id');
             $content = $data['content'] ?? '';
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MESSAGES', [
                 'provider' => $chatProvider ?? 'unknown',
                 'model' => $chatModel ?? 'unknown',
                 'model_id' => null !== $cancelledModelId && '' !== $cancelledModelId ? (int) $cancelledModelId : null,

@@ -59,7 +59,7 @@ final readonly class EmailVoiceReply
             ]);
             $path = $this->files->uploaded($speech['relativePath']);
 
-            $this->rateLimits->recordUsage($email->user, 'AUDIOS', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $email->user, 'AUDIOS', [
                 'provider' => $speech['provider'] ?? 'unknown',
                 'model' => $speech['model'] ?? 'unknown',
                 'model_id' => $speech['model_id'] ?? null,

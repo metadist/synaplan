@@ -337,7 +337,7 @@ class WebhookController extends AbstractController
                     default => null,
                 };
                 if ($mediaAction) {
-                    $this->rateLimitService->recordUsage($user, $mediaAction, [
+                    \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, $mediaAction, [
                         'provider' => $responseMeta['provider'] ?? 'unknown',
                         'model' => $responseMeta['model'] ?? 'unknown',
                         'model_id' => $responseMeta['model_id'] ?? null,
@@ -378,7 +378,7 @@ class WebhookController extends AbstractController
      */
     private function recordWebhookChat(User $user, Message $message, string $answer, array $metadata): void
     {
-        $this->rateLimitService->recordUsage(
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService,
             $user,
             'MESSAGES',
             FacadeMeteredChat::messages($metadata, 'WEBHOOK', $message->getText(), $answer),

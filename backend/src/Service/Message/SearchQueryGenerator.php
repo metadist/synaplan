@@ -212,7 +212,7 @@ final readonly class SearchQueryGenerator
                 return;
             }
 
-            $this->rateLimitService->recordUsage($user, 'SEARCH_QUERY', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'SEARCH_QUERY', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',

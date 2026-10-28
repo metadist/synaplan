@@ -40,7 +40,7 @@ final readonly class StreamUsageRecorder
      */
     public function recordStreamedReply(StreamTurnRequest $turn, StreamTurnState $state, Message $outgoing, array $metadata, array $classification, string $finalText, ?File $generatedFile): StreamUsage
     {
-        $recorded = $this->rateLimitService->recordUsage($turn->caller->user, 'MESSAGES', FacadeMeteredChat::messages(
+        $recorded = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $turn->caller->user, 'MESSAGES', FacadeMeteredChat::messages(
             $metadata,
             $turn->caller->source(),
             $state->messageText,
@@ -76,7 +76,7 @@ final readonly class StreamUsageRecorder
     public function recordBufferedReply(StreamTurnRequest $turn, StreamTurnState $state, Message $outgoing, array $metadata, array $classification, string $content): StreamUsage
     {
         $incoming = $state->incoming();
-        $recorded = $this->rateLimitService->recordUsage($turn->caller->user, 'MESSAGES', FacadeMeteredChat::messages(
+        $recorded = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $turn->caller->user, 'MESSAGES', FacadeMeteredChat::messages(
             $metadata,
             $turn->caller->source(),
             $incoming->getText(),
@@ -248,7 +248,7 @@ final readonly class StreamUsageRecorder
             return $recorded;
         }
 
-        return $this->rateLimitService->recordUsage($turn->caller->user, $mediaAction, [
+        return \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $turn->caller->user, $mediaAction, [
             'provider' => $metadata['provider'] ?? 'unknown',
             'model' => $metadata['model'] ?? 'unknown',
             'model_id' => $metadata['model_id'] ?? null,

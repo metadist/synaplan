@@ -171,7 +171,7 @@ final class QueryVectors
             if (null === $result || null === $vector) {
                 return null;
             }
-            $this->rateLimits->recordUsage($this->user, self::USAGE_ACTION, [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $this->user, self::USAGE_ACTION, [
                 'usage' => $result['usage'],
                 'provider' => $result['provider'],
                 'model' => $result['model'],

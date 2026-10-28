@@ -102,7 +102,7 @@ final readonly class RerankStage
         }
 
         try {
-            $this->rateLimit->recordUsage($user, 'RERANK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimit, $user, 'RERANK', [
                 'usage' => [
                     'prompt_tokens' => $ranked->promptTokens,
                     'completion_tokens' => 0,

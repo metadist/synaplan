@@ -287,7 +287,7 @@ final readonly class QueryRelaxer
             if (!$user instanceof User) {
                 return;
             }
-            $this->rateLimits->recordUsage($user, 'PLANNING', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $user, 'PLANNING', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',
