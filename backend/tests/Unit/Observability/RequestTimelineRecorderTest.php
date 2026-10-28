@@ -276,6 +276,39 @@ final class RequestTimelineRecorderTest extends \PHPUnit\Framework\TestCase
         self::assertSame(RequestTimelineStore::TTL_SECONDS, $state->lastTtlSeconds);
     }
 
+    public function testUsageRowStampsCostOntoTheCallTheHookRecordedAtZero(): void
+    {
+        $context = new RequestTimelineContext();
+        $hook = new AiCallMetricsHook($context);
+        $idle = new AiCall(
+            capability: AiCapability::Chat,
+            provider: 'openai',
+            model: 'gpt-4o',
+            context: new AiCallContext(userId: 7, source: AiCallSource::ChatWeb),
+            payload: AiCallPayload::chat([['role' => 'user', 'content' => 'Hello']]),
+            options: new AiCallOptions(),
+        );
+        $priced = new AiCallResult(
+            value: ['content' => 'Hi'],
+            outcome: AiCallOutcome::Ok,
+            usage: new AiUsage(promptTokens: 10, completionTokens: 4, totalTokens: 14),
+            timings: new AiCallTimings(hooksBeforeMs: 0.01, providerMs: 20.0, hooksAfterMs: 0.01),
+        );
+
+        $hook->after($idle, $priced);
+        self::assertSame([], $context->aiCalls(), 'A call outside a request is not kept on the timeline.');
+
+        $context->start('req-cost', 'chat_stream', 7, 1730100000, 1_000_000_000);
+        $hook->after($idle, $priced);
+        self::assertSame('0.000000', $context->aiCalls()[0]['cost']);
+
+        $context->stampChargedCost('openai', 'gpt-4o', '0.001250');
+        self::assertSame('0.001250', $context->aiCalls()[0]['cost']);
+
+        $context->stampChargedCost('openai', 'gpt-4o', '9.000000');
+        self::assertSame('0.001250', $context->aiCalls()[0]['cost']);
+    }
+
     private function wireJsonSerializer(AdminCapacityController $controller): void
     {
         $container = new \Symfony\Component\DependencyInjection\Container();

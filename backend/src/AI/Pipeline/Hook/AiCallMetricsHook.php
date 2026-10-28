@@ -9,6 +9,7 @@ use App\AI\Pipeline\AiCallHookInterface;
 use App\AI\Pipeline\AiCallResult;
 use App\AI\Pipeline\AsAiCallHook;
 use App\Observability\RequestTimelineContext;
+use App\Service\Usage\AiPipelineMeter;
 
 /**
  * Records per-call timing, token counts and cost onto {@see RequestTimelineContext}
@@ -22,6 +23,7 @@ final readonly class AiCallMetricsHook implements AiCallHookInterface
 {
     public function __construct(
         private ?RequestTimelineContext $timeline = null,
+        private ?AiPipelineMeter $meter = null,
     ) {
     }
 
@@ -32,14 +34,16 @@ final readonly class AiCallMetricsHook implements AiCallHookInterface
 
     public function after(AiCall $call, AiCallResult $result): void
     {
-        if (null === $this->timeline) {
+        if (null === $this->timeline || !$this->timeline->isStarted()) {
             return;
         }
 
         $usage = $result->usage;
         $tokensIn = null !== $usage ? $usage->promptTokens : 0;
         $tokensOut = null !== $usage ? $usage->completionTokens : 0;
-        $cost = null !== $usage && null !== $usage->chargedCost ? $usage->chargedCost : '0.000000';
+        $quoted = $this->meter?->takeTimelineCost();
+        $cost = $quoted
+            ?? (null !== $usage && null !== $usage->chargedCost ? $usage->chargedCost : '0.000000');
         $hooksMs = $result->timings->hooksBeforeMs + $result->timings->hooksAfterMs;
 
         $this->timeline->recordAiCall(

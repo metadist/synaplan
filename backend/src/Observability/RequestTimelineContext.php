@@ -131,6 +131,31 @@ final class RequestTimelineContext implements ResetInterface
         return $this->aiCalls;
     }
 
+    /**
+     * Fill the charged cost onto the newest still-unpriced AI call for this
+     * provider and model. The usage row is written after the metrics hook, so
+     * the hook records tokens first and the writer stamps the cost it just
+     * calculated.
+     */
+    public function stampChargedCost(string $provider, string $model, string $chargedCost): void
+    {
+        $providerLabel = self::boundedLabel($provider, 'unknown');
+        $modelLabel = self::boundedCatalogModel($model);
+        $cost = number_format(max(0.0, (float) $chargedCost), 6, '.', '');
+
+        for ($i = \count($this->aiCalls) - 1; $i >= 0; --$i) {
+            if ('0.000000' !== $this->aiCalls[$i]['cost']) {
+                continue;
+            }
+            if ($this->aiCalls[$i]['provider'] !== $providerLabel || $this->aiCalls[$i]['model'] !== $modelLabel) {
+                continue;
+            }
+            $this->aiCalls[$i]['cost'] = $cost;
+
+            return;
+        }
+    }
+
     public function recordTool(string $source, string $kind, string $outcome, int $durationMs): void
     {
         $this->toolCalls[] = [

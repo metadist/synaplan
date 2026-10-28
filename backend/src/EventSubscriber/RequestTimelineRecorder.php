@@ -11,6 +11,7 @@ use App\Observability\RequestTimelineStore;
 use App\Observability\ServerIdentity;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
@@ -92,10 +93,12 @@ final readonly class RequestTimelineRecorder implements EventSubscriberInterface
         try {
             $response = $event->getResponse();
             $statusCode = $response->getStatusCode();
-            $statusClass = RequestTimelineContext::classifyStatus(
-                $statusCode,
-                503 === $statusCode ? (string) $response->getContent() : null,
-            );
+            $body = null;
+            if (503 === $statusCode && !$response instanceof StreamedResponse) {
+                $raw = $response->getContent();
+                $body = \is_string($raw) ? $raw : null;
+            }
+            $statusClass = RequestTimelineContext::classifyStatus($statusCode, $body);
             $record = $this->context->buildRecord($this->identity->id(), $statusClass, hrtime(true));
             $this->store->record($record);
         } catch (\Throwable) {

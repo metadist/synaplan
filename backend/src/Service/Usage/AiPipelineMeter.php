@@ -14,6 +14,7 @@ use App\AI\Pipeline\AiCapability;
 use App\AI\Pipeline\UsageHookConfig;
 use App\Entity\User;
 use App\Observability\EventRingStore;
+use App\Observability\RequestTimelineContext;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\RateLimitService;
@@ -47,6 +48,9 @@ final class AiPipelineMeter implements ResetInterface
     /** @var (\Closure(array<string, mixed>): array<string, mixed>)|null */
     private ?\Closure $shadowPerturbation = null;
 
+    /** Charged cost of the call whose usage hook just ran, for the metrics hook. */
+    private ?string $pendingTimelineCost = null;
+
     private readonly AiUsageSpecBuilder $specBuilder;
 
     public function __construct(
@@ -58,6 +62,7 @@ final class AiPipelineMeter implements ResetInterface
         private readonly TurnUsageLedger $turnLedger = new TurnUsageLedger(),
         private readonly ?EventRingStore $eventRing = null,
         private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly ?RequestTimelineContext $timeline = null,
     ) {
         $this->specBuilder = new AiUsageSpecBuilder($costCalculationService, $rateLimitService, $models);
         LegacyUsageWriter::bind($this);
@@ -71,6 +76,18 @@ final class AiPipelineMeter implements ResetInterface
     public function turnLedger(): TurnUsageLedger
     {
         return $this->turnLedger;
+    }
+
+    /**
+     * Charged cost remembered by the usage hook for the metrics hook that runs
+     * immediately afterwards. Null when this mode did not price the call.
+     */
+    public function takeTimelineCost(): ?string
+    {
+        $cost = $this->pendingTimelineCost;
+        $this->pendingTimelineCost = null;
+
+        return $cost;
     }
 
     /**
@@ -185,6 +202,7 @@ final class AiPipelineMeter implements ResetInterface
         if (AiAction::Messages->value === $action) {
             $preview = $this->specBuilder->preview($metadata);
             $this->recordTurnContribution($turnId, $callId, $call, $metadata, $preview);
+            $this->pendingTimelineCost = $preview->chargedCost;
 
             return;
         }
@@ -197,11 +215,13 @@ final class AiPipelineMeter implements ResetInterface
             $recorded = $this->rateLimitService->recordUsage($user, $action, $metadata);
             $this->recordedByHook[$userId.':'.$action][] = $recorded;
             $this->recordTurnContribution($turnId, $callId, $call, $metadata, $recorded);
+            $this->pendingTimelineCost = $recorded->chargedCost;
 
             return;
         }
 
         $preview = $this->specBuilder->preview($metadata);
+        $this->pendingTimelineCost = $preview->chargedCost;
         $this->recordTurnContribution($turnId, $callId, $call, $metadata, $preview);
 
         if ($this->config->isShadow()) {
@@ -236,6 +256,7 @@ final class AiPipelineMeter implements ResetInterface
             : $this->activeTurnId;
         unset($metadata['turn_id']);
         $recorded = $rateLimitService->recordUsage($user, $action, $metadata);
+        $this->stampTimelineCost($metadata, $recorded->chargedCost);
 
         if ($this->config->isShadow()) {
             $this->verifyShadow($userId, $action, $metadata, $recorded, $rawTurnId);
@@ -253,6 +274,7 @@ final class AiPipelineMeter implements ResetInterface
         $this->turnSequence = 0;
         $this->callSequence = 0;
         $this->shadowPerturbation = null;
+        $this->pendingTimelineCost = null;
         $this->turnLedger->reset();
     }
 
@@ -301,7 +323,24 @@ final class AiPipelineMeter implements ResetInterface
             }
         }
 
-        return $rateLimitService->recordUsage($user, $action, $metadata);
+        $recorded = $rateLimitService->recordUsage($user, $action, $metadata);
+        $this->stampTimelineCost($metadata, $recorded->chargedCost);
+
+        return $recorded;
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function stampTimelineCost(array $metadata, string $chargedCost): void
+    {
+        if (true === ($metadata['facade_metered'] ?? false) || null === $this->timeline) {
+            return;
+        }
+
+        $provider = \is_string($metadata['provider'] ?? null) ? $metadata['provider'] : '';
+        $model = \is_string($metadata['model'] ?? null) ? $metadata['model'] : '';
+        $this->timeline->stampChargedCost($provider, $model, $chargedCost);
     }
 
     /**
@@ -337,7 +376,15 @@ final class AiPipelineMeter implements ResetInterface
         $chargedDelta = isset($expected['charged_cost'])
             ? round((float) $expected['charged_cost'] - (float) $actual->chargedCost, 6)
             : 0.0;
+        if (isset($expected['facade_charged_delta'])) {
+            $chargedDelta = round((float) $expected['facade_charged_delta'], 6);
+        }
         $priceKnownMismatch = isset($expected['price_known']) && $expected['price_known'] !== $actual->priceKnown;
+        if (isset($expected['facade_price_known'], $expected['facade_price_known_actual'])
+            && $expected['facade_price_known'] !== $expected['facade_price_known_actual']
+        ) {
+            $priceKnownMismatch = true;
+        }
 
         if ($expected['action'] !== $action
             || $expected['provider'] !== $actualProvider
@@ -421,7 +468,7 @@ final class AiPipelineMeter implements ResetInterface
      *
      * @param array<string, mixed> $metadata
      *
-     * @return array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool}
+     * @return array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool, facade_charged_delta?: string, facade_price_known?: bool, facade_price_known_actual?: bool}
      */
     private function buildShadowMessagesExpectation(array $metadata, string $turnId): array
     {
@@ -438,16 +485,18 @@ final class AiPipelineMeter implements ResetInterface
 
         $preview = $this->specBuilder->preview($wouldBeMeta);
         if (FacadeMeteredChat::isMetered($wouldBeMeta)) {
-            $actualCost = isset($metadata['facade_charged_cost']) && is_numeric($metadata['facade_charged_cost'])
+            // The quota row itself is zero-cost. The real comparison is the
+            // ledger's summed charge against the caller's facade_charged_cost.
+            $callerCost = isset($metadata['facade_charged_cost']) && is_numeric($metadata['facade_charged_cost'])
                 ? number_format((float) $metadata['facade_charged_cost'], 6, '.', '')
                 : '0.000000';
             $ledgerCost = isset($wouldBeMeta['facade_charged_cost']) && is_numeric($wouldBeMeta['facade_charged_cost'])
                 ? number_format((float) $wouldBeMeta['facade_charged_cost'], 6, '.', '')
                 : '0.000000';
-            $costDiff = round((float) $ledgerCost - (float) $actualCost, 6);
-            $priceKnown = isset($wouldBeMeta['facade_price_known']) && \is_bool($wouldBeMeta['facade_price_known'])
+            $ledgerPriceKnown = isset($wouldBeMeta['facade_price_known']) && \is_bool($wouldBeMeta['facade_price_known'])
                 ? $wouldBeMeta['facade_price_known']
                 : true;
+            $callerPriceKnown = !\array_key_exists('facade_price_known', $metadata) || false !== $metadata['facade_price_known'];
 
             return [
                 'action' => AiAction::Messages->value,
@@ -456,9 +505,12 @@ final class AiPipelineMeter implements ResetInterface
                 'prompt_tokens' => $preview->promptTokens,
                 'completion_tokens' => $preview->completionTokens,
                 'total_tokens' => $preview->totalTokens,
-                'cost' => number_format($costDiff, 6, '.', ''),
-                'charged_cost' => number_format($costDiff, 6, '.', ''),
-                'price_known' => $priceKnown,
+                'cost' => '0.000000',
+                'charged_cost' => '0.000000',
+                'price_known' => true,
+                'facade_charged_delta' => number_format((float) $ledgerCost - (float) $callerCost, 6, '.', ''),
+                'facade_price_known' => $ledgerPriceKnown,
+                'facade_price_known_actual' => $callerPriceKnown,
             ];
         }
 
