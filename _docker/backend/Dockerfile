@@ -30,7 +30,7 @@ FROM ghcr.io/metadist/synaplan-base-php:1.2.1@sha256:e10e74c5047cd9218ad8337b8e3
 # into `dev` below, so the dev and prod images both carry it. A stage has to
 # be declared before COPY --from can name it, which is why it sits here and
 # not at the top.
-FROM golang:1.27-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 AS watchdog
+FROM golang:1.27-bookworm@sha256:df4bb0305771186a85d0fd3a40f5c5da9af97ac8053d391ffce2c070817a20c6 AS watchdog
 WORKDIR /src
 COPY sidecars/synaplan-watchdog/go.mod sidecars/synaplan-watchdog/go.sum ./
 RUN go mod download
@@ -48,6 +48,7 @@ WORKDIR /var/www/backend
 # with "Failed to read the file", so HEIC->JPEG transcoding of modern iPhone
 # uploads breaks. Pull the newer libheif + decoder plugins from bookworm-backports
 # so ImageMagick/imagick (which loads libheif.so.1 at runtime) can read them.
+# Also distrust the eMudhra (emSign) root CAs (CVE-2026-115557).
 # TODO: fold this into the synaplan-base-php base image and drop this layer.
 RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list \
     && apt-get update \
@@ -57,7 +58,9 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
         libheif-plugin-aomenc \
         libheif-plugin-x265 \
         libheif-plugin-dav1d \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i 's|^mozilla/emSign_|!mozilla/emSign_|' /etc/ca-certificates.conf \
+    && update-ca-certificates
 
 # ext-redis (phpredis) is provided by the base image (synaplan-base-php >= 1.1.0)
 # for Symfony Messenger's Redis Streams transport (`symfony/redis-messenger`),
