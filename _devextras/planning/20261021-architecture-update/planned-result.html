@@ -19,6 +19,7 @@
       --ok-soft: #e7f4ec;
       --warn: #8a5a12;
       --warn-soft: #fbf3e4;
+      --arrow: #c4bbaa;
       color-scheme: light;
     }
     @media (prefers-color-scheme: dark) {
@@ -36,6 +37,7 @@
         --ok-soft: #1c3328;
         --warn: #e2c08a;
         --warn-soft: #3a2e1c;
+        --arrow: #5c564c;
         color-scheme: dark;
       }
     }
@@ -110,19 +112,59 @@
       .flows button[aria-pressed="true"] { color: #141311; }
     }
     .map {
+      position: relative;
       background: var(--paper);
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 16px;
-      display: grid;
-      gap: 10px;
+      padding: 16px 36px 16px 16px;
+      overflow-x: auto;
     }
-    .row {
-      display: grid;
-      gap: 10px;
+    .wires {
+      position: absolute;
+      left: 0;
+      top: 0;
+      overflow: visible;
+      pointer-events: none;
     }
-    .r4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .r2 { grid-template-columns: 1fr 1fr; }
+    .edge { fill: none; stroke: var(--arrow); stroke-width: 1.5; }
+    .edge.active { stroke: var(--accent); stroke-width: 2.25; }
+    .edge.dotted { stroke-dasharray: 3 3; }
+    .edge-label {
+      font: 11px/1.2 ui-sans-serif, system-ui, sans-serif;
+      fill: var(--arrow);
+    }
+    .edge-label.active { fill: var(--accent); font-weight: 650; }
+    .edge-label-bg { fill: var(--paper); }
+    .mapgrid {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 36px 18px;
+      min-width: 760px;
+    }
+    .span2 { grid-column: span 2; }
+    .span4 { grid-column: span 4; }
+    /* Fixed cells. Auto-placement would put the pump beside Files and the
+       pipeline beside the workers, and the arrows would land on the wrong box. */
+    #n-web { grid-area: 1 / 1; }
+    #n-widget { grid-area: 1 / 2; }
+    #n-apps { grid-area: 1 / 3; }
+    #n-mail { grid-area: 1 / 4; }
+    #n-caddy { grid-area: 2 / 1 / 3 / 5; }
+    #n-wdog { grid-area: 3 / 1 / 4 / 3; }
+    #n-api { grid-area: 3 / 3 / 4 / 5; }
+    #n-prep { grid-area: 4 / 1; }
+    #n-redis { grid-area: 4 / 2; }
+    #n-files { grid-area: 4 / 3 / 5 / 5; }
+    #n-pump { grid-area: 5 / 1; }
+    #n-work { grid-area: 5 / 2; }
+    #n-retr { grid-area: 5 / 3 / 6 / 5; }
+    #n-pipe { grid-area: 6 / 1; }
+    #n-inv { grid-area: 6 / 2; }
+    #n-egr { grid-area: 6 / 3; }
+    #n-cat { grid-area: 6 / 4; }
+    #n-prov { grid-area: 7 / 1 / 8 / 3; }
+    #n-state { grid-area: 7 / 3 / 8 / 5; }
     .node {
       border: 1px solid var(--line);
       background: var(--quiet);
@@ -219,12 +261,11 @@
       font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
     }
     @media (max-width: 800px) {
-      .r4, .split, .stats { grid-template-columns: 1fr 1fr; }
-      .node.span2 { grid-column: 1 / -1; }
+      .split, .stats { grid-template-columns: 1fr 1fr; }
       header.page h1 { font-size: 1.6rem; }
     }
     @media (max-width: 520px) {
-      .r4, .r2, .split, .stats { grid-template-columns: 1fr; }
+      .split, .stats { grid-template-columns: 1fr; }
       main { padding: 24px 14px 48px; }
     }
   </style>
@@ -249,44 +290,34 @@
   </div>
 
   <h2 id="picture">The picture</h2>
-  <p>Pick a path. The accent marks the boxes that path uses. The pipeline, the egress client, and the provider catalog stay lit on every path, because every model call uses them.</p>
+  <p>Pick a path. Accent marks the boxes and the lines that path uses. A quiet line belongs to another path. The arrowhead is the direction the information moves.</p>
   <div class="flows" role="group" aria-label="Which path to follow">
     <button type="button" data-flow="answer" aria-pressed="true">A streamed answer</button>
     <button type="button" data-flow="knowledge" aria-pressed="false">A file becomes knowledge</button>
     <button type="button" data-flow="channel" aria-pressed="false">Mail and WhatsApp</button>
   </div>
-  <div class="map" aria-label="Target architecture">
-    <div class="row r4">
-      <article class="node" data-on="answer"><h3>Web app</h3><p>Chat, files, admin</p></article>
-      <article class="node" data-on="answer"><h3>Widget</h3><p>Embedded on a site</p></article>
-      <article class="node" data-on="answer"><h3>Apps and SDKs</h3><p>Same events, two public APIs</p></article>
-      <article class="node" data-on="channel"><h3>Mail, WhatsApp, Telegram</h3><p>A webhook in, a finished reply back out</p></article>
-    </div>
-    <article class="node wide"><h3>Caddy</h3><p>Long routes go to the watchdog. Every other request goes to the API pool. Live updates go to Centrifugo.</p></article>
-    <div class="row r2">
-      <article class="node" data-on="answer"><h3>Watchdog · one Go process per server</h3><p>Free slot, or busy. Holds the client. Copies frames. Probes and metrics.</p></article>
-      <article class="node" data-on="knowledge channel"><h3>API pool · short PHP work</h3><p>Files, admin, config, webhooks. Stays fast while answers are streaming.</p></article>
-    </div>
-    <div class="row r4">
-      <article class="node" data-on="answer knowledge"><h3>Prepare the turn</h3><p>Auth, classify, history, prompt. The job carries no key.</p></article>
-      <article class="node" data-on="answer"><h3>Redis run stream</h3><p>The pump writes frames. The watchdog tails them.</p></article>
-      <article class="node" data-on="knowledge"><h3>Files and knowledge</h3><p>Tika, Whisper, then an embedding through the pipeline.</p></article>
-      <article class="node"><h3>Beside the request</h3><p>Centrifugo for takeover. Voice holds its own audio socket.</p></article>
-    </div>
-    <div class="row r4">
-      <article class="node" data-on="answer"><h3>Stream pump</h3><p>A few PHP processes hold the provider sockets and decode.</p></article>
-      <article class="node" data-on="answer"><h3>Messenger workers</h3><p>Tool step, save the reply, memory, media. A research round runs here too.</p></article>
-      <article class="node span2" data-on="knowledge"><h3>Retrieved into the next prompt</h3><p>Search hits MariaDB VECTOR and Qdrant. Prompt assembly stays as it is.</p></article>
-    </div>
-    <div class="row r4">
-      <article class="node spine" data-on="answer knowledge channel"><h3>AI pipeline</h3><p>Limit, circuit, health, usage, metrics</p></article>
-      <article class="node spine" data-on="answer channel"><h3>Tool invoker</h3><p>Registry, gate, clamp, audit</p></article>
-      <article class="node spine" data-on="answer knowledge channel"><h3>Egress client</h3><p>Proxy, allowlist, every redirect</p></article>
-      <article class="node spine" data-on="answer knowledge channel"><h3>Provider catalog</h3><p>One descriptor() per provider</p></article>
-    </div>
-    <div class="row r2">
-      <article class="node" data-on="answer knowledge channel"><h3>Providers and integrations</h3><p>Model APIs, search, MCP, Stripe, mail. An optional CONNECT gateway covers the sidecars.</p></article>
-      <article class="node" data-on="answer knowledge"><h3>State</h3><p>MariaDB · Redis · Qdrant · files on disk</p></article>
+  <div class="map" id="map" aria-label="Target architecture">
+    <svg class="wires" id="wires" aria-hidden="true"></svg>
+    <div class="mapgrid" id="grid">
+      <article class="node" id="n-web" data-on="answer knowledge"><h3>Web app</h3><p>Chat, files, admin</p></article>
+      <article class="node" id="n-widget" data-on="answer"><h3>Widget</h3><p>Embedded on a site</p></article>
+      <article class="node" id="n-apps" data-on="answer"><h3>Apps and SDKs</h3><p>Same events, two public APIs</p></article>
+      <article class="node" id="n-mail" data-on="channel"><h3>Mail, WhatsApp, Telegram</h3><p>A webhook in, a finished reply back out</p></article>
+      <article class="node span4" id="n-caddy" data-on="answer knowledge channel"><h3>Caddy</h3><p>Long routes go to the watchdog. Every other request goes to the API pool. Live updates go to Centrifugo, which stays off these three paths.</p></article>
+      <article class="node span2" id="n-wdog" data-on="answer"><h3>Watchdog · one Go process per server</h3><p>Free slot, or busy. Holds the client. Copies frames. Probes and metrics.</p></article>
+      <article class="node span2" id="n-api" data-on="knowledge channel"><h3>API pool · short PHP work</h3><p>Files, admin, config, webhooks. Stays fast while answers are streaming.</p></article>
+      <article class="node" id="n-prep" data-on="answer knowledge"><h3>Prepare the turn</h3><p>Auth, classify, history, prompt. The job carries no key.</p></article>
+      <article class="node" id="n-redis" data-on="answer"><h3>Redis run stream</h3><p>Frames live here, not in a PHP worker.</p></article>
+      <article class="node" id="n-files" data-on="knowledge"><h3>Files and knowledge</h3><p>Tika or Whisper, then an embedding.</p></article>
+      <article class="node" id="n-pump" data-on="answer"><h3>Stream pump</h3><p>A few PHP processes hold the provider sockets and decode.</p></article>
+      <article class="node" id="n-work" data-on="answer"><h3>Messenger workers</h3><p>Tool step, save the reply, memory, media. A research round runs here too.</p></article>
+      <article class="node span2" id="n-retr" data-on="knowledge"><h3>Retrieved into the next prompt</h3><p>Search hits MariaDB VECTOR and Qdrant. Prompt assembly stays as it is.</p></article>
+      <article class="node spine" id="n-pipe" data-on="answer knowledge channel"><h3>AI pipeline</h3><p>Limit, circuit, health, usage, metrics</p></article>
+      <article class="node spine" id="n-inv" data-on="answer channel"><h3>Tool invoker</h3><p>Registry, gate, clamp, audit</p></article>
+      <article class="node spine" id="n-egr" data-on="answer knowledge channel"><h3>Egress client</h3><p>Proxy, allowlist, every redirect</p></article>
+      <article class="node spine" id="n-cat" data-on="answer knowledge channel"><h3>Provider catalog</h3><p>One descriptor() per provider</p></article>
+      <article class="node span2" id="n-prov" data-on="answer knowledge channel"><h3>Providers and integrations</h3><p>Model APIs, search, MCP, Stripe, mail. An optional CONNECT gateway covers the sidecars.</p></article>
+      <article class="node span2" id="n-state" data-on="answer knowledge channel"><h3>State</h3><p>MariaDB, Redis, Qdrant, and files. Every path writes something here.</p></article>
     </div>
   </div>
   <p class="caption">Operate sits beside this picture: the Capacity page, the request timeline, the audit log, Prometheus on the watchdog, and Kubernetes probes that scale on held streams. With the watchdog or the pump off, streams run in the PHP pool again. Source: <code>00_master_plan.md</code> and <code>03_contracts.md</code>, read against <code>main</code> on 28 October 2026.</p>
@@ -382,14 +413,165 @@
 </main>
 <script>
   const buttons = document.querySelectorAll(".flows button");
-  buttons.forEach((button) => {
-    button.addEventListener("click", () => {
-      document.body.dataset.flow = button.dataset.flow;
-      buttons.forEach((other) => {
-        other.setAttribute("aria-pressed", other === button ? "true" : "false");
-      });
+  const map = document.getElementById("map");
+  const svg = document.getElementById("wires");
+
+  const edges = [
+    ["n-web", "n-caddy", "answer knowledge", "down"],
+    ["n-widget", "n-caddy", "answer", "down"],
+    ["n-apps", "n-caddy", "answer", "down"],
+    ["n-mail", "n-caddy", "channel", "down"],
+    ["n-caddy", "n-wdog", "answer", "down", "long route"],
+    ["n-caddy", "n-api", "knowledge channel", "down", "short request"],
+    ["n-wdog", "n-prep", "answer", "down"],
+    ["n-redis", "n-wdog", "answer", "up", "reads frames"],
+    ["n-pump", "n-redis", "answer", "up", "writes frames"],
+    ["n-prep", "n-pump", "answer", "down"],
+    ["n-pump", "n-work", "answer", "right", "tool or finish"],
+    ["n-work", "n-inv", "answer", "down", "tool step"],
+    ["n-pump", "n-pipe", "answer", "down", "model call"],
+    ["n-api", "n-files", "knowledge", "down", "extract"],
+    ["n-files", "n-retr", "knowledge", "down"],
+    ["n-retr", "n-prep", "knowledge", "into", "into the prompt"],
+    ["n-files", "n-pipe", "knowledge", "embed", "embed"],
+    ["n-api", "n-pipe", "channel", "rail", "model call"],
+    ["n-api", "n-inv", "channel", "rail-tool", "tool"],
+    ["n-pipe", "n-egr", "answer knowledge channel", "under", "outbound"],
+    ["n-egr", "n-prov", "answer knowledge channel", "out"],
+    ["n-cat", "n-egr", "answer knowledge channel", "left", "allowlist"]
+  ];
+
+  function box(id) {
+    const mapBox = map.getBoundingClientRect();
+    const r = document.getElementById(id).getBoundingClientRect();
+    return {
+      l: r.left - mapBox.left + map.scrollLeft,
+      t: r.top - mapBox.top + map.scrollTop,
+      r: r.right - mapBox.left + map.scrollLeft,
+      b: r.bottom - mapBox.top + map.scrollTop,
+      cx: r.left - mapBox.left + map.scrollLeft + r.width / 2,
+      cy: r.top - mapBox.top + map.scrollTop + r.height / 2
+    };
+  }
+
+  function railX() {
+    return map.scrollWidth - 14;
+  }
+
+  function route(kind, a, b) {
+    if (kind === "down") {
+      const x = (b.cx > a.l + 12 && b.cx < a.r - 12) ? b.cx : a.cx;
+      const mid = (a.b + b.t) / 2;
+      if (Math.abs(x - b.cx) < 6) return [[x, a.b], [b.cx, b.t]];
+      return [[x, a.b], [x, mid], [b.cx, mid], [b.cx, b.t]];
+    }
+    if (kind === "up") {
+      const mid = (a.t + b.b) / 2;
+      if (Math.abs(a.cx - b.cx) < 8) return [[a.cx, a.t], [b.cx, b.b]];
+      return [[a.cx, a.t], [a.cx, mid], [b.cx, mid], [b.cx, b.b]];
+    }
+    if (kind === "right") return [[a.r, a.cy], [b.l, b.cy]];
+    if (kind === "left") return [[a.l, a.cy], [b.r, b.cy]];
+    if (kind === "into") {
+      const y = (a.t + b.b) / 2;
+      return [[a.cx, a.t], [a.cx, y], [b.cx, y], [b.cx, b.b]];
+    }
+    if (kind === "under") {
+      const y = Math.max(a.b, b.b) + 14;
+      return [[a.cx, a.b], [a.cx, y], [b.cx, y], [b.cx, b.b]];
+    }
+    if (kind === "out") {
+      const y = (a.b + b.t) / 2;
+      return [[a.cx, a.b], [a.cx, y], [b.cx, y], [b.cx, b.t]];
+    }
+    const x = railX();
+    const y = b.t - 16;
+    return [[a.r, a.cy], [x, a.cy], [x, y], [b.cx, y], [b.cx, b.t]];
+  }
+
+  function pointsAttr(points) {
+    return points.map((p) => p.join(",")).join(" ");
+  }
+
+  function labelPoint(points, kind) {
+    if (kind === "embed" || kind === "rail") return [points[1][0] - 8, points[0][1] - 8];
+    if (kind === "rail-tool") return [points[3][0], points[3][1] - 8];
+    let best = 0;
+    let at = points[0];
+    for (let i = 1; i < points.length; i++) {
+      const len = Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+      if (len > best) {
+        best = len;
+        at = [(points[i][0] + points[i - 1][0]) / 2, (points[i][1] + points[i - 1][1]) / 2];
+      }
+    }
+    return at;
+  }
+
+  function draw() {
+    const flow = document.body.dataset.flow;
+    const w = map.scrollWidth;
+    const h = map.scrollHeight;
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("width", w);
+    svg.setAttribute("height", h);
+    svg.replaceChildren();
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    defs.innerHTML = '<marker id="arrow" viewBox="0 0 8 8" markerWidth="7" markerHeight="7" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="context-stroke"/></marker>';
+    svg.appendChild(defs);
+    const quiet = [];
+    const hot = [];
+    edges.forEach((spec) => {
+      const on = spec[2].split(" ");
+      (on.includes(flow) ? hot : quiet).push(spec);
     });
+    const labels = [];
+    [...quiet, ...hot].forEach((spec) => {
+      const [from, to, flows, kind, label] = spec;
+      const active = flows.split(" ").includes(flow);
+      const points = route(kind, box(from), box(to));
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      path.setAttribute("points", pointsAttr(points));
+      path.setAttribute("class", "edge" + (active ? " active" : "") + (kind === "left" ? " dotted" : ""));
+      path.setAttribute("marker-end", "url(#arrow)");
+      svg.appendChild(path);
+      if (label) labels.push({ points, kind, label, active });
+    });
+    labels.forEach(({ points, kind, label, active }) => {
+      const [x, y] = labelPoint(points, kind);
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", x);
+      text.setAttribute("y", y - 4);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("class", "edge-label" + (active ? " active" : ""));
+      text.textContent = label;
+      svg.appendChild(text);
+      const width = text.getComputedTextLength() + 8;
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("x", x - width / 2);
+      bg.setAttribute("y", y - 15);
+      bg.setAttribute("width", width);
+      bg.setAttribute("height", 14);
+      bg.setAttribute("rx", 3);
+      bg.setAttribute("class", "edge-label-bg");
+      svg.insertBefore(bg, text);
+    });
+  }
+
+  function selectFlow(flow) {
+    document.body.dataset.flow = flow;
+    buttons.forEach((other) => {
+      other.setAttribute("aria-pressed", other.dataset.flow === flow ? "true" : "false");
+    });
+    draw();
+  }
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => selectFlow(button.dataset.flow));
   });
+  window.addEventListener("resize", draw);
+  const requested = new URLSearchParams(location.search).get("flow");
+  if (requested === "knowledge" || requested === "channel" || requested === "answer") selectFlow(requested);
+  else draw();
 </script>
 </body>
 </html>
