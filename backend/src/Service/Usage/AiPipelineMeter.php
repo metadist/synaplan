@@ -25,7 +25,7 @@ use Symfony\Contracts\Service\ResetInterface;
  * Coordinates pipeline-level rate-limit checks, `BUSELOG` metering, shadow-mode
  * comparison (`ai.usage_mismatch`), and {@see TurnUsageLedger} aggregation for
  * {@see \App\AI\Pipeline\Hook\RateLimitHook}, {@see \App\AI\Pipeline\Hook\UsageHook},
- * and {@see LegacyUsageWriter} (`03_contracts.md` §1.3, §1.5, S1 AU11).
+ * and {@see LegacyUsageWriter} (`03_contracts.md` §1.3, §1.5, S1 AU11–AU12).
  */
 final class AiPipelineMeter implements ResetInterface
 {
@@ -182,6 +182,13 @@ final class AiPipelineMeter implements ResetInterface
             ? (string) $call->options->providerOptions['call_id']
             : sprintf('call-%d', ++$this->callSequence);
 
+        if (AiAction::Messages->value === $action) {
+            $preview = $this->specBuilder->preview($metadata);
+            $this->recordTurnContribution($turnId, $callId, $call, $metadata, $preview);
+
+            return;
+        }
+
         if ($call->options->callerMeters) {
             return;
         }
@@ -283,9 +290,13 @@ final class AiPipelineMeter implements ResetInterface
                 if (null === $closed) {
                     return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
                 }
-                if ($closed->callCount > 0 && $closed->facadeMetered && FacadeMeteredChat::isMetered($metadata)) {
-                    $metadata['facade_charged_cost'] = $closed->chargedCost;
-                    $metadata['facade_price_known'] = $closed->priceKnown;
+                if ($closed->callCount > 0) {
+                    if ($closed->facadeMetered && FacadeMeteredChat::isMetered($metadata)) {
+                        $metadata['facade_charged_cost'] = $closed->chargedCost;
+                        $metadata['facade_price_known'] = $closed->priceKnown;
+                    } elseif (!FacadeMeteredChat::isMetered($metadata)) {
+                        $metadata['usage'] = $closed->toTokenArray();
+                    }
                 }
             }
         }
@@ -416,9 +427,13 @@ final class AiPipelineMeter implements ResetInterface
     {
         $closed = $this->turnLedger->close($turnId);
         $wouldBeMeta = $metadata;
-        if (null !== $closed && $closed->callCount > 0 && $closed->facadeMetered && FacadeMeteredChat::isMetered($wouldBeMeta)) {
-            $wouldBeMeta['facade_charged_cost'] = $closed->chargedCost;
-            $wouldBeMeta['facade_price_known'] = $closed->priceKnown;
+        if (null !== $closed && $closed->callCount > 0) {
+            if ($closed->facadeMetered && FacadeMeteredChat::isMetered($wouldBeMeta)) {
+                $wouldBeMeta['facade_charged_cost'] = $closed->chargedCost;
+                $wouldBeMeta['facade_price_known'] = $closed->priceKnown;
+            } elseif (!FacadeMeteredChat::isMetered($wouldBeMeta)) {
+                $wouldBeMeta['usage'] = $closed->toTokenArray();
+            }
         }
 
         $preview = $this->specBuilder->preview($wouldBeMeta);
@@ -470,8 +485,9 @@ final class AiPipelineMeter implements ResetInterface
         array $metadata,
         RecordedUsage $recorded,
     ): void {
+        $isMessagesGateway = isset($call->options->providerOptions['_messages_gateway']);
         if (!\in_array($call->capability, [AiCapability::Chat, AiCapability::ChatStream, AiCapability::Passthrough], true)
-            || $call->options->callerMeters
+            || ($call->options->callerMeters && !$isMessagesGateway)
         ) {
             return;
         }
@@ -486,7 +502,7 @@ final class AiPipelineMeter implements ResetInterface
             'cache_creation_1h_tokens' => (int) ($usage['cache_creation_1h_tokens'] ?? 0),
             'charged_cost' => $recorded->chargedCost,
             'price_known' => $recorded->priceKnown,
-            'facade_metered' => true,
+            'facade_metered' => !$isMessagesGateway,
             'provider' => $call->provider,
             'model' => (string) $call->model,
             'model_id' => isset($metadata['model_id']) && is_numeric($metadata['model_id']) ? (int) $metadata['model_id'] : null,

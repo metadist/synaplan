@@ -13,7 +13,7 @@
         "methodLines": 119
     },
     "fileLines": {
-        "src/AI/Messages/MessagesGateway.php": 1050,
+        "src/AI/Messages/MessagesGateway.php": 1025,
         "src/AI/Messages/Tools/GatewayToolLoop.php": 1431,
         "src/AI/Messages/Translator/OpenAiMessagesTranslator.php": 1499,
         "src/AI/Provider/AnthropicProvider.php": 1731,

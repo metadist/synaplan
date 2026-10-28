@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\AI\Import;
 
+use App\AI\Pipeline\AiCall;
+use App\AI\Pipeline\AiCallContext;
+use App\AI\Pipeline\AiCallOptions;
+use App\AI\Pipeline\AiCallPayload;
+use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\AiCapability;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -17,9 +23,13 @@ final readonly class CapabilityProbe
 {
     private const TIMEOUT_SECONDS = 8.0;
 
+    private AiCallPipeline $pipeline;
+
     public function __construct(
         private HttpClientInterface $httpClient,
+        ?AiCallPipeline $pipeline = null,
     ) {
+        $this->pipeline = $pipeline ?? new AiCallPipeline();
     }
 
     /**
@@ -34,12 +44,12 @@ final readonly class CapabilityProbe
         }
 
         $started = hrtime(true);
-        $chat = $this->tryCall($base.'/chat/completions', $headers, [
+        $chat = $this->tryCall(AiCapability::Chat, $providerId, $base.'/chat/completions', $headers, [
             'model' => $providerId,
             'messages' => [['role' => 'user', 'content' => 'ping']],
             'max_tokens' => 1,
         ]);
-        $embeddings = $this->tryCall($base.'/embeddings', $headers, [
+        $embeddings = $this->tryCall(AiCapability::Embed, $providerId, $base.'/embeddings', $headers, [
             'model' => $providerId,
             'input' => 'ping',
         ]);
@@ -54,16 +64,31 @@ final readonly class CapabilityProbe
      *
      * @return ProbeResult::OK|ProbeResult::FAIL
      */
-    private function tryCall(string $url, array $headers, array $body): string
+    private function tryCall(AiCapability $capability, string $providerId, string $url, array $headers, array $body): string
     {
-        try {
-            $response = $this->httpClient->request('POST', $url, [
-                'timeout' => self::TIMEOUT_SECONDS,
-                'headers' => $headers + ['Content-Type' => 'application/json'],
-                'json' => $body,
-            ]);
+        $call = new AiCall(
+            capability: $capability,
+            provider: 'openaicompatible',
+            model: $providerId,
+            context: AiCallContext::probe(),
+            payload: new AiCallPayload(passthroughBody: $body),
+            options: AiCallOptions::fromArray(['skip_circuit_breaker' => true, 'skip_model_health' => true]),
+        );
 
-            return $response->getStatusCode() < 400 ? ProbeResult::OK : ProbeResult::FAIL;
+        try {
+            /* @var string */
+            return $this->pipeline->run(
+                $call,
+                function () use ($url, $headers, $body): string {
+                    $response = $this->httpClient->request('POST', $url, [
+                        'timeout' => self::TIMEOUT_SECONDS,
+                        'headers' => $headers + ['Content-Type' => 'application/json'],
+                        'json' => $body,
+                    ]);
+
+                    return $response->getStatusCode() < 400 ? ProbeResult::OK : ProbeResult::FAIL;
+                },
+            )->value;
         } catch (\Throwable) {
             return ProbeResult::FAIL;
         }

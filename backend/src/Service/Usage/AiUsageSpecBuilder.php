@@ -42,6 +42,10 @@ final readonly class AiUsageSpecBuilder
      */
     public function build(AiCall $call, AiCallResult $result): ?array
     {
+        if (AiCapability::Passthrough === $call->capability || isset($call->options->providerOptions['_messages_gateway'])) {
+            return $this->buildMessagesGatewayUsageSpec($call, $result->value);
+        }
+
         if (\in_array($call->capability, [AiCapability::Chat, AiCapability::ChatStream], true)) {
             return $this->buildChatUsageSpec($call, $result->value);
         }
@@ -51,6 +55,52 @@ final readonly class AiUsageSpecBuilder
         }
 
         return $this->buildMediaUsageSpec($call, $result);
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, mixed>}|null
+     */
+    private function buildMessagesGatewayUsageSpec(AiCall $call, mixed $value): ?array
+    {
+        $opts = $call->options->providerOptions;
+        $gw = \is_array($opts['_messages_gateway'] ?? null) ? $opts['_messages_gateway'] : [];
+        $keySource = \is_string($gw['key_source'] ?? null) ? $gw['key_source'] : 'operator';
+        $inputText = \is_string($gw['input_text'] ?? null) ? $gw['input_text'] : '';
+
+        if ($value instanceof \App\AI\Messages\MessagesUsage) {
+            if (!$value->shouldMeter()) {
+                return null;
+            }
+            $usage = $value->toRateLimitUsage();
+            $responseText = '';
+        } elseif (\is_array($value)) {
+            $status = (int) ($value['status'] ?? 200);
+            $body = $value['body'] ?? null;
+            $msgUsage = $value['usage'] ?? null;
+            if ($status >= 400 || !\is_array($body) || !$msgUsage instanceof \App\AI\Messages\MessagesUsage) {
+                return null;
+            }
+            $usage = $msgUsage->toRateLimitUsage();
+            $responseText = \App\AI\Messages\MessagesResponseText::extract($body);
+        } else {
+            return null;
+        }
+
+        $metadata = [
+            'provider' => $call->provider,
+            'model' => (string) $call->model,
+            'model_id' => $call->options->modelId,
+            'usage' => $usage,
+            'response_text' => $responseText,
+            'input_text' => $inputText,
+            'source' => 'MESSAGES_API',
+            'key_source' => $keySource,
+        ];
+        if ('user' === $keySource) {
+            $metadata['zero_cost'] = true;
+        }
+
+        return [AiAction::Messages->value, $metadata];
     }
 
     /**

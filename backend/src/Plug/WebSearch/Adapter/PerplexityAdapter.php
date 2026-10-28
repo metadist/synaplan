@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plug\WebSearch\Adapter;
 
-use App\AI\Provider\PerplexityProvider;
+use App\AI\Service\AiFacade;
 use App\Model\ModelCatalog;
 use App\Plug\PlugDescriptor;
 use App\Plug\PlugHealth;
@@ -34,7 +34,7 @@ final readonly class PerplexityAdapter implements WebSearchProviderInterface, We
         private PerplexitySearchClient $client,
         private ConfigRepository $configRepository,
         private LoggerInterface $logger,
-        private ?PerplexityProvider $chat = null,
+        private ?AiFacade $aiFacade = null,
     ) {
     }
 
@@ -134,15 +134,21 @@ final readonly class PerplexityAdapter implements WebSearchProviderInterface, We
         if (null === $model || 'perplexity' !== ModelCatalog::normalizeProvider((string) $model['service'])) {
             return null;
         }
-        if (null === $this->chat || !$this->chat->isAvailable()) {
+        if (null === $this->aiFacade || !$this->client->hasKey()) {
             return null;
         }
 
         $providerId = (string) $model['providerId'];
         try {
-            $response = $this->chat->chat(
+            $response = $this->aiFacade->chat(
                 [['role' => 'user', 'content' => $query]],
-                ['model' => $providerId],
+                null,
+                [
+                    'provider' => 'perplexity',
+                    'model' => $providerId,
+                    'skip_circuit_breaker' => true,
+                    'skip_model_health' => true,
+                ],
             );
         } catch (\Throwable $e) {
             $this->logger->warning('Perplexity WEBANSWER chat failed', [
@@ -152,7 +158,7 @@ final readonly class PerplexityAdapter implements WebSearchProviderInterface, We
             return null;
         }
 
-        $text = trim($response['content']);
+        $text = trim((string) ($response['content'] ?? ''));
         if ('' === $text) {
             return null;
         }

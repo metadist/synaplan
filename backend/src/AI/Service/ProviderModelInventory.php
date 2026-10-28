@@ -6,6 +6,12 @@ namespace App\AI\Service;
 
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
+use App\AI\Pipeline\AiCall;
+use App\AI\Pipeline\AiCallContext;
+use App\AI\Pipeline\AiCallOptions;
+use App\AI\Pipeline\AiCallPayload;
+use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\AiCapability;
 use App\Model\ModelCatalog;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -34,11 +40,15 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
     /** Safety stop so a broken cursor cannot loop forever. */
     private const MAX_PAGES = 10;
 
+    private AiCallPipeline $pipeline;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private ProviderKeyStore $keyStore,
         private LoggerInterface $logger,
+        ?AiCallPipeline $pipeline = null,
     ) {
+        $this->pipeline = $pipeline ?? new AiCallPipeline();
     }
 
     public function fetch(string $provider): ProviderModelListing
@@ -152,11 +162,24 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             return $this->probeXaiVoice($provider, $providerModelId, $listing['url'], $headers);
         }
 
+        $call = new AiCall(
+            capability: AiCapability::Probe,
+            provider: $provider,
+            model: $providerModelId,
+            context: AiCallContext::probe(),
+            payload: new AiCallPayload(),
+            options: AiCallOptions::fromArray(['skip_circuit_breaker' => true, 'skip_model_health' => true]),
+        );
+
         try {
-            $status = $this->httpClient->request('GET', rtrim($listing['url'], '/').'/'.ltrim($providerModelId, '/'), [
-                'headers' => $headers,
-                'timeout' => self::PROBE_TIMEOUT_SECONDS,
-            ])->getStatusCode();
+            /** @var int $status */
+            $status = $this->pipeline->run(
+                $call,
+                fn (): int => $this->httpClient->request('GET', rtrim($listing['url'], '/').'/'.ltrim($providerModelId, '/'), [
+                    'headers' => $headers,
+                    'timeout' => self::PROBE_TIMEOUT_SECONDS,
+                ])->getStatusCode(),
+            )->value;
         } catch (\Throwable $e) {
             $this->logger->warning('Model availability probe failed', [
                 'provider' => $provider,
@@ -193,13 +216,34 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             return ModelProbeResult::Inconclusive;
         }
 
+        $call = new AiCall(
+            capability: AiCapability::Probe,
+            provider: $provider,
+            model: $providerModelId,
+            context: AiCallContext::probe(),
+            payload: new AiCallPayload(),
+            options: AiCallOptions::fromArray(['skip_circuit_breaker' => true, 'skip_model_health' => true]),
+        );
+
         try {
-            $response = $this->httpClient->request('GET', $rosterUrl, [
-                'headers' => $headers,
-                'timeout' => self::PROBE_TIMEOUT_SECONDS,
-            ]);
-            $status = $response->getStatusCode();
-            $body = $status >= 200 && $status < 300 ? $response->toArray(false) : [];
+            /** @var array{status: int, body: array<mixed>} $result */
+            $result = $this->pipeline->run(
+                $call,
+                function () use ($rosterUrl, $headers): array {
+                    $response = $this->httpClient->request('GET', $rosterUrl, [
+                        'headers' => $headers,
+                        'timeout' => self::PROBE_TIMEOUT_SECONDS,
+                    ]);
+                    $status = $response->getStatusCode();
+
+                    return [
+                        'status' => $status,
+                        'body' => $status >= 200 && $status < 300 ? $response->toArray(false) : [],
+                    ];
+                },
+            )->value;
+            $status = $result['status'];
+            $body = $result['body'];
         } catch (\Throwable $e) {
             $this->logger->warning('Model availability probe failed', [
                 'provider' => $provider,
