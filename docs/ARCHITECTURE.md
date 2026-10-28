@@ -357,6 +357,20 @@ pipelines.
 
 ## Provider adapters
 
+### AI call pipeline — `AiCallPipeline`
+
+Every capability call on `AiFacade` builds an immutable `AiCall` (`App\AI\Pipeline\`) — carrying its `AiCapability`, provider name, resolved model, `AiCallContext`, `AiCallPayload` and `AiCallOptions` — and runs it through `AiCallPipeline::run()` or `AiCallPipeline::stream()`.
+
+Hooks implement `AiCallHookInterface` (or `StreamingAiCallHookInterface` to observe normalized `StreamChunk` items during a stream) and declare `#[AsAiCallHook(priority, blocking, budgetMs, onError, flag)]`, which autoconfigures the `app.ai.call_hook` tag. Both `before()` and `after()` run in **descending priority** order (`900` → `100`):
+
+| Priority | Hook | Before | After |
+| -------: | ---- | ------ | ----- |
+| 900 | `RequestContextHook` | stamps `X-Request-Id`, `runId`, and `hrtime` start | — |
+| 700 | `CircuitBreakerHook` | refuses with `AiCallRefusal` when the provider's circuit is open | records failure on the circuit breaker |
+| 600 | `ModelHealthHook` | — | records model health success or failure on `ModelHealthRecorder` |
+
+`HookContractTest` pins the priority order and enforces that non-blocking hooks never inject `HttpClientInterface`, `AiFacade`, `EntityManagerInterface`, or a repository. Blocking hooks receive a cooperative `AiCallDeadline` on `$call->options->deadline`; `AiCallPipeline` times every hook with `hrtime(true)`, logs `ai.hook_timeout` when a hook exceeds its `budgetMs`, and applies `HookFailure::Closed` refusals when an over-budget `before()` returns. Embedding cache + fallback (`AiEmbeddingExecutor`) and vision candidate fallback (`AiVisionExecutor`) sit under `AiFacade` and dispatch each provider call through the same pipeline.
+
 A vendor's adapter in `App\AI\Provider\` is what the registry knows: its
 name, its capability interfaces and its `app.ai.<capability>` tags in
 `config/services.yaml`. A large adapter is a façade over a folder of its

@@ -18,7 +18,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | merged (`3b0c6f627`) | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
 | 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | merged (`33f498065`) | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
 | 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
-| 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | open | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
+| 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | open (CI green, 3 Copilot rounds resolved) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
+| 2026-10-27 | AU10 | in progress | branch `refactor/au10-call-pipeline` | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 875 lines; pipeline overhead 0.008 ms p95 |
 
 ## Baselines
 
@@ -31,6 +32,26 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-27 — AU10: one call pipeline with ordered hooks under AiFacade
+
+Started from `test/au9-ai-paths` (`2208c6313`, [#2839](https://github.com/metadist/synaplan/pull/2839)).
+
+**What changed.**
+- `App\AI\Pipeline\`: `AiCall`, `AiCallContext`, `AiCallPayload`, `AiCallOptions`, `AiCallOutcome`, `AiCallRefusal`, `AiCallResult`, `AiCallTimings`, `AiCallDeadline`, `AiUsage`, `AiCapability`, `AiCallSource`, `HookFailure`, `AsAiCallHook`, `AiCallHookInterface`, `StreamingAiCallHookInterface`, and `AiCallPipeline` (`run()`, `stream()`).
+- Default hooks (`App\AI\Pipeline\Hook\`): `RequestContextHook` (priority 900), `CircuitBreakerHook` (priority 700), `ModelHealthHook` (priority 600), autoconfigured via `#[AsAiCallHook]` in `Kernel::build()`.
+- `AiFacade` routes `chat()`, `chatStream()`, `embed()`, `embedBatch()`, `analyzeImage()`, `generateImage()`, `generateVideo()`, `startVideoGeneration()`, `pollVideoOperation()`, `transcribe()`, and `synthesize()` through `AiCallPipeline`, with embedding cache/fallback in `AiEmbeddingExecutor` and vision candidate selection in `AiVisionExecutor`.
+- `AiFacade.php` shrank from **1,747 → 875 lines** (size ledger `methodLines` dropped `AiFacade::analyzeImage`, `AiFacade::embedBatch`, and `AiFacade::transcribe`: 122 → 119 methods over 100 lines; 0 new ledger entries).
+
+**Proof & mutation.**
+- `HookContractTest` (7 tests, 50 assertions): priority order pinned (`900 → 700 → 600`), non-blocking hook DI check (`HttpClientInterface`, `AiFacade`, `EntityManagerInterface`, `App\Repository\*` forbidden), `before()` refusal short-circuits transport and runs `after()` with `AiCallOutcome::Refused`, `after()` runs on failure, over-budget `before()` applies `HookFailure::Open` (logs `ai.hook_timeout` and continues) vs. `HookFailure::Closed` (logs and refuses with `AiCallRefusal::policy()`), over-budget `after()` only logs, streaming `onChunk()` receives normalized `StreamChunk`, `ttftMs` stamped on first visible token, `StreamCancelledException` records `AiCallOutcome::Cancelled`.
+- Mutation: changed `CircuitBreakerHook` priority from `700` to `500`; `HookContractTest::testDefaultHooksRunInDescendingPriorityOrderInBothPhases` failed (`Failed asserting that 500 is identical to 700`); restored.
+
+**Regression & performance.**
+- Every characterization snapshot (`AiPathCharacterizationTest`, `StreamTranscriptCharacterizationTest`, `MessageTurnCharacterizationTest`, `OpenAIProviderRequestCharacterizationTest`, `GoogleProviderRequestCharacterizationTest`, `MediaTurnCharacterizationTest`, `EmailTurnCharacterizationTest`, `WidgetTurnCharacterizationTest`, `WhatsAppTurnCharacterizationTest`, `FileAnalysisCharacterizationTest`) byte-identical.
+- `make perf-runtime`: 1,000 calls through `AiCallPipeline` with the default hooks and a no-op provider measured **0.0045 ms p50, 0.0082 ms p95, 0.0114 ms p99** (budget ≤ 1.0 ms p95: `ok`). `/api/health` p95 2.7 ms (1 client, budget ≤ 15.0 ms: `ok`), gateway TTFT p50 13.4 ms.
 
 ---
 
@@ -772,3 +793,9 @@ opinion on S5 and the approval-gate gap are in
 | 2026-10-27 | #2839 | 1 | `03` §1.5 conflicted with §1.7.1 on per-call `AI_CALL` rows vs. per-turn `MESSAGES` quota rows | Fixed: reconciled `03` §1.5 with `#2836`'s `AI_CALL` + `FacadeMeteredChat` per-turn `MESSAGES` model and `TurnUsageLedger` |
 | 2026-10-27 | #2839 | 1 | `03` §1.7.2/§1.7.3 named `PipelineStreamChunk` while §1.2 and §7 named `StreamChunk` | Fixed: unified §1.2, §1.7 and §7 on `App\AI\Stream\StreamChunk` |
 | 2026-10-27 | #2839 | 2 | Stubbing `UsageFailureLogger` suppressed the `BUSELOG` error row written by `ModelHealthRecorder::recordFailure()` on the `vectorize` batch failure | Fixed: wired the real `UsageFailureLogger` on the recording connection and captured `status` and `error` on every `buselog` entry |
+| 2026-10-27 | #2841 | 1 | `CircuitBreakerHook::before()` called `CircuitBreaker::execute()` with a dummy callback, recording a success before the provider ran and resetting consecutive failure counts | Fixed: split `CircuitBreaker::admit()`, `recordOutcomeSuccess()`, and `recordOutcomeException()`; `CircuitBreakerHook::before()` only admits, `after()` records success or failure; regression test `testCircuitBreakerHookAccumulatesConsecutiveFailuresUntilOpen` |
+| 2026-10-27 | #2841 | 1 | `AiEmbeddingExecutor` fallback bypassed `AiCallPipeline` and treated pre-call policy refusals as provider failover triggers | Fixed: `AiCallRefusedException` propagates without triggering fallback; genuine provider failovers run through `AiCallPipeline` as a new `AiCall` |
+| 2026-10-27 | #2841 | 1 | `pipeline_overhead.php` used an uninitialized `ModelRepository`, skipping `ModelHealthRecorder` cache updates after warmup | Fixed: primed `ModelHealthRecorder`'s model-id memo and asserted ≥ 25 warmup health successes before timing 1,000 calls |
+| 2026-10-27 | #2841 | 1 | `AiFacade::startVideoGeneration()` labeled its `AiCall` as `VideoPoll` instead of `VideoStart` | Fixed: uses `AiCapability::VideoStart` with explicit `skip_circuit_breaker` / `skip_model_health` flags |
+| 2026-10-27 | #2841 | 2 (overview) | Blocking hook deadlines leaked into later hooks and `after()`; `AiVisionExecutor` caught `AiCallRefusedException` and fell through; `synthesizeStream()` did not run through the pipeline | Fixed: `AiCallPipeline` caps blocking hook deadlines against inherited deadlines and restores the inherited deadline between hooks; `AiVisionExecutor` rethrows `AiCallRefusedException`; `AiCallPipeline::streamGenerator()` wraps `synthesizeStream()` lazily |
+| 2026-10-27 | #2841 | 3 | `streamGenerator()` had `yield` in its outer body, deferring eager provider setup errors until iteration after 200 headers | Fixed: `streamGenerator()` runs `before()` hooks and `$transport($call)` eagerly and returns `iterateStreamGenerator()` for lazy chunk delivery; regression test `testStreamGeneratorRunsBeforeHooksAndTransportCreationEagerlyBeforeIteration`. Three-round Copilot cap reached (`01` §9) |

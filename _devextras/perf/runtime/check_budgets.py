@@ -50,6 +50,8 @@ def assemble(work: Path, out: Path, chunk_ms: int) -> None:
     runtime = load(work / "runtime.json")
     gateway = load(work / "gateway.json")
     saturate = load(work / "saturate.json")
+    pipeline_path = work / "pipeline.json"
+    pipeline = load(pipeline_path) if pipeline_path.exists() else {}
     phases_path = work / "phases.json"
     phases = load(phases_path) if phases_path.exists() else {"skipped": True, "reason": "not run"}
     overhead_path = work / "overhead.txt"
@@ -58,6 +60,7 @@ def assemble(work: Path, out: Path, chunk_ms: int) -> None:
         "chunk_ms": chunk_ms,
         "health": {"clients1": health1, "clients8": health8},
         "runtime_config": runtime,
+        "pipeline": pipeline,
         "gateway": gateway,
         "saturation": {
             "streams": saturate.get("streams"),
@@ -93,6 +96,8 @@ def format_value(value) -> str:
     if value is None:
         return "n/a"
     if isinstance(value, float):
+        if 0 < abs(value) < 0.1:
+            return f"{value:.3f}"
         return f"{value:.1f}"
     return str(value)
 

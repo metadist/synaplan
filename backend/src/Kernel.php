@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\AI\Pipeline\AsAiCallHook;
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
 use App\DependencyInjection\Compiler\PerfTestProviderPass;
 use App\Module\Contract\FeatureModuleInterface;
@@ -11,6 +12,7 @@ use App\Plug\Extraction\ContentExtractorInterface;
 use App\Plug\Rerank\RerankProviderInterface;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -105,6 +107,12 @@ class Kernel extends BaseKernel
         $container->registerForAutoconfiguration(ContentExtractorInterface::class)->addTag('app.plug.extractor');
         $container->registerForAutoconfiguration(WebSearchProviderInterface::class)->addTag('app.plug.web_search');
         $container->registerForAutoconfiguration(RerankProviderInterface::class)->addTag('app.plug.rerank');
+        $container->registerAttributeForAutoconfiguration(
+            AsAiCallHook::class,
+            static function (ChildDefinition $definition, AsAiCallHook $attribute): void {
+                $definition->addTag('app.ai.call_hook', ['priority' => $attribute->priority]);
+            },
+        );
 
         // Feature modules: every descriptor reaches ModuleRegistry by implementing
         // the interface; the pass indexes the tag by the class's ID constant and
