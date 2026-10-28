@@ -683,6 +683,52 @@ LUA;
         }
     }
 
+    /**
+     * Write a request timeline record into the ring and increment all
+     * per-server counter/histogram hashes in a single Redis pipeline
+     * (`03_contracts.md` §9, `04_capacity_and_kubernetes.md` §2).
+     *
+     * @param array<string, array<string, int>> $hashIncrements
+     */
+    public function pipelineTimelineRecord(
+        string $ringKey,
+        float $score,
+        string $encodedRecord,
+        int $maxEntries,
+        int $ttlSeconds,
+        array $hashIncrements,
+    ): bool {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $prefixedRing = $this->prefix($ringKey);
+            $client->pipeline(function ($pipe) use ($prefixedRing, $score, $encodedRecord, $maxEntries, $ttlSeconds, $hashIncrements): void {
+                $pipe->zadd($prefixedRing, [$encodedRecord => $score]);
+                $pipe->zremrangebyrank($prefixedRing, 0, -($maxEntries + 1));
+                $pipe->expire($prefixedRing, $ttlSeconds);
+
+                foreach ($hashIncrements as $hashKey => $fields) {
+                    $prefixedHash = $this->prefix($hashKey);
+                    foreach ($fields as $field => $delta) {
+                        if (0 !== $delta) {
+                            $pipe->hincrby($prefixedHash, (string) $field, $delta);
+                        }
+                    }
+                    $pipe->expire($prefixedHash, $ttlSeconds);
+                }
+            });
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('PIPELINE', $ringKey, $e);
+
+            return false;
+        }
+    }
+
     public function getLastConnectionError(): ?\Throwable
     {
         return $this->connectionFailure;

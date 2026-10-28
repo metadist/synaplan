@@ -8,7 +8,9 @@ use App\Module\Contract\ConfiguredBy;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
+use App\Observability\RequestTimelineStore;
 use App\Service\Observability\CapacityService;
+use App\Service\Observability\CapacityTimelineService;
 use App\Service\Observability\CapacityUnavailableException;
 
 /**
@@ -92,7 +94,9 @@ final class CapacityModule implements FeatureModuleInterface
     {
         return [
             CapacityService::class,
+            CapacityTimelineService::class,
             CapacityUnavailableException::class,
+            RequestTimelineStore::class,
         ];
     }
 

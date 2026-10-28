@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Service\Observability\CapacityService;
+use App\Service\Observability\CapacityTimelineService;
 use App\Service\Observability\CapacityUnavailableException;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,6 +27,7 @@ final class AdminCapacityController extends AbstractController
 {
     public function __construct(
         private readonly CapacityService $capacity,
+        private readonly CapacityTimelineService $timeline,
     ) {
     }
 
@@ -173,6 +175,155 @@ final class AdminCapacityController extends AbstractController
     {
         try {
             $report = $this->capacity->report();
+        } catch (CapacityUnavailableException) {
+            return $this->json(['success' => false, 'error' => 'capacity_unavailable'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        return $this->json(['success' => true] + $report);
+    }
+
+    #[Route('/requests', name: 'admin_capacity_requests', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/admin/capacity/requests',
+        summary: 'Request timings by route class and slowest recent requests',
+        description: 'Reads the 24-hour request timeline ring from Redis: per-route-class request counts, errors, busy refusals, p50 / p95 / p99 durations, and the slowest requests in the last hour with their PHP, AI, tool, outbound and database parts.',
+        security: [['Bearer' => []]],
+        tags: ['Admin Capacity'],
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Request timings by route class and slowest requests',
+        content: new OA\JsonContent(
+            required: ['success', 'served_by', 'generated_at', 'route_classes', 'slowest'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'served_by', type: 'string', example: 'web1'),
+                new OA\Property(property: 'generated_at', type: 'string', format: 'date-time', example: '2026-10-28T08:00:00+00:00'),
+                new OA\Property(
+                    property: 'route_classes',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        required: ['route_class', 'requests', 'errors', 'busy', 'p50_ms', 'p95_ms', 'p99_ms'],
+                        properties: [
+                            new OA\Property(property: 'route_class', type: 'string', example: 'chat_stream'),
+                            new OA\Property(property: 'requests', type: 'integer', example: 42),
+                            new OA\Property(property: 'errors', type: 'integer', example: 0),
+                            new OA\Property(property: 'busy', type: 'integer', example: 1),
+                            new OA\Property(property: 'p50_ms', type: 'integer', example: 1000),
+                            new OA\Property(property: 'p95_ms', type: 'integer', example: 5000),
+                            new OA\Property(property: 'p99_ms', type: 'integer', example: 10000),
+                        ],
+                    ),
+                ),
+                new OA\Property(
+                    property: 'slowest',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        required: ['id', 'ts', 'server', 'route_class', 'status_class', 'total_ms', 'php_ms', 'db_ms', 'db_queries', 'ai', 'tools', 'egress', 'user_id'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', example: 'a1b2c3d4'),
+                            new OA\Property(property: 'ts', type: 'integer', example: 1730100000),
+                            new OA\Property(property: 'server', type: 'string', example: 'web1'),
+                            new OA\Property(property: 'route_class', type: 'string', example: 'chat_stream'),
+                            new OA\Property(property: 'status_class', type: 'string', enum: ['2xx', '4xx', '5xx', 'busy'], example: '2xx'),
+                            new OA\Property(property: 'total_ms', type: 'integer', example: 1240),
+                            new OA\Property(property: 'php_ms', type: 'integer', example: 1240),
+                            new OA\Property(property: 'wait_ms', type: 'integer', nullable: true, example: null),
+                            new OA\Property(property: 'db_ms', type: 'integer', example: 12),
+                            new OA\Property(property: 'db_queries', type: 'integer', example: 6),
+                            new OA\Property(property: 'ai', type: 'array', items: new OA\Items(type: 'object')),
+                            new OA\Property(property: 'tools', type: 'array', items: new OA\Items(type: 'object')),
+                            new OA\Property(property: 'egress', type: 'array', items: new OA\Items(type: 'object')),
+                            new OA\Property(property: 'user_id', type: 'integer', nullable: true, example: 7),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 404, description: 'The watchdog is off on this installation (feature_not_configured)')]
+    #[OA\Response(response: 503, description: 'The shared cache did not answer')]
+    public function requests(): JsonResponse
+    {
+        try {
+            $report = $this->timeline->requestsReport();
+        } catch (CapacityUnavailableException) {
+            return $this->json(['success' => false, 'error' => 'capacity_unavailable'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        return $this->json(['success' => true] + $report);
+    }
+
+    #[Route('/ai-calls', name: 'admin_capacity_ai_calls', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/admin/capacity/ai-calls',
+        summary: 'AI call timings, token counts and cost by provider/model and by source',
+        description: 'Reads the 24-hour request timeline ring from Redis: per-provider/model call counts, failures, TTFT p50/p95, duration p95, tokens, cost and hook time p95, plus totals grouped by source.',
+        security: [['Bearer' => []]],
+        tags: ['Admin Capacity'],
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'AI call metrics by model and by source',
+        content: new OA\JsonContent(
+            required: ['success', 'served_by', 'generated_at', 'models', 'sources'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'served_by', type: 'string', example: 'web1'),
+                new OA\Property(property: 'generated_at', type: 'string', format: 'date-time', example: '2026-10-28T08:00:00+00:00'),
+                new OA\Property(
+                    property: 'models',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        required: ['provider', 'model', 'capability', 'calls', 'failures', 'ttft_p50_ms', 'ttft_p95_ms', 'duration_p95_ms', 'tokens_in', 'tokens_out', 'cost', 'hooks_ms_p95'],
+                        properties: [
+                            new OA\Property(property: 'provider', type: 'string', example: 'openai'),
+                            new OA\Property(property: 'model', type: 'string', example: 'gpt-4o'),
+                            new OA\Property(property: 'capability', type: 'string', example: 'chat_stream'),
+                            new OA\Property(property: 'calls', type: 'integer', example: 18),
+                            new OA\Property(property: 'failures', type: 'integer', example: 0),
+                            new OA\Property(property: 'ttft_p50_ms', type: 'integer', nullable: true, example: 250),
+                            new OA\Property(property: 'ttft_p95_ms', type: 'integer', nullable: true, example: 500),
+                            new OA\Property(property: 'duration_p95_ms', type: 'integer', example: 2500),
+                            new OA\Property(property: 'tokens_in', type: 'integer', example: 1200),
+                            new OA\Property(property: 'tokens_out', type: 'integer', example: 640),
+                            new OA\Property(property: 'cost', type: 'string', example: '0.009400'),
+                            new OA\Property(property: 'hooks_ms_p95', type: 'number', format: 'float', example: 0.042),
+                        ],
+                    ),
+                ),
+                new OA\Property(
+                    property: 'sources',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        required: ['source', 'calls', 'failures', 'tokens_in', 'tokens_out', 'cost'],
+                        properties: [
+                            new OA\Property(property: 'source', type: 'string', example: 'chat_stream'),
+                            new OA\Property(property: 'calls', type: 'integer', example: 18),
+                            new OA\Property(property: 'failures', type: 'integer', example: 0),
+                            new OA\Property(property: 'tokens_in', type: 'integer', example: 1200),
+                            new OA\Property(property: 'tokens_out', type: 'integer', example: 640),
+                            new OA\Property(property: 'cost', type: 'string', example: '0.009400'),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 404, description: 'The watchdog is off on this installation (feature_not_configured)')]
+    #[OA\Response(response: 503, description: 'The shared cache did not answer')]
+    public function aiCalls(): JsonResponse
+    {
+        try {
+            $report = $this->timeline->aiCallsReport();
         } catch (CapacityUnavailableException) {
             return $this->json(['success' => false, 'error' => 'capacity_unavailable'], Response::HTTP_SERVICE_UNAVAILABLE);
         }
