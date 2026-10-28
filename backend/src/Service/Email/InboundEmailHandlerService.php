@@ -579,7 +579,7 @@ final readonly class InboundEmailHandlerService
 
             $routedEmail = trim($response['content'] ?? '');
 
-            $this->rateLimitService->recordUsage($handlerUser, 'EMAIL_ROUTING', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $handlerUser, 'EMAIL_ROUTING', [
                 'provider' => $response['provider'] ?? $provider,
                 'model' => $response['model'] ?? $modelName,
                 'model_id' => $modelId,

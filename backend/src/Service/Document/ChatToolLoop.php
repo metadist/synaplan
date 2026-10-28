@@ -53,25 +53,10 @@ final readonly class ChatToolLoop
         $started = time();
         $maxIter = $this->config->maxIterations();
         $maxOps = $this->config->maxOpsPerTurn();
-        $tools = $this->registry->declarationsFor($session->kind());
-        if (null !== $this->toolRegistry && null !== $this->toolsConfig && null !== $userId && $this->toolsConfig->isRegistryEnabled($userId)) {
-            $tools = [];
-            foreach ($this->toolRegistry->forUser($userId, ['documentKind' => $session->kind()]) as $descriptor) {
-                if ('document' !== $descriptor->source->value) {
-                    continue;
-                }
-                $tools[] = [
-                    'type' => 'function',
-                    'function' => [
-                        'name' => $descriptor->name,
-                        'description' => $descriptor->description,
-                        'parameters' => $descriptor->inputSchema,
-                    ],
-                ];
-            }
-        }
+        $tools = $this->resolveTools($session->kind(), $userId);
         $options['tools'] = $tools;
         $options['tool_choice'] = $options['tool_choice'] ?? 'auto';
+        $options['usage_turn_id'] = $options['usage_turn_id'] ?? ('doc-loop-'.bin2hex(random_bytes(8)));
 
         $content = '';
         $usage = [];
@@ -142,6 +127,33 @@ final readonly class ChatToolLoop
         }
 
         return new ChatToolLoopResult($content, $session, $usage, $facadeMetered, $facadeMetered ? number_format($charged, 6, '.', '') : null, $priceKnown);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function resolveTools(string $kind, ?int $userId): array
+    {
+        if (null === $this->toolRegistry || null === $this->toolsConfig || null === $userId || !$this->toolsConfig->isRegistryEnabled($userId)) {
+            return $this->registry->declarationsFor($kind);
+        }
+
+        $tools = [];
+        foreach ($this->toolRegistry->forUser($userId, ['documentKind' => $kind]) as $descriptor) {
+            if ('document' !== $descriptor->source->value) {
+                continue;
+            }
+            $tools[] = [
+                'type' => 'function',
+                'function' => [
+                    'name' => $descriptor->name,
+                    'description' => $descriptor->description,
+                    'parameters' => $descriptor->inputSchema,
+                ],
+            ];
+        }
+
+        return $tools;
     }
 
     /**

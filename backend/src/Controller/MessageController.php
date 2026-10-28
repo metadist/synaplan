@@ -276,7 +276,7 @@ class MessageController extends AbstractController
 
             $resolvedModelId = $modelId;
 
-            $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', FacadeMeteredChat::messages(
+            $recordedChatUsage = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MESSAGES', FacadeMeteredChat::messages(
                 $aiResponse,
                 'WEB',
                 $messageText,

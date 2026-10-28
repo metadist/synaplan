@@ -148,7 +148,7 @@ final readonly class WidgetSetupService
 
         $aiResponse = $response['content'] ?? '';
 
-        $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'WIDGET_SETUP', [
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
             'model_id' => $modelId,
@@ -221,7 +221,7 @@ final readonly class WidgetSetupService
         $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
         $aiResponse = $response['content'] ?? '';
 
-        $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'WIDGET_SETUP', [
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
             'model_id' => $modelId,
@@ -300,7 +300,7 @@ PROMPT;
 
             $content = trim($response['content'] ?? '');
 
-            $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'WIDGET_SETUP', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $modelConfig['model_id'],
@@ -483,7 +483,7 @@ PROMPT;
 
                 $content = $response['content'] ?? '';
 
-                $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
+                \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'WIDGET_SETUP', [
                     'provider' => $response['provider'] ?? 'unknown',
                     'model' => $response['model'] ?? 'unknown',
                     'model_id' => $metaModelConfig['model_id'],

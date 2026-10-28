@@ -199,7 +199,7 @@ PROMPT;
 
             $content = $response['content'] ?? '';
 
-            $this->rateLimitService->recordUsage($user, 'MESSAGE_DIGEST', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MESSAGE_DIGEST', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $modelConfig['model_id'] ?? null,
@@ -459,7 +459,7 @@ PROMPT;
                 throw new \RuntimeException('Failed to create digest embedding');
             }
 
-            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                 'usage' => $embedResult['usage'],
                 'provider' => $embeddingConfig['provider'] ?? 'unknown',
                 'model' => $embeddingConfig['model'] ?? 'unknown',

@@ -319,7 +319,7 @@ PROMPT;
 
             $content = trim((string) ($response['content'] ?? ''));
 
-            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'FEEDBACK', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $toolsConfig['model_id'] ?? null,
@@ -493,7 +493,7 @@ PROMPT;
 
             $correction = trim((string) ($response['content'] ?? ''));
 
-            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'FEEDBACK', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $toolsConfig['model_id'] ?? null,
@@ -555,7 +555,7 @@ PROMPT;
 
             $content = trim((string) ($response['content'] ?? ''));
 
-            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'FEEDBACK', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $toolsConfig['model_id'] ?? null,
@@ -617,7 +617,7 @@ PROMPT;
 
             $content = trim((string) ($response['content'] ?? ''));
 
-            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'FEEDBACK', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $toolsConfig['model_id'] ?? null,
@@ -979,7 +979,7 @@ PROMPT;
 
             $content = trim((string) ($response['content'] ?? ''));
 
-            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'FEEDBACK', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $toolsConfig['model_id'] ?? null,
@@ -1180,7 +1180,7 @@ PROMPT;
 
             $content = trim((string) ($response['content'] ?? ''));
 
-            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'FEEDBACK', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $toolsConfig['model_id'] ?? null,

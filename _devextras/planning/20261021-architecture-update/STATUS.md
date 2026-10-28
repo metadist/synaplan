@@ -18,8 +18,9 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | merged (`3b0c6f627`) | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
 | 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | merged (`33f498065`) | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
 | 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
-| 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | open (CI green, 3 Copilot rounds resolved) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
-| 2026-10-27 | AU10 | in progress | branch `refactor/au10-call-pipeline` | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 875 lines; pipeline overhead 0.008 ms p95 |
+| 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | merged (`a0bb87213`) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
+| 2026-10-27 | AU10 | [#2841](https://github.com/metadist/synaplan/pull/2841) | merged (`2b3148c40`) | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 1,070 lines; pipeline overhead 0.008 ms p95 |
+| 2026-10-28 | AU11 | in progress | branch `fix/au11-usage-hook` | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`) |
 
 ## Baselines
 
@@ -32,6 +33,31 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-28 — AU11 (Part 1): every AI call is metered once, in the pipeline
+
+Started from `main` at `2b3148c40` ([#2841](https://github.com/metadist/synaplan/pull/2841) merged).
+
+**What changed.**
+- `App\AI\Pipeline\`: `AiAction` (with `accountingUnit()`: `per_turn` for `MESSAGES` and `VOICE_LIVE`, `per_call` for `AI_CALL`, `SORTING`, `MEMORY_EXTRACTION`, `EMBEDDINGS`, `IMAGES`, `VIDEOS`, `AUDIOS`, `TRANSCRIPTION`, …), `UsageHookMode` (`legacy` | `shadow` | `on`), `UsageHookConfig` (`AI.USAGE_HOOK`), and `AiCallSource::isJoined()` (`false` for `MessagesApi` and `VoiceLive` until AU12, `true` for all `AiFacade` paths).
+- `App\AI\Pipeline\Hook\`: `RateLimitHook` (priority 800) and `UsageHook` (priority 300), wired to `AiPipelineMeter`.
+- `App\Service\Usage\`: `LegacyUsageWriter`, `TurnUsageLedger` (`turnusage:{turnId}` with `HSETNX` per `callId` and `SET turnusage:{turnId}:closed NX` on close, Redis-backed with in-process fallback), `TurnUsageTotal`, and `AiPipelineMeter`.
+- `AiPipelineConfigSeeder` seeds `BCONFIG` (`ownerId=0`, `group='AI'`, `setting='USAGE_HOOK'`, `value='legacy'`).
+- Every caller's AI-action `RateLimitService::recordUsage()` call now routes through `LegacyUsageWriter::record()`. Non-AI usage calls (`TOOLS` in `GatewayToolLoop:1367`, `COMPUTE_RUNS` in `CodeRunRunner:416`, `FILE_ANALYSIS` in `RateLimitService:241`) stay untouched for S4.
+
+**Grep of `->recordUsage(` across `backend/src/`:**
+- `backend/src/Service/Usage/AiPipelineMeter.php` (`UsageHook` writer)
+- `backend/src/Service/Usage/LegacyUsageWriter.php` (migration writer)
+- `backend/src/AI/Messages/Tools/GatewayToolLoop.php:1367` (`TOOLS` — non-AI, moves in S4)
+- `backend/src/Service/Multitask/Execution/Runner/CodeRunRunner.php:416` (`COMPUTE_RUNS` — non-AI, moves in S4)
+- `backend/src/Service/RateLimitService.php:241` (`FILE_ANALYSIS` — non-AI upload event)
+
+**Proof & regression.**
+- `AiPathCharacterizationTest::testShadowAndOnModesMatchTheBaselineRowsOnEveryJoinedPath`: runs all 19 paths under `legacy`, `shadow`, and `on`, asserting identical `BUSELOG` rows and zero shadow mismatches.
+- `UsageHookTest` (6 tests): two-round document tool loop (`ChatToolLoop`) and three-round gateway MCP tool loop (`OpenAiGatewayToolLoop`) each write one `MESSAGES` quota row with summed `facade_charged_cost` under `legacy`, `shadow`, and `on`; deliberately wrong shadow computation logs `ai.usage_mismatch`; `TurnUsageLedger` deduplicates `callId` contributions (`HSETNX`) and idempotently closes (`SET ... NX`); runtime rollback from `on` to `legacy` keeps one row per call; live voice (`VoiceLiveUsageService`) writes one `VOICE_LIVE` row under all three modes.
+- Soak signal to flip Part 2 (`AI.USAGE_HOOK = on`): 7 days in `shadow` on production with zero `ai.usage_mismatch` events in the event ring (`GET /api/v1/admin/logs?event=ai.usage_mismatch`).
 
 ---
 

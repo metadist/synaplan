@@ -311,7 +311,7 @@ final readonly class MessageSorter
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
-                'max_tokens' => self::CLASSIFICATION_MAX_TOKENS, 'caller_meters' => true,
+                'max_tokens' => self::CLASSIFICATION_MAX_TOKENS, 'caller_meters' => true, 'usage_action' => 'SORTING',
             ];
 
             // Enum-constrains BTOPIC/BLANG/BMEDIA/BINPUTMODE/BRESOLUTION on
@@ -886,7 +886,7 @@ final readonly class MessageSorter
                 return null;
             }
 
-            return $this->rateLimitService->recordUsage($user, 'SORTING', [
+            return \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'SORTING', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',

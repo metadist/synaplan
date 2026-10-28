@@ -243,7 +243,7 @@ final readonly class VectorizationService
 
             $user = $this->em->getRepository(User::class)->find($userId);
             if ($user) {
-                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                     'usage' => $usage,
                     'provider' => $provider,
                     'model' => $modelName,
@@ -349,7 +349,7 @@ final readonly class VectorizationService
      */
     private function embedWindowResilient(array $chunkTexts, int $userId, string $provider, string $modelName): array
     {
-        $options = ['model' => $modelName, 'provider' => $provider];
+        $options = ['model' => $modelName, 'provider' => $provider, 'usage_action' => 'EMBEDDINGS', 'usage_source' => 'VECTORIZATION'];
 
         try {
             $batch = $this->aiFacade->embedBatch(array_values($chunkTexts), $userId, $provider, $options);

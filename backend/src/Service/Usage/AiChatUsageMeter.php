@@ -31,6 +31,10 @@ final readonly class AiChatUsageMeter
     /** Pulled off the provider options before the call. See {@see claim()}. */
     public const USAGE_SOURCE = 'usage_source';
 
+    public const USAGE_ACTION = 'usage_action';
+
+    public const USAGE_TURN_ID = 'usage_turn_id';
+
     public const USAGE_CHAT_ID = 'usage_chat_id';
 
     public const USAGE_AGENT_ID = 'usage_agent_id';
@@ -92,7 +96,7 @@ final readonly class AiChatUsageMeter
         }
 
         try {
-            return $this->rateLimitService->recordUsage($user, self::ACTION, $metadata);
+            return LegacyUsageWriter::record($this->rateLimitService, $user, self::ACTION, $metadata);
         } catch (\Throwable $e) {
             $this->logger->warning('AiChatUsageMeter: failed to record chat usage', [
                 'user_id' => $userId,
@@ -121,6 +125,18 @@ final readonly class AiChatUsageMeter
             $context['source'] = trim($source);
         }
         unset($options[self::USAGE_SOURCE]);
+
+        $action = $options[self::USAGE_ACTION] ?? null;
+        if (is_string($action) && '' !== trim($action)) {
+            $context['action'] = trim($action);
+        }
+        unset($options[self::USAGE_ACTION]);
+
+        $turnId = $options[self::USAGE_TURN_ID] ?? null;
+        if (is_string($turnId) && '' !== trim($turnId)) {
+            $context['turn_id'] = trim($turnId);
+        }
+        unset($options[self::USAGE_TURN_ID]);
 
         foreach ([
             self::USAGE_CHAT_ID => 'chat_id',

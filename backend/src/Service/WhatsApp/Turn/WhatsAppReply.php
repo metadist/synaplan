@@ -221,7 +221,7 @@ final readonly class WhatsAppReply
             $this->em->flush();
         }
 
-        $recordedChatUsage = $this->rateLimitService->recordUsage(
+        $recordedChatUsage = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService,
             $user,
             'MESSAGES',
             FacadeMeteredChat::messages($metadata, 'WHATSAPP', $message->getText(), $responseText),

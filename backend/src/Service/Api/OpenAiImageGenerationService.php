@@ -49,6 +49,8 @@ final readonly class OpenAiImageGenerationService
         $options = [
             'provider' => $provider,
             'model' => $model->getProviderId(),
+            'model_id' => (int) $model->getId(),
+            'usage_source' => 'OPENAI_API',
             'modelConfig' => $model->getJson(),
             'n' => $request->n,
             'size' => 'auto' === $request->size ? OpenAiImageGenerationRequest::DEFAULT_SIZE : $request->size,
@@ -150,7 +152,7 @@ final readonly class OpenAiImageGenerationService
     private function recordUsage(User $user, string $provider, string $modelName, int $modelId, int $count, array $options): void
     {
         try {
-            $this->rateLimitService->recordUsage($user, 'IMAGES', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'IMAGES', [
                 'provider' => $provider,
                 'model' => $modelName,
                 'model_id' => $modelId,

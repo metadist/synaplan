@@ -61,7 +61,7 @@ final readonly class MediaJobUsageRecorder
         $mediaUsage = is_array($options['media_usage'] ?? null) ? $options['media_usage'] : [];
 
         try {
-            $recorded = $this->rateLimitService->recordUsage($user, $action, [
+            $recorded = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, $action, [
                 'provider' => $job->getProvider(),
                 'model' => $job->getModel() ?? 'unknown',
                 'model_id' => $job->getModelId(),

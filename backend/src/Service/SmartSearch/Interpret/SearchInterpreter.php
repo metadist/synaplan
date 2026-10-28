@@ -92,7 +92,7 @@ final readonly class SearchInterpreter
         }
 
         $content = is_string($response['content'] ?? null) ? $response['content'] : '';
-        $this->rateLimitService->recordUsage($user, self::USAGE_ACTION, [
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, self::USAGE_ACTION, [
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
             'model_id' => $model?->getId(),

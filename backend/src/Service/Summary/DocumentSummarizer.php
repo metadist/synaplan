@@ -59,7 +59,7 @@ final readonly class DocumentSummarizer
         if (null !== $call->startedAt) {
             $usage['latency'] = (int) ((microtime(true) - $call->startedAt) * 1000);
         }
-        $this->rateLimitService->recordUsage($user, $call->usageKind, $usage + [
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, $call->usageKind, $usage + [
             'response_text' => $summary,
             'input_text' => $call->usageInput,
         ]);

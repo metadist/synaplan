@@ -23,6 +23,14 @@ use App\AI\Messages\Translator\GeminiMessagesTranslator;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\AI\OpenAI\OpenAiGatewayToolLoop;
+use App\AI\Pipeline\AiCallPipeline;
+use App\AI\Pipeline\Hook\CircuitBreakerHook;
+use App\AI\Pipeline\Hook\ModelHealthHook;
+use App\AI\Pipeline\Hook\RateLimitHook;
+use App\AI\Pipeline\Hook\RequestContextHook;
+use App\AI\Pipeline\Hook\UsageHook;
+use App\AI\Pipeline\UsageHookConfig;
+use App\AI\Pipeline\UsageHookMode;
 use App\AI\Provider\OpenAIProvider;
 use App\AI\Provider\PerplexityProvider;
 use App\AI\Service\AiFacade;
@@ -110,8 +118,11 @@ use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\Usage\AiChatUsageMeter;
+use App\Service\Usage\AiPipelineMeter;
 use App\Service\Usage\CostCalculationService;
+use App\Service\Usage\LegacyUsageWriter;
 use App\Service\Usage\TranscriptionUsageRecorder;
+use App\Service\Usage\TurnUsageLedger;
 use App\Service\Usage\UsageFailureLogger;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
@@ -199,10 +210,29 @@ final class AiPathHarness
     /** @var array<int, array{capability: string, provider: string, model: string}> */
     private array $healthResolutionById = [];
 
+    /** @var list<array<string, mixed>> */
+    private array $mismatches = [];
+
+    private ?AiPipelineMeter $pipelineMeter = null;
+
     public function __construct(
         private readonly TestCase $test,
         private readonly string $uploadDir,
+        private readonly UsageHookMode $usageHookMode = UsageHookMode::Legacy,
     ) {
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function mismatches(): array
+    {
+        return $this->mismatches;
+    }
+
+    public function pipelineMeter(): ?AiPipelineMeter
+    {
+        return $this->pipelineMeter;
     }
 
     /**
@@ -232,6 +262,7 @@ final class AiPathHarness
             'model_probe' => $this->modelProbe(...),
         ];
 
+        $this->mismatches = [];
         $out = [];
         foreach ($cases as $name => $runner) {
             $this->resetLogs();
@@ -248,6 +279,7 @@ final class AiPathHarness
         $this->circuitBreaker = [];
         $this->modelHealth = [];
         $this->healthResolutionById = [];
+        LegacyUsageWriter::bind(null);
     }
 
     /**
@@ -1261,6 +1293,49 @@ final class AiPathHarness
         $transcriptionUsage = new TranscriptionUsageRecorder($limits, $userRepo, new NullLogger());
         $chatUsageMeter = new AiChatUsageMeter($limits, $userRepo, $modelRepo, new NullLogger());
 
+        $priceHistory = $this->createStub(ModelPriceHistoryRepository::class);
+        $priceHistory->method('findPriceAtTimestamp')->willReturn(null);
+        $costs = new CostCalculationService($modelRepo, $priceHistory, new NullLogger());
+
+        $hookConfigRepo = $this->createStub(ConfigRepository::class);
+        $hookConfigRepo->method('getValue')->willReturn($this->usageHookMode->value);
+        $hookConfig = new UsageHookConfig($hookConfigRepo);
+
+        $mismatchLogger = new class(function (array $ctx): void {
+            $this->mismatches[] = $ctx;
+        }) extends AbstractLogger {
+            /** @param \Closure(array<string, mixed>): void $record */
+            public function __construct(private readonly \Closure $record)
+            {
+            }
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                if ('ai.usage_mismatch' === ($context['event'] ?? null)) {
+                    ($this->record)($context);
+                }
+            }
+        };
+
+        $this->pipelineMeter = new AiPipelineMeter(
+            $limits,
+            $costs,
+            $userRepo,
+            $modelRepo,
+            $hookConfig,
+            new TurnUsageLedger(),
+            null,
+            $mismatchLogger,
+        );
+
+        $pipeline = new AiCallPipeline([
+            new RequestContextHook(),
+            new RateLimitHook($this->pipelineMeter),
+            new CircuitBreakerHook($breaker),
+            new ModelHealthHook($health),
+            new UsageHook($this->pipelineMeter),
+        ]);
+
         $sharedCache = new ArrayAdapter();
         $facade = new AiFacade(
             $registry,
@@ -1278,6 +1353,7 @@ final class AiPathHarness
             $this->uploadDir,
         );
         $facade->setUsageMeter($chatUsageMeter);
+        $facade->setPipeline($pipeline);
 
         return [$facade, $limits, $em, $user, $modelRepo, $modelConfig];
     }
@@ -1315,6 +1391,7 @@ final class AiPathHarness
 
         $logger = new class(function (array $entry): void {
             $this->rateLimitChecks[] = $entry;
+            $this->pipelineMeter?->markAdmitted((int) $entry['user_id'], (string) $entry['action']);
         }) extends AbstractLogger {
             /** @param \Closure(array<string, mixed>): void $record */
             public function __construct(private readonly \Closure $record)

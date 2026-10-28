@@ -218,7 +218,7 @@ final readonly class VectorSearchService
 
         $user = $this->em->getRepository(User::class)->find($userId);
         if ($user) {
-            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                 'usage' => $embedResult['usage'],
                 'provider' => $provider,
                 'model' => $modelName,

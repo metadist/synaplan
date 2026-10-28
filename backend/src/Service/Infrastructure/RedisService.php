@@ -178,6 +178,29 @@ final class RedisService
     }
 
     /**
+     * Store the value only when the key is absent. Returns `null` when Redis is
+     * unreachable or the command failed, `true` when the key was newly stored,
+     * and `false` when the key already existed.
+     */
+    public function trySetIfAbsent(string $key, string $value, int $ttlSeconds): ?bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return null;
+        }
+
+        try {
+            $result = $client->set($this->prefix($key), $value, 'EX', max(1, $ttlSeconds), 'NX');
+
+            return null !== $result && 'OK' === (string) $result;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('SET NX', $key, $e);
+
+            return null;
+        }
+    }
+
+    /**
      * Run a Lua script. Keys are prefixed; arguments are not, so a script must
      * read keys only from KEYS.
      *
@@ -607,6 +630,27 @@ LUA;
             $this->logCommandFailure('SMEMBERS', $key, $e);
 
             return [];
+        }
+    }
+
+    public function hSetNx(string $key, string $field, string $value, ?int $ttlSeconds = null): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $inserted = 1 === (int) $client->hsetnx($this->prefix($key), $field, $value);
+            if ($inserted && null !== $ttlSeconds && $ttlSeconds > 0) {
+                $client->expire($this->prefix($key), $ttlSeconds);
+            }
+
+            return $inserted;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('HSETNX', $key, $e);
+
+            return false;
         }
     }
 

@@ -70,6 +70,7 @@ final class AiEmbeddingExecutor
         $provider = $this->registry->getEmbeddingProvider($providerName);
         $resolvedModel = $model ?? $provider->getDefaultModels()['embedding'] ?? 'default';
 
+        $usageMeta = self::claimUsageMeta($options);
         $inProcessKey = $this->embeddingInProcessCacheKey($text, $provider->getName(), $resolvedModel, $options);
         if (isset($this->embedCache[$inProcessKey])) {
             $this->logger->debug('AI embedding in-process cache hit', [
@@ -86,7 +87,7 @@ final class AiEmbeddingExecutor
         try {
             return $this->embedCache[$inProcessKey] = $this->cache->get(
                 $sharedKey,
-                function (ItemInterface $item) use ($text, $provider, $options, $userId, $resolvedModel): array {
+                function (ItemInterface $item) use ($text, $provider, $options, $usageMeta, $userId, $resolvedModel): array {
                     $item->expiresAfter(self::EMBEDDING_SHARED_CACHE_TTL_SECONDS);
                     $this->logger->info('AI embedding request', [
                         'provider' => $provider->getName(),
@@ -105,13 +106,13 @@ final class AiEmbeddingExecutor
                             billable: null !== $userId && $userId > 0,
                         ),
                         payload: AiCallPayload::embed($text),
-                        options: AiCallOptions::fromArray($options),
+                        options: AiCallOptions::fromArray($options + ['_usage_meta' => $usageMeta]),
                     );
 
                     /* @var array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}} */
                     return $this->pipeline->run(
                         $call,
-                        static fn (AiCall $c): array => $provider->embed($c->payload->texts[0] ?? $text, $c->options->providerOptions),
+                        static fn (AiCall $c): array => $provider->embed($c->payload->texts[0] ?? $text, array_diff_key($c->options->providerOptions, ['_usage_meta' => true])),
                     )->value;
                 }
             );
@@ -166,6 +167,8 @@ final class AiEmbeddingExecutor
             ];
         }
 
+        $usageMeta = self::claimUsageMeta($options);
+
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
         }
@@ -208,13 +211,13 @@ final class AiEmbeddingExecutor
                     billable: null !== $userId && $userId > 0,
                 ),
                 payload: AiCallPayload::embedBatch($missingTexts),
-                options: AiCallOptions::fromArray($options),
+                options: AiCallOptions::fromArray($options + ['_usage_meta' => $usageMeta]),
             );
 
             /** @var array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}} $batch */
             $batch = $this->pipeline->run(
                 $call,
-                static fn (AiCall $c): array => $provider->embedBatch($c->payload->texts, $c->options->providerOptions),
+                static fn (AiCall $c): array => $provider->embedBatch($c->payload->texts, array_diff_key($c->options->providerOptions, ['_usage_meta' => true])),
             )->value;
         } catch (\Throwable $primaryError) {
             if ($primaryError instanceof AiCallRefusedException) {
@@ -222,27 +225,7 @@ final class AiEmbeddingExecutor
             }
 
             return $this->tryEmbeddingFallback(
-                function (EmbeddingProviderInterface $fb, array $fbOpts) use ($texts, $userId): array {
-                    $fbModel = (string) ($fbOpts['model'] ?? $fb->getDefaultModels()['embedding'] ?? 'default');
-                    $fbCall = new AiCall(
-                        capability: AiCapability::EmbedBatch,
-                        provider: $fb->getName(),
-                        model: $fbModel,
-                        context: new AiCallContext(
-                            userId: $userId,
-                            source: 0 === $userId ? AiCallSource::Probe : AiCallSource::Vectorize,
-                            billable: null !== $userId && $userId > 0,
-                        ),
-                        payload: AiCallPayload::embedBatch(array_values($texts)),
-                        options: AiCallOptions::fromArray($fbOpts),
-                    );
-
-                    /* @var array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}} */
-                    return $this->pipeline->run(
-                        $fbCall,
-                        static fn (AiCall $c): array => $fb->embedBatch($c->payload->texts, $c->options->providerOptions),
-                    )->value;
-                },
+                fn (EmbeddingProviderInterface $fb, array $fbOpts): array => $this->runFallbackBatch($fb, $texts, $userId, $fbOpts),
                 $provider->getName(),
                 $primaryError,
                 $options,
@@ -256,6 +239,35 @@ final class AiEmbeddingExecutor
             $sharedKeyByIndex,
             $inProcessKeyByIndex,
         );
+    }
+
+    /**
+     * @param string[]             $texts
+     * @param array<string, mixed> $fbOpts
+     *
+     * @return array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}}
+     */
+    private function runFallbackBatch(EmbeddingProviderInterface $fb, array $texts, ?int $userId, array $fbOpts): array
+    {
+        $fbModel = (string) ($fbOpts['model'] ?? $fb->getDefaultModels()['embedding'] ?? 'default');
+        $fbCall = new AiCall(
+            capability: AiCapability::EmbedBatch,
+            provider: $fb->getName(),
+            model: $fbModel,
+            context: new AiCallContext(
+                userId: $userId,
+                source: 0 === $userId ? AiCallSource::Probe : AiCallSource::Vectorize,
+                billable: null !== $userId && $userId > 0,
+            ),
+            payload: AiCallPayload::embedBatch(array_values($texts)),
+            options: AiCallOptions::fromArray($fbOpts),
+        );
+
+        /* @var array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}} */
+        return $this->pipeline->run(
+            $fbCall,
+            static fn (AiCall $c): array => $fb->embedBatch($c->payload->texts, $c->options->providerOptions),
+        )->value;
     }
 
     /**
@@ -447,6 +459,24 @@ final class AiEmbeddingExecutor
         } catch (\Throwable $e) {
             $this->logger->debug('Email fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private static function claimUsageMeta(array &$options): array
+    {
+        $usageMeta = [];
+        foreach (['usage_action', 'usage_source', 'usage_inputs', 'model_id'] as $metaKey) {
+            if (array_key_exists($metaKey, $options)) {
+                $usageMeta[$metaKey] = $options[$metaKey];
+                unset($options[$metaKey]);
+            }
+        }
+
+        return $usageMeta;
     }
 
     /**

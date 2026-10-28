@@ -86,7 +86,7 @@ final readonly class MemoryInputParser
 
             $content = $response['content'] ?? '';
 
-            $this->rateLimitService->recordUsage($user, 'MEMORY_PARSE', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'MEMORY_PARSE', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
                 'model_id' => $memoryModelConfig['model_id'] ?? null,

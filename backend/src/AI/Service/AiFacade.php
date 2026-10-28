@@ -182,9 +182,9 @@ class AiFacade
         ]);
 
         try {
-            $response = $this->runChatCall($provider, $messages, $options, $userId, $source, (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false));
+            $response = $this->runChatCall($provider, $messages, $options, $userId, $source, $billTo);
         } catch (StructuredOutputViolationException $e) {
-            $response = $this->recoverStructuredOutput($e, $provider, $messages, $options, $userId, $source, (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false));
+            $response = $this->recoverStructuredOutput($e, $provider, $messages, $options, $userId, $source, $billTo);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -218,6 +218,7 @@ class AiFacade
     /**
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
+     * @param array<string, mixed>       $billTo
      *
      * @return array<string, mixed>
      */
@@ -227,27 +228,30 @@ class AiFacade
         array $options,
         ?int $userId,
         AiCallSource $source,
-        bool $callerMeters,
+        array $billTo,
     ): array {
+        $turnId = \is_string($billTo['turn_id'] ?? null) ? $billTo['turn_id'] : null;
+        $callerMeters = (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false);
         $call = new AiCall(
             capability: AiCapability::Chat,
             provider: $provider->getName(),
             model: $this->reportedModel($provider, $options, 'chat'),
-            context: new AiCallContext(userId: $userId, source: $source),
+            context: new AiCallContext(userId: $userId, source: $source, turnId: $turnId),
             payload: AiCallPayload::chat($messages),
-            options: AiCallOptions::fromArray($options, stream: false, callerMeters: $callerMeters),
+            options: AiCallOptions::fromArray($options + ['_bill_to' => $billTo], stream: false, callerMeters: $callerMeters),
         );
 
         /* @var array<string, mixed> */
         return $this->pipeline()->run(
             $call,
-            static fn (AiCall $c): array => $provider->chat($c->payload->messages, $c->options->providerOptions),
+            static fn (AiCall $c): array => $provider->chat($c->payload->messages, array_diff_key($c->options->providerOptions, ['_bill_to' => true])),
         )->value;
     }
 
     /**
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
+     * @param array<string, mixed>       $billTo
      *
      * @return array<string, mixed>
      */
@@ -258,7 +262,7 @@ class AiFacade
         array $options,
         ?int $userId,
         AiCallSource $source,
-        bool $callerMeters,
+        array $billTo,
     ): array {
         $schema = $options['structured_output'] ?? null;
         if (!$schema instanceof StructuredOutputSchema) {
@@ -287,7 +291,7 @@ class AiFacade
         $repairMessages = $this->structuredOutputRecovery->repairMessages($messages, $violation, $schema);
 
         try {
-            $response = $this->runChatCall($provider, $repairMessages, $options, $userId, $source, $callerMeters);
+            $response = $this->runChatCall($provider, $repairMessages, $options, $userId, $source, $billTo);
         } catch (StructuredOutputViolationException $retryViolation) {
             $salvaged = $this->structuredOutputRecovery->salvage($retryViolation->getFailedGeneration(), $schema);
             if (null !== $salvaged) {
@@ -310,27 +314,17 @@ class AiFacade
         return $response;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function salvagedResponse(string $content): array
     {
         return [
             'content' => $content,
-            'usage' => [
-                'prompt_tokens' => 0,
-                'completion_tokens' => 0,
-                'total_tokens' => 0,
-                'cached_tokens' => 0,
-                'cache_creation_tokens' => 0,
-            ],
+            'usage' => ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0, 'cached_tokens' => 0, 'cache_creation_tokens' => 0],
             StructuredOutputRecovery::RESPONSE_KEY => StructuredOutputRecovery::RECOVERY_SALVAGED,
         ];
     }
 
     /**
-     * Chat with streaming support.
-     *
      * @param array|string $messages       Messages array or simple string prompt
      * @param callable     $streamCallback Callback function for each chunk
      * @param int|null     $userId         User ID for config lookup
@@ -364,22 +358,24 @@ class AiFacade
             'model' => $options['model'] ?? 'default',
         ]);
 
+        $turnId = \is_string($billTo['turn_id'] ?? null) ? $billTo['turn_id'] : null;
         $call = new AiCall(
             capability: AiCapability::ChatStream,
             provider: $provider->getName(),
             model: $this->reportedModel($provider, $options, 'chat'),
-            context: new AiCallContext(userId: $userId, source: $source),
+            context: new AiCallContext(userId: $userId, source: $source, turnId: $turnId),
             payload: AiCallPayload::chat($messages),
-            options: AiCallOptions::fromArray($options, stream: true, callerMeters: (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false)),
+            options: AiCallOptions::fromArray($options + ['_bill_to' => $billTo], stream: true, callerMeters: (bool) ($billTo[AiChatUsageMeter::CALLER_METERS] ?? false)),
         );
 
         try {
             $streamResult = $this->pipeline()->stream(
                 $call,
-                function (AiCall $c, callable $onChunk) use ($provider): mixed {
+                function (AiCall $c, callable $onChunk) use ($provider, $answer): mixed {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
-                    $res = $provider->chatStream($c->payload->messages, $onChunk, $c->options->providerOptions);
+                    $res = $provider->chatStream($c->payload->messages, $onChunk, array_diff_key($c->options->providerOptions, ['_bill_to' => true]));
                     $this->logger->info('🔵 AiFacade: Provider chatStream completed');
+                    $res['content'] = $answer->text();
 
                     return $res;
                 },
@@ -466,6 +462,13 @@ class AiFacade
         $provider = $this->registry->getImageGenerationProvider($providerName);
         $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
         $reportedModel = $this->reportedModel($provider, $options, 'image_generation');
+        $usageMeta = [];
+        foreach (['usage_source', 'model_id'] as $metaKey) {
+            if (\array_key_exists($metaKey, $options)) {
+                $usageMeta[$metaKey] = $options[$metaKey];
+                unset($options[$metaKey]);
+            }
+        }
 
         $this->logger->info('AI image generation request', [
             'provider' => $provider->getName(),
@@ -479,13 +482,13 @@ class AiFacade
             model: $reportedModel,
             context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
             payload: AiCallPayload::mediaPrompt($prompt),
-            options: AiCallOptions::fromArray($options),
+            options: AiCallOptions::fromArray($options + ['_usage_meta' => $usageMeta]),
         );
 
         try {
             $images = $this->pipeline()->run(
                 $call,
-                static fn (AiCall $c): mixed => $provider->generateImage((string) $c->payload->prompt, $c->options->providerOptions),
+                static fn (AiCall $c): mixed => $provider->generateImage((string) $c->payload->prompt, array_diff_key($c->options->providerOptions, ['_usage_meta' => true])),
                 static fn (mixed $imgs): AiUsage => new AiUsage(imageCount: \is_array($imgs) ? \count($imgs) : 1),
             )->value;
         } catch (ProviderException $e) {
@@ -785,7 +788,7 @@ class AiFacade
 
         try {
             $result = (new TranscriptionLanguageDecider())->transcribe(
-                function (?string $hint) use ($provider, $audioPath, $options, $userId): array {
+                function (?string $hint) use ($provider, $audioPath, $options, $userId, $sttModelId): array {
                     $callOptions = $options;
                     if (null !== $hint && '' !== $hint) {
                         $callOptions['language'] = $hint;
@@ -797,11 +800,11 @@ class AiFacade
                         model: $this->reportedModel($provider, $callOptions, 'speech_to_text'),
                         context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
                         payload: AiCallPayload::audioFile($audioPath),
-                        options: AiCallOptions::fromArray($callOptions),
+                        options: AiCallOptions::fromArray($callOptions + (null !== $sttModelId ? ['model_id' => $sttModelId] : [])),
                     );
                     $transcribed = $this->pipeline()->run(
                         $call,
-                        static fn (AiCall $c): mixed => $provider->transcribe((string) $c->payload->filePath, $c->options->providerOptions),
+                        static fn (AiCall $c): mixed => $provider->transcribe((string) $c->payload->filePath, array_diff_key($c->options->providerOptions, ['model_id' => true])),
                     )->value;
 
                     return \is_array($transcribed) ? $transcribed : [];
@@ -911,13 +914,13 @@ class AiFacade
             model: $reportedModel,
             context: new AiCallContext(userId: $userId, source: AiCallSource::Media),
             payload: AiCallPayload::speechText($text),
-            options: AiCallOptions::fromArray($options),
+            options: AiCallOptions::fromArray($options + (null !== $ttsModelId ? ['model_id' => $ttsModelId] : [])),
         );
 
         try {
             $filename = (string) $this->pipeline()->run(
                 $call,
-                static fn (AiCall $c): string => $provider->synthesize((string) $c->payload->prompt, $c->options->providerOptions),
+                static fn (AiCall $c): string => $provider->synthesize((string) $c->payload->prompt, array_diff_key($c->options->providerOptions, ['model_id' => true])),
                 static fn (): AiUsage => new AiUsage(characterCount: mb_strlen($text)),
             )->value;
         } catch (ProviderException $e) {
@@ -1011,47 +1014,28 @@ class AiFacade
     private function moveToUserPath(string $filename, ?int $userId, string $providerName): string
     {
         $sourcePath = $this->uploadDir.'/'.$filename;
-
         if (!$userId) {
-            $this->logger->warning('AiFacade: No userId for TTS file, keeping in root', [
-                'filename' => $filename,
-                'provider' => $providerName,
-            ]);
+            $this->logger->warning('AiFacade: No userId for TTS file, keeping in root', ['filename' => $filename, 'provider' => $providerName]);
 
             return $filename;
         }
 
-        $year = date('Y');
-        $month = date('m');
-        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
-        $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
+        $relativePath = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$filename;
         $targetPath = $this->uploadDir.'/'.$relativePath;
 
         if (!FileHelper::ensureParentDirectory($targetPath)) {
-            $this->logger->error('AiFacade: Failed to create user directory for TTS', [
-                'dir' => \dirname($targetPath),
-                'filename' => $filename,
-            ]);
+            $this->logger->error('AiFacade: Failed to create user directory for TTS', ['dir' => \dirname($targetPath), 'filename' => $filename]);
 
             return $filename;
         }
-
         if (!rename($sourcePath, $targetPath)) {
-            $this->logger->error('AiFacade: Failed to move TTS file to user path', [
-                'source' => $sourcePath,
-                'target' => $targetPath,
-            ]);
+            $this->logger->error('AiFacade: Failed to move TTS file to user path', ['source' => $sourcePath, 'target' => $targetPath]);
 
             return $filename;
         }
 
         FileHelper::setFilePermissions($targetPath);
-
-        $this->logger->info('AiFacade: Moved TTS file to user path', [
-            'filename' => $filename,
-            'relativePath' => $relativePath,
-            'userId' => $userId,
-        ]);
+        $this->logger->info('AiFacade: Moved TTS file to user path', ['filename' => $filename, 'relativePath' => $relativePath, 'userId' => $userId]);
 
         return $relativePath;
     }

@@ -145,7 +145,7 @@ final readonly class ChatTitleService
 
             $owner = $this->userRepository->find($ownerId);
             if ($owner) {
-                $this->rateLimitService->recordUsage($owner, $usageAction, [
+                \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $owner, $usageAction, [
                     'provider' => $response['provider'] ?? 'unknown',
                     'model' => $response['model'] ?? 'unknown',
                     'model_id' => $summaryConfig['model_id'],

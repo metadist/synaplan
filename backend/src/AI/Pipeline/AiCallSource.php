@@ -55,4 +55,19 @@ enum AiCallSource: string
             default => $default,
         };
     }
+
+    /**
+     * Whether this source already runs through {@see AiCallPipeline} (`03_contracts.md` §1.5).
+     *
+     * `/v1/messages` (`MessagesApi`) and live voice (`VoiceLive`) stay `false`
+     * in AU11 so their own writers keep metering under every mode until AU12
+     * joins them.
+     */
+    public function isJoined(): bool
+    {
+        return match ($this) {
+            self::MessagesApi, self::VoiceLive => false,
+            default => true,
+        };
+    }
 }

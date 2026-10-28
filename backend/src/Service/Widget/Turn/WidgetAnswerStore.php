@@ -89,7 +89,7 @@ final readonly class WidgetAnswerStore
         }
         $this->sessions->generateTitleIfNeeded($session, $turn->owner->getId());
 
-        $this->rateLimits->recordUsage($turn->owner, 'MESSAGES', FacadeMeteredChat::messages(
+        \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $turn->owner, 'MESSAGES', FacadeMeteredChat::messages(
             $metadata,
             'WIDGET',
             $stored->message->getText(),

@@ -39,7 +39,7 @@ final readonly class EmailAnswerStore
      */
     public function recordUsage(InboundEmail $email, StoredInboundEmail $stored, string $answer, array $metadata, float $processingTime): RecordedUsage
     {
-        $usage = $this->rateLimits->recordUsage($email->user, 'MESSAGES', FacadeMeteredChat::messages(
+        $usage = \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $email->user, 'MESSAGES', FacadeMeteredChat::messages(
             $metadata,
             'EMAIL',
             $stored->message->getText(),
@@ -50,7 +50,7 @@ final readonly class EmailAnswerStore
         $mediaType = $metadata['media_type'] ?? null;
         $mediaAction = is_string($mediaType) ? (self::MEDIA_ACTIONS[$mediaType] ?? null) : null;
         if (null !== $mediaAction) {
-            $this->rateLimits->recordUsage($email->user, $mediaAction, [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimits, $email->user, $mediaAction, [
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
                 'model_id' => $metadata['model_id'] ?? null,

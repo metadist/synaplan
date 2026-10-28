@@ -435,7 +435,7 @@ final readonly class UserMemoryService
 
         $user = $this->em->getRepository(User::class)->find($userId);
         if ($user) {
-            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                 'usage' => $embedResult['usage'],
                 'provider' => $provider ?? 'unknown',
                 'model' => $modelName ?? 'unknown',
@@ -573,7 +573,7 @@ final readonly class UserMemoryService
 
             $user = $this->em->getRepository(User::class)->find($userId);
             if ($user) {
-                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                     'usage' => $embedResult['usage'],
                     'provider' => $provider ?? 'unknown',
                     'model' => $modelName ?? 'unknown',
@@ -882,7 +882,7 @@ final readonly class UserMemoryService
                 throw new \RuntimeException(sprintf('Embedding dimension mismatch: model produced %d-dim vectors but the collection expects %d. The administrator must re-run the vector re-index for the active model.', $actualDim, $collectionDim));
             }
 
-            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'EMBEDDINGS', [
                 'usage' => $embedResult['usage'],
                 'provider' => $provider ?? 'unknown',
                 'model' => $modelName ?? 'unknown',

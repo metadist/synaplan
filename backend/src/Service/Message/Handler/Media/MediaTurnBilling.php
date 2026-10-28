@@ -117,7 +117,7 @@ final readonly class MediaTurnBilling
         }
 
         try {
-            return $this->rateLimitService->recordUsage($user, $mediaAction, [
+            return \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, $mediaAction, [
                 'provider' => $provider ?? 'unknown',
                 'model' => $modelName ?? 'unknown',
                 'model_id' => $modelId,

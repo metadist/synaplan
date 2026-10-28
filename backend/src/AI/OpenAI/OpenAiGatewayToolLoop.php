@@ -94,10 +94,14 @@ final readonly class OpenAiGatewayToolLoop
         }
 
         $options['tools'] = $merged;
+        $options['usage_turn_id'] = $options['usage_turn_id'] ?? ('openai-loop-'.bin2hex(random_bytes(8)));
         $maxIterations = $this->config->mcpMaxIterations($user->getId());
         $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
         $notes = [];
         $summedUsage = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
+        $summedCharged = 0.0;
+        $metered = false;
+        $priceKnown = true;
         $last = [];
 
         for ($i = 0; $i < $maxIterations; ++$i) {
@@ -107,14 +111,12 @@ final readonly class OpenAiGatewayToolLoop
 
             $last = $this->aiFacade->chat($messages, $user->getId(), $options);
             $summedUsage = $this->addUsage($summedUsage, is_array($last['usage'] ?? null) ? $last['usage'] : []);
+            [$metered, $summedCharged, $priceKnown] = self::foldCharged($last, $metered, $summedCharged, $priceKnown);
 
             $toolCalls = $this->normalizeToolCalls($last['tool_calls'] ?? []);
             $finish = is_string($last['finish_reason'] ?? null) ? $last['finish_reason'] : '';
             if ('tool_calls' !== $finish && [] === $toolCalls) {
-                $last['usage'] = $summedUsage;
-                $last['loop_notes'] = $notes;
-
-                return $last;
+                return self::finalizeComplete($last, $summedUsage, $notes, $metered, $summedCharged, $priceKnown);
             }
 
             $partition = $this->partition($toolCalls, $snapshot['dispatch']);
@@ -157,8 +159,45 @@ final readonly class OpenAiGatewayToolLoop
             $messages = $this->appendToolTurn($messages, $toolCalls, $results);
         }
 
+        return self::finalizeComplete($last, $summedUsage, $notes, $metered, $summedCharged, $priceKnown);
+    }
+
+    /**
+     * @param array<string, mixed> $round
+     *
+     * @return array{0: bool, 1: float, 2: bool}
+     */
+    private static function foldCharged(array $round, bool $metered, float $charged, bool $priceKnown): array
+    {
+        if (true === ($round['facade_metered'] ?? false)) {
+            $metered = true;
+            if (isset($round['facade_charged_cost']) && is_numeric($round['facade_charged_cost'])) {
+                $charged += (float) $round['facade_charged_cost'];
+            }
+            if (false === ($round['facade_price_known'] ?? true)) {
+                $priceKnown = false;
+            }
+        }
+
+        return [$metered, $charged, $priceKnown];
+    }
+
+    /**
+     * @param array<string, mixed> $last
+     * @param array<string, int>   $summedUsage
+     * @param list<string>         $notes
+     *
+     * @return array<string, mixed>
+     */
+    private static function finalizeComplete(array $last, array $summedUsage, array $notes, bool $metered, float $charged, bool $priceKnown): array
+    {
         $last['usage'] = $summedUsage;
         $last['loop_notes'] = $notes;
+        if ($metered) {
+            $last['facade_metered'] = true;
+            $last['facade_charged_cost'] = number_format($charged, 6, '.', '');
+            $last['facade_price_known'] = $priceKnown;
+        }
 
         return $last;
     }

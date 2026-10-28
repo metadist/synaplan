@@ -139,7 +139,7 @@ final readonly class WhatsAppReplyDelivery
                 'video' => 'VIDEOS',
                 default => 'AUDIOS',
             };
-            $this->rateLimitService->recordUsage($user, $mediaAction, [
+            \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, $mediaAction, [
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
                 'model_id' => $metadata['model_id'] ?? null,
