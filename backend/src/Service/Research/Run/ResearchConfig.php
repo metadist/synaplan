@@ -21,6 +21,12 @@ final readonly class ResearchConfig
     public const MAX_ACTIVE_THOROUGH = 'MAX_ACTIVE_THOROUGH_PER_USER';
     public const LEAD_MODE = 'LEAD_MODE';
     public const TOOL_MODE_MODELS = 'TOOL_MODE_MODELS';
+
+    /** The chat may start a research on its own when a question needs one. */
+    public const AUTO_ENABLED = 'AUTO_ENABLED';
+
+    /** The catalog keys that led research with native tool calls 20/20 in app:research:conformance. */
+    public const TOOL_MODE_MODELS_PROVEN = ['anthropic:claude-sonnet-5-5:chat', 'anthropic:claude-sonnet-5:chat'];
     public const ACTIVE_RUNS_RANGE = [1, 100];
     public const ACTIVE_THOROUGH_RANGE = [0, 10];
 
@@ -52,6 +58,21 @@ final readonly class ResearchConfig
         $stored = $this->configRepository->getValue(0, self::GROUP, self::ENABLED);
 
         return null !== $stored && $this->isOn($stored);
+    }
+
+    /**
+     * Whether the chat may start a research by itself. Off when research is
+     * off, and off when the row is missing, so an install that never seeded
+     * it behaves as before.
+     */
+    public function autoEnabled(): bool
+    {
+        if (!$this->isEnabled()) {
+            return false;
+        }
+        $stored = $this->configRepository->getValue(0, self::GROUP, self::AUTO_ENABLED);
+
+        return is_string($stored) && $this->isOn($stored);
     }
 
     public function maxActiveRuns(): int

@@ -143,6 +143,76 @@ final class ResearchStagesTest extends TestCase
         self::assertSame(['plan', 'plan_waiting'], array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'));
     }
 
+    public function testAnAutomaticRunWithASmallPlanShrinksToTheQuickRow(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Auto);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(2));
+
+        $result = (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('gather', $result->next);
+        self::assertSame(ResearchDepth::Quick, $ctx->state->ceiling);
+        self::assertSame(ResearchDepth::Quick, $ctx->state->effectiveDepth());
+        self::assertSame(2, $ctx->state->budget->limits()->searches);
+        self::assertSame(0, $ctx->state->budget->extras()->questions);
+        $plan = $ctx->events->replay($ctx->state->ref->id, 0)[0]['data'];
+        self::assertSame('quick', $plan['ceiling']);
+        self::assertSame(1, $plan['estimate']['minutes']);
+        self::assertSame(0.1, $plan['estimate']['cost']);
+    }
+
+    public function testAnAutomaticRunWithALargerPlanKeepsTheStandardRow(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Auto);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(3));
+
+        (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame(ResearchDepth::Standard, $ctx->state->ceiling);
+        self::assertSame(ResearchDepth::Standard, $ctx->state->effectiveDepth());
+        self::assertSame(10, $ctx->state->budget->limits()->searches);
+        self::assertSame('standard', $ctx->events->replay($ctx->state->ref->id, 0)[0]['data']['ceiling']);
+    }
+
+    public function testABriefHintCapsThePlanAtTwoPointsAndADeeperHintNeverShrinks(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Auto);
+        $ctx->state->hint = 'brief';
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(4));
+
+        (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertCount(2, $ctx->state->ledger->points());
+        self::assertSame(ResearchDepth::Quick, $ctx->state->ceiling);
+        self::assertStringContainsString('1–2 points', $caller->seen[0]['system']);
+
+        [$deeper, $caller] = $this->open(ResearchDepth::Auto);
+        $deeper->state->hint = 'deeper';
+        $deeper->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(1));
+
+        (new PlanStage(new StageCall($caller)))->run($deeper);
+
+        self::assertSame(ResearchDepth::Standard, $deeper->state->ceiling);
+        self::assertSame(10, $deeper->state->budget->limits()->searches);
+    }
+
+    public function testAChosenDepthNeverGetsACeiling(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(1));
+
+        (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertNull($ctx->state->ceiling);
+        self::assertNull($ctx->events->replay($ctx->state->ref->id, 0)[0]['data']['ceiling']);
+        self::assertSame(10, $ctx->state->budget->limits()->searches);
+    }
+
     public function testWriteNowDuringTheThoroughPlanCallDoesNotWaitForConfirmation(): void
     {
         [$ctx, $caller] = $this->open(ResearchDepth::Thorough);
@@ -812,6 +882,25 @@ final class ResearchStagesTest extends TestCase
     private function store(): ResearchStateStore
     {
         return new ResearchStateStore($this->keys, $this->clock);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function plan(int $points): array
+    {
+        $rows = [];
+        for ($i = 1; $i <= $points; ++$i) {
+            $rows[] = [
+                'id' => 'p'.$i,
+                'title' => 'Point '.$i,
+                'why' => 'The goal asks for it.',
+                'queries' => [['q' => 'point '.$i.' 2026', 'language' => 'en']],
+                'scope' => 'web',
+            ];
+        }
+
+        return ['points' => $rows, 'outline' => ['Summary'], 'estimate' => ['minutes' => 1, 'cost' => 1]];
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Repository\ChatRepository;
 use App\Repository\ConfigRepository;
 use App\Service\RAG\RagScopeResolver;
 use App\Service\Research\Run\Ledger\PlanPoint;
+use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchEventLog;
@@ -278,6 +279,63 @@ final class ResearchRunServiceTest extends ResearchUnitCase
         self::assertSame(ResearchStatus::Gathering, $state->status);
         self::assertTrue($this->store->writeNowRequested($opened->ref->id));
         self::assertCount(1, $this->bus->sent);
+    }
+
+    public function testAnAutomaticRunStartsOnTheStandardRowWithoutQuestions(): void
+    {
+        $state = $this->runs->start($this->user, ['question' => 'Compare A and B', 'depth' => 'auto', 'chat_id' => 11, 'hint' => 'brief'], true, null);
+
+        self::assertSame(ResearchDepth::Auto, $state->ref->depth);
+        self::assertSame('brief', $state->hint);
+        self::assertNull($state->ceiling);
+        self::assertSame(0, $state->budget->extras()->questions);
+        self::assertSame(10, $state->budget->limits()->searches);
+        self::assertSame('auto', $this->store->load($state->ref->id)?->ref->depth->value);
+    }
+
+    public function testAnUnknownHintIsRefused(): void
+    {
+        $this->expectException(ResearchRejected::class);
+
+        $this->runs->start($this->user, ['question' => 'Compare A and B', 'depth' => 'auto', 'chat_id' => 11, 'hint' => 'fast'], true, null);
+    }
+
+    public function testAnswerNowBeforeTheFirstSourceClosesWithoutAReport(): void
+    {
+        $started = $this->runs->start($this->user, ['question' => 'Compare A and B', 'depth' => 'auto', 'chat_id' => 11], true, null);
+
+        $closed = $this->runs->input($this->user, $started->ref->id, ['type' => 'answer_now']);
+
+        self::assertSame(ResearchStatus::Stopped, $closed->status);
+        self::assertSame(ResearchOutcome::ANSWERED_WITHOUT_RESEARCH, $closed->outcome?->code);
+        self::assertSame(['stopped'], $this->reports->statuses);
+    }
+
+    public function testAnswerNowWithASourceReadWritesFromWhatWasFound(): void
+    {
+        $opened = $this->runs->start($this->user, ['question' => 'Compare A and B', 'depth' => 'auto', 'chat_id' => 11], true, null);
+        $opened->ledger->addSource(Source::web('https://maker.example/price', 'Price list'));
+        $gathering = new ResearchRunState($opened->ref, ResearchStatus::Gathering, $opened->ledger, $opened->budget, 2, 1);
+        $this->store->save($gathering);
+
+        $state = $this->runs->input($this->user, $opened->ref->id, ['type' => 'answer_now']);
+
+        self::assertSame(ResearchStatus::Gathering, $state->status);
+        self::assertTrue($this->store->writeNowRequested($opened->ref->id));
+        self::assertSame([], $this->reports->statuses);
+    }
+
+    public function testAnswerNowWhileWritingChangesNothing(): void
+    {
+        $opened = $this->runs->start($this->user, ['question' => 'Compare A and B', 'depth' => 'auto', 'chat_id' => 11], true, null);
+        $writing = new ResearchRunState($opened->ref, ResearchStatus::Writing, $opened->ledger, $opened->budget, 2, 1);
+        $this->store->save($writing);
+
+        $state = $this->runs->input($this->user, $opened->ref->id, ['type' => 'answer_now']);
+
+        self::assertSame(ResearchStatus::Writing, $state->status);
+        self::assertFalse($this->store->writeNowRequested($opened->ref->id));
+        self::assertFalse($this->store->stopRequested($opened->ref->id));
     }
 
     public function testAFollowUpKeepsTheParent(): void

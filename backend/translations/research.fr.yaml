@@ -8,12 +8,28 @@ research:
     stopped_limit: 'Arrêté parce que cette recherche a atteint sa limite pour cette profondeur. Ce qui a été trouvé couvre %covered% points sur %points%.'
     stopped_waiting: 'Arrêté parce que le plan n’a pas été confirmé dans la journée. Relancez-la quand vous serez prêt.'
     stopped_by_admin: 'La recherche a été désactivée dans votre espace Synaplan. Ce qui a été trouvé est conservé.'
+    answered_without_research: 'Répondu sans l’examen approfondi. Rien n’a été recherché pour cette question.'
     failed_no_sources: 'Il n’y avait rien à rechercher : activez le web ou ajoutez des fichiers à ce projet.'
     failed_nothing_found: 'Les sources consultées ne contenaient rien qui réponde à cette question. Reformulez-la ou ajoutez des fichiers à ce projet.'
     failed_role_unavailable: 'Le modèle de %role% de ce projet n’est pas disponible et aucun autre modèle du projet ne peut le remplacer. Rien n’a été facturé.'
     failed_model_error: 'Le modèle de %role% a cessé de répondre. Rien d’autre n’a été facturé ; réessayez ou choisissez un autre modèle.'
     failed_interrupted: 'La recherche a été interrompue sur le serveur. Relancez-la : les sources trouvées jusqu’ici sont conservées.'
     unknown: 'La recherche s’est arrêtée. Relancez-la si vous avez encore besoin de la réponse.'
+  auto:
+    notice: 'Je consulte plusieurs sources pour cela — environ %minutes% minutes.'
+    why:
+      several_parts: 'La question comporte plusieurs parties.'
+      comparison: 'C’est une comparaison.'
+      procedure: 'C’est une démarche en plusieurs étapes auprès de plusieurs services.'
+      current_fact: 'Il faut des sources à jour.'
+      asked_thorough: 'Vous avez demandé une réponse approfondie.'
+      deeper: 'Vous avez demandé plus.'
+  limit:
+    no_sources: 'Je consulterais normalement plusieurs sources, mais la recherche web est désactivée ici et cette conversation n’a pas de dossier. Voici ce que je sais — vérifiez les exigences actuelles auprès des autorités.'
+    too_many: 'Trop de recherches sont déjà en cours. Voici une première réponse — cliquez sur Approfondir la recherche dans quelques minutes pour la version complète.'
+    budget: 'Votre budget d’utilisation pour cette période est épuisé, je réponds donc directement. Un administrateur peut l’augmenter.'
+    plan_limit: 'Les recherches de votre offre pour aujourd’hui sont épuisées, je réponds donc directement. Cela fonctionnera à nouveau demain.'
+    unavailable: 'La recherche n’est pas disponible pour le moment, je réponds donc directement. Réessayez avec Approfondir la recherche dans quelques minutes.'
   role:
     reading: 'lecture'
     sorting: 'tri'

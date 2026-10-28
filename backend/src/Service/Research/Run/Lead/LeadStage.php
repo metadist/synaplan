@@ -37,7 +37,7 @@ final readonly class LeadStage
 
     public function active(StageContext $ctx): bool
     {
-        return LeadMode::Tools === $this->modes->resolve($ctx->roles->lead, $ctx->state->ref->depth);
+        return LeadMode::Tools === $this->modes->resolve($ctx->roles->lead, $ctx->state->effectiveDepth());
     }
 
     public function run(StageContext $ctx): StageResult

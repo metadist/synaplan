@@ -23,6 +23,9 @@ final readonly class ResearchRunService
 {
     private const LIST_HOURS = 48;
 
+    /** The input type that ends an automatic run early, with or without a report. */
+    public const ANSWER_NOW = 'answer_now';
+
     public function __construct(
         private ResearchStateStore $store,
         private ResearchUnitBus $bus,
@@ -135,6 +138,9 @@ final readonly class ResearchRunService
         if ('stop_gathering' === $type) {
             return $this->writeNow($state);
         }
+        if (self::ANSWER_NOW === $type) {
+            return $this->answerNow($state);
+        }
         $unit = null;
         $saved = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh) use ($body, &$unit): bool {
             $unit = ResearchReply::apply($fresh, $body);
@@ -162,8 +168,13 @@ final readonly class ResearchRunService
         if ($state->status->isTerminal()) {
             return $state;
         }
+
+        return $this->close($state, new ResearchOutcome(ResearchOutcome::STOPPED_BY_USER));
+    }
+
+    private function close(ResearchRunState $state, ResearchOutcome $outcome): ResearchRunState
+    {
         $this->store->requestStop($state->ref->id);
-        $outcome = new ResearchOutcome(ResearchOutcome::STOPPED_BY_USER);
         $stopped = $this->store->underClaim($state, ResearchUnitWorker::LEASE_MS, static function (ResearchRunState $fresh) use ($outcome): bool {
             $fresh->finish(ResearchStatus::Stopped, $outcome);
 
@@ -234,6 +245,24 @@ final readonly class ResearchRunService
      * The flag is raised first, so a step that is underway writes next. A
      * waiting run has no step underway and goes to the report at once.
      */
+    /**
+     * "Answer now" on an automatic run. With a source already read the report
+     * is written from what was found; while it is being written nothing
+     * changes; before the first source the run closes without a report and
+     * the chat answers the question the ordinary way.
+     */
+    private function answerNow(ResearchRunState $state): ResearchRunState
+    {
+        if (in_array($state->status, [ResearchStatus::Writing, ResearchStatus::Checking], true)) {
+            return $state;
+        }
+        if ([] !== $state->ledger->sources()) {
+            return $this->writeNow($state);
+        }
+
+        return $this->close($state, new ResearchOutcome(ResearchOutcome::ANSWERED_WITHOUT_RESEARCH));
+    }
+
     private function writeNow(ResearchRunState $state): ResearchRunState
     {
         $this->store->requestWriteNow($state->ref->id);
@@ -264,7 +293,8 @@ final readonly class ResearchRunService
         if (null !== $plan?->searchCap) {
             $limits = $limits->withSearches($plan->searchCap);
         }
-        if (null !== $task) {
+        if (null !== $task || ResearchDepth::Auto === $request->depth) {
+            // Nobody is watching an unattended step, and an automatic run must never pause the chat with a question.
             $limits = $limits->withoutQuestions();
         }
         $budget = ResearchBudget::for($request->depth, $limits, $now);
@@ -278,6 +308,7 @@ final readonly class ResearchRunService
         $state->idempotencyKey = $idempotencyKey;
         $state->sourcesOn = $request->sources->label();
         $state->knowledgeKeys = $request->sources->knowledge;
+        $state->hint = ResearchDepth::Auto === $request->depth ? $request->hint : null;
         if (null !== $task) {
             $state->savedTaskRunId = $task->runId;
             $state->savedTaskNodeId = $task->nodeId;

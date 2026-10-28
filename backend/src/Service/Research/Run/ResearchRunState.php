@@ -69,6 +69,15 @@ final class ResearchRunState
      */
     public array $knowledgeKeys = [];
 
+    /** brief or deeper, when the request carried a hint. Only an automatic run reads it. */
+    public ?string $hint = null;
+
+    /**
+     * The row an automatic run settled on after its plan: quick or standard.
+     * Null until the plan stage decided, and always null for a chosen depth.
+     */
+    public ?ResearchDepth $ceiling = null;
+
     /**
      * The report file, set when it is saved. Not stored: the resume reads it
      * in the same request that wrote the file.
@@ -142,7 +151,22 @@ final class ResearchRunState
             'saved_task_node_id' => $this->savedTaskNodeId,
             'sources_on' => $this->sourcesOn,
             'knowledge_keys' => $this->knowledgeKeys,
+            'hint' => $this->hint,
+            'ceiling' => $this->ceiling?->value,
         ];
+    }
+
+    /**
+     * The depth the mode and stop rules use: the ceiling once an automatic
+     * run has one, standard while it has none, the chosen depth otherwise.
+     */
+    public function effectiveDepth(): ResearchDepth
+    {
+        if (ResearchDepth::Auto !== $this->ref->depth) {
+            return $this->ref->depth;
+        }
+
+        return $this->ceiling ?? ResearchDepth::Standard;
     }
 
     public function encode(
@@ -241,6 +265,10 @@ final class ResearchRunState
         $sourcesOn = $data['sources_on'] ?? 'web';
         $state->sourcesOn = is_string($sourcesOn) && '' !== $sourcesOn ? $sourcesOn : 'web';
         $state->knowledgeKeys = self::knowledgeKeys($data['knowledge_keys'] ?? null);
+        $hint = $data['hint'] ?? null;
+        $state->hint = is_string($hint) && in_array($hint, [ResearchRequest::HINT_BRIEF, ResearchRequest::HINT_DEEPER], true) ? $hint : null;
+        $ceiling = $data['ceiling'] ?? null;
+        $state->ceiling = is_string($ceiling) ? ResearchDepth::tryFrom($ceiling) : null;
 
         return $state;
     }

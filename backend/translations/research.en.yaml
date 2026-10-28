@@ -8,12 +8,28 @@ research:
     stopped_limit: 'Stopped because this research reached its limit for this depth. What was found covers %covered% of %points% points.'
     stopped_waiting: 'Stopped because the plan was not confirmed within a day. Start it again when you are ready.'
     stopped_by_admin: 'Research was turned off on your Synaplan workspace. What was found so far is kept.'
+    answered_without_research: 'Answered without the extra look. Nothing was searched for this question.'
     failed_no_sources: 'There was nothing to research: turn on the web or add files to this project.'
     failed_nothing_found: 'The sources that were searched held nothing that answers this question. Try rewording it or add files to this project.'
     failed_role_unavailable: 'The %role% model of this project is not available, and no other model in this project can stand in. Nothing was charged.'
     failed_model_error: 'The %role% model stopped answering. Nothing else was charged; try again or pick another model.'
     failed_interrupted: 'The research was interrupted on the server. Start it again — the sources found so far are kept here.'
     unknown: 'The research stopped. Start it again if you still need the answer.'
+  auto:
+    notice: 'I am looking through several sources for this — about %minutes% minutes.'
+    why:
+      several_parts: 'The question has several parts.'
+      comparison: 'It is a comparison.'
+      procedure: 'It is a procedure with several steps and authorities.'
+      current_fact: 'It needs current sources.'
+      asked_thorough: 'You asked for a thorough answer.'
+      deeper: 'You asked for more.'
+  limit:
+    no_sources: 'I would normally look this up in several sources, but web search is off here and this chat has no folder. Here is what I know — check current requirements with the authorities.'
+    too_many: 'Too many researches are already going. Here is a first answer — click Look deeper in a few minutes for the full one.'
+    budget: 'Your usage budget for this period is used up, so I answer directly. An administrator can raise it.'
+    plan_limit: "Your plan's researches for today are used up, so I answer directly. Tomorrow it works again."
+    unavailable: 'Research is not available right now, so I answer directly. Try Look deeper in a few minutes.'
   role:
     reading: 'reading'
     sorting: 'sorting'

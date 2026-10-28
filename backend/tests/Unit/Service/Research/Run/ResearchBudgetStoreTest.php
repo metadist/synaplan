@@ -39,4 +39,16 @@ final class ResearchBudgetStoreTest extends TestCase
         self::assertSame(ResearchBudgetStore::setting(ResearchDepth::Standard), 'BUDGET_STANDARD');
         self::assertSame(ResearchConfig::GROUP, 'RESEARCH');
     }
+
+    public function testAnAutomaticRunReadsTheStandardRow(): void
+    {
+        $repo = $this->createStub(ConfigRepository::class);
+        $repo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'BUDGET_STANDARD' === $setting ? '{"searches": 7}' : null,
+        );
+        $store = new ResearchBudgetStore($repo);
+
+        self::assertSame('BUDGET_STANDARD', ResearchBudgetStore::setting(ResearchDepth::Auto));
+        self::assertSame(7, $store->forDepth(ResearchDepth::Auto)->searches);
+    }
 }

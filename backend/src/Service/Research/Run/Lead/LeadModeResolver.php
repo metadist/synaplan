@@ -30,6 +30,7 @@ final readonly class LeadModeResolver
      */
     public function decide(string $mode, array $models, ?string $modelKey, ResearchDepth $depth): LeadMode
     {
+        // An automatic run passes its ceiling here, so a small plan lands in rounds like quick.
         if ('rounds' === $mode || ResearchDepth::Quick === $depth) {
             return LeadMode::Rounds;
         }

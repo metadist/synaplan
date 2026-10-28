@@ -55,11 +55,16 @@ final class ResearchController extends AbstractController
     #[Route('/v1/research/capabilities', name: 'v1_research_capabilities', methods: ['GET'])]
     #[OA\Get(path: '/api/v1/research/capabilities', summary: 'What research can do on this installation', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\Response(response: 200, description: 'Research is on', content: new OA\JsonContent(
-        required: ['enabled', 'research_protocol', 'depths', 'web_search_available', 'read_documents', 'max_active_thorough'],
+        required: ['enabled', 'research_protocol', 'depths', 'automatic', 'auto_limits', 'web_search_available', 'read_documents', 'max_active_thorough'],
         properties: [
             new OA\Property(property: 'enabled', type: 'boolean', example: true),
             new OA\Property(property: 'research_protocol', type: 'integer', example: 1),
-            new OA\Property(property: 'depths', type: 'array', items: new OA\Items(type: 'string', enum: ['quick', 'standard', 'thorough'])),
+            new OA\Property(property: 'depths', type: 'array', items: new OA\Items(type: 'string', enum: ['quick', 'standard', 'thorough', 'auto'])),
+            new OA\Property(property: 'automatic', type: 'boolean', example: true, description: 'The chat may start a research on its own when a question needs one. Off: no "Look deeper" exists.'),
+            new OA\Property(property: 'auto_limits', type: 'object', description: 'The most an automatic run can take: the standard row.', required: ['minutes', 'cost_cap'], properties: [
+                new OA\Property(property: 'minutes', type: 'integer', example: 6),
+                new OA\Property(property: 'cost_cap', type: 'number', format: 'float', example: 1.0),
+            ]),
             new OA\Property(property: 'web_search_available', type: 'boolean', example: true),
             new OA\Property(property: 'web_search_provider', type: 'object', nullable: true, properties: [
                 new OA\Property(property: 'id', type: 'string', example: 'brave'),
@@ -98,7 +103,8 @@ final class ResearchController extends AbstractController
         required: ['question', 'depth'],
         properties: [
             new OA\Property(property: 'question', type: 'string', maxLength: 4000, example: 'Which suppliers deliver X in Germany?'),
-            new OA\Property(property: 'depth', type: 'string', enum: ['quick', 'standard', 'thorough']),
+            new OA\Property(property: 'depth', type: 'string', enum: ['quick', 'standard', 'thorough', 'auto'], description: 'auto starts on the standard limits, asks no questions, and shrinks to quick after its plan when two points are enough.'),
+            new OA\Property(property: 'hint', type: 'string', nullable: true, enum: ['brief', 'deeper'], description: 'Only depth auto reads it. brief: the person asked for a short look (two points at most). deeper: a first answer was found thin, so the run never shrinks.'),
             new OA\Property(property: 'chat_id', type: 'integer', nullable: true, example: 4711),
             new OA\Property(
                 property: 'sources',
@@ -210,11 +216,11 @@ final class ResearchController extends AbstractController
 
     #[Route('/api/v1/research/{id}/input', name: 'api_research_input', methods: ['POST'])]
     #[Route('/v1/research/{id}/input', name: 'v1_research_input', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/research/{id}/input', summary: 'Answer a research question, approve its plan, or write the report now', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
+    #[OA\Post(path: '/api/v1/research/{id}/input', summary: 'Answer a research question, approve its plan, or write the report now', description: 'answer_now ends an automatic run early: with a source already read the report is written from what was found; before the first source the run closes with outcome answered_without_research and the chat answers the question the ordinary way; while writing or checking nothing changes.', security: [['Bearer' => []], ['ApiKey' => []]], tags: ['Research'])]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(
         required: ['type'],
         properties: [
-            new OA\Property(property: 'type', type: 'string', enum: ['answer', 'skip_question', 'approve_plan', 'edit_plan', 'stop_gathering']),
+            new OA\Property(property: 'type', type: 'string', enum: ['answer', 'skip_question', 'approve_plan', 'edit_plan', 'stop_gathering', 'answer_now']),
             new OA\Property(property: 'question', type: 'string', nullable: true, example: 'q1'),
             new OA\Property(property: 'choice', type: 'string', nullable: true, example: 'EU'),
             new OA\Property(property: 'text', type: 'string', nullable: true),

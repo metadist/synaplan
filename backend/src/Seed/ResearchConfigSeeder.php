@@ -36,7 +36,8 @@ final readonly class ResearchConfigSeeder implements SeederInterface
             ['ownerId' => 0, 'group' => ResearchConfig::GROUP, 'setting' => ResearchConfig::MAX_ACTIVE_RUNS, 'value' => '5'],
             ['ownerId' => 0, 'group' => ResearchConfig::GROUP, 'setting' => ResearchConfig::MAX_ACTIVE_THOROUGH, 'value' => '1'],
             ['ownerId' => 0, 'group' => ResearchConfig::GROUP, 'setting' => ResearchConfig::LEAD_MODE, 'value' => 'auto'],
-            ['ownerId' => 0, 'group' => ResearchConfig::GROUP, 'setting' => ResearchConfig::TOOL_MODE_MODELS, 'value' => '[]'],
+            ['ownerId' => 0, 'group' => ResearchConfig::GROUP, 'setting' => ResearchConfig::TOOL_MODE_MODELS, 'value' => json_encode(ResearchConfig::TOOL_MODE_MODELS_PROVEN, JSON_THROW_ON_ERROR)],
+            ['ownerId' => 0, 'group' => ResearchConfig::GROUP, 'setting' => ResearchConfig::AUTO_ENABLED, 'value' => '1'],
         ]);
     }
 }
