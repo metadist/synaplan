@@ -7,10 +7,11 @@
 > second Messages turn in one session `TurnUsageLedger::close()`
 > returns null. `buildShadowMessagesExpectation()` then compares the
 > caller's own metadata, so no `ai.usage_mismatch` is logged. RV3
-> releases the database connection before every provider stream in
-> the Messages tool loop, including after a `TOOLS` usage write
-> reopens it. AU24 keeps the wrap-up prompt and the `TOOLS` usage row
-> when the two tool loops become one.
+> releases the database connection before every provider stream:
+> the tool loop, again after a `TOOLS` usage write reopens it, and
+> the direct `stream()` when the request has no server tools. AU24
+> keeps the wrap-up prompt and the `TOOLS` usage row when the two
+> tool loops become one.
 
 Step log for [`00_master_plan.md`](./00_master_plan.md). A walk, a
 measurement and a rollout are entries here, not chat messages.

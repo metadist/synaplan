@@ -5,7 +5,8 @@ Corrected after the Copilot review of #2856: a silent shadow compare
 is not proof, the Messages stream releases before every provider
 stream, "sent" needs a recorded download, a claimed delivery expires,
 an inbound watch upload is not an own write, and the research lease
-covers the model call itself.
+covers the model call itself. Copilot on #2857: the direct stream
+releases too, and the lease covers every call in the step.
 **Base:** `main` at `fa64e4c82` (28 Oct 2026, 15:28 Europe/Berlin).
 **Rows it guards:** [21 research quality](../20261017-research-quality/00_master_plan.md),
 [22 architecture update](../20261021-architecture-update/00_master_plan.md),
@@ -205,22 +206,34 @@ migration, or env file.
 `ChatReplyGenerator` calls `DatabaseConnectionRelease::release()`
 before `chatStream()`, and wraps the first chunk with
 `releaseOnFirstCall()`. `MessagesApiController::streamResponse()`
-runs `GatewayToolLoop` for up to 240 seconds and returns the
-connection only when the response ends
+runs the provider stream for up to 240 seconds — `GatewayToolLoop`
+when the catalog has tools, `$pipelined->stream()` when it does
+not — and returns the connection only when the response ends
 (`StreamedResponseConnectionRelease`, kernel terminate).
 
-**Change.** Release before every provider stream in the tool loop,
-not only the first one. `releaseOnFirstCall()` runs once. Between
-rounds `GatewayToolLoop` writes a `TOOLS` usage row
-(`recordUsage` around the native and MCP paths), which opens the
-connection again. The next provider stream must release it before
-it waits. A single wrap around `executeStream()` does not do that.
+**Change.** Release before every provider stream on both paths out
+of `MessagesGateway::executeStream()`, not only the first one in
+the tool loop.
+
+`releaseOnFirstCall()` runs once. Between rounds `GatewayToolLoop`
+writes a `TOOLS` usage row (`recordUsage` around the native and MCP
+paths), which opens the connection again. The next provider stream
+must release it before it waits. A single wrap around
+`executeStream()` does not cover that.
+
+The direct path needs its own release. `tool_loop` is false when
+the catalog has no tools (`MessagesGateway`, the assignment of
+`$toolLoop`). `executeStream()` then calls `$pipelined->stream()`
+and never enters `GatewayToolLoop`. That wait holds the connection
+opened while the request was prepared, until kernel terminate.
 
 **Test.** Two tool rounds, with a usage write between them. The
 connection is closed before the first provider stream and again
-before the second. A later SSE chunk does not require it to stay
-open. Follow `ChatReplyGeneratorConnectionReleaseTest` for the
-shape of the assertion.
+before the second. One stream with no server-side tools
+(`tool_loop` false): the connection is closed before `stream()`.
+A later SSE chunk does not require it to stay open. Follow
+`ChatReplyGeneratorConnectionReleaseTest` for the shape of the
+assertion.
 
 **Do not.** Close a connection that is inside a transaction. Do not
 release on every SSE chunk.
@@ -356,14 +369,25 @@ call itself can outlast the lease. `OllamaProvider` waits up to
 redispatch while the first worker is still blocked inside that
 one call. The duplicate payment remains.
 
-The worker keeps the lease alive for the whole wait, or the call
-cannot run that long. Either:
+The worker keeps the lease alive for the whole step, or no call in
+that step can run past the time the claim has left. A per-call cap
+that ignores the calls already made is not enough. `CheckStage::run()`
+calls `StageCall::once()` once per batch, then may call `prose()`
+for a revision, and checkpoints only when the step returns.
+`StageCall::once()` retries once when the answer is the wrong JSON
+shape. Two waits of 150 seconds each stay under a 240 second
+per-call cap and still outlast `LEASE_MS`. The reaper can redispatch
+while the first worker is on its second call.
 
-- a heartbeat renews the claim while the provider call is in
-  progress, only while this token still holds it, or
-- the research caller sets a deadline shorter than the lease, with
-  time left afterwards to checkpoint. A call that hits the deadline
-  stops. It is not a lost worker.
+Either:
+
+- a heartbeat renews the claim while a provider call is in
+  progress, only while this token still holds it, and again before
+  the next call in the same step, or
+- before each call, the deadline is the time left on this claim,
+  minus the time needed to checkpoint. A call that would not finish
+  inside that remainder does not start, or it stops at the
+  remainder. It is not a lost worker.
 
 A renewal that loses the token stops the step before the next paid
 call. The reaper is unchanged: a worker that is actually gone is
@@ -373,9 +397,11 @@ read as a finished, fact-checked report (the delivery path already
 prefixes a non-complete report with the outcome sentence).
 
 **Test.** One model call whose wait is longer than `LEASE_MS` does
-not produce a second paid attempt. A claim that nobody renews, and
-that has no in-flight call, still redispatches once. A worker whose
-renewal fails does not call the model again.
+not produce a second paid attempt. Two calls in one check step,
+each shorter than `LEASE_MS` and together longer, do not either.
+The same for `once()` plus its retry. A claim that nobody renews,
+and that has no in-flight call, still redispatches once. A worker
+whose renewal fails does not call the model again.
 
 **Do not.** Lengthen the lease and call that the fix. Turn research
 on.
