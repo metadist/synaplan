@@ -7,7 +7,9 @@ namespace App\Tests\Controller;
 use App\Entity\ApiKey;
 use App\Entity\CloudWatch;
 use App\Entity\ExternalIdentity;
+use App\Entity\File;
 use App\Entity\PlatformInstance;
+use App\Entity\SavedPrompt;
 use App\Entity\SavedTask;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -48,6 +50,9 @@ final class CloudWatchTest extends WebTestCase
         $this->client->request('GET', '/api/v1/cloud/watches');
         self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         self::assertSame('feature_not_configured', $this->json()['error']);
+
+        $this->client->request('GET', '/api/v1/cloud/watches/options');
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testAPersonCanWatchAFolderPauseItAndStopIt(): void
@@ -81,6 +86,50 @@ final class CloudWatchTest extends WebTestCase
         self::assertSame('stopped', $this->json()['state']);
         $this->client->request('GET', '/api/v1/cloud/watches', server: $cloud['server']);
         self::assertSame([], $this->json()['items']);
+    }
+
+    public function testTheDialogOptionsAreThisPersonsShortcutsAndFolders(): void
+    {
+        $this->enable();
+        $cloud = $this->cloud('options');
+        $ownerId = (int) $cloud['user']->getId();
+        $prompt = (new SavedPrompt())
+            ->setUserId($ownerId)
+            ->setName('Vendor line')
+            ->setCommand('vendor')
+            ->setBody('Extract the vendor, the date and the total.');
+        $this->em->persist($prompt);
+        $file = new File();
+        $file->setUserId($ownerId);
+        $file->setFileName('inv.txt');
+        $file->setFilePath('/uploads/inv.txt');
+        $file->setFileType('txt');
+        $file->setFileSize(8);
+        $file->setFileMime('text/plain');
+        $file->setStatus('uploaded');
+        $file->setGroupKey('Invoices');
+        $this->em->persist($file);
+        $other = $this->person('other-options');
+        $foreign = (new SavedPrompt())
+            ->setUserId((int) $other->getId())
+            ->setName('Secret')
+            ->setCommand('secret')
+            ->setBody('Not yours.');
+        $this->em->persist($foreign);
+        $this->em->flush();
+
+        $this->client->request('GET', '/api/v1/cloud/watches/options', server: $cloud['server']);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $body = $this->json();
+        self::assertSame(['en', 'de', 'es', 'fr', 'tr'], $body['languages']);
+        self::assertSame([], $body['tasks']);
+        self::assertSame('Vendor line', $body['shortcuts'][0]['name']);
+        self::assertSame('vendor', $body['shortcuts'][0]['command']);
+        self::assertSame('Extract the vendor, the date and the total.', $body['shortcuts'][0]['body']);
+        self::assertSame('Invoices', $body['folders'][0]['group_key']);
+        self::assertSame(1, $body['folders'][0]['file_count']);
+        self::assertCount(1, $body['shortcuts']);
+        self::assertCount(1, $body['folders']);
     }
 
     public function testTheCapRefusesAnotherWatch(): void
