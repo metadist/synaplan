@@ -4,6 +4,7 @@ namespace App\Service\Message\Classification;
 
 use App\Entity\Message;
 use App\Service\Message\Capability\TopicIntentRule;
+use App\Service\Message\Effort\EffortVerdict;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
@@ -90,6 +91,11 @@ final readonly class SorterVerdict
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
+        // The effort rating rides in the same sorter answer. Read from the
+        // raw reply: the sorter's own parser keeps the fields it knows and
+        // does not pass the decoded object through.
+        $effort = EffortVerdict::fromRawResponse(is_string($result['raw_response'] ?? null) ? $result['raw_response'] : null);
+
         $classification = $this->agentPinRoute->attachRoutableAgent(array_merge([
             'topic' => $canonicalTopic,
             'language' => $result['language'],
@@ -112,7 +118,7 @@ final readonly class SorterVerdict
             // Usage taximeter: tokens/charged cost of the sorting call (null
             // when the fast path skipped the AI sorter or recording failed).
             'sorting_usage' => $result['sorting_usage'] ?? null,
-        ], $aiSortingDecision->toClassificationFields()), $message);
+        ], $effort->toClassificationFields(), $aiSortingDecision->toClassificationFields()), $message);
 
         return $this->withOverlays($classification, $result, $message, $text, $overrideModelId, $forceWebSearch, $spokenOutput);
     }

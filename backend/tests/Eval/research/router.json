@@ -1,0 +1,83 @@
+{
+  "name": "router",
+  "description": "Effort rating corpus for tools:sort (BEFFORT). Labels proposed 2026-10-28, to be confirmed by the owner. history is the thread before the message: role user|assistant, text.",
+  "items": [
+    { "id": "small-01", "lang": "en", "text": "Hi, how are you?", "history": [], "label": "answer", "why": "simple" },
+    { "id": "small-02", "lang": "de", "text": "Danke dir!", "history": [], "label": "answer", "why": "simple" },
+    { "id": "small-03", "lang": "es", "text": "Buenos días", "history": [], "label": "answer", "why": "simple" },
+    { "id": "small-04", "lang": "fr", "text": "Merci beaucoup, bonne journée", "history": [], "label": "answer", "why": "simple" },
+    { "id": "small-05", "lang": "tr", "text": "Merhaba, nasılsın?", "history": [], "label": "answer", "why": "simple" },
+    { "id": "small-06", "lang": "en", "text": "ok thanks that helps", "history": [{ "role": "user", "text": "What is 15 % of 240?" }, { "role": "assistant", "text": "15 % of 240 is 36." }], "label": "answer", "why": "simple" },
+
+    { "id": "code-01", "lang": "en", "text": "Write a Python function that sorts a list of dicts by the key 'date'.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "code-02", "lang": "de", "text": "Warum wirft dieser Code eine NullPointerException? ```java\nString s = null; s.length();```", "history": [], "label": "answer", "why": "simple" },
+    { "id": "code-03", "lang": "en", "text": "Explain the difference between a mutex and a semaphore.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "math-01", "lang": "fr", "text": "Combien font 17 × 23 ?", "history": [], "label": "answer", "why": "simple" },
+    { "id": "math-02", "lang": "en", "text": "Solve for x: 3x + 7 = 22", "history": [], "label": "answer", "why": "simple" },
+    { "id": "trans-01", "lang": "de", "text": "Übersetze ins Englische: Wir treffen uns morgen um zehn im Büro.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "trans-02", "lang": "es", "text": "Corrige la gramática: Ayer fuimos a la playa y nos divertimos mucho aunque hacía frío.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "trans-03", "lang": "tr", "text": "Bu cümleyi daha resmi yaz: Toplantıya gelemiyorum, kusura bakma.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "file-01", "lang": "en", "text": "Summarize the attached contract in five bullet points.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "file-02", "lang": "de", "text": "Was steht in dem angehängten Dokument zur Kündigungsfrist?", "history": [], "label": "answer", "why": "simple" },
+
+    { "id": "creative-01", "lang": "en", "text": "Write a birthday poem for my mother who loves gardening.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "creative-02", "lang": "de", "text": "Schreib mir eine freundliche Absage für eine Einladung zum Firmenfest.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "creative-03", "lang": "fr", "text": "Rédige un e-mail pour demander un report de réunion à la semaine prochaine.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "advice-01", "lang": "en", "text": "How do I stay motivated when learning a new language?", "history": [], "label": "answer", "why": "simple" },
+    { "id": "advice-02", "lang": "es", "text": "¿Qué me recomiendas para dormir mejor?", "history": [], "label": "answer", "why": "simple" },
+    { "id": "knowledge-01", "lang": "en", "text": "Explain photosynthesis to a ten-year-old.", "history": [], "label": "answer", "why": "simple" },
+    { "id": "knowledge-02", "lang": "de", "text": "Wer war der erste Bundeskanzler?", "history": [], "label": "answer", "why": "simple" },
+    { "id": "knowledge-03", "lang": "tr", "text": "Fotosentez nedir, kısaca anlat.", "history": [], "label": "answer", "why": "asked_short" },
+
+    { "id": "short-01", "lang": "de", "text": "Kurz: was ist eine Wärmepumpe?", "history": [], "label": "answer", "why": "asked_short" },
+    { "id": "short-02", "lang": "en", "text": "In one sentence: what does the GDPR regulate?", "history": [], "label": "answer", "why": "asked_short" },
+    { "id": "short-03", "lang": "fr", "text": "En bref, quelle est la différence entre une SARL et une SAS ?", "history": [], "label": "answer", "why": "asked_short" },
+    { "id": "short-04", "lang": "es", "text": "Brevemente: ¿qué es la inflación?", "history": [], "label": "answer", "why": "asked_short" },
+    { "id": "short-05", "lang": "en", "text": "tl;dr how does a heat pump work", "history": [], "label": "answer", "why": "asked_short" },
+
+    { "id": "fact-01", "lang": "de", "text": "Wie steht der Dollar zum Euro?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-02", "lang": "en", "text": "Who is the CEO of Siemens?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-03", "lang": "en", "text": "What is the latest stable version of PHP?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-04", "lang": "de", "text": "Wie ist das Wetter heute in Frankfurt?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-05", "lang": "fr", "text": "Quels sont les horaires d'ouverture de la Tour Eiffel ?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-06", "lang": "es", "text": "¿Quién ganó el último Mundial de fútbol?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-07", "lang": "tr", "text": "Bugün İstanbul'da dolar kuru ne kadar?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-08", "lang": "en", "text": "When is the next public holiday in Bavaria?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-09", "lang": "de", "text": "Wie viel kostet ein Deutschlandticket aktuell?", "history": [], "label": "lookup", "why": "current_fact" },
+    { "id": "fact-10", "lang": "en", "text": "What was announced at the last Apple event?", "history": [], "label": "lookup", "why": "current_fact" },
+
+    { "id": "follow-01", "lang": "de", "text": "Und in Österreich?", "history": [{ "role": "user", "text": "Welche Förderprogramme gibt es 2026 für Wärmepumpen in Bayern?" }, { "role": "assistant", "text": "Bericht: Förderprogramme für Wärmepumpen in Bayern 2026. 1. Bundesförderung für effiziente Gebäude (BEG) … 2. Bayerisches 10.000-Häuser-Programm … 3. Kommunale Zuschüsse … Quellen: [1] bafa.de [2] stmwi.bayern.de" }], "label": "lookup", "why": "follow_up" },
+    { "id": "follow-02", "lang": "en", "text": "Which of those needs an apostille?", "history": [{ "role": "user", "text": "What do I need to marry a Chinese citizen in China?" }, { "role": "assistant", "text": "Report: Marrying a Chinese citizen in China. 1. Certificate of no impediment from your home registry … 2. Passport and visa … 3. Translation and legalisation … 4. Registration at the Civil Affairs Bureau … Sources: [1] auswaertiges-amt.de [2] mca.gov.cn" }], "label": "lookup", "why": "follow_up" },
+    { "id": "follow-03", "lang": "en", "text": "Can you shorten that to three sentences?", "history": [{ "role": "user", "text": "Compare Nextcloud, ownCloud and OpenCloud for a 50-person company" }, { "role": "assistant", "text": "Report: Nextcloud, ownCloud and OpenCloud compared … (long report with sources)" }], "label": "answer", "why": "follow_up" },
+    { "id": "follow-04", "lang": "fr", "text": "Et pour une entreprise de 500 personnes ?", "history": [{ "role": "user", "text": "Compare Nextcloud, ownCloud et OpenCloud pour une entreprise de 50 personnes" }, { "role": "assistant", "text": "Rapport : Nextcloud, ownCloud et OpenCloud comparés … Sources : [1] nextcloud.com [2] owncloud.com [3] opencloud.eu" }], "label": "lookup", "why": "follow_up" },
+    { "id": "follow-05", "lang": "es", "text": "¿Y cuánto tarda el trámite?", "history": [{ "role": "user", "text": "¿Qué necesito para casarme con una ciudadana china en China?" }, { "role": "assistant", "text": "Informe: Casarse con una ciudadana china en China. 1. Certificado de capacidad matrimonial … 2. Pasaporte … 3. Traducción y legalización … Fuentes: [1] exteriores.gob.es [2] mca.gov.cn" }], "label": "lookup", "why": "follow_up" },
+    { "id": "follow-06", "lang": "de", "text": "Danke, das reicht mir.", "history": [{ "role": "user", "text": "Wie steht der Dollar zum Euro?" }, { "role": "assistant", "text": "1 USD = 0,92 EUR (Stand heute). Quelle: ecb.europa.eu" }], "label": "answer", "why": "simple" },
+
+    { "id": "proc-01", "lang": "de", "text": "Was brauche ich, um eine Chinesin in China zu heiraten — welche Behörden, welche Dokumente, in welcher Reihenfolge?", "history": [], "label": "research", "why": "procedure" },
+    { "id": "proc-02", "lang": "en", "text": "How do I register a GmbH in Germany as a non-EU citizen? Which offices, which documents, in what order, and what does it cost?", "history": [], "label": "research", "why": "procedure" },
+    { "id": "proc-03", "lang": "fr", "text": "Quelles démarches dois-je faire pour importer une voiture d'occasion d'Allemagne en France : documents, taxes, contrôle technique, immatriculation ?", "history": [], "label": "research", "why": "procedure" },
+    { "id": "proc-04", "lang": "es", "text": "¿Qué pasos, documentos y organismos necesito para obtener la nacionalidad española por residencia?", "history": [], "label": "research", "why": "procedure" },
+    { "id": "proc-05", "lang": "tr", "text": "Almanya'da çalışma vizesi almak için hangi kurumlara, hangi belgelerle ve hangi sırayla başvurmalıyım?", "history": [], "label": "research", "why": "procedure" },
+    { "id": "proc-06", "lang": "en", "text": "What is the full process to get a drone operator licence in the EU for commercial use, including training providers, exams, registration and insurance?", "history": [], "label": "research", "why": "procedure" },
+
+    { "id": "comp-01", "lang": "en", "text": "Compare Nextcloud, ownCloud and OpenCloud for a 50-person company: licensing, hosting options, office integration, costs.", "history": [], "label": "research", "why": "comparison" },
+    { "id": "comp-02", "lang": "de", "text": "Vergleiche die drei größten Stromanbieter für Gewerbekunden in Deutschland nach Preis, Vertragslaufzeit und Ökostromanteil.", "history": [], "label": "research", "why": "comparison" },
+    { "id": "comp-03", "lang": "fr", "text": "Compare les offres de fibre pour les PME chez Orange, SFR et Bouygues : débit, prix, engagement, SLA.", "history": [], "label": "research", "why": "comparison" },
+    { "id": "comp-04", "lang": "es", "text": "Compara los principales bancos online de España para autónomos: comisiones, TPV, financiación y atención.", "history": [], "label": "research", "why": "comparison" },
+    { "id": "comp-05", "lang": "en", "text": "Which EU countries are best for a remote-work visa as a freelancer? Compare requirements, taxes, duration and cost.", "history": [], "label": "research", "why": "comparison" },
+
+    { "id": "reg-01", "lang": "en", "text": "What are the current rules for bringing a dog from the US into Germany, and how do they differ for puppies under 15 weeks?", "history": [], "label": "research", "why": "several_parts" },
+    { "id": "reg-02", "lang": "de", "text": "Welche Pflichten habe ich als kleiner Onlinehändler 2026 nach dem Verpackungsgesetz, dem Elektrogesetz und der Batterieverordnung?", "history": [], "label": "research", "why": "several_parts" },
+    { "id": "reg-03", "lang": "fr", "text": "Quelles sont les obligations d'accessibilité numérique pour une PME en France et en Allemagne en 2026, et quelles sanctions s'appliquent ?", "history": [], "label": "research", "why": "several_parts" },
+    { "id": "reg-04", "lang": "tr", "text": "AB'de bir e-ticaret sitesi açmak için KDV, tüketici hakları ve veri koruma açısından ülke ülke hangi kurallar geçerli?", "history": [], "label": "research", "why": "several_parts" },
+
+    { "id": "deep-01", "lang": "de", "text": "Recherchiere gründlich, welche Förderprogramme es 2026 für Wärmepumpen in Bayern gibt.", "history": [], "label": "research", "why": "asked_thorough" },
+    { "id": "deep-02", "lang": "en", "text": "Give me a thorough overview with sources of the state of solid-state batteries in 2026.", "history": [], "label": "research", "why": "asked_thorough" },
+    { "id": "deep-03", "lang": "fr", "text": "Fais une recherche approfondie sur les aides à la rénovation énergétique en 2026 pour un propriétaire bailleur.", "history": [], "label": "research", "why": "asked_thorough" },
+    { "id": "deep-04", "lang": "es", "text": "Investiga detalladamente qué ayudas hay en 2026 para instalar placas solares en Andalucía.", "history": [], "label": "research", "why": "asked_thorough" },
+    { "id": "deep-05", "lang": "tr", "text": "2026'da Türkiye'de elektrikli araç teşviklerini ayrıntılı ve kaynaklı araştır.", "history": [], "label": "research", "why": "asked_thorough" },
+
+    { "id": "market-01", "lang": "en", "text": "Who are the main vendors of on-premise LLM inference servers in Europe, what do they offer, and what do they charge?", "history": [], "label": "research", "why": "several_parts" },
+    { "id": "market-02", "lang": "de", "text": "Gib mir einen Überblick über den aktuellen Stand der Forschung zu Mikroplastik im Trinkwasser: Messmethoden, Grenzwerte, gesundheitliche Bewertung.", "history": [], "label": "research", "why": "several_parts" }
+  ]
+}

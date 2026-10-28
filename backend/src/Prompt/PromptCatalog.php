@@ -450,7 +450,7 @@ If there are attached files, their types are listed in BATTACHED_FILES and the c
 
 You will respond only with a valid JSON object containing ONLY the
 classification fields listed under "Answer format" below (BTOPIC, BLANG,
-BWEBSEARCH, BREADPAGES, BMULTI, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
+BWEBSEARCH, BREADPAGES, BMULTI, BEFFORT, BEFFORT_WHY, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
 BTEXT, BFILETEXT, BFILEPATH, BDATETIME, or any other field from the message
 you received — those are input only.
 
@@ -569,6 +569,50 @@ This is the list, use only this:
      opening hours, a simple yes/no fact, "latest news from Berlin" as a headline roundup.
    When in doubt on a research question with no URL, prefer 3 over 0 — a hedged
    "I cannot confirm the figure" is worse than reading three pages.
+
+6c. **Rate how much work the answer needs (BEFFORT)**. Three values:
+
+   "answer" — one reply from general knowledge or from this conversation.
+   This is the default. ALWAYS "answer" for: greetings and smalltalk; coding
+   help; creative writing; translation, grammar, rephrasing, summarising or
+   extracting from text or files the user provided; math and logic; opinions
+   and advice; a message that asks for brevity ("short", "quickly", "in one
+   sentence", "kurz", "schnell", "en bref", "kısaca", "brevemente"); and a
+   follow-up that the previous answer in this conversation already covers.
+
+   "lookup" — ONE current fact or a short list that a few web pages settle:
+   a price, a date, an office holder, a version, the weather, opening hours,
+   "what is the latest …". Usually BWEBSEARCH 1.
+
+   "research" — the correct answer has SEVERAL parts that each need their own
+   sources, and a person would open many pages to assemble it:
+   - a procedure with authorities, documents and an order ("what do I need to
+     marry a Chinese citizen in China — which offices, which documents"),
+   - a comparison of several products, providers, laws or places,
+   - a regulation or requirement that differs by country, state or case,
+   - a market, vendor or literature overview,
+   - an explicit wish for depth: "thorough", "in detail", "with sources",
+     "research this", "gründlich", "ausführlich", "recherchiere",
+     "à fond", "detalladamente", "ayrıntılı".
+   When a message is between "lookup" and "research" and the user did not
+   ask for brevity, choose "research". NEVER choose "research" for the
+   "answer" list above, however long the message is.
+
+   Set BEFFORT_WHY to the one reason that made you decide:
+   "simple", "current_fact", "several_parts", "comparison", "procedure",
+   "asked_short", "asked_thorough", "follow_up".
+
+   Examples:
+   - "Hi, wie gehts?" → BEFFORT: "answer", BEFFORT_WHY: "simple"
+   - "Write a Python function that sorts a list" → BEFFORT: "answer", BEFFORT_WHY: "simple"
+   - "Wie steht der Dollar zum Euro?" → BEFFORT: "lookup", BEFFORT_WHY: "current_fact"
+   - "Who is the CEO of Siemens?" → BEFFORT: "lookup", BEFFORT_WHY: "current_fact"
+   - "Was brauche ich, um eine Chinesin in China zu heiraten — welche Behörden, welche Dokumente, in welcher Reihenfolge?" → BEFFORT: "research", BEFFORT_WHY: "procedure"
+   - "Compare Nextcloud, ownCloud and OpenCloud for a 50-person company" → BEFFORT: "research", BEFFORT_WHY: "comparison"
+   - "Recherchiere gründlich, welche Förderprogramme es 2026 für Wärmepumpen in Bayern gibt" → BEFFORT: "research", BEFFORT_WHY: "asked_thorough"
+   - "Kurz: was ist eine Wärmepumpe?" → BEFFORT: "answer", BEFFORT_WHY: "asked_short"
+   - (after a report on heat pump subsidies) "Und in Österreich?" → BEFFORT: "lookup", BEFFORT_WHY: "follow_up"
+   - "Summarize the attached contract" → BEFFORT: "answer", BEFFORT_WHY: "simple"
 
 7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
 
@@ -745,6 +789,8 @@ BDATETIME, BATTACHED_FILES, ...):
 * "BWEBSEARCH": 0 | 1
 * "BREADPAGES": 0 | 2 | 3
 * "BMULTI": 0 | 1
+* "BEFFORT": "answer" | "lookup" | "research"
+* "BEFFORT_WHY": "simple" | "current_fact" | "several_parts" | "comparison" | "procedure" | "asked_short" | "asked_thorough" | "follow_up"
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
 * "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
 * "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
