@@ -1,0 +1,2133 @@
+{
+    "buffered_chat_email": {
+        "buselog": [
+            {
+                "action": "AI_CALL",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "chat_id": 5,
+                    "model": "gpt-4o",
+                    "provider": "openai",
+                    "source": "EMAIL"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "facade_charged_cost": "0.000152",
+                    "facade_metered": true,
+                    "facade_price_known": true,
+                    "model": "",
+                    "provider": "",
+                    "source": "EMAIL"
+                },
+                "model": "",
+                "model_id": null,
+                "provider": "",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "When do you open on Saturday?",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "temperature": 0.7
+                    },
+                    "body_sha1": "1379dece1e7e7d5ea3458420edd763d0d7555469",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 174",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "content": "We open at 9 on Saturday.",
+            "metadata": {
+                "facade_charged_cost": "0.000152",
+                "facade_metered": true,
+                "facade_price_known": true,
+                "model": "gpt-4o",
+                "provider": "openai",
+                "response_id": null,
+                "usage": {
+                    "cache_creation_tokens": 0,
+                    "cached_tokens": 4,
+                    "completion_tokens": 9,
+                    "prompt_tokens": 21,
+                    "total_tokens": 30
+                }
+            },
+            "recorded_tokens": 0
+        }
+    },
+    "in_app_stream": {
+        "buselog": [
+            {
+                "action": "AI_CALL",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "chat_id": 5,
+                    "model": "gpt-4o",
+                    "provider": "openai",
+                    "source": "WEB"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "agentId": null,
+                    "agentVersionId": null,
+                    "chat_id": "5",
+                    "facade_charged_cost": "0.000152",
+                    "facade_metered": true,
+                    "facade_price_known": true,
+                    "model": "",
+                    "provider": "",
+                    "source": "WEB"
+                },
+                "model": "",
+                "model_id": null,
+                "provider": "",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "What is Synaplan?",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "stream": true,
+                        "temperature": 0.7
+                    },
+                    "body_sha1": "823bd900d39bfe80e05b7606c43332a299d82776",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 176",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "chat_usage": {
+                "completionTokens": 9,
+                "cost": "0.000152",
+                "kind": "LLM",
+                "modelKey": "openai:gpt-4o",
+                "priceKnown": true,
+                "promptTokens": 21,
+                "totalTokens": 30
+            },
+            "chunks": [
+                {
+                    "content": "Hello from Synaplan.",
+                    "type": "content"
+                },
+                {
+                    "finish_reason": "stop",
+                    "type": "finish"
+                }
+            ],
+            "content": "Hello from Synaplan.",
+            "finish_reason": "stop"
+        }
+    },
+    "llm_rerank": {
+        "buselog": [],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "Query:\nAI call pipeline\n\nCandidates:\n- id=c1: Unrelated note\n- id=c2: The AI call pipeline runs ordered hooks",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "instructions": "Return a JSON array of candidate ids, best first.",
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "temperature": 0.7
+                    },
+                    "body_sha1": "215e20c4f8c63c57a83dde86b19e932396eed53a",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 326",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": [
+            {
+                "chunk_id": "c2",
+                "chunk_text": "The AI call pipeline runs ordered hooks",
+                "rerank": {
+                    "applied": true,
+                    "ms": 1,
+                    "provider": "llm"
+                },
+                "rerank_score": 1,
+                "score": 0.8
+            },
+            {
+                "chunk_id": "c1",
+                "chunk_text": "Unrelated note",
+                "rerank": {
+                    "applied": true,
+                    "ms": 1,
+                    "provider": "llm"
+                },
+                "rerank_score": 0.99,
+                "score": 0.9
+            }
+        ]
+    },
+    "media_image": {
+        "buselog": [
+            {
+                "action": "IMAGES",
+                "cost": "0.040000",
+                "error": "",
+                "metadata": {
+                    "model": "dall-e-3",
+                    "provider": "openai"
+                },
+                "model": "dall-e-3",
+                "model_id": 41,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_image_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "image_generation",
+                "model": "dall-e-3",
+                "model_id": 41,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "body": {
+                        "model": "dall-e-3",
+                        "n": 1,
+                        "prompt": "A lighthouse at dusk",
+                        "quality": "standard",
+                        "size": "1024x1024",
+                        "style": "vivid"
+                    },
+                    "body_sha1": "52c14539a57f3ee5004f8add082eabde96b4da89",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 114",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/images/generations"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "IMAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "content": "__IMAGE_GENERATED__",
+            "media_type": "image",
+            "model": "dall-e-3",
+            "provider": "openai"
+        }
+    },
+    "memory_extraction": {
+        "buselog": [
+            {
+                "action": "MEMORY_EXTRACTION",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "model": "gpt-4o",
+                    "provider": "openai"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "Conversation (USER turns only — assistant replies have been removed):\n\n\nCurrent Message (from the user):\nI prefer dark mode in my editor.\n\n\n✨ NO EXISTING MEMORIES YET!\nThis is a FRESH START. Extract ALL relevant information you find.\nUse action: 'create' for everything worth remembering.\n\n\nRESPONSE FORMAT (strict JSON, no markdown):\n[\n  {\"action\": \"create\", \"category\": \"personal\", \"key\": \"short_key\", \"value\": \"the fact\"},\n  {\"action\": \"update\", \"memory_id\": 123, \"category\": \"personal\", \"key\": \"short_key\", \"value\": \"updated fact\"},\n  {\"action\": \"delete\", \"memory_id\": 456}\n]\nReturn [] if nothing to save, or null.\n\nRULES:\n- Only save facts the user states about THEMSELVES (name, age, preferences, skills, etc.)\n- The Conversation block is USER-only. Never invent or extract from anything you (the assistant) wrote in earlier replies — only the lines shown above are valid sources.\n- Questions about topics are NOT memories (\"Who is X?\" → null, \"Is Y true?\" → null)\n- One fact per memory, short keys (snake_case, <= 24 chars)\n- category: personal, preferences, work, projects, or other relevant category\n- create = new fact, update = changed fact (needs memory_id), delete = user asks to forget (needs memory_id)\n- Already stored and unchanged → return []",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "instructions": "Extract important user preferences and information.\n\nRESPONSE FORMAT (JSON):\n[\n  {\n    \"action\": \"create\",\n    \"category\": \"personal\",\n    \"key\": \"short_key\",\n    \"value\": \"the information\"\n  },\n  {\n    \"action\": \"update\",\n    \"memory_id\": 123,\n    \"category\": \"personal\",\n    \"key\": \"short_key\",\n    \"value\": \"updated information\"\n  }\n]\n\nRULES:\n- action: \"create\" for new info, \"update\" for changes (needs memory_id), \"delete\" to remove\n- Return [] if nothing to save",
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "temperature": 0.3,
+                        "text": {
+                            "format": {
+                                "name": "memory_extraction",
+                                "schema": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "memories": {
+                                            "items": {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "action": {
+                                                        "enum": [
+                                                            "create",
+                                                            "update",
+                                                            "delete"
+                                                        ],
+                                                        "type": "string"
+                                                    },
+                                                    "category": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "key": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "memory_id": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "value": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "action",
+                                                    "memory_id",
+                                                    "category",
+                                                    "key",
+                                                    "value"
+                                                ],
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "required": [
+                                        "memories"
+                                    ],
+                                    "type": "object"
+                                },
+                                "strict": false,
+                                "type": "json_schema"
+                            }
+                        }
+                    },
+                    "body_sha1": "c8acb127e42696e86f824596a2715755468a133a",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 2579",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": [
+            {
+                "action": "create",
+                "category": "preferences",
+                "key": "editor_theme",
+                "value": "dark mode"
+            }
+        ]
+    },
+    "messages_passthrough_anthropic": {
+        "buselog": [
+            {
+                "action": "MESSAGES",
+                "cost": "0.000150",
+                "error": "",
+                "metadata": {
+                    "key_source": "operator",
+                    "model": "claude-sonnet-4-6",
+                    "provider": "anthropic",
+                    "source": "MESSAGES_API"
+                },
+                "model": "claude-sonnet-4-6",
+                "model_id": 14,
+                "provider": "anthropic",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 8,
+                    "estimated": false,
+                    "prompt": 10,
+                    "total": 18
+                }
+            }
+        ],
+        "circuit_breaker": [],
+        "model_health": [],
+        "provider_requests": {
+            "http": [
+                {
+                    "body": {
+                        "max_tokens": 256,
+                        "messages": [
+                            {
+                                "content": "Hello Messages gateway",
+                                "role": "user"
+                            }
+                        ],
+                        "model": "claude-sonnet-4-6"
+                    },
+                    "body_sha1": "5231eddcee7d9acdeabf4fd51951d293647f3b64",
+                    "headers": [
+                        "Accept: */*",
+                        "Content-Length: 110",
+                        "anthropic-version: 2023-06-01",
+                        "content-type: application/json",
+                        "x-api-key: <secret>"
+                    ],
+                    "method": "POST",
+                    "timeout": 600,
+                    "url": "https://api.anthropic.com/v1/messages"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "body": {
+                "content": [
+                    {
+                        "text": "Hello from Anthropic.",
+                        "type": "text"
+                    }
+                ],
+                "id": "msg_01",
+                "model": "claude-sonnet-4-6",
+                "role": "assistant",
+                "stop_reason": "end_turn",
+                "type": "message",
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 8
+                }
+            },
+            "status": 200,
+            "usage": {
+                "cache_creation_1h_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 8,
+                "prompt_tokens": 10,
+                "total_tokens": 18
+            }
+        }
+    },
+    "messages_translated_gemini": {
+        "buselog": [
+            {
+                "action": "MESSAGES",
+                "cost": "0.000021",
+                "error": "",
+                "metadata": {
+                    "key_source": "operator",
+                    "model": "gemini-2.5-flash",
+                    "provider": "google",
+                    "source": "MESSAGES_API"
+                },
+                "model": "gemini-2.5-flash",
+                "model_id": 15,
+                "provider": "google",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 7,
+                    "estimated": false,
+                    "prompt": 11,
+                    "total": 18
+                }
+            }
+        ],
+        "circuit_breaker": [],
+        "model_health": [],
+        "provider_requests": {
+            "http": [
+                {
+                    "body": {
+                        "contents": [
+                            {
+                                "parts": [
+                                    {
+                                        "text": "Hello Messages gateway"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "generationConfig": {
+                            "maxOutputTokens": 256
+                        }
+                    },
+                    "body_sha1": "4898e415f10d644109a6750892257c45c82c15bf",
+                    "headers": [
+                        "Accept: */*",
+                        "Content-Length: 117",
+                        "content-type: application/json",
+                        "x-goog-api-key: <secret>"
+                    ],
+                    "method": "POST",
+                    "timeout": 600,
+                    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "body": {
+                "content": [
+                    {
+                        "text": "Hello from Gemini translator.",
+                        "type": "text"
+                    }
+                ],
+                "id": "msg_<random>",
+                "model": "gemini-2.5-flash",
+                "role": "assistant",
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "type": "message",
+                "usage": {
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                    "input_tokens": 11,
+                    "output_tokens": 7
+                }
+            },
+            "status": 200,
+            "usage": {
+                "cache_creation_1h_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 7,
+                "prompt_tokens": 11,
+                "total_tokens": 18
+            }
+        }
+    },
+    "messages_translated_openai": {
+        "buselog": [
+            {
+                "action": "MESSAGES",
+                "cost": "0.000083",
+                "error": "",
+                "metadata": {
+                    "key_source": "operator",
+                    "model": "gpt-4o",
+                    "provider": "openai",
+                    "source": "MESSAGES_API"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 6,
+                    "estimated": false,
+                    "prompt": 9,
+                    "total": 15
+                }
+            }
+        ],
+        "circuit_breaker": [],
+        "model_health": [],
+        "provider_requests": {
+            "http": [
+                {
+                    "body": {
+                        "max_tokens": 256,
+                        "messages": [
+                            {
+                                "content": "Hello Messages gateway",
+                                "role": "user"
+                            }
+                        ],
+                        "model": "gpt-4o",
+                        "stream": false
+                    },
+                    "body_sha1": "899077a84cf88dad9b8d62d4a3b85c181a5ca5cc",
+                    "headers": [
+                        "Accept: */*",
+                        "Content-Length: 114",
+                        "authorization: Bearer <secret>",
+                        "content-type: application/json"
+                    ],
+                    "method": "POST",
+                    "timeout": 600,
+                    "url": "https://api.openai.com/v1/chat/completions"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "body": {
+                "content": [
+                    {
+                        "text": "Hello from OpenAI translator.",
+                        "type": "text"
+                    }
+                ],
+                "id": "chatcmpl_01",
+                "model": "gpt-4o",
+                "role": "assistant",
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "type": "message",
+                "usage": {
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                    "input_tokens": 9,
+                    "output_tokens": 6
+                }
+            },
+            "status": 200,
+            "usage": {
+                "cache_creation_1h_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 6,
+                "prompt_tokens": 9,
+                "total_tokens": 15
+            }
+        }
+    },
+    "model_probe": {
+        "buselog": [],
+        "circuit_breaker": [],
+        "model_health": [],
+        "provider_requests": {
+            "http": [
+                {
+                    "body": {
+                        "max_tokens": 1,
+                        "messages": [
+                            {
+                                "content": "ping",
+                                "role": "user"
+                            }
+                        ],
+                        "model": "custom-chat-1"
+                    },
+                    "body_sha1": "2bc2970646226ba1457dd2441eacad6dad33c99b",
+                    "headers": [
+                        "Accept: */*",
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 86",
+                        "Content-Type: application/json"
+                    ],
+                    "method": "POST",
+                    "timeout": 8,
+                    "url": "https://endpoint.example.test/v1/chat/completions"
+                },
+                {
+                    "body": {
+                        "input": "ping",
+                        "model": "custom-chat-1"
+                    },
+                    "body_sha1": "1bdd47a83be18170c83673fcb6d90c3319bcc2a0",
+                    "headers": [
+                        "Accept: */*",
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 40",
+                        "Content-Type: application/json"
+                    ],
+                    "method": "POST",
+                    "timeout": 8,
+                    "url": "https://endpoint.example.test/v1/embeddings"
+                },
+                {
+                    "headers": [
+                        "Accept: */*",
+                        "Authorization: Bearer <secret>"
+                    ],
+                    "method": "GET",
+                    "timeout": 20,
+                    "url": "https://api.openai.com/v1/models"
+                },
+                {
+                    "headers": [
+                        "Accept: */*",
+                        "Authorization: Bearer <secret>"
+                    ],
+                    "method": "GET",
+                    "timeout": 10,
+                    "url": "https://api.openai.com/v1/models/gpt-4o-retired-probe"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": {
+            "availability_status": "ok",
+            "capability_probe": {
+                "chat": "ok",
+                "embeddings": "ok"
+            },
+            "served_count": 1,
+            "single_model_probe": "Gone"
+        }
+    },
+    "openai_chat_buffered": {
+        "buselog": [
+            {
+                "action": "AI_CALL",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "model": "gpt-4o",
+                    "provider": "openai",
+                    "source": "ai_facade"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "facade_charged_cost": "0.000152",
+                    "facade_metered": true,
+                    "facade_price_known": true,
+                    "model": "",
+                    "provider": "",
+                    "source": "OPENAI_API"
+                },
+                "model": "",
+                "model_id": null,
+                "provider": "",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "Hello gateway",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "temperature": 0.7
+                    },
+                    "body_sha1": "7b6904ded8fe68e2d43521a5e5fe97c071105085",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 158",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "body": {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "index": 0,
+                        "message": {
+                            "content": "Buffered gateway reply.",
+                            "role": "assistant"
+                        }
+                    }
+                ],
+                "created": 1700000000,
+                "id": "<chatcmpl-id>",
+                "model": "gpt-4o",
+                "object": "chat.completion",
+                "usage": {
+                    "completion_tokens": 9,
+                    "prompt_tokens": 21,
+                    "total_tokens": 30
+                }
+            },
+            "status": 200
+        }
+    },
+    "openai_chat_stream": {
+        "buselog": [
+            {
+                "action": "AI_CALL",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "model": "gpt-4o",
+                    "provider": "openai",
+                    "source": "ai_facade"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "facade_charged_cost": "0.000152",
+                    "facade_metered": true,
+                    "facade_price_known": true,
+                    "model": "",
+                    "provider": "",
+                    "source": "OPENAI_API"
+                },
+                "model": "",
+                "model_id": null,
+                "provider": "",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "Stream gateway",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "stream": true,
+                        "temperature": 0.7
+                    },
+                    "body_sha1": "2683828d8103007430ff9cdec716af77d79f9a92",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 173",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "events": [
+                {
+                    "choices": [
+                        {
+                            "delta": {
+                                "role": "assistant"
+                            },
+                            "finish_reason": null,
+                            "index": 0
+                        }
+                    ],
+                    "created": 1700000000,
+                    "id": "<chatcmpl-id>",
+                    "model": "gpt-4o",
+                    "object": "chat.completion.chunk"
+                },
+                {
+                    "choices": [
+                        {
+                            "delta": {
+                                "content": "Streamed gateway reply."
+                            },
+                            "finish_reason": null,
+                            "index": 0
+                        }
+                    ],
+                    "created": 1700000000,
+                    "id": "<chatcmpl-id>",
+                    "model": "gpt-4o",
+                    "object": "chat.completion.chunk"
+                },
+                {
+                    "choices": [
+                        {
+                            "delta": [],
+                            "finish_reason": "stop",
+                            "index": 0
+                        }
+                    ],
+                    "created": 1700000000,
+                    "id": "<chatcmpl-id>",
+                    "model": "gpt-4o",
+                    "object": "chat.completion.chunk"
+                },
+                {
+                    "choices": [],
+                    "created": 1700000000,
+                    "id": "<chatcmpl-id>",
+                    "model": "gpt-4o",
+                    "object": "chat.completion.chunk",
+                    "usage": {
+                        "completion_tokens": 9,
+                        "prompt_tokens": 21,
+                        "total_tokens": 30
+                    }
+                },
+                "[DONE]"
+            ],
+            "status": 200
+        }
+    },
+    "openai_embeddings": {
+        "buselog": [
+            {
+                "action": "EMBEDDINGS",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "inputs": 1,
+                    "model": "text-embedding-3-small",
+                    "provider": "openai",
+                    "source": "OPENAI_API"
+                },
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 5,
+                    "total": 5
+                }
+            }
+        ],
+        "circuit_breaker": [],
+        "model_health": [
+            {
+                "capability": "embedding",
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "body": {
+                        "input": [
+                            "Embed this sentence"
+                        ],
+                        "model": "text-embedding-3-small"
+                    },
+                    "body_sha1": "e09e81202d5ab854ea487ca93b7cad5d8c328e79",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 66",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/embeddings"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "EMBEDDINGS",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "data": [
+                {
+                    "embedding": [
+                        0.25,
+                        -0.5,
+                        0.75
+                    ],
+                    "index": 0,
+                    "object": "embedding"
+                }
+            ],
+            "model": "text-embedding-3-small",
+            "object": "list",
+            "usage": {
+                "prompt_tokens": 5,
+                "total_tokens": 5
+            }
+        }
+    },
+    "openai_images_generations": {
+        "buselog": [
+            {
+                "action": "IMAGES",
+                "cost": "0.040000",
+                "error": "",
+                "metadata": {
+                    "model": "dall-e-3",
+                    "provider": "openai",
+                    "source": "OPENAI_API"
+                },
+                "model": "dall-e-3",
+                "model_id": 41,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_image_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "image_generation",
+                "model": "dall-e-3",
+                "model_id": 41,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "body": {
+                        "model": "dall-e-3",
+                        "n": 1,
+                        "prompt": "A red bicycle",
+                        "quality": "standard",
+                        "size": "1024x1024",
+                        "style": "vivid"
+                    },
+                    "body_sha1": "b765dcd42925f36258591be66f4821830953ae64",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 107",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/images/generations"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "IMAGES",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "created": 1700000000,
+            "data": [
+                {
+                    "revised_prompt": "A red bicycle",
+                    "url": "https://example.test/generated.png"
+                }
+            ]
+        }
+    },
+    "perplexity_web_answer": {
+        "buselog": [],
+        "circuit_breaker": [],
+        "model_health": [],
+        "provider_requests": {
+            "http": [
+                {
+                    "body": {
+                        "max_results": 10,
+                        "query": "Synaplan architecture"
+                    },
+                    "body_sha1": "d89d28cfc66c92a397f27ef402be246439669654",
+                    "headers": [
+                        "Accept: application/json",
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 50",
+                        "Content-Type: application/json"
+                    ],
+                    "method": "POST",
+                    "timeout": 10,
+                    "url": "https://api.perplexity.ai/search"
+                }
+            ],
+            "sdk": [
+                {
+                    "body": {
+                        "max_tokens": 4096,
+                        "messages": [
+                            {
+                                "content": "Synaplan architecture",
+                                "role": "user"
+                            }
+                        ],
+                        "model": "sonar"
+                    },
+                    "body_sha1": "7200436fe504a7f05946b519c474ffe20f7da3f3",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 98",
+                        "Content-Type: application/json",
+                        "Host: api.perplexity.ai"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.perplexity.ai/chat/completions"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": {
+            "answer": {
+                "citations": 1,
+                "text": "Synaplan uses one AI call pipeline."
+            },
+            "count": 1,
+            "first_url": "https://docs.synaplan.com/architecture",
+            "query": "Synaplan architecture"
+        }
+    },
+    "sorter": {
+        "buselog": [
+            {
+                "action": "SORTING",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "model": "gpt-4o",
+                    "provider": "openai"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "{\"BTEXT\":\"Hello, how are you?\",\"BLANG\":\"en\"}",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "instructions": "Classify into \"general\" | \"mediamaker\" with languages \"de\" | \"en\" | \"it\" | \"es\" | \"fr\" | \"nl\" | \"pt\" | \"ru\" | \"sv\" | \"tr\": - \"general\": General conversation\n- \"mediamaker\": Image, video or audio generation",
+                        "max_output_tokens": 2048,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "temperature": 0.1,
+                        "text": {
+                            "format": {
+                                "name": "sort_classification",
+                                "schema": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "BDURATION": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "BINPUTMODE": {
+                                            "enum": [
+                                                "text_only",
+                                                "reference_images",
+                                                null
+                                            ],
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "BLANG": {
+                                            "enum": [
+                                                "de",
+                                                "en",
+                                                "it",
+                                                "es",
+                                                "fr",
+                                                "nl",
+                                                "pt",
+                                                "ru",
+                                                "sv",
+                                                "tr"
+                                            ],
+                                            "type": "string"
+                                        },
+                                        "BMEDIA": {
+                                            "enum": [
+                                                "image",
+                                                "video",
+                                                "audio",
+                                                null
+                                            ],
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "BMULTI": {
+                                            "type": [
+                                                "boolean",
+                                                "null"
+                                            ]
+                                        },
+                                        "BREADPAGES": {
+                                            "enum": [
+                                                0,
+                                                2,
+                                                3
+                                            ],
+                                            "type": "integer"
+                                        },
+                                        "BRESOLUTION": {
+                                            "enum": [
+                                                "720p",
+                                                "1080p",
+                                                "4K",
+                                                null
+                                            ],
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "BTOPIC": {
+                                            "enum": [
+                                                "general",
+                                                "mediamaker"
+                                            ],
+                                            "type": "string"
+                                        },
+                                        "BWEBSEARCH": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "BTOPIC",
+                                        "BLANG",
+                                        "BWEBSEARCH",
+                                        "BREADPAGES",
+                                        "BMULTI",
+                                        "BMEDIA",
+                                        "BINPUTMODE",
+                                        "BDURATION",
+                                        "BRESOLUTION"
+                                    ],
+                                    "type": "object"
+                                },
+                                "strict": false,
+                                "type": "json_schema"
+                            }
+                        }
+                    },
+                    "body_sha1": "c52d9e6ca4c5e56c3b84bd0602410e2ea5937f29",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 1252",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": {
+            "language": "en",
+            "sorting_model_name": "gpt-4o",
+            "sorting_provider": "openai",
+            "sorting_usage": {
+                "completion_tokens": 9,
+                "cost": "0.000152",
+                "price_known": true,
+                "prompt_tokens": 21,
+                "tokens": 30
+            },
+            "topic": "general"
+        }
+    },
+    "synthesis": {
+        "buselog": [
+            {
+                "action": "AUDIOS",
+                "cost": "0.000465",
+                "error": "",
+                "metadata": {
+                    "model": "tts-1",
+                    "provider": "openai"
+                },
+                "model": "tts-1",
+                "model_id": 45,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_tts_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "text_to_speech",
+                "model": "tts-1",
+                "model_id": 45,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "body": {
+                        "input": "Welcome aboard the harbour tour",
+                        "model": "tts-1",
+                        "response_format": "mp3",
+                        "speed": 1,
+                        "voice": "alloy"
+                    },
+                    "body_sha1": "33d19f07b6c1ce0b978a1dba285622a81c2f7250",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 109",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/audio/speech"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "AUDIOS",
+                "kind": "limit",
+                "user_id": 7
+            },
+            {
+                "action": "COST_BUDGET",
+                "kind": "cost_budget",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "content": "__AUDIO_GENERATED__",
+            "media_type": "audio",
+            "model": "tts-1",
+            "provider": "openai"
+        }
+    },
+    "transcription": {
+        "buselog": [
+            {
+                "action": "TRANSCRIPTION",
+                "cost": "0.021000",
+                "error": "",
+                "metadata": {
+                    "language": "de",
+                    "model": "whisper-1",
+                    "provider": "openai"
+                },
+                "model": "whisper-1",
+                "model_id": 51,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_stt_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "speech_to_text",
+                "model": "whisper-1",
+                "model_id": 51,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "body": {
+                        "file": {
+                            "bytes": 14,
+                            "filename": "voice.mp3",
+                            "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
+                        },
+                        "model": "whisper-1",
+                        "response_format": "verbose_json"
+                    },
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 352",
+                        "Content-Type: multipart/form-data; boundary=<boundary>",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/audio/transcriptions"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": {
+            "duration": 3.5,
+            "language": "de",
+            "model": "whisper-1",
+            "model_id": 51,
+            "provider": "openai",
+            "text": "Hallo Synaplan",
+            "transcription_usage": {
+                "completionTokens": 0,
+                "cost": "0.023100",
+                "kind": "TRANSCRIPTION",
+                "modelKey": "openai:whisper-1",
+                "priceKnown": true,
+                "promptTokens": 0,
+                "totalTokens": 0
+            }
+        }
+    },
+    "vectorize": {
+        "buselog": [
+            {
+                "action": "embedding",
+                "cost": "0.000000",
+                "error": "OpenAI batch embedding error: Server error (HTTP 500) occurred.",
+                "metadata": {
+                    "failure_kind": "transient"
+                },
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "provider": "openai",
+                "status": "error",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            },
+            {
+                "action": "EMBEDDINGS",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "model": "text-embedding-3-small",
+                    "provider": "openai",
+                    "source": "VECTORIZATION"
+                },
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 8,
+                    "total": 8
+                }
+            }
+        ],
+        "circuit_breaker": [],
+        "model_health": [
+            {
+                "capability": "embedding",
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "outcome": "failure",
+                "provider": "openai"
+            },
+            {
+                "capability": "embedding",
+                "model": "text-embedding-3-small",
+                "model_id": 21,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "body": {
+                        "input": [
+                            "Synaplan routes every AI call through one pipeline."
+                        ],
+                        "model": "text-embedding-3-small"
+                    },
+                    "body_sha1": "a884af3c0cc9d1cc882a46afe839ac23494e8e8b",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 98",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/embeddings"
+                },
+                {
+                    "body": {
+                        "input": "Synaplan routes every AI call through one pipeline.",
+                        "model": "text-embedding-3-small"
+                    },
+                    "body_sha1": "dff51f4ec3106e0f185748544b2205b2831a171e",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 96",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/embeddings"
+                }
+            ]
+        },
+        "rate_limit_checks": [],
+        "result": {
+            "chunks_created": 1,
+            "error": null,
+            "provider": "qdrant",
+            "success": true
+        }
+    },
+    "widget_stream": {
+        "buselog": [
+            {
+                "action": "AI_CALL",
+                "cost": "0.000138",
+                "error": "",
+                "metadata": {
+                    "chat_id": 5,
+                    "model": "gpt-4o",
+                    "provider": "openai",
+                    "source": "WIDGET"
+                },
+                "model": "gpt-4o",
+                "model_id": 12,
+                "provider": "openai",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 4,
+                    "completion": 9,
+                    "estimated": false,
+                    "prompt": 21,
+                    "total": 30
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "cost": "0.000000",
+                "error": "",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "facade_charged_cost": "0.000152",
+                    "facade_metered": true,
+                    "facade_price_known": true,
+                    "files": [],
+                    "model": "",
+                    "provider": "",
+                    "source": "WIDGET"
+                },
+                "model": "",
+                "model_id": null,
+                "provider": "",
+                "status": "success",
+                "tokens": {
+                    "cache_creation": 0,
+                    "cached": 0,
+                    "completion": 0,
+                    "estimated": false,
+                    "prompt": 0,
+                    "total": 0
+                }
+            }
+        ],
+        "circuit_breaker": [
+            {
+                "outcome": "success",
+                "service": "ai_provider_openai"
+            }
+        ],
+        "model_health": [
+            {
+                "capability": "chat",
+                "model": "gpt-4o",
+                "model_id": 12,
+                "outcome": "success",
+                "provider": "openai"
+            }
+        ],
+        "provider_requests": {
+            "sdk": [
+                {
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "GET",
+                    "url": "https://api.openai.com/v1/models/gpt-4o"
+                },
+                {
+                    "body": {
+                        "input": [
+                            {
+                                "content": [
+                                    {
+                                        "text": "Need widget help",
+                                        "type": "input_text"
+                                    }
+                                ],
+                                "role": "user"
+                            }
+                        ],
+                        "max_output_tokens": 4096,
+                        "model": "gpt-4o",
+                        "store": false,
+                        "stream": true,
+                        "temperature": 0.7
+                    },
+                    "body_sha1": "ced15401f34cab4ce322dd0fa8eda7400bf5eadb",
+                    "headers": [
+                        "Authorization: Bearer <secret>",
+                        "Content-Length: 175",
+                        "Content-Type: application/json",
+                        "Host: api.openai.com"
+                    ],
+                    "method": "POST",
+                    "url": "https://api.openai.com/v1/responses"
+                }
+            ]
+        },
+        "rate_limit_checks": [
+            {
+                "action": "MESSAGES",
+                "kind": "limit",
+                "user_id": 7
+            }
+        ],
+        "result": {
+            "chunks": [
+                {
+                    "content": "Welcome to support.",
+                    "type": "content"
+                },
+                {
+                    "finish_reason": "stop",
+                    "type": "finish"
+                }
+            ],
+            "content": "Welcome to support.",
+            "preview": "Welcome to support."
+        }
+    }
+}

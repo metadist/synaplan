@@ -35,8 +35,11 @@ final class OpenAISdkRecorder
      * @param list<ResponseInterface> $responses
      * @param list<string>            $secrets
      */
-    public function __construct(array $responses, private readonly array $secrets)
-    {
+    public function __construct(
+        array $responses,
+        private readonly array $secrets,
+        private readonly ?string $baseUri = null,
+    ) {
         $this->mock = new MockHandler($responses);
     }
 
@@ -48,8 +51,16 @@ final class OpenAISdkRecorder
         $stack = HandlerStack::create($this->mock);
         $stack->push(Middleware::history($this->history));
         $guzzle = new GuzzleClient(['handler' => $stack]);
+        $baseUri = $this->baseUri;
 
-        return static fn (string $key): Client => \OpenAI::factory()->withApiKey($key)->withHttpClient($guzzle)->make();
+        return static function (string $key) use ($guzzle, $baseUri): Client {
+            $factory = \OpenAI::factory()->withApiKey($key)->withHttpClient($guzzle);
+            if (null !== $baseUri && '' !== $baseUri) {
+                $factory = $factory->withBaseUri($baseUri);
+            }
+
+            return $factory->make();
+        };
     }
 
     /**
