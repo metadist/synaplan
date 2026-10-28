@@ -11,7 +11,11 @@ use App\Repository\ChatRepository;
 use App\Repository\ConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Message\Effort\AutoResearchGate;
+use App\Service\Message\Effort\Effort;
+use App\Service\Message\Effort\EffortReason;
+use App\Service\Message\Effort\EffortVerdict;
 use App\Service\Message\Effort\GateDecision;
+use App\Service\Message\Effort\GateTurn;
 use App\Service\RateLimitService;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchDepth;
@@ -120,6 +124,33 @@ final class AutoResearchGateTest extends ResearchUnitCase
         self::assertTrue($first->startedRun());
 
         self::assertSame(GateDecision::TOO_MANY, $gate->decide($this->message(2), $this->rated('research', 'comparison'), [])->heldBackBy());
+    }
+
+    public function testATurnWithoutAStoredMessageGoesThroughTheSameDoor(): void
+    {
+        $gate = $this->gate();
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $turn = new GateTurn(
+            question: 'Compare the visa rules of four countries',
+            verdict: new EffortVerdict(Effort::Research, EffortReason::Comparison, true),
+            folder: null,
+            language: 'en',
+            turns: [['role' => 'user', 'text' => 'Hello']],
+            chatId: null,
+            assistantId: null,
+            idempotencyKey: 'gw:7:abc',
+        );
+
+        $first = $gate->decideFor($user, $turn);
+        $again = $gate->decideFor($user, $turn);
+
+        self::assertTrue($first->startedRun());
+        self::assertSame($first->runId, $again->runId, 'the same key never starts a second run');
+        self::assertNull($this->store->load((string) $first->runId)?->ref->chatId);
+
+        $this->autoRow = '0';
+        self::assertFalse($this->gate()->decideFor($user, $turn)->startedRun());
     }
 
     /**

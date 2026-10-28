@@ -37,7 +37,7 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertFalse($this->config->allowOperatorKey(1));
         $this->assertTrue($this->config->isBudgetNoticeEnabled(1));
         $this->assertSame(MessagesGatewayConfig::WEB_SEARCH_AUTO, $this->config->webSearchMode(1));
-        $this->assertSame(2, $this->config->webSearchMaxRounds(1));
+        $this->assertSame(4, $this->config->webSearchMaxRounds(1));
         $this->assertSame(MessagesGatewayConfig::WEB_FETCH_AUTO, $this->config->webFetchMode(1));
         $this->assertSame(3, $this->config->webFetchMaxPerTurn(1));
         $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));

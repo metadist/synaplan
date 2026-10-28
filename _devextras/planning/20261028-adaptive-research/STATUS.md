@@ -12,8 +12,8 @@ chat message.
 | AR1 | done | 2026-10-28. `BEFFORT` / `BEFFORT_WHY` in `tools:sort`; router corpus and `app:research:router-eval`; gate passed (entry below) |
 | AR2 | done | 2026-10-28. Depth `auto` with the ceiling from the plan, `hint`, `answer_now`, `RESEARCH.AUTO_ENABLED`, `TOOL_MODE_MODELS` seeded (`Version20261028120000`) |
 | AR3 | done | 2026-10-28. Gate in `MessageProcessor`, notice, `research_started`, card on the message, Answer now, Look deeper, limit sentences; Tools → Research and `ResearchComposer.vue` removed; J-AR-1 walked (entry below) |
-| AR4 | planned | Automatic research switch on the admin tab |
-| AR5 | planned | Gateway: `WEB_SEARCH_MAX_ROUNDS` 2 → 4, effort paragraph, `x-synaplan-effort` / `x-synaplan-research-run` |
+| AR4 | done | Automatic research switch on the admin tab; J-AR-7 walked. The "no vote in 24 h" info line was not built (see entry) |
+| AR5 | done | Gateway: `WEB_SEARCH_MAX_ROUNDS` 2 → 4 with migration, effort paragraph, `x-synaplan-effort` / `x-synaplan-research-run` / `x-synaplan-research-limit`; hard corpus measured before and after (gate met). UC-03 / UC-04 live in synaplan-desktop and were not run from here |
 | AR6 | planned | Synaplan Desktop: chip removed, header sent, card attached, Answer now, Look deeper |
 | AR7 | planned | Router gate after AR3/AR5, cost curve, the marriage question live, J-AR-2 walked |
 | AX1 | planned | User docs: the chat chooses how deep to look |
@@ -129,3 +129,76 @@ Size ratchet respected by moving code out, never in: `chatTurns.ts`
 `SorterEffortStub`, `AutoResearchTurn::noticeResult`,
 `PlanStage::announcePlan` on the backend. `TestProvider.php` kept its
 frozen length (one-line call into the stub).
+
+## 2026-10-28 — AR4: the administrator's switch; J-AR-7 walked
+
+`RESEARCH.AUTO_ENABLED` has a second row under Research on the admin
+research tab (`ResearchAutoSwitch.vue`): Turn off / Turn on from the row,
+the consequence in one sentence ("the chat answers every question
+directly; Look deeper disappears; runs already going finish"), "Turn on
+Research first." while research is off (the backend answers 409
+`research_off` to a `PUT` that tries anyway), a note when web search is
+off (folders only). Every change is audited as `research.settings.update`
+with `autoEnabledBefore` / `autoEnabled`. Capabilities are forgotten on
+save so the chat's Look deeper follows the switch without a reload.
+
+Walked in Chromium (Playwright, headless, admin account): tab opened, the
+row found under Research in under ten seconds; Turn off clicked —
+consequence sentence read, `PUT /api/v1/admin/research` carried
+`{"autoEnabled": false}`, the row said Off; Turn on clicked — On again;
+Research turned off — the row disabled with "Turn on Research first.".
+
+Not built: the "questions without a vote in the last 24 h" line of `02`
+§3.4. There is no honest source for it yet — the sorter result is not
+stored per message, and counting replies without `effort` would count
+every unsorted path (widget, saved task, channel) as a missing vote and
+inflate the rate. It needs a counter written where the vote is read; a
+follow-up, not a guess on the tab.
+
+## 2026-10-28 — AR5: the gateway's ceiling and `x-synaplan-effort`
+
+Built: `WEB_SEARCH_MAX_ROUNDS` seeds `4`; `Version20261028130000` raises
+rows still at `2` and leaves a chosen value alone; `GatewayEffortRules`
+appends the effort paragraph once per turn whenever Synaplan runs the
+search itself; `x-synaplan-effort: auto` rates the last user text with the
+production sorter and runs `AutoResearchGate::decideFor` (the chat's gate,
+refactored around `GateTurn` so both doors share the checks); a started
+run answers the turn with the notice sentence as one assistant message —
+JSON or the Anthropic SSE sequence — and sets `x-synaplan-research-run`;
+a held-back `research` rating runs the turn as usual and names the limit
+in `x-synaplan-research-limit`. Without the header the sorter is never
+called. `GatewayToolLoop.php` shrank by three lines.
+
+Measured on the dev stack with `app:research:eval --arm=b1plus
+--web-search` on the hard corpus (12 items, user 1, `claude-sonnet-5-5`
+on the gateway, deterministic fact recall, cost from `BUSELOG` rows in the
+command window; `--gateway-url=http://127.0.0.1:80`):
+
+| Date | Arm | Ceiling | Recall | Searches | Cost (messages) | Prompt / completion tokens | Answer ms p50 / max | Report |
+| ---- | --- | ------- | ------ | -------- | --------------- | -------------------------- | ------------------- | ------ |
+| 2026-10-28 | B1+ | 2, no paragraph (code before AR5) | 1.00 across 12 | 17 | 1.54 USD | 715 131 / 11 293 | 10 960 / 29 718 | `var/research-eval/ar5-before.md` |
+| 2026-10-28 | B1+ | 4 + paragraph | 1.00 across 12 | 19 | 2.00 USD | 949 318 / 10 027 | 9 121 / 18 022 | `var/research-eval/ar5-after.md` |
+
+Gate (`03` AR5 exit): recall not lowered (1.00 → 1.00); cost 1.30× on the
+hard corpus, under the 1.5× ceiling. The seed stays 4. Both runs abstained
+on hard-11 and hard-12 (the trap items) with full recall. Two searches
+more across twelve questions: the paragraph keeps a one-fact question at
+one search; the extra rounds went to the multi-part items.
+
+Not measured from here: UC-03 / UC-04 are Desktop use cases in
+`synaplan-desktop` (`cargo run -p synaplan-core`); they are the AR6 exit
+on the stack that carries this change.
+
+Walked on the gateway with an API key (curl, dev stack): "Say hello in
+one word." with `x-synaplan-effort: auto` → `X-Synaplan-Effort: answer`,
+the model's "Hello!"; the four-country visa comparison → `X-Synaplan-Effort:
+research`, `X-Synaplan-Research-Run: rr_…`, body one assistant message
+"I am looking through several sources for this — about 6 minutes. It is a
+comparison."; the same question with `stream: true` → the six Anthropic
+events and the **same** run id (idempotency key `gw:<user>:<question
+hash>`); `GET /v1/research/{id}` showed the run `gathering`, depth `auto`,
+ceiling `standard`; `POST /v1/research/{id}/cancel` → 200.
+
+The eval needed the gateway on (`MESSAGES_GATEWAY.ENABLED`,
+`ALLOW_OPERATOR_KEY`) on the dev database; both rows were set back to `0`
+afterwards.

@@ -62,44 +62,67 @@ final readonly class AutoResearchGate
         if (Effort::Research !== $verdict->effort || !$verdict->voted) {
             return GateDecision::none();
         }
-        $userId = $message->getUserId();
-        $web = $this->search->available($userId);
-        $folder = is_string($classification['rag_group_key'] ?? null) && '' !== $classification['rag_group_key'] ? $classification['rag_group_key'] : null;
-        if (!$web && null === $folder) {
-            return GateDecision::heldBack(GateDecision::NO_SOURCES);
-        }
-        $user = $this->users->find($userId);
+        $user = $this->users->find($message->getUserId());
         if (!$user instanceof User) {
             return GateDecision::none();
+        }
+        $turn = new GateTurn(
+            question: $message->getText(),
+            verdict: $verdict,
+            folder: is_string($classification['rag_group_key'] ?? null) && '' !== $classification['rag_group_key'] ? $classification['rag_group_key'] : null,
+            language: is_string($classification['language'] ?? null) ? $classification['language'] : null,
+            turns: self::turns($history),
+            chatId: $message->getChatId(),
+            assistantId: isset($options['agentId']) && is_numeric($options['agentId']) ? (int) $options['agentId'] : null,
+            idempotencyKey: self::KEY_PREFIX.$message->getId(),
+        );
+
+        return $this->decideFor($user, $turn);
+    }
+
+    /**
+     * The checks every caller shares once it holds a user and a rated turn:
+     * the switch, the rating, a source to read, the cost budget, the start.
+     * The chat arrives here through {@see decide()}; the Anthropic-compatible
+     * gateway builds its {@see GateTurn} from the request and comes here directly.
+     */
+    public function decideFor(User $user, GateTurn $turn): GateDecision
+    {
+        if (!$this->config->autoEnabled()) {
+            return GateDecision::none();
+        }
+        if (Effort::Research !== $turn->verdict->effort || !$turn->verdict->voted) {
+            return GateDecision::none();
+        }
+        $web = $this->search->available((int) $user->getId());
+        if (!$web && null === $turn->folder) {
+            return GateDecision::heldBack(GateDecision::NO_SOURCES);
         }
         if (!$this->rateLimits->checkCostBudget($user)['allowed']) {
             return GateDecision::heldBack(GateDecision::BUDGET);
         }
 
-        return $this->start($user, $message, $classification, $options, $history, $web, $folder, $verdict);
+        return $this->start($user, $turn, $web);
     }
 
-    /**
-     * @param array<string, mixed>                                     $classification
-     * @param array<string, mixed>                                     $options
-     * @param array<int, Message|array{role: string, content: string}> $history
-     */
-    private function start(User $user, Message $message, array $classification, array $options, array $history, bool $web, ?string $folder, EffortVerdict $verdict): GateDecision
+    private function start(User $user, GateTurn $turn, bool $web): GateDecision
     {
         $body = [
-            'question' => $message->getText(),
+            'question' => $turn->question,
             'depth' => ResearchDepth::Auto->value,
-            'sources' => ['web' => $web, 'knowledge' => null === $folder ? [] : [$folder]],
-            'language' => is_string($classification['language'] ?? null) ? $classification['language'] : null,
-            'chat_id' => $message->getChatId(),
-            'assistant_id' => isset($options['agentId']) && is_numeric($options['agentId']) ? (int) $options['agentId'] : null,
-            'context' => ['turns' => self::turns($history)],
-            'hint' => EffortReason::AskedShort === $verdict->reason ? 'brief' : null,
+            'sources' => ['web' => $web, 'knowledge' => null === $turn->folder ? [] : [$turn->folder]],
+            'language' => $turn->language,
+            'chat_id' => $turn->chatId,
+            'assistant_id' => $turn->assistantId,
+            'context' => ['turns' => $turn->turns],
+            'hint' => EffortReason::AskedShort === $turn->verdict->reason ? 'brief' : null,
         ];
         try {
-            $state = $this->runs->start($user, $body, true, self::KEY_PREFIX.$message->getId());
+            // A turn with a chat writes its report into that chat; a gateway
+            // turn has none, so the report stays on the run (an API request).
+            $state = $this->runs->start($user, $body, null !== $turn->chatId, $turn->idempotencyKey);
         } catch (ResearchRejected $e) {
-            $this->logger->info('Automatic research held back', ['code' => $e->errorCode, 'message_id' => $message->getId()]);
+            $this->logger->info('Automatic research held back', ['code' => $e->errorCode, 'key' => $turn->idempotencyKey]);
 
             return GateDecision::heldBack('too_many' === $e->errorCode ? GateDecision::TOO_MANY : GateDecision::UNAVAILABLE);
         } catch (ResearchStoreUnavailable) {
@@ -107,7 +130,7 @@ final readonly class AutoResearchGate
         }
         $minutes = ($this->budgets?->forDepth(ResearchDepth::Auto) ?? ResearchBudgetConfig::defaults(ResearchDepth::Auto))->minutes();
 
-        return GateDecision::started($state->ref->id, $minutes, $verdict->reason->value);
+        return GateDecision::started($state->ref->id, $minutes, $turn->verdict->reason->value);
     }
 
     /**
@@ -134,7 +157,7 @@ final readonly class AutoResearchGate
      *
      * @return list<array{role: string, text: string}>
      */
-    private static function turns(array $history): array
+    public static function turns(array $history): array
     {
         $turns = [];
         foreach (array_slice(array_values($history), -self::CONTEXT_TURNS) as $turn) {
