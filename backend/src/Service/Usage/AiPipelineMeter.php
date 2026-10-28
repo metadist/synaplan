@@ -25,24 +25,14 @@ use Symfony\Contracts\Service\ResetInterface;
  * Coordinates pipeline-level rate-limit checks, `BUSELOG` metering, shadow-mode
  * comparison (`ai.usage_mismatch`), and {@see TurnUsageLedger} aggregation for
  * {@see \App\AI\Pipeline\Hook\RateLimitHook}, {@see \App\AI\Pipeline\Hook\UsageHook},
- * and {@see LegacyUsageWriter} (`03_contracts.md` §1.3, §1.5, S1 AU11).
+ * and {@see LegacyUsageWriter} (`03_contracts.md` §1.3, §1.5, S1 AU11–AU12).
  */
 final class AiPipelineMeter implements ResetInterface
 {
-    private const CAPABILITY_TAGS = [
-        'chat' => 'chat',
-        'vision' => 'pic2text',
-        'embedding' => 'vectorize',
-        'image_generation' => 'text2pic',
-        'video_generation' => 'text2vid',
-        'speech_to_text' => 'sound2text',
-        'text_to_speech' => 'text2sound',
-    ];
-
     /** @var array<string, list<RecordedUsage>> keyed by "{userId}:{action}" */
     private array $recordedByHook = [];
 
-    /** @var array<string, list<array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string}>> */
+    /** @var array<string, list<array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool}>> */
     private array $shadowExpectations = [];
 
     /** @var array<string, bool> keyed by "{userId}:{action}" */
@@ -50,21 +40,26 @@ final class AiPipelineMeter implements ResetInterface
 
     private ?string $activeTurnId = null;
 
+    private int $turnSequence = 0;
+
     private int $callSequence = 0;
 
     /** @var (\Closure(array<string, mixed>): array<string, mixed>)|null */
     private ?\Closure $shadowPerturbation = null;
 
+    private readonly AiUsageSpecBuilder $specBuilder;
+
     public function __construct(
         private readonly RateLimitService $rateLimitService,
-        private readonly CostCalculationService $costCalculationService,
+        CostCalculationService $costCalculationService,
         private readonly UserRepository $users,
-        private readonly ModelRepository $models,
+        ModelRepository $models,
         private readonly UsageHookConfig $config,
         private readonly TurnUsageLedger $turnLedger = new TurnUsageLedger(),
         private readonly ?EventRingStore $eventRing = null,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
+        $this->specBuilder = new AiUsageSpecBuilder($costCalculationService, $rateLimitService, $models);
         LegacyUsageWriter::bind($this);
     }
 
@@ -119,23 +114,32 @@ final class AiPipelineMeter implements ResetInterface
             return null;
         }
 
-        $this->admittedInRequest[$key] = true;
         $check = $this->rateLimitService->checkLimit($user, $action);
         if (!($check['allowed'] ?? true)) {
             return AiCallRefusal::rateLimit($call->provider, 'Rate limit exceeded.');
         }
+
+        $this->admittedInRequest[$key] = true;
 
         return null;
     }
 
     public function prepareTurnContext(AiCall $call): AiCall
     {
+        if ($this->config->isLegacy()) {
+            return $call;
+        }
+
+        $userId = $call->context->userId ?? 0;
         $turnId = $call->context->turnId;
         if (null === $turnId || '' === $turnId) {
             $optTurnId = $call->options->providerOptions['turn_id'] ?? null;
-            $turnId = \is_string($optTurnId) && '' !== $optTurnId
+            $baseId = \is_string($optTurnId) && '' !== $optTurnId
                 ? $optTurnId
-                : ($call->context->runId ?? $call->context->requestId ?? 'turn-default');
+                : ($call->context->runId ?? $this->activeTurnId ?? sprintf('turn-%d-%s', ++$this->turnSequence, bin2hex(random_bytes(6))));
+            $turnId = self::scopeTurnId($userId, $baseId);
+        } else {
+            $turnId = self::scopeTurnId($userId, $turnId);
         }
         $this->activeTurnId = $turnId;
 
@@ -153,7 +157,7 @@ final class AiPipelineMeter implements ResetInterface
 
     public function onCallAfter(AiCall $call, AiCallResult $result): void
     {
-        if (AiCallOutcome::Ok !== $result->outcome || !$call->context->billable) {
+        if ($this->config->isLegacy() || AiCallOutcome::Ok !== $result->outcome || !$call->context->billable) {
             return;
         }
 
@@ -167,21 +171,25 @@ final class AiPipelineMeter implements ResetInterface
             return;
         }
 
-        $spec = $this->buildCallUsageSpec($call, $result);
+        $spec = $this->specBuilder->build($call, $result);
         if (null === $spec) {
             return;
         }
 
         [$action, $metadata] = $spec;
-        $turnId = $call->context->turnId ?? $this->activeTurnId ?? 'turn-default';
+        $turnId = $call->context->turnId ?? $this->activeTurnId ?? self::scopeTurnId($userId, 'turn-default');
         $callId = \is_string($call->options->providerOptions['call_id'] ?? null)
             ? (string) $call->options->providerOptions['call_id']
             : sprintf('call-%d', ++$this->callSequence);
 
         if (AiAction::Messages->value === $action) {
-            $preview = $this->previewUsage($metadata);
+            $preview = $this->specBuilder->preview($metadata);
             $this->recordTurnContribution($turnId, $callId, $call, $metadata, $preview);
 
+            return;
+        }
+
+        if ($call->options->callerMeters) {
             return;
         }
 
@@ -193,7 +201,7 @@ final class AiPipelineMeter implements ResetInterface
             return;
         }
 
-        $preview = $this->previewUsage($metadata);
+        $preview = $this->specBuilder->preview($metadata);
         $this->recordTurnContribution($turnId, $callId, $call, $metadata, $preview);
 
         if ($this->config->isShadow()) {
@@ -223,11 +231,14 @@ final class AiPipelineMeter implements ResetInterface
             return $this->fulfillJoinedOnMode($rateLimitService, $user, $action, $metadata);
         }
 
+        $rawTurnId = \is_string($metadata['turn_id'] ?? null) && '' !== $metadata['turn_id']
+            ? self::scopeTurnId($userId, (string) $metadata['turn_id'])
+            : $this->activeTurnId;
         unset($metadata['turn_id']);
         $recorded = $rateLimitService->recordUsage($user, $action, $metadata);
 
         if ($this->config->isShadow()) {
-            $this->verifyShadow($userId, $action, $metadata, $recorded);
+            $this->verifyShadow($userId, $action, $metadata, $recorded, $rawTurnId);
         }
 
         return $recorded;
@@ -239,6 +250,7 @@ final class AiPipelineMeter implements ResetInterface
         $this->shadowExpectations = [];
         $this->admittedInRequest = [];
         $this->activeTurnId = null;
+        $this->turnSequence = 0;
         $this->callSequence = 0;
         $this->shadowPerturbation = null;
         $this->turnLedger->reset();
@@ -257,16 +269,20 @@ final class AiPipelineMeter implements ResetInterface
         $key = $userId.':'.$action;
 
         if (!empty($this->recordedByHook[$key])) {
-            /** @var RecordedUsage $alreadyRecorded */
-            $alreadyRecorded = array_shift($this->recordedByHook[$key]);
+            $receipts = $this->recordedByHook[$key];
+            $this->recordedByHook[$key] = [];
+            if (1 === \count($receipts)) {
+                return $receipts[0];
+            }
 
-            return $alreadyRecorded;
+            return self::foldReceipts($receipts);
         }
 
         if (AiAction::Messages->value === $action) {
             $turnId = \is_string($metadata['turn_id'] ?? null) && '' !== $metadata['turn_id']
-                ? (string) $metadata['turn_id']
+                ? self::scopeTurnId($userId, (string) $metadata['turn_id'])
                 : $this->activeTurnId;
+            $this->activeTurnId = null;
             unset($metadata['turn_id']);
 
             if (null !== $turnId && '' !== $turnId) {
@@ -291,12 +307,24 @@ final class AiPipelineMeter implements ResetInterface
     /**
      * @param array<string, mixed> $metadata
      */
-    private function verifyShadow(int $userId, string $action, array $metadata, RecordedUsage $actual): void
-    {
+    private function verifyShadow(
+        int $userId,
+        string $action,
+        array $metadata,
+        RecordedUsage $actual,
+        ?string $turnId = null,
+    ): void {
         $key = $userId.':'.$action;
-        $expected = !empty($this->shadowExpectations[$key])
-            ? array_shift($this->shadowExpectations[$key])
-            : $this->buildShadowExpectationFromMetadata($action, $metadata);
+        if (!empty($this->shadowExpectations[$key])) {
+            $items = $this->shadowExpectations[$key];
+            $this->shadowExpectations[$key] = [];
+            $expected = 1 === \count($items) ? $items[0] : self::foldShadowExpectations($items);
+        } elseif (AiAction::Messages->value === $action && null !== $turnId && '' !== $turnId) {
+            $this->activeTurnId = null;
+            $expected = $this->buildShadowMessagesExpectation($metadata, $turnId);
+        } else {
+            $expected = $this->buildShadowExpectationFromMetadata($action, $metadata);
+        }
 
         if (null !== $this->shadowPerturbation) {
             $expected = ($this->shadowPerturbation)($expected);
@@ -306,27 +334,34 @@ final class AiPipelineMeter implements ResetInterface
         $actualModel = \is_string($metadata['model'] ?? null) ? $metadata['model'] : '';
         $tokenDelta = $expected['total_tokens'] - $actual->totalTokens;
         $costDelta = round((float) $expected['cost'] - (float) $actual->rawCost, 6);
+        $chargedDelta = isset($expected['charged_cost'])
+            ? round((float) $expected['charged_cost'] - (float) $actual->chargedCost, 6)
+            : 0.0;
+        $priceKnownMismatch = isset($expected['price_known']) && $expected['price_known'] !== $actual->priceKnown;
 
         if ($expected['action'] !== $action
             || $expected['provider'] !== $actualProvider
             || $expected['model'] !== $actualModel
             || 0 !== $tokenDelta
             || abs($costDelta) > 0.000001
+            || abs($chargedDelta) > 0.000001
+            || $priceKnownMismatch
         ) {
+            $reportedCostDelta = abs($costDelta) > 0.000001 ? $costDelta : $chargedDelta;
             $this->logger->warning('AI usage hook shadow mismatch', [
                 'event' => 'ai.usage_mismatch',
                 'action' => $action,
                 'provider' => $actualProvider,
                 'model' => $actualModel,
                 'token_delta' => $tokenDelta,
-                'cost_delta' => number_format($costDelta, 6, '.', ''),
+                'cost_delta' => number_format($reportedCostDelta, 6, '.', ''),
             ]);
 
             $this->eventRing?->record([
                 'level' => 'warning',
                 'channel' => 'ai',
                 'event' => 'ai.usage_mismatch',
-                'message' => sprintf('Usage shadow mismatch on %s (token delta %d, cost delta %s)', $action, $tokenDelta, number_format($costDelta, 6, '.', '')),
+                'message' => sprintf('Usage shadow mismatch on %s (token delta %d, cost delta %s)', $action, $tokenDelta, number_format($reportedCostDelta, 6, '.', '')),
                 'user_id' => $userId,
                 'provider' => '' !== $actualProvider ? $actualProvider : null,
                 'model' => '' !== $actualModel ? $actualModel : null,
@@ -352,17 +387,19 @@ final class AiPipelineMeter implements ResetInterface
             'completion_tokens' => $preview->completionTokens,
             'total_tokens' => $preview->totalTokens,
             'cost' => $preview->rawCost,
+            'charged_cost' => $preview->chargedCost,
+            'price_known' => $preview->priceKnown,
         ];
     }
 
     /**
      * @param array<string, mixed> $metadata
      *
-     * @return array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string}
+     * @return array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool}
      */
     private function buildShadowExpectationFromMetadata(string $action, array $metadata): array
     {
-        $preview = $this->previewUsage($metadata);
+        $preview = $this->specBuilder->preview($metadata);
 
         return [
             'action' => $action,
@@ -372,6 +409,69 @@ final class AiPipelineMeter implements ResetInterface
             'completion_tokens' => $preview->completionTokens,
             'total_tokens' => $preview->totalTokens,
             'cost' => $preview->rawCost,
+            'charged_cost' => $preview->chargedCost,
+            'price_known' => $preview->priceKnown,
+        ];
+    }
+
+    /**
+     * Build the shadow expectation for a per-turn `MESSAGES` row from the
+     * {@see TurnUsageLedger}, comparing the ledger's aggregated `facade_charged_cost`
+     * / `facade_price_known` (or token usage) against the caller's metadata.
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool}
+     */
+    private function buildShadowMessagesExpectation(array $metadata, string $turnId): array
+    {
+        $closed = $this->turnLedger->close($turnId);
+        $wouldBeMeta = $metadata;
+        if (null !== $closed && $closed->callCount > 0) {
+            if ($closed->facadeMetered && FacadeMeteredChat::isMetered($wouldBeMeta)) {
+                $wouldBeMeta['facade_charged_cost'] = $closed->chargedCost;
+                $wouldBeMeta['facade_price_known'] = $closed->priceKnown;
+            } elseif (!FacadeMeteredChat::isMetered($wouldBeMeta)) {
+                $wouldBeMeta['usage'] = $closed->toTokenArray();
+            }
+        }
+
+        $preview = $this->specBuilder->preview($wouldBeMeta);
+        if (FacadeMeteredChat::isMetered($wouldBeMeta)) {
+            $actualCost = isset($metadata['facade_charged_cost']) && is_numeric($metadata['facade_charged_cost'])
+                ? number_format((float) $metadata['facade_charged_cost'], 6, '.', '')
+                : '0.000000';
+            $ledgerCost = isset($wouldBeMeta['facade_charged_cost']) && is_numeric($wouldBeMeta['facade_charged_cost'])
+                ? number_format((float) $wouldBeMeta['facade_charged_cost'], 6, '.', '')
+                : '0.000000';
+            $costDiff = round((float) $ledgerCost - (float) $actualCost, 6);
+            $priceKnown = isset($wouldBeMeta['facade_price_known']) && \is_bool($wouldBeMeta['facade_price_known'])
+                ? $wouldBeMeta['facade_price_known']
+                : true;
+
+            return [
+                'action' => AiAction::Messages->value,
+                'provider' => \is_string($metadata['provider'] ?? null) ? $metadata['provider'] : '',
+                'model' => \is_string($metadata['model'] ?? null) ? $metadata['model'] : '',
+                'prompt_tokens' => $preview->promptTokens,
+                'completion_tokens' => $preview->completionTokens,
+                'total_tokens' => $preview->totalTokens,
+                'cost' => number_format($costDiff, 6, '.', ''),
+                'charged_cost' => number_format($costDiff, 6, '.', ''),
+                'price_known' => $priceKnown,
+            ];
+        }
+
+        return [
+            'action' => AiAction::Messages->value,
+            'provider' => \is_string($metadata['provider'] ?? null) ? $metadata['provider'] : '',
+            'model' => \is_string($metadata['model'] ?? null) ? $metadata['model'] : '',
+            'prompt_tokens' => $preview->promptTokens,
+            'completion_tokens' => $preview->completionTokens,
+            'total_tokens' => $preview->totalTokens,
+            'cost' => $preview->rawCost,
+            'charged_cost' => $preview->chargedCost,
+            'price_known' => $preview->priceKnown,
         ];
     }
 
@@ -409,343 +509,6 @@ final class AiPipelineMeter implements ResetInterface
         ]);
     }
 
-    /**
-     * Build the `[action, metadata]` pair for a completed `AiCall` when the
-     * pipeline hook has everything needed to meter it.
-     *
-     * @return array{0: string, 1: array<string, mixed>}|null
-     */
-    private function buildCallUsageSpec(AiCall $call, AiCallResult $result): ?array
-    {
-        if (AiCapability::Passthrough === $call->capability || isset($call->options->providerOptions['_messages_gateway'])) {
-            return $this->buildMessagesGatewayUsageSpec($call, $result->value);
-        }
-
-        if (\in_array($call->capability, [AiCapability::Chat, AiCapability::ChatStream], true)) {
-            return $this->buildChatUsageSpec($call, $result->value);
-        }
-
-        if (\in_array($call->capability, [AiCapability::Embed, AiCapability::EmbedBatch], true)) {
-            return $this->buildEmbeddingUsageSpec($call, $result->value);
-        }
-
-        return $this->buildMediaUsageSpec($call, $result);
-    }
-
-    /**
-     * @return array{0: string, 1: array<string, mixed>}|null
-     */
-    private function buildMessagesGatewayUsageSpec(AiCall $call, mixed $value): ?array
-    {
-        $opts = $call->options->providerOptions;
-        $gw = \is_array($opts['_messages_gateway'] ?? null) ? $opts['_messages_gateway'] : [];
-        $keySource = \is_string($gw['key_source'] ?? null) ? $gw['key_source'] : 'operator';
-        $inputText = \is_string($gw['input_text'] ?? null) ? $gw['input_text'] : '';
-
-        if ($value instanceof \App\AI\Messages\MessagesUsage) {
-            if (!$value->shouldMeter()) {
-                return null;
-            }
-            $usage = $value->toRateLimitUsage();
-            $responseText = '';
-        } elseif (\is_array($value)) {
-            $status = (int) ($value['status'] ?? 200);
-            $body = $value['body'] ?? null;
-            $msgUsage = $value['usage'] ?? null;
-            if ($status >= 400 || !\is_array($body) || !$msgUsage instanceof \App\AI\Messages\MessagesUsage) {
-                return null;
-            }
-            $usage = $msgUsage->toRateLimitUsage();
-            $responseText = \App\AI\Messages\MessagesResponseText::extract($body);
-        } else {
-            return null;
-        }
-
-        $metadata = [
-            'provider' => $call->provider,
-            'model' => (string) $call->model,
-            'model_id' => $call->options->modelId,
-            'usage' => $usage,
-            'response_text' => $responseText,
-            'input_text' => $inputText,
-            'source' => 'MESSAGES_API',
-            'key_source' => $keySource,
-        ];
-        if ('user' === $keySource) {
-            $metadata['zero_cost'] = true;
-        }
-
-        return [AiAction::Messages->value, $metadata];
-    }
-
-    /**
-     * @return array{0: string, 1: array<string, mixed>}|null
-     */
-    private function buildChatUsageSpec(AiCall $call, mixed $value): ?array
-    {
-        $opts = $call->options->providerOptions;
-        $billTo = \is_array($opts['_bill_to'] ?? null) ? $opts['_bill_to'] : [];
-        $explicitAction = \is_string($billTo['action'] ?? null) && '' !== $billTo['action']
-            ? $billTo['action']
-            : null;
-
-        if ($call->options->callerMeters && null === $explicitAction) {
-            return null;
-        }
-
-        $action = $explicitAction ?? AiChatUsageMeter::ACTION;
-        $provider = $call->provider;
-        $model = (string) ($call->model ?? 'unknown');
-        $usage = \is_array($value) && \is_array($value['usage'] ?? null) ? $value['usage'] : [];
-        $modelId = $call->options->modelId
-            ?? (isset($billTo['model_id']) && is_numeric($billTo['model_id']) ? (int) $billTo['model_id'] : null)
-            ?? $this->resolveModelId('chat', $provider, $model);
-
-        $metadata = [
-            'provider' => $provider,
-            'model' => $model,
-            'model_id' => $modelId,
-            'usage' => $usage,
-            'input_text' => self::messagesText($call->payload->messages),
-            'response_text' => \is_array($value) && \is_string($value['content'] ?? null) ? $value['content'] : '',
-        ];
-        if (AiChatUsageMeter::ACTION === $action) {
-            $source = $billTo['source'] ?? null;
-            $metadata['source'] = \is_string($source) && '' !== trim($source) ? trim($source) : 'ai_facade';
-        }
-        foreach (['chat_id', 'agentId', 'agentVersionId'] as $key) {
-            if (isset($billTo[$key])) {
-                $metadata[$key] = $billTo[$key];
-            }
-        }
-
-        return [$action, $metadata];
-    }
-
-    /**
-     * @return array{0: string, 1: array<string, mixed>}|null
-     */
-    private function buildEmbeddingUsageSpec(AiCall $call, mixed $value): ?array
-    {
-        $opts = $call->options->providerOptions;
-        $usageMeta = \is_array($opts['_usage_meta'] ?? null) ? $opts['_usage_meta'] : [];
-        $action = \is_string($usageMeta['usage_action'] ?? null) ? $usageMeta['usage_action'] : null;
-        if (null === $action) {
-            return null;
-        }
-        $modelId = isset($usageMeta['model_id']) && is_numeric($usageMeta['model_id'])
-            ? (int) $usageMeta['model_id']
-            : ($call->options->modelId ?? $this->resolveModelId('embedding', $call->provider, $call->model));
-        $usage = \is_array($value) && \is_array($value['usage'] ?? null)
-            ? $value['usage']
-            : ['prompt_tokens' => 0, 'total_tokens' => 0];
-
-        $metadata = [
-            'usage' => [
-                'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
-                'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
-            ],
-            'provider' => $call->provider,
-            'model' => (string) $call->model,
-            'model_id' => $modelId,
-            'input_bytes' => array_sum(array_map('strlen', $call->payload->texts)),
-            'source' => \is_string($usageMeta['usage_source'] ?? null) ? $usageMeta['usage_source'] : 'VECTORIZATION',
-        ];
-        if (isset($usageMeta['usage_inputs'])) {
-            $metadata['inputs'] = (int) $usageMeta['usage_inputs'];
-        }
-
-        return [$action, $metadata];
-    }
-
-    /**
-     * @return array{0: string, 1: array<string, mixed>}|null
-     */
-    private function buildMediaUsageSpec(AiCall $call, AiCallResult $result): ?array
-    {
-        $opts = $call->options->providerOptions;
-        $value = $result->value;
-
-        if (AiCapability::Image === $call->capability) {
-            if (!\is_array($value) || [] === $value) {
-                return null;
-            }
-            $usageMeta = \is_array($opts['_usage_meta'] ?? null) ? $opts['_usage_meta'] : [];
-            $source = \is_string($usageMeta['usage_source'] ?? null) ? $usageMeta['usage_source'] : null;
-            if (null === $source && (!\is_array($value[0] ?? null) || !isset($value[0]['url']))) {
-                return null;
-            }
-            $modelId = isset($usageMeta['model_id']) && is_numeric($usageMeta['model_id'])
-                ? (int) $usageMeta['model_id']
-                : ($call->options->modelId ?? $this->resolveModelId('image_generation', $call->provider, $call->model));
-
-            $metadata = [
-                'provider' => $call->provider,
-                'model' => (string) $call->model,
-                'model_id' => $modelId,
-                'media_usage' => array_filter([
-                    'images' => (float) \count($value),
-                    'quality' => $opts['quality'] ?? 'standard',
-                    'size' => $opts['size'] ?? '1024x1024',
-                ]),
-            ];
-            if (null !== $source) {
-                $metadata['source'] = $source;
-            }
-
-            return [AiAction::Images->value, $metadata];
-        }
-
-        if (AiCapability::Synthesize === $call->capability) {
-            $modelId = $call->options->modelId ?? $this->resolveModelId('text_to_speech', $call->provider, $call->model);
-            $chars = null !== $result->usage ? $result->usage->characterCount : mb_strlen((string) $call->payload->prompt);
-
-            return [AiAction::Audios->value, [
-                'provider' => $call->provider,
-                'model' => (string) $call->model,
-                'model_id' => $modelId,
-                'media_usage' => ['characters' => $chars],
-            ]];
-        }
-
-        if (AiCapability::Transcribe === $call->capability) {
-            if (!\is_array($value)) {
-                return null;
-            }
-            $modelId = $call->options->modelId ?? $this->resolveModelId('speech_to_text', $call->provider, $call->model);
-            $duration = (float) ($value['duration'] ?? 0) + (float) ($value['first_pass_duration'] ?? 0);
-            if (null === $modelId || $duration <= 0.0) {
-                return null;
-            }
-
-            return [AiAction::Transcription->value, [
-                'provider' => $call->provider,
-                'model' => (string) $call->model,
-                'model_id' => $modelId,
-                'media_usage' => ['duration_seconds' => $duration],
-                'language' => $value['language'] ?? 'unknown',
-            ]];
-        }
-
-        return null;
-    }
-
-    /**
-     * Read-only preview of what {@see RateLimitService::recordUsage()} would
-     * compute for `$metadata`, without writing to `BUSELOG`.
-     *
-     * @param array<string, mixed> $metadata
-     */
-    private function previewUsage(array $metadata): RecordedUsage
-    {
-        $usage = \is_array($metadata['usage'] ?? null) ? $metadata['usage'] : [];
-        $promptTokens = (int) ($usage['prompt_tokens'] ?? 0);
-        $completionTokens = (int) ($usage['completion_tokens'] ?? 0);
-        $cachedTokens = (int) ($usage['cached_tokens'] ?? 0);
-        $cacheCreationTokens = (int) ($usage['cache_creation_tokens'] ?? 0);
-        $cacheCreation1hTokens = max(0, (int) ($usage['cache_creation_1h_tokens'] ?? 0));
-        $totalTokens = (int) ($usage['total_tokens'] ?? ($promptTokens + $completionTokens));
-
-        $inputBytes = !empty($metadata['input_bytes']) ? (int) $metadata['input_bytes'] : 0;
-        if (0 === $inputBytes && !empty($metadata['input_text']) && \is_string($metadata['input_text'])) {
-            $inputBytes = \strlen($metadata['input_text']);
-        }
-        $outputBytes = (!empty($metadata['response_text']) && \is_string($metadata['response_text']) ? \strlen($metadata['response_text']) : 0)
-            + (!empty($metadata['response_bytes']) ? (int) $metadata['response_bytes'] : 0);
-
-        if (0 === $totalTokens && ($inputBytes + $outputBytes) > 0) {
-            $totalTokens = RateLimitService::estimateTokens($inputBytes + $outputBytes);
-        }
-        if ($totalTokens > 0 && 0 === $promptTokens && 0 === $completionTokens) {
-            if ($inputBytes > 0 && $outputBytes > 0) {
-                $ratio = $inputBytes / ($inputBytes + $outputBytes);
-                $promptTokens = (int) ceil($totalTokens * $ratio);
-                $completionTokens = $totalTokens - $promptTokens;
-            } else {
-                $promptTokens = $totalTokens;
-            }
-        }
-
-        $modelId = isset($metadata['model_id']) && is_numeric($metadata['model_id']) ? (int) $metadata['model_id'] : null;
-        $mediaUsage = \is_array($metadata['media_usage'] ?? null) ? $metadata['media_usage'] : [];
-        $pricingMode = $this->costCalculationService->getPricingMode($modelId);
-        $timestamp = time();
-
-        if (!empty($metadata['zero_cost'])) {
-            $rawCost = 0.0;
-            $priceKnown = true;
-        } elseif ('per_token' !== $pricingMode && [] !== $mediaUsage) {
-            $inputQty = match ($pricingMode) {
-                'per_character' => (float) ($mediaUsage['characters'] ?? 0),
-                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
-                'per_request' => (float) ($mediaUsage['requests'] ?? 1),
-                default => 0.0,
-            };
-            $outputQty = match ($pricingMode) {
-                'per_image' => (float) ($mediaUsage['images'] ?? 0),
-                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
-                'per_generation' => (float) ($mediaUsage['clips'] ?? 1),
-                default => 0.0,
-            };
-            $costResult = $this->costCalculationService->calculateMediaCost(
-                $modelId,
-                $inputQty,
-                $outputQty,
-                $timestamp,
-                \is_string($mediaUsage['resolution'] ?? null) ? $mediaUsage['resolution'] : null,
-                \is_string($mediaUsage['quality'] ?? null) ? $mediaUsage['quality'] : null,
-                \is_string($mediaUsage['size'] ?? null) ? $mediaUsage['size'] : null,
-            );
-            $rawCost = (float) $costResult->totalCost;
-            $priceKnown = false !== ($costResult->priceSnapshot['price_known'] ?? true);
-        } else {
-            $costResult = $this->costCalculationService->calculateCost(
-                $promptTokens,
-                $completionTokens,
-                $cachedTokens,
-                $cacheCreationTokens,
-                $modelId,
-                $timestamp,
-                $cacheCreation1hTokens,
-            );
-            $rawCost = (float) $costResult->totalCost;
-            $priceKnown = false !== ($costResult->priceSnapshot['price_known'] ?? true);
-        }
-
-        $chargedCost = $rawCost * (1.0 + ($this->rateLimitService->getMarkupPercent() / 100.0));
-
-        return new RecordedUsage(
-            chargedCost: number_format($chargedCost, 6, '.', ''),
-            rawCost: number_format($rawCost, 6, '.', ''),
-            promptTokens: $promptTokens,
-            completionTokens: $completionTokens,
-            totalTokens: $totalTokens,
-            priceKnown: $priceKnown,
-        );
-    }
-
-    private function resolveModelId(string $capability, string $providerName, ?string $providerModelId): ?int
-    {
-        if (null === $providerModelId || '' === trim($providerModelId)) {
-            return null;
-        }
-
-        if ('chat' === $capability) {
-            return $this->models->findChatIdByProvider($providerName, $providerModelId);
-        }
-
-        $tag = self::CAPABILITY_TAGS[$capability] ?? null;
-        if (null === $tag) {
-            return null;
-        }
-
-        try {
-            return $this->models->findIdByServiceProviderIdAndTag($providerName, $providerModelId, $tag);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
     private static function rateLimitActionForCapability(AiCapability $capability): ?string
     {
         return match ($capability) {
@@ -759,22 +522,80 @@ final class AiPipelineMeter implements ResetInterface
         };
     }
 
-    /**
-     * @param list<mixed> $messages
-     */
-    private static function messagesText(array $messages): string
+    private static function scopeTurnId(int $userId, string $turnId): string
     {
-        $parts = [];
-        foreach ($messages as $message) {
-            if (!\is_array($message)) {
-                continue;
-            }
-            $content = $message['content'] ?? null;
-            if (\is_string($content) && '' !== $content) {
-                $parts[] = $content;
+        $prefix = $userId.':';
+
+        return str_starts_with($turnId, $prefix) ? $turnId : $prefix.$turnId;
+    }
+
+    /**
+     * @param non-empty-list<RecordedUsage> $receipts
+     */
+    private static function foldReceipts(array $receipts): RecordedUsage
+    {
+        $charged = 0.0;
+        $raw = 0.0;
+        $prompt = 0;
+        $completion = 0;
+        $total = 0;
+        $priceKnown = true;
+        foreach ($receipts as $r) {
+            $charged += (float) $r->chargedCost;
+            $raw += (float) $r->rawCost;
+            $prompt += $r->promptTokens;
+            $completion += $r->completionTokens;
+            $total += $r->totalTokens;
+            if (!$r->priceKnown) {
+                $priceKnown = false;
             }
         }
 
-        return implode("\n", $parts);
+        return new RecordedUsage(
+            chargedCost: number_format($charged, 6, '.', ''),
+            rawCost: number_format($raw, 6, '.', ''),
+            promptTokens: $prompt,
+            completionTokens: $completion,
+            totalTokens: $total,
+            priceKnown: $priceKnown,
+        );
+    }
+
+    /**
+     * @param non-empty-list<array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool}> $items
+     *
+     * @return array{action: string, provider: string, model: string, prompt_tokens: int, completion_tokens: int, total_tokens: int, cost: string, charged_cost: string, price_known: bool}
+     */
+    private static function foldShadowExpectations(array $items): array
+    {
+        $last = $items[\count($items) - 1];
+        $prompt = 0;
+        $completion = 0;
+        $total = 0;
+        $cost = 0.0;
+        $charged = 0.0;
+        $priceKnown = true;
+        foreach ($items as $item) {
+            $prompt += $item['prompt_tokens'];
+            $completion += $item['completion_tokens'];
+            $total += $item['total_tokens'];
+            $cost += (float) $item['cost'];
+            $charged += (float) $item['charged_cost'];
+            if (!$item['price_known']) {
+                $priceKnown = false;
+            }
+        }
+
+        return [
+            'action' => $last['action'],
+            'provider' => $last['provider'],
+            'model' => $last['model'],
+            'prompt_tokens' => $prompt,
+            'completion_tokens' => $completion,
+            'total_tokens' => $total,
+            'cost' => number_format($cost, 6, '.', ''),
+            'charged_cost' => number_format($charged, 6, '.', ''),
+            'price_known' => $priceKnown,
+        ];
     }
 }
