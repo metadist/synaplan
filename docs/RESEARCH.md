@@ -1,6 +1,6 @@
 # Research
 
-Research is off until an administrator turns it on. A person can start a run,
+Research is on unless an administrator turns it off. A person can start a run,
 read it, stop it and delete it. The report of a run that belongs to a chat is
 written into that chat by the server, including when the browser is closed.
 
@@ -9,7 +9,7 @@ written into that chat by the server, including when the browser is closed.
 | | |
 | --- | --- |
 | Environment | `RESEARCH_ENABLED=1` forces it on. `RESEARCH_ENABLED=0` forces it off. Empty follows the database. |
-| Database | `BCONFIG` group `RESEARCH`, setting `ENABLED`, owner `0`. New installs seed `0`. |
+| Database | `BCONFIG` group `RESEARCH`, setting `ENABLED`, owner `0`. Installs seed `1`; `Version20261028110000` turned existing installs on once. |
 | Gate | `FEATURE_MODULES_GATE_RESEARCH=true` makes the start routes answer 404 while research is off. |
 
 While research is off, these routes answer 404: capabilities, start, a reply,
@@ -111,8 +111,8 @@ a new or renamed point is searched by its title. Write now ends the search
 and writes the report from what was already found. When the next step has
 waited 20 seconds for a worker, the state carries `queued_since` and the
 events end with a `queued` frame. Both are computed on each request and
-never recorded, so they are as fresh as the client's poll. Research as a whole stays off until
-`RESEARCH.ENABLED` is turned on.
+never recorded, so they are as fresh as the client's poll. Research as a whole is off while
+`RESEARCH.ENABLED` is `0`.
 
 The conformance suite plays ten scenarios twice against one model — start
 with a search, search in parallel, read what was found, react to a refused

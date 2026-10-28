@@ -489,8 +489,9 @@ sits in exactly one section.
 
 ## Research runs
 
-A research run is stored in Redis, not in a table. `ResearchModule` is off
-until `RESEARCH_ENABLED` or `RESEARCH.ENABLED` is on. The start route queues
+A research run is stored in Redis, not in a table. `ResearchModule` is on
+while `RESEARCH.ENABLED` is `1` (the seeded value); `RESEARCH_ENABLED` pins it
+on or off. The start route queues
 one step; `ResearchUnitWorker` runs that step and queues the next. A web
 run's last step writes the report into the chat. See `docs/RESEARCH.md`.
 

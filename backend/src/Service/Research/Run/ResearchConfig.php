@@ -7,11 +7,11 @@ namespace App\Service\Research\Run;
 use App\Repository\ConfigRepository;
 
 /**
- * Research is off until an administrator turns it on.
+ * Research is on unless an administrator turns it off.
  *
  * RESEARCH_ENABLED=1 forces it on and RESEARCH_ENABLED=0 forces it off.
- * An empty variable follows the RESEARCH.ENABLED row, which new installs
- * seed as off.
+ * An empty variable follows the RESEARCH.ENABLED row, which installs seed
+ * as on. A missing row is off.
  */
 final readonly class ResearchConfig
 {

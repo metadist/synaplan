@@ -124,8 +124,10 @@ value; a share a person created does not.
 
 ## Research
 
-Research is **off** on a new install. `RESEARCH.ENABLED` is seeded as `0`
-and is never turned on by an upgrade. `RESEARCH_ENABLED=1` pins it on and
+Research is **on**. `RESEARCH.ENABLED` is seeded as `1` on a new install,
+and migration `Version20261028110000` turned it on for existing installs
+once. An administrator can turn it off again on AI infrastructure → Research;
+a later upgrade does not change that choice. `RESEARCH_ENABLED=1` pins it on and
 `RESEARCH_ENABLED=0` pins it off; an empty variable follows the database row.
 This is a module switch, not one of the flags the September waves turned on.
 See `docs/RESEARCH.md`.

@@ -524,7 +524,7 @@ Pin a Task Prompt and run it on demand or on a schedule. Configured via
 
 ## Research (BCONFIG)
 
-Long research runs. Off until an administrator turns them on. `RESEARCH_ENABLED=1`
+Long research runs. On unless an administrator turns them off. `RESEARCH_ENABLED=1`
 pins the switch on and `RESEARCH_ENABLED=0` pins it off. See `docs/RESEARCH.md`.
 
 | Group / Key | Default | Description |
