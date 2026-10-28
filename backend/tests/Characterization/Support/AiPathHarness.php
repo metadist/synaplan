@@ -262,6 +262,7 @@ final class AiPathHarness
             'model_probe' => $this->modelProbe(...),
         ];
 
+        $this->mismatches = [];
         $out = [];
         foreach ($cases as $name => $runner) {
             $this->resetLogs();
@@ -278,7 +279,6 @@ final class AiPathHarness
         $this->circuitBreaker = [];
         $this->modelHealth = [];
         $this->healthResolutionById = [];
-        $this->mismatches = [];
         LegacyUsageWriter::bind(null);
     }
 

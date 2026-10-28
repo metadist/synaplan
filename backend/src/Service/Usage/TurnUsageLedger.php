@@ -63,7 +63,10 @@ final class TurnUsageLedger implements ResetInterface
         $hashKey = self::KEY_PREFIX.$turnId;
 
         if (null !== $this->redis && $this->redis->isAvailable()) {
-            return $this->redis->hSetNx($hashKey, $callId, $encoded, self::TTL_SECONDS);
+            $stored = $this->redis->hSetNx($hashKey, $callId, $encoded, self::TTL_SECONDS);
+            $this->localHashes[$turnId][$callId] ??= $encoded;
+
+            return $stored;
         }
 
         if (isset($this->localHashes[$turnId][$callId])) {
@@ -100,11 +103,16 @@ final class TurnUsageLedger implements ResetInterface
         $closedKey = self::KEY_PREFIX.$turnId.':closed';
 
         if (null !== $this->redis && $this->redis->isAvailable()) {
-            if (!$this->redis->setIfAbsent($closedKey, '1', self::TTL_SECONDS)) {
+            $claimed = $this->redis->trySetIfAbsent($closedKey, '1', self::TTL_SECONDS);
+            if (false === $claimed) {
                 return null;
             }
+            if (true === $claimed) {
+                $this->localClosed[$turnId] = true;
 
-            return $this->summary($turnId);
+                return $this->summary($turnId);
+            }
+            // $claimed === null: Redis command failed mid-turn; fall through to in-process close.
         }
 
         if ($this->localClosed[$turnId] ?? false) {
