@@ -53,17 +53,6 @@ final readonly class CloudWatchService
         return ['items' => $items, 'paused_count' => $paused];
     }
 
-    /** @return array{tasks: list<array{id: int, name: string}>, languages: list<string>, shortcuts: list<array<string, mixed>>, folders: list<array<string, mixed>>} */
-    public function options(User $user): array
-    {
-        return [
-            'tasks' => $this->tasks->manual((int) $user->getId()),
-            'languages' => ['en', 'de', 'es', 'fr', 'tr'],
-            'shortcuts' => [],
-            'folders' => [],
-        ];
-    }
-
     /**
      * @param array<string, mixed> $body
      *
