@@ -29,7 +29,7 @@ measurement and a rollout are entries here, not chat messages.
 
 Started from `main` at `010d689be` ([#2849](https://github.com/metadist/synaplan/pull/2849)). No runtime code changes. The inventory is the gate for AU15–AU17.
 
-The 2026-10-21 egress map named 9 `curl_init` calls, one `file_get_contents` fallback, and `HttpClient::create()` in `MetaProvider`. The scan also finds two `curl_init` calls in `plugins/synaform` and three `file_get_contents` downloads of an image URL in `OpenAIImageGeneration`. `docs/EGRESS.md` lists every site, including MariaDB, Redis, SMTP, IMAP, Triton gRPC, and the voice sidecar's WebSocket.
+The 2026-10-21 egress map named 9 `curl_init` calls, one `file_get_contents` fallback, and `HttpClient::create()` in `MetaProvider`. The scan of `backend/src` and the committed plugins also finds three `file_get_contents` downloads of an image URL in `OpenAIImageGeneration` and `OpenAI::client()` in `OpenAIApiClient`. Plugins named in `.gitignore` (including Synaform) stay out of the baseline: a clean checkout does not contain them. `docs/EGRESS.md` lists every inventoried site, including MariaDB, Redis, SMTP, IMAP, Triton gRPC, and the voice sidecar's WebSocket.
 
 ## Baselines
 

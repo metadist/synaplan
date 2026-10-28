@@ -8,10 +8,12 @@ policy that will stand in front of these calls is
 its default will be `off`.
 
 The 2026-10-21 map in `STATUS.md` counted 9 `curl_init` calls, one
-`file_get_contents` fallback, and one `HttpClient::create()`. The scan on
-2026-10-28 finds the same backend cURL sites, plus two `curl_init` calls in
-the Synaform plugin and three `file_get_contents` downloads of an image URL
-in OpenAI image generation.
+`file_get_contents` fallback, and one `HttpClient::create()`. The scan of
+`backend/src` and the plugins committed in this repository finds those
+backend cURL sites, three `file_get_contents` downloads of an image URL in
+OpenAI image generation, and `OpenAI::client()` in `OpenAIApiClient`.
+Plugins named in `.gitignore` (Synaform, Synamail, and the other external
+checkouts) are absent from a clean checkout and stay out of this inventory.
 
 ## HTTP stacks that bypass Symfony HttpClient
 
@@ -25,10 +27,9 @@ These sites do not.
 | `curl_init` | `OpenAICurlTransport` | Multipart upload for `gpt-image`. |
 | `curl_init` | `CloudflareProvider` | Embeddings. |
 | `curl_init` ×5 | `SystemConfigService` | Health probes for Ollama, Tika, Docling, Qdrant, and Piper. |
-| `curl_init` ×2 | `plugins/synaform` `SynaformController` | Probes an HTTP endpoint the form is configured to call. |
 | `file_get_contents` ×3 | `OpenAIImageGeneration` | Downloads an image URL (and a mask URL) before an edit or a variation. |
 | `HttpClient::create()` | `MetaProvider` | Its own Symfony client when none is injected. |
-| OpenAI PHP SDK, no injected client | `GroqProvider`, `XaiProvider`, `PerplexityProvider`, `AbstractChatCompletionsCloudProvider`, `OpenAiCompatibleClients` | `OpenAI::factory()->make()` discovers a PSR-18 client. |
+| OpenAI PHP SDK, no injected client | `GroqProvider`, `XaiProvider`, `PerplexityProvider`, `AbstractChatCompletionsCloudProvider`, `OpenAiCompatibleClients`, `OpenAIApiClient` | `OpenAI::factory()->make()` and `OpenAI::client()` discover a PSR-18 client. |
 | Ollama PHP SDK | `OllamaProvider` | `Ollama::client()`, which uses Guzzle. |
 | Stripe PHP SDK | `SubscriptionController` (6), `StripeWebhookController` (2), `StripeCheckoutSessionGateway` (3) | `Stripe::setApiKey()` leaves the SDK on its default cURL client. |
 | Google API client | `GooglePlayVerifier` | `new GoogleClient()` for the Play Developer API. The client uses Guzzle. |
