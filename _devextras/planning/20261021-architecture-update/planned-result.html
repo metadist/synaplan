@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synaplan after the architecture update</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --paper: #fffcf7;
+      --ink: #1c1915;
+      --muted: #5e584f;
+      --line: #ddd6c8;
+      --accent: #1d4e89;
+      --accent-soft: #e7f0f8;
+      --quiet: #f7f4ee;
+      --shared: #f3eee4;
+      --ok: #1f6b45;
+      --ok-soft: #e7f4ec;
+      --warn: #8a5a12;
+      --warn-soft: #fbf3e4;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141311;
+        --paper: #1e1c19;
+        --ink: #f3efe6;
+        --muted: #b7b0a4;
+        --line: #3a362f;
+        --accent: #8eb7e0;
+        --accent-soft: #243140;
+        --quiet: #26231f;
+        --shared: #2a261f;
+        --ok: #8dccab;
+        --ok-soft: #1c3328;
+        --warn: #e2c08a;
+        --warn-soft: #3a2e1c;
+        color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 17px/1.5 "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+    }
+    a { color: var(--accent); }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    header.page h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      line-height: 1.15;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+    .lede { margin: 0; color: var(--muted); max-width: 68ch; }
+    nav.toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin: 22px 0 0;
+      font: 14px/1.3 ui-sans-serif, system-ui, sans-serif;
+    }
+    h2 {
+      margin: 40px 0 12px;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+    }
+    h3 { margin: 22px 0 6px; font-size: 1.05rem; }
+    p { max-width: 72ch; }
+    .note, .callout {
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 18px 0;
+    }
+    .callout strong { display: block; margin-bottom: 4px; }
+    .callout.ok { background: var(--ok-soft); border-color: transparent; }
+    .callout.warn { background: var(--warn-soft); border-color: transparent; }
+    .callout p, .note p { margin: 0; }
+    .flows {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+    .flows button {
+      font: 14px/1.2 ui-sans-serif, system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    .flows button[aria-pressed="true"] {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    @media (prefers-color-scheme: dark) {
+      .flows button[aria-pressed="true"] { color: #141311; }
+    }
+    .map {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+    .row {
+      display: grid;
+      gap: 10px;
+    }
+    .r4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .r2 { grid-template-columns: 1fr 1fr; }
+    .node {
+      border: 1px solid var(--line);
+      background: var(--quiet);
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-height: 64px;
+    }
+    .node h3 {
+      margin: 0 0 2px;
+      font: 600 13px/1.3 ui-sans-serif, system-ui, sans-serif;
+    }
+    .node p {
+      margin: 0;
+      max-width: none;
+      color: var(--muted);
+      font: 12px/1.35 ui-sans-serif, system-ui, sans-serif;
+    }
+    body[data-flow="answer"] .node[data-on~="answer"],
+    body[data-flow="knowledge"] .node[data-on~="knowledge"],
+    body[data-flow="channel"] .node[data-on~="channel"] {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+    .node.wide { grid-column: 1 / -1; }
+    .node.span2 { grid-column: span 2; }
+    .spine { background: var(--shared); }
+    .caption {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+      max-width: none;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 28px;
+      align-items: start;
+    }
+    ol.steps { margin: 0; padding-left: 1.2rem; }
+    ol.steps li { margin: 0 0 10px; }
+    ol.steps li:last-child { margin-bottom: 0; }
+    .steps { display: none; }
+    body[data-flow="answer"] .steps[data-for="answer"],
+    body[data-flow="knowledge"] .steps[data-for="knowledge"],
+    body[data-flow="channel"] .steps[data-for="channel"] { display: block; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font: 14px/1.4 ui-sans-serif, system-ui, sans-serif;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    tr:last-child td { border-bottom: 0; }
+    th { font-weight: 650; background: var(--quiet); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 8px 0 6px;
+    }
+    .stat {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .stat b {
+      display: block;
+      font-size: 1.6rem;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .stat span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font: 13px/1.3 ui-sans-serif, system-ui, sans-serif;
+    }
+    .fine {
+      color: var(--muted);
+      font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+    }
+    footer.page {
+      margin-top: 48px;
+      color: var(--muted);
+      font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+    }
+    @media (max-width: 800px) {
+      .r4, .split, .stats { grid-template-columns: 1fr 1fr; }
+      .node.span2 { grid-column: 1 / -1; }
+      header.page h1 { font-size: 1.6rem; }
+    }
+    @media (max-width: 520px) {
+      .r4, .r2, .split, .stats { grid-template-columns: 1fr; }
+      main { padding: 24px 14px 48px; }
+    }
+  </style>
+</head>
+<body data-flow="answer">
+<main>
+  <header class="page">
+    <h1>Synaplan after the architecture update</h1>
+    <p class="lede">One product, four spines, and a runtime that holds the model’s stream so a PHP worker does not. This is the target once sprints S0 through S6 have landed. Agentic research, which arrived while the plan was in progress, joins this shape. It does not replace it.</p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#picture">Picture</a>
+      <a href="#paths">Paths</a>
+      <a href="#parts">Parts</a>
+      <a href="#highlights">Highlights</a>
+      <a href="#research">Agentic research</a>
+    </nav>
+  </header>
+
+  <div class="callout ok">
+    <strong>Already on main, as of 28 October 2026</strong>
+    <p>Two PHP pools, an immediate busy reply, the database connection released while a chat stream waits, a capacity watchdog, and the Capacity page. AU9 and AU10 are merged: every AI call path is characterized, and <code>AiFacade::chat()</code> already builds an <code>AiCall</code> and runs <code>AiCallPipeline</code>. The provider catalog, central egress, the tool invoker, the stream pump, and the relay are still ahead. With the relay off, streams still run inside the PHP pool.</p>
+  </div>
+
+  <h2 id="picture">The picture</h2>
+  <p>Pick a path. The accent marks the boxes that path uses. The pipeline, the egress client, and the provider catalog stay lit on every path, because every model call uses them.</p>
+  <div class="flows" role="group" aria-label="Which path to follow">
+    <button type="button" data-flow="answer" aria-pressed="true">A streamed answer</button>
+    <button type="button" data-flow="knowledge" aria-pressed="false">A file becomes knowledge</button>
+    <button type="button" data-flow="channel" aria-pressed="false">Mail and WhatsApp</button>
+  </div>
+  <div class="map" aria-label="Target architecture">
+    <div class="row r4">
+      <article class="node" data-on="answer"><h3>Web app</h3><p>Chat, files, admin</p></article>
+      <article class="node" data-on="answer"><h3>Widget</h3><p>Embedded on a site</p></article>
+      <article class="node" data-on="answer"><h3>Apps and SDKs</h3><p>Same events, two public APIs</p></article>
+      <article class="node" data-on="channel"><h3>Mail, WhatsApp, Telegram</h3><p>A webhook in, a finished reply back out</p></article>
+    </div>
+    <article class="node wide"><h3>Caddy</h3><p>Long routes go to the watchdog. Every other request goes to the API pool. Live updates go to Centrifugo.</p></article>
+    <div class="row r2">
+      <article class="node" data-on="answer"><h3>Watchdog · one Go process per server</h3><p>Free slot, or busy. Holds the client. Copies frames. Probes and metrics.</p></article>
+      <article class="node" data-on="knowledge channel"><h3>API pool · short PHP work</h3><p>Files, admin, config, webhooks. Stays fast while answers are streaming.</p></article>
+    </div>
+    <div class="row r4">
+      <article class="node" data-on="answer knowledge"><h3>Prepare the turn</h3><p>Auth, classify, history, prompt. The job carries no key.</p></article>
+      <article class="node" data-on="answer"><h3>Redis run stream</h3><p>The pump writes frames. The watchdog tails them.</p></article>
+      <article class="node" data-on="knowledge"><h3>Files and knowledge</h3><p>Tika, Whisper, then an embedding through the pipeline.</p></article>
+      <article class="node"><h3>Beside the request</h3><p>Centrifugo for takeover. Voice holds its own audio socket.</p></article>
+    </div>
+    <div class="row r4">
+      <article class="node" data-on="answer"><h3>Stream pump</h3><p>A few PHP processes hold the provider sockets and decode.</p></article>
+      <article class="node" data-on="answer"><h3>Messenger workers</h3><p>Tool step, save the reply, memory, media. A research round runs here too.</p></article>
+      <article class="node span2" data-on="knowledge"><h3>Retrieved into the next prompt</h3><p>Search hits MariaDB VECTOR and Qdrant. Prompt assembly stays as it is.</p></article>
+    </div>
+    <div class="row r4">
+      <article class="node spine" data-on="answer knowledge channel"><h3>AI pipeline</h3><p>Limit, circuit, health, usage, metrics</p></article>
+      <article class="node spine" data-on="answer channel"><h3>Tool invoker</h3><p>Registry, gate, clamp, audit</p></article>
+      <article class="node spine" data-on="answer knowledge channel"><h3>Egress client</h3><p>Proxy, allowlist, every redirect</p></article>
+      <article class="node spine" data-on="answer knowledge channel"><h3>Provider catalog</h3><p>One descriptor() per provider</p></article>
+    </div>
+    <div class="row r2">
+      <article class="node" data-on="answer knowledge channel"><h3>Providers and integrations</h3><p>Model APIs, search, MCP, Stripe, mail. An optional CONNECT gateway covers the sidecars.</p></article>
+      <article class="node" data-on="answer knowledge"><h3>State</h3><p>MariaDB · Redis · Qdrant · files on disk</p></article>
+    </div>
+  </div>
+  <p class="caption">Operate sits beside this picture: the Capacity page, the request timeline, the audit log, Prometheus on the watchdog, and Kubernetes probes that scale on held streams. With the watchdog or the pump off, streams run in the PHP pool again. Source: <code>00_master_plan.md</code> and <code>03_contracts.md</code>, read against <code>main</code> on 28 October 2026.</p>
+
+  <div class="split" id="paths">
+    <section>
+      <h2>How this path moves</h2>
+      <ol class="steps" data-for="answer">
+        <li>The person sends a message from the web app, the widget, the desktop or mobile app, or an SDK.</li>
+        <li>Caddy hands that long route to the watchdog. If every stream slot is taken, the reply is “busy — your message was not sent,” and the client retries.</li>
+        <li>The watchdog asks PHP to prepare the turn: who is asking, which model, history, retrieved files and memories, and the prompt. PHP enqueues a job that names the run and carries no provider key, then steps aside.</li>
+        <li>The watchdog keeps the browser connection and reads frames from the run’s Redis stream. A keep-alive goes out during silence. The stream always ends on a terminal frame.</li>
+        <li>A pump process opens the provider socket through the one pipeline and the one HTTP client. Each chunk is decoded into the same server-sent events the apps already understand.</li>
+        <li>A tool call leaves the pump. A worker runs the invoker: look up the tool, apply the approval gate, execute, clamp the result, audit a write, record usage, then queue the next model round.</li>
+        <li>When the model finishes, a worker stores the reply, closes the single usage row for the turn, and queues memory extraction.</li>
+        <li>If the page drops, it re-attaches with a signed cursor and continues from the last frame. A web restart drops the connection. The answer keeps going.</li>
+      </ol>
+      <ol class="steps" data-for="knowledge">
+        <li>The upload arrives on the API pool. It never takes a stream slot.</li>
+        <li>Tika extracts a document, Whisper a recording. An embedding call goes through the same pipeline as chat, labelled as vectorize, so it is metered and visible.</li>
+        <li>The vectors live in MariaDB, and in Qdrant when that store is on. The file itself stays on disk, with its row in MariaDB.</li>
+        <li>A later chat prepares its turn by searching those vectors. The passages go into the prompt. This plan does not change how the prompt is assembled.</li>
+        <li>From there the answer follows the streamed path: watchdog, pump, pipeline, and the same server-sent events.</li>
+      </ol>
+      <ol class="steps" data-for="channel">
+        <li>Mail, WhatsApp, and Telegram still arrive as webhooks on the API pool. Intake, deduplication, and the stored message stay as they are.</li>
+        <li>The turn is buffered. PHP waits for the whole answer, then sends the mail or the WhatsApp message. These routes are not held by the watchdog.</li>
+        <li>The model call is still one <code>AiCall</code>. The same hooks, the same meter, and the same outbound client apply.</li>
+        <li>A tool inside that turn uses the same invoker as a chat tool, including the approval gate and the audit row for a write.</li>
+      </ol>
+    </section>
+    <section id="parts">
+      <h2>Logical parts</h2>
+      <p>Eight parts. The plan rebuilds the spines and the stream runtime. The doors, the turn, the stores, and the sidecars stay.</p>
+      <table>
+        <thead><tr><th>Part</th><th>Owns</th></tr></thead>
+        <tbody>
+          <tr><td>Doors</td><td>Web app, widget, desktop and mobile, SDKs, mail, WhatsApp, Telegram</td></tr>
+          <tr><td>Edge</td><td>Caddy, the API pool, the streams pool, the watchdog</td></tr>
+          <tr><td>Turn</td><td>Classify, history, retrieval, prompt, then the reply</td></tr>
+          <tr><td>Spines</td><td>AI pipeline, provider catalog, egress, tool invoker</td></tr>
+          <tr><td>Stream runtime</td><td>Pump, Redis run stream, workers, scheduler reaper</td></tr>
+          <tr><td>State</td><td>MariaDB, Redis, Qdrant, files on disk</td></tr>
+          <tr><td>Beside the request</td><td>Centrifugo, live voice, compute, Tika, Whisper</td></tr>
+          <tr><td>Operate</td><td>Capacity, request timeline, audit log, Kubernetes probes</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <h2 id="highlights">Highlights</h2>
+  <div class="stats">
+    <div class="stat"><b>1</b><span>Path to a provider</span></div>
+    <div class="stat"><b>1</b><span>Tool invoker</span></div>
+    <div class="stat"><b>1</b><span>Outbound HTTP client</span></div>
+    <div class="stat"><b>≥500</b><span>Streams held per server</span></div>
+  </div>
+  <p class="fine">Plan targets, not production counts. The stream figure is the acceptance budget: 500 streams of 10 seconds with none failed. The spike held 1,000 provider streams in one PHP process at about 134 MB, and 2,000 client connections in the Go relay.</p>
+
+  <h3>One door for every model call</h3>
+  <p>Chat, the widget, both public APIs, the sorter, embeddings, memory, rerank, probes, and live-voice usage enter through <code>AiFacade</code> and leave through <code>AiCallPipeline</code>. Ordered hooks apply the rate limit and the circuit breaker before the call, then record health, usage, and metrics after it. The pipeline’s own overhead stays under 1&nbsp;ms at the 95th percentile. Each billable turn has exactly one usage row.</p>
+
+  <h3>A provider is one class</h3>
+  <p><code>descriptor()</code> states capabilities, endpoints, keys, dialects, and the icon. The catalog is what keys, the allowlist, pricing, and the admin screen ask. The browser reads names and icons from <code>GET /api/v1/ai/providers</code>. An OpenAI-compatible provider is that class plus its model rows.</p>
+
+  <h3>One way out, and one tool gate</h3>
+  <p><code>EgressHttpClient</code> is the HTTP stack: the enterprise proxy, an allowlist built from enabled providers and configured integrations, and a check on every redirect. A URL a person typed stays pinned to the address that was checked. MariaDB, Redis, mail, and Triton gRPC are listed rather than forced through that client. An optional CONNECT gateway covers PHP, voice, the transcriber, and compute. Every tool loop calls <code>ToolInvoker</code>. The approval gate always runs. A write lands in the audit log. A read becomes a metric. Edits to the person’s own files stay automatic.</p>
+
+  <h3>PHP stops waiting on the model</h3>
+  <p>The watchdog holds the client. A few pump processes hold the provider sockets. Workers run tools and save the reply. A full server answers at once, and the API pool stays fast while streams are saturated. Kubernetes probes follow that capacity, and autoscaling watches held streams. Turning the watchdog or the pump off puts streams back in the PHP pool.</p>
+
+  <h3>The wire, the prompt, and the live channel stay</h3>
+  <p>Server-sent event names and payloads do not change, so the web app, the widget, desktop, and the mobile apps keep their readers. Prompt assembly, Centrifugo, Messenger, and the scheduler stay. Mail and WhatsApp keep their adapters. Only their model calls join the pipeline. Plugins beyond a one-file provider wait for a later track.</p>
+
+  <h2 id="research">Agentic research still fits</h2>
+  <p>From 24 October through 28 October 2026 the research engine landed on <code>main</code>: a lead model that calls <code>search</code>, <code>read_sources</code>, <code>reread</code>, <code>ask_user</code>, and <code>finish</code>, running as Messenger units. Research mode is in the web chat, on AI infrastructure, and as a Saved Task step. The switch stays off. Notion page edits landed in the same window, inside the existing <code>McpActionRunner</code>, which the tool sprint already lists.</p>
+
+  <h3>The spines still hold</h3>
+  <p>The lead, the reader, the writer, and the fact-checker all call <code>AiFacade::chat()</code>. That method now runs <code>AiCallPipeline</code>. Research did not add a second way to a provider. The cost figure it keeps is the run’s own budget. It does not write a second usage row.</p>
+  <p>Starting a run queues a unit and returns. The watchdog, the two PHP pools, and the later stream pump remain about the browser’s open answer. A research round holds a Messenger worker for the time the run has left, plus four minutes. That is the same role the plan already gives tool steps, saving the reply, and memory extraction. Redis keys are <code>research:*</code>, separate from the capacity snapshots and from the future <code>chatrun:</code> stream.</p>
+  <p>Page fetches already use the guard the egress sprint relies on. <code>UrlContentService</code> checks the address with <code>SsrfGuard</code> before it connects. Provider endpoints and these model-chosen page addresses stay different kinds of destination.</p>
+
+  <div class="callout warn">
+    <strong>Two inventories to update before those sprints</strong>
+    <p>The tool sprint still names three loops: document chat, the Messages gateway, and the OpenAI gateway. There is now a fourth, <code>LeadStage</code> together with <code>LeadToolbox</code>. It applies the run’s own budget and does not call <code>ToolExecutionGate</code>. AU23 characterizes it with the others. AU24 can send those calls through the invoker as automatic reads. AU26 keeps unifying the three chat and gateway loops. The research loop pauses for a person’s answer and checkpoints between units, so folding it into that chat loop would drop the part that lets the run survive a closed tab.</p>
+  </div>
+  <p>When the egress allowlist is enforced, a research page fetch stays on the pinned-address path. An allowlist made only of provider hosts would refuse every source the lead opens, the moment an administrator turns research on.</p>
+  <p>One label is missing on the pipeline. A research <code>chat()</code> call does not name a channel, so today it is recorded as <code>chat_web</code>. A <code>research</code> source, added before the usage hook becomes the only writer, keeps those calls out of the chat quota and visible on the capacity page as their own kind of work.</p>
+
+  <footer class="page">
+    Written 28 October 2026 for <code>_devextras/planning/20261021-architecture-update/</code>. It describes the target of that plan. It is not a second plan, and it does not change a step’s title or a contract.
+  </footer>
+</main>
+<script>
+  const buttons = document.querySelectorAll(".flows button");
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      document.body.dataset.flow = button.dataset.flow;
+      buttons.forEach((other) => {
+        other.setAttribute("aria-pressed", other === button ? "true" : "false");
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -39,6 +39,7 @@ approved in the 2026-10-21 pre-flight session (Agree column of §0).
 | [`STATUS.md`](./STATUS.md) | Step log, measurements, review log |
 | [`HANDOVER.md`](./HANDOVER.md) | 2026-10-22 handover, updated 2026-10-24: AU3, AU4 and AU5 merged, AU6 in progress, second opinion on S5 |
 | [`spike/`](./spike/README.md) | The 2026-10-21 runtime spike: scripts that produced every number in `02` |
+| [`planned-result.html`](./planned-result.html) | The target picture once S0–S6 have landed: the parts, the three flows, the highlights, and how agentic research joins |
 
 ---
 
