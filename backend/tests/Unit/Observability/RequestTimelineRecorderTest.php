@@ -276,6 +276,86 @@ final class RequestTimelineRecorderTest extends \PHPUnit\Framework\TestCase
         self::assertSame(RequestTimelineStore::TTL_SECONDS, $state->lastTtlSeconds);
     }
 
+    public function testUsageRowStampsCostOntoTheCallTheHookRecordedAtZero(): void
+    {
+        $context = new RequestTimelineContext();
+        $hook = new AiCallMetricsHook($context);
+        $idle = new AiCall(
+            capability: AiCapability::Chat,
+            provider: 'openai',
+            model: 'gpt-4o',
+            context: new AiCallContext(userId: 7, source: AiCallSource::ChatWeb),
+            payload: AiCallPayload::chat([['role' => 'user', 'content' => 'Hello']]),
+            options: new AiCallOptions(),
+        );
+        $priced = new AiCallResult(
+            value: ['content' => 'Hi'],
+            outcome: AiCallOutcome::Ok,
+            usage: new AiUsage(promptTokens: 10, completionTokens: 4, totalTokens: 14),
+            timings: new AiCallTimings(hooksBeforeMs: 0.01, providerMs: 20.0, hooksAfterMs: 0.01),
+        );
+
+        $hook->after($idle, $priced);
+        self::assertSame([], $context->aiCalls(), 'A call outside a request is not kept on the timeline.');
+
+        $context->start('req-cost', 'chat_stream', 7, 1730100000, 1_000_000_000);
+        $hook->after($idle, $priced);
+        self::assertSame('0.000000', $context->aiCalls()[0]['cost']);
+
+        $context->stampChargedCost('openai', 'gpt-4o', '0.001250');
+        self::assertSame('0.001250', $context->aiCalls()[0]['cost']);
+
+        $context->stampChargedCost('openai', 'gpt-4o', '9.000000');
+        self::assertSame('0.001250', $context->aiCalls()[0]['cost']);
+    }
+
+    public function testASharedReceiptSplitsAcrossCallsAndAPreviewIsReplacedOnThatCallOnly(): void
+    {
+        $context = new RequestTimelineContext();
+        $context->start('req-split', 'files', 7, 1730100000, 1_000_000_000);
+        $context->recordAiCall('openai', 'gpt-4o', 'chat', 'chat_web', null, 10, 10, 0, '0.000100', 'failed', 0.01);
+        $context->stampChargedCost('openai', 'gpt-4o', '0.000100');
+
+        $context->recordAiCall('openai', 'text-embedding-3-small', 'embed', 'vectorize', null, 5, 100, 0, '0.000000', 'ok', 0.01);
+        $context->recordAiCall('openai', 'text-embedding-3-small', 'embed', 'vectorize', null, 8, 300, 0, '0.000050', 'ok', 0.01);
+        $context->stampChargedCost('openai', 'text-embedding-3-small', '0.000400');
+
+        self::assertSame('0.000100', $context->aiCalls()[0]['cost']);
+        self::assertSame('0.000100', $context->aiCalls()[1]['cost']);
+        self::assertSame('0.000300', $context->aiCalls()[2]['cost']);
+    }
+
+    public function testAUsageReceiptWithoutAChargedCostDoesNotAbortTheCall(): void
+    {
+        $context = new RequestTimelineContext();
+        $context->start('req-mock', 'other', 7, 1730100000, 1_000_000_000);
+        $context->recordAiCall('openai', 'gpt-4o', 'chat', 'email', null, 10, 4, 2, '0.000000', 'ok', 0.01);
+
+        $limits = $this->createStub(\App\Service\RateLimitService::class);
+        $limits->method('recordUsage')->willReturn($this->createStub(\App\Service\Usage\RecordedUsage::class));
+        $user = $this->createStub(\App\Entity\User::class);
+        $user->method('getId')->willReturn(7);
+        $meter = new \App\Service\Usage\AiPipelineMeter(
+            $limits,
+            $this->createStub(\App\Service\Usage\CostCalculationService::class),
+            $this->createStub(\App\Repository\UserRepository::class),
+            $this->createStub(\App\Repository\ModelRepository::class),
+            new \App\AI\Pipeline\UsageHookConfig(),
+            new \App\Service\Usage\TurnUsageLedger(),
+            null,
+            new \Psr\Log\NullLogger(),
+            $context,
+        );
+
+        $recorded = $meter->recordFromLegacyWriter($limits, $user, 'EMAIL_ROUTING', [
+            'provider' => 'openai',
+            'model' => 'gpt-4o',
+        ]);
+
+        self::assertInstanceOf(\App\Service\Usage\RecordedUsage::class, $recorded);
+        self::assertSame('0.000000', $context->aiCalls()[0]['cost']);
+    }
+
     private function wireJsonSerializer(AdminCapacityController $controller): void
     {
         $container = new \Symfony\Component\DependencyInjection\Container();
