@@ -59,7 +59,7 @@ is the `answer_now` input above; **Stop** keeps what was written.
 
 | | |
 | --- | --- |
-| Switch | `BCONFIG` group `RESEARCH`, setting `AUTO_ENABLED`, owner `0`. Installs seed `1` (the seeder adds the missing row on existing installs too). Off, or research off (`RESEARCH_ENABLED=0` included), means the chat answers every question directly and Look deeper is absent. The admin research tab has the switch. |
+| Switch | `BCONFIG` group `RESEARCH`, setting `AUTO_ENABLED`, owner `0`. Installs seed `1` (the seeder adds the missing row on existing installs too). Off, or research off (`RESEARCH_ENABLED=0` included), means the chat answers every question directly and Look deeper is absent. The admin research tab (AI infrastructure → Research) has the switch as a second row under Research: it is disabled with "Turn on Research first." while research is off, says what off means ("the chat answers every question directly; Look deeper disappears; runs already going finish"), notes when web search is off (folders only), and is audited as `research.settings.update` with the old and new value. `PUT /api/v1/admin/research` takes `autoEnabled`; while research is off it answers 409 `research_off`. |
 | Capabilities | `automatic` (boolean) and `auto_limits { minutes, cost_cap }` from the standard budget. |
 | Eval | `app:research:router-eval --user=<id>` rates the labelled corpus in `backend/tests/Eval/research/router.json` with that account's sorting model. Gate: agreement ≥ 90 %, over-escalation ≤ 5 %, under-escalation ≤ 10 %, no vote ≤ 2 %. |
 

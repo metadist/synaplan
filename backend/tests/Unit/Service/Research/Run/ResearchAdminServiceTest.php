@@ -21,6 +21,7 @@ use App\Service\Research\Run\ResearchRunService;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Research\Run\ResearchStoreUnavailable;
+use App\Service\Research\Run\Stage\ResearchSearch;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 
@@ -48,7 +49,7 @@ final class ResearchAdminServiceTest extends TestCase
             'research.settings.update',
             'research',
             'workspace',
-            ['changed' => ['enabled'], 'enabledBefore' => false, 'enabled' => true],
+            ['changed' => ['enabled'], 'enabledBefore' => false, 'enabled' => true, 'autoEnabledBefore' => false, 'autoEnabled' => false],
             '127.0.0.1',
         );
         $service = $this->service($repo, new ResearchConfig($repo, ''), $audit);
@@ -59,6 +60,69 @@ final class ResearchAdminServiceTest extends TestCase
         self::assertFalse($described['envLocked']);
         self::assertSame('1', $this->values['RESEARCH.ENABLED']);
         self::assertSame(2, $described['budgets']['quick']['searches']);
+    }
+
+    public function testAutomaticResearchRoundTripsAndIsAuditedWithBothValues(): void
+    {
+        $repo = $this->memoryRepo();
+        $this->values['RESEARCH.ENABLED'] = '1';
+        $this->values['RESEARCH.AUTO_ENABLED'] = '1';
+        $audit = $this->createMock(AuditLogWriter::class);
+        $audit->expects($this->once())->method('record')->with(
+            4,
+            'research.settings.update',
+            'research',
+            'workspace',
+            ['changed' => ['autoEnabled'], 'enabledBefore' => true, 'enabled' => true, 'autoEnabledBefore' => true, 'autoEnabled' => false],
+            '127.0.0.1',
+        );
+        $service = $this->service($repo, new ResearchConfig($repo, ''), $audit);
+
+        self::assertTrue($service->describe($this->admin())['autoEnabled']);
+        $described = $service->update($this->admin(), ['autoEnabled' => false], '127.0.0.1');
+
+        self::assertFalse($described['autoEnabled']);
+        self::assertSame('0', $this->values['RESEARCH.AUTO_ENABLED']);
+    }
+
+    public function testAutomaticResearchIsRefusedWhileResearchIsOff(): void
+    {
+        $repo = $this->memoryRepo();
+        $service = $this->service($repo, new ResearchConfig($repo, ''));
+
+        try {
+            $service->update($this->admin(), ['autoEnabled' => true], '127.0.0.1');
+            self::fail('The second switch needs the first.');
+        } catch (ResearchRejected $rejected) {
+            self::assertSame(409, $rejected->status);
+            self::assertSame('research_off', $rejected->errorCode);
+            self::assertSame('autoEnabled', $rejected->field);
+        }
+        self::assertSame([], $this->values);
+    }
+
+    public function testTurningResearchOffKeepsTheAutomaticSwitchAsStored(): void
+    {
+        $repo = $this->memoryRepo();
+        $this->values['RESEARCH.ENABLED'] = '1';
+        $this->values['RESEARCH.AUTO_ENABLED'] = '1';
+        $service = $this->service($repo, new ResearchConfig($repo, ''));
+
+        $described = $service->update($this->admin(), ['enabled' => false], '127.0.0.1');
+
+        self::assertFalse($described['enabled']);
+        self::assertTrue($described['autoEnabled'], 'the tab shows the stored switch so it comes back as it was');
+        self::assertSame('1', $this->values['RESEARCH.AUTO_ENABLED']);
+    }
+
+    public function testTheTabSaysWhenWebSearchIsOff(): void
+    {
+        $repo = $this->memoryRepo();
+        $search = $this->createStub(ResearchSearch::class);
+        $search->method('available')->willReturn(false);
+        $service = $this->service($repo, new ResearchConfig($repo, ''), null, null, null, null, $search);
+
+        self::assertFalse($service->describe($this->admin())['webSearchAvailable']);
     }
 
     public function testASaveThatChangesNothingIsNotAudited(): void
@@ -172,6 +236,7 @@ final class ResearchAdminServiceTest extends TestCase
         ?ResearchRunService $runService = null,
         ?array $runs = null,
         ?ResearchStateStore $store = null,
+        ?ResearchSearch $search = null,
     ): ResearchAdminService {
         $models = $this->createStub(ModelListingService::class);
         $models->method('forUser')->willReturn(['models' => ['CHAT' => [
@@ -181,6 +246,10 @@ final class ResearchAdminServiceTest extends TestCase
         if (null === $store) {
             $store = $this->createStub(ResearchStateStore::class);
             $store->method('runsFor')->willReturn($runs ?? []);
+        }
+        if (null === $search) {
+            $search = $this->createStub(ResearchSearch::class);
+            $search->method('available')->willReturn(true);
         }
 
         return new ResearchAdminService(
@@ -192,6 +261,7 @@ final class ResearchAdminServiceTest extends TestCase
             $store,
             $audit ?? $this->createStub(AuditLogWriter::class),
             new MockClock('2026-10-27 10:00:00'),
+            $search,
         );
     }
 

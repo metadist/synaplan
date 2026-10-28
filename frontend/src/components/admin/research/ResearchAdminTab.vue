@@ -46,6 +46,13 @@
         </p>
       </section>
 
+      <ResearchAutoSwitch
+        :research-on="form.enabled"
+        :auto-enabled="form.autoEnabled"
+        :web-search-available="form.webSearchAvailable"
+        @saved="adoptSwitch"
+      />
+
       <section class="surface-card rounded-lg p-4 mb-6">
         <h2 class="text-lg font-semibold txt-primary">{{ t('adminSetup.research.teamTitle') }}</h2>
         <p class="text-sm txt-secondary mt-1">{{ t('adminSetup.research.planningNote') }}</p>
@@ -154,6 +161,7 @@ import {
   type ResearchAdmin,
 } from '@/services/api/researchAdminApi'
 import ResearchSampleCard from './ResearchSampleCard.vue'
+import ResearchAutoSwitch from './ResearchAutoSwitch.vue'
 import { REFUSAL_KEYS, researchRefusal } from './researchAdminErrors'
 
 type ModelField = 'readingModelId' | 'checkingModelId'
@@ -270,17 +278,22 @@ async function load(): Promise<void> {
   }
 }
 
+/** A switch changed on the server: take its view, keep the unsaved edits of the form. */
+function adoptSwitch(next: ResearchAdmin): void {
+  if (!form.value) return
+  const keepEdits = dirty.value ? { budgets: form.value.budgets, limits: form.value.limits } : {}
+  const picked = { ...models.value }
+  apply(next)
+  Object.assign(form.value, keepEdits)
+  models.value = picked
+}
+
 async function setEnabled(enabled: boolean): Promise<void> {
   if (!form.value || !stored.value) return
   switching.value = true
   errorPlace.value = ''
   try {
-    const next = await saveResearchAdmin({ enabled })
-    const keepEdits = dirty.value ? { budgets: form.value.budgets, limits: form.value.limits } : {}
-    const picked = { ...models.value }
-    apply(next)
-    Object.assign(form.value, keepEdits)
-    models.value = picked
+    adoptSwitch(await saveResearchAdmin({ enabled }))
   } catch (error) {
     errorPlace.value = 'switch'
     errorText.value = refusalText(error, 'adminSetup.research.errors.switchFailed')

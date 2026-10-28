@@ -130,6 +130,10 @@ once. An administrator can turn it off again on AI infrastructure → Research;
 a later upgrade does not change that choice. `RESEARCH_ENABLED=1` pins it on and
 `RESEARCH_ENABLED=0` pins it off; an empty variable follows the database row.
 This is a module switch, not one of the flags the September waves turned on.
+The **Automatic research** switch under it (`RESEARCH.AUTO_ENABLED`, same tab)
+is a different thing: it decides whether the chat starts a research on its own,
+not whether research exists. It has no environment pin and needs Research on.
+
 See `docs/RESEARCH.md`.
 
 ## For developers

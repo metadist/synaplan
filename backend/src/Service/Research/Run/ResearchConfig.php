@@ -67,9 +67,16 @@ final readonly class ResearchConfig
      */
     public function autoEnabled(): bool
     {
-        if (!$this->isEnabled()) {
-            return false;
-        }
+        return $this->isEnabled() && $this->autoSwitch();
+    }
+
+    /**
+     * The automatic-research switch as stored, whatever the research switch
+     * says. The admin tab shows this one, so turning research off and on
+     * again brings the setting back as it was.
+     */
+    public function autoSwitch(): bool
+    {
         $stored = $this->configRepository->getValue(0, self::GROUP, self::AUTO_ENABLED);
 
         return is_string($stored) && $this->isOn($stored);

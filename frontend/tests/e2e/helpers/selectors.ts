@@ -260,6 +260,12 @@ export const selectors = {
     find: '[data-testid="text-research-find"]',
     lookDeeper: '[data-testid="btn-look-deeper"]',
     lookDeeperSection: '[data-testid="section-look-deeper"]',
+    /** Admin tab: the automatic-research switch under the research switch */
+    adminAuto: '[data-testid="research-admin-auto"]',
+    adminAutoTurnOff: '[data-testid="research-admin-auto-turn-off"]',
+    adminAutoTurnOn: '[data-testid="research-admin-auto-turn-on"]',
+    adminAutoConsequence: '[data-testid="research-admin-auto-consequence"]',
+    adminAutoNeedsResearch: '[data-testid="research-admin-auto-needs-research"]',
   },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */

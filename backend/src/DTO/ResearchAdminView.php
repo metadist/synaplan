@@ -9,10 +9,12 @@ use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'ResearchAdminView',
-    required: ['enabled', 'envLocked', 'readingModelId', 'checkingModelId', 'models', 'limits', 'budgets', 'sample'],
+    required: ['enabled', 'envLocked', 'autoEnabled', 'webSearchAvailable', 'readingModelId', 'checkingModelId', 'models', 'limits', 'budgets', 'sample'],
     properties: [
         new OA\Property(property: 'enabled', type: 'boolean'),
         new OA\Property(property: 'envLocked', type: 'boolean'),
+        new OA\Property(property: 'autoEnabled', description: 'Whether the chat starts a research on its own; shown as stored, even while research is off', type: 'boolean'),
+        new OA\Property(property: 'webSearchAvailable', description: 'False when web search is off for the install, so automatic research reads folders only', type: 'boolean'),
         new OA\Property(property: 'readingModelId', type: 'integer', nullable: true),
         new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true),
         new OA\Property(property: 'models', type: 'array', items: new OA\Items(type: 'object', required: ['id', 'name', 'available', 'reason'], properties: [
