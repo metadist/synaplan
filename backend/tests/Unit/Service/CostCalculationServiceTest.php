@@ -280,6 +280,29 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.010000', $result->totalCost);
     }
 
+    public function testGemini4ArgonIntroPriceBillsCacheAndOutput(): void
+    {
+        $model = $this->createModelMock('Google', 2.0, 10.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 0.10,
+        ], 'gemini-4-argon');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 1_000_000 prompt, 200_000 cached, 100_000 output (answer + thinking).
+        // Regular input: 800_000 * $2 / 1M = 1.60
+        // Cached input:  200_000 * $0.10 / 1M = 0.02
+        // Output:        100_000 * $10 / 1M = 1.00
+        $result = $this->service->calculateCost(1_000_000, 100_000, 200_000, 0, 1);
+
+        $this->assertSame('2.620000', $result->totalCost);
+        $this->assertSame('1.620000', $result->inputCost);
+        $this->assertSame('1.000000', $result->outputCost);
+        $this->assertSame('0.380000', $result->cacheSavings);
+    }
+
     public function testNegativeRegularInputTokensClamped(): void
     {
         $model = $this->createModelMock('openai', 3.0, 15.0, 'per1M', 'per1M');

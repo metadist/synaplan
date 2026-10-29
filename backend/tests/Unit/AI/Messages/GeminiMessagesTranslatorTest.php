@@ -238,4 +238,25 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertIsArray($toolBlock);
         $this->assertSame('sig-candidate', $toolBlock['thought_signature'] ?? null);
     }
+
+    public function testUsageCountsThinkingTokensAsOutput(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => ['parts' => [['text' => 'Done.']]],
+            ]],
+            'usageMetadata' => [
+                'promptTokenCount' => 1000,
+                'candidatesTokenCount' => 20,
+                'thoughtsTokenCount' => 80,
+                'cachedContentTokenCount' => 200,
+            ],
+        ], ['model' => 'gemini-4-argon']);
+
+        $this->assertSame(1000, $anthropic['usage']['input_tokens']);
+        $this->assertSame(100, $anthropic['usage']['output_tokens']);
+        $this->assertSame(200, $anthropic['usage']['cache_read_input_tokens']);
+    }
 }

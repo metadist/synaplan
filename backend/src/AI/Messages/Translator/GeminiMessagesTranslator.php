@@ -7,6 +7,7 @@ namespace App\AI\Messages\Translator;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
+use App\AI\Provider\Google\GoogleUsage;
 use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -240,7 +241,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
             default => 'end_turn',
         };
 
-        $usageMeta = \is_array($gemini['usageMetadata'] ?? null) ? $gemini['usageMetadata'] : [];
+        $usage = GoogleUsage::fromMetadata(\is_array($gemini['usageMetadata'] ?? null) ? $gemini['usageMetadata'] : []);
 
         return [
             'id' => 'msg_'.bin2hex(random_bytes(8)),
@@ -251,10 +252,10 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
             'stop_reason' => $stopReason,
             'stop_sequence' => null,
             'usage' => [
-                'input_tokens' => (int) ($usageMeta['promptTokenCount'] ?? 0),
-                'output_tokens' => (int) ($usageMeta['candidatesTokenCount'] ?? 0),
+                'input_tokens' => $usage['prompt_tokens'],
+                'output_tokens' => $usage['completion_tokens'],
                 'cache_creation_input_tokens' => 0,
-                'cache_read_input_tokens' => (int) ($usageMeta['cachedContentTokenCount'] ?? 0),
+                'cache_read_input_tokens' => $usage['cached_tokens'],
             ],
         ];
     }
@@ -529,11 +530,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                     continue;
                 }
 
-                if (isset($decoded['usageMetadata']) && \is_array($decoded['usageMetadata'])) {
-                    $inputTokens = (int) ($decoded['usageMetadata']['promptTokenCount'] ?? $inputTokens);
-                    $outputTokens = (int) ($decoded['usageMetadata']['candidatesTokenCount'] ?? $outputTokens);
-                    $cacheRead = (int) ($decoded['usageMetadata']['cachedContentTokenCount'] ?? $cacheRead);
-                }
+                [$inputTokens, $outputTokens, $cacheRead] = GoogleUsage::running($decoded['usageMetadata'] ?? null, $inputTokens, $outputTokens, $cacheRead);
 
                 $candidate = $decoded['candidates'][0] ?? [];
                 if (\is_array($candidate)) {
