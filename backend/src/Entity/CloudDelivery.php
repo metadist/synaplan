@@ -18,6 +18,7 @@ use Doctrine\ORM\Mapping as ORM;
 class CloudDelivery
 {
     public const STATE_QUEUED = 'queued';
+    public const STATE_CLAIMED = 'claimed';
     public const STATE_DELIVERED = 'delivered';
     public const STATE_FAILED = 'failed';
 
@@ -74,6 +75,10 @@ class CloudDelivery
 
     #[ORM\Column(name: 'BFINISHED', type: 'bigint', nullable: true)]
     private ?int $finished = null;
+
+    /** Set when the cloud took the file bytes. A copy counts as sent only after this. */
+    #[ORM\Column(name: 'BDOWNLOADED', type: 'bigint', nullable: true)]
+    private ?int $downloadedAt = null;
 
     /** App and host at the time of the copy. They stay after the link is removed. */
     #[ORM\Column(name: 'BCLIENT', length: 32, nullable: true)]
@@ -162,6 +167,21 @@ class CloudDelivery
     public function getCreated(): int
     {
         return $this->created;
+    }
+
+    public function markClaimed(): void
+    {
+        $this->state = self::STATE_CLAIMED;
+    }
+
+    public function markDownloaded(): void
+    {
+        $this->downloadedAt = time();
+    }
+
+    public function wasDownloaded(): bool
+    {
+        return null !== $this->downloadedAt;
     }
 
     public function markDelivered(?string $remotePath, ?string $remoteId, ?string $openUrl): void
