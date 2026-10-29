@@ -23,11 +23,18 @@ final class ReplayCaller implements ResearchModelCaller
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?\Closure $onText = null,
     ): ResearchModelReply {
         $this->seen[] = ['system' => $system, 'user' => $user];
         $next = array_shift($this->script);
         if (!$next instanceof ResearchModelReply) {
             throw new \RuntimeException('No replay left for the model call.');
+        }
+        if ($onText instanceof \Closure && null === $schema && '' !== $next->text) {
+            // A recorded answer arrives in two pieces, the way a stream would.
+            $half = intdiv(mb_strlen($next->text), 2);
+            $onText(mb_substr($next->text, 0, $half));
+            $onText(mb_substr($next->text, $half));
         }
 
         return $next;

@@ -22,6 +22,8 @@ import { useHistoryStore } from './history'
 import { useIncognitoStore } from './incognito'
 
 const POLL_MS = 2000
+/** While the writer streams the draft the person reads it word by word, so the poll keeps pace. */
+const POLL_WRITING_MS = 700
 /** The server refuses a start with more starting pages than this. */
 const MAX_SEED_SOURCES = 50
 
@@ -258,15 +260,23 @@ async function resume(bag: ResearchBag, chatId: number, id: string): Promise<voi
 function startPoll(bag: ResearchBag): void {
   stopPoll(bag)
   void tick(bag)
-  bag.pollTimer = window.setInterval(() => {
-    void tick(bag)
-  }, POLL_MS)
 }
 
 function stopPoll(bag: ResearchBag): void {
   if (bag.pollTimer === null) return
-  window.clearInterval(bag.pollTimer)
+  window.clearTimeout(bag.pollTimer)
   bag.pollTimer = null
+}
+
+/** The next tick is set once this one has answered, at the pace the run's phase asks for. */
+function scheduleTick(bag: ResearchBag): void {
+  if (bag.pollTimer !== null) return
+  const status = bag.progress.value?.status
+  const delay = status === 'writing' ? POLL_WRITING_MS : POLL_MS
+  bag.pollTimer = window.setTimeout(() => {
+    bag.pollTimer = null
+    void tick(bag)
+  }, delay)
 }
 
 async function tick(bag: ResearchBag): Promise<void> {
@@ -277,13 +287,19 @@ async function tick(bag: ResearchBag): Promise<void> {
   }
   try {
     const next = await framesSince(bag, current)
-    if (next === null || bag.progress.value?.id !== current.id) return
-    if (isTerminalStatus(bag.progress.value.status)) return
-    bag.progress.value = next
-    if (!isTerminalStatus(next.status)) return
-    await settle(bag, next)
+    const shown = bag.progress.value
+    if (next !== null && shown?.id === current.id && !isTerminalStatus(shown.status)) {
+      bag.progress.value = next
+      if (isTerminalStatus(next.status)) {
+        await settle(bag, next)
+        return
+      }
+    }
   } catch {
     // The next tick asks again. Closing the page does not stop the run.
+  }
+  if (bag.progress.value?.id === current.id && !isTerminalStatus(bag.progress.value.status)) {
+    scheduleTick(bag)
   }
 }
 

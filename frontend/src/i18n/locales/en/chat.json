@@ -1161,6 +1161,8 @@
       "working": "Researching…",
       "stepOf": "Step {n} of {total}",
       "stepsSoFar": "{steps} steps so far · {sources} sources read",
+      "draftWriting": "Draft of the answer — every statement is checked next.",
+      "draftChecking": "Draft of the answer — checking every statement now. The final text follows.",
       "summary": {
         "complete": "Researched: {steps} steps · {sources} sources read",
         "stopped": "Research stopped after {steps} steps",
@@ -1177,7 +1179,9 @@
       "answered": "{count} answered",
       "searches": "{count} search | {count} searches",
       "sourcesRead": "{count} source read | {count} sources read",
+      "findings": "{count} finding | {count} findings",
       "gatherBlocked": "{count} could not be opened",
+      "softened": "{count} softened.",
       "sectionsWritten": "{count} section written | {count} sections written",
       "earlier": "Show {count} earlier step | Show {count} earlier steps"
     },
@@ -1194,6 +1198,9 @@
         "read": "Read",
         "blocked": "Could not open"
       },
+      "finding": "Found",
+      "sourceFindings": "{count} finding | {count} findings",
+      "sourceNothingNew": "nothing new for the plan",
       "point": {
         "answered": "Answered",
         "not_confirmed": "Not confirmed",
@@ -1203,9 +1210,35 @@
       "roundAgain": "Not enough yet — looking again (round {round})",
       "roundWrite": "Enough found — writing the answer",
       "roundWait": "Waiting for your answer",
+      "roundReason": {
+        "write_now": "You asked for the answer now.",
+        "finish": "The lead decided there is enough to answer.",
+        "covered": "Every point is answered.",
+        "answered": "Every point is answered.",
+        "budget": "The research budget is used up.",
+        "no_progress": "The last round found nothing new.",
+        "calls": "The limit of model calls is reached.",
+        "wall": "The time limit is reached.",
+        "cost": "The cost limit is reached.",
+        "rounds": "The limit of rounds is reached.",
+        "gather": "No searches or reads are left.",
+        "nothing_queued": "Nothing was left to look up."
+      },
       "writing": "Writing",
       "section": "Wrote",
       "checking": "Checking every statement",
+      "verdict": {
+        "partial": "Softened",
+        "contradicted": "Contradicted — left out",
+        "unsupported": "Unsupported — left out",
+        "removed": "Left out"
+      },
+      "verdictReason": {
+        "uncited": "No source stands behind it.",
+        "number": "The number is not in the cited source.",
+        "name": "The name is not in the cited source.",
+        "unknown_id": "It cites a source the research never read."
+      },
       "check": "Fact-check: {ratio} statements backed",
       "checkRemoved": "{count} left out of the answer because no source confirmed them.",
       "checkSameProvider": "Checked by a model of the same provider.",

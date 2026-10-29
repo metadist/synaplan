@@ -199,6 +199,30 @@ final class ResearchLeadTest extends TestCase
         self::assertSame('write', $bench->stage->run($bench->ctx)->next);
     }
 
+    public function testThePersonReadsTheLeadsWordsAndTheReasonItFinished(): void
+    {
+        $bench = LeadBench::open();
+        $id = $bench->pricePage('https://maker.example/price');
+        $bench->ctx->state->ledger->markSource($id, Source::READ);
+        $bench->ctx->state->budget->spend('sources');
+        $bench->lead->script[] = new ResearchLeadTurn(true, true, "Two shops agree on the price.\nNothing else is open.", [
+            new ToolCall('f', 'finish', ['reason' => 'covered', 'points' => [['id' => 'p1', 'status' => 'open', 'note' => 'Only snippets so far.']]]),
+        ], 'test:lead', null);
+
+        $bench->stage->run($bench->ctx);
+        $byName = [];
+        foreach ($bench->keys->events as $body) {
+            $event = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            self::assertIsArray($event);
+            $byName[$event['event']][] = $event['data'];
+        }
+
+        self::assertSame([['text' => 'Two shops agree on the price. Nothing else is open.']], $byName['thought']);
+        self::assertSame('Only snippets so far.', $byName['point'][0]['note']);
+        self::assertSame('covered', $byName['round'][0]['reason']);
+        self::assertSame('write', $byName['round'][0]['next']);
+    }
+
     public function testAnUnknownToolIsNamed(): void
     {
         $bench = LeadBench::open();

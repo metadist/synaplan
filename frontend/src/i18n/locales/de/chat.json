@@ -1159,6 +1159,8 @@
       "working": "Recherchiere…",
       "stepOf": "Schritt {n} von {total}",
       "stepsSoFar": "Bisher {steps} Schritte · {sources} Quellen gelesen",
+      "draftWriting": "Entwurf der Antwort — jede Aussage wird als Nächstes geprüft.",
+      "draftChecking": "Entwurf der Antwort — jede Aussage wird jetzt geprüft. Der endgültige Text folgt.",
       "summary": {
         "complete": "Recherchiert: {steps} Schritte · {sources} Quellen gelesen",
         "stopped": "Recherche nach {steps} Schritten gestoppt",
@@ -1175,7 +1177,9 @@
       "answered": "{count} beantwortet",
       "searches": "{count} Suche | {count} Suchen",
       "sourcesRead": "{count} Quelle gelesen | {count} Quellen gelesen",
+      "findings": "{count} Fund | {count} Funde",
       "gatherBlocked": "{count} nicht öffenbar",
+      "softened": "{count} abgeschwächt.",
       "sectionsWritten": "{count} Abschnitt geschrieben | {count} Abschnitte geschrieben",
       "earlier": "{count} früheren Schritt anzeigen | {count} frühere Schritte anzeigen"
     },
@@ -1192,6 +1196,9 @@
         "read": "Gelesen",
         "blocked": "Nicht öffenbar"
       },
+      "finding": "Gefunden",
+      "sourceFindings": "{count} Fund | {count} Funde",
+      "sourceNothingNew": "nichts Neues für den Plan",
       "point": {
         "answered": "Beantwortet",
         "not_confirmed": "Nicht bestätigt",
@@ -1201,9 +1208,35 @@
       "roundAgain": "Noch nicht genug — schaue weiter (Runde {round})",
       "roundWrite": "Genug gefunden — schreibe die Antwort",
       "roundWait": "Warte auf deine Antwort",
+      "roundReason": {
+        "write_now": "Du hast die Antwort jetzt angefordert.",
+        "finish": "Die Leitung hat entschieden, dass genug da ist.",
+        "covered": "Jeder Punkt ist beantwortet.",
+        "answered": "Jeder Punkt ist beantwortet.",
+        "budget": "Das Recherche-Budget ist aufgebraucht.",
+        "no_progress": "Die letzte Runde hat nichts Neues gefunden.",
+        "calls": "Das Limit an Modellaufrufen ist erreicht.",
+        "wall": "Das Zeitlimit ist erreicht.",
+        "cost": "Das Kostenlimit ist erreicht.",
+        "rounds": "Das Limit an Runden ist erreicht.",
+        "gather": "Keine Suchen oder Lesevorgänge mehr übrig.",
+        "nothing_queued": "Es gab nichts mehr nachzuschlagen."
+      },
       "writing": "Schreibe",
       "section": "Geschrieben",
       "checking": "Prüfe jede Aussage",
+      "verdict": {
+        "partial": "Abgeschwächt",
+        "contradicted": "Widerlegt — weggelassen",
+        "unsupported": "Nicht belegt — weggelassen",
+        "removed": "Weggelassen"
+      },
+      "verdictReason": {
+        "uncited": "Keine Quelle steht dahinter.",
+        "number": "Die Zahl steht nicht in der zitierten Quelle.",
+        "name": "Der Name steht nicht in der zitierten Quelle.",
+        "unknown_id": "Es zitiert eine Quelle, die die Recherche nie gelesen hat."
+      },
       "check": "Faktencheck: {ratio} Aussagen belegt",
       "checkRemoved": "{count} aus der Antwort gelassen, weil keine Quelle sie bestätigt hat.",
       "checkSameProvider": "Geprüft hat ein Modell desselben Anbieters.",

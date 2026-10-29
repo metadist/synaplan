@@ -229,6 +229,23 @@ spent: every model call is summed per role and model (`LEAD`, `READ`,
 `WRITE`, `VERIFY`, `SORT`) next to the sorting that started the run, with
 the cost the person was charged. Tokens and cost on a research reply are
 the run's, not just the one chat call.
+
+While the run works, the fold shows the model's own words, not only the
+step names, and the client polls `research/{id}/events` for them (every
+2 s, every 0.7 s while the draft streams):
+
+| Event | Carries | Where it comes from |
+| ----- | ------- | ------------------- |
+| `thought` | `text` | The lead's sentence before the tool calls of a turn (tool mode), at most 600 characters. |
+| `plan` | `points[].why` | Why the plan has the point. |
+| `source` (`found`) | `why` | The triage's reason for picking the page, at most 200 characters. |
+| `source` (`read`) | `findings` | How many evidence cards the page gave; `0` reads as "nothing new for the plan". |
+| `finding` | `source`, `point`, `fact`, `confidence`, `quote` | An evidence card, at most four per source, with its first verified quote. |
+| `point` | `note` | The lead's or reflect's sentence on the point's state. |
+| `round` | `reason` | Why the round ended: a code (`covered`, `budget`, `no_progress`, …) the client puts into words, or the lead's own sentence. |
+| `draft` | `text` | The writer's text as it streams, flushed every 160 characters or 0.7 s. The client concatenates the pieces and shows them under the phases as a draft until the checked report replaces them. |
+| `verdict` | `statement`, `verdict`, `note`, `part`, `reason` | One statement the check softened (`partial`), left out (`contradicted`, `unsupported`) or the draft check removed (`removed` with a code: `uncited`, `number`, `name`, `unknown_id`); at most eight per run. |
+
 - **Stopped or failed with something found:** the sentence why it ended
   stands above the report, so a partial report never reads as a finished one.
 - **Stopped or failed with nothing found:** only that sentence, no file.

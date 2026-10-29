@@ -30,6 +30,11 @@
         </div>
       </div>
       <ResearchPhases :progress="progress" />
+      <ResearchDraft
+        v-if="progress.draft !== ''"
+        :text="progress.draft"
+        :checking="progress.status === 'checking'"
+      />
     </template>
 
     <template v-else>
@@ -92,6 +97,7 @@ import {
   type ResearchProgress,
 } from '@/services/chat/stream/handlers/research'
 import { progressNarrationSwitches } from '@/utils/progressNarrationConfig'
+import ResearchDraft from './ResearchDraft.vue'
 import ResearchPhases from './ResearchPhases.vue'
 import ResearchSpinner from './ResearchSpinner.vue'
 import { formatElapsed, researchPhases } from './researchPhases'

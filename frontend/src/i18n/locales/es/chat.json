@@ -1096,6 +1096,8 @@
       "working": "Investigando…",
       "stepOf": "Paso {n} de {total}",
       "stepsSoFar": "{steps} pasos hasta ahora · {sources} fuentes leídas",
+      "draftWriting": "Borrador de la respuesta: a continuación se comprueba cada afirmación.",
+      "draftChecking": "Borrador de la respuesta: comprobando cada afirmación ahora. Sigue el texto final.",
       "summary": {
         "complete": "Investigado: {steps} pasos · {sources} fuentes leídas",
         "stopped": "Investigación detenida tras {steps} pasos",
@@ -1112,7 +1114,9 @@
       "answered": "{count} respondidos",
       "searches": "{count} búsqueda | {count} búsquedas",
       "sourcesRead": "{count} fuente leída | {count} fuentes leídas",
+      "findings": "{count} hallazgo | {count} hallazgos",
       "gatherBlocked": "{count} no se pudieron abrir",
+      "softened": "{count} matizadas.",
       "sectionsWritten": "{count} sección escrita | {count} secciones escritas",
       "earlier": "Mostrar {count} paso anterior | Mostrar {count} pasos anteriores"
     },
@@ -1129,6 +1133,9 @@
         "read": "Leída",
         "blocked": "No se pudo abrir"
       },
+      "finding": "Hallazgo",
+      "sourceFindings": "{count} hallazgo | {count} hallazgos",
+      "sourceNothingNew": "nada nuevo para el plan",
       "point": {
         "answered": "Respondido",
         "not_confirmed": "Sin confirmar",
@@ -1138,9 +1145,35 @@
       "roundAgain": "Aún no basta: sigo buscando (ronda {round})",
       "roundWrite": "Suficiente encontrado: escribiendo la respuesta",
       "roundWait": "Esperando tu respuesta",
+      "roundReason": {
+        "write_now": "Pediste la respuesta ahora.",
+        "finish": "La dirección decidió que hay suficiente para responder.",
+        "covered": "Todos los puntos están respondidos.",
+        "answered": "Todos los puntos están respondidos.",
+        "budget": "El presupuesto de investigación se agotó.",
+        "no_progress": "La última ronda no encontró nada nuevo.",
+        "calls": "Se alcanzó el límite de llamadas al modelo.",
+        "wall": "Se alcanzó el límite de tiempo.",
+        "cost": "Se alcanzó el límite de coste.",
+        "rounds": "Se alcanzó el límite de rondas.",
+        "gather": "No quedan búsquedas ni lecturas.",
+        "nothing_queued": "No quedaba nada por consultar."
+      },
       "writing": "Escribiendo",
       "section": "Escrito",
       "checking": "Comprobando cada afirmación",
+      "verdict": {
+        "partial": "Matizada",
+        "contradicted": "Contradicha: fuera de la respuesta",
+        "unsupported": "Sin respaldo: fuera de la respuesta",
+        "removed": "Fuera de la respuesta"
+      },
+      "verdictReason": {
+        "uncited": "Ninguna fuente la respalda.",
+        "number": "La cifra no está en la fuente citada.",
+        "name": "El nombre no está en la fuente citada.",
+        "unknown_id": "Cita una fuente que la investigación nunca leyó."
+      },
       "check": "Verificación: {ratio} afirmaciones respaldadas",
       "checkRemoved": "{count} fuera de la respuesta porque ninguna fuente las confirmó.",
       "checkSameProvider": "Revisado por un modelo del mismo proveedor.",

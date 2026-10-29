@@ -32,6 +32,39 @@ const NOTICE =
 const DIRECT_ANSWER = 'Most tourists need no visa for up to 90 days.'
 const ANSWER = 'No visa for 90 days.'
 const REPORT = `${ANSWER} [1]`
+const THOUGHT = 'The embassy publishes the rule itself, so I read that page first.'
+const WHY_PICKED = 'Official source for the entry rule.'
+const FACT = 'A tourist stay of up to 90 days needs no visa.'
+const QUOTE = 'visa-free for 90 days'
+const SOFTENED = 'Processing takes a week.'
+const CHECK_NOTE = 'Only one office names a time.'
+const DRAFT_START = 'No visa for '
+const DRAFT_END = '90 days.'
+
+/** What the run's event pages say, in the order the poll reads them. */
+const frames = (lines: Array<[number, string, Record<string, unknown>]>): string =>
+  lines
+    .map(([id, event, data]) => `id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+    .join('')
+const GATHER_FRAMES = frames([
+  [1, 'plan', { points: [{ id: 'p1', title: 'Visa types' }], ceiling: 'quick' }],
+  [2, 'thought', { text: THOUGHT }],
+  [3, 'search', { point: 'p1', query: 'japan tourist visa', scope: 'web', results: 8 }],
+  [4, 'source', { id: 's1', title: 'Embassy notice', status: 'found', why: WHY_PICKED }],
+  [5, 'finding', { source: 's1', point: 'p1', fact: FACT, confidence: 'high', quote: QUOTE }],
+  [6, 'source', { id: 's1', status: 'read', findings: 1 }],
+])
+const WRITE_FRAMES = frames([
+  [7, 'writing', { section: 'Answer' }],
+  [8, 'draft', { text: DRAFT_START }],
+  [9, 'draft', { text: DRAFT_END }],
+])
+const CHECK_FRAMES = frames([
+  [10, 'checking', {}],
+  [11, 'verdict', { statement: SOFTENED, verdict: 'partial', note: CHECK_NOTE }],
+  [12, 'check', { statements: 4, supported: 3, removed: 1, same_provider: true }],
+  [13, 'complete', { outcome: { code: 'complete' } }],
+])
 const SOURCE = {
   title: 'Embassy notice',
   url: 'https://embassy.example/visa',
@@ -125,11 +158,12 @@ async function stubChatStream(page: Page, mode: 'research' | 'lookup') {
  * reaches the real backend, so nothing else would be there to reload.
  */
 async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
-  // The run stays busy for three polls (about four seconds), so the working
-  // reply can be looked at before the report replaces it.
+  // The run gathers for two polls, writes on the third and ends on the fourth
+  // (about five seconds), so the working reply and the draft can be looked at
+  // before the report replaces them.
   let framesSent = 0
   let ended = false
-  const finished = () => ended || (mode !== 'answer_now' && framesSent >= 3)
+  const finished = () => ended || (mode !== 'answer_now' && framesSent >= 4)
   await page.route('**/api/v1/chats/*/messages**', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.fallback()
@@ -209,8 +243,10 @@ async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
     framesSent += 1
     const body =
       mode === 'answer_now' || framesSent < 3
-        ? 'id: 1\nevent: plan\ndata: {"points":[{"id":"p1","title":"Visa types"}],"ceiling":"quick"}\n\nid: 2\nevent: search\ndata: {"point":"p1","query":"japan tourist visa","scope":"web"}\n\nid: 3\nevent: source\ndata: {"id":"s1","title":"Embassy notice","status":"read"}\n\n'
-        : 'id: 4\nevent: check\ndata: {"statements":4,"supported":3,"removed":1,"same_provider":true}\n\nid: 5\nevent: complete\ndata: {"outcome":{"code":"complete"}}\n\n'
+        ? GATHER_FRAMES
+        : framesSent === 3
+          ? WRITE_FRAMES
+          : CHECK_FRAMES
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body })
   })
   await page.route('**/api/v1/research/*/input', async (route) => {
@@ -287,7 +323,14 @@ test.describe('@ci @research Research the chat starts on its own', () => {
       'data-state',
       'active'
     )
-    await expect(bubble.locator(selectors.research.activity)).toContainText('Embassy notice')
+    // The open phase reads what the model itself said: its sentence before the
+    // search, why it picked the page, and what the page said in its own words.
+    const gatherOpen = bubble.locator(selectors.research.phase('gather'))
+    await expect(gatherOpen).toContainText(THOUGHT)
+    await expect(gatherOpen.locator(selectors.research.stepAside).first()).toContainText(WHY_PICKED)
+    await expect(bubble.locator(selectors.research.activity)).toContainText(FACT)
+    await expect(bubble.locator(selectors.research.activity)).toContainText(QUOTE)
+    await expect(gatherOpen).toContainText('1 finding')
     await expect(bubble.locator(selectors.research.phase('write'))).toHaveAttribute(
       'data-state',
       'upcoming'
@@ -295,20 +338,33 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(bubble).not.toContainText('about 6 minutes')
     await expect(page.locator(selectors.research.answerNow)).toBeVisible()
 
+    // The writer's words arrive while it writes: the draft grows under the
+    // phases and says the check comes next.
+    const draft = bubble.locator(selectors.research.draft)
+    await expect(draft).toContainText(DRAFT_START + DRAFT_END)
+    await expect(bubble.locator(selectors.research.draftNote)).toContainText('Draft of the answer')
+
     // Once it is done, the report is the reply and one line stays below it.
     // Opening it lists the phases folded; each unfolds on a click.
     const done = chat.conversationBubbles().last().locator(selectors.research.turn)
-    await expect(done).toHaveAttribute('data-status', 'complete')
+    await expect(done).toHaveAttribute('data-status', 'complete', { timeout: 15_000 })
+    await expect(done.locator(selectors.research.draft)).toHaveCount(0)
     await expect(chat.conversationBubbles().last()).toContainText(ANSWER)
     await expect(done.locator(selectors.research.summary)).toContainText('sources read')
     await expect(page.locator(selectors.research.answerNow)).toHaveCount(0)
     await done.locator(selectors.research.stepsToggle).click()
-    await expect(done.locator(selectors.research.phase('write'))).toHaveCount(0)
+    // The stub sends no brief, so that phase is left out; the four it entered stay.
+    await expect(done.locator(selectors.research.phase('understand'))).toHaveCount(0)
+    await expect(done.locator(selectors.research.phase('write'))).toHaveAttribute(
+      'data-state',
+      'done'
+    )
     const gather = done.locator(selectors.research.phase('gather'))
     await expect(gather.locator(selectors.research.phaseSummary)).toContainText('1 source read')
     await expect(gather.locator(selectors.research.steps)).toHaveCount(0)
     await gather.locator(selectors.research.phaseToggle).click()
     const steps = gather.locator(selectors.research.steps)
+    await expect(steps).toContainText(THOUGHT)
     await expect(steps).toContainText('japan tourist visa')
     await expect(steps).toContainText('Embassy notice')
     const check = done.locator(selectors.research.phase('check'))
@@ -316,8 +372,12 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(check.locator(selectors.research.phaseSummary)).toContainText(
       '1 left out of the answer'
     )
+    await expect(check.locator(selectors.research.phaseSummary)).toContainText('1 softened')
     await check.locator(selectors.research.phaseToggle).click()
     await expect(check.locator(selectors.research.steps)).toContainText('same provider')
+    await expect(check.locator(selectors.research.steps)).toContainText('Softened')
+    await expect(check.locator(selectors.research.steps)).toContainText(SOFTENED)
+    await expect(check.locator(selectors.research.stepAside)).toContainText(CHECK_NOTE)
 
     // The citation is a numbered badge that leads to the source card, and the
     // fold replaces the "Web Search" badge.
@@ -375,7 +435,10 @@ test.describe('@ci @research Research the chat starts on its own', () => {
 
     const turn = chat.conversationBubbles().last().locator(selectors.research.turn)
     await expect(turn).toBeVisible()
-    await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
+    // The stubbed run ends on its fourth poll, about five seconds in.
+    await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete', {
+      timeout: 15_000,
+    })
     await expect(page.locator(selectors.chat.messageText).last()).toContainText(ANSWER)
   })
 

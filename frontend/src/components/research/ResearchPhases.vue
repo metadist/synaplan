@@ -71,6 +71,7 @@
         <ResearchSteps
           :steps="visibleRows(phase)"
           :points="progress.points"
+          :source-titles="progress.sourceTitles"
           :live="phase.state === 'active'"
         />
       </div>

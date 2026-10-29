@@ -121,6 +121,7 @@ final readonly class PlanStage implements ResearchStage
             'points' => array_map(static fn (PlanPoint $point): array => [
                 'id' => $point->id,
                 'title' => $point->title,
+                'why' => $point->why,
             ], $ctx->state->ledger->points()),
             'outline' => $ctx->state->ledger->outline(),
             'estimate' => [

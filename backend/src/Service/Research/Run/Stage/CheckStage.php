@@ -81,6 +81,7 @@ final readonly class CheckStage implements ResearchStage
             $verdicts[$item['id']] = ['verdict' => 'supported', 'part' => ''];
         }
 
+        CheckVerdictEvents::announce($ctx, $sorted, $verdicts);
         $counts = $this->counts($sorted, $verdicts);
         $brief = $ctx->state->ledger->brief();
         $language = null !== $brief ? $brief->language : 'en';
@@ -114,7 +115,7 @@ final readonly class CheckStage implements ResearchStage
     /**
      * @param array<string, string> $passages
      *
-     * @return array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>}
+     * @return array{drop: list<array{sentence: string, text: string, reason: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>}
      */
     private function sort(string $report, array $passages): array
     {
@@ -130,7 +131,7 @@ final readonly class CheckStage implements ResearchStage
             $bare = DraftSentences::bare($sentence);
             $reason = $flagged[$key] ?? null;
             if (null !== $reason) {
-                $drop[] = ['sentence' => $sentence, 'text' => $bare];
+                $drop[] = ['sentence' => $sentence, 'text' => $bare, 'reason' => $reason];
                 continue;
             }
             if ([] === $this->ids($sentence)) {
@@ -178,7 +179,7 @@ final readonly class CheckStage implements ResearchStage
      *
      * @param list<array{id: string, sentence: string, bare: string, passages: string}> $group
      *
-     * @return array<string, array{verdict: string, part: string}>|null null when the answer has no verdict list at all
+     * @return array<string, array{verdict: string, part: string, note?: string}>|null null when the answer has no verdict list at all
      */
     private function verdicts(mixed $data, array $group): ?array
     {
@@ -198,6 +199,7 @@ final readonly class CheckStage implements ResearchStage
             $out[$id] = [
                 'verdict' => $row['verdict'],
                 'part' => is_string($row['unsupported_part'] ?? null) ? $row['unsupported_part'] : '',
+                'note' => is_string($row['note'] ?? null) ? $row['note'] : '',
             ];
         }
 

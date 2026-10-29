@@ -26,12 +26,15 @@ const PHASE_OF: Record<string, ResearchPhaseId> = {
   brief: 'understand',
   plan: 'plan',
   point: 'plan',
+  thought: 'gather',
   search: 'gather',
   source: 'gather',
+  finding: 'gather',
   round: 'gather',
   writing: 'write',
   section: 'write',
   checking: 'check',
+  verdict: 'check',
   check: 'check',
 }
 
@@ -82,12 +85,18 @@ function phaseRows(
   progress: ResearchProgress
 ): ResearchStep[] {
   if (id === 'plan') {
-    return progress.points.map((point) => ({
-      kind: 'point',
-      text: point.title,
-      status: point.status,
-      ref: point.id,
-    }))
+    return progress.points.map((point) => {
+      const row: ResearchStep = {
+        kind: 'point',
+        text: point.title,
+        status: point.status,
+        ref: point.id,
+      }
+      // What the lead last said about the point, or why the plan has it.
+      const note = point.note ?? point.why
+      if (note !== undefined && note !== '') row.note = note
+      return row
+    })
   }
   return steps
 }
@@ -116,10 +125,12 @@ export function phaseSummary(
       ).length
       const counts = sourceCounts(progress)
       if (searches === 0 && counts.found === 0) return ''
+      const findings = phase.rows.filter((row) => row.kind === 'finding').length
       const parts = [
         t('research.phase.searches', { count: searches }, searches),
         t('research.phase.sourcesRead', { count: counts.read }, counts.read),
       ]
+      if (findings > 0) parts.push(t('research.phase.findings', { count: findings }, findings))
       if (counts.blocked > 0) {
         parts.push(t('research.phase.gatherBlocked', { count: counts.blocked }))
       }
@@ -134,6 +145,10 @@ export function phaseSummary(
       const check = progress.check
       if (check === null || phase.state === 'active') return ''
       const parts = [t('research.step.check', { ratio: `${check.supported}/${check.statements}` })]
+      const softened = phase.rows.filter(
+        (row) => row.kind === 'verdict' && row.status === 'partial'
+      ).length
+      if (softened > 0) parts.push(t('research.phase.softened', { count: softened }, softened))
       if (check.removed > 0) parts.push(t('research.step.checkRemoved', { count: check.removed }))
       return parts.join(' ')
     }

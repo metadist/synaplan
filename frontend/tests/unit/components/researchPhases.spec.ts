@@ -123,6 +123,62 @@ describe('researchPhases', () => {
     )
   })
 
+  it('keeps the model’s words with the phase they belong to and counts them in the line', () => {
+    const progress = progressOf(
+      GATHERING +
+        frames([
+          'id: 7',
+          'event: thought',
+          'data: {"text":"The embassy page has the fee. I read it next."}',
+          '',
+          'id: 8',
+          'event: finding',
+          'data: {"source":"s1","point":"p1","fact":"The fee is 30 EUR.","confidence":"high"}',
+          '',
+          'id: 9',
+          'event: point',
+          'data: {"id":"p2","status":"not_confirmed","note":"No office names a time."}',
+          '',
+          'id: 10',
+          'event: checking',
+          'data: {}',
+          '',
+          'id: 11',
+          'event: verdict',
+          'data: {"statement":"It takes a week.","verdict":"partial","note":"Only one office says so."}',
+          '',
+          'id: 12',
+          'event: check',
+          'data: {"statements":4,"supported":3,"removed":1,"same_provider":false}',
+          '',
+          'id: 13',
+          'event: complete',
+          'data: {"outcome":{"code":"complete"}}',
+          '',
+        ])
+    )
+    const phases = researchPhases(progress)
+    const plan = phases.find((phase) => phase.id === 'plan')!
+    const gather = phases.find((phase) => phase.id === 'gather')!
+    const check = phases.find((phase) => phase.id === 'check')!
+
+    expect(gather.rows.map((row) => row.kind)).toEqual([
+      'search',
+      'source',
+      'source',
+      'thought',
+      'finding',
+    ])
+    expect(plan.rows[1].note).toBe('No office names a time.')
+    expect(check.rows.map((row) => row.kind)).toEqual(['checking', 'verdict', 'check'])
+    expect(phaseSummary(t, gather, progress)).toBe(
+      'research.phase.searches:{"count":1}#1 · research.phase.sourcesRead:{"count":1}#1 · research.phase.findings:{"count":1}#1 · research.phase.gatherBlocked:{"count":1}'
+    )
+    expect(phaseSummary(t, check, progress)).toBe(
+      'research.step.check:{"ratio":"3/4"} research.phase.softened:{"count":1}#1 research.step.checkRemoved:{"count":1}'
+    )
+  })
+
   it('says nothing for the check while it is still going', () => {
     const progress = progressOf(GATHERING + frames(['id: 7', 'event: checking', 'data: {}', '']))
     const check = researchPhases(progress).find((phase) => phase.id === 'check')

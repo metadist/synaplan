@@ -2631,6 +2631,10 @@ How to work:
 - Never repeat a query. If a point stays open after two tries, change the
   words, the language or the source kind once more, then leave it open.
 - Call several tools in one turn when they do not depend on each other.
+- Before the tool calls of a turn, write one or two plain sentences in the
+  language of the brief: what the last results told you and what you do
+  next. The person reads them while the research runs. They are notes for
+  the person, never the answer.
 - Use the point and source ids exactly as the plan and the results give them.
 - When a tool says no search is left, read what you found; when nothing is
   left, call finish.

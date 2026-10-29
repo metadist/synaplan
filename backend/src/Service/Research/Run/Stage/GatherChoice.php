@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\Service\Research\Run\Ledger\CanonicalUrl;
+use App\Service\Research\Run\Ledger\PlainText;
 
 /**
  * Picks which hits to read. A title never becomes a search, and a host is
@@ -46,7 +47,7 @@ final class GatherChoice
      * @param list<string>                                                      $mustUse
      * @param list<string>                                                      $mustAvoid
      *
-     * @return list<array{url: string, title: string, kind: string}>
+     * @return list<array{url: string, title: string, kind: string, reason: string}>
      */
     public function choose(array $hits, array $verdicts, array $mustUse, array $mustAvoid, int $room): array
     {
@@ -60,7 +61,8 @@ final class GatherChoice
             if ($this->avoided($hit, $kind, $mustAvoid)) {
                 continue;
             }
-            $wanted[] = $hit + ['kind' => $kind, 'preferred' => $this->preferred($hit, $mustUse)];
+            $reason = is_string($verdict['reason'] ?? null) ? PlainText::line($verdict['reason'], 200) : '';
+            $wanted[] = $hit + ['kind' => $kind, 'reason' => $reason, 'preferred' => $this->preferred($hit, $mustUse)];
         }
 
         usort($wanted, static fn (array $left, array $right): int => $right['preferred'] <=> $left['preferred']);
@@ -105,9 +107,9 @@ final class GatherChoice
     }
 
     /**
-     * @param list<array{url: string, title: string, host: string, kind: string}> $wanted
+     * @param list<array{url: string, title: string, host: string, kind: string, reason: string}> $wanted
      *
-     * @return list<array{url: string, title: string, kind: string}>
+     * @return list<array{url: string, title: string, kind: string, reason: string}>
      */
     private function diverse(array $wanted, int $room): array
     {
@@ -125,7 +127,7 @@ final class GatherChoice
                 }
                 $seenHost[$row['host']] = true;
                 $seenUrl[$row['url']] = true;
-                $picked[] = ['url' => $row['url'], 'title' => $row['title'], 'kind' => $row['kind']];
+                $picked[] = ['url' => $row['url'], 'title' => $row['title'], 'kind' => $row['kind'], 'reason' => $row['reason']];
             }
         }
 

@@ -1161,6 +1161,8 @@
       "working": "Recherche en cours…",
       "stepOf": "Étape {n} sur {total}",
       "stepsSoFar": "{steps} étapes jusqu’ici · {sources} sources lues",
+      "draftWriting": "Brouillon de la réponse : chaque affirmation est vérifiée ensuite.",
+      "draftChecking": "Brouillon de la réponse : vérification de chaque affirmation en cours. Le texte final suit.",
       "summary": {
         "complete": "Recherché : {steps} étapes · {sources} sources lues",
         "stopped": "Recherche arrêtée après {steps} étapes",
@@ -1177,7 +1179,9 @@
       "answered": "{count} répondus",
       "searches": "{count} recherche | {count} recherches",
       "sourcesRead": "{count} source lue | {count} sources lues",
+      "findings": "{count} constat | {count} constats",
       "gatherBlocked": "{count} impossibles à ouvrir",
+      "softened": "{count} nuancées.",
       "sectionsWritten": "{count} section rédigée | {count} sections rédigées",
       "earlier": "Afficher {count} étape précédente | Afficher {count} étapes précédentes"
     },
@@ -1194,6 +1198,9 @@
         "read": "Lue",
         "blocked": "Impossible à ouvrir"
       },
+      "finding": "Trouvé",
+      "sourceFindings": "{count} constat | {count} constats",
+      "sourceNothingNew": "rien de neuf pour le plan",
       "point": {
         "answered": "Répondu",
         "not_confirmed": "Non confirmé",
@@ -1203,9 +1210,35 @@
       "roundAgain": "Pas encore assez : je continue (tour {round})",
       "roundWrite": "Assez trouvé : rédaction de la réponse",
       "roundWait": "En attente de votre réponse",
+      "roundReason": {
+        "write_now": "Vous avez demandé la réponse maintenant.",
+        "finish": "La direction a jugé qu’il y en a assez pour répondre.",
+        "covered": "Chaque point a sa réponse.",
+        "answered": "Chaque point a sa réponse.",
+        "budget": "Le budget de recherche est épuisé.",
+        "no_progress": "Le dernier tour n’a rien trouvé de neuf.",
+        "calls": "La limite d’appels au modèle est atteinte.",
+        "wall": "La limite de temps est atteinte.",
+        "cost": "La limite de coût est atteinte.",
+        "rounds": "La limite de tours est atteinte.",
+        "gather": "Plus aucune recherche ni lecture disponible.",
+        "nothing_queued": "Il ne restait rien à consulter."
+      },
       "writing": "Rédaction",
       "section": "Rédigé",
       "checking": "Vérification de chaque affirmation",
+      "verdict": {
+        "partial": "Nuancée",
+        "contradicted": "Contredite : écartée de la réponse",
+        "unsupported": "Non étayée : écartée de la réponse",
+        "removed": "Écartée de la réponse"
+      },
+      "verdictReason": {
+        "uncited": "Aucune source ne la soutient.",
+        "number": "Le chiffre ne figure pas dans la source citée.",
+        "name": "Le nom ne figure pas dans la source citée.",
+        "unknown_id": "Elle cite une source que la recherche n’a jamais lue."
+      },
       "check": "Vérification : {ratio} affirmations étayées",
       "checkRemoved": "{count} laissées hors de la réponse, car aucune source ne les a confirmées.",
       "checkSameProvider": "Vérifié par un modèle du même fournisseur.",

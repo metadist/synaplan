@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchDecisionSchema;
+use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\PlanPoint;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\Loop\LoopAction;
@@ -86,7 +87,7 @@ final readonly class ReflectStage implements ResearchStage
                 $decision = new LoopStop(LoopStop::WRITE, 'nothing_queued', null, false);
             }
         }
-        $this->roundEvent($ctx, $decision->next);
+        $this->roundEvent($ctx, $decision->next, $decision->reason);
         if (LoopStop::CONTINUE !== $decision->next) {
             return $this->close($ctx, $decision);
         }
@@ -230,10 +231,11 @@ final readonly class ReflectStage implements ResearchStage
             } catch (\InvalidArgumentException) {
                 continue;
             }
-            $ctx->events->append($ctx->state->ref->id, 'point', [
-                'id' => $point['id'],
-                'status' => $status,
-            ]);
+            $event = ['id' => $point['id'], 'status' => $status];
+            if ('' !== trim($note)) {
+                $event['note'] = PlainText::line($note, 300);
+            }
+            $ctx->events->append($ctx->state->ref->id, 'point', $event);
         }
     }
 
@@ -302,13 +304,17 @@ final readonly class ReflectStage implements ResearchStage
         ]);
     }
 
-    private function roundEvent(StageContext $ctx, string $next): void
+    private function roundEvent(StageContext $ctx, string $next, ?string $reason = null): void
     {
         $rounds = $ctx->state->budget->toArray()['rounds'];
-        $ctx->events->append($ctx->state->ref->id, 'round', [
+        $event = [
             'n' => $rounds[0],
             'max' => $rounds[1],
             'next' => $next,
-        ]);
+        ];
+        if (null !== $reason && '' !== $reason) {
+            $event['reason'] = $reason;
+        }
+        $ctx->events->append($ctx->state->ref->id, 'round', $event);
     }
 }

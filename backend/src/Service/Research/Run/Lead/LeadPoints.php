@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run\Lead;
 
+use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\PlanPoint;
 use App\Service\Research\Run\Stage\StageContext;
 
@@ -38,10 +39,11 @@ final readonly class LeadPoints
             } catch (\InvalidArgumentException) {
                 continue;
             }
-            $ctx->events->append($ctx->state->ref->id, 'point', [
-                'id' => $point['id'],
-                'status' => $status,
-            ]);
+            $event = ['id' => $point['id'], 'status' => $status];
+            if ('' !== trim($note)) {
+                $event['note'] = PlainText::line($note, 300);
+            }
+            $ctx->events->append($ctx->state->ref->id, 'point', $event);
         }
     }
 }

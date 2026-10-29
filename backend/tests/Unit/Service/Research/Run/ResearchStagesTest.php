@@ -963,6 +963,62 @@ final class ResearchStagesTest extends TestCase
         }
     }
 
+    public function testThePersonReadsWhyASourceWasPickedWhatItSaidAndTheDraftAsItIsWritten(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'It answers the question.', [['q' => 'unit price', 'language' => 'en', 'scope' => 'web']]);
+        $caller->script = [
+            $this->json(['results' => [[
+                'id' => 'r1', 'point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'Price list on the maker site',
+            ]]]),
+            $this->json([
+                'source_id' => 's1',
+                'useful' => true,
+                'published' => null,
+                'kind' => 'vendor',
+                'findings' => [[
+                    'point' => 'p1',
+                    'fact' => 'The unit price is 12.40 EUR.',
+                    'passages' => ['§1'],
+                    'quote' => ['text' => 'The unit price is 12.40 EUR.', 'passage' => '§1'],
+                    'confidence' => 'high',
+                ]],
+                'leads' => [],
+                'flags' => [],
+            ]),
+            new ResearchModelReply(true, true, null, 'The unit price is 12.40 EUR [e1].', 'test:replay', null),
+        ];
+        $search = new ReplaySearch();
+        $search->hits['unit price'] = [ResearchHit::from('https://maker.example/price', 'Price list', '12.40 EUR', null)];
+        $pages = new ReplayPages();
+        $pages->pages['https://maker.example/price'] = new ResearchPage(false, 'The unit price is 12.40 EUR.', '', []);
+        $calls = new StageCall($caller);
+
+        (new GatherStage($calls, $search, new GatherChoice()))->run($ctx);
+        (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx);
+        (new WriteStage($calls))->run($ctx);
+
+        $byName = [];
+        foreach ($ctx->events->replay($ctx->state->ref->id, 0) as $event) {
+            $byName[$event['event']][] = $event['data'];
+        }
+        $sources = $byName['source'];
+        self::assertSame('Price list on the maker site', $sources[0]['why']);
+        self::assertSame('found', $sources[0]['status']);
+        self::assertSame('read', $sources[count($sources) - 1]['status']);
+        self::assertSame(1, $sources[count($sources) - 1]['findings']);
+        self::assertSame([[
+            'source' => 's1',
+            'point' => 'p1',
+            'fact' => 'The unit price is 12.40 EUR.',
+            'confidence' => 'high',
+            'quote' => 'The unit price is 12.40 EUR.',
+        ]], $byName['finding']);
+        self::assertSame('The unit price is 12.40 EUR [e1].', implode('', array_column($byName['draft'], 'text')));
+        self::assertSame(['writing', 'draft', 'section'], array_slice(array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'), -3));
+    }
+
     public function testAQuickRunLeavesItsLastTwoCallsToTheWriterAndTheChecker(): void
     {
         [$ctx, $caller] = $this->open();

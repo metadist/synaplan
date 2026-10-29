@@ -270,6 +270,11 @@ export const selectors = {
     phaseToggle: '[data-testid="btn-research-phase"]',
     phaseSummary: '[data-testid="text-research-phase-summary"]',
     steps: '[data-testid="list-research-steps"]',
+    /** The model's own sentence under a step: why a source was picked, what it said */
+    stepAside: '[data-testid="text-research-step-aside"]',
+    /** The answer as the writer streams it, under the phases while the run works */
+    draft: '[data-testid="research-draft"]',
+    draftNote: '[data-testid="text-research-draft-note"]',
     lookDeeper: '[data-testid="btn-look-deeper"]',
     lookDeeperSection: '[data-testid="section-look-deeper"]',
     /** Admin tab: the automatic-research switch under the research switch */

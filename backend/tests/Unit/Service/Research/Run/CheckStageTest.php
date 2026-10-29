@@ -78,6 +78,39 @@ REPORT);
         self::assertSame('Done: 5 statements, 1 backed by a source.', $ctx->state->outcome->text());
     }
 
+    public function testThePersonReadsWhichStatementsChangedAndWhy(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $this->card($ctx, 'The warranty is two years.');
+        $this->card($ctx, 'The shop is in Berlin.');
+        $ctx->state->ledger->setReport(<<<'REPORT'
+The price is 12.40 EUR. [e1]
+The warranty is five years. [e2]
+The shop is in Paris. [e3]
+The fee is 50 EUR.
+REPORT);
+        $caller->script[] = $this->verdicts([
+            ['c1', 'supported', null, 'The passage states the price.'],
+            ['c2', 'contradicted', null, 'The source says two years.'],
+            ['c3', 'partial', 'the city', 'The source names the shop, not the city.'],
+        ]);
+
+        $this->stage($caller)->run($ctx);
+
+        $verdicts = [];
+        foreach ($ctx->events->replay($ctx->state->ref->id, 0) as $event) {
+            if ('verdict' === $event['event']) {
+                $verdicts[] = $event['data'];
+            }
+        }
+        self::assertSame([
+            ['statement' => 'The fee is 50 EUR.', 'verdict' => 'removed', 'reason' => 'uncited'],
+            ['statement' => 'The warranty is five years.', 'verdict' => 'contradicted', 'note' => 'The source says two years.'],
+            ['statement' => 'The shop is in Paris.', 'verdict' => 'partial', 'note' => 'The source names the shop, not the city.', 'part' => 'the city'],
+        ], $verdicts);
+    }
+
     public function testAnAnswerWithoutTheVerdictEnvelopeStopsTheRun(): void
     {
         [$ctx, $caller] = $this->open(false);
@@ -497,7 +530,7 @@ REPORT, 'test:writer', null);
     }
 
     /**
-     * @param list<array{0: string, 1: string, 2?: string}> $rows
+     * @param list<array{0: string, 1: string, 2?: string|null, 3?: string}> $rows
      */
     private function verdicts(array $rows): ResearchModelReply
     {
@@ -508,7 +541,7 @@ REPORT, 'test:writer', null);
                 'statement' => $row[0],
                 'verdict' => $verdict,
                 'unsupported_part' => $row[2] ?? ('partial' === $verdict ? 'the place' : null),
-                'note' => '',
+                'note' => $row[3] ?? '',
             ];
         }
 
