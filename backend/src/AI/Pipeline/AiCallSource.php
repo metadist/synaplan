@@ -57,11 +57,11 @@ enum AiCallSource: string
     }
 
     /**
-     * Whether this source already runs through {@see AiCallPipeline} (`03_contracts.md` §1.5).
+     * Whether this source runs through {@see AiCallPipeline}.
      *
-     * `/v1/messages` (`MessagesApi`) and live voice (`VoiceLive`) stay `false`
-     * in AU11 so their own writers keep metering under every mode until AU12
-     * joins them.
+     * Every source is joined, including `/v1/messages` ({@see self::MessagesApi})
+     * and live voice ({@see self::VoiceLive}). The shared usage hook meters
+     * all of them.
      */
     public function isJoined(): bool
     {

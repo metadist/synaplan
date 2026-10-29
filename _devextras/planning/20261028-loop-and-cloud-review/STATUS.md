@@ -8,8 +8,8 @@ D1–D6 as proposed).
 | ---- | ----- | ---- |
 | RV0 | merged | [#2856](https://github.com/metadist/synaplan/pull/2856), [#2857](https://github.com/metadist/synaplan/pull/2857), against `main` `fa64e4c82` |
 | RV1 | planned | Round mode drops `scope: files` |
-| RV2 | planned | Messages session reuses `call-1` once the usage hook is `on`. A silent shadow compare can hide it |
-| RV3 | in review | [#2865](https://github.com/metadist/synaplan/pull/2865). A Messages stream releases the database connection before every provider stream, including one with no server tools. Live today |
+| RV2 | in review | [#2867](https://github.com/metadist/synaplan/pull/2867). A Messages request gets its own usage turn. The session key stays the key for conversation memory. Before `AI.USAGE_HOOK=on` |
+| RV3 | merged | [#2865](https://github.com/metadist/synaplan/pull/2865). A Messages stream releases the database connection before every provider stream, including one with no server tools. Live today |
 | RV4 | merged | [#2860](https://github.com/metadist/synaplan/pull/2860) — pickup copy stores the claiming platform instance on the file. Live where platform links are on |
 | RV5 | merged | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
 | RV6 | merged | [#2862](https://github.com/metadist/synaplan/pull/2862). A copy counts as sent only after the download. A claimed row expires unconfirmed. Live, same |
@@ -86,3 +86,12 @@ round that writes a usage row reopens the connection, and the next
 provider stream releases it again. A later chunk of the same stream
 does not. A connection inside a transaction stays open. RV3 is
 [#2865](https://github.com/metadist/synaplan/pull/2865).
+
+## 2026-10-29 — RV2
+
+A Messages request gets its own usage turn. The session key stays the
+key for conversation memory. Provider call ids do not restart at 1, so
+a second request in the same session is not a zero-cost row when the
+usage hook is on, and a shadow compare reads that request's ledger.
+RV2 is [#2867](https://github.com/metadist/synaplan/pull/2867).
+`AI.USAGE_HOOK` stays `legacy`.

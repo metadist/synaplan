@@ -460,7 +460,7 @@ final class MessagesGateway
             return $this->err(500, 'api_error', 'No translator available.');
         }
 
-        $turnId = 'messages-'.$prepared['session_key'];
+        $turnId = 'messages-'.bin2hex(random_bytes(16));
         $pipelined = new PipelineMessagesTranslator($translator, $this->pipeline(), (int) $user->getId(), $prepared['resolved'], $prepared['key_source'], $turnId);
 
         try {
@@ -525,7 +525,7 @@ final class MessagesGateway
             return new MessagesUsage();
         }
 
-        $turnId = 'messages-'.$prepared['session_key'];
+        $turnId = 'messages-'.bin2hex(random_bytes(16));
         $pipelined = new PipelineMessagesTranslator($translator, $this->pipeline(), (int) $user->getId(), $prepared['resolved'], $prepared['key_source'], $turnId);
 
         $capture = StreamTextCapture::wrap($emit);

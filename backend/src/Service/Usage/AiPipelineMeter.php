@@ -45,6 +45,12 @@ final class AiPipelineMeter implements ResetInterface
 
     private int $callSequence = 0;
 
+    /**
+     * Fresh on each request. The counter alone repeats `1` after {@see reset()},
+     * and a repeated id is dropped by the turn ledger.
+     */
+    private string $callScope = '';
+
     /** @var (\Closure(array<string, mixed>): array<string, mixed>)|null */
     private ?\Closure $shadowPerturbation = null;
 
@@ -197,7 +203,7 @@ final class AiPipelineMeter implements ResetInterface
         $turnId = $call->context->turnId ?? $this->activeTurnId ?? self::scopeTurnId($userId, 'turn-default');
         $callId = \is_string($call->options->providerOptions['call_id'] ?? null)
             ? (string) $call->options->providerOptions['call_id']
-            : sprintf('call-%d', ++$this->callSequence);
+            : $this->nextCallId();
 
         if (AiAction::Messages->value === $action) {
             $preview = $this->specBuilder->preview($metadata);
@@ -273,9 +279,23 @@ final class AiPipelineMeter implements ResetInterface
         $this->activeTurnId = null;
         $this->turnSequence = 0;
         $this->callSequence = 0;
+        $this->callScope = '';
         $this->shadowPerturbation = null;
         $this->pendingTimelineCost = null;
         $this->turnLedger->reset();
+    }
+
+    /**
+     * Provider call id for this request. Resetting the meter starts a new
+     * scope, so two requests do not both store the id `1`.
+     */
+    private function nextCallId(): string
+    {
+        if ('' === $this->callScope) {
+            $this->callScope = bin2hex(random_bytes(8));
+        }
+
+        return $this->callScope.'-'.++$this->callSequence;
     }
 
     /**
