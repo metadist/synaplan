@@ -12,7 +12,7 @@ from `main` and does not repeat that tick.
 | RV2 | planned | Messages session reuses `call-1` once the usage hook is `on`. A silent shadow compare can hide it |
 | RV3 | planned | Messages stream must release before every provider stream, including one with no server tools. Live today |
 | RV4 | planned | Pickup copy leaves `BSOURCEINSTANCE` null. Live where platform links are on |
-| RV5 | in review | A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
+| RV5 | in review | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
 | RV6 | planned | `delivered` needs a recorded download, and a claimed row must expire. Live, same |
 | RV7 | planned | Regression lock: do not mark an inbound watch upload as an own write. Before `cloud_files` |
 | RV8 | planned | Calls in one step whose waits sum past the lease pay the step twice. Waits on `RESEARCH.ENABLED` |
@@ -56,4 +56,5 @@ Two findings on the corrected plan, both accepted. No product code.
 
 A repeated listing of a remote id returns the same upload, reuse or skip.
 The file count and the byte count stay on the first decision. A new id
-still counts. RV4 is [#2860](https://github.com/metadist/synaplan/pull/2860).
+still counts. RV5 is [#2861](https://github.com/metadist/synaplan/pull/2861).
+RV4 is [#2860](https://github.com/metadist/synaplan/pull/2860).
