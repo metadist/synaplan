@@ -4,60 +4,35 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
-use App\Model\ModelCatalog;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Insert Gemini 4 Argon (chat + vision) on installs that skip the model seeder.
+ * A copy counts as sent only after the cloud took the bytes. The mark is the
+ * moment the download ticket is consumed and the file is opened.
  *
- * ModelSeeder inserts the same BIDs on deploy when the row is absent. This
- * migration covers the skip-seed path. Operator flags are set only on insert
- * (the existence check skips a row that is already there). Raw SQL via
- * ModelCatalog::upsert, no Schema API (Galera-safe).
+ * Galera-safe: raw addSql only, no Schema API.
  */
 final class Version20261029140000 extends AbstractMigration
 {
-    /** @var list<int> */
-    private const NEW_BIDS = [400, 401];
-
     public function getDescription(): string
     {
-        return 'Insert Gemini 4 Argon chat and vision catalog rows';
+        return 'Record when a cloud copy was actually downloaded';
     }
 
     public function isTransactional(): bool
     {
+        // MariaDB implicit-commits DDL, so this statement cannot sit in a transaction.
         return false;
     }
 
     public function up(Schema $schema): void
     {
-        $byId = [];
-        foreach (ModelCatalog::all() as $row) {
-            $byId[(int) $row['id']] = $row;
-        }
-
-        foreach (self::NEW_BIDS as $bid) {
-            $this->abortIf(
-                !isset($byId[$bid]),
-                sprintf('ModelCatalog is missing BID %d — the migration cannot insert it.', $bid),
-            );
-
-            $exists = $this->connection->fetchOne('SELECT BID FROM BMODELS WHERE BID = ?', [$bid]);
-            if (false !== $exists) {
-                continue;
-            }
-
-            /** @var array<string, mixed> $row */
-            $row = $byId[$bid];
-            ModelCatalog::upsert($this->connection, $row);
-        }
+        $this->addSql('ALTER TABLE BCLOUDDELIVERIES ADD COLUMN IF NOT EXISTS BDOWNLOADED BIGINT DEFAULT NULL');
     }
 
     public function down(Schema $schema): void
     {
-        // Rows stay: BMESSAGES / BUSELOG reference BIDs. Disable via the admin UI
-        // or ModelCatalog::RETIREMENTS if a later release withdraws them.
+        $this->addSql('ALTER TABLE BCLOUDDELIVERIES DROP COLUMN IF EXISTS BDOWNLOADED');
     }
 }

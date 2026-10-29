@@ -1,5 +1,18 @@
 # Architecture update — status
 
+> **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
+> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> Do not set `AI.USAGE_HOOK` to `on` until RV2 is merged, and do not
+> treat a clean shadow soak as proof that the collision is gone. On a
+> second Messages turn in one session `TurnUsageLedger::close()`
+> returns null. `buildShadowMessagesExpectation()` then compares the
+> caller's own metadata, so no `ai.usage_mismatch` is logged. RV3
+> releases the database connection before every provider stream:
+> the tool loop, again after a `TOOLS` usage write reopens it, and
+> the direct `stream()` when the request has no server tools. AU24
+> keeps the wrap-up prompt and the `TOOLS` usage row when the two
+> tool loops become one.
+
 Step log for [`00_master_plan.md`](./00_master_plan.md). A walk, a
 measurement and a rollout are entries here, not chat messages.
 
@@ -20,8 +33,16 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
 | 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | merged (`a0bb87213`) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
 | 2026-10-27 | AU10 | [#2841](https://github.com/metadist/synaplan/pull/2841) | merged (`2b3148c40`) | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 1,070 lines; pipeline overhead 0.008 ms p95 |
-| 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | open | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`) |
-| 2026-10-28 | AU12 | in progress | branch `refactor/au12-join-pipeline` | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes (`CapabilityProbe`, `ProviderModelInventory`) join `AiCallPipeline`; `MessagesGateway` 1,050 → 1,025 lines; `AiPathOnlyThroughPipelineTest` |
+| 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | merged (`f029b10fd`) | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`). Live installation set to `shadow` on 2026-10-28 |
+| 2026-10-28 | AU12 | [#2845](https://github.com/metadist/synaplan/pull/2845) | merged (`32ce18e76`) | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes join `AiCallPipeline`; `AiPathOnlyThroughPipelineTest` |
+| 2026-10-28 | AU13 | [#2846](https://github.com/metadist/synaplan/pull/2846) | merged (`74800aed5`) | `AiCallMetricsHook` (200), request timeline, capacity `/requests` and `/ai-calls`. Post-merge cost stamp: [#2849](https://github.com/metadist/synaplan/pull/2849) (`010d689be`) |
+| 2026-10-28 | AU14 | [#2854](https://github.com/metadist/synaplan/pull/2854) | open | `EgressInventoryTest` freezes today's outbound HTTP stacks. No runtime change. Started from `main` at `010d689be` |
+
+## 2026-10-28 — AU14 started
+
+Started from `main` at `010d689be` ([#2849](https://github.com/metadist/synaplan/pull/2849)). No runtime code changes. The inventory is the gate for AU15–AU17.
+
+The 2026-10-21 egress map named 9 `curl_init` calls, one `file_get_contents` fallback, and `HttpClient::create()` in `MetaProvider`. The scan of `backend/src` and the committed plugins also finds three `file_get_contents` downloads of an image URL in `OpenAIImageGeneration` and `OpenAI::client()` in `OpenAIApiClient`. Plugins named in `.gitignore` (including Synaform) stay out of the baseline: a clean checkout does not contain them. `docs/EGRESS.md` lists every inventoried site, including MariaDB, Redis, SMTP, IMAP, Triton gRPC, and the voice sidecar's WebSocket.
 
 ## Baselines
 
@@ -34,6 +55,23 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-21 | Runtime-config throughput | 315 and 318 req/s | 4 clients |
 | 2026-10-21 | Gateway time to first text token, test-model | 9.3 ms and 13.0 ms p50 | no paid provider |
 | 2026-10-21 | Probe p95 while 12 streams hold 8 workers | 10.3 s and 19.9 s | after AU3; not enforced |
+
+---
+
+## 2026-10-28 — AU13: every request and AI call is timed from start to end
+
+Started from `refactor/au12-join-pipeline` (`4053a7f6c`, [#2845](https://github.com/metadist/synaplan/pull/2845)).
+
+**What changed.**
+- `AiCallMetricsHook` (priority 200, after `UsageHook` at 300) records every AI call's provider, bounded catalog model (`custom` when unknown), capability, source, TTFT (`ttft_ms`), duration (`duration_ms`), `tokens_in`, `tokens_out`, `cost`, `outcome`, and `hooks_ms` onto `RequestTimelineContext`.
+- `RequestTimelineDbMiddleware` (`#[AsMiddleware]`) accumulates `db_ms` and `db_queries` per request without reading SQL text or parameters.
+- `RequestTimelineRecorder` (`kernel.request`, `kernel.controller`, `kernel.terminate`) builds the allow-listed request record and writes it via `RequestTimelineStore::record()` in a single Redis pipeline (`timeline:requests` ZSET capped at 10,000 entries with 24 h TTL, plus per-server `metrics:{serverId}:*` counter and histogram hashes with 24 h TTL).
+- `AdminCapacityController` adds `GET /api/v1/admin/capacity/requests` and `GET /api/v1/admin/capacity/ai-calls` (backed by `CapacityTimelineService`, registered in `CapacityModule`) with full OpenAPI annotations; `make -C frontend generate-schemas` generated `GetAdminCapacityRequestsResponseSchema` and `GetAdminCapacityAiCallsResponseSchema`, verified with `vue-tsc`.
+
+**Proof, privacy & performance.**
+- `RequestTimelineRecorderTest` (4 tests, 77 assertions): chat stream, gateway call and file upload record shapes and capacity endpoints; bounded labels (`custom` for unknown model, `other` for unknown route); privacy test feeding a prompt, an `sk-…` API key, a Bearer JWT and an email address through the recorder and asserting none appear anywhere in the Redis ZSET or hash state; ring cap (`10,000`) and TTL (`86,400 s`).
+- `HookContractTest` updated to pin `AiCallMetricsHook` at priority `200` (`UsageHook` 300 runs before `AiCallMetricsHook` 200).
+- `make perf-runtime`: pipeline overhead **0.027 ms p95** (budget ≤ 1.0 ms: `ok`); request timeline measuring cost **0.100 ms p95** (budget ≤ 0.3 ms: `ok`).
 
 ---
 
@@ -79,7 +117,7 @@ Started from `main` at `2b3148c40` ([#2841](https://github.com/metadist/synaplan
 **Proof & regression.**
 - `AiPathCharacterizationTest::testShadowAndOnModesMatchTheBaselineRowsOnEveryJoinedPath`: runs all 19 paths under `legacy`, `shadow`, and `on`, asserting identical `BUSELOG` rows and zero shadow mismatches.
 - `UsageHookTest` (6 tests): two-round document tool loop (`ChatToolLoop`) and three-round gateway MCP tool loop (`OpenAiGatewayToolLoop`) each write one `MESSAGES` quota row with summed `facade_charged_cost` under `legacy`, `shadow`, and `on`; deliberately wrong shadow computation logs `ai.usage_mismatch`; `TurnUsageLedger` deduplicates `callId` contributions (`HSETNX`) and idempotently closes (`SET ... NX`); runtime rollback from `on` to `legacy` keeps one row per call; live voice (`VoiceLiveUsageService`) writes one `VOICE_LIVE` row under all three modes.
-- Soak signal to flip Part 2 (`AI.USAGE_HOOK = on`): 7 days in `shadow` on production with zero `ai.usage_mismatch` events in the event ring (`GET /api/v1/admin/logs?event=ai.usage_mismatch`).
+- Soak signal to flip Part 2 (`AI.USAGE_HOOK = on`): 7 days in `shadow` on production with zero `ai.usage_mismatch` events in the event ring (`GET /api/v1/admin/logs?event=ai.usage_mismatch`). Row 31 RV2: that signal is not proof until the Messages session collision is fixed. A null `close()` compares the caller's own metadata and logs nothing.
 
 ---
 
@@ -847,3 +885,5 @@ opinion on S5 and the approval-gate gap are in
 | 2026-10-27 | #2841 | 1 | `AiFacade::startVideoGeneration()` labeled its `AiCall` as `VideoPoll` instead of `VideoStart` | Fixed: uses `AiCapability::VideoStart` with explicit `skip_circuit_breaker` / `skip_model_health` flags |
 | 2026-10-27 | #2841 | 2 (overview) | Blocking hook deadlines leaked into later hooks and `after()`; `AiVisionExecutor` caught `AiCallRefusedException` and fell through; `synthesizeStream()` did not run through the pipeline | Fixed: `AiCallPipeline` caps blocking hook deadlines against inherited deadlines and restores the inherited deadline between hooks; `AiVisionExecutor` rethrows `AiCallRefusedException`; `AiCallPipeline::streamGenerator()` wraps `synthesizeStream()` lazily |
 | 2026-10-27 | #2841 | 3 | `streamGenerator()` had `yield` in its outer body, deferring eager provider setup errors until iteration after 200 headers | Fixed: `streamGenerator()` runs `before()` hooks and `$transport($call)` eagerly and returns `iterateStreamGenerator()` for lazy chunk delivery; regression test `testStreamGeneratorRunsBeforeHooksAndTransportCreationEagerlyBeforeIteration`. Three-round Copilot cap reached (`01` §9) |
+| 2026-10-28 | #2844 | 1 | `admittedInRequest` set before `checkLimit()` succeeds; `X-Request-Id` reused as turn ID; `TurnUsageLedger::close()` conflates Redis error with already-closed key; `legacy` mode ran hook spec/preview work; multi-call operations consumed only 1 receipt; `MESSAGES` shadow check did not compare `TurnUsageLedger` cost; `AiPathHarness::runAll()` cleared `mismatches` per case | Fixed in `1a9310a14`: all 7 findings accepted and resolved (`AiPipelineMeter`, `AiUsageSpecBuilder`, `TurnUsageLedger`, `RedisService::trySetIfAbsent()`, `AiPathHarness`) |
+| 2026-10-28 | #2844–#2846 | post-merge | AI call cost on the request timeline was always `0.000000`: the metrics hook runs before the usage row is written, and it read `AiUsage::$chargedCost`, which the pipeline never sets. A facade-metered shadow comparison also treated an unknown catalog price as a mismatch against the zero-cost quota row | Fixed on `fix/s1-post-merge-review`: the usage writer stamps the charged cost onto the call the hook already recorded; shadow compares the ledger's `facade_charged_cost` with the caller's and leaves the quota row's own zero cost alone. Calls outside a request are not kept on the in-request collector |

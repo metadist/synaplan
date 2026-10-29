@@ -175,7 +175,7 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: node:24@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+    image: node:26@sha256:b5f0e27e7423ea242b37af44c8c856e28f7e37d4fac23cb430cb618874ff8517
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -252,7 +252,7 @@ services:
   # rendering chunks (native binary + JS heap), which OOM-killed every build
   # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:24@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+    image: node:26@sha256:b5f0e27e7423ea242b37af44c8c856e28f7e37d4fac23cb430cb618874ff8517
     container_name: synaplan-frontend-widgets
     working_dir: /app
     # Wait for the generated Zod schemas before the first build: src/generated/
@@ -833,7 +833,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:13.0.2@sha256:0e4bb0f339feba125d1154fbacd36c16ec8518f52e44e1f82ecec7d6771caf39
+    image: mariadb:13.0.2@sha256:f4054da26e3a9dd6c8b5cc97363e544408b15c0fb369d7359c25dc04826eb6e1
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -876,7 +876,7 @@ services:
     # client publications from 7.x, whereas Redis 8.x dropped pub/sub fan-out to
     # the Centrifugo node (control messages arrived, publications did not),
     # which silently broke realtime delivery to dashboard + widget clients.
-    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    image: redis:7.4-alpine@sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af
     container_name: synaplan-redis
     command: >-
       redis-server
@@ -945,7 +945,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:20d1bbfbabe1c97ba4b16301f08a20d8484bcf77047742a3cb71c613d8e12d0b
+    image: ollama/ollama:latest@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
     container_name: synaplan-ollama
     depends_on:
       backend:
@@ -1070,7 +1070,7 @@ services:
   # then set FREEAPI_BASE_URL=http://freeapi-fake:8787 and FEATURE_FREEAPI_ENABLED=true.
   # Canned answers, in-memory state; see _devextras/freeapi-fake/README.md.
   freeapi-fake:
-    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+    image: node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
     container_name: synaplan-freeapi-fake
     profiles: [freeapi-fake]
     restart: unless-stopped
@@ -1124,7 +1124,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin:latest@sha256:414db3b5c801a6c9b9f4a6dbd06a9e426dfc7f0a09d02140ae0e483eface5fdd
+    image: phpmyadmin:latest@sha256:fb0cb638f7d1c2529407921d86679b2b2faf5bb8542314821e9f16e7e3d2954f
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db
@@ -1147,7 +1147,7 @@ services:
   # and point TELEGRAM_API_BASE_URL at http://telegram-stub:3998 on backend and worker.
   telegram-stub:
     profiles: [telegram-stub]
-    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+    image: node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
     container_name: synaplan-telegram-stub
     user: node
     working_dir: /app
@@ -1285,7 +1285,7 @@ services:
   # synaplan-tts README). The UI locale / detected reply language selects
   # the matching baked voice automatically.
   tts:
-    image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:4efc4535b90bf348b6c5598e3793ca5aa7b5bdb4c051456f74a1d2b0b1328388
     container_name: synaplan-tts
     depends_on:
       backend:

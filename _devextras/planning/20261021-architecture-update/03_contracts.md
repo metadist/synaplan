@@ -582,12 +582,18 @@ redirects today, keeps following them through this path (AU16).
 
 ### 3.5 The inventory gate (AU14)
 
-`tests/Architecture/EgressInventoryTest.php` scans `src/` and `plugins/` for
-`curl_init(`, `file_get_contents('http`, `fopen('http`, `HttpClient::create(`,
-`new \GuzzleHttp\Client`, `Psr18ClientDiscovery`, and SDK factory calls without
-an injected client. `egressInventoryBaseline.json` freezes today's sites; it may
-only shrink. After AU17 it lists only the allow-listed transports (Triton
-gRPC, Redis, SMTP, IMAP).
+`tests/Architecture/EgressInventoryTest.php` scans `src/` and the plugins
+committed in this repository for `curl_init(`, `file_get_contents('http`,
+`fopen('http`, `HttpClient::create(`, a Guzzle client (`new \GuzzleHttp\Client`
+or `new Client` after `use GuzzleHttp\Client`), `Psr18ClientDiscovery`, and
+SDK construction without an injected client (`OpenAI::factory()` until its
+own `make()` or semicolon, and `OpenAI::client()`). Plugin directories listed
+in `.gitignore` are local checkouts and stay outside the gate. A site id is
+the file, the kind, the enclosing function, and the call line, so removing
+one call cannot authorize a different call in the same file.
+`egressInventoryBaseline.json` freezes today's sites; it may only shrink.
+After AU17 it lists only the allow-listed transports (Triton gRPC, Redis,
+SMTP, IMAP).
 
 ### 3.6 Pinned requests behind a proxy
 

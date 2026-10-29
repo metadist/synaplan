@@ -138,7 +138,7 @@ final class AdminUserProvisioningController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'name', type: 'string', example: 'nextcloud-alice'),
-                new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'files', 'rag']),
+                new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'files', 'rag', 'cloud:watch']),
             ]
         )
     )]

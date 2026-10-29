@@ -61,11 +61,18 @@ final readonly class PipelineMessagesTranslator implements MessagesTranslatorInt
     {
         $call = $this->buildCall(AiCapability::ChatStream, $requestBody, stream: true, responseText: null);
 
+        // Both paths out of MessagesGateway::executeStream() arrive here: the
+        // direct stream, and every round of the tool loop. Releasing once
+        // around executeStream() misses the round after a TOOLS usage write.
         /* @var MessagesUsage */
         return $this->pipeline->stream(
             $call,
-            fn (AiCall $c, callable $onChunk): MessagesUsage => $this->inner->stream($c->payload->passthroughBody, $context, $onChunk),
-            $emit,
+            function (AiCall $c, callable $onChunk) use ($context): MessagesUsage {
+                $this->pipeline->releaseBeforeProvider('messages stream');
+
+                return $this->inner->stream($c->payload->passthroughBody, $context, $onChunk);
+            },
+            $this->pipeline->releaseOnFirstChunk($emit, 'messages stream'),
             static fn (mixed $usage): ?AiUsage => $usage instanceof MessagesUsage ? AiUsage::fromTokenArray($usage->toRateLimitUsage()) : null,
         )->value;
     }

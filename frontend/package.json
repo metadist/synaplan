@@ -79,7 +79,7 @@
     "@tailwindcss/postcss": "4.3.3",
     "@types/dompurify": "3.2.0",
     "@types/katex": "0.16.8",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.5",
     "@typescript-eslint/eslint-plugin": "8.72.0",
     "@typescript-eslint/parser": "8.72.0",
     "@vitejs/plugin-vue": "6.0.10",

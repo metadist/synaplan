@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Service\CloudWatch\CloudWatchException;
 use App\Service\CloudWatch\CloudWatchIndex;
 use App\Service\CloudWatch\CloudWatchService;
+use App\Service\CloudWatch\WatchDialogOptions;
 use App\Service\CloudWatch\WatchUpload;
 use App\Service\File\CloudFilesConfig;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
@@ -32,6 +33,7 @@ final class CloudWatchController extends AbstractController
     public function __construct(
         private readonly CloudFilesConfig $cloudFiles,
         private readonly CloudWatchService $watches,
+        private readonly WatchDialogOptions $dialogOptions,
         private readonly WatchUpload $uploads,
         private readonly CloudWatchIndex $index,
         private readonly InstanceCredential $instances,
@@ -55,9 +57,52 @@ final class CloudWatchController extends AbstractController
     }
 
     #[Route('/api/v1/cloud/watches/options', name: 'api_cloud_watches_options', methods: ['GET'])]
-    #[OA\Get(path: '/api/v1/cloud/watches/options', operationId: 'cloudWatchOptions', summary: 'Tasks, languages and folders the watch dialog can offer', tags: ['Cloud watches'], responses: [
-        new OA\Response(response: 200, description: 'Manual tasks and the languages a translation can use'),
-    ])]
+    #[OA\Get(
+        path: '/api/v1/cloud/watches/options',
+        operationId: 'cloudWatchOptions',
+        summary: 'Tasks, shortcuts, knowledge folders and languages the watch dialog can offer',
+        tags: ['Cloud watches'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Only this person\'s tasks, shortcuts and knowledge folders',
+                content: new OA\JsonContent(
+                    required: ['tasks', 'languages', 'shortcuts', 'folders'],
+                    properties: [
+                        new OA\Property(property: 'tasks', type: 'array', items: new OA\Items(
+                            required: ['id', 'name'],
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 3),
+                                new OA\Property(property: 'name', type: 'string', example: 'Contract check'),
+                            ],
+                            type: 'object',
+                        )),
+                        new OA\Property(property: 'languages', type: 'array', items: new OA\Items(type: 'string', enum: ['en', 'de', 'es', 'fr', 'tr'])),
+                        new OA\Property(property: 'shortcuts', type: 'array', items: new OA\Items(
+                            required: ['id', 'name', 'command', 'body'],
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 8),
+                                new OA\Property(property: 'name', type: 'string', example: 'Vendor line'),
+                                new OA\Property(property: 'command', type: 'string', example: 'vendor'),
+                                new OA\Property(property: 'body', type: 'string', example: 'Extract the vendor, the date and the total.'),
+                            ],
+                            type: 'object',
+                        )),
+                        new OA\Property(property: 'folders', type: 'array', items: new OA\Items(
+                            required: ['group_key', 'file_count'],
+                            properties: [
+                                new OA\Property(property: 'group_key', type: 'string', example: 'Invoices'),
+                                new OA\Property(property: 'file_count', type: 'integer', example: 4),
+                            ],
+                            type: 'object',
+                        )),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: 404, description: 'Cloud file state is turned off'),
+        ],
+    )]
     public function options(#[CurrentUser] ?User $user): JsonResponse
     {
         $denied = $this->gate($user);
@@ -66,7 +111,7 @@ final class CloudWatchController extends AbstractController
         }
         \assert($user instanceof User);
 
-        return $this->json($this->watches->options($user));
+        return $this->json($this->dialogOptions->forUser($user));
     }
 
     #[Route('/api/v1/cloud/watches', name: 'api_cloud_watches_create', methods: ['POST'])]
