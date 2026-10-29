@@ -125,19 +125,29 @@ final readonly class ReflectStage implements ResearchStage
     private function hasWork(StageContext $ctx): bool
     {
         $budget = $ctx->state->budget;
-        if ($budget->canSearch() && $ctx->state->ledger->hasPlannedSearch()) {
+        if ($budget->canSearch() && $ctx->state->ledger->hasPlannedSearch($ctx->filesOn())) {
             return true;
         }
         if (!$budget->canRead()) {
             return false;
         }
         foreach ($ctx->state->ledger->unreadSources() as $source) {
-            if (Source::WEB === $source->kind && null !== $source->url) {
+            if ($this->readable($source, $ctx->filesOn())) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** A page with an address, or a file this run is allowed to open. */
+    private function readable(Source $source, bool $filesOn): bool
+    {
+        if (Source::WEB === $source->kind) {
+            return null !== $source->url;
+        }
+
+        return $filesOn && Source::FILE === $source->kind && null !== $source->fileId;
     }
 
     private function close(StageContext $ctx, LoopStop $stop): StageResult
@@ -238,12 +248,23 @@ final readonly class ReflectStage implements ResearchStage
             if (LoopAction::SEARCH !== $action->type || null === $action->point || null === $action->query) {
                 continue;
             }
-            $ctx->state->ledger->planSearch(
+            $scope = $action->scope ?? 'web';
+            $stored = $ctx->state->ledger->planSearch(
                 $action->point,
                 $action->query,
                 $action->language ?? $fallback,
-                $action->scope ?? 'web',
+                $scope,
             );
+            if ($stored) {
+                continue;
+            }
+            $ctx->events->append($ctx->state->ref->id, 'search', [
+                'point' => $action->point,
+                'query' => $action->query,
+                'scope' => $scope,
+                'kept' => false,
+                'reason' => 'That search was not added. This part of the plan already has as many searches as it can hold.',
+            ]);
         }
     }
 

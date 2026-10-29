@@ -186,7 +186,7 @@ final class EvidenceLedger
             return false;
         }
         $text = PlainText::line($query, 200);
-        if ('' === $text || !in_array($scope, ['web', 'both'], true)) {
+        if ('' === $text || !in_array($scope, ['web', 'files', 'both'], true)) {
             return false;
         }
         $queries = $point->queries;
@@ -200,8 +200,8 @@ final class EvidenceLedger
         return true;
     }
 
-    /** A planned web search that has not run yet, keyed like the gather step. */
-    public function hasPlannedSearch(): bool
+    /** A planned search that has not run yet. Pass false to ignore a files-only query. */
+    public function hasPlannedSearch(bool $includeFiles = true): bool
     {
         $ran = [];
         foreach ($this->queries as $query) {
@@ -209,7 +209,10 @@ final class EvidenceLedger
         }
         foreach ($this->points as $point) {
             foreach ($point->queries as $query) {
-                if ('files' !== $query['scope'] && !isset($ran[$point->id.'|'.$query['q']])) {
+                if (!$includeFiles && 'files' === $query['scope']) {
+                    continue;
+                }
+                if (!isset($ran[$point->id.'|'.$query['q']])) {
                     return true;
                 }
             }
