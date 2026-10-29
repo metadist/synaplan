@@ -496,8 +496,9 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(section).toBeVisible()
     const toggle = section.locator('[data-testid="btn-toggle-agent-models"]')
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    await expect(section.locator('[data-testid="badge-agent-models-summary"]')).toContainText(
-      'All automatic'
+    // The account is shared with other specs, which may leave a model chosen; the badge names either state.
+    await expect(section.locator('[data-testid="badge-agent-models-summary"]')).toHaveText(
+      /All automatic|\d+ custom/
     )
 
     await toggle.click()
