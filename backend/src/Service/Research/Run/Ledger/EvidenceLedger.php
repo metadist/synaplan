@@ -186,7 +186,7 @@ final class EvidenceLedger
             return false;
         }
         $text = PlainText::line($query, 200);
-        if ('' === $text || !in_array($scope, ['web', 'both'], true)) {
+        if ('' === $text || !in_array($scope, ['web', 'files', 'both'], true)) {
             return false;
         }
         $queries = $point->queries;
@@ -200,16 +200,20 @@ final class EvidenceLedger
         return true;
     }
 
-    /** A planned web search that has not run yet, keyed like the gather step. */
-    public function hasPlannedSearch(): bool
+    /** A planned web or file search that has not run. Each scope is tracked on its own. */
+    public function hasPlannedSearch(bool $includeFiles = true, bool $includeWeb = true): bool
     {
-        $ran = [];
+        $ran = ['files' => [], 'web' => []];
         foreach ($this->queries as $query) {
-            $ran[$query->pointId.'|'.$query->query] = true;
+            $side = 'files' === $query->scope ? 'files' : 'web';
+            $ran[$side][$query->pointId.'|'.$query->query] = true;
         }
         foreach ($this->points as $point) {
             foreach ($point->queries as $query) {
-                if ('files' !== $query['scope'] && !isset($ran[$point->id.'|'.$query['q']])) {
+                $key = $point->id.'|'.$query['q'];
+                $fileLeft = $includeFiles && 'web' !== $query['scope'] && !isset($ran['files'][$key]);
+                $webLeft = $includeWeb && 'files' !== $query['scope'] && !isset($ran['web'][$key]);
+                if ($fileLeft || $webLeft) {
                     return true;
                 }
             }

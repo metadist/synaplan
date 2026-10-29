@@ -7,8 +7,8 @@ D1–D6 as proposed).
 | Step | State | Note |
 | ---- | ----- | ---- |
 | RV0 | merged | [#2856](https://github.com/metadist/synaplan/pull/2856), [#2857](https://github.com/metadist/synaplan/pull/2857), against `main` `fa64e4c82` |
-| RV1 | planned | Round mode drops `scope: files` |
-| RV2 | in review | [#2867](https://github.com/metadist/synaplan/pull/2867). A Messages request gets its own usage turn. The session key stays the key for conversation memory. Before `AI.USAGE_HOOK=on` |
+| RV1 | in review | [#2868](https://github.com/metadist/synaplan/pull/2868). A files-only search stays on the point and the next round runs it. Before `RESEARCH.ENABLED` |
+| RV2 | merged | [#2867](https://github.com/metadist/synaplan/pull/2867). A Messages request gets its own usage turn. The session key stays the key for conversation memory. Before `AI.USAGE_HOOK=on` |
 | RV3 | merged | [#2865](https://github.com/metadist/synaplan/pull/2865). A Messages stream releases the database connection before every provider stream, including one with no server tools. Live today |
 | RV4 | merged | [#2860](https://github.com/metadist/synaplan/pull/2860) — pickup copy stores the claiming platform instance on the file. Live where platform links are on |
 | RV5 | merged | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
@@ -95,3 +95,12 @@ a second request in the same session is not a zero-cost row when the
 usage hook is on, and a shadow compare reads that request's ledger.
 RV2 is [#2867](https://github.com/metadist/synaplan/pull/2867).
 `AI.USAGE_HOOK` stays `legacy`.
+
+## 2026-10-29 — RV1
+
+A files-only search stays on the plan point. The next round runs it
+when this run may search files. An unread file keeps the round while
+reads remain. A search the plan cannot hold is recorded, with the
+reason, instead of being dropped in silence. RV1 is
+[#2868](https://github.com/metadist/synaplan/pull/2868).
+`RESEARCH.ENABLED` stays off.
