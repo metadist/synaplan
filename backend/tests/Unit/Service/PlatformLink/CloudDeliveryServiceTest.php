@@ -313,7 +313,7 @@ final class CloudDeliveryServiceTest extends TestCase
             $delivery = $this->delivery(9, 4);
             $delivery->markClaimed();
             $file = $this->createStub(File::class);
-            $file->method('getDisplayName')->willReturn('notes.txt');
+            $file->method('getDisplayName')->willReturn('/Shared/Invoices/notes.txt');
             $file->method('getFileMime')->willReturn('text/plain');
             $file->method('getFilePath')->willReturn('notes.txt');
             $files = $this->createStub(FileRepository::class);
@@ -332,6 +332,8 @@ final class CloudDeliveryServiceTest extends TestCase
             ]);
 
             self::assertSame($path, $downloaded['path']);
+            // The copy in the cloud is a plain file name, never the source path.
+            self::assertSame('notes.txt', $downloaded['name']);
             self::assertTrue($delivery->wasDownloaded());
             self::assertSame(CloudDelivery::STATE_DELIVERED, $state['state']);
         } finally {
