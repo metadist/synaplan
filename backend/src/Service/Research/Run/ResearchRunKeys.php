@@ -27,6 +27,12 @@ interface ResearchRunKeys
     public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool;
 
     /**
+     * Slide the lease forward, only while $token still holds it. False when
+     * the claim was lost, so a worker that no longer owns the step stops.
+     */
+    public function renew(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool;
+
+    /**
      * Write the state and release the claim, only while the claim still holds
      * the token and the run still exists. False when the lease was lost or the
      * run was deleted meanwhile.

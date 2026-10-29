@@ -73,6 +73,7 @@ final class GoogleChatTest extends TestCase
         self::assertArrayNotHasKey('topP', $config);
         self::assertArrayNotHasKey('topK', $config);
         self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
+        self::assertArrayNotHasKey('max_duration', $request);
         self::assertSame([10, 3, 20], [$result['usage']['completion_tokens'], $result['usage']['cached_tokens'], $result['usage']['total_tokens']]);
     }
 
@@ -93,7 +94,36 @@ final class GoogleChatTest extends TestCase
         self::assertSame(['thinkingLevel' => 'low'], $config['thinkingConfig']);
         self::assertArrayNotHasKey('temperature', $config);
         self::assertEqualsWithDelta(900, (float) $this->requests()[0]['timeout'], 0.001);
+        self::assertArrayNotHasKey('max_duration', $this->requests()[0]);
         self::assertSame([100, 200, 1100], [$result['usage']['completion_tokens'], $result['usage']['cached_tokens'], $result['usage']['total_tokens']]);
+    }
+
+    public function testANamedDeadlineCapsArgonForTheWholeRequest(): void
+    {
+        $chat = $this->chat([self::json([
+            'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 1, 'candidatesTokenCount' => 1],
+        ])]);
+
+        $chat->chat([['role' => 'user', 'content' => 'Hi']], ['model' => 'gemini-4-argon', 'timeout' => 225]);
+
+        $request = $this->requests()[0];
+        self::assertEqualsWithDelta(225, (float) $request['timeout'], 0.001);
+        self::assertEqualsWithDelta(225, (float) $request['max_duration'], 0.001);
+    }
+
+    public function testAShorterModelTimeoutStaysShorterThanTheNamedDeadline(): void
+    {
+        $chat = $this->chat([self::json([
+            'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 1, 'candidatesTokenCount' => 1],
+        ])]);
+
+        $chat->chat([['role' => 'user', 'content' => 'Hi']], ['model' => 'gemini-2.5-flash', 'timeout' => 225]);
+
+        $request = $this->requests()[0];
+        self::assertEqualsWithDelta(60, (float) $request['timeout'], 0.001);
+        self::assertEqualsWithDelta(60, (float) $request['max_duration'], 0.001);
     }
 
     /**

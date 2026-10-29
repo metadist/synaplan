@@ -13,8 +13,8 @@ D1–D6 as proposed).
 | RV4 | merged | [#2860](https://github.com/metadist/synaplan/pull/2860) — pickup copy stores the claiming platform instance on the file. Live where platform links are on |
 | RV5 | merged | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
 | RV6 | merged | [#2862](https://github.com/metadist/synaplan/pull/2862). A copy counts as sent only after the download. A claimed row expires unconfirmed. Live, same |
-| RV7 | in review | [#2870](https://github.com/metadist/synaplan/pull/2870). An inbound watch upload is not an own write. A new version of the same remote id stays accepted. Before `cloud_files` |
-| RV8 | planned | Calls in one step whose waits sum past the lease pay the step twice. Waits on `RESEARCH.ENABLED` |
+| RV7 | merged | [#2870](https://github.com/metadist/synaplan/pull/2870). An inbound watch upload is not an own write. A new version of the same remote id stays accepted. Before `cloud_files` |
+| RV8 | in review | [#2871](https://github.com/metadist/synaplan/pull/2871). A live step renews its lease through every model call. Before `RESEARCH.ENABLED` |
 
 ## 2026-10-28 — review
 
@@ -114,3 +114,13 @@ that remote id, are still skipped. Storing the upload does not add a
 copy-out row. RV7 is
 [#2870](https://github.com/metadist/synaplan/pull/2870).
 `cloud_files` stays off.
+
+## 2026-10-29 — RV8
+
+A live research step renews the claim it already holds. The lease stays
+four minutes. A call that waits longer than that, two check calls whose
+waits sum past it, and `once()` plus its retry do not pay the step
+twice. A renewal that loses the token does not call the model again. A
+claim nobody renews is still redispatched once. RV8 is
+[#2871](https://github.com/metadist/synaplan/pull/2871).
+`RESEARCH.ENABLED` stays off.

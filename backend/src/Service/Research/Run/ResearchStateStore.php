@@ -86,6 +86,30 @@ final readonly class ResearchStateStore
     }
 
     /**
+     * Keep the same lease, only while $token still holds this step.
+     * False when the claim was lost. The lease length does not change.
+     */
+    public function renew(string $runId, int $seq, string $token, int $leaseMs): bool
+    {
+        ResearchIds::assert($runId);
+        if ($seq < 1) {
+            throw new \InvalidArgumentException('A research unit needs a sequence number.');
+        }
+        if ($leaseMs < 1) {
+            throw new \InvalidArgumentException('A research claim needs a lease.');
+        }
+
+        return $this->keys->renew(
+            ResearchKey::claim($runId, $seq),
+            $token,
+            $leaseMs,
+            ResearchKey::CLAIMS,
+            $this->nowMs() + $leaseMs,
+            ResearchKey::claimMember($runId, $seq, $token),
+        );
+    }
+
+    /**
      * Write the run and release the claim, only while $token still holds the
      * claim for the unit that is in progress. A lost lease leaves the stored
      * run untouched.

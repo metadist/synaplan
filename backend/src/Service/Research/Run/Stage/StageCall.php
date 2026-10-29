@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\Service\Research\Run\ResearchLease;
 
 /**
  * One paid call, and a single retry when the answer is not the JSON shape.
@@ -76,8 +77,14 @@ final readonly class StageCall
         if ($blocked instanceof StageResult) {
             return $blocked;
         }
+        $lease = $ctx->lease;
+        // The token is gone, so this step must not pay for another call.
+        // The checkpoint cannot land, and the reaper still owns the run.
+        if ($lease instanceof ResearchLease && !$lease->renew()) {
+            return new StageResult('done');
+        }
 
-        $reply = $this->models->answer($ctx->state->ref->userId, $modelId, $system, $user, $schema, $onText);
+        $reply = $this->models->answer($ctx->state->ref->userId, $modelId, $system, $user, $schema, $onText, $lease);
         if ($reply->called) {
             $ctx->state->budget->spend('calls');
             if (null !== $reply->cost) {

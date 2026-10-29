@@ -158,6 +158,45 @@ final class AiFacadeStructuredOutputRecoveryTest extends TestCase
         self::assertSame('general', json_decode($result['content'], true, 512, JSON_THROW_ON_ERROR)['BTOPIC']);
     }
 
+    public function testARefusedRetryDoesNotCallTheProviderAgain(): void
+    {
+        $this->provider->expects(self::once())->method('chat')
+            ->willThrowException(self::violation(self::BROKEN));
+
+        $options = self::options();
+        $options['before_paid_retry'] = static fn (): bool => false;
+
+        $this->expectException(StructuredOutputViolationException::class);
+        $this->facade->chat(self::MESSAGES, 1, $options);
+    }
+
+    public function testAGrantedRetryStillRepairsOnce(): void
+    {
+        $calls = 0;
+        $renewed = 0;
+        $this->provider->expects(self::exactly(2))->method('chat')
+            ->willReturnCallback(static function () use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    throw self::violation(self::BROKEN);
+                }
+
+                return ['content' => self::VALID, 'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2]];
+            });
+
+        $options = self::options();
+        $options['before_paid_retry'] = static function () use (&$renewed): bool {
+            ++$renewed;
+
+            return true;
+        };
+
+        $result = $this->facade->chat(self::MESSAGES, 1, $options);
+
+        self::assertSame(1, $renewed);
+        self::assertSame(StructuredOutputRecovery::RECOVERY_REPAIRED, $result[StructuredOutputRecovery::RESPONSE_KEY]);
+    }
+
     public function testGivesUpTypedAfterExactlyOneRetry(): void
     {
         $this->provider->expects(self::exactly(2))->method('chat')

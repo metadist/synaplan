@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Lead;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\Stage\ResearchModelCaller;
 use App\Service\Research\Run\Stage\ResearchModelReply;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -22,7 +23,7 @@ final class ScriptedModelCaller implements ResearchModelCaller
     /** @var list<string> */
     public array $users = [];
 
-    public function answer(int $userId, int $modelId, string $system, string $user, ?StructuredOutputSchema $schema, ?\Closure $onText = null): ResearchModelReply
+    public function answer(int $userId, int $modelId, string $system, string $user, ?StructuredOutputSchema $schema, ?\Closure $onText = null, ?ResearchLease $lease = null): ResearchModelReply
     {
         $this->users[] = $user;
         $reply = array_shift($this->script) ?? $this->fallback ?? ResearchModelReply::failed();

@@ -14,7 +14,10 @@ use App\Service\Research\Run\Stage\StageResult;
  */
 final readonly class ResearchUnitWorker
 {
-    /** Two minutes of work, and the lease is twice that so a slow call can still checkpoint. */
+    /**
+     * Four minutes. A live step renews this same lease while it runs.
+     * A longer constant is not how a slow call keeps its claim.
+     */
     public const LEASE_MS = 240_000;
 
     /** Gap before the next step, so one run cannot fill the queue. */
@@ -53,7 +56,7 @@ final readonly class ResearchUnitWorker
 
             return;
         }
-        $result = $this->runClaimed($state, $unit, $token);
+        $result = $this->runClaimed($state, $unit, $token, self::leaseMs($state, $unit));
         if (!$this->store->checkpoint($state, $token)) {
             return;
         }
@@ -79,10 +82,10 @@ final readonly class ResearchUnitWorker
         return $state->budget->secondsLeft() * 1000 + self::LEASE_MS;
     }
 
-    private function runClaimed(ResearchRunState $state, string $unit, string $token): StageResult
+    private function runClaimed(ResearchRunState $state, string $unit, string $token, int $leaseMs): StageResult
     {
         try {
-            return $this->step($state, $unit);
+            return $this->step($state, $unit, $token, $leaseMs);
         } catch (ResearchRunNotFound) {
             $this->store->release($state->ref->id, $state->expectedSeq, $token);
 
@@ -90,19 +93,21 @@ final readonly class ResearchUnitWorker
         }
     }
 
-    private function step(ResearchRunState $state, string $unit): StageResult
+    private function step(ResearchRunState $state, string $unit, string $token, int $leaseMs): StageResult
     {
         if ($this->store->stopRequested($state->ref->id)) {
             return $this->stop($state);
         }
+        $lease = new ResearchLease($this->store, $state->ref->id, $state->expectedSeq, $token, $leaseMs);
         if (!$this->config->isEnabled()) {
-            return $this->stoppedByAdmin($state);
+            return $this->stoppedByAdmin($state, $lease);
         }
         try {
             $context = $this->contexts->open($state);
         } catch (RoleUnavailable $missing) {
             return $this->failRole($state, $missing);
         }
+        $context->lease = $lease;
 
         return $this->units->run($context, $unit);
     }
@@ -123,11 +128,13 @@ final readonly class ResearchUnitWorker
         $this->bus->dispatch($state->ref->id, $next, $state->expectedSeq, self::GAP_MS);
     }
 
-    private function stoppedByAdmin(ResearchRunState $state): StageResult
+    private function stoppedByAdmin(ResearchRunState $state, ResearchLease $lease): StageResult
     {
         if (null === $state->ledger->report()) {
             try {
-                $this->units->run($this->contexts->open($state), ResearchUnitPlan::WRITE);
+                $context = $this->contexts->open($state);
+                $context->lease = $lease;
+                $this->units->run($context, ResearchUnitPlan::WRITE);
             } catch (RoleUnavailable) {
                 // What was already found is the report. The missing model is not a second failure.
             }
