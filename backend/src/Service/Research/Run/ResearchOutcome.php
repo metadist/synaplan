@@ -82,7 +82,7 @@ final readonly class ResearchOutcome
                 $this->whole('supported'),
             ),
             self::COMPLETE_PARTIAL => sprintf(
-                'Done with gaps: %d of %d points could not be confirmed. They are listed under Not confirmed.',
+                'Done with gaps: %d of %d points could not be confirmed by a source, so the answer leaves them out. Look deeper checks them again.',
                 $this->whole('open'),
                 $this->whole('points'),
             ),

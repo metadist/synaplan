@@ -2487,7 +2487,11 @@ Return JSON only:
   - scope: web | files | both. Prefer files when the files above likely
     contain it.
 - outline: section titles for the [OUTPUT] in the report language, starting
-  with the summary and ending with "Not confirmed" (translated).
+  with the summary and ending with "Not confirmed" (translated). One section
+  per thing the goal asks for and nothing the goal did not ask for: no
+  recommendation, advice, outlook or "next steps" section unless the brief
+  asks for one. A comparison of three or more items is one table section
+  that covers every asked aspect, not one section per item.
 
 Points must not overlap. Put the point the goal depends on most first.
 PROMPT;
@@ -2648,12 +2652,19 @@ Facts come ONLY from the evidence below. End every sentence that states a fact
 with the ids of the evidence it relies on, like [e12] or [e12][e31]. Sentences
 without facts (structure, transitions) need no id.
 
-Start with a summary of 3–5 sentences that answers the goal directly. Then
-follow the outline. Use a table when you compare three or more items.
+Answer what the goal asks and nothing more: no recommendation, advice,
+outlook or extra section the goal did not ask for, no restating of the
+question. Start with a summary of 2–4 sentences that answers the goal
+directly. Then follow the outline. When you compare three or more items, put
+the comparison in one table: one row per item, one column per asked aspect,
+each cell the figure or a few words with its ids.
 
-Where evidence is missing, thin or conflicting, say so in the section
-"[NOT_CONFIRMED_TITLE]": what is not confirmed and why; for a conflict, both
-versions with their dates. Never fill a gap with your own knowledge.
+Where evidence for something asked is missing, thin or conflicting, say so
+in the place the reader looks for it — a few words in the table cell or
+sentence, such as "no source confirms the fee" — and list it again in the
+section "[NOT_CONFIRMED_TITLE]": what is not confirmed and why; for a
+conflict, both versions with their dates. Never fill a gap with your own
+knowledge.
 
 Keep it as short as the goal allows (at most [MAX_WORDS] words). Write plainly
 for a non-expert unless the audience is expert. Never mention evidence cards,

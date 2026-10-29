@@ -260,6 +260,7 @@ final readonly class CheckStage implements ResearchStage
             'supported' => $supported,
             'softened' => $softened,
             'removed' => $counts['removed'],
+            'same_provider' => $ctx->roles->checkerSameFamily,
         ]);
     }
 

@@ -30,7 +30,7 @@ const FIXTURE = [
   '',
   'id: 5',
   'event: check',
-  'data: {"statements":4,"supported":3,"removed":1}',
+  'data: {"statements":4,"supported":3,"removed":1,"same_provider":true}',
   '',
   'id: 6',
   'event: complete',
@@ -65,7 +65,13 @@ describe('research event handler', () => {
       { kind: 'plan', text: '1', status: null, ref: null },
       { kind: 'source', text: 'Harbour notice', status: 'read', ref: 's1' },
       { kind: 'point', text: '', status: 'answered', ref: 'p1' },
-      { kind: 'check', text: '3/4', status: null, ref: null },
+      {
+        kind: 'check',
+        text: '3/4',
+        status: null,
+        ref: null,
+        check: { removed: 1, sameProvider: true },
+      },
       { kind: 'complete', text: 'complete', status: null, ref: null },
     ])
     expect(currentStep(progress)).toEqual({

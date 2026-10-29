@@ -237,7 +237,7 @@
           </div>
 
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
-          <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
+          <div v-if="(files && files.length > 0) || webSearchBadge || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
             <div class="flex flex-wrap gap-2">
               <!-- Files (show based on collapse state) -->
@@ -306,32 +306,32 @@
 
               <!-- Web Search Badge (fallback for legacy messages without tool metadata) -->
               <div
-                v-else-if="webSearch"
+                v-else-if="webSearchBadge"
                 class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon icon="mdi:web" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">Web Search</span>
                 <span
-                  v-if="webSearch.query && showAllBadges"
+                  v-if="webSearchBadge.query && showAllBadges"
                   class="text-xs opacity-80 hidden sm:inline truncate max-w-[150px]"
-                  >· {{ webSearch.query }}</span
+                  >· {{ webSearchBadge.query }}</span
                 >
-                <span v-if="webSearch.resultsCount" class="text-xs opacity-80 font-semibold">
-                  · {{ webSearch.resultsCount }}
+                <span v-if="webSearchBadge.resultsCount" class="text-xs opacity-80 font-semibold">
+                  · {{ webSearchBadge.resultsCount }}
                 </span>
                 <span
-                  v-if="webSearch.pagesRead"
+                  v-if="webSearchBadge.pagesRead"
                   class="text-xs opacity-80"
                   :title="
                     $t(
                       'processing.pagesReadDesc',
-                      { count: webSearch.pagesRead },
-                      webSearch.pagesRead
+                      { count: webSearchBadge.pagesRead },
+                      webSearchBadge.pagesRead
                     )
                   "
                   data-testid="badge-web-search-pages-read"
                 >
-                  · {{ $t('processing.pagesReadBadge', { count: webSearch.pagesRead }) }}
+                  · {{ $t('processing.pagesReadBadge', { count: webSearchBadge.pagesRead }) }}
                 </span>
               </div>
 
@@ -343,7 +343,7 @@
                 @click="showAllBadges = !showAllBadges"
               >
                 <span v-if="!showAllBadges"
-                  >+{{ totalBadgesCount - (tool || webSearch ? 3 : 2) }}</span
+                  >+{{ totalBadgesCount - (tool || webSearchBadge ? 3 : 2) }}</span
                 >
                 <Icon
                   :icon="showAllBadges ? 'mdi:chevron-up' : 'mdi:chevron-down'"
@@ -1540,11 +1540,14 @@ const messageToolBadge = computed<'search' | 'pic' | 'vid' | null>(() => {
   return cmd === 'search' || cmd === 'pic' || cmd === 'vid' ? cmd : null
 })
 
+// A research reply stores its cited sources like a web search so the numbers
+// link to them, but its fold already says what was read: no "Web Search" badge.
+const webSearchBadge = computed(() => (props.researchRunId ? null : (props.webSearch ?? null)))
 // Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {
   let count = 0
   if (props.files) count += props.files.length
-  if (props.tool || props.webSearch) count += 1
+  if (props.tool || webSearchBadge.value) count += 1
   return count
 })
 

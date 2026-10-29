@@ -1120,6 +1120,8 @@
       "section": "Escrito",
       "checking": "Comprobando cada afirmación",
       "check": "Verificación: {ratio} afirmaciones respaldadas",
+      "checkRemoved": "{count} fuera de la respuesta porque ninguna fuente las confirmó.",
+      "checkSameProvider": "Revisado por un modelo del mismo proveedor.",
       "complete": "Listo",
       "stopped": "Detenida",
       "failed": "No terminó"

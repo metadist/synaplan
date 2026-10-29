@@ -24,6 +24,8 @@ export interface ResearchStep {
   status: string | null
   /** The source or point id, so a later frame updates the row instead of adding a second one. */
   ref: string | null
+  /** For `check`: what the fact-check left out, and whether a model of the same provider checked. */
+  check?: { removed: number; sameProvider: boolean }
 }
 
 export interface ResearchProgress {
@@ -269,12 +271,13 @@ function stepFor(frame: ResearchFrame): ResearchStep | null {
     case 'checking':
       return { kind: 'checking', text: '', status: null, ref: null }
     case 'check': {
-      const check = readCheck(data) ?? { supported: 0, statements: 0 }
+      const check = readCheck(data) ?? { supported: 0, statements: 0, removed: 0 }
       return {
         kind: 'check',
         text: `${check.supported}/${check.statements}`,
         status: null,
         ref: null,
+        check: { removed: check.removed, sameProvider: data.same_provider === true },
       }
     }
     default:

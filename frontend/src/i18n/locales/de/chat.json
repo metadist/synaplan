@@ -1183,6 +1183,8 @@
       "section": "Geschrieben",
       "checking": "Prüfe jede Aussage",
       "check": "Faktencheck: {ratio} Aussagen belegt",
+      "checkRemoved": "{count} aus der Antwort gelassen, weil keine Quelle sie bestätigt hat.",
+      "checkSameProvider": "Geprüft hat ein Modell desselben Anbieters.",
       "complete": "Fertig",
       "stopped": "Gestoppt",
       "failed": "Nicht abgeschlossen"

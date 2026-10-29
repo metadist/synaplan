@@ -1,7 +1,7 @@
 research:
   outcome:
     complete: 'Fertig: %statements% Aussagen, %supported% davon mit einer Quelle belegt.'
-    complete_partial: 'Fertig mit Lücken: %open% von %points% Punkten konnten nicht bestätigt werden. Sie stehen unter „Nicht bestätigt“.'
+    complete_partial: 'Fertig mit Lücken: %open% von %points% Punkten konnte keine Quelle bestätigen, deshalb fehlen sie in der Antwort. „Gründlicher nachsehen“ prüft sie noch einmal.'
     complete_snippets_only: 'Keine Seite ließ sich öffnen, deshalb beruht dieser Bericht nur auf Suchzusammenfassungen. Wo es wichtig ist, steht das dabei.'
     stopped_by_user: 'Gestoppt. Nach deinem Klick auf Stopp wurde keine neue Arbeit begonnen; ein Schritt, der schon lief, kann noch zählen. Was bisher gefunden wurde, bleibt erhalten.'
     stopped_budget: 'Gestoppt, weil dein monatliches KI-Budget aufgebraucht ist. Der Bericht deckt %covered% von %points% Punkten ab.'
@@ -15,6 +15,8 @@ research:
     failed_model_error: 'Das Modell für %role% hat nicht mehr geantwortet. Sonst wurde nichts berechnet; versuche es erneut oder wähle ein anderes Modell.'
     failed_interrupted: 'Die Recherche wurde auf dem Server unterbrochen. Starte sie neu – die bisher gefundenen Quellen bleiben hier erhalten.'
     unknown: 'Die Recherche wurde beendet. Starte sie neu, wenn du die Antwort noch brauchst.'
+  report:
+    sources: 'Quellen'
   auto:
     notice: 'Ich sehe das für dich in mehreren Quellen nach — etwa %minutes% Minuten.'
     why:

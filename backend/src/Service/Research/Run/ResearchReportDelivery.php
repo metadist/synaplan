@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageMetaRepository;
+use App\Repository\SearchResultRepository;
 use App\Repository\UserRepository;
 use App\Service\Chat\Stream\StreamMessageMeta;
 use App\Service\File\FileStorageService;
@@ -17,10 +18,11 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Puts a finished web research run into its chat: the report as the
+ * Puts a finished web research run into its chat: the reader's report as the
  * assistant's message with the markdown file attached, or the sentence why
- * the run ended without one. A run that did not complete says so above the
- * report, so a partial report never reads as a finished one.
+ * the run ended without one. The sources the report cites are stored under
+ * the question, where the chat history shows them beneath the reply and
+ * turns the citation numbers into links.
  *
  * A run the chat started on its own already has a reply — the one stamped
  * with the run id — and the report replaces that reply's text, so the person
@@ -40,10 +42,10 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         private FileStorageService $storage,
         private GeneratedFileRegistrar $files,
         private ResearchStateStore $store,
-        private ResearchOutcomeText $outcomes,
+        private ResearchReplyText $replies,
         private LoggerInterface $logger,
         private MessageMetaRepository $metas,
-        private ?ResearchDirectAnswer $direct = null,
+        private SearchResultRepository $sources,
     ) {
     }
 
@@ -64,9 +66,9 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
 
                 return;
             }
-            $message = $this->post($state, $chat);
+            [$message, $file] = $this->post($state, $chat);
             $this->store->markDelivered($state->ref->id);
-            $this->attachReport($state, $message);
+            $this->attachReport($state, $message, $file);
         } catch (\Throwable $e) {
             $this->logger->warning('Research report was not posted to the chat', [
                 'run_id' => $state->ref->id,
@@ -76,20 +78,27 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         }
     }
 
-    private function post(ResearchRunState $state, Chat $chat): Message
+    /**
+     * @return array{0: Message, 1: ?string} the reply and the text of the file to attach
+     */
+    private function post(ResearchRunState $state, Chat $chat): array
     {
         $locale = $this->locale($state->ref->userId);
         $message = $this->metas->findMessageInChatByMeta((int) $chat->getId(), StreamMessageMeta::RESEARCH_RUN, $state->ref->id)
             ?? $this->newReply($state, $chat, $locale);
+        $reply = $this->replies->compose($state, $locale);
         $message
-            ->setText($this->text($state, $locale))
+            ->setText($reply['text'])
             ->setStatus('complete')
             ->setMeta(StreamMessageMeta::RESEARCH_RUN, $state->ref->id);
+        if ([] !== $reply['sources'] && $this->sources->saveForReply($message, $reply['sources'], $state->ref->question)) {
+            $message->setMeta('web_search_results_count', (string) count($reply['sources']));
+        }
         $this->em->persist($message);
         $chat->updateTimestamp();
         $this->em->flush();
 
-        return $message;
+        return [$message, $reply['file']];
     }
 
     private function newReply(ResearchRunState $state, Chat $chat, string $locale): Message
@@ -110,26 +119,8 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
             ->setDirection('OUT');
     }
 
-    private function text(ResearchRunState $state, string $locale): string
+    private function attachReport(ResearchRunState $state, Message $message, ?string $report): void
     {
-        $report = trim($state->ledger->report() ?? '');
-        $outcome = $state->outcome;
-        if ('' === $report) {
-            $sentence = $this->outcomes->sentence($outcome, $locale);
-            $answer = ResearchOutcome::ANSWERED_WITHOUT_RESEARCH === $outcome?->code ? $this->direct?->answer($state) : null;
-
-            return null === $answer ? $sentence : '> '.$sentence."\n\n".$answer;
-        }
-        if (ResearchOutcome::COMPLETE === $outcome?->code) {
-            return $report;
-        }
-
-        return '> '.$this->outcomes->sentence($outcome, $locale)."\n\n".$report;
-    }
-
-    private function attachReport(ResearchRunState $state, Message $message): void
-    {
-        $report = $state->ledger->report();
         if (null === $report || '' === trim($report)) {
             return;
         }

@@ -1,7 +1,7 @@
 research:
   outcome:
     complete: 'Tamamlandı: %statements% ifade, %supported% tanesi bir kaynakla destekleniyor.'
-    complete_partial: 'Eksiklerle tamamlandı: %points% noktadan %open% tanesi doğrulanamadı. Bunlar "Doğrulanmadı" altında listeleniyor.'
+    complete_partial: 'Eksiklerle tamamlandı: %points% noktadan %open% tanesini hiçbir kaynak doğrulayamadı, bu yüzden yanıt onları dışarıda bırakıyor. „Daha derin bak“ bunları yeniden kontrol eder.'
     complete_snippets_only: 'Hiçbir sayfa açılamadı, bu yüzden bu rapor yalnızca arama özetlerine dayanıyor. Önemli olduğu yerlerde bunu belirtiyor.'
     stopped_by_user: 'Durduruldu. Durdur''a bastıktan sonra yeni bir iş başlatılmadı; zaten süren bir adım yine de sayılabilir. Şimdiye kadar bulunanlar saklanıyor.'
     stopped_budget: 'Aylık AI bütçen tükendiği için durduruldu. Rapor %points% noktadan %covered% tanesini kapsıyor.'
@@ -15,6 +15,8 @@ research:
     failed_model_error: '%role% modeli yanıt vermeyi bıraktı. Başka bir ücret alınmadı; tekrar dene ya da başka bir model seç.'
     failed_interrupted: 'Araştırma sunucuda kesildi. Yeniden başlat — şimdiye kadar bulunan kaynaklar burada saklanıyor.'
     unknown: 'Araştırma durdu. Yanıta hâlâ ihtiyacın varsa yeniden başlat.'
+  report:
+    sources: 'Kaynaklar'
   auto:
     notice: 'Bunun için birkaç kaynağa bakıyorum; yaklaşık %minutes% dakika.'
     why:

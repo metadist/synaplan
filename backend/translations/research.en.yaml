@@ -1,7 +1,7 @@
 research:
   outcome:
     complete: 'Done: %statements% statements, %supported% backed by a source.'
-    complete_partial: 'Done with gaps: %open% of %points% points could not be confirmed. They are listed under Not confirmed.'
+    complete_partial: 'Done with gaps: %open% of %points% points could not be confirmed by a source, so the answer leaves them out. Look deeper checks them again.'
     complete_snippets_only: 'No page could be opened, so this report is based on search summaries only. It says so where it matters.'
     stopped_by_user: 'Stopped. No new work was started after you pressed Stop; a step that was already underway may still count. What was found so far is kept.'
     stopped_budget: 'Stopped because your monthly AI budget is used up. The report covers %covered% of %points% points.'
@@ -15,6 +15,8 @@ research:
     failed_model_error: 'The %role% model stopped answering. Nothing else was charged; try again or pick another model.'
     failed_interrupted: 'The research was interrupted on the server. Start it again — the sources found so far are kept here.'
     unknown: 'The research stopped. Start it again if you still need the answer.'
+  report:
+    sources: 'Sources'
   auto:
     notice: 'I am looking through several sources for this — about %minutes% minutes.'
     why:

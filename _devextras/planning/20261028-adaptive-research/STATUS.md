@@ -244,3 +244,45 @@ reload showing the report and the line; Answer now ending the run in the
 same bubble; Look deeper opening its own reply that ends with the report;
 320 px dark. Screenshots were taken for the two states and reviewed
 (light working state, dark 320 px working state).
+
+## 2026-10-29 — The answer is what was asked; the audit lives in the fold
+
+A real run (visa rules for remote workers in four countries: costs,
+minimum income, duration, tax) produced a sound research — 5 points, 12
+sources — but a bloated reply: an "Empfehlung nach Profil" section the
+question never asked for (emptied by the check, heading left standing), a
+"Nicht bestätigt" list of every removed sentence including table-row
+fragments, the closing count and the same-provider sentence inside the
+report, and `[e47]`-style evidence ids as raw text.
+
+- Prompts: the planner's outline holds one section per thing the goal asks
+  for and no recommendation, advice, outlook or "next steps" section unless
+  the brief asks; a comparison of three or more items is one table section.
+  The writer answers what the goal asks and nothing more, a 2–4 sentence
+  summary, one table (row per item, column per asked aspect), and names a
+  gap in the place the reader looks for it ("no source confirms the fee")
+  as well as under Not confirmed.
+- `ReaderReport`: the checked report stays as it is in the run's state (Look
+  deeper still seeds its plan from Not confirmed, revise still works on it).
+  The chat message gets the reader's version: no Not confirmed section, no
+  closing count, no same-provider sentence, no heading the check emptied,
+  and every evidence id renumbered to its source in order of first
+  appearance (`[e12][e31]` → `[1][2]`).
+- Sources: `ResearchReportDelivery` stores the cited sources under the
+  question (`SearchResultRepository::saveForReply`) and stamps
+  `web_search_results_count` on the reply, so the chat history renders the
+  numbers as the existing citation badges with the Sources carousel beneath
+  — no second citation renderer. A file source links to `/files?file=<id>`.
+  The attached markdown file lists the sources at the end. The "Web Search"
+  badge stays off on a research reply (`webSearchBadge` in `ChatMessage`).
+- Honesty moved, not dropped: the `check` event carries `same_provider`,
+  and the fold's fact-check row says "14 left out of the answer because no
+  source confirmed them. Checked by a model of the same provider." (wraps,
+  five locales). `complete_partial` now says the answer leaves the open
+  points out and names Look deeper as the recovery.
+- `ResearchReplyText` composes text, file and sources; the delivery's
+  constructor stays at ten parameters.
+
+Walked (Playwright, stubbed): the report with the `1` badge, the source
+card with its host, the fact-check row with its detail, no "Web Search"
+badge, the reload; 320 px dark. Screenshot reviewed.

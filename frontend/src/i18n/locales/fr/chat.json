@@ -1185,6 +1185,8 @@
       "section": "Rédigé",
       "checking": "Vérification de chaque affirmation",
       "check": "Vérification : {ratio} affirmations étayées",
+      "checkRemoved": "{count} laissées hors de la réponse, car aucune source ne les a confirmées.",
+      "checkSameProvider": "Vérifié par un modèle du même fournisseur.",
       "complete": "Terminé",
       "stopped": "Arrêtée",
       "failed": "Non aboutie"

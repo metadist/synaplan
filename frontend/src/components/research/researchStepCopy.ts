@@ -44,7 +44,7 @@ export function researchStepCopy(
     case 'checking':
       return { title: t('research.step.checking'), detail: '' }
     case 'check':
-      return { title: t('research.step.check', { ratio: step.text }), detail: '' }
+      return { title: t('research.step.check', { ratio: step.text }), detail: checkDetail(t, step) }
     case 'complete':
       return {
         title: t(
@@ -61,6 +61,16 @@ export function researchStepCopy(
     default:
       return { title: step.kind, detail: step.text }
   }
+}
+
+/** What the check left out of the answer, so the fold tells it even though the answer does not. */
+function checkDetail(t: Translate, step: ResearchStep): string {
+  const parts: string[] = []
+  if ((step.check?.removed ?? 0) > 0) {
+    parts.push(t('research.step.checkRemoved', { count: step.check?.removed ?? 0 }))
+  }
+  if (step.check?.sameProvider) parts.push(t('research.step.checkSameProvider'))
+  return parts.join(' ')
 }
 
 function sourceStatus(status: string | null): 'read' | 'blocked' | 'found' {

@@ -1185,6 +1185,8 @@
       "section": "Wrote",
       "checking": "Checking every statement",
       "check": "Fact-check: {ratio} statements backed",
+      "checkRemoved": "{count} left out of the answer because no source confirmed them.",
+      "checkSameProvider": "Checked by a model of the same provider.",
       "complete": "Done",
       "stopped": "Stopped",
       "failed": "Could not finish"

@@ -1,7 +1,7 @@
 research:
   outcome:
     complete: 'Terminé : %statements% affirmations, dont %supported% appuyées par une source.'
-    complete_partial: 'Terminé avec des lacunes : %open% points sur %points% n’ont pas pu être confirmés. Ils figurent sous « Non confirmé ».'
+    complete_partial: 'Terminé avec des lacunes : aucune source n’a pu confirmer %open% points sur %points%, la réponse les laisse donc de côté. « Approfondir la recherche » les vérifie à nouveau.'
     complete_snippets_only: 'Aucune page n’a pu être ouverte, ce rapport repose donc uniquement sur des résumés de recherche. Il le précise là où c’est important.'
     stopped_by_user: 'Arrêté. Aucun nouveau travail n’a été lancé après votre clic sur Arrêter ; une étape déjà en cours peut encore compter. Ce qui a été trouvé est conservé.'
     stopped_budget: 'Arrêté parce que votre budget IA mensuel est épuisé. Le rapport couvre %covered% points sur %points%.'
@@ -15,6 +15,8 @@ research:
     failed_model_error: 'Le modèle de %role% a cessé de répondre. Rien d’autre n’a été facturé ; réessayez ou choisissez un autre modèle.'
     failed_interrupted: 'La recherche a été interrompue sur le serveur. Relancez-la : les sources trouvées jusqu’ici sont conservées.'
     unknown: 'La recherche s’est arrêtée. Relancez-la si vous avez encore besoin de la réponse.'
+  report:
+    sources: 'Sources'
   auto:
     notice: 'Je consulte plusieurs sources pour cela — environ %minutes% minutes.'
     why:

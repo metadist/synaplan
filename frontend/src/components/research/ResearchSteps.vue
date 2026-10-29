@@ -13,9 +13,14 @@
         aria-hidden="true"
       />
       <span class="flex-shrink-0">{{ row.title }}</span>
-      <span v-if="row.detail" class="truncate opacity-70" :title="row.detail">{{
-        row.detail
-      }}</span>
+      <!-- The check row tells what the answer leaves out, so it wraps instead of truncating. -->
+      <span
+        v-if="row.detail"
+        class="opacity-70"
+        :class="row.kind === 'check' ? 'min-w-0' : 'truncate'"
+        :title="row.detail"
+        >{{ row.detail }}</span
+      >
     </li>
   </ol>
 </template>

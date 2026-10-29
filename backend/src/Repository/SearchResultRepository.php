@@ -62,6 +62,46 @@ class SearchResultRepository extends ServiceEntityRepository
     }
 
     /**
+     * Stores the sources a reply cites under the question it answers, which
+     * is where the chat history looks for them: the latest incoming message
+     * of the chat before the reply. False when the chat has no such message.
+     *
+     * @param list<array{title: string, url: string, host: string, description: string}> $sources
+     */
+    public function saveForReply(Message $reply, array $sources, string $query): bool
+    {
+        $question = $this->getEntityManager()->createQueryBuilder()
+            ->select('m')
+            ->from(Message::class, 'm')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('m.unixTimestamp < :timestamp')
+            ->setParameter('chatId', $reply->getChatId())
+            ->setParameter('direction', 'IN')
+            ->setParameter('timestamp', $reply->getUnixTimestamp())
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+        if (!$question instanceof Message) {
+            return false;
+        }
+        $results = [];
+        foreach ($sources as $source) {
+            $results[] = [
+                'title' => $source['title'],
+                'url' => $source['url'],
+                'description' => '' !== $source['description'] ? $source['description'] : null,
+                'profile' => ['name' => $source['host']],
+            ];
+        }
+        $this->saveSearchResults($question, ['results' => $results], $query);
+
+        return true;
+    }
+
+    /**
      * Save search results for a message.
      *
      * @param array  $searchResults Parsed search results from BraveSearchService

@@ -10,14 +10,18 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageMetaRepository;
+use App\Repository\SearchResultRepository;
 use App\Repository\UserRepository;
 use App\Service\File\FileStorageService;
 use App\Service\Media\GeneratedFileRegistrar;
+use App\Service\Research\Run\Ledger\EvidenceCard;
+use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchBudgetConfig;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchOutcome;
 use App\Service\Research\Run\ResearchOutcomeText;
+use App\Service\Research\Run\ResearchReplyText;
 use App\Service\Research\Run\ResearchReportDelivery;
 use App\Service\Research\Run\ResearchRunRef;
 use App\Service\Research\Run\ResearchRunState;
@@ -32,6 +36,11 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
     private array $posted = [];
 
     private int $registered = 0;
+
+    private ?string $storedFile = null;
+
+    /** @var list<array{title: string, url: string, host: string, description: string}> */
+    private array $savedSources = [];
 
     public function testAFinishedRunPostsTheReportWithTheFileAttachedOnce(): void
     {
@@ -95,6 +104,22 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame($state->ref->id, $this->posted[0]->getMeta('research_run_id'));
     }
 
+    public function testThePersonReadsTheAnswerWithNumberedSourcesAndTheFileListsThem(): void
+    {
+        $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, null, 11);
+        $state->ledger->addPoint('Costs');
+        $source = $state->ledger->addSource(Source::web('https://pt.example/visa', 'Portugal'));
+        $state->ledger->addEvidence(new EvidenceCard('', $source, 'p1', 'Fee 90 EUR.', ['§1'], []));
+        $state->ledger->setReport("The fee is 90 EUR. [e1]\n\n## Nicht bestätigt\n\n- The tax rate.\n\n1 von 2 Aussagen sind durch eine Quelle belegt.");
+
+        $this->delivery()->deliver($state);
+
+        self::assertSame('The fee is 90 EUR. [1]', $this->posted[0]->getText());
+        self::assertSame('1', $this->posted[0]->getMeta('web_search_results_count'));
+        self::assertSame(['Portugal'], array_column($this->savedSources, 'title'));
+        self::assertSame("The fee is 90 EUR. [1]\n\n## de:research.report.sources\n\n1. Portugal — https://pt.example/visa", $this->storedFile);
+    }
+
     public function testNothingIsPostedForAnApiRunOrSomeoneElsesChat(): void
     {
         $this->delivery()->deliver($this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, 'Report.', null));
@@ -142,9 +167,17 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         });
 
         $storage = $this->createStub(FileStorageService::class);
-        $storage->method('storeRawContent')->willReturn([
-            'success' => true, 'path' => '7/2026/10/research.md', 'size' => 12, 'mime' => 'text/markdown', 'error' => null,
-        ]);
+        $storage->method('storeRawContent')->willReturnCallback(function (string $content): array {
+            $this->storedFile = $content;
+
+            return ['success' => true, 'path' => '7/2026/10/research.md', 'size' => 12, 'mime' => 'text/markdown', 'error' => null];
+        });
+        $sources = $this->createStub(SearchResultRepository::class);
+        $sources->method('saveForReply')->willReturnCallback(function (Message $reply, array $sources): bool {
+            $this->savedSources = $sources;
+
+            return true;
+        });
         $files = $this->createStub(GeneratedFileRegistrar::class);
         $files->method('register')->willReturnCallback(function (): File {
             ++$this->registered;
@@ -164,9 +197,10 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
             $storage,
             $files,
             $this->store,
-            new ResearchOutcomeText($translator),
+            new ResearchReplyText(new ResearchOutcomeText($translator), $translator),
             new NullLogger(),
             $metas,
+            $sources,
         );
     }
 }

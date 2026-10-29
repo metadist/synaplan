@@ -1120,6 +1120,8 @@
       "section": "Yazıldı",
       "checking": "Her ifade kontrol ediliyor",
       "check": "Doğrulama: {ratio} ifade desteklendi",
+      "checkRemoved": "{count} tanesi hiçbir kaynak doğrulamadığı için yanıtın dışında bırakıldı.",
+      "checkSameProvider": "Aynı sağlayıcının bir modeli kontrol etti.",
       "complete": "Bitti",
       "stopped": "Durduruldu",
       "failed": "Tamamlanamadı"

@@ -30,7 +30,14 @@ const QUESTION = 'Which visa do I need for Japan and how long does it take?'
 const NOTICE =
   'I am looking through several sources for this — about 6 minutes. The question has several parts.'
 const DIRECT_ANSWER = 'Most tourists need no visa for up to 90 days.'
-const REPORT = 'No visa for 90 days.'
+const ANSWER = 'No visa for 90 days.'
+const REPORT = `${ANSWER} [1]`
+const SOURCE = {
+  title: 'Embassy notice',
+  url: 'https://embassy.example/visa',
+  description: 'A tourist stay is visa-free for 90 days.',
+  source: 'embassy.example',
+}
 
 function showBody(status: string, outcome: { code: string } | null = null) {
   return {
@@ -140,6 +147,8 @@ async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
             effort: 'research',
             effortNotice: null,
             researchRunId: RUN_ID,
+            webSearch: { query: QUESTION, resultsCount: 1 },
+            searchResults: [SOURCE],
           },
         ]
       : []
@@ -201,7 +210,7 @@ async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
     const body =
       mode === 'answer_now' || framesSent < 3
         ? 'id: 1\nevent: plan\ndata: {"points":[{"id":"p1","title":"Visa types"}],"ceiling":"quick"}\n\nid: 2\nevent: search\ndata: {"point":"p1","query":"japan tourist visa","scope":"web"}\n\nid: 3\nevent: source\ndata: {"id":"s1","title":"Embassy notice","status":"read"}\n\n'
-        : 'id: 4\nevent: check\ndata: {"statements":4,"supported":3,"removed":1}\n\nid: 5\nevent: complete\ndata: {"outcome":{"code":"complete"}}\n\n'
+        : 'id: 4\nevent: check\ndata: {"statements":4,"supported":3,"removed":1,"same_provider":true}\n\nid: 5\nevent: complete\ndata: {"outcome":{"code":"complete"}}\n\n'
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body })
   })
   await page.route('**/api/v1/research/*/input', async (route) => {
@@ -270,7 +279,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     // Once it is done, the report is the reply and one line stays below it.
     const done = chat.conversationBubbles().last().locator(selectors.research.turn)
     await expect(done).toHaveAttribute('data-status', 'complete')
-    await expect(chat.conversationBubbles().last()).toContainText(REPORT)
+    await expect(chat.conversationBubbles().last()).toContainText(ANSWER)
     await expect(done.locator(selectors.research.summary)).toContainText('sources read')
     await expect(page.locator(selectors.research.answerNow)).toHaveCount(0)
     await done.locator(selectors.research.stepsToggle).click()
@@ -278,12 +287,21 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(steps).toContainText('japan tourist visa')
     await expect(steps).toContainText('Embassy notice')
     await expect(steps).toContainText('3/4')
+    await expect(steps).toContainText('1 left out of the answer')
+    await expect(steps).toContainText('same provider')
 
+    // The citation is a numbered badge that leads to the source card, and the
+    // fold replaces the "Web Search" badge.
     await page.reload()
     const reloaded = page.locator(selectors.research.turn)
     await expect(reloaded).toHaveAttribute('data-status', 'complete')
     await expect(reloaded.locator(selectors.research.summary)).toBeVisible()
-    await expect(page.locator(selectors.chat.messageText).last()).toContainText(REPORT)
+    const text = page.locator(selectors.chat.messageText).last()
+    await expect(text).toContainText(ANSWER)
+    await expect(text.locator('a.source-ref')).toHaveText('1')
+    const last = chat.conversationBubbles().last()
+    await expect(last).toContainText('embassy.example')
+    await expect(last).not.toContainText('Web Search')
   })
 
   test('Answer now is the primary action and says what it does right now', async ({ page }) => {
@@ -303,7 +321,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await page.locator(selectors.research.answerNow).click()
 
     await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
-    await expect(page.locator(selectors.chat.messageText).last()).toContainText(REPORT)
+    await expect(page.locator(selectors.chat.messageText).last()).toContainText(ANSWER)
   })
 
   test('Look deeper under a direct answer starts the research the chat skipped in a new reply', async ({
@@ -329,7 +347,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     const turn = chat.conversationBubbles().last().locator(selectors.research.turn)
     await expect(turn).toBeVisible()
     await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
-    await expect(page.locator(selectors.chat.messageText).last()).toContainText(REPORT)
+    await expect(page.locator(selectors.chat.messageText).last()).toContainText(ANSWER)
   })
 
   test('Look deeper is absent when automatic research is off', async ({ page }) => {

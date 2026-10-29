@@ -197,6 +197,20 @@ same stamp, which is how the chat shows the run and later its steps:
 - **Complete:** the report is the message, and the markdown file is attached
   to it. The file also shows in the file manager's Generated gallery with
   "Open in chat".
+
+The person reads the **reader's report**, not the checked report the run
+keeps (`report.markdown` in the run's state). The reader's report answers
+the question only: the "Not confirmed" section, the closing count and the
+same-provider sentence stay out of the message, a heading the check emptied
+goes with them, and every evidence id becomes the number of its source in
+the order the sources first appear (`[e12][e31]` reads as `[1][2]`). The
+sources are stored under the question like web-search results, so the chat
+shows them beneath the reply and the numbers link to them; the attached
+file lists them at the end. What the check removed, and whether a model of
+the same provider checked, is told in the research fold under the reply
+(`check` event: `statements`, `supported`, `softened`, `removed`,
+`same_provider`), and **Look deeper** still seeds its plan from the checked
+report's "Not confirmed" list.
 - **Stopped or failed with something found:** the sentence why it ended
   stands above the report, so a partial report never reads as a finished one.
 - **Stopped or failed with nothing found:** only that sentence, no file.
