@@ -167,10 +167,16 @@ final readonly class CloudDeliveryService
     }
 
     /**
+     * `$withBody` is false for a header-only request. That request must not
+     * take the ticket or the download mark, because no bytes are sent.
+     *
      * @return array{path: string, name: string, mime: string}
      */
-    public function download(PlatformInstance $instance, int $id, string $ticket): array
+    public function download(PlatformInstance $instance, int $id, string $ticket, bool $withBody = true): array
     {
+        if (!$withBody) {
+            throw new CloudDeliveryException(Response::HTTP_METHOD_NOT_ALLOWED, 'method_not_allowed');
+        }
         $delivery = $this->requireOwn($instance, $id);
         $stored = $this->redis->get(self::DOWNLOAD_PREFIX.$id);
         if (!is_string($stored) || !hash_equals($stored, $ticket)) {
@@ -181,9 +187,7 @@ final readonly class CloudDeliveryService
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
         }
         $path = $this->storage->getAbsolutePath($file->getFilePath());
-        if (!is_file($path)) {
-            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
-        }
+        $this->openForReading($path);
         $taken = $this->redis->getAndDelete(self::DOWNLOAD_PREFIX.$id);
         if (!is_string($taken) || !hash_equals($taken, $ticket)) {
             throw new CloudDeliveryException(Response::HTTP_GONE, 'expired');
@@ -241,20 +245,13 @@ final readonly class CloudDeliveryService
         $status = is_string($answer['status'] ?? null) ? $answer['status'] : '';
         if (CloudDelivery::STATE_DELIVERED === $status) {
             $this->rememberDelivered($delivery, $answer);
-            if (CloudDelivery::STATE_DELIVERED === $delivery->getState()) {
-                return $this->success($delivery);
-            }
 
-            return $this->pending($delivery);
+            return $this->outcome($delivery);
         }
         if (CloudDelivery::STATE_FAILED === $status) {
-            $stored = $this->rememberFailure($delivery, $answer, true);
-            if (CloudDelivery::STATE_DELIVERED === $delivery->getState()) {
-                return $this->success($delivery);
-            }
-            $code = DestinationFailureCode::tryFrom($stored) ?? DestinationFailureCode::Unreachable;
+            $this->rememberFailure($delivery, $answer, true);
 
-            return DestinationResult::failure($code, ['delivery_id' => (string) $delivery->getId()]);
+            return $this->outcome($delivery);
         }
 
         return $this->pending($delivery);
@@ -286,17 +283,47 @@ final readonly class CloudDeliveryService
     /**
      * @param array<string, mixed> $body
      */
-    private function rememberFailure(CloudDelivery $delivery, array $body, bool $includeQueued): string
+    private function rememberFailure(CloudDelivery $delivery, array $body, bool $includeQueued): void
     {
         $stored = $this->errorCode($body);
         if ($this->deliveries->recordFailed((int) $delivery->getId(), $stored, $includeQueued)) {
             $delivery->markFailed($stored);
 
-            return $stored;
+            return;
         }
         $this->deliveries->refreshDelivery($delivery);
+    }
 
-        return $stored;
+    /**
+     * Sent, the failure that is actually stored, or still pending. A notify
+     * that lost the race reports the row, not the body that arrived too late.
+     */
+    private function outcome(CloudDelivery $delivery): DestinationResult
+    {
+        if (CloudDelivery::STATE_DELIVERED === $delivery->getState()) {
+            return $this->success($delivery);
+        }
+        if (CloudDelivery::STATE_FAILED === $delivery->getState()) {
+            $code = DestinationFailureCode::tryFrom((string) ($delivery->getErrorCode() ?? ''))
+                ?? DestinationFailureCode::Unreachable;
+
+            return DestinationResult::failure($code, ['delivery_id' => (string) $delivery->getId()]);
+        }
+
+        return $this->pending($delivery);
+    }
+
+    private function openForReading(string $path): void
+    {
+        if (!is_file($path)) {
+            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
+        }
+        try {
+            $opened = new \SplFileObject($path, 'rb');
+        } catch (\RuntimeException) {
+            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
+        }
+        unset($opened);
     }
 
     private function success(CloudDelivery $delivery): DestinationResult

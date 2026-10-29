@@ -13,6 +13,7 @@ use App\Repository\CloudDeliveryRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\FileRepository;
 use App\Repository\PlatformInstanceRepository;
+use App\Service\Destination\DestinationFailureCode;
 use App\Service\Destination\DestinationResult;
 use App\Service\Destination\ShareableFile;
 use App\Service\File\FileStorageService;
@@ -338,6 +339,25 @@ final class CloudDeliveryServiceTest extends TestCase
         }
     }
 
+    public function testAHeaderOnlyDownloadDoesNotTakeTheFile(): void
+    {
+        $delivery = $this->delivery(9, 4);
+        $delivery->markClaimed();
+        $deliveries = $this->createMock(CloudDeliveryRepository::class);
+        $deliveries->expects(self::never())->method('markDownloaded');
+        $redis = $this->createMock(RedisService::class);
+        $redis->expects(self::never())->method('getAndDelete');
+
+        try {
+            $this->service($deliveries, redis: $redis)->download($this->instance(), 9, 'ticket', false);
+            self::fail('A header-only request took the download.');
+        } catch (CloudDeliveryException $e) {
+            self::assertSame(405, $e->status);
+            self::assertSame('method_not_allowed', $e->errorCode);
+            self::assertFalse($delivery->wasDownloaded());
+        }
+    }
+
     public function testAMissingFileDoesNotBurnTheDownloadTicket(): void
     {
         $delivery = $this->delivery(9, 4);
@@ -421,6 +441,24 @@ final class CloudDeliveryServiceTest extends TestCase
         self::assertSame('Synaplan/Documents/notes.txt', $result->reference);
         self::assertInstanceOf(CloudDelivery::class, $saved);
         self::assertSame(CloudDelivery::STATE_DELIVERED, $saved->getState());
+    }
+
+    public function testADeliveredNotifyReportsAFailureThatAlreadyWon(): void
+    {
+        $result = $this->notifyAgainstStoredFailure(['status' => 'delivered', 'remote_path' => 'late.txt']);
+
+        self::assertFalse($result->ok);
+        self::assertFalse($result->isPending());
+        self::assertSame(DestinationFailureCode::QuotaExceeded, $result->code);
+    }
+
+    public function testAFailedNotifyReportsTheFailureThatWon(): void
+    {
+        $result = $this->notifyAgainstStoredFailure(['status' => 'failed', 'error_code' => 'conflict']);
+
+        self::assertFalse($result->ok);
+        self::assertFalse($result->isPending());
+        self::assertSame(DestinationFailureCode::QuotaExceeded, $result->code);
     }
 
     public function testAFailedNotifyRecordsTheCloudError(): void
@@ -579,6 +617,35 @@ final class CloudDeliveryServiceTest extends TestCase
         );
 
         return $deliveries;
+    }
+
+    /**
+     * @param array<string, mixed> $answer
+     */
+    private function notifyAgainstStoredFailure(array $answer): DestinationResult
+    {
+        $slot = new class {
+            public ?CloudDelivery $delivery = null;
+        };
+        $deliveries = $this->createStub(CloudDeliveryRepository::class);
+        $deliveries->method('save')->willReturnCallback(static function (CloudDelivery $delivery) use ($slot): void {
+            (new \ReflectionProperty(CloudDelivery::class, 'id'))->setValue($delivery, 9);
+            $slot->delivery = $delivery;
+        });
+        $deliveries->method('recordDelivered')->willReturn(false);
+        $deliveries->method('recordFailed')->willReturn(false);
+        $deliveries->method('refreshDelivery')->willReturnCallback(static function () use ($slot): void {
+            $slot->delivery?->markFailed(DestinationFailureCode::QuotaExceeded->value);
+        });
+        $platforms = $this->createStub(PlatformInstanceRepository::class);
+        $platforms->method('findByInstanceId')->willReturn($this->instance());
+        $notifier = $this->createStub(DeliveryNotifier::class);
+        $notifier->method('delivery')->willReturn($answer);
+
+        return $this->service($deliveries, $this->identities(), $platforms, notifier: $notifier)->copy(
+            new ShareableFile(3, 7, '/tmp/a', 'notes.txt', 12),
+            ['identity_id' => 4],
+        );
     }
 
     /**
