@@ -707,7 +707,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:20d1bbfbabe1c97ba4b16301f08a20d8484bcf77047742a3cb71c613d8e12d0b
+    image: ollama/ollama:latest@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0
