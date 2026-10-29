@@ -81,6 +81,17 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return true;
     }
 
+    public function renew(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
+    {
+        if ($this->get($claimKey) !== $token) {
+            return false;
+        }
+        $this->strings[$claimKey]['expiresAt'] = $this->nowMs() + $ttlMillis;
+        $this->zAdd($indexKey, $score, $member);
+
+        return true;
+    }
+
     public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool
     {
         if ($this->get($claimKey) !== $token || null === $this->get($stateKey)) {

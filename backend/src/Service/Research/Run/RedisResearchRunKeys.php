@@ -54,6 +54,15 @@ end
 return 0
 LUA;
 
+    private const RENEW = <<<'LUA'
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[2]))
+  redis.call('ZADD', KEYS[2], tonumber(ARGV[3]), ARGV[4])
+  return 1
+end
+return 0
+LUA;
+
     private const GET = <<<'LUA'
 local value = redis.call('GET', KEYS[1])
 if value then
@@ -111,6 +120,17 @@ LUA;
     {
         $result = $this->redis->eval(
             self::CLAIM,
+            [$claimKey, $indexKey],
+            [$token, (string) max(1, $ttlMillis), (string) $score, $member],
+        );
+
+        return 1 === $this->requiredInteger($result);
+    }
+
+    public function renew(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
+    {
+        $result = $this->redis->eval(
+            self::RENEW,
             [$claimKey, $indexKey],
             [$token, (string) max(1, $ttlMillis), (string) $score, $member],
         );

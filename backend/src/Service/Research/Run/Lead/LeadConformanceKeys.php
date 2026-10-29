@@ -37,6 +37,11 @@ final class LeadConformanceKeys implements ResearchRunKeys
         return false;
     }
 
+    public function renew(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool
+    {
+        return false;
+    }
+
     public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool
     {
         return false;

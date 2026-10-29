@@ -7,6 +7,7 @@ namespace App\Service\Research\Run\Stage;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\ModelConfigService;
+use App\Service\Research\Run\ResearchLease;
 use App\Service\Usage\CostCalculationService;
 
 /**
@@ -28,10 +29,14 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?ResearchLease $lease = null,
     ): ResearchModelReply {
         $provider = $this->models->getProviderForModel($modelId);
         $name = $this->models->getModelName($modelId);
         if (null === $provider || '' === $provider || null === $name || '' === $name) {
+            return ResearchModelReply::failed();
+        }
+        if ($lease instanceof ResearchLease && !$lease->renew()) {
             return ResearchModelReply::failed();
         }
 
@@ -40,6 +45,9 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
             'model' => $name,
             'temperature' => 0.1,
         ];
+        if ($lease instanceof ResearchLease) {
+            $options['timeout'] = intdiv($lease->waitMs(), 1000);
+        }
         if ($schema instanceof StructuredOutputSchema) {
             $options['structured_output'] = $schema;
         }

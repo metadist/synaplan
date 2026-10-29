@@ -23,6 +23,9 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      */
     private const PROBE_TIMEOUT_SECONDS = 2.0;
 
+    /** The longest a chat waits when the caller does not name a shorter deadline. */
+    private const MAX_CHAT_SECONDS = 300;
+
     private $client;
 
     /** @var list<array{name: string, size: int, family: string}>|null */
@@ -171,6 +174,10 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             ]);
 
             $requestBody = $this->buildChatRequestBody($messages, $options, $model);
+            $deadline = self::requestedTimeout($options);
+            if (null !== $deadline) {
+                return $this->chatWithin($requestBody, $deadline);
+            }
 
             $response = $this->client->chat()->create($requestBody);
 
@@ -268,7 +275,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $response = $this->httpClient->request('POST', $apiUrl, [
                 'json' => $requestBody,
                 'buffer' => false,
-                'timeout' => 300,
+                'timeout' => self::requestedTimeout($options) ?? self::MAX_CHAT_SECONDS,
             ]);
 
             $chunkCount = 0;
@@ -432,6 +439,54 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         return $requestBody;
+    }
+
+    /**
+     * A research step names how long this call may block. Absent, chat keeps
+     * the provider default. Never longer than the five-minute cap.
+     *
+     * @param array<string, mixed> $options
+     */
+    private static function requestedTimeout(array $options): ?int
+    {
+        $requested = $options['timeout'] ?? null;
+        if (!is_int($requested) || $requested < 1) {
+            return null;
+        }
+
+        return min(self::MAX_CHAT_SECONDS, $requested);
+    }
+
+    /**
+     * One non-streaming chat that stops at $timeoutSeconds. The SDK client
+     * has no per-request deadline, so this goes through the HTTP client.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array{content: string, usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cache_creation_tokens: int}}
+     */
+    private function chatWithin(array $requestBody, int $timeoutSeconds): array
+    {
+        $response = $this->httpClient->request('POST', rtrim($this->baseUrl, '/').'/api/chat', [
+            'json' => $requestBody + ['stream' => false],
+            'timeout' => $timeoutSeconds,
+        ]);
+        $payload = $response->toArray();
+        $message = $payload['message'] ?? null;
+        $content = is_array($message) && is_string($message['content'] ?? null) ? $message['content'] : '';
+        $promptTokens = is_numeric($payload['prompt_eval_count'] ?? null) ? (int) $payload['prompt_eval_count'] : 0;
+        $completionTokens = is_numeric($payload['eval_count'] ?? null) ? (int) $payload['eval_count'] : 0;
+
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => $promptTokens,
+                'completion_tokens' => $completionTokens,
+                'total_tokens' => $promptTokens + $completionTokens,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+        ];
     }
 
     /**

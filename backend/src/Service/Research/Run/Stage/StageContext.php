@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\Service\Research\Run\ResearchEventLog;
+use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\ResearchRoles;
 use App\Service\Research\Run\ResearchRunState;
 
@@ -24,6 +25,9 @@ final class StageContext
         public string $sourcesOn = 'web',
     ) {
     }
+
+    /** Set by the worker for the step it claimed. Null in a test that does not hold a lease. */
+    public ?ResearchLease $lease = null;
 
     /** The person switched the web on. A run that names only files does not search the web. */
     public function webOn(): bool
