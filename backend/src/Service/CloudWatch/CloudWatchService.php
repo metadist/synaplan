@@ -169,11 +169,7 @@ final readonly class CloudWatchService
     {
         $instanceId = $this->instances->fromRequest($request) ?? '';
         if ('' === $instanceId && $this->instances->isAmbiguous($request)) {
-            throw new CloudWatchException(
-                409,
-                'More than one cloud is registered for this login. Ask a Synaplan administrator to remove the one no longer in use.',
-                'platform_ambiguous',
-            );
+            throw new CloudWatchException(409, 'More than one cloud is registered for this login. Ask a Synaplan administrator to remove the one no longer in use.', 'platform_ambiguous');
         }
         foreach ($this->identities->findByUserId((int) $user->getId()) as $identity) {
             if ($identity->getInstanceId() === $instanceId && '' !== $instanceId) {

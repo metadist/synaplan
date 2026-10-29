@@ -6,9 +6,9 @@ namespace App\Tests\Unit\Service\PlatformLink;
 
 use App\Entity\PlatformInstance;
 use App\Repository\PlatformInstanceRepository;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
-use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\DeliveryProbe;
 use App\Service\PlatformLink\PlatformInstanceService;
 use PHPUnit\Framework\MockObject\MockObject;
