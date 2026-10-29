@@ -76,7 +76,7 @@ final class OllamaProviderChatTest extends TestCase
     {
         $captured = [];
         $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
-            $captured = ['method' => $method, 'url' => $url, 'timeout' => $opts['timeout'] ?? null];
+            $captured = ['method' => $method, 'url' => $url, 'timeout' => $opts['timeout'] ?? null, 'max_duration' => $opts['max_duration'] ?? null];
 
             return new MockResponse(json_encode([
                 'message' => ['content' => 'kept'],
@@ -94,6 +94,7 @@ final class OllamaProviderChatTest extends TestCase
         $this->assertSame('POST', $captured['method']);
         $this->assertStringContainsString('/api/chat', $captured['url']);
         $this->assertSame(225.0, $captured['timeout']);
+        $this->assertSame(225.0, $captured['max_duration']);
         $this->assertSame('kept', $result['content']);
         $this->assertSame(2, $result['usage']['prompt_tokens']);
         $this->assertSame(3, $result['usage']['completion_tokens']);
@@ -101,9 +102,9 @@ final class OllamaProviderChatTest extends TestCase
 
     public function testADeadlinePastFiveMinutesStaysAtTheCap(): void
     {
-        $captured = null;
+        $captured = [];
         $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
-            $captured = $opts['timeout'] ?? null;
+            $captured = ['timeout' => $opts['timeout'] ?? null, 'max_duration' => $opts['max_duration'] ?? null];
 
             return new MockResponse(json_encode(['message' => ['content' => 'kept']], JSON_THROW_ON_ERROR));
         });
@@ -111,7 +112,46 @@ final class OllamaProviderChatTest extends TestCase
 
         $provider->chat([['role' => 'user', 'content' => 'hi']], ['model' => 'llama3.2', 'timeout' => 900]);
 
-        $this->assertSame(300.0, $captured);
+        $this->assertSame(300.0, $captured['timeout']);
+        $this->assertSame(300.0, $captured['max_duration']);
+    }
+
+    public function testANamedStreamDeadlineBoundsTheWholeRequest(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = ['timeout' => $opts['timeout'] ?? null, 'max_duration' => $opts['max_duration'] ?? null];
+
+            return new MockResponse(json_encode(['message' => ['content' => ''], 'done' => true]));
+        });
+
+        $this->providerWithModel($client, 'llama3.2')->chatStream(
+            [['role' => 'user', 'content' => 'hi']],
+            static fn () => null,
+            ['model' => 'llama3.2', 'timeout' => 225],
+        );
+
+        $this->assertSame(225.0, $captured['timeout']);
+        $this->assertSame(225.0, $captured['max_duration']);
+    }
+
+    public function testAStreamWithoutADeadlineKeepsTheIdleTimeoutOnly(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = ['timeout' => $opts['timeout'] ?? null, 'max_duration' => $opts['max_duration'] ?? null];
+
+            return new MockResponse(json_encode(['message' => ['content' => ''], 'done' => true]));
+        });
+
+        $this->providerWithModel($client, 'llama3.2')->chatStream(
+            [['role' => 'user', 'content' => 'hi']],
+            static fn () => null,
+            ['model' => 'llama3.2'],
+        );
+
+        $this->assertSame(300.0, $captured['timeout']);
+        $this->assertSame(0, $captured['max_duration']);
     }
 
     /**

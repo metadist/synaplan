@@ -68,11 +68,13 @@ final class GoogleChat
                 'message_count' => count($messages),
             ]);
 
+            $timeout = $this->requestTimeout($model, self::DEFAULT_CHAT_TIMEOUT_SECONDS, $options);
             $response = $this->api->postJson(
                 $url,
                 $payload,
                 $key,
-                $this->requestTimeout($model, self::DEFAULT_CHAT_TIMEOUT_SECONDS),
+                $timeout,
+                $this->durationLimit($options, $timeout),
             );
 
             $data = $response->toArray();
@@ -131,12 +133,14 @@ final class GoogleChat
             // surface to the user so they can switch models or wait.
             // Only the request/header phase is retried — once chunks start
             // flowing, we never restart mid-stream.
+            $timeout = $this->requestTimeout($model, self::DEFAULT_STREAM_TIMEOUT_SECONDS, $options);
             $response = $this->requestWithSingleRetryOn503(
                 $this->api->modelUrl($model, 'streamGenerateContent?alt=sse'),
                 $payload,
                 $key,
                 $model,
-                $this->requestTimeout($model, self::DEFAULT_STREAM_TIMEOUT_SECONDS),
+                $timeout,
+                $this->durationLimit($options, $timeout),
             );
 
             return ['usage' => $this->readStream($response, $callback)];
@@ -331,15 +335,16 @@ final class GoogleChat
      * higher-level catch can surface a friendly message.
      *
      * @param array<string, mixed> $payload
+     * @param array<string, mixed> $httpOptions
      */
-    private function requestWithSingleRetryOn503(string $url, array $payload, string $key, string $model, int $timeout): ResponseInterface
+    private function requestWithSingleRetryOn503(string $url, array $payload, string $key, string $model, int $timeout, array $httpOptions = []): ResponseInterface
     {
         $maxAttempts = 2;
         $attempt = 0;
 
         while (true) {
             ++$attempt;
-            $response = $this->api->postJson($url, $payload, $key, $timeout);
+            $response = $this->api->postJson($url, $payload, $key, $timeout, $httpOptions);
 
             try {
                 $status = $response->getStatusCode();
@@ -482,9 +487,39 @@ final class GoogleChat
         return $config;
     }
 
-    private function requestTimeout(string $model, int $default): int
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function requestTimeout(string $model, int $default, array $options = []): int
     {
-        return $this->usesThinkingLevel($model) ? self::ARGON_TIMEOUT_SECONDS : $default;
+        $base = $this->usesThinkingLevel($model) ? self::ARGON_TIMEOUT_SECONDS : $default;
+        $requested = self::namedTimeout($options);
+
+        return null === $requested ? $base : min($base, $requested);
+    }
+
+    /**
+     * A named deadline also bounds the whole request. Idle timeout alone
+     * lets a trickle of bytes run past it. No named deadline keeps the
+     * previous request, which had no total-duration cap.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{max_duration?: int}
+     */
+    private function durationLimit(array $options, int $timeout): array
+    {
+        return null === self::namedTimeout($options) ? [] : ['max_duration' => $timeout];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private static function namedTimeout(array $options): ?int
+    {
+        $requested = $options['timeout'] ?? null;
+
+        return is_int($requested) && $requested >= 1 ? $requested : null;
     }
 
     private function usesThinkingLevel(string $model): bool

@@ -64,7 +64,9 @@ final class AiFacadeResearchModelCallerTest extends TestCase
             self::anything(),
             7,
             self::callback(static function (array $options): bool {
-                return 225 === ($options['timeout'] ?? null);
+                $again = $options['before_paid_retry'] ?? null;
+
+                return 225 === ($options['timeout'] ?? null) && $again instanceof \Closure && true === $again();
             }),
         )->willReturn(['content' => 'kept', 'usage' => []]);
         $costs = $this->createStub(CostCalculationService::class);

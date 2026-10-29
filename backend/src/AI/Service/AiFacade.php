@@ -244,7 +244,7 @@ class AiFacade
         /* @var array<string, mixed> */
         return $this->pipeline()->run(
             $call,
-            static fn (AiCall $c): array => $provider->chat($c->payload->messages, array_diff_key($c->options->providerOptions, ['_bill_to' => true, 'skip_circuit_breaker' => true, 'skip_model_health' => true])),
+            static fn (AiCall $c): array => $provider->chat($c->payload->messages, array_diff_key($c->options->providerOptions, ['_bill_to' => true, 'skip_circuit_breaker' => true, 'skip_model_health' => true, 'before_paid_retry' => true])),
         )->value;
     }
 
@@ -269,19 +269,18 @@ class AiFacade
             throw $violation;
         }
 
-        $logContext = [
-            'provider' => $provider->getName(),
-            'model' => $options['model'] ?? null,
-            'schema' => $schema->name,
-            'user_id' => $userId,
-            'validation_error' => $violation->getValidationError(),
-        ];
+        $logContext = ['provider' => $provider->getName(), 'model' => $options['model'] ?? null, 'schema' => $schema->name, 'user_id' => $userId, 'validation_error' => $violation->getValidationError()];
 
         $salvaged = $this->structuredOutputRecovery->salvage($violation->getFailedGeneration(), $schema);
         if (null !== $salvaged) {
             $this->logger->warning('AI chat: salvaged a schema-rejected generation without a retry', $logContext);
 
             return $this->salvagedResponse($salvaged);
+        }
+
+        $again = $options['before_paid_retry'] ?? null;
+        if ($again instanceof \Closure && true !== $again()) {
+            throw $violation;
         }
 
         $this->logger->warning('AI chat: schema-rejected generation not salvageable, retrying once with a corrective turn', $logContext + [

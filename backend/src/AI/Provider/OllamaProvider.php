@@ -271,12 +271,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Stream directly via HttpClient so we can read the `thinking` field
             // that the Ollama PHP SDK (ChatMessageResponse) silently drops.
-            $apiUrl = rtrim($this->baseUrl, '/').'/api/chat';
-            $response = $this->httpClient->request('POST', $apiUrl, [
-                'json' => $requestBody,
-                'buffer' => false,
-                'timeout' => self::requestedTimeout($options) ?? self::MAX_CHAT_SECONDS,
-            ]);
+            $response = $this->httpClient->request('POST', rtrim($this->baseUrl, '/').'/api/chat', self::streamHttpOptions($requestBody, $options));
 
             $chunkCount = 0;
             $fullResponse = '';
@@ -458,6 +453,30 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
+     * Idle timeout alone lets a slow stream run past a named deadline.
+     * The five-minute default stays idle-only, as it was.
+     *
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private static function streamHttpOptions(array $requestBody, array $options): array
+    {
+        $named = self::requestedTimeout($options);
+        $http = [
+            'json' => $requestBody,
+            'buffer' => false,
+            'timeout' => $named ?? self::MAX_CHAT_SECONDS,
+        ];
+        if (null !== $named) {
+            $http['max_duration'] = $named;
+        }
+
+        return $http;
+    }
+
+    /**
      * One non-streaming chat that stops at $timeoutSeconds. The SDK client
      * has no per-request deadline, so this goes through the HTTP client.
      *
@@ -470,6 +489,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         $response = $this->httpClient->request('POST', rtrim($this->baseUrl, '/').'/api/chat', [
             'json' => $requestBody + ['stream' => false],
             'timeout' => $timeoutSeconds,
+            'max_duration' => $timeoutSeconds,
         ]);
         $payload = $response->toArray();
         $message = $payload['message'] ?? null;

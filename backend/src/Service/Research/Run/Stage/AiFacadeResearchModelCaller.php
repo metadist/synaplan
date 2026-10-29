@@ -47,6 +47,9 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         ];
         if ($lease instanceof ResearchLease) {
             $options['timeout'] = intdiv($lease->waitMs(), 1000);
+            // The facade's schema repair is another paid call. Renew first.
+            // A lost token skips it; the checkpoint still cannot land.
+            $options['before_paid_retry'] = static fn (): bool => $lease->renew();
         }
         if ($schema instanceof StructuredOutputSchema) {
             $options['structured_output'] = $schema;
