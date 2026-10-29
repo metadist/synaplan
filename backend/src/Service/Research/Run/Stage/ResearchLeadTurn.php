@@ -19,6 +19,7 @@ final readonly class ResearchLeadTurn
         public array $calls,
         public string $modelKey,
         public ?float $cost,
+        public ?ResearchCallUsage $usage = null,
     ) {
     }
 

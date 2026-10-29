@@ -16,6 +16,7 @@ final readonly class ResearchSettingsInput
      */
     private function __construct(
         public ?bool $enabled,
+        public ?bool $autoEnabled,
         public ?int $maxActiveRuns,
         public ?int $maxActiveThorough,
         public array $budgets,
@@ -27,13 +28,8 @@ final readonly class ResearchSettingsInput
      */
     public static function fromBody(array $body): self
     {
-        $enabled = null;
-        if (array_key_exists('enabled', $body)) {
-            if (!is_bool($body['enabled'])) {
-                throw new ResearchRejected(400, 'invalid', 'enabled', 'Choose on or off.');
-            }
-            $enabled = $body['enabled'];
-        }
+        $enabled = self::toggle($body, 'enabled');
+        $autoEnabled = self::toggle($body, 'autoEnabled');
 
         $limits = self::section($body, 'limits');
         $budgets = [];
@@ -57,10 +53,26 @@ final readonly class ResearchSettingsInput
 
         return new self(
             $enabled,
+            $autoEnabled,
             self::whole($limits, 'maxActiveRuns', $runsMin, $runsMax, 'limits.'),
             self::whole($limits, 'maxActiveThorough', $thoroughMin, $thoroughMax, 'limits.'),
             $budgets,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private static function toggle(array $body, string $key): ?bool
+    {
+        if (!array_key_exists($key, $body)) {
+            return null;
+        }
+        if (!is_bool($body[$key])) {
+            throw new ResearchRejected(400, 'invalid', $key, 'Choose on or off.');
+        }
+
+        return $body[$key];
     }
 
     /**

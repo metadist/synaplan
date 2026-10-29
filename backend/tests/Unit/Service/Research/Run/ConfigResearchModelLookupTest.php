@@ -32,6 +32,29 @@ final class ConfigResearchModelLookupTest extends TestCase
         $this->assertSame('anthropic', $choice->family);
     }
 
+    public function testFallbackIsSkippedWhenSlotHasNoConfiguredBinding(): void
+    {
+        $models = $this->createStub(ModelConfigService::class);
+        $models->method('getConfiguredDefaultModel')->willReturn(null);
+        $models->method('getDefaultModel')->willReturn(null);
+
+        $this->assertNull($this->lookup([12 => $this->model('anthropic', 'chat')], $models)->slot(7, 'READ'));
+    }
+
+    public function testConfiguredBindingTakesPrecedenceInSlot(): void
+    {
+        $models = $this->createStub(ModelConfigService::class);
+        $models->method('getConfiguredDefaultModel')->willReturnCallback(
+            static fn (string $slot): ?int => 'READ' === $slot ? 12 : null,
+        );
+        $models->method('isConfiguredModelUsable')->willReturn(true);
+
+        $choice = $this->lookup([12 => $this->model('anthropic', 'chat')], $models)->slot(7, 'READ');
+
+        $this->assertNotNull($choice);
+        $this->assertSame(12, $choice->id);
+    }
+
     public function testAHintedModelIsCheckedAgainstTheAllowList(): void
     {
         $groups = $this->createMock(GroupPolicyService::class);

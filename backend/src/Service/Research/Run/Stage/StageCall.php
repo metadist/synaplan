@@ -26,6 +26,9 @@ final readonly class StageCall
     {
     }
 
+    /**
+     * @param \Closure(string): void|null $onText hears a plain answer piece by piece as the model writes it
+     */
     public function once(
         StageContext $ctx,
         string $role,
@@ -33,8 +36,9 @@ final readonly class StageCall
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?\Closure $onText = null,
     ): StageCallResult {
-        $reply = $this->attempt($ctx, $role, $modelId, $system, $user, $schema);
+        $reply = $this->attempt($ctx, $role, $modelId, $system, $user, $schema, $onText);
         if ($reply instanceof StageResult) {
             return StageCallResult::stop($reply);
         }
@@ -66,17 +70,21 @@ final readonly class StageCall
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?\Closure $onText = null,
     ): ResearchModelReply|StageResult {
         $blocked = StageEnds::beforeCall($ctx);
         if ($blocked instanceof StageResult) {
             return $blocked;
         }
 
-        $reply = $this->models->answer($ctx->state->ref->userId, $modelId, $system, $user, $schema);
+        $reply = $this->models->answer($ctx->state->ref->userId, $modelId, $system, $user, $schema, $onText);
         if ($reply->called) {
             $ctx->state->budget->spend('calls');
             if (null !== $reply->cost) {
                 $ctx->state->budget->addCost($reply->cost);
+            }
+            if (null !== $reply->usage) {
+                $ctx->state->spend->add($role, $reply->modelKey, $reply->usage);
             }
             $ledgerRole = self::LEDGER_ROLE[$role] ?? null;
             if (null !== $ledgerRole && '' !== $reply->modelKey) {

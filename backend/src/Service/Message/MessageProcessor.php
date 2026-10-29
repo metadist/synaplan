@@ -9,6 +9,9 @@ use App\Entity\Message;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\Infrastructure\PerfTimer;
+use App\Service\Message\Chat\FreshInfoRequest;
+use App\Service\Message\Effort\AutoResearchTurn;
+use App\Service\Message\Processing\FreshInfoRetry;
 use App\Service\Message\Processing\TurnClassificationResolver;
 use App\Service\Message\Processing\TurnDispatcher;
 use App\Service\Message\Processing\TurnHistoryLoader;
@@ -36,6 +39,8 @@ final readonly class MessageProcessor
         private TurnWebSearch $webSearch,
         private TurnDispatcher $dispatcher,
         private LoggerInterface $logger,
+        private ?AutoResearchTurn $autoResearch = null,
+        private ?FreshInfoRetry $freshInfo = null,
     ) {
     }
 
@@ -95,20 +100,26 @@ final readonly class MessageProcessor
             $classification = TurnClassificationResolver::withWidgetMode($classification ?? [], $options);
             $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
+            [$classification, $notice, $limitSentence] = $this->autoResearch($message, $classification, $options, $conversationHistory, $status);
+            if (null !== $notice) {
+                return $this->noticeResult($streamCallback, $notice, $classification, $sorting, $preprocessed);
+            }
             [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options, $perfTimer);
 
-            ['classification' => $classification, 'searchResults' => $searchResults]
+            ['classification' => $classification, 'searchResults' => $searchResults, 'searchOnRequest' => $searchOnRequest]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status, $perfTimer);
-            if ($searchResults) {
-                $options['search_results'] = $searchResults;
-            }
+            $options = $this->withSearchResults($message, $options, $searchResults, $searchOnRequest);
 
             [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory, $perfTimer);
 
             $this->dispatcher->announce($message, $status);
+            if (null !== $limitSentence) {
+                $streamCallback($limitSentence."\n\n"); // why no research started, saved with the reply
+            }
 
             $perfTimer->start('handler_total');
-            $response = $this->dispatcher->dispatchStreamed($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+            $dispatch = fn (array $options): array => $this->dispatcher->dispatchStreamed($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+            [$response, $requestedResults] = $this->answerAfterRequestedSearch($message, $classification, $options, $dispatch($options), $status, $dispatch, $perfTimer);
             $perfTimer->stop('handler_total');
 
             return [
@@ -116,7 +127,7 @@ final readonly class MessageProcessor
                 'classification' => self::verdictForCaller($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting),
                 'response' => $response,
                 'preprocessed' => $preprocessed,
-                'search_results' => $searchResults,
+                'search_results' => $requestedResults ?? $searchResults,
             ];
         } catch (StreamCancelledException $e) {
             // An explicit Stop is not a failure: the cancelled turn is already
@@ -184,20 +195,29 @@ final readonly class MessageProcessor
             $classification = TurnClassificationResolver::withWidgetMode($classification, $options);
             $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
-            [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options);
+            [$classification, $notice, $limitSentence] = $this->autoResearch($message, $classification, $options, $conversationHistory, $status);
+            $searchResults = null;
+            if (null !== $notice) {
+                $response = AutoResearchTurn::noticeReply($notice);
+            } else {
+                [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options);
 
-            ['classification' => $classification, 'searchResults' => $searchResults]
-                = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status);
-            if ($searchResults) {
-                $options['search_results'] = $searchResults;
+                ['classification' => $classification, 'searchResults' => $searchResults, 'searchOnRequest' => $searchOnRequest]
+                    = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status);
+                $options = $this->withSearchResults($message, $options, $searchResults, $searchOnRequest);
+
+                // The same read-only summary as the stream, so email, MCP and
+                // webhook turns get the same long-thread context.
+                [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory);
+
+                $this->dispatcher->announce($message, $status);
+                $dispatch = fn (array $options): array => $this->dispatcher->dispatchBuffered($message, $conversationHistory, $classification, $statusCallback, $options);
+                [$response, $requestedResults] = $this->answerAfterRequestedSearch($message, $classification, $options, $dispatch($options), $status, $dispatch);
+                $searchResults = $requestedResults ?? $searchResults;
+                if (null !== $limitSentence && is_string($response['content'] ?? null)) {
+                    $response['content'] = $limitSentence."\n\n".$response['content'];
+                }
             }
-
-            // The same read-only summary as the stream, so email, MCP and
-            // webhook turns get the same long-thread context.
-            [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory);
-
-            $this->dispatcher->announce($message, $status);
-            $response = $this->dispatcher->dispatchBuffered($message, $conversationHistory, $classification, $statusCallback, $options);
             // A buffered caller has no stream to end, so the turn reports its own end.
             $status->report('complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
@@ -235,6 +255,97 @@ final readonly class MessageProcessor
 
             return ['success' => false, 'error' => $e->getMessage(), 'details' => $errorDetails, 'classification' => $classification ?? null, 'exception' => $e];
         }
+    }
+
+    /**
+     * The chat may start a research instead of answering. A failure inside
+     * the gate never costs the person their answer: it is logged and the
+     * turn goes on as rated.
+     *
+     * @param array<string, mixed>                                     $classification
+     * @param array<string, mixed>                                     $options
+     * @param array<int, Message|array{role: string, content: string}> $history
+     *
+     * @return array{0: array<string, mixed>, 1: string|null, 2: string|null}
+     */
+    private function autoResearch(Message $message, array $classification, array $options, array $history, TurnStatus $status): array
+    {
+        if (null === $this->autoResearch) {
+            return [$classification, null, null];
+        }
+        try {
+            return $this->autoResearch->apply($message, $classification, $options, $history, $status);
+        } catch (\Throwable $e) {
+            $this->logger->error('Automatic research gate failed; answering directly', ['message_id' => $message->getId(), 'error' => $e->getMessage()]);
+
+            return [$classification, null, null];
+        }
+    }
+
+    /**
+     * The search results for the handler — or, when none ran and the turn
+     * may still search, the option that lets the answering model ask for
+     * one ({@see FreshInfoRequest}). Only on the direct route, where the
+     * handler's request comes back to this processor.
+     *
+     * @param array<string, mixed>      $options
+     * @param array<string, mixed>|null $searchResults
+     *
+     * @return array<string, mixed>
+     */
+    private function withSearchResults(Message $message, array $options, ?array $searchResults, bool $searchOnRequest): array
+    {
+        if ($searchResults) {
+            $options['search_results'] = $searchResults;
+        } elseif ($searchOnRequest && null !== $this->freshInfo && $this->dispatcher->returnsHandlerResult($message)) {
+            $options[FreshInfoRequest::OPTION] = true;
+        }
+
+        return $options;
+    }
+
+    /**
+     * When the model asked for the web instead of answering, search with its
+     * phrase and dispatch again. A failure inside the retry never costs the
+     * person their answer: the turn answers without the search.
+     *
+     * @param array<string, mixed>                                 $classification
+     * @param array<string, mixed>                                 $options
+     * @param array<string, mixed>                                 $response
+     * @param callable(array<string, mixed>): array<string, mixed> $dispatch
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>|null} the final handler result and the requested search's results
+     */
+    private function answerAfterRequestedSearch(Message $message, array $classification, array $options, array $response, TurnStatus $status, callable $dispatch, ?PerfTimer $perfTimer = null): array
+    {
+        if (null === $this->freshInfo || null === FreshInfoRequest::fromHandlerResult($response)) {
+            return [$response, null];
+        }
+
+        return $this->freshInfo->apply($message, $classification, $options, $response, $status, $dispatch, $perfTimer);
+    }
+
+    /**
+     * The research answers later, in this chat; the notice is the turn's
+     * whole reply, streamed so the saved reply carries it too.
+     *
+     * @param array<string, mixed>                $classification
+     * @param array{0: mixed, 1: mixed, 2: mixed} $sorting
+     * @param array{hasFiles: bool}               $preprocessed
+     *
+     * @return array<string, mixed>
+     */
+    private function noticeResult(callable $streamCallback, string $notice, array $classification, array $sorting, array $preprocessed): array
+    {
+        $streamCallback($notice);
+
+        return [
+            'success' => true,
+            'classification' => self::verdictForCaller($classification, $sorting),
+            'response' => AutoResearchTurn::noticeReply($notice),
+            'preprocessed' => $preprocessed,
+            'search_results' => null,
+        ];
     }
 
     /**

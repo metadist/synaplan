@@ -1610,6 +1610,35 @@
                                                 "null"
                                             ]
                                         },
+                                        "BEFFORT": {
+                                            "enum": [
+                                                "answer",
+                                                "lookup",
+                                                "research",
+                                                null
+                                            ],
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "BEFFORT_WHY": {
+                                            "enum": [
+                                                "simple",
+                                                "current_fact",
+                                                "several_parts",
+                                                "comparison",
+                                                "procedure",
+                                                "asked_short",
+                                                "asked_thorough",
+                                                "follow_up",
+                                                null
+                                            ],
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
                                         "BINPUTMODE": {
                                             "enum": [
                                                 "text_only",
@@ -1691,6 +1720,8 @@
                                         "BWEBSEARCH",
                                         "BREADPAGES",
                                         "BMULTI",
+                                        "BEFFORT",
+                                        "BEFFORT_WHY",
                                         "BMEDIA",
                                         "BINPUTMODE",
                                         "BDURATION",
@@ -1703,10 +1734,10 @@
                             }
                         }
                     },
-                    "body_sha1": "c52d9e6ca4c5e56c3b84bd0602410e2ea5937f29",
+                    "body_sha1": "5c34b35415461b4d33bf98933b28ce80913f9aa1",
                     "headers": [
                         "Authorization: Bearer <secret>",
-                        "Content-Length: 1252",
+                        "Content-Length: 1519",
                         "Content-Type: application/json",
                         "Host: api.openai.com"
                     ],

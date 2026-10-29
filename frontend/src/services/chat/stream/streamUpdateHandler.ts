@@ -5,6 +5,7 @@
  * reach memory code. Every event of an aborted turn is dropped.
  */
 import type { StreamUpdatePayload } from '@/types/chatStream'
+import { autoResearchHandlers } from './handlers/autoResearch'
 import { guestCompletionHandlers, memberCompletionHandlers } from './handlers/completion'
 import { contentHandlers, memberContentHandlers } from './handlers/content'
 import { continuationHandlers } from './handlers/continuation'
@@ -31,6 +32,7 @@ const memberHandlers: StreamHandlers<MemberTurn> = {
   ...memberProgressHandlers,
   ...memberContentHandlers,
   ...memoryHandlers,
+  ...autoResearchHandlers,
   ...memberCompletionHandlers,
 }
 

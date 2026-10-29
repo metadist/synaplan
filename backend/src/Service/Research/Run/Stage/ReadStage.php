@@ -6,9 +6,11 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchEvidenceSchema;
 use App\Service\Research\Run\Ledger\CanonicalUrl;
+use App\Service\Research\Run\Ledger\EvidenceCard;
 use App\Service\Research\Run\Ledger\Passage;
 use App\Service\Research\Run\Ledger\PassageMap;
 use App\Service\Research\Run\Ledger\PassageSplitter;
+use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\PlanPoint;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchStateStore;
@@ -26,6 +28,8 @@ final readonly class ReadStage implements ResearchStage
     private const PASSAGE_BUDGET = 12000;
     private const MAX_LINKS = 8;
     private const WRITER_CALLS = 2;
+    /** Findings of one source shown to the person; the rest still go into the ledger. */
+    private const SHOWN_FINDINGS = 4;
 
     public function __construct(
         private StageCall $calls,
@@ -169,8 +173,11 @@ final readonly class ReadStage implements ResearchStage
 
         $data = $called->reply->data ?? [];
         $accepted = $this->accepted->accept($source->id, $data, $map, $links, $ctx->state->ledger);
-        foreach ($accepted['cards'] as $card) {
+        foreach ($accepted['cards'] as $index => $card) {
             $ctx->state->ledger->addEvidence($card);
+            if ($index < self::SHOWN_FINDINGS) {
+                $ctx->events->append($ctx->state->ref->id, 'finding', $this->findingEvent($card));
+            }
         }
         foreach ($accepted['leads'] as $lead) {
             $created = Source::web($lead['url'], CanonicalUrl::host($lead['url']) ?? 'Untitled source')->fromLink($source->id);
@@ -186,9 +193,33 @@ final readonly class ReadStage implements ResearchStage
         $published = is_string($data['published'] ?? null) ? $data['published'] : null;
         $ctx->state->ledger->describeSource($source->id, $kind, $published);
         $ctx->state->budget->spend('sources');
-        $this->mark($ctx, $source->id, Source::READ);
+        $this->mark($ctx, $source->id, Source::READ, null, count($accepted['cards']));
 
         return null;
+    }
+
+    /**
+     * What the reader took from the page, in its own words, with the quote
+     * that backs it when there is one.
+     *
+     * @return array<string, mixed>
+     */
+    private function findingEvent(EvidenceCard $card): array
+    {
+        $event = [
+            'source' => $card->sourceId,
+            'point' => $card->pointId,
+            'fact' => PlainText::line($card->fact, 300),
+            'confidence' => $card->confidence,
+        ];
+        foreach ($card->quotes as $quote) {
+            if ($quote->verified) {
+                $event['quote'] = PlainText::line($quote->text, 300);
+                break;
+            }
+        }
+
+        return $event;
     }
 
     private function pageFor(StageContext $ctx, Source $source): ResearchPage
@@ -200,17 +231,22 @@ final readonly class ReadStage implements ResearchStage
         return $this->pages->open($source->url ?? '');
     }
 
-    private function mark(StageContext $ctx, string $sourceId, string $status, ?string $reason = null): void
+    private function mark(StageContext $ctx, string $sourceId, string $status, ?string $reason = null, ?int $findings = null): void
     {
         $ctx->state->ledger->markSource($sourceId, $status, $reason);
-        $this->announce($ctx, $sourceId);
+        $this->announce($ctx, $sourceId, $findings);
     }
 
-    private function announce(StageContext $ctx, string $sourceId): void
+    /** A read source says how many findings it gave, so "nothing new in it" is visible too. */
+    private function announce(StageContext $ctx, string $sourceId, ?int $findings = null): void
     {
         $source = $ctx->state->ledger->source($sourceId);
         if (null !== $source) {
-            $ctx->events->append($ctx->state->ref->id, 'source', $source->toEvent());
+            $event = $source->toEvent();
+            if (null !== $findings) {
+                $event['findings'] = $findings;
+            }
+            $ctx->events->append($ctx->state->ref->id, 'source', $event);
         }
     }
 

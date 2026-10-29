@@ -155,6 +155,7 @@ final readonly class StreamReplyPersister
         $outgoing->setDirection('OUT');
         $outgoing->setStatus('complete');
         $this->meta->stampAgentId($outgoing, $turn->options->agent?->agentId, $turn->options->agent?->versionId);
+        $this->meta->stampEffort($outgoing, $classification);
 
         // Incognito keeps the reply transient: the File rows exist (marked
         // ephemeral), but no attachment rows are written.

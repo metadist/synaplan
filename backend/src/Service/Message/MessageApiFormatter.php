@@ -8,6 +8,7 @@ use App\AI\Exception\ChatFailureReason;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Chat\Stream\StreamMessageMeta;
 use App\Service\File\DataUrlFixer;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -241,9 +242,8 @@ final readonly class MessageApiFormatter
             // Background media job (Release 4.0 async video) — lets the UI show
             // a persistent "generating in background" banner after reload.
             'mediaJob' => $mediaJob,
-            'errorReason' => $errorFields['errorReason'],
-            'canRetryModel' => $errorFields['canRetryModel'],
-            'errorDebug' => $errorFields['errorDebug'],
+            ...$errorFields,
+            ...StreamMessageMeta::effortPayload($m),
             'voiceReplyFailed' => $this->voiceReplyFailedReason($m),
             'agentId' => $this->agentIdFromMeta($m),
             'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),

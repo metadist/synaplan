@@ -143,6 +143,76 @@ final class ResearchStagesTest extends TestCase
         self::assertSame(['plan', 'plan_waiting'], array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'));
     }
 
+    public function testAnAutomaticRunWithASmallPlanShrinksToTheQuickRow(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Auto);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(2));
+
+        $result = (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('gather', $result->next);
+        self::assertSame(ResearchDepth::Quick, $ctx->state->ceiling);
+        self::assertSame(ResearchDepth::Quick, $ctx->state->effectiveDepth());
+        self::assertSame(2, $ctx->state->budget->limits()->searches);
+        self::assertSame(0, $ctx->state->budget->extras()->questions);
+        $plan = $ctx->events->replay($ctx->state->ref->id, 0)[0]['data'];
+        self::assertSame('quick', $plan['ceiling']);
+        self::assertSame(1, $plan['estimate']['minutes']);
+        self::assertSame(0.1, $plan['estimate']['cost']);
+    }
+
+    public function testAnAutomaticRunWithALargerPlanKeepsTheStandardRow(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Auto);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(3));
+
+        (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame(ResearchDepth::Standard, $ctx->state->ceiling);
+        self::assertSame(ResearchDepth::Standard, $ctx->state->effectiveDepth());
+        self::assertSame(10, $ctx->state->budget->limits()->searches);
+        self::assertSame('standard', $ctx->events->replay($ctx->state->ref->id, 0)[0]['data']['ceiling']);
+    }
+
+    public function testABriefHintCapsThePlanAtTwoPointsAndADeeperHintNeverShrinks(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Auto);
+        $ctx->state->hint = 'brief';
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(4));
+
+        (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertCount(2, $ctx->state->ledger->points());
+        self::assertSame(ResearchDepth::Quick, $ctx->state->ceiling);
+        self::assertStringContainsString('1–2 points', $caller->seen[0]['system']);
+
+        [$deeper, $caller] = $this->open(ResearchDepth::Auto);
+        $deeper->state->hint = 'deeper';
+        $deeper->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(1));
+
+        (new PlanStage(new StageCall($caller)))->run($deeper);
+
+        self::assertSame(ResearchDepth::Standard, $deeper->state->ceiling);
+        self::assertSame(10, $deeper->state->budget->limits()->searches);
+    }
+
+    public function testAChosenDepthNeverGetsACeiling(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = $this->json($this->plan(1));
+
+        (new PlanStage(new StageCall($caller)))->run($ctx);
+
+        self::assertNull($ctx->state->ceiling);
+        self::assertNull($ctx->events->replay($ctx->state->ref->id, 0)[0]['data']['ceiling']);
+        self::assertSame(10, $ctx->state->budget->limits()->searches);
+    }
+
     public function testWriteNowDuringTheThoroughPlanCallDoesNotWaitForConfirmation(): void
     {
         [$ctx, $caller] = $this->open(ResearchDepth::Thorough);
@@ -893,6 +963,62 @@ final class ResearchStagesTest extends TestCase
         }
     }
 
+    public function testThePersonReadsWhyASourceWasPickedWhatItSaidAndTheDraftAsItIsWritten(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'It answers the question.', [['q' => 'unit price', 'language' => 'en', 'scope' => 'web']]);
+        $caller->script = [
+            $this->json(['results' => [[
+                'id' => 'r1', 'point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'Price list on the maker site',
+            ]]]),
+            $this->json([
+                'source_id' => 's1',
+                'useful' => true,
+                'published' => null,
+                'kind' => 'vendor',
+                'findings' => [[
+                    'point' => 'p1',
+                    'fact' => 'The unit price is 12.40 EUR.',
+                    'passages' => ['§1'],
+                    'quote' => ['text' => 'The unit price is 12.40 EUR.', 'passage' => '§1'],
+                    'confidence' => 'high',
+                ]],
+                'leads' => [],
+                'flags' => [],
+            ]),
+            new ResearchModelReply(true, true, null, 'The unit price is 12.40 EUR [e1].', 'test:replay', null),
+        ];
+        $search = new ReplaySearch();
+        $search->hits['unit price'] = [ResearchHit::from('https://maker.example/price', 'Price list', '12.40 EUR', null)];
+        $pages = new ReplayPages();
+        $pages->pages['https://maker.example/price'] = new ResearchPage(false, 'The unit price is 12.40 EUR.', '', []);
+        $calls = new StageCall($caller);
+
+        (new GatherStage($calls, $search, new GatherChoice()))->run($ctx);
+        (new ReadStage($calls, $pages, new PassageSplitter(), new AcceptedEvidence(new PassageVerifier()), $this->store()))->run($ctx);
+        (new WriteStage($calls))->run($ctx);
+
+        $byName = [];
+        foreach ($ctx->events->replay($ctx->state->ref->id, 0) as $event) {
+            $byName[$event['event']][] = $event['data'];
+        }
+        $sources = $byName['source'];
+        self::assertSame('Price list on the maker site', $sources[0]['why']);
+        self::assertSame('found', $sources[0]['status']);
+        self::assertSame('read', $sources[count($sources) - 1]['status']);
+        self::assertSame(1, $sources[count($sources) - 1]['findings']);
+        self::assertSame([[
+            'source' => 's1',
+            'point' => 'p1',
+            'fact' => 'The unit price is 12.40 EUR.',
+            'confidence' => 'high',
+            'quote' => 'The unit price is 12.40 EUR.',
+        ]], $byName['finding']);
+        self::assertSame('The unit price is 12.40 EUR [e1].', implode('', array_column($byName['draft'], 'text')));
+        self::assertSame(['writing', 'draft', 'section'], array_slice(array_column($ctx->events->replay($ctx->state->ref->id, 0), 'event'), -3));
+    }
+
     public function testAQuickRunLeavesItsLastTwoCallsToTheWriterAndTheChecker(): void
     {
         [$ctx, $caller] = $this->open();
@@ -1082,6 +1208,25 @@ final class ResearchStagesTest extends TestCase
     private function store(): ResearchStateStore
     {
         return new ResearchStateStore($this->keys, $this->clock);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function plan(int $points): array
+    {
+        $rows = [];
+        for ($i = 1; $i <= $points; ++$i) {
+            $rows[] = [
+                'id' => 'p'.$i,
+                'title' => 'Point '.$i,
+                'why' => 'The goal asks for it.',
+                'queries' => [['q' => 'point '.$i.' 2026', 'language' => 'en']],
+                'scope' => 'web',
+            ];
+        }
+
+        return ['points' => $rows, 'outline' => ['Summary'], 'estimate' => ['minutes' => 1, 'cost' => 1]];
     }
 
     /**

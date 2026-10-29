@@ -6,6 +6,8 @@ namespace App\AI\StructuredOutput\Schema;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Effort\Effort;
+use App\Service\Message\Effort\EffortReason;
 
 /**
  * JSON schema for {@see \App\Service\Message\MessageSorter}'s classification
@@ -64,12 +66,14 @@ final class SortClassificationSchema
                     'BWEBSEARCH' => ['type' => 'boolean'],
                     'BREADPAGES' => ['type' => 'integer', 'enum' => [0, 2, 3]],
                     'BMULTI' => ['type' => ['boolean', 'null']],
+                    'BEFFORT' => ['type' => ['string', 'null'], 'enum' => [...Effort::values(), null]],
+                    'BEFFORT_WHY' => ['type' => ['string', 'null'], 'enum' => [...EffortReason::values(), null]],
                     'BMEDIA' => ['type' => ['string', 'null'], 'enum' => [...self::MEDIA_TYPES, null]],
                     'BINPUTMODE' => ['type' => ['string', 'null'], 'enum' => [...self::INPUT_MODES, null]],
                     'BDURATION' => ['type' => ['integer', 'null']],
                     'BRESOLUTION' => ['type' => ['string', 'null'], 'enum' => [...self::VIDEO_RESOLUTIONS, null]],
                 ],
-                'required' => ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BREADPAGES', 'BMULTI', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
+                'required' => ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BREADPAGES', 'BMULTI', 'BEFFORT', 'BEFFORT_WHY', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
             ],
         );
     }

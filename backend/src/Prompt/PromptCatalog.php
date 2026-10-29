@@ -450,7 +450,7 @@ If there are attached files, their types are listed in BATTACHED_FILES and the c
 
 You will respond only with a valid JSON object containing ONLY the
 classification fields listed under "Answer format" below (BTOPIC, BLANG,
-BWEBSEARCH, BREADPAGES, BMULTI, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
+BWEBSEARCH, BREADPAGES, BMULTI, BEFFORT, BEFFORT_WHY, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
 BTEXT, BFILETEXT, BFILEPATH, BDATETIME, or any other field from the message
 you received — those are input only.
 
@@ -569,6 +569,50 @@ This is the list, use only this:
      opening hours, a simple yes/no fact, "latest news from Berlin" as a headline roundup.
    When in doubt on a research question with no URL, prefer 3 over 0 — a hedged
    "I cannot confirm the figure" is worse than reading three pages.
+
+6c. **Rate how much work the answer needs (BEFFORT)**. Three values:
+
+   "answer" — one reply from general knowledge or from this conversation.
+   This is the default. ALWAYS "answer" for: greetings and smalltalk; coding
+   help; creative writing; translation, grammar, rephrasing, summarising or
+   extracting from text or files the user provided; math and logic; opinions
+   and advice; a message that asks for brevity ("short", "quickly", "in one
+   sentence", "kurz", "schnell", "en bref", "kısaca", "brevemente"); and a
+   follow-up that the previous answer in this conversation already covers.
+
+   "lookup" — ONE current fact or a short list that a few web pages settle:
+   a price, a date, an office holder, a version, the weather, opening hours,
+   "what is the latest …". Usually BWEBSEARCH 1.
+
+   "research" — the correct answer has SEVERAL parts that each need their own
+   sources, and a person would open many pages to assemble it:
+   - a procedure with authorities, documents and an order ("what do I need to
+     marry a Chinese citizen in China — which offices, which documents"),
+   - a comparison of several products, providers, laws or places,
+   - a regulation or requirement that differs by country, state or case,
+   - a market, vendor or literature overview,
+   - an explicit wish for depth: "thorough", "in detail", "with sources",
+     "research this", "gründlich", "ausführlich", "recherchiere",
+     "à fond", "detalladamente", "ayrıntılı".
+   When a message is between "lookup" and "research" and the user did not
+   ask for brevity, choose "research". NEVER choose "research" for the
+   "answer" list above, however long the message is.
+
+   Set BEFFORT_WHY to the one reason that made you decide:
+   "simple", "current_fact", "several_parts", "comparison", "procedure",
+   "asked_short", "asked_thorough", "follow_up".
+
+   Examples:
+   - "Hi, wie gehts?" → BEFFORT: "answer", BEFFORT_WHY: "simple"
+   - "Write a Python function that sorts a list" → BEFFORT: "answer", BEFFORT_WHY: "simple"
+   - "Wie steht der Dollar zum Euro?" → BEFFORT: "lookup", BEFFORT_WHY: "current_fact"
+   - "Who is the CEO of Siemens?" → BEFFORT: "lookup", BEFFORT_WHY: "current_fact"
+   - "Was brauche ich, um eine Chinesin in China zu heiraten — welche Behörden, welche Dokumente, in welcher Reihenfolge?" → BEFFORT: "research", BEFFORT_WHY: "procedure"
+   - "Compare Nextcloud, ownCloud and OpenCloud for a 50-person company" → BEFFORT: "research", BEFFORT_WHY: "comparison"
+   - "Recherchiere gründlich, welche Förderprogramme es 2026 für Wärmepumpen in Bayern gibt" → BEFFORT: "research", BEFFORT_WHY: "asked_thorough"
+   - "Kurz: was ist eine Wärmepumpe?" → BEFFORT: "answer", BEFFORT_WHY: "asked_short"
+   - (after a report on heat pump subsidies) "Und in Österreich?" → BEFFORT: "lookup", BEFFORT_WHY: "follow_up"
+   - "Summarize the attached contract" → BEFFORT: "answer", BEFFORT_WHY: "simple"
 
 7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
 
@@ -745,6 +789,8 @@ BDATETIME, BATTACHED_FILES, ...):
 * "BWEBSEARCH": 0 | 1
 * "BREADPAGES": 0 | 2 | 3
 * "BMULTI": 0 | 1
+* "BEFFORT": "answer" | "lookup" | "research"
+* "BEFFORT_WHY": "simple" | "current_fact" | "several_parts" | "comparison" | "procedure" | "asked_short" | "asked_thorough" | "follow_up"
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
 * "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
 * "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
@@ -2441,7 +2487,11 @@ Return JSON only:
   - scope: web | files | both. Prefer files when the files above likely
     contain it.
 - outline: section titles for the [OUTPUT] in the report language, starting
-  with the summary and ending with "Not confirmed" (translated).
+  with the summary and ending with "Not confirmed" (translated). One section
+  per thing the goal asks for and nothing the goal did not ask for: no
+  recommendation, advice, outlook or "next steps" section unless the brief
+  asks for one. A comparison of three or more items is one table section
+  that covers every asked aspect, not one section per item.
 
 Points must not overlap. Put the point the goal depends on most first.
 PROMPT;
@@ -2581,6 +2631,10 @@ How to work:
 - Never repeat a query. If a point stays open after two tries, change the
   words, the language or the source kind once more, then leave it open.
 - Call several tools in one turn when they do not depend on each other.
+- Before the tool calls of a turn, write one or two plain sentences in the
+  language of the brief: what the last results told you and what you do
+  next. The person reads them while the research runs. They are notes for
+  the person, never the answer.
 - Use the point and source ids exactly as the plan and the results give them.
 - When a tool says no search is left, read what you found; when nothing is
   left, call finish.
@@ -2602,12 +2656,19 @@ Facts come ONLY from the evidence below. End every sentence that states a fact
 with the ids of the evidence it relies on, like [e12] or [e12][e31]. Sentences
 without facts (structure, transitions) need no id.
 
-Start with a summary of 3–5 sentences that answers the goal directly. Then
-follow the outline. Use a table when you compare three or more items.
+Answer what the goal asks and nothing more: no recommendation, advice,
+outlook or extra section the goal did not ask for, no restating of the
+question. Start with a summary of 2–4 sentences that answers the goal
+directly. Then follow the outline. When you compare three or more items, put
+the comparison in one table: one row per item, one column per asked aspect,
+each cell the figure or a few words with its ids.
 
-Where evidence is missing, thin or conflicting, say so in the section
-"[NOT_CONFIRMED_TITLE]": what is not confirmed and why; for a conflict, both
-versions with their dates. Never fill a gap with your own knowledge.
+Where evidence for something asked is missing, thin or conflicting, say so
+in the place the reader looks for it — a few words in the table cell or
+sentence, such as "no source confirms the fee" — and list it again in the
+section "[NOT_CONFIRMED_TITLE]": what is not confirmed and why; for a
+conflict, both versions with their dates. Never fill a gap with your own
+knowledge.
 
 Keep it as short as the goal allows (at most [MAX_WORDS] words). Write plainly
 for a non-expert unless the audience is expert. Never mention evidence cards,

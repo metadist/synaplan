@@ -13,8 +13,9 @@ use App\AI\ToolCalling\ToolDefinition;
 interface ResearchLeadCaller
 {
     /**
-     * @param list<array<string, mixed>> $messages
-     * @param list<ToolDefinition>       $tools
+     * @param list<array<string, mixed>>  $messages
+     * @param list<ToolDefinition>        $tools
+     * @param \Closure(string): void|null $onText   receives the lead's prose as it streams
      */
-    public function turn(int $userId, int $modelId, array $messages, array $tools): ResearchLeadTurn;
+    public function turn(int $userId, int $modelId, array $messages, array $tools, ?\Closure $onText = null): ResearchLeadTurn;
 }

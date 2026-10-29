@@ -82,6 +82,35 @@ final class ResearchBudgetTest extends TestCase
         self::assertTrue($restored->canCall());
     }
 
+    public function testShrinkingToTheQuickRowLowersEveryLimitAndSurvivesTheRoundTrip(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $budget = ResearchBudget::for(ResearchDepth::Auto, ResearchBudgetConfig::defaults(ResearchDepth::Auto)->withoutQuestions(), $start);
+        $budget->at($start);
+        $budget->spend('searches', 3);
+
+        $budget->shrinkTo(ResearchBudgetConfig::defaults(ResearchDepth::Quick));
+
+        self::assertSame([3, 2], $budget->toArray()['searches']);
+        self::assertFalse($budget->canSearch());
+        self::assertSame([0, 60], $budget->toArray()['seconds']);
+        self::assertSame(0.1, $budget->toArray()['cost']['estimate']);
+        self::assertSame(0, $budget->extras()->questions);
+        self::assertSame(3, $budget->extras()->pointsMin, 'the plan range stays with the row the run was planned on');
+
+        $restored = ResearchBudget::fromExport(ResearchDepth::Auto, $budget->export());
+
+        self::assertSame(2, $restored->limits()->searches);
+        self::assertSame(1, $restored->limits()->minutes());
+    }
+
+    public function testAnAutomaticRunStartsOnTheStandardRow(): void
+    {
+        self::assertEquals(ResearchBudgetConfig::defaults(ResearchDepth::Standard), ResearchBudgetConfig::defaults(ResearchDepth::Auto));
+        self::assertSame(ResearchDepth::Standard, ResearchDepth::Auto->budgetRow());
+        self::assertSame(['quick', 'standard', 'thorough', 'auto'], ResearchDepth::values());
+    }
+
     public function testASavedRunDoesNotSpendTimeWhileItWaits(): void
     {
         $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');

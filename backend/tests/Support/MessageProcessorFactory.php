@@ -14,6 +14,7 @@ use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\ConversationSummaryService;
+use App\Service\Message\Effort\AutoResearchTurn;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
@@ -62,6 +63,7 @@ final class MessageProcessorFactory
         ?WebResearchService $webResearch = null,
         ?ConfluenceLinkedPageReader $confluencePages = null,
         ?JiraLinkedIssueReader $jiraIssues = null,
+        ?AutoResearchTurn $autoResearch = null,
     ): MessageProcessor {
         return new MessageProcessor(
             $preProcessor,
@@ -78,6 +80,7 @@ final class MessageProcessorFactory
             ),
             new TurnDispatcher($router, $taskPlanExecutor, $taskPlanner, $taskPlanStore, $multitaskConfig, $modelConfigService, $logger),
             $logger,
+            $autoResearch,
         );
     }
 }

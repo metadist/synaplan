@@ -133,7 +133,7 @@ final readonly class MessagesGatewayConfig
     private const DEFAULT_MCP_TOOLS_WITH_CLIENT_TOOLS = false;
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
     private const DEFAULT_WEB_SEARCH_MODE = self::WEB_SEARCH_AUTO;
-    private const DEFAULT_WEB_SEARCH_MAX_ROUNDS = 2;
+    private const DEFAULT_WEB_SEARCH_MAX_ROUNDS = 4;
     private const DEFAULT_WEB_FETCH_MODE = self::WEB_FETCH_AUTO;
     private const DEFAULT_VISION_MODE = self::VISION_AUTO;
 

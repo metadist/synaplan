@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import ResearchAdminTab from '@/components/admin/research/ResearchAdminTab.vue'
 import { ApiError } from '@/services/api/httpClient'
 
@@ -16,6 +17,8 @@ vi.mock('@/services/api/researchAdminApi', () => ({
 const off = () => ({
   enabled: false,
   envLocked: false,
+  autoEnabled: true,
+  webSearchAvailable: true,
   readingModelId: null,
   checkingModelId: null,
   models: [{ id: 3, name: 'Atlas', available: true, reason: null }],
@@ -33,6 +36,7 @@ const refusal = (status: number, code: string, field: string | null = null) =>
 
 describe('ResearchAdminTab', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     fetchResearchAdmin.mockReset()
     saveResearchAdmin.mockReset()
     startResearchSample.mockReset()

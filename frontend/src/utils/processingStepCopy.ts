@@ -47,6 +47,33 @@ function strList(value: unknown): string[] {
 }
 
 /**
+ * The web search step. When the answering model, not the sorter, asked for
+ * the search, the detail says so: a search step that appears after the
+ * answer was already under way needs a reason the person can read.
+ */
+function webStepCopy(step: TimelineStep, done: boolean, t: Translate): StepCopy {
+  const meta = step.metadata
+  const count = num(meta.results_count)
+  const requestedByModel = meta.reason === 'model_requested'
+  if (step.status === 'search_failed') {
+    return { title: t('processing.timeline.searchFailed') }
+  }
+  if (done) {
+    return {
+      title: t('processing.searchCompleteTitle'),
+      chip: count !== undefined ? `${count} ${t('processing.results')}` : undefined,
+      detail: requestedByModel ? t('processing.timeline.searchRequestedByModel') : undefined,
+    }
+  }
+  return {
+    title: t('processing.searchingTitle'),
+    detail: requestedByModel
+      ? t('processing.timeline.searchRequestedByModel')
+      : t('processing.searchingDesc'),
+  }
+}
+
+/**
  * What the sorter understood, as one plain sentence. Media and document
  * requests are the most specific hints, then research, then multi-step; a
  * plain conversation says so instead of leaving the line empty.
@@ -153,19 +180,8 @@ export function describeStep(
       return { title: t('processing.fetchingUrlsTitle'), detail: t('processing.fetchingUrlsDesc') }
     }
 
-    case 'web': {
-      const count = num(meta.results_count)
-      if (step.status === 'search_failed') {
-        return { title: t('processing.timeline.searchFailed') }
-      }
-      if (done) {
-        return {
-          title: t('processing.searchCompleteTitle'),
-          chip: count !== undefined ? `${count} ${t('processing.results')}` : undefined,
-        }
-      }
-      return { title: t('processing.searchingTitle'), detail: t('processing.searchingDesc') }
-    }
+    case 'web':
+      return webStepCopy(step, done, t)
 
     case 'pages': {
       const read = num(meta.pages_read) ?? 0

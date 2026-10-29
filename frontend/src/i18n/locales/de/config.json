@@ -795,7 +795,20 @@
       "legacyTitle": "Legacy-Fallback (Admin)",
       "legacyDesc": "Der Einzelthema-AI-Sorter-Prompt, der verwendet wird, wenn Multi-Task-Routing aus ist.",
       "fallbackTitle": "AI-Fallback-Sort-Prompt",
-      "fallbackSubtitle": "Der Einzelthema-AI-Sorter-Prompt, der verwendet wird, wenn Multi-Task-Routing aus ist. Nur Admin."
+      "fallbackSubtitle": "Der Einzelthema-AI-Sorter-Prompt, der verwendet wird, wenn Multi-Task-Routing aus ist. Nur Admin.",
+      "agentTuningTitle": "Feinabstimmung für Agenten & Recherche (Optional)",
+      "agentTuningDesc": "Lege optional fest, welche Modelle Aufgabenplanung, Quellen lesen und Faktencheck übernehmen. Standardmäßig werden dein Sortier- und Textanalyse-Modell automatisch genutzt.",
+      "agentTuningAllAuto": "Alles automatisch",
+      "agentTuningCustomCount": "{count} angepasst",
+      "plannerSlotLabel": "Aufgaben-Planung",
+      "plannerSlotHint": "Zerlegt komplexe Anfragen in einzelne Schritte.",
+      "readingSlotLabel": "Quellen lesen",
+      "readingModelAuto": "Automatisch (Sortier-Modell verwenden)",
+      "readingSlotHint": "Liest jede geöffnete Quelle und extrahiert Belege.",
+      "checkingSlotLabel": "Faktencheck",
+      "checkingModelAuto": "Automatisch (anderer Anbieter / Textanalyse)",
+      "checkingSlotHint": "Prüft jede zitierte Aussage gegen ihre Quelle.",
+      "researchLeadNote": "Planung und Schreiben einer Recherche nutzen immer das Modell, das du im Chat ausgewählt hast."
     },
     "sortingPrompt": {
       "title": "Preprocessor",

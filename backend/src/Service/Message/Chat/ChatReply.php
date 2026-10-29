@@ -13,7 +13,8 @@ use App\Service\Document\DocumentEditResult;
  * streamed document edit also the file and changes the edit produced.
  * `documentEdit` is set when the document tool loop answered instead of a
  * plain completion. `sawVisibleText` is false when a stream ended without a
- * single visible token.
+ * single visible token. `webSearchQuery` is set when the model answered with
+ * a {@see FreshInfoRequest} instead of an answer.
  */
 final readonly class ChatReply
 {
@@ -28,6 +29,7 @@ final readonly class ChatReply
         public ?string $finishReason = null,
         public ?DocumentEditResult $documentEdit = null,
         public bool $sawVisibleText = true,
+        public ?string $webSearchQuery = null,
     ) {
     }
 

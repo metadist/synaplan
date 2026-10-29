@@ -111,7 +111,6 @@
       <IncognitoToggle />
     </div>
 
-    <ResearchHost v-if="route.name === 'chat'" />
     <TourHost />
 
     <!-- Global background-jobs tray (Release 4.0) — self-contained floating launcher -->
@@ -131,7 +130,7 @@ import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
-import ResearchHost from './research/ResearchHost.vue'
+import { useResearchBinding } from '../composables/useResearchBinding'
 import TourHost from './help/TourHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 import IncognitoToggle from './IncognitoToggle.vue'
@@ -144,6 +143,7 @@ const sidebarStore = useSidebarStore()
 const incomingStore = useIncomingStore()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
+useResearchBinding()
 
 // Signed-out users get a prominent login shortcut in the top bar. Hidden while
 // the drawer is open so it never overlaps the sliding content / close button.

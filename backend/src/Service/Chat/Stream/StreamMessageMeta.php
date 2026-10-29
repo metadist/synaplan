@@ -18,9 +18,48 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class StreamMessageMeta
 {
+    /** How much the question needed: answer, lookup or research. */
+    public const EFFORT = 'effort';
+    /** Why a research the question needed was not started (a GateDecision reason). */
+    public const EFFORT_NOTICE = 'effort_notice';
+    /** The research run the chat started for this turn; its report replaces the reply's text. */
+    public const RESEARCH_RUN = 'research_run_id';
+
     public function __construct(
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * The effort rating, a held-back reason and the research run on the
+     * reply, so Look deeper and the research steps survive a reload.
+     *
+     * @param array<string, mixed> $classification
+     */
+    public function stampEffort(Message $message, array $classification): void
+    {
+        foreach ([self::EFFORT, self::EFFORT_NOTICE, self::RESEARCH_RUN] as $key) {
+            $value = $classification[$key] ?? null;
+            if (is_string($value) && '' !== $value) {
+                $message->setMeta($key, $value);
+            }
+        }
+    }
+
+    /**
+     * The same three fields on the history row and on the SSE `complete`
+     * event, so Look deeper and the research steps show live and after a
+     * reload alike.
+     *
+     * @return array{effort: ?string, effortNotice: ?string, researchRunId: ?string}
+     */
+    public static function effortPayload(Message $message): array
+    {
+        return [
+            'effort' => $message->getMeta(self::EFFORT),
+            'effortNotice' => $message->getMeta(self::EFFORT_NOTICE),
+            'researchRunId' => $message->getMeta(self::RESEARCH_RUN),
+        ];
     }
 
     public function stampAgentId(Message $message, ?int $agentId, ?int $agentVersionId = null): void

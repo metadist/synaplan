@@ -452,6 +452,7 @@
   "chatMessage": {
     "again": "Tekrar",
     "againWith": "Şununla tekrar",
+    "moreActions": "Diğer işlemler",
     "regenerateWith": "Şununla yeniden oluştur",
     "copy": "Mesajı kopyala",
     "whatWasSent": "Gönderilen metin",
@@ -793,6 +794,7 @@
       "preprocessingDone": "Ekler işlendi",
       "understoodDone": "İsteğiniz anlaşıldı",
       "searchFailed": "Web araması kullanılamıyor — aramasız yanıtlanıyor",
+      "searchRequestedByModel": "Yanıt güncel bilgi gerektiriyor — model web'e bakılmasını istedi",
       "plannedDone": "Adımlar planlandı",
       "promptDone": "Talimatlar hazırlandı",
       "filesDone": "Dosyalarınız kontrol edildi",
@@ -1074,44 +1076,110 @@
     "deleteConfirm": "/{command} sohbet menüsünden kaldırılır. Daha önce gönderdiğiniz mesajlar olduğu gibi kalır."
   },
   "research": {
-    "menu": "Araştırma",
-    "menuHint": "Kaynaklı yazılı bir rapor, bu sohbette",
-    "title": "Araştırma",
-    "questionLabel": "Ne öğrenmek istiyorsun?",
-    "depth": {
-      "standard": "Standart",
-      "thorough": "Ayrıntılı"
-    },
-    "depthHint": {
-      "standard": "Yaklaşık {minutes} dakika",
-      "thorough": "Yaklaşık {minutes} dakika"
-    },
-    "sourcesLabel": "Kaynaklar",
-    "sourceWeb": "Web",
-    "sourceFiles": "Kitaplık klasörleri",
-    "start": "Araştırmayı başlat",
-    "startNeedsQuestion": "Ne öğrenmek istediğini yaz.",
-    "startNeedsSource": "Web'i aç veya dosya ekle.",
-    "noSources": "Web araması ve Kitaplık klasörleri kapalı, bu yüzden araştırma başlayamaz.",
     "noChat": "Bir sohbet aç, sonra araştırmayı başlat.",
     "startFailed": "Araştırma başlatılamadı. Soruyu kontrol edip yeniden dene.",
     "stopFailed": "Araştırma durdurulamadı. Hâlâ sürüyor.",
     "incognito": "Araştırma raporu sohbete kaydeder. Önce gizli sohbeti bitir.",
-    "close": "Kapat",
-    "continues": "Bu pencereyi kapatabilirsin. Araştırma sürer ve rapor bu sohbette görünür.",
     "stop": "Durdur",
     "stopConsequence": "Durdurmak şimdiye kadar yazılanı tutar ve başka arama yapmaz.",
-    "stopped": "Araştırma durdu. Şimdiye kadar yazılan bu sohbette kalır. Başka arama yapılmadı.",
-    "failed": "Araştırma bitirilemedi. Bu sohbete yeni bir şey eklenmedi.",
-    "working": "Araştırma sürüyor.",
-    "workingDone": "Araştırma bitti.",
     "queued": "Araştırma sırada. {seconds} saniyedir bekliyor.",
-    "factCheck": "Olgu kontrolü: {total} ifadeden {supported} tanesi destekleniyor. {removed} tanesi çıkarıldı.",
-    "find": "Rapor bu sohbette. Kitaplık, sonra Dosyalar altında da açabilir veya başlığıyla arayabilirsin.",
-    "sourcesCount": "{found} bulundu, {read} okundu, {blocked} engellendi",
-    "pointDone": "Bitti",
-    "pointOpen": "Açık",
-    "pointNotConfirmed": "Doğrulanmadı",
-    "depthLabel": "Ne kadar ayrıntılı?"
+    "answerNow": "Şimdi yanıtla",
+    "answerNowConsequence": {
+      "reading": "Şimdi yanıtla, okunanlardan raporu yazar.",
+      "early": "Şimdi yanıtla, ek arama olmadan yanıtlar.",
+      "writing": "Rapor neredeyse hazır."
+    },
+    "answerNowFailed": "Şimdi yanıtla araştırmaya ulaşamadı. Araştırma sürüyor.",
+    "answeredWithout": "Ek arama olmadan yanıtlandı.",
+    "lookDeeper": "Daha derin bak",
+    "turn": {
+      "working": "Araştırılıyor…",
+      "stepOf": "Adım {n} / {total}",
+      "stepsSoFar": "Şimdiye kadar {steps} adım · {sources} kaynak okundu",
+      "draftWriting": "Yanıt taslağı — sırada her ifadenin kontrolü var.",
+      "draftChecking": "Yanıt taslağı — şu anda her ifade kontrol ediliyor. Son metin ardından gelir.",
+      "summary": {
+        "complete": "Araştırıldı: {steps} adım · {sources} kaynak okundu",
+        "stopped": "Araştırma {steps} adımdan sonra durduruldu",
+        "failed": "Araştırma tamamlanamadı"
+      }
+    },
+    "phase": {
+      "understand": "Soruyu anlama",
+      "plan": "Yanıtı planlama",
+      "gather": "Arama ve okuma",
+      "write": "Yanıtı yazma",
+      "check": "Her ifadeyi kontrol etme",
+      "points": "{count} nokta",
+      "answered": "{count} yanıtlandı",
+      "searches": "{count} arama",
+      "sourcesRead": "{count} kaynak okundu",
+      "findings": "{count} bulgu",
+      "gatherBlocked": "{count} açılamadı",
+      "softened": "{count} yumuşatıldı.",
+      "sectionsWritten": "{count} bölüm yazıldı",
+      "earlier": "{count} önceki adımı göster"
+    },
+    "step": {
+      "brief": "Soru anlaşıldı",
+      "plan": "{count} nokta planlandı",
+      "search": "Arandı",
+      "searchFiles": "Dosyalarda arandı",
+      "searchSkipped": "Arama eklenmedi — bu bölümde zaten yeterince var",
+      "searchResults": "{count} sonuç",
+      "source": {
+        "found": "Bulundu",
+        "reading": "Okunuyor",
+        "read": "Okundu",
+        "blocked": "Açılamadı"
+      },
+      "finding": "Bulundu",
+      "sourceFindings": "{count} bulgu",
+      "sourceNothingNew": "plan için yeni bir şey yok",
+      "point": {
+        "answered": "Yanıtlandı",
+        "not_confirmed": "Doğrulanmadı",
+        "open": "Açık"
+      },
+      "round": "Tur {round}",
+      "roundAgain": "Henüz yeterli değil — aramaya devam (tur {round})",
+      "roundWrite": "Yeterince bulundu — yanıt yazılıyor",
+      "roundWait": "Yanıtınız bekleniyor",
+      "roundReason": {
+        "write_now": "Yanıtı şimdi istediniz.",
+        "finish": "Yönetici, yanıt için yeterli olduğuna karar verdi.",
+        "covered": "Her nokta yanıtlandı.",
+        "answered": "Her nokta yanıtlandı.",
+        "budget": "Araştırma bütçesi tükendi.",
+        "no_progress": "Son tur yeni bir şey bulmadı.",
+        "calls": "Model çağrısı sınırına ulaşıldı.",
+        "wall": "Zaman sınırına ulaşıldı.",
+        "cost": "Maliyet sınırına ulaşıldı.",
+        "rounds": "Tur sınırına ulaşıldı.",
+        "gather": "Arama veya okuma hakkı kalmadı.",
+        "nothing_queued": "Bakılacak bir şey kalmamıştı."
+      },
+      "writing": "Yazılıyor",
+      "section": "Yazıldı",
+      "checking": "Her ifade kontrol ediliyor",
+      "verdict": {
+        "partial": "Yumuşatıldı",
+        "contradicted": "Çelişiyor — yanıtın dışında bırakıldı",
+        "unsupported": "Desteklenmiyor — yanıtın dışında bırakıldı",
+        "removed": "Yanıtın dışında bırakıldı"
+      },
+      "verdictReason": {
+        "uncited": "Arkasında hiçbir kaynak yok.",
+        "number": "Sayı, alıntılanan kaynakta yer almıyor.",
+        "name": "İsim, alıntılanan kaynakta yer almıyor.",
+        "unknown_id": "Araştırmanın hiç okumadığı bir kaynağı alıntılıyor."
+      },
+      "check": "Doğrulama: {ratio} ifade desteklendi",
+      "checkRemoved": "{count} tanesi hiçbir kaynak doğrulamadığı için yanıtın dışında bırakıldı.",
+      "checkSameProvider": "Aynı sağlayıcının bir modeli kontrol etti.",
+      "complete": "Bitti",
+      "stopped": "Durduruldu",
+      "failed": "Tamamlanamadı"
+    }
   }
 }

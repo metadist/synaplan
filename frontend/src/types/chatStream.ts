@@ -174,6 +174,9 @@ export interface StreamUpdatePayload {
   model?: string
   model_id?: number | null
   topic?: string
+  effort?: string | null
+  effortNotice?: string | null
+  researchRunId?: string | null
   originalTopic?: string | null
   originalMediaType?: string | null
   errorReason?: string | null

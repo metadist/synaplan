@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Messages;
 
+use App\AI\Messages\GatewayEffortRules;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
@@ -1278,6 +1279,57 @@ final class GatewayToolLoopTest extends TestCase
         );
 
         $this->assertSame(4, $calls);
+        $this->assertSame(200, $result['status']);
+    }
+
+    public function testTheSeededCeilingOfFourAllowsFourSearchesAndTellsTheModelHowToScaleThem(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->exactly(4))->method('execute')->willReturn([
+            'text' => 'See https://example.org/visa',
+            'isError' => false,
+            'query' => 'visa',
+            'resultCount' => 1,
+        ]);
+
+        $loop = $this->webSearchLoop($webSearch, 4);
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                $paragraphs = array_filter(
+                    $body['system'] ?? [],
+                    static fn (array $block): bool => GatewayEffortRules::PARAGRAPH === $block['text'],
+                );
+                $this->assertCount(1, $paragraphs, 'the effort rules are said once per upstream call');
+                if ($calls <= 4) {
+                    return $this->toolUseBody('toolu_search_'.$calls, 'web_search', ['query' => 'visa part '.$calls]);
+                }
+
+                return $this->textBody('Four parts, four sources. https://example.org/visa');
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'system' => 'You are a careful assistant.',
+                'messages' => [['role' => 'user', 'content' => 'Compare the visa rules of four countries.']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        $this->assertSame(5, $calls, 'four searches, then the wrap-up answer');
         $this->assertSame(200, $result['status']);
     }
 

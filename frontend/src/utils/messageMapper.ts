@@ -17,6 +17,7 @@ import { generatePartId, isMediaPartType } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
 import { collapseApiToolTurn } from '@/utils/apiToolTurn'
 import { extractPastedBlocks } from '@/utils/pastedContent'
+import { adoptEffort, effortFields, type MessageEffort } from '@/utils/messageEffort'
 import {
   buildUploadUrl,
   isAudioFileType,
@@ -292,7 +293,7 @@ export interface ApiLoadedAttachmentFile {
 }
 
 /** Message row from GET /chats/{id}/messages and GET /messages/{id} */
-export interface ApiLoadedMessageRow {
+export interface ApiLoadedMessageRow extends MessageEffort {
   id: number
   direction?: string
   text?: string
@@ -406,7 +407,6 @@ function askUserFrom(value: unknown): import('@/stores/history').TaskCard['askUs
 
 export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   const role = m.direction === 'IN' ? 'user' : 'assistant'
-
   const parts = parseContentWithThinking(m.text || '', role, m.thinking_seconds ?? null)
 
   // Add generated file (image/video/audio) as part if present.
@@ -525,11 +525,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         askUser: askUserFrom(c.ask_user),
       }
     })
-    taskPlanState = {
-      active: false,
-      replyNode: m.taskPlan.reply_node,
-      cards,
-    }
+    taskPlanState = { active: false, replyNode: m.taskPlan.reply_node, cards }
   }
 
   // Remove any plain-media parts whose URL already appears on a restored card
@@ -589,6 +585,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     provider: cleanProvider,
     modelLabel: cleanModelLabel,
     topic: m.topic,
+    ...effortFields(role, m),
     originalTopic: m.originalTopic || null,
     originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
     errorReason: role === 'assistant' ? (m.errorReason ?? null) : null,
@@ -808,9 +805,7 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
     if (persisted.provider) local.provider = persisted.provider
     if (persisted.modelLabel) local.modelLabel = persisted.modelLabel
   }
-  if (persisted.webSearch) {
-    local.webSearch = persisted.webSearch
-  }
+  if (persisted.webSearch) local.webSearch = persisted.webSearch
   if (persisted.searchResults && persisted.searchResults.length > 0) {
     local.searchResults = persisted.searchResults
   }
@@ -831,6 +826,7 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   if (persisted.voiceReplyFailed) {
     local.voiceReplyFailed = persisted.voiceReplyFailed
   }
+  adoptEffort(local, persisted)
   if (persisted.wasMultitask) {
     local.wasMultitask = true
   }

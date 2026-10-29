@@ -43,6 +43,9 @@
         "topic": "tools:pic"
     },
     "again_sort_prompt_is_no_override": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -97,6 +100,9 @@
         "topic": "officemaker"
     },
     "attach_image_code_execution_forces_the_planner": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -114,6 +120,9 @@
         "web_search": false
     },
     "attach_image_goes_to_the_sorter": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -195,6 +204,9 @@
         "topic": "tools:pic"
     },
     "chat_plain_de": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": null,
         "model_id": null,
@@ -212,6 +224,9 @@
         "web_search": false
     },
     "chat_plain_en": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": null,
         "model_id": null,
@@ -229,6 +244,9 @@
         "web_search": false
     },
     "chat_plain_es": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": null,
         "model_id": null,
@@ -246,6 +264,9 @@
         "web_search": false
     },
     "chat_plain_fr": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": null,
         "model_id": null,
@@ -263,6 +284,9 @@
         "web_search": false
     },
     "chat_thanks": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": null,
         "model_id": null,
@@ -379,6 +403,9 @@
         "topic": "general"
     },
     "cmd_search": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "force_web_search": true,
         "intent": "chat",
         "language": "en",
@@ -463,6 +490,9 @@
         "topic": "tools:web"
     },
     "deferral_needs_a_tool_calling_provider": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -495,6 +525,9 @@
         "web_search": null
     },
     "embedding_below_the_threshold": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -528,6 +561,9 @@
         "web_search": null
     },
     "embedding_match_declined_for_an_unknown_language": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "de",
         "media_type": "image",
@@ -546,6 +582,9 @@
         "web_search": false
     },
     "fastpath_on_declines_a_later_document_edit": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "document_generation",
         "language": "de",
         "model_id": null,
@@ -563,6 +602,9 @@
         "web_search": false
     },
     "fastpath_on_declines_after_a_generated_file": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "document_generation",
         "language": "de",
         "model_id": null,
@@ -580,6 +622,9 @@
         "web_search": false
     },
     "fastpath_on_declines_after_generated_media": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "input_mode": "reference_images",
         "intent": "image_generation",
         "language": "de",
@@ -599,6 +644,9 @@
         "web_search": false
     },
     "fastpath_on_declines_an_unknown_language": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "de",
         "model_id": null,
@@ -616,6 +664,9 @@
         "web_search": false
     },
     "fastpath_on_declines_media_words": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "de",
         "media_type": "image",
@@ -1297,6 +1348,9 @@
         "web_search": null
     },
     "produce_a_file_skips_the_embedding_router_and_the_deferral": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1314,6 +1368,9 @@
         "web_search": false
     },
     "produce_chart_from_csv": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "de",
         "model_id": null,
@@ -1331,6 +1388,9 @@
         "web_search": false
     },
     "produce_chart_from_csv_en": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1348,6 +1408,9 @@
         "web_search": false
     },
     "produce_stamp_on_png": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "de",
         "media_type": "image",
@@ -1366,6 +1429,9 @@
         "web_search": false
     },
     "self_aware_question_skips_the_embedding_router": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1383,6 +1449,9 @@
         "web_search": false
     },
     "sort_analyze": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "file_analysis",
         "language": "en",
         "model_id": null,
@@ -1400,6 +1469,9 @@
         "web_search": false
     },
     "sort_audio": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "de",
         "media_type": "audio",
@@ -1418,6 +1490,9 @@
         "web_search": false
     },
     "sort_audio_describe_attached_generic_image": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "de",
         "model_id": null,
@@ -1435,6 +1510,9 @@
         "web_search": false
     },
     "sort_audio_describe_attached_image": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "de",
         "model_id": null,
@@ -1452,6 +1530,9 @@
         "web_search": false
     },
     "sort_audio_no_attachment_stays_mediamaker": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "de",
         "media_type": "audio",
@@ -1470,6 +1551,9 @@
         "web_search": false
     },
     "sort_calendar_needs_planning": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1487,6 +1571,9 @@
         "web_search": false
     },
     "sort_custom_topic": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1504,6 +1591,9 @@
         "web_search": false
     },
     "sort_general": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": 5,
@@ -1521,6 +1611,9 @@
         "web_search": false
     },
     "sort_image": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "en",
         "media_type": "image",
@@ -1539,6 +1632,9 @@
         "web_search": false
     },
     "sort_multi_step_vote": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1556,6 +1652,9 @@
         "web_search": false
     },
     "sort_no_step_vote": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1573,6 +1672,9 @@
         "web_search": false
     },
     "sort_officemaker": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "document_generation",
         "language": "de",
         "model_id": null,
@@ -1590,6 +1692,9 @@
         "web_search": false
     },
     "sort_single_step_vote": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1608,6 +1713,9 @@
     },
     "sort_video_params": {
         "duration": 8,
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "image_generation",
         "language": "en",
         "media_type": "video",
@@ -1627,6 +1735,9 @@
         "web_search": false
     },
     "sort_websearch": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1644,6 +1755,9 @@
         "web_search": true
     },
     "spoken_output_forces_the_planner": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "de",
         "model_id": null,
@@ -1661,6 +1775,9 @@
         "web_search": false
     },
     "u1_outlook_calendar_write": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1678,6 +1795,9 @@
         "web_search": false
     },
     "u2_mail_me_the_invite": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1695,6 +1815,9 @@
         "web_search": false
     },
     "u3_mail_search_summarize": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "en",
         "model_id": null,
@@ -1712,6 +1835,9 @@
         "web_search": false
     },
     "u4_document_to_target": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "document_generation",
         "language": "en",
         "model_id": null,
@@ -1729,6 +1855,9 @@
         "web_search": false
     },
     "voice_note_weather": {
+        "effort": "answer",
+        "effort_voted": false,
+        "effort_why": "simple",
         "intent": "chat",
         "language": "de",
         "model_id": null,

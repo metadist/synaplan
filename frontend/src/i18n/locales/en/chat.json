@@ -461,6 +461,7 @@
   "chatMessage": {
     "again": "Again",
     "againWith": "Again with",
+    "moreActions": "More actions",
     "regenerateWith": "Regenerate with",
     "copy": "Copy message",
     "messageDetails": "Message details",
@@ -785,6 +786,7 @@
       "preprocessingDone": "Attachments processed",
       "understoodDone": "Understood your request",
       "searchFailed": "Web search unavailable — answering without it",
+      "searchRequestedByModel": "The answer needs current information — the model asked to check the web",
       "plannedDone": "Steps planned",
       "promptDone": "Instructions prepared",
       "filesDone": "Checked your files",
@@ -1139,44 +1141,110 @@
     "deleteConfirm": "/{command} disappears from the chat menu. Messages you already sent stay as they are."
   },
   "research": {
-    "menu": "Research",
-    "menuHint": "A written report with sources, in this chat",
-    "title": "Research",
-    "questionLabel": "What do you want to find out?",
-    "depth": {
-      "standard": "Standard",
-      "thorough": "Thorough"
-    },
-    "depthHint": {
-      "standard": "About {minutes} minutes",
-      "thorough": "About {minutes} minutes"
-    },
-    "sourcesLabel": "Sources",
-    "sourceWeb": "Web",
-    "sourceFiles": "Library folders",
-    "start": "Start research",
-    "startNeedsQuestion": "Write what you want to find out.",
-    "startNeedsSource": "Turn on the web or add files.",
-    "noSources": "Web search and Library folders are both off, so research cannot start.",
     "noChat": "Open a chat, then start research.",
     "startFailed": "Research could not start. Check the question and try again.",
     "stopFailed": "Research could not be stopped. It is still running.",
     "incognito": "Research saves a report in the chat. End the incognito chat first.",
-    "close": "Close",
-    "continues": "You can close this window. Research continues, and the report appears in this chat.",
     "stop": "Stop",
     "stopConsequence": "Stopping keeps what was already written and does not search further.",
-    "stopped": "Research stopped. What was already written stays in this chat. Nothing further was searched.",
-    "failed": "Research could not finish. Nothing new was added to this chat.",
-    "working": "Research is working.",
-    "workingDone": "Research finished.",
     "queued": "Research is queued. It has been waiting {seconds} seconds.",
-    "factCheck": "Fact-check: {supported} of {total} statements are backed. {removed} were removed.",
-    "find": "The report is in this chat. You can also open it under Library, then Files, or search for its title.",
-    "sourcesCount": "{found} found, {read} read, {blocked} blocked",
-    "pointDone": "Done",
-    "pointOpen": "Still open",
-    "pointNotConfirmed": "Not confirmed",
-    "depthLabel": "How thorough?"
+    "answerNow": "Answer now",
+    "answerNowConsequence": {
+      "reading": "Answer now writes the report from what was already read.",
+      "early": "Answer now answers the question without the extra look.",
+      "writing": "The report is almost done."
+    },
+    "answerNowFailed": "Answer now did not reach the research. It is still running.",
+    "answeredWithout": "Answered without the extra look.",
+    "lookDeeper": "Look deeper",
+    "turn": {
+      "working": "Researching…",
+      "stepOf": "Step {n} of {total}",
+      "stepsSoFar": "{steps} steps so far · {sources} sources read",
+      "draftWriting": "Draft of the answer — every statement is checked next.",
+      "draftChecking": "Draft of the answer — checking every statement now. The final text follows.",
+      "summary": {
+        "complete": "Researched: {steps} steps · {sources} sources read",
+        "stopped": "Research stopped after {steps} steps",
+        "failed": "Research could not finish"
+      }
+    },
+    "phase": {
+      "understand": "Understanding the question",
+      "plan": "Planning the answer",
+      "gather": "Searching and reading",
+      "write": "Writing the answer",
+      "check": "Checking every statement",
+      "points": "{count} point | {count} points",
+      "answered": "{count} answered",
+      "searches": "{count} search | {count} searches",
+      "sourcesRead": "{count} source read | {count} sources read",
+      "findings": "{count} finding | {count} findings",
+      "gatherBlocked": "{count} could not be opened",
+      "softened": "{count} softened.",
+      "sectionsWritten": "{count} section written | {count} sections written",
+      "earlier": "Show {count} earlier step | Show {count} earlier steps"
+    },
+    "step": {
+      "brief": "Understood the question",
+      "plan": "Planned {count} points",
+      "search": "Searched",
+      "searchFiles": "Searched the files",
+      "searchSkipped": "Search not added — this part already has enough",
+      "searchResults": "{count} results",
+      "source": {
+        "found": "Found",
+        "reading": "Reading",
+        "read": "Read",
+        "blocked": "Could not open"
+      },
+      "finding": "Found",
+      "sourceFindings": "{count} finding | {count} findings",
+      "sourceNothingNew": "nothing new for the plan",
+      "point": {
+        "answered": "Answered",
+        "not_confirmed": "Not confirmed",
+        "open": "Open"
+      },
+      "round": "Round {round}",
+      "roundAgain": "Not enough yet — looking again (round {round})",
+      "roundWrite": "Enough found — writing the answer",
+      "roundWait": "Waiting for your answer",
+      "roundReason": {
+        "write_now": "You asked for the answer now.",
+        "finish": "The lead decided there is enough to answer.",
+        "covered": "Every point is answered.",
+        "answered": "Every point is answered.",
+        "budget": "The research budget is used up.",
+        "no_progress": "The last round found nothing new.",
+        "calls": "The limit of model calls is reached.",
+        "wall": "The time limit is reached.",
+        "cost": "The cost limit is reached.",
+        "rounds": "The limit of rounds is reached.",
+        "gather": "No searches or reads are left.",
+        "nothing_queued": "Nothing was left to look up."
+      },
+      "writing": "Writing",
+      "section": "Wrote",
+      "checking": "Checking every statement",
+      "verdict": {
+        "partial": "Softened",
+        "contradicted": "Contradicted — left out",
+        "unsupported": "Unsupported — left out",
+        "removed": "Left out"
+      },
+      "verdictReason": {
+        "uncited": "No source stands behind it.",
+        "number": "The number is not in the cited source.",
+        "name": "The name is not in the cited source.",
+        "unknown_id": "It cites a source the research never read."
+      },
+      "check": "Fact-check: {ratio} statements backed",
+      "checkRemoved": "{count} left out of the answer because no source confirmed them.",
+      "checkSameProvider": "Checked by a model of the same provider.",
+      "complete": "Done",
+      "stopped": "Stopped",
+      "failed": "Could not finish"
+    }
   }
 }

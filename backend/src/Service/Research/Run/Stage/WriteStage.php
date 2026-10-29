@@ -9,7 +9,9 @@ use App\Service\Research\Run\ResearchStatus;
 /**
  * Writes the report from evidence cards in one call. The writer never sees
  * the raw page, so a sentence in a page cannot become a sentence in the report
- * unless it was kept as evidence.
+ * unless it was kept as evidence. The words go out as `draft` events while
+ * the model writes them, so the person reads the answer forming before the
+ * fact-check settles it.
  */
 final readonly class WriteStage implements ResearchStage
 {
@@ -43,7 +45,9 @@ final readonly class WriteStage implements ResearchStage
         $ctx->state->advance(ResearchStatus::Writing);
         $ctx->events->append($ctx->state->ref->id, 'writing', ['section' => $sections[0]]);
 
-        $called = $this->calls->once($ctx, 'writing', $ctx->roles->writer, $system, FollowUpTask::text($ctx->state), null);
+        $draft = DraftStream::for($ctx);
+        $called = $this->calls->once($ctx, 'writing', $ctx->roles->writer, $system, FollowUpTask::text($ctx->state), null, $draft->listener());
+        $draft->finish();
         if ($called->stop instanceof StageResult) {
             return $called->stop;
         }

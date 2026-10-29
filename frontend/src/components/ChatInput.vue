@@ -453,13 +453,13 @@
               <button
                 v-else
                 type="button"
-                :disabled="!isStreaming && !canSend"
+                :disabled="(!composerStopping && !canSend) || (researchRunning && researchStopping)"
                 class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
-                :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
+                :aria-label="composerStopping ? $t('research.stop') : $t('chatInput.send')"
                 data-testid="btn-chat-send"
-                @click="isStreaming ? emit('stop') : sendMessage()"
+                @click="onSendSlot(sendMessage, () => emit('stop'))"
               >
-                <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
+                <div v-if="composerStopping" class="w-4 h-4 bg-white rounded-sm"></div>
                 <ArrowUpIcon v-else class="w-5 h-5" />
               </button>
             </div>
@@ -568,7 +568,7 @@ import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { useLiveVoice } from '@/composables/useLiveVoice'
-import { liveVoiceButtonVisible, liveVoiceReplacesSend } from '@/services/liveVoice/visibility'
+import { useComposerStop } from '@/composables/useComposerStop'
 import { liveCostBudget, type LiveVoiceCostBudget } from '@/services/api/liveVoiceApi'
 import type { LimitCheckResult } from '@/composables/useLimitCheck'
 import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
@@ -2133,27 +2133,20 @@ const {
   dismiss: liveDismiss,
 } = useLiveVoice((budget) => emit('budgetBlocked', liveBudgetResult(budget)))
 
-const showLiveVoiceButton = computed(() =>
-  liveVoiceButtonVisible({
-    enabled: configStore.voiceLive?.enabled === true,
-    guest: isGuestMode.value,
-    nativeApp: isNativeApp(),
-  })
-)
-
-const showLiveInSendSlot = computed(() =>
-  liveVoiceReplacesSend({
-    available: showLiveVoiceButton.value,
-    streaming: isStreaming.value,
-    hasText: message.value.trim().length > 0,
-    hasAttachment: uploadedFiles.value.length > 0 || pastedBlocks.value.length > 0,
-  })
-)
-
-function onLivePress() {
-  if (!showLiveInSendSlot.value) return
-  void livePress()
-}
+const {
+  composerStopping,
+  researchRunning,
+  researchStopping,
+  showLiveInSendSlot,
+  onLivePress,
+  onSendSlot,
+} = useComposerStop({
+  streaming: isStreaming,
+  guest: isGuestMode,
+  hasText: computed(() => message.value.trim().length > 0),
+  hasAttachment: computed(() => uploadedFiles.value.length > 0 || pastedBlocks.value.length > 0),
+  livePress,
+})
 
 const liveStatusHint = computed(() =>
   livePhase.value === 'connecting' ? t('chatInput.liveVoice.connectingHint') : ''

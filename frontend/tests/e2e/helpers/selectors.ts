@@ -249,15 +249,42 @@ export const selectors = {
     banner: '[data-testid="banner-incognito"]',
   },
   research: {
+    /** Removed with automatic research; asserted absent. */
     menu: '[data-testid="btn-tool-research"]',
-    composer: '[data-testid="section-research-composer"]',
-    question: '[data-testid="input-research-question"]',
-    start: '[data-testid="btn-research-start"]',
+    /** Gone from the card; Stop is the composer's send button while a run works. */
     stop: '[data-testid="btn-research-stop"]',
-    card: '[data-testid="card-research"]',
-    factCheck: '[data-testid="text-research-fact-check"]',
-    find: '[data-testid="text-research-find"]',
-    continues: '[data-testid="text-research-continues"]',
+    answerNow: '[data-testid="btn-research-answer-now"]',
+    answerNowConsequence: '[data-testid="text-research-answer-now-consequence"]',
+    /** The research inside the reply bubble; `data-status` carries the run status */
+    turn: '[data-testid="research-turn"]',
+    working: '[data-testid="research-turn-working"]',
+    /** "Step 3 of 5" beside the headline while the run works */
+    stepOf: '[data-testid="text-research-step-of"]',
+    /** The row of the open phase that is happening right now */
+    activity: '[data-testid="text-research-activity"]',
+    stepsToggle: '[data-testid="btn-research-steps"]',
+    summary: '[data-testid="text-research-summary"]',
+    /** One phase of the run; `data-phase` names it, `data-state` is done, active or upcoming */
+    phase: (id: 'understand' | 'plan' | 'gather' | 'write' | 'check') =>
+      `[data-testid="research-phase"][data-phase="${id}"]`,
+    phaseToggle: '[data-testid="btn-research-phase"]',
+    phaseSummary: '[data-testid="text-research-phase-summary"]',
+    steps: '[data-testid="list-research-steps"]',
+    /** The model's own sentence under a step: why a source was picked, what it said */
+    stepAside: '[data-testid="text-research-step-aside"]',
+    /** A done step folded to one line; a click opens it */
+    stepToggle: '[data-testid="btn-research-step"]',
+    /** The answer as the writer streams it, under the phases while the run works */
+    draft: '[data-testid="research-draft"]',
+    draftNote: '[data-testid="text-research-draft-note"]',
+    lookDeeper: '[data-testid="btn-look-deeper"]',
+    lookDeeperSection: '[data-testid="section-look-deeper"]',
+    /** Admin tab: the automatic-research switch under the research switch */
+    adminAuto: '[data-testid="research-admin-auto"]',
+    adminAutoTurnOff: '[data-testid="research-admin-auto-turn-off"]',
+    adminAutoTurnOn: '[data-testid="research-admin-auto-turn-on"]',
+    adminAutoConsequence: '[data-testid="research-admin-auto-consequence"]',
+    adminAutoNeedsResearch: '[data-testid="research-admin-auto-needs-research"]',
   },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */

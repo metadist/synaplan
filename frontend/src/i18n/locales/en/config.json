@@ -810,7 +810,20 @@
       "legacyTitle": "Legacy fallback (admin)",
       "legacyDesc": "The single-topic AI sorter prompt, used when multi-task routing is off.",
       "fallbackTitle": "AI Fallback Sort Prompt",
-      "fallbackSubtitle": "The single-topic AI sorter prompt, used when multi-task routing is off. Admin only."
+      "fallbackSubtitle": "The single-topic AI sorter prompt, used when multi-task routing is off. Admin only.",
+      "agentTuningTitle": "Fine-Tuning for Agents & Research (Optional)",
+      "agentTuningDesc": "Optionally override which models handle task planning, reading sources, and fact-checking. By default, your Sorting and Text Analytics models are used automatically.",
+      "agentTuningAllAuto": "All automatic",
+      "agentTuningCustomCount": "{count} custom",
+      "plannerSlotLabel": "Task planning",
+      "plannerSlotHint": "Breaks complex requests into task steps.",
+      "readingSlotLabel": "Reading sources",
+      "readingModelAuto": "Auto (use Sorting model)",
+      "readingSlotHint": "Reads each opened source and extracts quotes.",
+      "checkingSlotLabel": "Fact-checking",
+      "checkingModelAuto": "Auto (other provider / Text Analytics)",
+      "checkingSlotHint": "Checks every cited statement against its source.",
+      "researchLeadNote": "Leading the research and writing the answer always use the model selected in your chat."
     },
     "sortingPrompt": {
       "title": "Preprocessor",

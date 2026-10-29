@@ -23,6 +23,7 @@ final readonly class ResearchCapabilities
         private PlugConfigService $plugs,
         private ResearchConfig $config,
         private ResearchSearch $search,
+        private ?ResearchBudgetStore $budgets = null,
     ) {
     }
 
@@ -33,11 +34,18 @@ final readonly class ResearchCapabilities
     {
         $provider = strtolower($this->plugs->webSearchProvider($user->getId()));
         $web = array_key_exists($provider, WebSearchHosting::PROVIDERS) && $this->search->available($user->getId() ?? 0);
+        $standard = $this->budgets?->forDepth(ResearchDepth::Standard) ?? ResearchBudgetConfig::defaults(ResearchDepth::Standard);
 
         return [
             'enabled' => true,
             'research_protocol' => self::PROTOCOL,
-            'depths' => ['quick', 'standard', 'thorough'],
+            'depths' => ResearchDepth::values(),
+            // The chat decides the effort; auto is the upper bound such a run can reach.
+            'automatic' => $this->config->autoEnabled(),
+            'auto_limits' => [
+                'minutes' => $standard->minutes(),
+                'cost_cap' => $standard->costCap,
+            ],
             'web_search_available' => $web,
             'web_search_provider' => $web ? [
                 'id' => $provider,

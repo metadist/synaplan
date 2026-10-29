@@ -36,6 +36,7 @@ final class ResearchRunView
             'research_protocol' => ResearchCapabilities::PROTOCOL,
             'status' => $state->status->value,
             'depth' => $state->ref->depth->value,
+            'ceiling' => $state->ceiling?->value,
             'question' => $state->ref->question,
             'parent' => $state->parent,
             'follow_up' => $state->followUp,

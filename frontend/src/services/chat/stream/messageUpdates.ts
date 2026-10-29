@@ -227,4 +227,9 @@ export function applyRouting(message: Message, data: StreamUpdatePayload): void 
   if (data.originalMediaType !== undefined) {
     message.originalMediaType = data.originalMediaType
   }
+  if (data.effort !== undefined) {
+    message.effort = data.effort
+    message.effortNotice = data.effortNotice ?? null
+  }
+  if (data.researchRunId) message.researchRunId = data.researchRunId
 }

@@ -8,11 +8,13 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Model\ModelListingService;
+use App\Service\Research\Run\Stage\ResearchSearch;
 use Psr\Clock\ClockInterface;
 
 /**
- * The research tab on AI infrastructure: the switch, the two model slots,
- * the limits an administrator can change, and one sample run.
+ * The research tab on AI infrastructure: the switch, the automatic-research
+ * switch under it, the two model slots, the limits an administrator can
+ * change, and one sample run.
  *
  * A save is checked as a whole first, so a refused value never leaves the
  * other half of the form stored.
@@ -34,6 +36,7 @@ final readonly class ResearchAdminService
         private ResearchStateStore $store,
         private AuditLogWriter $audit,
         private ClockInterface $clock,
+        private ResearchSearch $search,
     ) {
     }
 
@@ -45,6 +48,8 @@ final readonly class ResearchAdminService
         return [
             'enabled' => $this->config->isEnabled(),
             'envLocked' => null !== $this->config->envForces(),
+            'autoEnabled' => $this->config->autoSwitch(),
+            'webSearchAvailable' => $this->search->available((int) $admin->getId()),
             'readingModelId' => $this->storedModel('READ'),
             'checkingModelId' => $this->storedModel('VERIFY'),
             'models' => $this->chatOptions($admin),
@@ -66,8 +71,12 @@ final readonly class ResearchAdminService
     {
         $input = ResearchSettingsInput::fromBody($body);
         $wasEnabled = $this->config->isEnabled();
+        $autoBefore = $this->config->autoSwitch();
         if (null !== $input->enabled && null !== $this->config->envForces()) {
             throw new ResearchRejected(409, 'env_locked', 'enabled', 'This switch is set by the server and cannot be changed here.');
+        }
+        if (null !== $input->autoEnabled && !($input->enabled ?? $wasEnabled)) {
+            throw new ResearchRejected(409, 'research_off', 'autoEnabled', 'Turn on Research first.');
         }
         $modelWrites = $this->modelWrites($admin, $body);
         $budgetsBefore = $this->currentBudgets();
@@ -76,6 +85,10 @@ final readonly class ResearchAdminService
         if (null !== $input->enabled && $input->enabled !== $wasEnabled) {
             $this->configRepository->setValue(0, ResearchConfig::GROUP, ResearchConfig::ENABLED, $input->enabled ? '1' : '0');
             $changed[] = 'enabled';
+        }
+        if (null !== $input->autoEnabled && $input->autoEnabled !== $autoBefore) {
+            $this->configRepository->setValue(0, ResearchConfig::GROUP, ResearchConfig::AUTO_ENABLED, $input->autoEnabled ? '1' : '0');
+            $changed[] = 'autoEnabled';
         }
         $changed = [...$changed, ...$this->storeLimits($input)];
         foreach ($input->budgets as $depth => $row) {
@@ -97,7 +110,13 @@ final readonly class ResearchAdminService
                 'research.settings.update',
                 'research',
                 'workspace',
-                ['changed' => $changed, 'enabledBefore' => $wasEnabled, 'enabled' => $this->config->isEnabled()],
+                [
+                    'changed' => $changed,
+                    'enabledBefore' => $wasEnabled,
+                    'enabled' => $this->config->isEnabled(),
+                    'autoEnabledBefore' => $autoBefore,
+                    'autoEnabled' => $this->config->autoSwitch(),
+                ],
                 $ip,
             );
         }

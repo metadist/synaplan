@@ -108,7 +108,7 @@ final readonly class GatherStage implements ResearchStage
     /**
      * @param list<array{id: string, url: string, host: string, title: string, snippet: string, date: string}> $hits
      *
-     * @return list<array{url: string, title: string, kind: string}>|StageResult
+     * @return list<array{url: string, title: string, kind: string, reason: string}>|StageResult
      */
     private function triage(StageContext $ctx, array $hits): array|StageResult
     {
@@ -142,7 +142,10 @@ final readonly class GatherStage implements ResearchStage
     }
 
     /**
-     * @param list<array{url: string, title: string, kind: string}> $picked
+     * The sorter's reason travels with the source event, so the person reads
+     * why this page was picked out of the results.
+     *
+     * @param list<array{url: string, title: string, kind: string, reason: string}> $picked
      */
     private function keep(StageContext $ctx, array $picked): void
     {
@@ -154,7 +157,11 @@ final readonly class GatherStage implements ResearchStage
             $ctx->state->ledger->describeSource($id, $row['kind'], null);
             $source = $ctx->state->ledger->source($id);
             if (null !== $source) {
-                $ctx->events->append($ctx->state->ref->id, 'source', $source->toEvent());
+                $event = $source->toEvent();
+                if ('' !== $row['reason']) {
+                    $event['why'] = $row['reason'];
+                }
+                $ctx->events->append($ctx->state->ref->id, 'source', $event);
             }
         }
     }

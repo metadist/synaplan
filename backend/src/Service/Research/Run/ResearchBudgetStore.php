@@ -62,9 +62,10 @@ final readonly class ResearchBudgetStore
         $this->configRepository->setValue(0, ResearchConfig::GROUP, self::setting($depth), $payload);
     }
 
+    /** The row a depth reads; an automatic run starts on the standard row. */
     public static function setting(ResearchDepth $depth): string
     {
-        return 'BUDGET_'.strtoupper($depth->value);
+        return 'BUDGET_'.strtoupper($depth->budgetRow()->value);
     }
 
     /**

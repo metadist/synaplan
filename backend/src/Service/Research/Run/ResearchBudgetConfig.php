@@ -33,9 +33,45 @@ final readonly class ResearchBudgetConfig
     {
         return match ($depth) {
             ResearchDepth::Quick => self::quick(),
-            ResearchDepth::Standard => self::standard(),
+            ResearchDepth::Standard, ResearchDepth::Auto => self::standard(),
             ResearchDepth::Thorough => self::thorough(),
         };
+    }
+
+    /**
+     * The same limits, capped at another row. Counters that are already
+     * lower stay; nothing grows. Used once, when an automatic run learns
+     * from its plan that a short look is enough.
+     */
+    public function cappedAt(self $ceiling): self
+    {
+        $extras = $this->extras;
+        $cap = $ceiling->extras;
+
+        return new self(
+            min($this->searches, $ceiling->searches),
+            min($this->sources, $ceiling->sources),
+            min($this->rounds, $ceiling->rounds),
+            min($this->wallSeconds, $ceiling->wallSeconds),
+            min($this->costCap, $ceiling->costCap),
+            min($this->maxModelCalls, $ceiling->maxModelCalls),
+            new ResearchBudgetExtras(
+                min($extras->resultsPerSearch, $cap->resultsPerSearch),
+                $extras->fetchParallel,
+                $extras->readParallel,
+                min($extras->questions, $cap->questions),
+                min($extras->reportWords, $cap->reportWords),
+                min($extras->maxActions, $cap->maxActions),
+                $extras->pointsMin,
+                $extras->pointsMax,
+            ),
+        );
+    }
+
+    /** The minutes a person is told to expect: the wall clock, rounded up. */
+    public function minutes(): int
+    {
+        return max(1, (int) ceil($this->wallSeconds / 60));
     }
 
     /** The same limits, with no questions, so an unattended step cannot pause. */

@@ -3,6 +3,7 @@ import {
   GetApiResearchCapabilitiesResponseSchema,
   GetApiResearchShowResponseSchema,
   PostApiResearchCancelResponseSchema,
+  PostApiResearchInputResponseSchema,
   PostApiResearchStartResponseSchema,
 } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
@@ -18,11 +19,19 @@ export async function fetchResearchCapabilities(): Promise<ResearchCapabilities>
   })
 }
 
+export type ResearchDepth = 'quick' | 'standard' | 'thorough' | 'auto'
+
 export async function startResearch(body: {
   question: string
-  depth: 'quick' | 'standard' | 'thorough'
+  depth: ResearchDepth
   chat_id: number
   sources: { web: boolean; knowledge: boolean }
+  /** `deeper` after a direct answer the person wants more on; `brief` for a short look. */
+  hint?: 'brief' | 'deeper'
+  /** The last turns of the chat, newest last, so the research knows what was already said. */
+  context?: { turns: Array<{ role: 'user' | 'assistant'; text: string }> }
+  /** Pages the research starts from, such as the cited pages of the answer it deepens. */
+  seed_sources?: Array<{ url: string; title?: string }>
 }): Promise<z.infer<typeof PostApiResearchStartResponseSchema>> {
   return httpClient('/api/v1/research', {
     method: 'POST',
@@ -35,6 +44,15 @@ export async function startResearch(body: {
 export async function fetchResearchRun(id: string): Promise<ResearchRunView> {
   return httpClient(`/api/v1/research/${encodeURIComponent(id)}`, {
     schema: GetApiResearchShowResponseSchema,
+  })
+}
+
+/** Answer now: write the report from what was read, or answer without the research when nothing was. */
+export async function answerNowResearch(id: string): Promise<ResearchRunView> {
+  return httpClient(`/api/v1/research/${encodeURIComponent(id)}/input`, {
+    method: 'POST',
+    body: JSON.stringify({ type: 'answer_now' }),
+    schema: PostApiResearchInputResponseSchema,
   })
 }
 
