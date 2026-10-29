@@ -326,8 +326,10 @@ final class ApiKeyScopeTest extends TestCase
             ApiKeyScope::provisionedPlatformScopes(),
             ApiKeyScope::platformLinkScopes(),
         );
-        self::assertSame(['chat', 'files', 'rag'], ApiKeyScope::platformLinkScopes());
-        self::assertSame(['chat', 'files', 'rag', 'memories'], ApiKeyScope::platformLinkScopes(true));
+        self::assertSame(['chat', 'files', 'rag', 'cloud:watch'], ApiKeyScope::platformLinkScopes());
+        self::assertSame(['chat', 'files', 'rag', 'cloud:watch', 'memories'], ApiKeyScope::platformLinkScopes(true));
+        self::assertTrue(ApiKeyScope::allows(ApiKeyScope::platformLinkScopes(), '/api/v1/cloud/watches', 'GET'));
+        self::assertTrue(ApiKeyScope::allows(ApiKeyScope::platformLinkScopes(), '/api/v1/cloud/watches', 'POST'));
     }
 
     /**
