@@ -193,6 +193,32 @@ describe('research event handler', () => {
     expect(progress.sourceTitles).toEqual({ s1: 'Embassy' })
   })
 
+  it('grows the lead’s note while it writes it and swaps it for the finished note', () => {
+    const writing = applyResearchSse(
+      emptyProgress('run-6', 7, 'Visa fee?'),
+      [
+        'event: thinking',
+        'data: {"text":"Two shops "}',
+        '',
+        'event: thinking',
+        'data: {"text":"agree."}',
+        '',
+      ].join('\n')
+    )
+    const done = applyResearchFrame(writing, {
+      seq: null,
+      event: 'thought',
+      data: { text: 'Two shops agree.' },
+    })
+
+    expect(writing.thinking).toBe('Two shops agree.')
+    expect(writing.steps).toEqual([])
+    expect(done.thinking).toBe('')
+    expect(done.steps.map((step) => [step.kind, step.text])).toEqual([
+      ['thought', 'Two shops agree.'],
+    ])
+  })
+
   it('grows the draft as the writer streams it and keeps it on a reload', () => {
     const body = [
       'event: writing',

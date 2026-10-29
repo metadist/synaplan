@@ -73,6 +73,8 @@ export interface ResearchProgress {
   steps: ResearchStep[]
   /** The report as the writer is writing it, piece by piece; the fact-check may still change it. */
   draft: string
+  /** The lead's note as it is still writing it; cleared when the finished note (`thought`) arrives. */
+  thinking: string
   /** The title of every source the run named, by id, so a finding can say where it came from. */
   sourceTitles: Record<string, string>
   /** When the run started (the server's stamp, or when this client first saw it); null when unknown. */
@@ -87,6 +89,8 @@ export interface ResearchFrame {
 }
 
 const TERMINAL = new Set(['complete', 'stopped', 'failed'])
+/** Frames that say nothing about the lead's turn and leave its note being written alone. */
+const LIVE_ONLY = new Set(['queued', 'ping', 'draft'])
 
 export function isTerminalStatus(status: string): boolean {
   return TERMINAL.has(status)
@@ -108,6 +112,7 @@ export function emptyProgress(id: string, chatId: number, question: string): Res
     outcome: null,
     steps: [],
     draft: '',
+    thinking: '',
     sourceTitles: {},
     startedAt: Date.now(),
     lastSeq: 0,
@@ -184,6 +189,12 @@ export function applyResearchFrame(
   if (isTerminalStatus(state.status) && frame.event !== 'check') return next
   // A frame already applied (a replayed page) must not add its step twice.
   if (frame.seq !== null && frame.seq <= state.lastSeq) return next
+  if (frame.event === 'thinking') {
+    next.thinking = state.thinking + (typeof frame.data.text === 'string' ? frame.data.text : '')
+    return next
+  }
+  // Any other step means the lead's turn is over: its finished note, if any, is a step of its own.
+  if (!LIVE_ONLY.has(frame.event)) next.thinking = ''
   next.steps = appendStep(next.steps, stepFor(frame))
 
   if (frame.event === 'plan') {

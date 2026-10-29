@@ -73,6 +73,7 @@
           :points="progress.points"
           :source-titles="progress.sourceTitles"
           :live="phase.state === 'active'"
+          :offset="hiddenCount(phase)"
         />
       </div>
     </li>

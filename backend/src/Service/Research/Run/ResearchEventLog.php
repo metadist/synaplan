@@ -18,6 +18,7 @@ final readonly class ResearchEventLog
         'question',
         'plan',
         'plan_waiting',
+        'thinking',
         'thought',
         'search',
         'source',

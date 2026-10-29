@@ -217,7 +217,9 @@ final class ResearchLeadTest extends TestCase
             $byName[$event['event']][] = $event['data'];
         }
 
+        self::assertSame([['text' => "Two shops agree on the price.\nNothing else is open."]], $byName['thinking']);
         self::assertSame([['text' => 'Two shops agree on the price. Nothing else is open.']], $byName['thought']);
+        self::assertLessThan(array_search('thought', array_keys($byName), true), array_search('thinking', array_keys($byName), true));
         self::assertSame('Only snippets so far.', $byName['point'][0]['note']);
         self::assertSame('covered', $byName['round'][0]['reason']);
         self::assertSame('write', $byName['round'][0]['next']);

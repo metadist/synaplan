@@ -12,7 +12,7 @@
       }}</span>
     </p>
     <div class="txt-secondary" data-testid="text-research-draft">
-      <MessageText :content="text" :is-streaming="!checking" readonly />
+      <MessageText :content="shown" :is-streaming="!checking" readonly />
     </div>
   </section>
 </template>
@@ -21,6 +21,7 @@
 import { useI18n } from 'vue-i18n'
 import { PencilIcon } from '@heroicons/vue/24/outline'
 import MessageText from '@/components/MessageText.vue'
+import { useRevealText } from './useRevealText'
 
 /**
  * The answer as the writer writes it, word by word, under the phases. It
@@ -28,11 +29,15 @@ import MessageText from '@/components/MessageText.vue'
  * statement, and the line above the text says so. When the run is done
  * the checked report takes the bubble and the draft goes away.
  */
-defineProps<{
+const props = defineProps<{
   text: string
   /** The writer is done and the fact-check is going over the text. */
   checking: boolean
 }>()
 
 const { t } = useI18n()
+const shown = useRevealText(
+  () => props.text,
+  () => !props.checking
+)
 </script>

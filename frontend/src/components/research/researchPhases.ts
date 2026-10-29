@@ -48,7 +48,15 @@ const PHASE_OF: Record<string, ResearchPhaseId> = {
 export function researchPhases(progress: ResearchProgress): ResearchPhase[] {
   const running = !isTerminalStatus(progress.status)
   const grouped = new Map<ResearchPhaseId, ResearchStep[]>()
-  for (const step of progress.steps) {
+  // The lead's note it is still writing is the row happening now; the finished note takes its place.
+  const steps =
+    running && progress.thinking.trim() !== ''
+      ? [
+          ...progress.steps,
+          { kind: 'thought', text: progress.thinking.trim(), status: 'streaming', ref: null },
+        ]
+      : progress.steps
+  for (const step of steps) {
     const id = PHASE_OF[step.kind]
     if (id === undefined) continue
     const rows = grouped.get(id) ?? []

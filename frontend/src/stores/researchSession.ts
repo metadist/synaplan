@@ -21,8 +21,8 @@ import { useChatsStore } from './chats'
 import { useHistoryStore } from './history'
 import { useIncognitoStore } from './incognito'
 
-const POLL_MS = 2000
-/** While the writer streams the draft the person reads it word by word, so the poll keeps pace. */
+const POLL_MS = 1200
+/** While the writer streams the draft or the lead its note, the person reads along, so the poll keeps pace. */
 const POLL_WRITING_MS = 700
 /** The server refuses a start with more starting pages than this. */
 const MAX_SEED_SOURCES = 50
@@ -271,8 +271,9 @@ function stopPoll(bag: ResearchBag): void {
 /** The next tick is set once this one has answered, at the pace the run's phase asks for. */
 function scheduleTick(bag: ResearchBag): void {
   if (bag.pollTimer !== null) return
-  const status = bag.progress.value?.status
-  const delay = status === 'writing' ? POLL_WRITING_MS : POLL_MS
+  const current = bag.progress.value
+  const streaming = current?.status === 'writing' || (current?.thinking ?? '') !== ''
+  const delay = streaming ? POLL_WRITING_MS : POLL_MS
   bag.pollTimer = window.setTimeout(() => {
     bag.pollTimer = null
     void tick(bag)

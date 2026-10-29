@@ -179,6 +179,21 @@ describe('researchPhases', () => {
     )
   })
 
+  it('shows the note the lead is still writing as the row happening now', () => {
+    const progress = progressOf(
+      GATHERING + frames(['id: 7', 'event: thinking', 'data: {"text":"The embassy page has "}', ''])
+    )
+    const gather = researchPhases(progress).find((phase) => phase.id === 'gather')!
+
+    expect(gather.state).toBe('active')
+    expect(gather.rows[gather.rows.length - 1]).toEqual({
+      kind: 'thought',
+      text: 'The embassy page has',
+      status: 'streaming',
+      ref: null,
+    })
+  })
+
   it('says nothing for the check while it is still going', () => {
     const progress = progressOf(GATHERING + frames(['id: 7', 'event: checking', 'data: {}', '']))
     const check = researchPhases(progress).find((phase) => phase.id === 'check')

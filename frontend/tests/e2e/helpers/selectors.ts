@@ -272,6 +272,8 @@ export const selectors = {
     steps: '[data-testid="list-research-steps"]',
     /** The model's own sentence under a step: why a source was picked, what it said */
     stepAside: '[data-testid="text-research-step-aside"]',
+    /** A done step folded to one line; a click opens it */
+    stepToggle: '[data-testid="btn-research-step"]',
     /** The answer as the writer streams it, under the phases while the run works */
     draft: '[data-testid="research-draft"]',
     draftNote: '[data-testid="text-research-draft-note"]',

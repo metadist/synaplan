@@ -10,6 +10,7 @@ use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
+use App\Service\Research\Run\Stage\DraftStream;
 use App\Service\Research\Run\Stage\ResearchLeadCaller;
 use App\Service\Research\Run\Stage\ResearchLeadTurn;
 use App\Service\Research\Run\Stage\ResearchPrompts;
@@ -54,12 +55,15 @@ final readonly class LeadStage
             return $this->toReport($ctx);
         }
 
+        $thinking = DraftStream::for($ctx, 'thinking');
         $turn = $this->caller->turn(
             $ctx->state->ref->userId,
             $ctx->roles->lead,
             $this->messages($ctx),
             $this->tools->definitions($ctx),
+            $thinking->listener(),
         );
+        $thinking->finish();
         if ($turn->called) {
             $this->charge($ctx, $turn);
         }
