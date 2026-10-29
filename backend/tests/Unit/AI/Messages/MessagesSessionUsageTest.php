@@ -82,6 +82,9 @@ final class MessagesSessionUsageTest extends TestCase
     /** @var list<TurnUsageTotal|null> */
     private array $closes = [];
 
+    /** @var list<array{event: string, data: array<string, mixed>}> */
+    private array $streamEvents = [];
+
     protected function tearDown(): void
     {
         LegacyUsageWriter::bind(null);
@@ -174,6 +177,70 @@ final class MessagesSessionUsageTest extends TestCase
         self::assertSame([self::SESSION, self::SESSION], $this->sessionKeys);
     }
 
+    public function testSecondStreamRequestInTheSameSessionIsNotAZeroUsageRow(): void
+    {
+        UsageHookConfig::setModeOverride(UsageHookMode::On);
+        [$gateway, $meter, $user] = $this->build(providerCalls: 1);
+
+        $this->executeStream($gateway, $user);
+        $meter->reset();
+        $this->executeStream($gateway, $user);
+
+        $messages = $this->messagesRows();
+        self::assertCount(2, $messages);
+        self::assertSame(10, $messages[1]['prompt']);
+        self::assertSame(4, $messages[1]['completion']);
+        self::assertSame(14, $messages[1]['tokens']);
+        self::assertNotSame('0.000000', $messages[1]['cost']);
+        self::assertNotSame($this->turnIds[0], $this->turnIds[1]);
+        self::assertStringNotContainsString(self::SESSION, $this->turnIds[0]);
+        self::assertStringNotContainsString(self::SESSION, $this->turnIds[1]);
+        self::assertNotSame($this->callIds[0], $this->callIds[1]);
+        self::assertSame([self::SESSION, self::SESSION], $this->sessionKeys);
+        $this->assertUsageEvents(2);
+    }
+
+    public function testShadowCompareOnTheSecondStreamRequestReadsThatRequestLedger(): void
+    {
+        UsageHookConfig::setModeOverride(UsageHookMode::Shadow);
+        [$gateway, $meter, $user] = $this->build(providerCalls: 1);
+
+        $this->executeStream($gateway, $user);
+        $meter->reset();
+        $this->executeStream($gateway, $user);
+
+        self::assertCount(2, $this->closes);
+        self::assertInstanceOf(TurnUsageTotal::class, $this->closes[1]);
+        self::assertGreaterThan(0, $this->closes[1]->callCount);
+        self::assertSame([], $this->mismatches);
+        self::assertNotSame($this->turnIds[0], $this->turnIds[1]);
+        self::assertSame([self::SESSION, self::SESSION], $this->sessionKeys);
+        $this->assertUsageEvents(2);
+    }
+
+    public function testThirdProviderStreamInOneRequestSumsIntoThatTurn(): void
+    {
+        UsageHookConfig::setModeOverride(UsageHookMode::On);
+        [$gateway, , $user] = $this->build(providerCalls: 3);
+
+        $this->executeStream($gateway, $user);
+
+        $messages = $this->messagesRows();
+        self::assertCount(1, $messages);
+        self::assertSame(30, $messages[0]['prompt']);
+        self::assertSame(12, $messages[0]['completion']);
+        self::assertSame(42, $messages[0]['tokens']);
+        self::assertNotSame('0.000000', $messages[0]['cost']);
+        self::assertCount(3, $this->callIds);
+        self::assertCount(3, array_unique($this->callIds));
+        self::assertCount(1, array_unique($this->turnIds));
+        self::assertCount(1, $this->closes);
+        self::assertInstanceOf(TurnUsageTotal::class, $this->closes[0]);
+        self::assertSame(3, $this->closes[0]->callCount);
+        self::assertSame([self::SESSION], $this->sessionKeys);
+        $this->assertUsageEvents(3);
+    }
+
     /**
      * @return list<array{action: string, cost: string, prompt: int, completion: int, tokens: int}>
      */
@@ -201,6 +268,53 @@ final class MessagesSessionUsageTest extends TestCase
         self::assertSame(self::SESSION, $executed['session_key']);
     }
 
+    private function executeStream(MessagesGateway $gateway, User $user): void
+    {
+        $prepared = $gateway->prepare($this->request(stream: true), $user);
+        if (false === $prepared['ok']) {
+            self::fail($prepared['message']);
+        }
+        self::assertTrue($prepared['stream']);
+        self::assertSame(self::SESSION, $prepared['session_key']);
+
+        $usage = $gateway->executeStream($prepared, $user, function (string|array $event): void {
+            if (\is_string($event)) {
+                return;
+            }
+            $this->streamEvents[] = ['event' => $event['event'], 'data' => $event['data']];
+        });
+        self::assertTrue($usage->shouldMeter());
+    }
+
+    private function assertUsageEvents(int $rounds): void
+    {
+        $starts = array_values(array_filter(
+            $this->streamEvents,
+            static fn (array $event): bool => 'message_start' === $event['event'],
+        ));
+        $deltas = array_values(array_filter(
+            $this->streamEvents,
+            static fn (array $event): bool => 'message_delta' === $event['event'],
+        ));
+        self::assertCount($rounds, $starts);
+        self::assertCount($rounds, $deltas);
+        foreach ($starts as $event) {
+            $message = $event['data']['message'] ?? null;
+            self::assertIsArray($message);
+            $usage = $message['usage'] ?? null;
+            self::assertIsArray($usage);
+            self::assertSame(10, $usage['input_tokens'] ?? null);
+        }
+        foreach ($deltas as $event) {
+            $delta = $event['data']['delta'] ?? null;
+            $usage = $event['data']['usage'] ?? null;
+            self::assertIsArray($delta);
+            self::assertIsArray($usage);
+            self::assertSame('end_turn', $delta['stop_reason'] ?? null);
+            self::assertSame(4, $usage['output_tokens'] ?? null);
+        }
+    }
+
     /**
      * @return array{0: MessagesGateway, 1: AiPipelineMeter, 2: User}
      */
@@ -212,6 +326,7 @@ final class MessagesSessionUsageTest extends TestCase
         $this->turnIds = [];
         $this->callIds = [];
         $this->closes = [];
+        $this->streamEvents = [];
 
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(self::USER_ID);
@@ -381,6 +496,16 @@ final class MessagesSessionUsageTest extends TestCase
                     return $result;
                 },
             );
+            $loop->method('runStream')->willReturnCallback(
+                static function (array $requestBody, array $translatorContext, MessagesTranslatorInterface $translator, mixed $user, mixed $snapshot, callable $emit) use ($providerCalls): MessagesUsage {
+                    $usage = $translator->stream($requestBody, $translatorContext, $emit);
+                    for ($i = 1; $i < $providerCalls; ++$i) {
+                        $usage = $translator->stream($requestBody, $translatorContext, $emit);
+                    }
+
+                    return $usage;
+                },
+            );
         }
 
         $gateway = new MessagesGateway(
@@ -407,15 +532,20 @@ final class MessagesSessionUsageTest extends TestCase
         return [$gateway, $meter, $user];
     }
 
-    private function request(): Request
+    private function request(bool $stream = false): Request
     {
-        return Request::create('/v1/messages', 'POST', [], [], [], [
-            'HTTP_X_CLAUDE_CODE_SESSION_ID' => self::SESSION,
-        ], (string) json_encode([
+        $body = [
             'model' => 'scripted-1',
             'max_tokens' => 32,
             'messages' => [['role' => 'user', 'content' => 'hello']],
-        ], \JSON_THROW_ON_ERROR));
+        ];
+        if ($stream) {
+            $body['stream'] = true;
+        }
+
+        return Request::create('/v1/messages', 'POST', [], [], [], [
+            'HTTP_X_CLAUDE_CODE_SESSION_ID' => self::SESSION,
+        ], (string) json_encode($body, \JSON_THROW_ON_ERROR));
     }
 }
 
@@ -444,6 +574,35 @@ final class ScriptedMessagesTranslator implements MessagesTranslatorInterface
 
     public function stream(array $requestBody, array $context, callable $emit): MessagesUsage
     {
-        return new MessagesUsage();
+        $emit([
+            'event' => 'message_start',
+            'data' => [
+                'type' => 'message_start',
+                'message' => [
+                    'id' => 'msg_scripted',
+                    'type' => 'message',
+                    'role' => 'assistant',
+                    'usage' => ['input_tokens' => 10, 'output_tokens' => 0],
+                ],
+            ],
+        ]);
+        $emit([
+            'event' => 'content_block_delta',
+            'data' => [
+                'type' => 'content_block_delta',
+                'index' => 0,
+                'delta' => ['type' => 'text_delta', 'text' => 'Answer'],
+            ],
+        ]);
+        $emit([
+            'event' => 'message_delta',
+            'data' => [
+                'type' => 'message_delta',
+                'delta' => ['stop_reason' => 'end_turn'],
+                'usage' => ['output_tokens' => 4],
+            ],
+        ]);
+
+        return new MessagesUsage(10, 4, 0, 0, 'end_turn');
     }
 }
