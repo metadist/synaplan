@@ -156,7 +156,7 @@ final readonly class CloudDeliveryService
         return [
             'id' => (string) $id,
             'external_id' => $identity instanceof ExternalIdentity ? $identity->getExternalId() : '',
-            'name' => $file->getDisplayName(),
+            'name' => self::fileName($file),
             'mime' => $file->getFileMime(),
             'size' => $file->getFileSize(),
             'target' => ['kind' => $delivery->getTargetKind(), 'ref' => $delivery->getTargetRef() ?? ''],
@@ -197,7 +197,19 @@ final readonly class CloudDeliveryService
         }
         $delivery->markDownloaded();
 
-        return ['path' => $path, 'name' => $file->getDisplayName(), 'mime' => $file->getFileMime()];
+        return ['path' => $path, 'name' => self::fileName($file), 'mime' => $file->getFileMime()];
+    }
+
+    /**
+     * A cloud file's display name is its path in that cloud ("/Invoices/a.pdf").
+     * The cloud writes the copy under a plain name, and a Content-Disposition
+     * filename may not contain a slash.
+     */
+    private static function fileName(File $file): string
+    {
+        $name = basename(str_replace('\\', '/', $file->getDisplayName()));
+
+        return '' !== $name ? $name : 'file';
     }
 
     /**
