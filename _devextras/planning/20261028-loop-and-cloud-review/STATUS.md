@@ -10,7 +10,7 @@ D1–D6 as proposed).
 | RV1 | planned | Round mode drops `scope: files` |
 | RV2 | planned | Messages session reuses `call-1` once the usage hook is `on`. A silent shadow compare can hide it |
 | RV3 | planned | Messages stream must release before every provider stream, including one with no server tools. Live today |
-| RV4 | in review | Pickup copy stores the claiming platform instance on the file. Live where platform links are on |
+| RV4 | in review | [#2860](https://github.com/metadist/synaplan/pull/2860) — pickup copy stores the claiming platform instance on the file. Live where platform links are on |
 | RV5 | planned | A repeated listing spends the file limit again. Live, same |
 | RV6 | planned | `delivered` needs a recorded download, and a claimed row must expire. Live, same |
 | RV7 | planned | Regression lock: do not mark an inbound watch upload as an own write. Before `cloud_files` |
