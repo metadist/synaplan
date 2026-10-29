@@ -21,6 +21,7 @@ export const useResearchStore = defineStore('research', () => {
     capabilities: bag.capabilities,
     starting: bag.starting,
     stopping: bag.stopping,
+    answerNowAccepted: bag.answerNowAccepted,
     startError: bag.startError,
     progress: bag.progress,
     ensureCapabilities: () => ensureCapabilities(bag),

@@ -317,7 +317,9 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator(selectors.research.answerNowConsequence)).toContainText(
       'from what was already read'
     )
-    await expect(page.locator(selectors.research.stop)).toBeVisible()
+    await expect(page.locator(selectors.research.stop)).toHaveCount(0)
+    await expect(page.locator(selectors.chat.sendBtn)).toHaveAttribute('aria-label', 'Stop')
+    await expect(page.locator('[data-testid="btn-chat-live-voice"]')).toHaveCount(0)
     await page.locator(selectors.research.answerNow).click()
 
     await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
@@ -339,9 +341,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
 
     const lookDeeper = page.locator(selectors.research.lookDeeper)
     await expect(lookDeeper).toBeVisible()
-    await expect(page.locator(selectors.research.lookDeeperSection)).toContainText(
-      'About 6 minutes'
-    )
+    await expect(page.locator(selectors.research.lookDeeperSection)).not.toContainText('minutes')
     await lookDeeper.click()
 
     const turn = chat.conversationBubbles().last().locator(selectors.research.turn)

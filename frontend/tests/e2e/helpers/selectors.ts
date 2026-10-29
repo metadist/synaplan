@@ -251,6 +251,7 @@ export const selectors = {
   research: {
     /** Removed with automatic research; asserted absent. */
     menu: '[data-testid="btn-tool-research"]',
+    /** Gone from the card; Stop is the composer's send button while a run works. */
     stop: '[data-testid="btn-research-stop"]',
     answerNow: '[data-testid="btn-research-answer-now"]',
     answerNowConsequence: '[data-testid="text-research-answer-now-consequence"]',

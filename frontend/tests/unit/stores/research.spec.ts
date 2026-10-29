@@ -110,6 +110,7 @@ describe('research store · a run the chat started on its own', () => {
 
     expect(research.progress?.status).toBe('writing')
     expect(research.startError).toBeNull()
+    expect(research.answerNowAccepted).toBe(true)
   })
 
   it('look deeper starts an automatic run told the person wants more', async () => {

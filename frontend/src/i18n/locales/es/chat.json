@@ -452,6 +452,7 @@
   "chatMessage": {
     "again": "Otra vez",
     "againWith": "Otra vez con",
+    "moreActions": "Más acciones",
     "regenerateWith": "Regenerar con",
     "copy": "Copiar mensaje",
     "whatWasSent": "Qué se envió",
@@ -1091,7 +1092,6 @@
     "answerNowFailed": "Responder ahora no llegó a la investigación. Sigue en marcha.",
     "answeredWithout": "Respondido sin la búsqueda adicional.",
     "lookDeeper": "Investigar a fondo",
-    "lookDeeperHint": "Lee más fuentes y comprueba cada afirmación. Unos {minutes} minutos.",
     "turn": {
       "working": "Investigando…",
       "stepsSoFar": "{steps} pasos hasta ahora · {sources} fuentes leídas",

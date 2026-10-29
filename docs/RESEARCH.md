@@ -36,8 +36,9 @@ reply then carries `researchRunId` (meta `research_run_id`), live and after
 a reload. In the web chat that reply bubble shows the run working — a
 spinner, the last thing the run did (the query it searched, the source it
 read, the section it writes), a fold with every step so far, and **Answer
-now** / **Stop** with their consequence — and hides the fallback sentence
-meanwhile. The one sentence the stream writes ("I am looking through several
+now** with its consequence. **Stop** is the send button in the composer;
+the live-speech button does not take that place while a run is going. The
+bubble hides the fallback sentence meanwhile. The one sentence the stream writes ("I am looking through several
 sources for this — about N minutes. The question has several parts.") is
 what a channel without that UI gets. When the run finishes, the report
 replaces that reply's text (see "Where the report goes"), so the person
@@ -63,7 +64,8 @@ The plan event carries `ceiling` (`quick` or `standard`) and the minutes the
 run now needs; the run state carries `ceiling` as well. The hint `brief`
 (the sorter said `asked_short`) caps the plan at two points; `deeper` lets
 it grow. An automatic run never asks a question. **Answer now** on the card
-is the `answer_now` input above; **Stop** keeps what was written.
+is the `answer_now` input above; **Stop** is the composer's send button and
+keeps what was written.
 
 | | |
 | --- | --- |

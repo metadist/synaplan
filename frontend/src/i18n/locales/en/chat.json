@@ -461,6 +461,7 @@
   "chatMessage": {
     "again": "Again",
     "againWith": "Again with",
+    "moreActions": "More actions",
     "regenerateWith": "Regenerate with",
     "copy": "Copy message",
     "messageDetails": "Message details",
@@ -1156,7 +1157,6 @@
     "answerNowFailed": "Answer now did not reach the research. It is still running.",
     "answeredWithout": "Answered without the extra look.",
     "lookDeeper": "Look deeper",
-    "lookDeeperHint": "Reads more sources and checks every statement. About {minutes} minutes.",
     "turn": {
       "working": "Researching…",
       "stepsSoFar": "{steps} steps so far · {sources} sources read",

@@ -37,6 +37,8 @@ export interface ResearchBag {
   capabilities: Ref<ResearchCapabilities | null>
   starting: Ref<boolean>
   stopping: Ref<boolean>
+  /** Answer now was accepted for the run now showing. Stays until another run starts. */
+  answerNowAccepted: Ref<boolean>
   startError: Ref<string | null>
   progress: Ref<ResearchProgress | null>
   capabilitiesTask: Promise<void> | null
@@ -50,6 +52,7 @@ export function createResearchBag(): ResearchBag {
     capabilities: ref(null),
     starting: ref(false),
     stopping: ref(false),
+    answerNowAccepted: ref(false),
     startError: ref(null),
     progress: ref(null),
     capabilitiesTask: null,
@@ -75,6 +78,7 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
   bag.boundChatId = chatId
   if (chatId === null) {
     bag.progress.value = null
+    bag.answerNowAccepted.value = false
     stopPoll(bag)
     return
   }
@@ -83,6 +87,7 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
     return
   }
   bag.progress.value = null
+  bag.answerNowAccepted.value = false
   stopPoll(bag)
   const saved = readSaved(chatId)
   if (saved !== null) void resume(bag, chatId, saved)
@@ -95,6 +100,7 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
  */
 export function adoptRun(bag: ResearchBag, chatId: number, id: string, question: string): void {
   bag.startError.value = null
+  bag.answerNowAccepted.value = false
   localStorage.setItem(storageKey(chatId), id)
   if (bag.boundChatId !== chatId) return
   bag.progress.value = emptyProgress(id, chatId, question)
@@ -107,6 +113,7 @@ export function adoptRun(bag: ResearchBag, chatId: number, id: string, question:
  */
 export async function followRun(bag: ResearchBag, chatId: number, id: string): Promise<void> {
   if (bag.progress.value?.id === id) return
+  bag.answerNowAccepted.value = false
   const run = await fetchResearchRun(id)
   if (isTerminalStatus(run.status) || bag.boundChatId !== chatId) return
   bag.progress.value = progressFromRun(chatId, run)
@@ -138,16 +145,17 @@ export async function stopResearch(bag: ResearchBag): Promise<void> {
 
 /** Answer now: the report from what was read, or the plain answer when nothing was read yet. */
 export async function answerNow(bag: ResearchBag): Promise<void> {
-  await endRun(bag, answerNowResearch, 'answerNowFailed')
+  const accepted = await endRun(bag, answerNowResearch, 'answerNowFailed')
+  if (accepted) bag.answerNowAccepted.value = true
 }
 
 async function endRun(
   bag: ResearchBag,
   send: (id: string) => Promise<Parameters<typeof progressFromRun>[1]>,
   failure: string
-): Promise<void> {
+): Promise<boolean> {
   const current = bag.progress.value
-  if (current === null || isTerminalStatus(current.status) || bag.stopping.value) return
+  if (current === null || isTerminalStatus(current.status) || bag.stopping.value) return false
   bag.stopping.value = true
   try {
     const run = await send(current.id)
@@ -157,8 +165,10 @@ async function endRun(
       else startPoll(bag)
     }
     if (isTerminalStatus(run.status)) await reloadChat(current.chatId)
+    return true
   } catch {
     bag.startError.value = failure
+    return false
   } finally {
     bag.stopping.value = false
   }
@@ -205,6 +215,7 @@ async function acceptRun(bag: ResearchBag, chatId: number, input: LookDeeperInpu
   next.status = accepted.status
   localStorage.setItem(storageKey(chatId), accepted.id)
   if (bag.boundChatId !== chatId) return
+  bag.answerNowAccepted.value = false
   bag.progress.value = next
   addReplyFor(chatId, accepted.id)
   startPoll(bag)

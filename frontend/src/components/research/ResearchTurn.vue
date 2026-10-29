@@ -69,24 +69,16 @@
         <button
           type="button"
           class="btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="research.stopping"
+          :disabled="research.stopping || research.answerNowAccepted"
+          :aria-busy="research.stopping"
           data-testid="btn-research-answer-now"
           @click="research.answerNow()"
         >
           {{ t('research.answerNow') }}
         </button>
-        <button
-          type="button"
-          class="btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="research.stopping"
-          data-testid="btn-research-stop"
-          @click="research.stop()"
-        >
-          {{ t('research.stop') }}
-        </button>
       </div>
       <p class="text-xs txt-tertiary" data-testid="text-research-answer-now-consequence">
-        {{ answerNowConsequence }} {{ t('research.stopConsequence') }}
+        {{ answerNowConsequence }}
       </p>
       <p
         v-if="research.startError === 'stopFailed' || research.startError === 'answerNowFailed'"
@@ -119,9 +111,9 @@ import { researchStepCopy } from './researchStepCopy'
 /**
  * The research inside the reply bubble. While the run works the bubble
  * shows a spinner, the last thing the run did and a fold with every step
- * so far, plus Answer now and Stop. Once the run is done the report is the
- * bubble's text and one muted line stays below it — open it to see what
- * the research actually did.
+ * so far, plus Answer now. Stop is the composer's send button. Once the
+ * run is done the report is the bubble's text and one muted line stays
+ * below it — open it to see what the research actually did.
  *
  * A run the store follows is read live. Any other (a reload, an old chat)
  * is rebuilt once from its recorded events; one still running is then

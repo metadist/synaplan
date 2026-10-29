@@ -428,13 +428,6 @@
             {{ $t('chat.readAloudStopped') }}
           </p>
 
-          <LookDeeperAction
-            v-if="role === 'assistant' && !isStreaming && !isGuestMode"
-            :effort="effort"
-            :effort-notice="effortNotice"
-            @look-deeper="emit('look-deeper')"
-          />
-
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
             class="m-3"
@@ -938,47 +931,26 @@
           <!-- Right: Actions (assistant only, hidden during streaming) -->
           <!-- Show if: has againData OR has backend message ID (can fetch models) -->
           <div
-            v-if="role === 'assistant' && !isStreaming && backendMessageId"
+            v-if="role === 'assistant' && !isStreaming"
             class="flex items-center gap-2 flex-shrink-0"
           >
-            <!-- False Positive Button - only show if memory/feedback service is available -->
-            <button
-              v-if="isFeedbackServiceAvailable"
-              type="button"
-              :disabled="isSuperseded || isGuestMode"
-              :class="[
-                'pill text-xs relative',
-                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
-              ]"
-              :aria-label="$t('feedback.falsePositive.button')"
-              data-testid="btn-message-false-positive"
-              @click="!isGuestMode && handleFalsePositive()"
-            >
-              <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
-              <span class="font-medium hidden sm:inline">{{
-                $t('feedback.falsePositive.button')
-              }}</span>
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
-              />
-            </button>
-
-            <!-- Report Button (Apple Guideline 1.2) - flag objectionable content.
-                 Available to any signed-in user; hidden in guest mode. -->
-            <button
+            <LookDeeperAction
               v-if="!isGuestMode"
-              type="button"
-              class="pill text-xs"
-              :aria-label="$t('moderation.report.button')"
-              :title="$t('moderation.report.button')"
-              data-testid="btn-message-report"
-              @click="handleReport"
-            >
-              <Icon icon="mdi:flag-outline" class="w-4 h-4" />
-              <span class="font-medium hidden sm:inline">{{ $t('moderation.report.button') }}</span>
-            </button>
+              :effort="effort"
+              :effort-notice="effortNotice"
+              @look-deeper="emit('look-deeper')"
+            />
+            <template v-if="backendMessageId">
+            <!-- Not correct and Report sit in one menu (Apple 1.2 still
+                 reaches Report). Look deeper stays a button of its own. -->
+            <MessageMoreActions
+              :show-false-positive="isFeedbackServiceAvailable"
+              :show-report="!isGuestMode"
+              :false-positive-disabled="isSuperseded || isGuestMode"
+              :guest="isGuestMode"
+              @false-positive="!isGuestMode && handleFalsePositive()"
+              @report="handleReport"
+            />
 
             <!-- Multitask (DAG) turn: a single model pick can't represent the
                  whole plan, so offer one plain "Again" that re-runs the full
@@ -1055,6 +1027,7 @@
                 </div>
               </Transition>
             </div>
+            </template>
           </div>
         </div>
 
@@ -1171,6 +1144,7 @@ import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import LookDeeperAction from '@/components/research/LookDeeperAction.vue'
+import MessageMoreActions from '@/components/chat/MessageMoreActions.vue'
 import ResearchTurn from '@/components/research/ResearchTurn.vue'
 import { useResearchTurn } from '@/composables/useResearchTurn'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'

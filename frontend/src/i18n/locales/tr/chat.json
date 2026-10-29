@@ -452,6 +452,7 @@
   "chatMessage": {
     "again": "Tekrar",
     "againWith": "Şununla tekrar",
+    "moreActions": "Diğer işlemler",
     "regenerateWith": "Şununla yeniden oluştur",
     "copy": "Mesajı kopyala",
     "whatWasSent": "Gönderilen metin",
@@ -1091,7 +1092,6 @@
     "answerNowFailed": "Şimdi yanıtla araştırmaya ulaşamadı. Araştırma sürüyor.",
     "answeredWithout": "Ek arama olmadan yanıtlandı.",
     "lookDeeper": "Daha derin bak",
-    "lookDeeperHint": "Daha fazla kaynak okur ve her ifadeyi kontrol eder. Yaklaşık {minutes} dakika.",
     "turn": {
       "working": "Araştırılıyor…",
       "stepsSoFar": "Şimdiye kadar {steps} adım · {sources} kaynak okundu",
