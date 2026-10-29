@@ -35,19 +35,40 @@ final readonly class SourceInstanceResolver
                 : null;
         }
 
+        $matches = $this->activeForBearer($request);
+
+        return 1 === count($matches) ? $matches[0]->getInstanceId() : null;
+    }
+
+    /**
+     * True when the bearer's client names more than one active cloud, so no
+     * single instance can be attributed. That happens when the same cloud was
+     * registered twice (a lost state file, a dev stack) and the earlier
+     * instance was never revoked. Callers turn it into its own sentence
+     * instead of the generic "not linked".
+     */
+    public function isAmbiguous(Request $request): bool
+    {
+        return count($this->activeForBearer($request)) > 1;
+    }
+
+    /**
+     * @return list<PlatformInstance>
+     */
+    private function activeForBearer(Request $request): array
+    {
         $claims = $request->attributes->get(OidcBearerAuthenticator::CLAIMS_ATTRIBUTE);
         if (!is_array($claims)) {
-            return null;
+            return [];
         }
         $azp = $claims['azp'] ?? '';
         if (!is_string($azp) || '' === $azp) {
-            return null;
+            return [];
         }
-        $matches = array_values(array_filter(
+
+        return array_values(array_filter(
             $this->instances->findBy(['oidcClientId' => $azp]),
             static fn (PlatformInstance $instance): bool => $instance->isActive(),
         ));
-
-        return 1 === count($matches) ? $matches[0]->getInstanceId() : null;
     }
 }

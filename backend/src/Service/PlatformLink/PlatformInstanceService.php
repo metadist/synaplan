@@ -137,7 +137,27 @@ final readonly class PlatformInstanceService
             'app_capabilities' => $instance->getAppCapabilities(),
             'reachable' => $instance->isReachable(),
             'notify_keys' => $this->notifyKeys->publicKeys(),
+            'conflicting_instances' => $this->conflictingInstances($instance),
         ];
+    }
+
+    /**
+     * Other active instances whose tokens name the same OIDC client. More
+     * than zero means a bearer from that cloud cannot be attributed, and the
+     * app shows the administrator what to clean up.
+     */
+    private function conflictingInstances(PlatformInstance $instance): int
+    {
+        $clientId = $instance->getOidcClientId();
+        if (null === $clientId || '' === $clientId) {
+            return 0;
+        }
+        $others = array_filter(
+            $this->instanceRepository->findBy(['oidcClientId' => $clientId]),
+            static fn (PlatformInstance $other): bool => $other->isActive() && $other->getInstanceId() !== $instance->getInstanceId(),
+        );
+
+        return count($others);
     }
 
     /**
