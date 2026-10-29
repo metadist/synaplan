@@ -18,7 +18,7 @@ services:
       OFFICE_CONVERT_URL: ""
       SEARXNG_BASE_URL: ""
       CHAT_ARTIFACTS_ENABLED: ""
-      RESEARCH_ENABLED: ""
+      RESEARCH_ENABLED: "0"
       CLOUD_FILES_ENABLED: ""
       SYNAPLAN_TTS_URL: ""
       OLLAMA_BASE_URL: ""

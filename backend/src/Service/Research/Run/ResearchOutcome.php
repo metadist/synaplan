@@ -26,9 +26,11 @@ final readonly class ResearchOutcome
     public const FAILED_MODEL_ERROR = 'failed_model_error';
     public const FAILED_INTERRUPTED = 'failed_interrupted';
     public const STOPPED_BY_ADMIN = 'stopped_by_admin';
+    public const ANSWERED_WITHOUT_RESEARCH = 'answered_without_research';
 
     /** @var list<string> */
     public const CODES = [
+        self::ANSWERED_WITHOUT_RESEARCH,
         self::COMPLETE,
         self::COMPLETE_PARTIAL,
         self::COMPLETE_SNIPPETS_ONLY,
@@ -80,7 +82,7 @@ final readonly class ResearchOutcome
                 $this->whole('supported'),
             ),
             self::COMPLETE_PARTIAL => sprintf(
-                'Done with gaps: %d of %d points could not be confirmed. They are listed under Not confirmed.',
+                'Done with gaps: %d of %d points could not be confirmed by a source, so the answer leaves them out. Look deeper checks them again.',
                 $this->whole('open'),
                 $this->whole('points'),
             ),
@@ -109,6 +111,7 @@ final readonly class ResearchOutcome
             ),
             self::FAILED_INTERRUPTED => 'The research was interrupted on the server. Start it again — the sources found so far are kept here.',
             self::STOPPED_BY_ADMIN => 'Research was turned off on your Synaplan workspace. What was found so far is kept.',
+            self::ANSWERED_WITHOUT_RESEARCH => 'Answered without the extra look. Nothing was searched for this question.',
             default => 'The research stopped. Start it again if you still need the answer.',
         };
     }

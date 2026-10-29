@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Messages\Tools;
 
+use App\AI\Messages\GatewayEffortRules;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesEventEmitter;
 use App\AI\Messages\MessagesTranslatorInterface;
@@ -50,7 +51,8 @@ use Psr\Log\LoggerInterface;
  * @phpstan-type DispatchEntry array{kind: string, serverId: int, tool: string, annotations: array<string, mixed>}
  * @phpstan-type CatalogSnapshot array{
  *     tools: list<array{name: string, description: string, input_schema: array<string, mixed>}>,
- *     dispatch: array<string, DispatchEntry>
+ *     dispatch: array<string, DispatchEntry>,
+ *     web_search?: string
  * }
  */
 final readonly class GatewayToolLoop
@@ -102,16 +104,11 @@ final readonly class GatewayToolLoop
         }
 
         $requestBody = $this->stripServerTools($requestBody, $replacedServerTools);
-        $clientTools = [];
-        if (isset($requestBody['tools']) && \is_array($requestBody['tools'])) {
-            foreach ($requestBody['tools'] as $tool) {
-                if (\is_array($tool)) {
-                    $clientTools[] = $tool;
-                }
-            }
-        }
-
+        $clientTools = \is_array($requestBody['tools'] ?? null) ? array_values(array_filter($requestBody['tools'], '\is_array')) : [];
         $requestBody['tools'] = array_merge($snapshot['tools'], $clientTools);
+        if (GatewayToolCatalog::WEB_SEARCH_SYNAPLAN === ($snapshot['web_search'] ?? null)) {
+            $requestBody = GatewayEffortRules::apply($requestBody);
+        }
 
         return $requestBody;
     }

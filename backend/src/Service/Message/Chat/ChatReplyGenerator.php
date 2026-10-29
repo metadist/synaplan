@@ -150,7 +150,10 @@ final readonly class ChatReplyGenerator
             'stage' => 'request_sent',
         ]);
 
-        $answer = new StreamedAnswer($streamCallback, $turn->perfTimer);
+        // The first characters wait until they are known to be an answer and
+        // not the model's request for a web search (FreshInfoRequest).
+        $guard = !empty($turn->options[FreshInfoRequest::OPTION]) ? new FreshInfoGuard($streamCallback) : null;
+        $answer = new StreamedAnswer($guard ?? $streamCallback, $turn->perfTimer);
         $turn->perfTimer->start('provider_total');
         $this->transcripts->reset();
         $capture = empty($turn->classification['is_widget_mode'])
@@ -175,6 +178,7 @@ final readonly class ChatReplyGenerator
         }
         $this->transcripts->seal();
         $turn->perfTimer->stop('provider_total');
+        $guard?->finish();
 
         return new ChatReply(
             content: $answer->text,
@@ -183,6 +187,7 @@ final readonly class ChatReplyGenerator
             finishReason: self::finishReason($metadata, $answer->finishReason),
             documentEdit: $documentEdit,
             sawVisibleText: $answer->sawVisibleToken,
+            webSearchQuery: $guard?->requestedQuery(),
         );
     }
 

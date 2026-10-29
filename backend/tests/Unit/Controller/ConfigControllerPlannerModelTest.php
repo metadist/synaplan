@@ -200,6 +200,29 @@ final class ConfigControllerPlannerModelTest extends TestCase
         $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
     }
 
+    public function testSavePersistsResearchReadingAndCheckingOverrides(): void
+    {
+        $this->configRepository->method('findOneBy')->willReturn(null);
+        $this->modelRepository->method('find')->willReturnCallback(fn (int $id): Model => $this->makeActiveModel($id));
+
+        $persisted = [];
+        $this->em
+            ->method('persist')
+            ->willReturnCallback(function (Config $config) use (&$persisted): void {
+                $persisted[] = [$config->getSetting(), $config->getValue(), $config->getOwnerId()];
+            });
+
+        $response = $this->controller->savePlannerModel(
+            $this->makeRequest(['readingModelId' => 15, 'checkingModelId' => 22]),
+            $this->makeUser(7),
+        );
+        $payload = $this->decode($response);
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertTrue($payload['success']);
+        $this->assertSame([['READ', '15', 7], ['VERIFY', '22', 7]], $persisted);
+    }
+
     /**
      * @param array<string, mixed> $payload
      */

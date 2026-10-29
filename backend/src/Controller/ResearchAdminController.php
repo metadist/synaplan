@@ -64,6 +64,7 @@ final class ResearchAdminController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                new OA\Property(property: 'autoEnabled', description: 'Refused with research_off while research is off', type: 'boolean', example: true),
                 new OA\Property(property: 'readingModelId', type: 'integer', nullable: true, example: 12),
                 new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true, example: 0),
                 new OA\Property(property: 'limits', type: 'object', properties: [
@@ -82,7 +83,7 @@ final class ResearchAdminController extends AbstractController
     #[OA\Response(response: 200, description: 'The research tab after the change', content: new OA\JsonContent(ref: new Model(type: ResearchAdminView::class)))]
     #[OA\Response(response: 400, description: 'A value is missing its form or is out of range. Nothing was stored.', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 409, description: 'The switch is pinned by the server. Nothing was stored.', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
+    #[OA\Response(response: 409, description: 'The switch is pinned by the server, or automatic research was changed while research is off. Nothing was stored.', content: new OA\JsonContent(ref: new Model(type: ResearchErrorView::class)))]
     public function update(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $admin = $this->admin($user);

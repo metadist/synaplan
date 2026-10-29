@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Research\Run;
 
+use App\Service\Message\Effort\GateDecision;
 use App\Service\Research\Run\ResearchOutcome;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -42,15 +43,31 @@ final class ResearchOutcomeTranslationsTest extends TestCase
         }
     }
 
+    #[DataProvider('locales')]
+    public function testEveryAutomaticResearchSentenceExistsWithTheSamePlaceholders(string $locale): void
+    {
+        $english = self::load('en' === $locale ? 'de' : 'en');
+        $translated = self::load($locale);
+
+        self::assertSame(['%minutes%'], self::placeholders($translated['auto']['notice']), $locale.' changes the notice placeholder');
+        foreach (array_keys($english['auto']['why']) as $why) {
+            self::assertArrayHasKey($why, $translated['auto']['why'], $locale.' misses the reason '.$why);
+        }
+        foreach (GateDecision::REASONS as $reason) {
+            self::assertArrayHasKey($reason, $translated['limit'], $locale.' misses the limit '.$reason);
+            self::assertSame([], self::placeholders($translated['limit'][$reason]), $locale.' limit sentences take no placeholder');
+        }
+    }
+
     /**
-     * @return array{outcome: array<string, string>, role: array<string, string>}
+     * @return array{outcome: array<string, string>, role: array<string, string>, auto: array{notice: string, why: array<string, string>}, limit: array<string, string>}
      */
     private static function load(string $locale): array
     {
         $parsed = Yaml::parseFile(dirname(__DIR__, 5).'/translations/research.'.$locale.'.yaml');
         self::assertIsArray($parsed);
 
-        /** @var array{outcome: array<string, string>, role: array<string, string>} $research */
+        /** @var array{outcome: array<string, string>, role: array<string, string>, auto: array{notice: string, why: array<string, string>}, limit: array<string, string>} $research */
         $research = $parsed['research'];
 
         return $research;

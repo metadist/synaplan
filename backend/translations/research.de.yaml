@@ -1,19 +1,37 @@
 research:
   outcome:
     complete: 'Fertig: %statements% Aussagen, %supported% davon mit einer Quelle belegt.'
-    complete_partial: 'Fertig mit Lücken: %open% von %points% Punkten konnten nicht bestätigt werden. Sie stehen unter „Nicht bestätigt“.'
+    complete_partial: 'Fertig mit Lücken: %open% von %points% Punkten konnte keine Quelle bestätigen, deshalb fehlen sie in der Antwort. „Gründlicher nachsehen“ prüft sie noch einmal.'
     complete_snippets_only: 'Keine Seite ließ sich öffnen, deshalb beruht dieser Bericht nur auf Suchzusammenfassungen. Wo es wichtig ist, steht das dabei.'
     stopped_by_user: 'Gestoppt. Nach deinem Klick auf Stopp wurde keine neue Arbeit begonnen; ein Schritt, der schon lief, kann noch zählen. Was bisher gefunden wurde, bleibt erhalten.'
     stopped_budget: 'Gestoppt, weil dein monatliches KI-Budget aufgebraucht ist. Der Bericht deckt %covered% von %points% Punkten ab.'
     stopped_limit: 'Gestoppt, weil diese Recherche ihr Limit für diese Tiefe erreicht hat. Das Gefundene deckt %covered% von %points% Punkten ab.'
     stopped_waiting: 'Gestoppt, weil der Plan nicht innerhalb eines Tages bestätigt wurde. Starte sie neu, wenn du so weit bist.'
     stopped_by_admin: 'Die Recherche wurde in deinem Synaplan-Arbeitsbereich ausgeschaltet. Was bisher gefunden wurde, bleibt erhalten.'
+    answered_without_research: 'Ohne den genaueren Blick beantwortet. Für diese Frage wurde nichts gesucht.'
     failed_no_sources: 'Es gab nichts zu recherchieren: Schalte das Web ein oder füge diesem Projekt Dateien hinzu.'
     failed_nothing_found: 'Die durchsuchten Quellen enthielten nichts, was diese Frage beantwortet. Formuliere sie anders oder füge diesem Projekt Dateien hinzu.'
     failed_role_unavailable: 'Das Modell für %role% in diesem Projekt ist nicht verfügbar, und kein anderes Modell im Projekt kann einspringen. Es wurde nichts berechnet.'
     failed_model_error: 'Das Modell für %role% hat nicht mehr geantwortet. Sonst wurde nichts berechnet; versuche es erneut oder wähle ein anderes Modell.'
     failed_interrupted: 'Die Recherche wurde auf dem Server unterbrochen. Starte sie neu – die bisher gefundenen Quellen bleiben hier erhalten.'
     unknown: 'Die Recherche wurde beendet. Starte sie neu, wenn du die Antwort noch brauchst.'
+  report:
+    sources: 'Quellen'
+  auto:
+    notice: 'Ich sehe das für dich in mehreren Quellen nach — etwa %minutes% Minuten.'
+    why:
+      several_parts: 'Die Frage hat mehrere Teile.'
+      comparison: 'Es ist ein Vergleich.'
+      procedure: 'Es ist ein Ablauf mit mehreren Schritten und Stellen.'
+      current_fact: 'Es braucht aktuelle Quellen.'
+      asked_thorough: 'Du hast um eine gründliche Antwort gebeten.'
+      deeper: 'Du wolltest mehr wissen.'
+  limit:
+    no_sources: 'Normalerweise würde ich das in mehreren Quellen nachsehen, aber die Websuche ist hier aus und dieser Chat hat keinen Ordner. Das weiß ich dazu — prüfe aktuelle Vorgaben bei den Behörden.'
+    too_many: 'Es laufen schon zu viele Recherchen. Hier ist eine erste Antwort — klicke in ein paar Minuten auf Gründlicher nachsehen für die vollständige.'
+    budget: 'Dein Nutzungsbudget für diesen Zeitraum ist aufgebraucht, deshalb antworte ich direkt. Ein Administrator kann es erhöhen.'
+    plan_limit: 'Die Recherchen deines Tarifs für heute sind aufgebraucht, deshalb antworte ich direkt. Morgen geht es wieder.'
+    unavailable: 'Die Recherche ist gerade nicht verfügbar, deshalb antworte ich direkt. Versuche es in ein paar Minuten mit Gründlicher nachsehen.'
   role:
     reading: 'Lesen'
     sorting: 'Sortieren'

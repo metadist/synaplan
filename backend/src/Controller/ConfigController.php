@@ -429,19 +429,22 @@ final class ConfigController extends AbstractController
     #[Route('/routing/planner-model', name: 'routing_planner_model_get', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/config/routing/planner-model',
-        summary: 'Get the planner model selection',
-        description: 'Returns the resolved planner model id (DEFAULTMODEL.PLAN, user override then global) and the Sorting model id it falls back to when no planner model is set.',
+        summary: 'Get the planner and research model selections',
+        description: 'Returns the resolved planner model id (DEFAULTMODEL.PLAN, user override then global), the Sorting model id it falls back to, whether Research is enabled, and the optional research reading (DEFAULTMODEL.READ) and checking (DEFAULTMODEL.VERIFY) overrides.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
     #[OA\Response(
         response: 200,
-        description: 'Planner model selection',
+        description: 'Planner and research model selections',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Selected planner model id, or null when none is configured (falls back to the Sorting model)', example: 12),
                 new OA\Property(property: 'fallbackModelId', type: 'integer', nullable: true, description: 'Sorting model id used when no planner model is set', example: 7),
+                new OA\Property(property: 'researchEnabled', type: 'boolean', description: 'Whether Research is turned on for this installation', example: true),
+                new OA\Property(property: 'readingModelId', type: 'integer', nullable: true, description: 'Selected research source-reading model id (DEFAULTMODEL.READ), or null for automatic fallback', example: 12),
+                new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true, description: 'Selected research fact-checking model id (DEFAULTMODEL.VERIFY), or null for automatic fallback', example: 53),
             ]
         )
     )]
@@ -456,35 +459,39 @@ final class ConfigController extends AbstractController
     }
 
     /**
-     * Save (or clear) the user's planner model selection (DEFAULTMODEL.PLAN).
+     * Save (or clear) the user's planner and/or research model overrides
+     * (DEFAULTMODEL.PLAN, DEFAULTMODEL.READ, DEFAULTMODEL.VERIFY).
      *
-     * A null `modelId` removes the per-user override so the planner reverts to
-     * the global default / Sorting model fallback.
+     * A null value removes the per-user override so the slot reverts to
+     * its automatic fallback.
      */
     #[Route('/routing/planner-model', name: 'routing_planner_model_save', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/routing/planner-model',
-        summary: 'Save the planner model selection',
-        description: 'Writes the per-user DEFAULTMODEL.PLAN override. Pass `modelId: null` to clear the override and fall back to the Sorting model.',
+        summary: 'Save the planner or research model selections',
+        description: 'Writes per-user DEFAULTMODEL.PLAN (`modelId`), DEFAULTMODEL.READ (`readingModelId`), or DEFAULTMODEL.VERIFY (`checkingModelId`) overrides. Pass `null` for a field to clear that override.',
         security: [['Bearer' => []]],
         tags: ['Configuration'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['modelId'],
                 properties: [
                     new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Planner model id, or null to clear the override', example: 12),
+                    new OA\Property(property: 'readingModelId', type: 'integer', nullable: true, description: 'Research reading model id, or null to clear the override', example: 12),
+                    new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true, description: 'Research fact-checking model id, or null to clear the override', example: 53),
                 ]
             )
         )
     )]
     #[OA\Response(
         response: 200,
-        description: 'Planner model saved',
+        description: 'Model selections saved',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'modelId', type: 'integer', nullable: true, example: 12),
+                new OA\Property(property: 'readingModelId', type: 'integer', nullable: true, example: 12),
+                new OA\Property(property: 'checkingModelId', type: 'integer', nullable: true, example: 53),
             ]
         )
     )]
@@ -499,17 +506,17 @@ final class ConfigController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-        if (!is_array($data) || !array_key_exists('modelId', $data)) {
+        if (!is_array($data) || ([] === array_intersect(array_keys($data), ['modelId', 'readingModelId', 'checkingModelId']))) {
             return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
         }
 
         try {
-            $modelId = $this->routingModels->savePlanner((int) $user->getId(), $data['modelId']);
+            $saved = $this->routingModels->saveAgentModels((int) $user->getId(), $data);
         } catch (InvalidModelSelectionException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->json(['success' => true, 'modelId' => $modelId]);
+        return $this->json(['success' => true] + $saved);
     }
 
     /**

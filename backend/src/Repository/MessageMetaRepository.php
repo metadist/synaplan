@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Message;
 use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -69,6 +70,29 @@ class MessageMetaRepository extends ServiceEntityRepository
             ->setParameter('key', $key)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * The one message of a chat that carries a meta value, e.g. the reply
+     * stamped with a research run id. Null when no message carries it.
+     */
+    public function findMessageInChatByMeta(int $chatId, string $key, string $value): ?Message
+    {
+        $result = $this->createQueryBuilder('x')
+            ->select('x', 'm')
+            ->innerJoin('x.message', 'm')
+            ->where('m.chatId = :chatId')
+            ->andWhere('x.metaKey = :key')
+            ->andWhere('x.metaValue = :value')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('key', $key)
+            ->setParameter('value', $value)
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result instanceof MessageMeta ? $result->getMessage() : null;
     }
 
     /**

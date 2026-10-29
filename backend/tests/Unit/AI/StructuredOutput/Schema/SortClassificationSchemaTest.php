@@ -39,6 +39,10 @@ final class SortClassificationSchemaTest extends TestCase
         $this->assertSame('integer', $properties['BREADPAGES']['type']);
         $this->assertSame([0, 2, 3], $properties['BREADPAGES']['enum']);
         $this->assertSame(['boolean', 'null'], $properties['BMULTI']['type']);
+        $this->assertSame(['string', 'null'], $properties['BEFFORT']['type']);
+        $this->assertSame(['answer', 'lookup', 'research', null], $properties['BEFFORT']['enum']);
+        $this->assertSame(['string', 'null'], $properties['BEFFORT_WHY']['type']);
+        $this->assertContains(null, $properties['BEFFORT_WHY']['enum']);
         $this->assertSame(['string', 'null'], $properties['BMEDIA']['type']);
         $this->assertSame(['string', 'null'], $properties['BINPUTMODE']['type']);
         $this->assertSame(['integer', 'null'], $properties['BDURATION']['type']);
@@ -54,7 +58,7 @@ final class SortClassificationSchemaTest extends TestCase
         $schema = SortClassificationSchema::build(['general'], ['en']);
 
         $this->assertSame(
-            ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BREADPAGES', 'BMULTI', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
+            ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BREADPAGES', 'BMULTI', 'BEFFORT', 'BEFFORT_WHY', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
             $schema->schema['required'],
         );
         $this->assertSame(array_keys($schema->schema['properties']), $schema->schema['required']);

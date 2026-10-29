@@ -1,16 +1,16 @@
 # Research
 
-Research is off until an administrator turns it on. A person can start a run,
+Research is on unless an administrator turns it off. A person can start a run,
 read it, stop it and delete it. The report of a run that belongs to a chat is
 written into that chat by the server, including when the browser is closed.
 
 ## Switch
 
-| | |
-| --- | --- |
-| Environment | `RESEARCH_ENABLED=1` forces it on. `RESEARCH_ENABLED=0` forces it off. Empty follows the database. |
-| Database | `BCONFIG` group `RESEARCH`, setting `ENABLED`, owner `0`. New installs seed `0`. |
-| Gate | `FEATURE_MODULES_GATE_RESEARCH=true` makes the start routes answer 404 while research is off. |
+|             |                                                                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Environment | `RESEARCH_ENABLED=1` forces it on. `RESEARCH_ENABLED=0` forces it off. Empty follows the database.                                     |
+| Database    | `BCONFIG` group `RESEARCH`, setting `ENABLED`, owner `0`. Installs seed `1`; `Version20261028110000` turned existing installs on once. |
+| Gate        | `FEATURE_MODULES_GATE_RESEARCH=true` makes the start routes answer 404 while research is off.                                          |
 
 While research is off, these routes answer 404: capabilities, start, a reply,
 and a follow-up. Reading a run, its updates, stopping it and deleting it keep
@@ -19,22 +19,89 @@ working, so a run that was already going can still be opened and removed.
 A unit that starts after research was turned off writes what it has found and
 then stops with "Research was turned off on your Synaplan workspace."
 
+## Automatic research
+
+There is no research mode and no menu entry. The chat decides how much a
+question needs, from the same `tools:sort` answer that already carries the
+topic and the web-search vote: `BEFFORT` is `answer`, `lookup` or `research`,
+`BEFFORT_WHY` names the one reason (`several_parts`, `comparison`,
+`procedure`, `current_fact`, `asked_thorough`, `asked_short`, `simple`,
+`deeper`). A sorting model that does not fill the fields counts as no vote,
+and the chat answers directly — an install whose sorter cannot carry the
+rating simply never researches on its own.
+
+When the rating is `research`, the turn starts a run of depth `auto` for the
+person. The stream carries `research_started` with the run id first; the
+reply then carries `researchRunId` (meta `research_run_id`), live and after
+a reload. In the web chat that reply bubble shows the run working as five
+phases a person can follow — understanding the question, planning the
+answer, searching and reading, writing the answer, checking every
+statement. The headline says which step of how many the run is in and how
+long it has been going (the admin timing switch hides the clock). A phase
+the run has passed folds to its title and one summary line ("2 points · 1
+answered", "4 searches · 6 sources read · 1 could not be opened") and opens
+again on a click; the phase it is in is open and shows what it does right
+now — the query it searched and how many results came back, the source it
+reads, the decision at the end of a round ("Not enough yet — looking
+again"), the section it writes — with the newest row in the primary ink and
+the earlier ones muted, at most six rows before a "Show N earlier steps"
+line; the phases still to come are listed muted. When the run moves on, the
+phase it left folds and the next one opens. **Answer now** with its
+consequence is under the phases. **Stop** is the send button in the
+composer; the live-speech button does not take that place while a run is
+going. The bubble hides the fallback sentence meanwhile. The one sentence
+the stream writes ("I am looking through several sources for this — about N
+minutes. The question has several parts.") is what a channel without that
+UI gets. When the run finishes, the report replaces that reply's text (see
+"Where the report goes"), so the person reads the answer where they watched
+it being made; one muted line below the report ("Researched: 12 steps · 8
+sources read") opens the phases again, folded, in any later session too.
+Only an ordinary signed-in web chat turn
+does this: never a widget, a saved task, an incognito chat, an "Again", a
+turn with a fixed task prompt, or a channel without a chat.
+
+A `research` turn that cannot start a run answers directly and begins with
+why, in the person's language: web search off and no folder on the chat
+(`no_sources`), too many runs going (`too_many`), the usage budget used up
+(`budget`), the plan's research allowance used up (`plan_limit`), or the
+research store not answering (`unavailable`). The reply carries `effort` and
+`effortNotice`, so **Look deeper** is offered under a `lookup` answer and
+under every answer that began with a limit sentence, live and after a
+reload. Look deeper starts a run of depth `auto` with the hint `deeper` and
+the last six turns of the chat as context.
+
+Depth `auto` sizes itself from the plan: after planning, a plan of up to two
+points is capped at the quick budget, a larger plan at the standard budget.
+The plan event carries `ceiling` (`quick` or `standard`) and the minutes the
+run now needs; the run state carries `ceiling` as well. The hint `brief`
+(the sorter said `asked_short`) caps the plan at two points; `deeper` lets
+it grow. An automatic run never asks a question. **Answer now** on the card
+is the `answer_now` input above; **Stop** is the composer's send button and
+keeps what was written.
+
+|              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Switch       | `BCONFIG` group `RESEARCH`, setting `AUTO_ENABLED`, owner `0`. Installs seed `1` (the seeder adds the missing row on existing installs too). Off, or research off (`RESEARCH_ENABLED=0` included), means the chat answers every question directly and Look deeper is absent. The admin research tab (AI infrastructure → Research) has the switch as a second row under Research: it is disabled with "Turn on Research first." while research is off, says what off means ("the chat answers every question directly; Look deeper disappears; runs already going finish"), notes when web search is off (folders only), and is audited as `research.settings.update` with the old and new value. `PUT /api/v1/admin/research` takes `autoEnabled`; while research is off it answers 409 `research_off`. |
+| Capabilities | `automatic` (boolean) and `auto_limits { minutes, cost_cap }` from the standard budget.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Eval         | `app:research:router-eval --user=<id>` rates the labelled corpus in `backend/tests/Eval/research/router.json` with that account's sorting model. Gate: agreement ≥ 90 %, over-escalation ≤ 5 %, under-escalation ≤ 10 %, no vote ≤ 2 %.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Gateway      | `POST /v1/messages` with `x-synaplan-effort: auto` rates the last user message with the same sorter and runs the same gate (`AutoResearchGate::decideFor`). A started run answers the turn with the notice sentence as one assistant message and reports `x-synaplan-research-run`; the report stays on the run because a gateway turn has no chat. Without the header the gateway never rates. See `docs/ANTHROPIC_COMPATIBLE_API.md`, "Effort".                                                                                                                                                                                                                                                                                                                                                        |
+
 ## Routes
 
 The same actions are on `/api/v1/research` (signed-in app) and `/v1/research`
 (an API key with `desktop:messages`).
 
-| Method | Path | When research is off |
-| --- | --- | --- |
-| GET | `research/capabilities` | 404 |
-| POST | `research` | 404. Header `Idempotency-Key` (1–64 of letters, digits, `.` `_` `:` `-`) returns the same id for 24 hours. |
-| GET | `research` | The caller's runs from the last 48 hours, newest first. `?active=1` lists only runs that are still going. |
-| GET | `research/{id}` | That run, when it belongs to the caller. |
-| GET | `research/{id}/events` | Updates so far, as server-sent events. `Last-Event-ID` or `?after=` resumes. |
-| POST | `research/{id}/input` | 404 |
-| POST | `research/{id}/cancel` | Asks the run to stop. |
-| POST | `research/{id}/followups` | 404 |
-| DELETE | `research/{id}` | Removes the run, its updates and its cached pages. |
+| Method | Path                      | When research is off                                                                                       |
+| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| GET    | `research/capabilities`   | 404                                                                                                        |
+| POST   | `research`                | 404. Header `Idempotency-Key` (1–64 of letters, digits, `.` `_` `:` `-`) returns the same id for 24 hours. |
+| GET    | `research`                | The caller's runs from the last 48 hours, newest first. `?active=1` lists only runs that are still going.  |
+| GET    | `research/{id}`           | That run, when it belongs to the caller.                                                                   |
+| GET    | `research/{id}/events`    | Updates so far, as server-sent events. `Last-Event-ID` or `?after=` resumes.                               |
+| POST   | `research/{id}/input`     | 404                                                                                                        |
+| POST   | `research/{id}/cancel`    | Asks the run to stop.                                                                                      |
+| POST   | `research/{id}/followups` | 404                                                                                                        |
+| DELETE | `research/{id}`           | Removes the run, its updates and its cached pages.                                                         |
 
 A follow-up is a new run. It keeps the parent's sources and continues the
 source, evidence and point numbers, and it stays inside the parent's world.
@@ -45,12 +112,13 @@ its own. The parent has to be finished; until then the answer is 409
 `Idempotency-Key` header works as on start, so a double click starts one
 follow-up.
 
-| Type | Text | What it does |
-| --- | --- | --- |
-| question | required | A quick run. When at least half of the question's words appear in the findings or the report, it answers from them. Otherwise it searches once for the question. A completed question with an answer sets `can_add_to_report`, so a later screen can offer Add to report. This app does not show that button yet. |
-| revise | required | Rewrites the report from the instruction (shorter, for the board, a translation, a table, one section). A cited sentence with the same words and the same citations keeps its verdict and is not checked again; any other cited sentence is checked. A parent without a report answers 409. |
-| deeper | optional | Uses the thorough budget. Each line under Not confirmed (up to eight; the closing count is not a line) becomes a plan point, and so does the text. With neither, the parent question is searched again. |
-| refresh | optional | Reads sources dated before the start of the brief's time frame again, and sources without a date, and says what changed. With no start date, it reads every source that was already read again. |
+| Type       | Text     | What it does                                                                                                                                                                                                                                                                                                      |
+| ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| question   | required | A quick run. When at least half of the question's words appear in the findings or the report, it answers from them. Otherwise it searches once for the question. A completed question with an answer sets `can_add_to_report`, so a later screen can offer Add to report. This app does not show that button yet. |
+| revise     | required | Rewrites the report from the instruction (shorter, for the board, a translation, a table, one section). A cited sentence with the same words and the same citations keeps its verdict and is not checked again; any other cited sentence is checked. A parent without a report answers 409.                       |
+| deeper     | optional | Uses the thorough budget. Each line under Not confirmed (up to eight; the closing count is not a line) becomes a plan point, and so does the text. With neither, the parent question is searched again.                                                                                                           |
+| refresh    | optional | Reads sources dated before the start of the brief's time frame again, and sources without a date, and says what changed. With no start date, it reads every source that was already read again.                                                                                                                   |
+| answer_now | none     | Answer now on the card. While sources were read, the run writes the report from them (like write now). Before any source was read, the run ends at once with the outcome `answered_without_research` and the chat answers the question directly. While the report is being written or checked, nothing changes.   |
 
 An id that is not the caller's is 404. The session route requires `chat_id`
 and the chat must belong to the caller. The API route rejects `chat_id`; the
@@ -111,8 +179,8 @@ a new or renamed point is searched by its title. Write now ends the search
 and writes the report from what was already found. When the next step has
 waited 20 seconds for a worker, the state carries `queued_since` and the
 events end with a `queued` frame. Both are computed on each request and
-never recorded, so they are as fresh as the client's poll. Research as a whole stays off until
-`RESEARCH.ENABLED` is turned on.
+never recorded, so they are as fresh as the client's poll. Research as a whole is off while
+`RESEARCH.ENABLED` is `0`.
 
 The conformance suite plays ten scenarios twice against one model — start
 with a search, search in parallel, read what was found, react to a refused
@@ -133,12 +201,54 @@ one person, and at most `RESEARCH.MAX_ACTIVE_THOROUGH_PER_USER` thorough runs
 
 ## Where the report goes
 
-When the run has a `chat_id`, the server posts one assistant message into
-that chat however the run ends, in the person's language:
+When the run has a `chat_id`, the server writes one assistant message into
+that chat however the run ends, in the person's language. A run the chat
+started on its own already has a reply — the one stamped with the run id
+(`research_run_id`) — and that reply's text becomes the report; a run
+started by **Look deeper** or the research API gets a new reply carrying the
+same stamp, which is how the chat shows the run and later its steps:
 
 - **Complete:** the report is the message, and the markdown file is attached
   to it. The file also shows in the file manager's Generated gallery with
   "Open in chat".
+
+The person reads the **reader's report**, not the checked report the run
+keeps (`report.markdown` in the run's state). The reader's report answers
+the question only: the "Not confirmed" section, the closing count and the
+same-provider sentence stay out of the message, a heading the check emptied
+goes with them, and every evidence id becomes the number of its source in
+the order the sources first appear (`[e12][e31]` reads as `[1][2]`). The
+sources are stored under the question like web-search results, so the chat
+shows them beneath the reply and the numbers link to them; the attached
+file lists them at the end. What the check removed, and whether a model of
+the same provider checked, is told in the research fold under the reply
+(`check` event: `statements`, `supported`, `softened`, `removed`,
+`same_provider`), and **Look deeper** still seeds its plan from the checked
+report's "Not confirmed" list. The reply's info panel shows what the run
+spent: every model call is summed per role and model (`LEAD`, `READ`,
+`WRITE`, `VERIFY`, `SORT`) next to the sorting that started the run, with
+the cost the person was charged. Tokens and cost on a research reply are
+the run's, not just the one chat call.
+
+While the run works, the fold shows the model's own words, not only the
+step names, and the client polls `research/{id}/events` for them (every
+1.2 s, every 0.7 s while the draft or the lead's note streams). The row
+happening now is open and its words run in at reading pace; every row
+before it folds to one line and opens on a click.
+
+| Event              | Carries                                          | Where it comes from                                                                                                                                                                                          |
+| ------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `thinking`         | `text`                                           | The lead's note as it streams (tool mode), flushed like `draft`. A provider that cannot call tools while streaming is asked without the stream, so only `thought` arrives.                                   |
+| `thought`          | `text`                                           | The lead's finished note before the tool calls of a turn (tool mode), at most 600 characters. It replaces the streamed `thinking`.                                                                           |
+| `plan`             | `points[].why`                                   | Why the plan has the point.                                                                                                                                                                                  |
+| `source` (`found`) | `why`                                            | The triage's reason for picking the page, at most 200 characters.                                                                                                                                            |
+| `source` (`read`)  | `findings`                                       | How many evidence cards the page gave; `0` reads as "nothing new for the plan".                                                                                                                              |
+| `finding`          | `source`, `point`, `fact`, `confidence`, `quote` | An evidence card, at most four per source, with its first verified quote.                                                                                                                                    |
+| `point`            | `note`                                           | The lead's or reflect's sentence on the point's state.                                                                                                                                                       |
+| `round`            | `reason`                                         | Why the round ended: a code (`covered`, `budget`, `no_progress`, …) the client puts into words, or the lead's own sentence.                                                                                  |
+| `draft`            | `text`                                           | The writer's text as it streams, flushed every 160 characters or 0.7 s. The client concatenates the pieces and shows them under the phases as a draft until the checked report replaces them.                |
+| `verdict`          | `statement`, `verdict`, `note`, `part`, `reason` | One statement the check softened (`partial`), left out (`contradicted`, `unsupported`) or the draft check removed (`removed` with a code: `uncited`, `number`, `name`, `unknown_id`); at most eight per run. |
+
 - **Stopped or failed with something found:** the sentence why it ended
   stands above the report, so a partial report never reads as a finished one.
 - **Stopped or failed with nothing found:** only that sentence, no file.
@@ -162,7 +272,7 @@ A run that does not finish fails the step with its sentence, and later steps
 skip. The step does not ask questions and cannot be thorough.
 
 The planner does not see the step while the flag is off, and never offers it
-to a normal chat turn (that has its own research mode). Closing the window
+to a normal chat turn (the chat decides on its own when a question needs a research). Closing the window
 does not stop the research. The report still appears in the chat, and so does
 what the later steps produce.
 

@@ -36,7 +36,8 @@ final readonly class ConfigResearchModelLookup implements ResearchModelLookup
 
     public function slot(int $userId, string $slot): ?ResearchModelChoice
     {
-        $id = $this->models->getDefaultModel($slot, $userId);
+        $id = $this->models->getConfiguredDefaultModel($slot, $userId)
+            ?? $this->models->getDefaultModel($slot, $userId);
         if (null === $id || $id < 1) {
             return null;
         }

@@ -808,7 +808,20 @@
       "legacyTitle": "Repli hérité (admin)",
       "legacyDesc": "L’instruction du trieur IA à sujet unique, utilisée lorsque le routage multi-tâches est désactivé.",
       "fallbackTitle": "Instruction de tri de repli IA",
-      "fallbackSubtitle": "L’instruction du trieur IA à sujet unique, utilisée lorsque le routage multi-tâches est désactivé. Administrateurs uniquement."
+      "fallbackSubtitle": "L’instruction du trieur IA à sujet unique, utilisée lorsque le routage multi-tâches est désactivé. Administrateurs uniquement.",
+      "agentTuningTitle": "Réglage fin pour les agents et la recherche (optionnel)",
+      "agentTuningDesc": "Choisissez en option quels modèles gèrent la planification des tâches, la lecture des sources et la vérification des faits. Par défaut, vos modèles de tri et d’analyse de texte sont utilisés automatiquement.",
+      "agentTuningAllAuto": "Tout automatique",
+      "agentTuningCustomCount": "{count} personnalisé(s)",
+      "plannerSlotLabel": "Planification des tâches",
+      "plannerSlotHint": "Découpe les demandes complexes en étapes.",
+      "readingSlotLabel": "Lecture des sources",
+      "readingModelAuto": "Auto (utiliser le modèle de tri)",
+      "readingSlotHint": "Lit chaque source ouverte et extrait les preuves.",
+      "checkingSlotLabel": "Vérification des faits",
+      "checkingModelAuto": "Auto (autre fournisseur / analyse de texte)",
+      "checkingSlotHint": "Vérifie chaque affirmation citée par rapport à sa source.",
+      "researchLeadNote": "La conduite de la recherche et la rédaction de la réponse utilisent toujours le modèle sélectionné dans le chat."
     },
     "sortingPrompt": {
       "title": "Préprocesseur",

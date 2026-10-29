@@ -27,7 +27,7 @@ final class ResearchBudget
 
     public function __construct(
         private readonly ResearchDepth $depth,
-        private readonly ResearchBudgetConfig $limits,
+        private ResearchBudgetConfig $limits,
         private readonly \DateTimeImmutable $startedAt,
     ) {
         $this->estimateMicro = self::micro($limits->costCap);
@@ -137,6 +137,25 @@ final class ResearchBudget
     public function extras(): ResearchBudgetExtras
     {
         return $this->limits->extras;
+    }
+
+    public function limits(): ResearchBudgetConfig
+    {
+        return $this->limits;
+    }
+
+    /**
+     * Lower the limits to another row. Spent counters stay, so a run that
+     * already used more than the new cap simply has nothing left. The cost
+     * estimate follows the new cap when it was still the old one.
+     */
+    public function shrinkTo(ResearchBudgetConfig $ceiling): void
+    {
+        $oldCap = self::micro($this->limits->costCap);
+        $this->limits = $this->limits->cappedAt($ceiling);
+        if ($this->estimateMicro === $oldCap) {
+            $this->estimateMicro = self::micro($this->limits->costCap);
+        }
     }
 
     /**

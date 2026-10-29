@@ -14,11 +14,13 @@ use PHPUnit\Framework\TestCase;
 final class StructuredOutputRecoveryTest extends TestCase
 {
     /**
-     * Verbatim `failed_generation` Groq returned for gpt-oss-120b on
-     * 2026-09-03 (strict: true requested): a complete, valid classification
-     * with the sorter's INPUT fields echoed next to it.
+     * The `failed_generation` Groq returned for gpt-oss-120b on 2026-09-03
+     * (strict: true requested): a complete, valid classification with the
+     * sorter's INPUT fields echoed next to it. The two effort fields the
+     * schema gained since are added where the model's alphabetical order
+     * puts them.
      */
-    private const ECHOED_SORT_GENERATION = '{"BDATETIME":"20260903124200","BDURATION":null,"BFILE":0,"BFILEPATH":"","BFILETEXT":"","BINPUTMODE":null,"BLANG":"de","BMEDIA":null,"BMULTI":false,"BREADPAGES":0,"BRESOLUTION":null,"BTEXT":"ok, mach mir ein PDF mit dem Bild","BTOPIC":"general","BWEBSEARCH":false}';
+    private const ECHOED_SORT_GENERATION = '{"BDATETIME":"20260903124200","BDURATION":null,"BEFFORT":null,"BEFFORT_WHY":null,"BFILE":0,"BFILEPATH":"","BFILETEXT":"","BINPUTMODE":null,"BLANG":"de","BMEDIA":null,"BMULTI":false,"BREADPAGES":0,"BRESOLUTION":null,"BTEXT":"ok, mach mir ein PDF mit dem Bild","BTOPIC":"general","BWEBSEARCH":false}';
 
     private StructuredOutputRecovery $recovery;
 
@@ -44,7 +46,7 @@ final class StructuredOutputRecoveryTest extends TestCase
         $data = json_decode($salvaged, true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            ['BDURATION', 'BINPUTMODE', 'BLANG', 'BMEDIA', 'BMULTI', 'BREADPAGES', 'BRESOLUTION', 'BTOPIC', 'BWEBSEARCH'],
+            ['BDURATION', 'BEFFORT', 'BEFFORT_WHY', 'BINPUTMODE', 'BLANG', 'BMEDIA', 'BMULTI', 'BREADPAGES', 'BRESOLUTION', 'BTOPIC', 'BWEBSEARCH'],
             array_keys($data),
             'exactly the schema keys survive, in the order the model emitted them',
         );
@@ -59,7 +61,7 @@ final class StructuredOutputRecoveryTest extends TestCase
     {
         // Echoed input fields AND a missing BLANG: pruning alone cannot make
         // this conform, and a made-up language would be worse than a retry.
-        $generation = '{"BTEXT":"hi","BTOPIC":"general","BWEBSEARCH":false,"BREADPAGES":0,"BMULTI":null,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
+        $generation = '{"BTEXT":"hi","BTOPIC":"general","BWEBSEARCH":false,"BREADPAGES":0,"BMULTI":null,"BEFFORT":null,"BEFFORT_WHY":null,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
 
         self::assertNull($this->recovery->salvage($generation, self::sortSchema()));
     }
@@ -218,7 +220,7 @@ final class StructuredOutputRecoveryTest extends TestCase
         self::assertSame(['role' => 'assistant', 'content' => '{"BTEXT":"hi","BTOPIC":"general"}'], $repaired[2]);
         self::assertSame('user', $repaired[3]['role']);
         self::assertStringContainsString("additionalProperties 'BTEXT' not allowed", $repaired[3]['content']);
-        self::assertStringContainsString('"BTOPIC", "BLANG", "BWEBSEARCH", "BREADPAGES", "BMULTI", "BMEDIA", "BINPUTMODE", "BDURATION", "BRESOLUTION"', $repaired[3]['content']);
+        self::assertStringContainsString('"BTOPIC", "BLANG", "BWEBSEARCH", "BREADPAGES", "BMULTI", "BEFFORT", "BEFFORT_WHY", "BMEDIA", "BINPUTMODE", "BDURATION", "BRESOLUTION"', $repaired[3]['content']);
         self::assertStringContainsString('Do not repeat or echo any field', $repaired[3]['content']);
     }
 

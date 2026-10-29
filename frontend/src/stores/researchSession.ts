@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { ApiError } from '@/services/api/httpClient'
 import {
+  answerNowResearch,
   cancelResearch,
   fetchResearchCapabilities,
   fetchResearchEvents,
@@ -9,25 +10,37 @@ import {
   type ResearchCapabilities,
 } from '@/services/api/researchApi'
 import {
-  applyResearchFrame,
+  applyResearchSse,
   emptyProgress,
   isTerminalStatus,
-  parseResearchSse,
   progressFromRun,
   type ResearchProgress,
 } from '@/services/chat/stream/handlers/research'
+import { createUuid } from '@/utils/uuid'
 import { useChatsStore } from './chats'
 import { useHistoryStore } from './history'
 import { useIncognitoStore } from './incognito'
 
-const POLL_MS = 2000
+const POLL_MS = 1200
+/** While the writer streams the draft or the lead its note, the person reads along, so the poll keeps pace. */
+const POLL_WRITING_MS = 700
+/** The server refuses a start with more starting pages than this. */
+const MAX_SEED_SOURCES = 50
+
+/** What Look deeper sends: the question, the answer's cited pages, and the last turns so the research knows the chat. */
+export interface LookDeeperInput {
+  question: string
+  context: Array<{ role: 'user' | 'assistant'; text: string }>
+  seedSources: Array<{ url: string; title?: string }>
+}
 
 export interface ResearchBag {
   available: Ref<boolean | null>
   capabilities: Ref<ResearchCapabilities | null>
-  composerOpen: Ref<boolean>
   starting: Ref<boolean>
   stopping: Ref<boolean>
+  /** Answer now was accepted for the run now showing. Stays until another run starts. */
+  answerNowAccepted: Ref<boolean>
   startError: Ref<string | null>
   progress: Ref<ResearchProgress | null>
   capabilitiesTask: Promise<void> | null
@@ -39,9 +52,9 @@ export function createResearchBag(): ResearchBag {
   return {
     available: ref(null),
     capabilities: ref(null),
-    composerOpen: ref(false),
     starting: ref(false),
     stopping: ref(false),
+    answerNowAccepted: ref(false),
     startError: ref(null),
     progress: ref(null),
     capabilitiesTask: null,
@@ -56,20 +69,18 @@ export async function ensureCapabilities(bag: ResearchBag): Promise<void> {
   await bag.capabilitiesTask
 }
 
-export function openComposer(bag: ResearchBag): void {
-  bag.startError.value = null
-  bag.composerOpen.value = true
-}
-
-export function closeComposer(bag: ResearchBag): void {
-  bag.composerOpen.value = false
-  bag.startError.value = null
+/** Forget what the server said, so the next question asks again (an admin flipped a switch). */
+export function forgetCapabilities(bag: ResearchBag): void {
+  bag.available.value = null
+  bag.capabilities.value = null
+  bag.capabilitiesTask = null
 }
 
 export function attachChat(bag: ResearchBag, chatId: number | null): void {
   bag.boundChatId = chatId
   if (chatId === null) {
     bag.progress.value = null
+    bag.answerNowAccepted.value = false
     stopPoll(bag)
     return
   }
@@ -78,15 +89,42 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
     return
   }
   bag.progress.value = null
+  bag.answerNowAccepted.value = false
   stopPoll(bag)
   const saved = readSaved(chatId)
   if (saved !== null) void resume(bag, chatId, saved)
 }
 
-export async function beginResearch(
-  bag: ResearchBag,
-  input: { question: string; depth: 'standard' | 'thorough'; web: boolean; knowledge: boolean }
-): Promise<void> {
+/**
+ * The chat started a research on its own (`research_started` on the stream):
+ * follow it at once, the same way a run of our own is followed. The reply
+ * bubble that carries the run id shows what it does.
+ */
+export function adoptRun(bag: ResearchBag, chatId: number, id: string, question: string): void {
+  bag.startError.value = null
+  bag.answerNowAccepted.value = false
+  localStorage.setItem(storageKey(chatId), id)
+  if (bag.boundChatId !== chatId) return
+  bag.progress.value = emptyProgress(id, chatId, question)
+  startPoll(bag)
+}
+
+/**
+ * A reply that was found after the fact — a reload, another device — still
+ * running: follow it from where it is. A finished one is left alone.
+ */
+export async function followRun(bag: ResearchBag, chatId: number, id: string): Promise<void> {
+  if (bag.progress.value?.id === id) return
+  bag.answerNowAccepted.value = false
+  const run = await fetchResearchRun(id)
+  if (isTerminalStatus(run.status) || bag.boundChatId !== chatId) return
+  bag.progress.value = progressFromRun(chatId, run)
+  localStorage.setItem(storageKey(chatId), id)
+  startPoll(bag)
+}
+
+/** Look deeper under a direct answer: a research sized by its own plan, told the person wants more. */
+export async function lookDeeper(bag: ResearchBag, input: LookDeeperInput): Promise<void> {
   bag.startError.value = null
   const chatId = await chatForResearch()
   if (chatId === null) {
@@ -104,28 +142,38 @@ export async function beginResearch(
 }
 
 export async function stopResearch(bag: ResearchBag): Promise<void> {
+  await endRun(bag, cancelResearch, 'stopFailed')
+}
+
+/** Answer now: the report from what was read, or the plain answer when nothing was read yet. */
+export async function answerNow(bag: ResearchBag): Promise<void> {
+  const accepted = await endRun(bag, answerNowResearch, 'answerNowFailed')
+  if (accepted) bag.answerNowAccepted.value = true
+}
+
+async function endRun(
+  bag: ResearchBag,
+  send: (id: string) => Promise<Parameters<typeof progressFromRun>[1]>,
+  failure: string
+): Promise<boolean> {
   const current = bag.progress.value
-  if (current === null || isTerminalStatus(current.status) || bag.stopping.value) return
+  if (current === null || isTerminalStatus(current.status) || bag.stopping.value) return false
   bag.stopping.value = true
   try {
-    const run = await cancelResearch(current.id)
+    const run = await send(current.id)
     if (bag.progress.value?.id === current.id) {
-      bag.progress.value = progressFromRun(current.chatId, run)
-      stopPoll(bag)
+      bag.progress.value = withSteps(progressFromRun(current.chatId, run), bag.progress.value)
+      if (isTerminalStatus(run.status)) stopPoll(bag)
+      else startPoll(bag)
     }
-    await reloadChat(current.chatId)
+    if (isTerminalStatus(run.status)) await reloadChat(current.chatId)
+    return true
   } catch {
-    bag.startError.value = 'stopFailed'
+    bag.startError.value = failure
+    return false
   } finally {
     bag.stopping.value = false
   }
-}
-
-export function dismissResearch(bag: ResearchBag): void {
-  const current = bag.progress.value
-  if (current !== null) localStorage.removeItem(storageKey(current.chatId))
-  bag.progress.value = null
-  stopPoll(bag)
 }
 
 export function pauseResearch(bag: ResearchBag): void {
@@ -151,24 +199,43 @@ async function chatForResearch(): Promise<number | null> {
   return chat?.id ?? null
 }
 
-async function acceptRun(
-  bag: ResearchBag,
-  chatId: number,
-  input: { question: string; depth: 'standard' | 'thorough'; web: boolean; knowledge: boolean }
-): Promise<void> {
+async function acceptRun(bag: ResearchBag, chatId: number, input: LookDeeperInput): Promise<void> {
+  const capabilities = bag.capabilities.value
   const accepted = await startResearch({
     question: input.question,
-    depth: input.depth,
+    depth: 'auto',
+    hint: 'deeper',
     chat_id: chatId,
-    sources: { web: input.web, knowledge: input.knowledge },
+    sources: {
+      web: capabilities?.web_search_available ?? true,
+      knowledge: capabilities?.knowledge_available ?? false,
+    },
+    context: { turns: input.context.slice(-6) },
+    seed_sources: input.seedSources.slice(0, MAX_SEED_SOURCES),
   })
   const next = emptyProgress(accepted.id, chatId, input.question)
   next.status = accepted.status
   localStorage.setItem(storageKey(chatId), accepted.id)
-  bag.composerOpen.value = false
   if (bag.boundChatId !== chatId) return
+  bag.answerNowAccepted.value = false
   bag.progress.value = next
+  addReplyFor(chatId, accepted.id)
   startPoll(bag)
+}
+
+/**
+ * The bubble a Look deeper run works in: an empty reply bound to the run,
+ * until the reload after the run brings the persisted one with the report.
+ */
+function addReplyFor(chatId: number, runId: string): void {
+  if (useChatsStore().activeChatId !== chatId) return
+  useHistoryStore().messages.push({
+    id: createUuid(),
+    role: 'assistant',
+    parts: [],
+    timestamp: new Date(),
+    researchRunId: runId,
+  })
 }
 
 async function resume(bag: ResearchBag, chatId: number, id: string): Promise<void> {
@@ -193,15 +260,24 @@ async function resume(bag: ResearchBag, chatId: number, id: string): Promise<voi
 function startPoll(bag: ResearchBag): void {
   stopPoll(bag)
   void tick(bag)
-  bag.pollTimer = window.setInterval(() => {
-    void tick(bag)
-  }, POLL_MS)
 }
 
 function stopPoll(bag: ResearchBag): void {
   if (bag.pollTimer === null) return
-  window.clearInterval(bag.pollTimer)
+  window.clearTimeout(bag.pollTimer)
   bag.pollTimer = null
+}
+
+/** The next tick is set once this one has answered, at the pace the run's phase asks for. */
+function scheduleTick(bag: ResearchBag): void {
+  if (bag.pollTimer !== null) return
+  const current = bag.progress.value
+  const streaming = current?.status === 'writing' || (current?.thinking ?? '') !== ''
+  const delay = streaming ? POLL_WRITING_MS : POLL_MS
+  bag.pollTimer = window.setTimeout(() => {
+    bag.pollTimer = null
+    void tick(bag)
+  }, delay)
 }
 
 async function tick(bag: ResearchBag): Promise<void> {
@@ -212,13 +288,19 @@ async function tick(bag: ResearchBag): Promise<void> {
   }
   try {
     const next = await framesSince(bag, current)
-    if (next === null || bag.progress.value?.id !== current.id) return
-    if (isTerminalStatus(bag.progress.value.status)) return
-    bag.progress.value = next
-    if (!isTerminalStatus(next.status)) return
-    await settle(bag, next)
+    const shown = bag.progress.value
+    if (next !== null && shown?.id === current.id && !isTerminalStatus(shown.status)) {
+      bag.progress.value = next
+      if (isTerminalStatus(next.status)) {
+        await settle(bag, next)
+        return
+      }
+    }
   } catch {
     // The next tick asks again. Closing the page does not stop the run.
+  }
+  if (bag.progress.value?.id === current.id && !isTerminalStatus(bag.progress.value.status)) {
+    scheduleTick(bag)
   }
 }
 
@@ -230,8 +312,7 @@ async function framesSince(
   if (bag.progress.value?.id !== current.id || isTerminalStatus(bag.progress.value.status)) {
     return bag.progress.value
   }
-  let next = current
-  for (const frame of parseResearchSse(body)) next = applyResearchFrame(next, frame)
+  const next = applyResearchSse(current, body)
   if (bag.progress.value?.id !== current.id || isTerminalStatus(bag.progress.value.status)) {
     return bag.progress.value
   }
@@ -242,8 +323,14 @@ async function settle(bag: ResearchBag, current: ResearchProgress): Promise<void
   stopPoll(bag)
   const run = await fetchResearchRun(current.id)
   if (bag.progress.value?.id !== current.id) return
-  bag.progress.value = progressFromRun(current.chatId, run)
+  bag.progress.value = withSteps(progressFromRun(current.chatId, run), current)
   await reloadChat(current.chatId)
+}
+
+/** The run summary has no steps; the ones followed so far stay with it. */
+function withSteps(summary: ResearchProgress, followed: ResearchProgress): ResearchProgress {
+  summary.steps = followed.steps
+  return summary
 }
 
 async function reloadChat(chatId: number): Promise<void> {

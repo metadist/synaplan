@@ -246,6 +246,45 @@ describe('describeStep', () => {
     expect(done.title).toBe('processing.timeline.sentTo:{"model":"Grok 4"}')
   })
 
+  it('says why a web search runs after the answer was under way', () => {
+    const active = describeStep(
+      {
+        ...base,
+        key: 'web',
+        status: 'searching',
+        metadata: { reason: 'model_requested' },
+        state: 'active',
+      },
+      {},
+      t
+    )
+    expect(active.title).toBe('processing.searchingTitle')
+    expect(active.detail).toBe('processing.timeline.searchRequestedByModel')
+
+    const done = describeStep(
+      {
+        ...base,
+        key: 'web',
+        status: 'search_complete',
+        metadata: { reason: 'model_requested', results_count: 5 },
+        state: 'done',
+        endedAt: 1,
+      },
+      {},
+      t
+    )
+    expect(done.title).toBe('processing.searchCompleteTitle')
+    expect(done.chip).toBe('5 processing.results')
+    expect(done.detail).toBe('processing.timeline.searchRequestedByModel')
+
+    const sorter = describeStep(
+      { ...base, key: 'web', status: 'searching', metadata: {}, state: 'active' },
+      {},
+      t
+    )
+    expect(sorter.detail).toBe('processing.searchingDesc')
+  })
+
   it('does not pair a step-level metadata.model with the sorter provider', () => {
     const copy = describeStep(
       {

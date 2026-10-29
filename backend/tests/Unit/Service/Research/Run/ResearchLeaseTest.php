@@ -270,6 +270,7 @@ final class WaitingCaller implements ResearchModelCaller
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?\Closure $onText = null,
         ?ResearchLease $lease = null,
     ): ResearchModelReply {
         ++$this->calls;

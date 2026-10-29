@@ -23,10 +23,14 @@ final class ScriptedModelCaller implements ResearchModelCaller
     /** @var list<string> */
     public array $users = [];
 
-    public function answer(int $userId, int $modelId, string $system, string $user, ?StructuredOutputSchema $schema, ?ResearchLease $lease = null): ResearchModelReply
+    public function answer(int $userId, int $modelId, string $system, string $user, ?StructuredOutputSchema $schema, ?\Closure $onText = null, ?ResearchLease $lease = null): ResearchModelReply
     {
         $this->users[] = $user;
+        $reply = array_shift($this->script) ?? $this->fallback ?? ResearchModelReply::failed();
+        if ($onText instanceof \Closure && null === $schema && '' !== $reply->text) {
+            $onText($reply->text);
+        }
 
-        return array_shift($this->script) ?? $this->fallback ?? ResearchModelReply::failed();
+        return $reply;
     }
 }

@@ -237,7 +237,7 @@
           </div>
 
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
-          <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
+          <div v-if="(files && files.length > 0) || webSearchBadge || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
             <div class="flex flex-wrap gap-2">
               <!-- Files (show based on collapse state) -->
@@ -306,32 +306,32 @@
 
               <!-- Web Search Badge (fallback for legacy messages without tool metadata) -->
               <div
-                v-else-if="webSearch"
+                v-else-if="webSearchBadge"
                 class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon icon="mdi:web" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">Web Search</span>
                 <span
-                  v-if="webSearch.query && showAllBadges"
+                  v-if="webSearchBadge.query && showAllBadges"
                   class="text-xs opacity-80 hidden sm:inline truncate max-w-[150px]"
-                  >· {{ webSearch.query }}</span
+                  >· {{ webSearchBadge.query }}</span
                 >
-                <span v-if="webSearch.resultsCount" class="text-xs opacity-80 font-semibold">
-                  · {{ webSearch.resultsCount }}
+                <span v-if="webSearchBadge.resultsCount" class="text-xs opacity-80 font-semibold">
+                  · {{ webSearchBadge.resultsCount }}
                 </span>
                 <span
-                  v-if="webSearch.pagesRead"
+                  v-if="webSearchBadge.pagesRead"
                   class="text-xs opacity-80"
                   :title="
                     $t(
                       'processing.pagesReadDesc',
-                      { count: webSearch.pagesRead },
-                      webSearch.pagesRead
+                      { count: webSearchBadge.pagesRead },
+                      webSearchBadge.pagesRead
                     )
                   "
                   data-testid="badge-web-search-pages-read"
                 >
-                  · {{ $t('processing.pagesReadBadge', { count: webSearch.pagesRead }) }}
+                  · {{ $t('processing.pagesReadBadge', { count: webSearchBadge.pagesRead }) }}
                 </span>
               </div>
 
@@ -343,7 +343,7 @@
                 @click="showAllBadges = !showAllBadges"
               >
                 <span v-if="!showAllBadges"
-                  >+{{ totalBadgesCount - (tool || webSearch ? 3 : 2) }}</span
+                  >+{{ totalBadgesCount - (tool || webSearchBadge ? 3 : 2) }}</span
                 >
                 <Icon
                   :icon="showAllBadges ? 'mdi:chevron-up' : 'mdi:chevron-down'"
@@ -411,6 +411,7 @@
             :docs="docs"
             :foreign-memory="foreignMemory"
           />
+          <ResearchTurn v-if="researchRunId" :run-id="researchRunId" />
 
           <p
             v-if="role === 'assistant' && voiceReplyFailed"
@@ -930,92 +931,44 @@
           <!-- Right: Actions (assistant only, hidden during streaming) -->
           <!-- Show if: has againData OR has backend message ID (can fetch models) -->
           <div
-            v-if="role === 'assistant' && !isStreaming && backendMessageId"
+            v-if="role === 'assistant' && !isStreaming"
             class="flex items-center gap-2 flex-shrink-0"
           >
-            <!-- False Positive Button - only show if memory/feedback service is available -->
-            <button
-              v-if="isFeedbackServiceAvailable"
-              type="button"
-              :disabled="isSuperseded || isGuestMode"
-              :class="[
-                'pill text-xs relative',
-                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
-              ]"
-              :aria-label="$t('feedback.falsePositive.button')"
-              data-testid="btn-message-false-positive"
-              @click="!isGuestMode && handleFalsePositive()"
-            >
-              <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
-              <span class="font-medium hidden sm:inline">{{
-                $t('feedback.falsePositive.button')
-              }}</span>
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
-              />
-            </button>
-
-            <!-- Report Button (Apple Guideline 1.2) - flag objectionable content.
-                 Available to any signed-in user; hidden in guest mode. -->
-            <button
+            <LookDeeperAction
               v-if="!isGuestMode"
-              type="button"
-              class="pill text-xs"
-              :aria-label="$t('moderation.report.button')"
-              :title="$t('moderation.report.button')"
-              data-testid="btn-message-report"
-              @click="handleReport"
-            >
-              <Icon icon="mdi:flag-outline" class="w-4 h-4" />
-              <span class="font-medium hidden sm:inline">{{ $t('moderation.report.button') }}</span>
-            </button>
+              :effort="effort"
+              :effort-notice="effortNotice"
+              @look-deeper="emit('look-deeper')"
+            />
+            <template v-if="backendMessageId">
+              <!-- Not correct and Report sit in one menu (Apple 1.2 still
+                 reaches Report). Look deeper stays a button of its own. -->
+              <MessageMoreActions
+                :show-false-positive="isFeedbackServiceAvailable"
+                :show-report="!isGuestMode"
+                :false-positive-disabled="isSuperseded || isGuestMode"
+                :guest="isGuestMode"
+                @false-positive="!isGuestMode && handleFalsePositive()"
+                @report="handleReport"
+              />
 
-            <!-- Multitask (DAG) turn: a single model pick can't represent the
+              <!-- Multitask (DAG) turn: a single model pick can't represent the
                  whole plan, so offer one plain "Again" that re-runs the full
                  pipeline (re-classify + re-plan). -->
-            <button
-              v-if="isMultitaskTurn && canRewrite !== false"
-              type="button"
-              :disabled="isSuperseded || isGuestMode"
-              :class="[
-                'pill text-xs whitespace-nowrap relative',
-                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
-              ]"
-              :aria-label="$t('chatMessage.again')"
-              data-testid="btn-message-again"
-              @click.stop="!isGuestMode && handleSimpleAgain()"
-            >
-              <ArrowPathIcon class="w-4 h-4" />
-              <span class="font-medium">{{ $t('chatMessage.again') }}</span>
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
-              />
-            </button>
-
-            <div v-else-if="canRewrite !== false" class="relative">
-              <!-- Single "Again with… ▾" control: opening the dropdown and
-                   picking a model re-runs the prompt (see selectModel). The old
-                   standalone "Again with <model>" button was merged into this to
-                   save horizontal space. -->
               <button
+                v-if="isMultitaskTurn && canRewrite !== false"
                 type="button"
-                :disabled="isSuperseded || isGuestMode || !hasModels"
+                :disabled="isSuperseded || isGuestMode"
                 :class="[
                   'pill text-xs whitespace-nowrap relative',
-                  isSuperseded || isGuestMode || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
+                  isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
                 ]"
-                :aria-label="$t('chatMessage.regenerateWith')"
+                :aria-label="$t('chatMessage.again')"
                 data-testid="btn-message-again"
-                @click.stop="!isGuestMode && toggleModelDropdown()"
-                @keydown.escape="closeModelDropdown"
+                @click.stop="!isGuestMode && handleSimpleAgain()"
               >
                 <ArrowPathIcon class="w-4 h-4" />
-                <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
-                <ChevronDownIcon class="w-4 h-4" />
+                <span class="font-medium">{{ $t('chatMessage.again') }}</span>
                 <Icon
                   v-if="isGuestMode"
                   icon="mdi:lock-outline"
@@ -1023,30 +976,60 @@
                 />
               </button>
 
-              <Transition
-                enter-active-class="transition ease-out duration-100"
-                enter-from-class="transform opacity-0 scale-95"
-                enter-to-class="transform opacity-100 scale-100"
-                leave-active-class="transition ease-in duration-75"
-                leave-from-class="transform opacity-100 scale-100"
-                leave-to-class="transform opacity-0 scale-95"
-              >
-                <div
-                  v-if="modelDropdownOpen && !isSuperseded"
-                  v-click-outside="closeModelDropdown"
-                  data-testid="dropdown-again-models"
-                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
+              <div v-else-if="canRewrite !== false" class="relative">
+                <!-- Single "Again with… ▾" control: opening the dropdown and
+                   picking a model re-runs the prompt (see selectModel). The old
+                   standalone "Again with <model>" button was merged into this to
+                   save horizontal space. -->
+                <button
+                  type="button"
+                  :disabled="isSuperseded || isGuestMode || !hasModels"
+                  :class="[
+                    'pill text-xs whitespace-nowrap relative',
+                    isSuperseded || isGuestMode || !hasModels
+                      ? 'opacity-50 cursor-not-allowed'
+                      : '',
+                  ]"
+                  :aria-label="$t('chatMessage.regenerateWith')"
+                  data-testid="btn-message-again"
+                  @click.stop="!isGuestMode && toggleModelDropdown()"
                   @keydown.escape="closeModelDropdown"
                 >
-                  <AgainModelMenu
-                    :options="modelOptions"
-                    :selected="selectedModel"
-                    :peers="peerModelsForCost"
-                    @select="selectModel"
+                  <ArrowPathIcon class="w-4 h-4" />
+                  <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
+                  <ChevronDownIcon class="w-4 h-4" />
+                  <Icon
+                    v-if="isGuestMode"
+                    icon="mdi:lock-outline"
+                    class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
                   />
-                </div>
-              </Transition>
-            </div>
+                </button>
+
+                <Transition
+                  enter-active-class="transition ease-out duration-100"
+                  enter-from-class="transform opacity-0 scale-95"
+                  enter-to-class="transform opacity-100 scale-100"
+                  leave-active-class="transition ease-in duration-75"
+                  leave-from-class="transform opacity-100 scale-100"
+                  leave-to-class="transform opacity-0 scale-95"
+                >
+                  <div
+                    v-if="modelDropdownOpen && !isSuperseded"
+                    v-click-outside="closeModelDropdown"
+                    data-testid="dropdown-again-models"
+                    class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
+                    @keydown.escape="closeModelDropdown"
+                  >
+                    <AgainModelMenu
+                      :options="modelOptions"
+                      :selected="selectedModel"
+                      :peers="peerModelsForCost"
+                      @select="selectModel"
+                    />
+                  </div>
+                </Transition>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -1162,6 +1145,10 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
+import LookDeeperAction from '@/components/research/LookDeeperAction.vue'
+import MessageMoreActions from '@/components/chat/MessageMoreActions.vue'
+import ResearchTurn from '@/components/research/ResearchTurn.vue'
+import { useResearchTurn } from '@/composables/useResearchTurn'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
@@ -1186,6 +1173,7 @@ import type { StreamEventMetadata } from '@/types/chatStream'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
+import { formatFileSize, getFileIcon } from '@/utils/messageFileDisplay'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
@@ -1322,6 +1310,11 @@ interface Props {
   voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
   /** Live reading stopped. Stays visible when the full spoken file arrives. */
   readAloudFailed?: boolean
+  /** How much the question needed (`answer`, `lookup`, `research`); a lookup offers Look deeper. */
+  effort?: string | null
+  /** Why a research the question needed was not started. */
+  effortNotice?: string | null
+  researchRunId?: string | null
   searchResults?: Array<{
     title: string
     url: string
@@ -1523,11 +1516,14 @@ const messageToolBadge = computed<'search' | 'pic' | 'vid' | null>(() => {
   return cmd === 'search' || cmd === 'pic' || cmd === 'vid' ? cmd : null
 })
 
+// A research reply stores its cited sources like a web search so the numbers
+// link to them, but its fold already says what was read: no "Web Search" badge.
+const webSearchBadge = computed(() => (props.researchRunId ? null : (props.webSearch ?? null)))
 // Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {
   let count = 0
   if (props.files) count += props.files.length
-  if (props.tool || props.webSearch) count += 1
+  if (props.tool || webSearchBadge.value) count += 1
   return count
 })
 
@@ -1861,6 +1857,8 @@ const emit = defineEmits<{
   report: [messageId: number]
   'click-memory': [memory: UserMemory]
   continue: []
+  /** Look deeper under a direct answer: start the research the chat skipped. */
+  'look-deeper': []
   mediaJobUpdate: [job: MediaJobInfo]
   mediaJobCompleted: [payload: { url: string; type: string }]
   mediaJobCancel: [jobId: string]
@@ -2051,10 +2049,10 @@ const hasPartialAnswer = computed(() => {
   return true
 })
 
+const researchTurn = useResearchTurn(() => props.researchRunId)
 const visibleContentParts = computed(() => {
-  if (!props.errorReason || hasPartialAnswer.value) {
-    return contentParts.value
-  }
+  if (researchTurn.running.value) return []
+  if (!props.errorReason || hasPartialAnswer.value) return contentParts.value
   return contentParts.value.filter((part) => part.type !== 'text')
 })
 
@@ -2188,28 +2186,6 @@ const vClickOutside = {
       document.removeEventListener('click', handler)
     }
   },
-}
-
-// File handling functions
-const getFileIcon = (fileType: string): string => {
-  const type = fileType.toLowerCase()
-  if (['pdf'].includes(type)) return 'mdi:file-pdf-box'
-  if (['doc', 'docx'].includes(type)) return 'mdi:file-word-box'
-  if (['xls', 'xlsx'].includes(type)) return 'mdi:file-excel-box'
-  if (['ppt', 'pptx'].includes(type)) return 'mdi:file-powerpoint-box'
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(type)) return 'mdi:file-image'
-  if (['mp3', 'wav', 'ogg', 'm4a', 'opus'].includes(type)) return 'mdi:file-music'
-  if (['mp4', 'avi', 'mov', 'webm'].includes(type)) return 'mdi:file-video'
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(type)) return 'mdi:folder-zip'
-  if (['txt', 'md'].includes(type)) return 'mdi:file-document-outline'
-  return 'mdi:file-outline'
-}
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
 const downloadFile = async (file: MessageFile) => {

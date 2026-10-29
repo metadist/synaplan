@@ -18,10 +18,14 @@ final class ScriptedLead implements ResearchLeadCaller
     /** @var list<list<array<string, mixed>>> */
     public array $seen = [];
 
-    public function turn(int $userId, int $modelId, array $messages, array $tools): ResearchLeadTurn
+    public function turn(int $userId, int $modelId, array $messages, array $tools, ?\Closure $onText = null): ResearchLeadTurn
     {
         $this->seen[] = $messages;
+        $turn = array_shift($this->script) ?? ResearchLeadTurn::failed();
+        if ($onText instanceof \Closure && '' !== $turn->text) {
+            $onText($turn->text);
+        }
 
-        return array_shift($this->script) ?? ResearchLeadTurn::failed();
+        return $turn;
     }
 }

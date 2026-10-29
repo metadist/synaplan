@@ -84,6 +84,9 @@ final readonly class ChatSystemPromptAssembler
             $prompt .= $this->webSearch($searchResults, $languageDirective, $turn->language());
             $searchResults = null;
         }
+        if (null !== $prompt && !empty($options[FreshInfoRequest::OPTION])) {
+            $prompt .= FreshInfoRequest::instruction();
+        }
 
         if (null !== $prompt && !empty($options['quoted_text'])) {
             $prompt .= ChatPromptBlocks::quotedReference($options);
@@ -156,6 +159,11 @@ final readonly class ChatSystemPromptAssembler
         if (null !== $prompt && isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $prompt .= $this->webSearch($options['search_results'], $languageDirective, $turn->language());
             unset($options['search_results']);
+        }
+        // The model may ask for the web when the sorter saw no need for it;
+        // the processor sets the option only while it can still honour that.
+        if (null !== $prompt && !empty($options[FreshInfoRequest::OPTION])) {
+            $prompt .= FreshInfoRequest::instruction();
         }
 
         return new ChatSystemPrompt($prompt, $fallback, $docs, $options);

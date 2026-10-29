@@ -1,19 +1,37 @@
 research:
   outcome:
     complete: 'Tamamlandı: %statements% ifade, %supported% tanesi bir kaynakla destekleniyor.'
-    complete_partial: 'Eksiklerle tamamlandı: %points% noktadan %open% tanesi doğrulanamadı. Bunlar "Doğrulanmadı" altında listeleniyor.'
+    complete_partial: 'Eksiklerle tamamlandı: %points% noktadan %open% tanesini hiçbir kaynak doğrulayamadı, bu yüzden yanıt onları dışarıda bırakıyor. „Daha derin bak“ bunları yeniden kontrol eder.'
     complete_snippets_only: 'Hiçbir sayfa açılamadı, bu yüzden bu rapor yalnızca arama özetlerine dayanıyor. Önemli olduğu yerlerde bunu belirtiyor.'
     stopped_by_user: 'Durduruldu. Durdur''a bastıktan sonra yeni bir iş başlatılmadı; zaten süren bir adım yine de sayılabilir. Şimdiye kadar bulunanlar saklanıyor.'
     stopped_budget: 'Aylık AI bütçen tükendiği için durduruldu. Rapor %points% noktadan %covered% tanesini kapsıyor.'
     stopped_limit: 'Bu araştırma bu derinlik için sınırına ulaştığı için durduruldu. Bulunanlar %points% noktadan %covered% tanesini kapsıyor.'
     stopped_waiting: 'Plan bir gün içinde onaylanmadığı için durduruldu. Hazır olduğunda yeniden başlat.'
     stopped_by_admin: 'Araştırma Synaplan çalışma alanında kapatıldı. Şimdiye kadar bulunanlar saklanıyor.'
+    answered_without_research: 'Ek inceleme yapılmadan yanıtlandı. Bu soru için hiçbir şey aranmadı.'
     failed_no_sources: 'Araştırılacak bir şey yoktu: web''i aç ya da bu projeye dosya ekle.'
     failed_nothing_found: 'Aranan kaynaklarda bu soruyu yanıtlayan bir şey yoktu. Soruyu farklı ifade et ya da bu projeye dosya ekle.'
     failed_role_unavailable: 'Bu projedeki %role% modeli kullanılamıyor ve projedeki başka bir model onun yerine geçemiyor. Hiçbir ücret alınmadı.'
     failed_model_error: '%role% modeli yanıt vermeyi bıraktı. Başka bir ücret alınmadı; tekrar dene ya da başka bir model seç.'
     failed_interrupted: 'Araştırma sunucuda kesildi. Yeniden başlat — şimdiye kadar bulunan kaynaklar burada saklanıyor.'
     unknown: 'Araştırma durdu. Yanıta hâlâ ihtiyacın varsa yeniden başlat.'
+  report:
+    sources: 'Kaynaklar'
+  auto:
+    notice: 'Bunun için birkaç kaynağa bakıyorum; yaklaşık %minutes% dakika.'
+    why:
+      several_parts: 'Soru birkaç bölümden oluşuyor.'
+      comparison: 'Bu bir karşılaştırma.'
+      procedure: 'Birkaç adım ve kurum içeren bir süreç.'
+      current_fact: 'Güncel kaynaklar gerekiyor.'
+      asked_thorough: 'Ayrıntılı bir yanıt istediniz.'
+      deeper: 'Daha fazlasını istediniz.'
+  limit:
+    no_sources: 'Normalde bunu birkaç kaynakta araştırırdım, ancak burada web araması kapalı ve bu sohbetin klasörü yok. Bildiklerim şunlar; güncel gereklilikleri yetkili kurumlarla doğrulayın.'
+    too_many: "Zaten çok fazla araştırma sürüyor. İlk yanıt şu; tam yanıt için birkaç dakika sonra Daha derin bak'a tıklayın."
+    budget: 'Bu dönem için kullanım bütçeniz doldu, bu yüzden doğrudan yanıtlıyorum. Bir yönetici artırabilir.'
+    plan_limit: 'Planınızın bugünkü araştırmaları doldu, bu yüzden doğrudan yanıtlıyorum. Yarın yeniden çalışır.'
+    unavailable: "Araştırma şu anda kullanılamıyor, bu yüzden doğrudan yanıtlıyorum. Birkaç dakika sonra Daha derin bak'ı deneyin."
   role:
     reading: 'okuma'
     sorting: 'sıralama'

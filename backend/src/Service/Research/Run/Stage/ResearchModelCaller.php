@@ -18,12 +18,17 @@ use App\Service\Research\Run\ResearchLease;
  */
 interface ResearchModelCaller
 {
+    /**
+     * @param \Closure(string): void|null $onText receives each piece of a plain
+     *                                            answer as it arrives; a structured call ignores it
+     */
     public function answer(
         int $userId,
         int $modelId,
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?\Closure $onText = null,
         ?ResearchLease $lease = null,
     ): ResearchModelReply;
 }

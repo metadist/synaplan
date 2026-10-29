@@ -7,11 +7,11 @@ namespace App\Service\Research\Run;
 use App\Repository\ConfigRepository;
 
 /**
- * Research is off until an administrator turns it on.
+ * Research is on unless an administrator turns it off.
  *
  * RESEARCH_ENABLED=1 forces it on and RESEARCH_ENABLED=0 forces it off.
- * An empty variable follows the RESEARCH.ENABLED row, which new installs
- * seed as off.
+ * An empty variable follows the RESEARCH.ENABLED row, which installs seed
+ * as on. A missing row is off.
  */
 final readonly class ResearchConfig
 {
@@ -21,6 +21,12 @@ final readonly class ResearchConfig
     public const MAX_ACTIVE_THOROUGH = 'MAX_ACTIVE_THOROUGH_PER_USER';
     public const LEAD_MODE = 'LEAD_MODE';
     public const TOOL_MODE_MODELS = 'TOOL_MODE_MODELS';
+
+    /** The chat may start a research on its own when a question needs one. */
+    public const AUTO_ENABLED = 'AUTO_ENABLED';
+
+    /** The catalog keys that led research with native tool calls 20/20 in app:research:conformance. */
+    public const TOOL_MODE_MODELS_PROVEN = ['anthropic:claude-sonnet-5-5:chat', 'anthropic:claude-sonnet-5:chat'];
     public const ACTIVE_RUNS_RANGE = [1, 100];
     public const ACTIVE_THOROUGH_RANGE = [0, 10];
 
@@ -52,6 +58,28 @@ final readonly class ResearchConfig
         $stored = $this->configRepository->getValue(0, self::GROUP, self::ENABLED);
 
         return null !== $stored && $this->isOn($stored);
+    }
+
+    /**
+     * Whether the chat may start a research by itself. Off when research is
+     * off, and off when the row is missing, so an install that never seeded
+     * it behaves as before.
+     */
+    public function autoEnabled(): bool
+    {
+        return $this->isEnabled() && $this->autoSwitch();
+    }
+
+    /**
+     * The automatic-research switch as stored, whatever the research switch
+     * says. The admin tab shows this one, so turning research off and on
+     * again brings the setting back as it was.
+     */
+    public function autoSwitch(): bool
+    {
+        $stored = $this->configRepository->getValue(0, self::GROUP, self::AUTO_ENABLED);
+
+        return is_string($stored) && $this->isOn($stored);
     }
 
     public function maxActiveRuns(): int

@@ -130,7 +130,7 @@ final class CheckReport
     }
 
     /** A line that close() appended: the count or the same-provider sentence. */
-    private static function isClosing(string $line): bool
+    public static function isClosing(string $line): bool
     {
         $line = trim($line);
         if (in_array($line, self::SAME_PROVIDER, true)) {

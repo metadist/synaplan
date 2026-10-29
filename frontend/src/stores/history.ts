@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgainData } from '@/types/ai-models'
 import type { ApiActiveRun, ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
+import type { MessageEffort } from '@/utils/messageEffort'
 import {
   IN_PROGRESS_TURN_ID,
   mapApiMessageRow,
@@ -124,7 +125,7 @@ export interface MediaJobInfo {
   stallReason?: string
 }
 
-export interface Message {
+export interface Message extends MessageEffort {
   id: string
   role: 'user' | 'assistant'
   parts: Part[]
@@ -748,9 +749,7 @@ export const useHistoryStore = defineStore('history', () => {
 
   const markSuperseded = (id: string) => {
     const message = messages.value.find((m: Message) => m.id === id)
-    if (message) {
-      message.isSuperseded = true
-    }
+    if (message) message.isSuperseded = true
   }
 
   const applySavedEdit = (id: string, text: string) => {

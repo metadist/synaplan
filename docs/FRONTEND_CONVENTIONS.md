@@ -80,6 +80,7 @@ and the live-conversation waveform.
 | Upload | `CloudArrowUpIcon` |
 | Search | `MagnifyingGlassIcon` |
 | Research | `DocumentMagnifyingGlassIcon` |
+| Look deeper (start the research the chat skipped) | `MagnifyingGlassPlusIcon` |
 | Close | `XMarkIcon` |
 | Share | `ShareIcon` |
 | Folder / new folder | `FolderIcon` / `FolderPlusIcon` |

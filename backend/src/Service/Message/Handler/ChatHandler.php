@@ -14,6 +14,7 @@ use App\Service\Message\Chat\ChatReplyGenerator;
 use App\Service\Message\Chat\ChatRequestOptions;
 use App\Service\Message\Chat\ChatSystemPromptAssembler;
 use App\Service\Message\Chat\ChatTurnContextLoader;
+use App\Service\Message\Chat\FreshInfoRequest;
 use App\Service\Message\ProgressCallback;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingHandoffResolver;
@@ -122,6 +123,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (null !== $handoff) {
             return $handoff->toHandlerResult();
         }
+        $searchQuery = !empty($options[FreshInfoRequest::OPTION]) ? FreshInfoRequest::parse(is_string($reply->content) ? $reply->content : null) : null;
+        if (null !== $searchQuery) {
+            return FreshInfoRequest::handlerResult($searchQuery, $reply->metadata + ['model_id' => $model->modelId]);
+        }
 
         ProgressCallback::notify($progressCallback, 'generating', 'Response generated.');
 
@@ -200,6 +205,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $handoff = $routingDeferred ? $this->routing->directiveFor($reply->toolCalls) : null;
         if (null !== $handoff) {
             return $handoff->toHandlerResult();
+        }
+        // The model asked for the web instead of answering: nothing was
+        // streamed, the processor searches and asks again.
+        if (null !== $reply->webSearchQuery) {
+            return FreshInfoRequest::handlerResult($reply->webSearchQuery, $reply->metadata + ['model_id' => $model->modelId]);
         }
 
         $this->replies->assertStreamedAnswer($reply, $turn, $model);

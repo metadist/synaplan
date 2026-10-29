@@ -563,7 +563,20 @@
       "plannerModelSaveFailed": "No se pudo guardar el modelo del planificador.",
       "plannerModelLoadFailed": "No se pudo cargar el modelo del planificador.",
       "legacyTitle": "Alternativa heredada (admin)",
-      "legacyDesc": "El prompt del clasificador de IA de un solo tema, usado cuando el enrutamiento multitarea está desactivado."
+      "legacyDesc": "El prompt del clasificador de IA de un solo tema, usado cuando el enrutamiento multitarea está desactivado.",
+      "agentTuningTitle": "Ajuste fino para agentes e investigación (opcional)",
+      "agentTuningDesc": "Elige opcionalmente qué modelos se encargan de planificar tareas, leer fuentes y verificar datos. Por defecto se usan automáticamente tus modelos de clasificación y análisis de texto.",
+      "agentTuningAllAuto": "Todo automático",
+      "agentTuningCustomCount": "{count} personalizado(s)",
+      "plannerSlotLabel": "Planificación de tareas",
+      "plannerSlotHint": "Divide solicitudes complejas en pasos.",
+      "readingSlotLabel": "Lectura de fuentes",
+      "readingModelAuto": "Automático (usar modelo de clasificación)",
+      "readingSlotHint": "Lee cada fuente abierta y extrae citas.",
+      "checkingSlotLabel": "Verificación de datos",
+      "checkingModelAuto": "Automático (otro proveedor / análisis de texto)",
+      "checkingSlotHint": "Comprueba cada afirmación citada frente a su fuente.",
+      "researchLeadNote": "Dirigir la investigación y redactar la respuesta siempre utilizan el modelo seleccionado en el chat."
     },
     "sortingPrompt": {
       "title": "Preprocesador",

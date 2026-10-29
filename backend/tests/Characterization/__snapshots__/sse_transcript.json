@@ -268,6 +268,8 @@
                         "title": "string"
                     }
                 },
+                "effort": "null",
+                "effortNotice": "null",
                 "language": "string",
                 "memoryIds": {
                     "list": "int"
@@ -290,6 +292,7 @@
                         "startLine": "int"
                     }
                 },
+                "researchRunId": "null",
                 "searchResults": {
                     "list": {
                         "description": "string",
@@ -406,6 +409,8 @@
                         "provider": "string"
                     }
                 },
+                "effort": "null",
+                "effortNotice": "null",
                 "language": "string",
                 "messageId": "int",
                 "model": "string",
@@ -414,6 +419,7 @@
                 "originalTopic": "null",
                 "provider": "string",
                 "ragSources": "null",
+                "researchRunId": "null",
                 "searchResults": "null",
                 "status": "string",
                 "topic": "string",
@@ -512,6 +518,8 @@
                         "provider": "string"
                     }
                 },
+                "effort": "null",
+                "effortNotice": "null",
                 "language": "string",
                 "messageId": "null",
                 "model": "string",
@@ -520,6 +528,7 @@
                 "originalTopic": "null",
                 "provider": "string",
                 "ragSources": "null",
+                "researchRunId": "null",
                 "searchResults": "null",
                 "status": "string",
                 "topic": "string",

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\ModelConfigService;
 use App\Service\Research\Run\ResearchLease;
@@ -13,6 +14,7 @@ use App\Service\Usage\CostCalculationService;
 /**
  * Asks the model selected for a research role. A transport failure is a failed reply, not a stack trace.
  * The cost is priced from the reported usage, so the run's cost cap sees every call.
+ * A plain call with a text listener streams, so the person reads the words as they come.
  */
 final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
 {
@@ -29,6 +31,7 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         string $system,
         string $user,
         ?StructuredOutputSchema $schema,
+        ?\Closure $onText = null,
         ?ResearchLease $lease = null,
     ): ResearchModelReply {
         $provider = $this->models->getProviderForModel($modelId);
@@ -54,12 +57,20 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         if ($schema instanceof StructuredOutputSchema) {
             $options['structured_output'] = $schema;
         }
+        $messages = [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ];
 
         try {
-            $response = $this->ai->chat([
-                ['role' => 'system', 'content' => $system],
-                ['role' => 'user', 'content' => $user],
-            ], $userId, $options);
+            $response = $onText instanceof \Closure && !$schema instanceof StructuredOutputSchema
+                ? $this->ai->chatStream($messages, static function (mixed $chunk) use ($onText): void {
+                    $text = is_string($chunk) || is_array($chunk) ? StreamChunk::visibleText($chunk) : '';
+                    if ('' !== $text) {
+                        $onText($text);
+                    }
+                }, $userId, $options)
+                : $this->ai->chat($messages, $userId, $options);
         } catch (\Throwable) {
             return ResearchModelReply::failed(true);
         }
@@ -68,8 +79,9 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         $data = self::objectFrom($text);
         $ok = null === $schema ? '' !== trim($text) : is_array($data);
         $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $cost = $this->cost($usage, $modelId);
 
-        return new ResearchModelReply($ok, true, $data, $text, $provider.':'.$name, $this->cost($usage, $modelId));
+        return new ResearchModelReply($ok, true, $data, $text, $provider.':'.$name, $cost, ResearchCallUsage::fromResponse($response, $cost));
     }
 
     /**

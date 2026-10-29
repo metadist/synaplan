@@ -73,7 +73,7 @@ final class AiFacadeResearchModelCallerTest extends TestCase
         $costs->method('calculateCost')->willReturn(new CostResult('0.000000', '0.000000', '0.000000', '0.000000', [], 0));
 
         $reply = (new AiFacadeResearchModelCaller($ai, $this->models('test'), $costs))
-            ->answer(7, 42, 'system', 'user', null, $lease);
+            ->answer(7, 42, 'system', 'user', null, null, $lease);
 
         self::assertTrue($reply->called);
         self::assertSame('kept', $reply->text);
@@ -91,7 +91,7 @@ final class AiFacadeResearchModelCallerTest extends TestCase
         $ai->expects(self::never())->method('chat');
 
         $reply = (new AiFacadeResearchModelCaller($ai, $this->models('test'), $this->createStub(CostCalculationService::class)))
-            ->answer(7, 42, 'system', 'user', null, $lease);
+            ->answer(7, 42, 'system', 'user', null, null, $lease);
 
         self::assertFalse($reply->called);
     }

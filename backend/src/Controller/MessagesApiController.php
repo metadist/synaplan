@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Messages\GatewayAutoResearch;
+use App\AI\Messages\GatewayEffortRating;
+use App\AI\Messages\GatewayResearchReply;
 use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\GatewayToolCatalog;
@@ -38,6 +41,7 @@ final class MessagesApiController extends AbstractController
         private readonly MessagesGatewayConfig $config,
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
+        private readonly GatewayAutoResearch $autoResearch,
     ) {
     }
 
@@ -75,7 +79,8 @@ final class MessagesApiController extends AbstractController
     )]
     #[OA\Parameter(name: 'x-synaplan-agent-id', in: 'header', required: false, schema: new OA\Schema(type: 'integer'), description: 'Optional Assistant id to pin this turn. Ignored when missing, invalid, or AGENTS.ENABLED is off. Does not replace the body model.')]
     #[OA\Parameter(name: 'x-synaplan-rag-group-key', in: 'header', required: false, schema: new OA\Schema(type: 'string', example: 'DESKTOP:personal'), description: 'Optional knowledge folder. Desktop sends DESKTOP:{projectId}. Combined with a pinned Assistant\'s folders; never dropped.')]
-    #[OA\Response(response: 200, description: 'Message response or SSE stream')]
+    #[OA\Parameter(name: 'x-synaplan-effort', in: 'header', required: false, schema: new OA\Schema(type: 'string', enum: ['auto', 'answer'], default: 'answer'), description: 'With `auto` the gateway rates the last user message like the chat does and may start a research instead of asking the model; the reply is then one assistant message with the notice sentence, `x-synaplan-research-run` carries the run id and `x-synaplan-effort` the rating (`research`, `lookup`, `answer`). Without the header the turn runs as always.')]
+    #[OA\Response(response: 200, description: 'Message response or SSE stream. Response headers: `x-synaplan-web-search`, `x-synaplan-web-fetch`, `x-synaplan-vision`; with `x-synaplan-effort: auto` also `x-synaplan-effort`, `x-synaplan-research-run` (a research started) or `x-synaplan-research-limit` (rated research, held back: no_sources, too_many, budget, plan_limit, unavailable).')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Gateway disabled')]
     #[OA\Response(response: 404, description: 'Model not found')]
@@ -96,6 +101,16 @@ final class MessagesApiController extends AbstractController
             );
         }
 
+        // With `x-synaplan-effort: auto` the question is rated first; a
+        // research the gateway starts answers the turn with the notice sentence.
+        $rating = $this->autoResearch->rate($request, $prepared, $user);
+        if (null !== $rating) {
+            if ($rating->startedRun()) {
+                return GatewayResearchReply::respond($prepared, $rating);
+            }
+            $prepared['effort'] = $rating;
+        }
+
         if ($prepared['stream']) {
             return $this->streamResponse($prepared, $user);
         }
@@ -110,20 +125,23 @@ final class MessagesApiController extends AbstractController
             );
         }
 
-        // Upstream error bodies are forwarded unmodified (Claude Code recovery
-        // matches on error wording). Only wrap when the body is not already
-        // Anthropic-shaped.
+        return $this->completeResponse($result, $prepared);
+    }
+
+    /**
+     * Upstream error bodies are forwarded unmodified (Claude Code recovery
+     * matches on error wording); everything else is JSON.
+     *
+     * @param array{status: int, body: array<string, mixed>|string|null, headers: array<string, string>} $result
+     * @param GatewaySuccess                                                                             $prepared
+     */
+    private function completeResponse(array $result, array $prepared): Response
+    {
         $status = $result['status'];
         $body = $result['body'];
-        if ($status >= 400 && \is_string($body)) {
-            $response = new Response($body, $status, ['Content-Type' => 'application/json']);
-        } elseif ($status >= 400 && \is_array($body) && isset($body['type']) && 'error' === $body['type']) {
-            $response = new JsonResponse($body, $status);
-        } elseif ($status >= 400 && \is_array($body)) {
-            $response = new JsonResponse($body, $status);
-        } else {
-            $response = new JsonResponse($body, $status);
-        }
+        $response = $status >= 400 && \is_string($body)
+            ? new Response($body, $status, ['Content-Type' => 'application/json'])
+            : new JsonResponse($body, $status);
 
         foreach ($result['headers'] as $name => $value) {
             $response->headers->set($name, $value);
@@ -143,7 +161,8 @@ final class MessagesApiController extends AbstractController
      * `x-synaplan-web-search` reports how a `web_search` declaration was handled
      * — `synaplan` (we ran the search), `passthrough` (forwarded for the upstream
      * to run) or `off`. Without it, a model answering "I cannot search the web"
-     * is indistinguishable from a misconfigured gateway.
+     * is indistinguishable from a misconfigured gateway. `x-synaplan-effort`
+     * echoes the rating when the caller asked for one.
      *
      * @param array<string, mixed> $prepared
      */
@@ -152,6 +171,11 @@ final class MessagesApiController extends AbstractController
         $mode = $prepared['web_search'] ?? null;
         if (\is_string($mode) && '' !== $mode && GatewayToolCatalog::WEB_SEARCH_NONE !== $mode) {
             $response->headers->set('x-synaplan-web-search', $mode);
+        }
+        if (($prepared['effort'] ?? null) instanceof GatewayEffortRating) {
+            foreach ($prepared['effort']->headers() as $name => $value) {
+                $response->headers->set($name, $value);
+            }
         }
 
         $webFetch = $prepared['web_fetch'] ?? null;

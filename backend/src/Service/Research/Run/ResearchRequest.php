@@ -16,14 +16,21 @@ final readonly class ResearchRequest
     /** @var list<string> */
     private const FIELDS = [
         'question', 'depth', 'sources', 'language', 'output', 'instructions',
-        'context', 'chat_id', 'assistant_id', 'models', 'world', 'seed_sources', 'parent',
+        'context', 'chat_id', 'assistant_id', 'models', 'world', 'seed_sources', 'parent', 'hint',
     ];
+
+    /** The person asked for a short look ("quick research on …"). Only depth auto reads it. */
+    public const HINT_BRIEF = 'brief';
+
+    /** The person found a first answer thin and asked for more. Only depth auto reads it. */
+    public const HINT_DEEPER = 'deeper';
 
     public function __construct(
         public string $question,
         public ResearchDepth $depth,
         public ?int $chatId,
         public ResearchSources $sources = new ResearchSources(),
+        public ?string $hint = null,
     ) {
     }
 
@@ -39,7 +46,24 @@ final readonly class ResearchRequest
             self::depth($body),
             self::chat($body, $session, $user, $chats),
             ResearchSources::fromBody($body),
+            self::hint($body),
         );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private static function hint(array $body): ?string
+    {
+        $hint = $body['hint'] ?? null;
+        if (null === $hint) {
+            return null;
+        }
+        if (!is_string($hint) || !in_array($hint, [self::HINT_BRIEF, self::HINT_DEEPER], true)) {
+            throw new ResearchRejected(400, 'invalid', 'hint', 'A hint is brief or deeper.');
+        }
+
+        return $hint;
     }
 
     /**
@@ -93,11 +117,11 @@ final readonly class ResearchRequest
     {
         $depth = $body['depth'] ?? null;
         if (!is_string($depth)) {
-            throw new ResearchRejected(400, 'invalid', 'depth', 'Choose quick, standard, or thorough.');
+            throw new ResearchRejected(400, 'invalid', 'depth', 'Choose quick, standard, thorough, or auto.');
         }
         $match = ResearchDepth::tryFrom($depth);
         if (null === $match) {
-            throw new ResearchRejected(400, 'invalid', 'depth', 'Choose quick, standard, or thorough.');
+            throw new ResearchRejected(400, 'invalid', 'depth', 'Choose quick, standard, thorough, or auto.');
         }
 
         return $match;

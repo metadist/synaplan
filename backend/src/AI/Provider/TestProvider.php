@@ -390,11 +390,11 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         $data['BLANG'] = $this->detectLanguage($text ?: $fileText, is_string($data['BLANG'] ?? null) ? $data['BLANG'] : 'en');
         $data['BWEBSEARCH'] = $this->needsWebSearch($text);
         $data['BREADPAGES'] = $data['BWEBSEARCH'] ? $this->needsReadPages($text) : 0;
-        // Always set BMULTI explicitly. The inbound JSON omits it (so a real
-        // model that echoes without deciding leaves multi_step = null and the
-        // planner still runs). The test stub must vote, from the same
-        // predicates mockTaskPlan() routes on, so the two cannot disagree.
+        // Always set BMULTI explicitly: the inbound JSON omits it (a real model that
+        // echoes without deciding leaves multi_step = null and the planner still runs).
+        // The stub votes from the predicates mockTaskPlan() routes on, so they agree.
         $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText, $systemContent);
+        [$data['BEFFORT'], $data['BEFFORT_WHY']] = SorterEffortStub::vote($text, (bool) $data['BWEBSEARCH']);
 
         $topicEnum = $this->schemaTopicEnum($schema);
         $availableTopics = $topicEnum ?? $this->extractAvailableTopics($systemContent);

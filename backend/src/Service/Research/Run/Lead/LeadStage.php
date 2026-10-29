@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Lead;
 
 use App\AI\ToolCalling\ToolCall;
+use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
+use App\Service\Research\Run\Stage\DraftStream;
 use App\Service\Research\Run\Stage\ResearchLeadCaller;
 use App\Service\Research\Run\Stage\ResearchLeadTurn;
 use App\Service\Research\Run\Stage\ResearchPrompts;
@@ -26,6 +28,9 @@ final readonly class LeadStage
 {
     private const REMINDER = 'Call a tool, or call finish with the status of every point. A turn without either ends the research.';
 
+    /** A thought longer than this is cut; the person reads it in one glance. */
+    private const THOUGHT_CHARS = 600;
+
     public function __construct(
         private ResearchLeadCaller $caller,
         private LeadToolbox $tools,
@@ -37,7 +42,7 @@ final readonly class LeadStage
 
     public function active(StageContext $ctx): bool
     {
-        return LeadMode::Tools === $this->modes->resolve($ctx->roles->lead, $ctx->state->ref->depth);
+        return LeadMode::Tools === $this->modes->resolve($ctx->roles->lead, $ctx->state->effectiveDepth());
     }
 
     public function run(StageContext $ctx): StageResult
@@ -50,12 +55,15 @@ final readonly class LeadStage
             return $this->toReport($ctx);
         }
 
+        $thinking = DraftStream::for($ctx, 'thinking');
         $turn = $this->caller->turn(
             $ctx->state->ref->userId,
             $ctx->roles->lead,
             $this->messages($ctx),
             $this->tools->definitions($ctx),
+            $thinking->listener(),
         );
+        $thinking->finish();
         if ($turn->called) {
             $this->charge($ctx, $turn);
         }
@@ -73,6 +81,7 @@ final readonly class LeadStage
 
     private function noTools(StageContext $ctx, ResearchLeadTurn $turn): StageResult
     {
+        $this->thought($ctx, $turn);
         $this->remember($ctx, $turn, [], []);
         if ($ctx->state->conversation->wasReminded()) {
             $this->roundEvent($ctx, 'write');
@@ -86,6 +95,7 @@ final readonly class LeadStage
 
     private function withTools(StageContext $ctx, ResearchLeadTurn $turn): StageResult
     {
+        $this->thought($ctx, $turn);
         $finish = null;
         $rest = [];
         foreach ($turn->calls as $call) {
@@ -102,7 +112,8 @@ final readonly class LeadStage
                 'name' => 'finish',
                 'content' => '{"finished":true}',
             ]]);
-            $this->roundEvent($ctx, 'write');
+            $reason = $finish->arguments['reason'] ?? null;
+            $this->roundEvent($ctx, 'write', is_string($reason) ? $reason : null);
 
             return $this->toReport($ctx);
         }
@@ -196,6 +207,9 @@ final readonly class LeadStage
         $ctx->state->budget->spend('calls');
         if (null !== $turn->cost) {
             $ctx->state->budget->addCost($turn->cost);
+        }
+        if (null !== $turn->usage) {
+            $ctx->state->spend->add('lead', $turn->modelKey, $turn->usage);
         }
     }
 
@@ -294,13 +308,30 @@ final readonly class LeadStage
         return '' !== $call->id ? $call->id : 'call_'.$index;
     }
 
-    private function roundEvent(StageContext $ctx, string $next): void
+    /**
+     * The words the lead wrote before its tool calls — what the last results
+     * told it and what it does next. The person reads them while the run works.
+     */
+    private function thought(StageContext $ctx, ResearchLeadTurn $turn): void
+    {
+        $text = PlainText::line($turn->text, self::THOUGHT_CHARS);
+        if ('' === $text) {
+            return;
+        }
+        $ctx->events->append($ctx->state->ref->id, 'thought', ['text' => $text]);
+    }
+
+    private function roundEvent(StageContext $ctx, string $next, ?string $reason = null): void
     {
         $rounds = $ctx->state->budget->toArray()['rounds'];
-        $ctx->events->append($ctx->state->ref->id, 'round', [
+        $event = [
             'n' => $rounds[0],
             'max' => $rounds[1],
             'next' => $next,
-        ]);
+        ];
+        if (null !== $reason && '' !== $reason) {
+            $event['reason'] = $reason;
+        }
+        $ctx->events->append($ctx->state->ref->id, 'round', $event);
     }
 }

@@ -32,8 +32,26 @@ final class SorterVerdictTest extends TestCase
             'topic' => 'general', 'language' => 'de', 'web_search' => true, 'read_pages' => 2, 'multi_step' => false,
             'source' => 'ai_sorting', 'skip_sorting' => false, 'intent' => 'chat',
             'model_id' => 7, 'provider' => 'groq', 'model_name' => 'sorter', 'sorting_usage' => ['tokens' => 12],
+            'effort' => 'answer', 'effort_why' => 'simple', 'effort_voted' => false,
             'routing_confidence' => 1.0, 'routing_fallback_reason' => null, 'routing_discarded_alternatives' => [],
         ], $route);
+    }
+
+    public function testTheEffortRatingIsReadFromTheRawSorterReply(): void
+    {
+        $raw = '{"BTOPIC":"general","BLANG":"de","BWEBSEARCH":true,"BREADPAGES":3,"BMULTI":false,"BEFFORT":"research","BEFFORT_WHY":"procedure"}';
+        $route = $this->verdict(['topic' => 'general', 'language' => 'de', 'web_search' => true, 'raw_response' => $raw])
+            ->classify($this->message('Welche Behörden brauche ich?'), 'Welche Behörden brauche ich?', [], null, false, false);
+
+        self::assertSame(['research', 'procedure', true], [$route['effort'], $route['effort_why'], $route['effort_voted']]);
+    }
+
+    public function testAnUnparsableReplyIsNoEffortVote(): void
+    {
+        $route = $this->verdict(['topic' => 'general', 'language' => 'en', 'raw_response' => 'not json at all'])
+            ->classify($this->message('hi'), 'hi', [], null, false, false);
+
+        self::assertSame(['answer', 'simple', false], [$route['effort'], $route['effort_why'], $route['effort_voted']]);
     }
 
     public function testThePassThroughsAndTheForcedSearchLandOnTheVerdict(): void

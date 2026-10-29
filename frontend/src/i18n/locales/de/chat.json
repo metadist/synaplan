@@ -456,6 +456,7 @@
   "chatMessage": {
     "again": "Nochmal",
     "againWith": "Nochmal mit",
+    "moreActions": "Weitere Aktionen",
     "regenerateWith": "Neu generieren mit",
     "copy": "Nachricht kopieren",
     "messageDetails": "Nachrichtendetails",
@@ -783,6 +784,7 @@
       "preprocessingDone": "Anhänge verarbeitet",
       "understoodDone": "Anfrage verstanden",
       "searchFailed": "Websuche nicht verfügbar — Antwort ohne Suche",
+      "searchRequestedByModel": "Die Antwort braucht aktuelle Informationen — das Modell hat eine Websuche angefordert",
       "plannedDone": "Schritte geplant",
       "promptDone": "Anweisungen vorbereitet",
       "filesDone": "Deine Dateien geprüft",
@@ -1137,44 +1139,110 @@
     "deleteConfirm": "/{command} verschwindet aus dem Chat-Menü. Bereits gesendete Nachrichten bleiben unverändert."
   },
   "research": {
-    "menu": "Recherche",
-    "menuHint": "Ein schriftlicher Bericht mit Quellen, in diesem Chat",
-    "title": "Recherche",
-    "questionLabel": "Was möchtest du herausfinden?",
-    "depth": {
-      "standard": "Standard",
-      "thorough": "Gründlich"
-    },
-    "depthHint": {
-      "standard": "Etwa {minutes} Minuten",
-      "thorough": "Etwa {minutes} Minuten"
-    },
-    "sourcesLabel": "Quellen",
-    "sourceWeb": "Web",
-    "sourceFiles": "Bibliotheksordner",
-    "start": "Recherche starten",
-    "startNeedsQuestion": "Schreib, was du herausfinden möchtest.",
-    "startNeedsSource": "Schalte das Web ein oder füge Dateien hinzu.",
-    "noSources": "Websuche und Bibliotheksordner sind aus, deshalb kann die Recherche nicht starten.",
     "noChat": "Öffne einen Chat und starte dann die Recherche.",
     "startFailed": "Die Recherche konnte nicht starten. Prüfe die Frage und versuche es erneut.",
     "stopFailed": "Die Recherche konnte nicht gestoppt werden. Sie läuft noch.",
     "incognito": "Die Recherche speichert einen Bericht im Chat. Beende zuerst den Inkognito-Chat.",
-    "close": "Schließen",
-    "continues": "Du kannst dieses Fenster schließen. Die Recherche läuft weiter, und der Bericht erscheint in diesem Chat.",
     "stop": "Stopp",
     "stopConsequence": "Stoppen behält, was schon geschrieben ist, und sucht nicht weiter.",
-    "stopped": "Die Recherche wurde gestoppt. Was schon geschrieben ist, bleibt in diesem Chat. Es wurde nicht weiter gesucht.",
-    "failed": "Die Recherche konnte nicht fertig werden. In diesem Chat ist nichts Neues hinzugekommen.",
-    "working": "Die Recherche läuft.",
-    "workingDone": "Die Recherche ist fertig.",
     "queued": "Die Recherche wartet. Sie wartet seit {seconds} Sekunden.",
-    "factCheck": "Faktenprüfung: {supported} von {total} Aussagen sind belegt. {removed} wurden entfernt.",
-    "find": "Der Bericht ist in diesem Chat. Du kannst ihn auch unter Bibliothek, dann Dateien, öffnen oder nach dem Titel suchen.",
-    "sourcesCount": "{found} gefunden, {read} gelesen, {blocked} blockiert",
-    "pointDone": "Fertig",
-    "pointOpen": "Noch offen",
-    "pointNotConfirmed": "Nicht bestätigt",
-    "depthLabel": "Wie gründlich?"
+    "answerNow": "Jetzt antworten",
+    "answerNowConsequence": {
+      "reading": "Jetzt antworten schreibt den Bericht aus dem, was schon gelesen ist.",
+      "early": "Jetzt antworten beantwortet die Frage ohne die zusätzliche Suche.",
+      "writing": "Der Bericht ist gleich fertig."
+    },
+    "answerNowFailed": "Jetzt antworten hat die Recherche nicht erreicht. Sie läuft weiter.",
+    "answeredWithout": "Ohne die zusätzliche Suche beantwortet.",
+    "lookDeeper": "Gründlicher nachsehen",
+    "turn": {
+      "working": "Recherchiere…",
+      "stepOf": "Schritt {n} von {total}",
+      "stepsSoFar": "Bisher {steps} Schritte · {sources} Quellen gelesen",
+      "draftWriting": "Entwurf der Antwort — jede Aussage wird als Nächstes geprüft.",
+      "draftChecking": "Entwurf der Antwort — jede Aussage wird jetzt geprüft. Der endgültige Text folgt.",
+      "summary": {
+        "complete": "Recherchiert: {steps} Schritte · {sources} Quellen gelesen",
+        "stopped": "Recherche nach {steps} Schritten gestoppt",
+        "failed": "Recherche konnte nicht abgeschlossen werden"
+      }
+    },
+    "phase": {
+      "understand": "Frage verstehen",
+      "plan": "Antwort planen",
+      "gather": "Suchen und lesen",
+      "write": "Antwort schreiben",
+      "check": "Jede Aussage prüfen",
+      "points": "{count} Punkt | {count} Punkte",
+      "answered": "{count} beantwortet",
+      "searches": "{count} Suche | {count} Suchen",
+      "sourcesRead": "{count} Quelle gelesen | {count} Quellen gelesen",
+      "findings": "{count} Fund | {count} Funde",
+      "gatherBlocked": "{count} nicht öffenbar",
+      "softened": "{count} abgeschwächt.",
+      "sectionsWritten": "{count} Abschnitt geschrieben | {count} Abschnitte geschrieben",
+      "earlier": "{count} früheren Schritt anzeigen | {count} frühere Schritte anzeigen"
+    },
+    "step": {
+      "brief": "Frage verstanden",
+      "plan": "{count} Punkte geplant",
+      "search": "Gesucht",
+      "searchFiles": "In den Dateien gesucht",
+      "searchSkipped": "Suche nicht aufgenommen — dieser Teil hat schon genug",
+      "searchResults": "{count} Treffer",
+      "source": {
+        "found": "Gefunden",
+        "reading": "Lese",
+        "read": "Gelesen",
+        "blocked": "Nicht öffenbar"
+      },
+      "finding": "Gefunden",
+      "sourceFindings": "{count} Fund | {count} Funde",
+      "sourceNothingNew": "nichts Neues für den Plan",
+      "point": {
+        "answered": "Beantwortet",
+        "not_confirmed": "Nicht bestätigt",
+        "open": "Offen"
+      },
+      "round": "Runde {round}",
+      "roundAgain": "Noch nicht genug — schaue weiter (Runde {round})",
+      "roundWrite": "Genug gefunden — schreibe die Antwort",
+      "roundWait": "Warte auf deine Antwort",
+      "roundReason": {
+        "write_now": "Du hast die Antwort jetzt angefordert.",
+        "finish": "Die Leitung hat entschieden, dass genug da ist.",
+        "covered": "Jeder Punkt ist beantwortet.",
+        "answered": "Jeder Punkt ist beantwortet.",
+        "budget": "Das Recherche-Budget ist aufgebraucht.",
+        "no_progress": "Die letzte Runde hat nichts Neues gefunden.",
+        "calls": "Das Limit an Modellaufrufen ist erreicht.",
+        "wall": "Das Zeitlimit ist erreicht.",
+        "cost": "Das Kostenlimit ist erreicht.",
+        "rounds": "Das Limit an Runden ist erreicht.",
+        "gather": "Keine Suchen oder Lesevorgänge mehr übrig.",
+        "nothing_queued": "Es gab nichts mehr nachzuschlagen."
+      },
+      "writing": "Schreibe",
+      "section": "Geschrieben",
+      "checking": "Prüfe jede Aussage",
+      "verdict": {
+        "partial": "Abgeschwächt",
+        "contradicted": "Widerlegt — weggelassen",
+        "unsupported": "Nicht belegt — weggelassen",
+        "removed": "Weggelassen"
+      },
+      "verdictReason": {
+        "uncited": "Keine Quelle steht dahinter.",
+        "number": "Die Zahl steht nicht in der zitierten Quelle.",
+        "name": "Der Name steht nicht in der zitierten Quelle.",
+        "unknown_id": "Es zitiert eine Quelle, die die Recherche nie gelesen hat."
+      },
+      "check": "Faktencheck: {ratio} Aussagen belegt",
+      "checkRemoved": "{count} aus der Antwort gelassen, weil keine Quelle sie bestätigt hat.",
+      "checkSameProvider": "Geprüft hat ein Modell desselben Anbieters.",
+      "complete": "Fertig",
+      "stopped": "Gestoppt",
+      "failed": "Nicht abgeschlossen"
+    }
   }
 }

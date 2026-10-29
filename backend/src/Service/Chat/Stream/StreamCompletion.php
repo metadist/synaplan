@@ -143,6 +143,7 @@ final readonly class StreamCompletion
             'searchResults' => $searchResults,
             'ragSources' => $reply->ragSources,
             'aiModels' => $this->meta->buildAiModelsPayload($outgoing),
+            ...StreamMessageMeta::effortPayload($outgoing),
         ]);
 
         // Only on the turn that named the chat, so the sidebar needs no refetch.

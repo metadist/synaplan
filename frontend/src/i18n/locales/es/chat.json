@@ -452,6 +452,7 @@
   "chatMessage": {
     "again": "Otra vez",
     "againWith": "Otra vez con",
+    "moreActions": "Más acciones",
     "regenerateWith": "Regenerar con",
     "copy": "Copiar mensaje",
     "whatWasSent": "Qué se envió",
@@ -793,6 +794,7 @@
       "preprocessingDone": "Adjuntos procesados",
       "understoodDone": "Solicitud entendida",
       "searchFailed": "Búsqueda web no disponible — respondiendo sin ella",
+      "searchRequestedByModel": "La respuesta necesita información actual — el modelo pidió consultar la web",
       "plannedDone": "Pasos planificados",
       "promptDone": "Instrucciones preparadas",
       "filesDone": "Tus archivos revisados",
@@ -1074,44 +1076,110 @@
     "deleteConfirm": "/{command} desaparece del menú del chat. Los mensajes ya enviados no cambian."
   },
   "research": {
-    "menu": "Investigar",
-    "menuHint": "Un informe escrito con fuentes, en este chat",
-    "title": "Investigar",
-    "questionLabel": "¿Qué quieres averiguar?",
-    "depth": {
-      "standard": "Estándar",
-      "thorough": "A fondo"
-    },
-    "depthHint": {
-      "standard": "Unos {minutes} minutos",
-      "thorough": "Unos {minutes} minutos"
-    },
-    "sourcesLabel": "Fuentes",
-    "sourceWeb": "Web",
-    "sourceFiles": "Carpetas de la biblioteca",
-    "start": "Empezar a investigar",
-    "startNeedsQuestion": "Escribe lo que quieres averiguar.",
-    "startNeedsSource": "Activa la web o añade archivos.",
-    "noSources": "La búsqueda web y las carpetas de la biblioteca están apagadas, así que la investigación no puede empezar.",
     "noChat": "Abre un chat y luego empieza a investigar.",
     "startFailed": "La investigación no pudo empezar. Revisa la pregunta e inténtalo de nuevo.",
     "stopFailed": "La investigación no se pudo detener. Sigue en marcha.",
     "incognito": "La investigación guarda un informe en el chat. Termina primero el chat de incógnito.",
-    "close": "Cerrar",
-    "continues": "Puedes cerrar esta ventana. La investigación sigue y el informe aparece en este chat.",
     "stop": "Detener",
     "stopConsequence": "Detener conserva lo ya escrito y no busca más.",
-    "stopped": "La investigación se detuvo. Lo ya escrito permanece en este chat. No se buscó nada más.",
-    "failed": "La investigación no pudo terminar. No se añadió nada nuevo a este chat.",
-    "working": "La investigación está en marcha.",
-    "workingDone": "La investigación ha terminado.",
     "queued": "La investigación está en espera. Lleva {seconds} segundos esperando.",
-    "factCheck": "Comprobación: {supported} de {total} afirmaciones están respaldadas. Se quitaron {removed}.",
-    "find": "El informe está en este chat. También puedes abrirlo en Biblioteca y luego Archivos, o buscarlo por el título.",
-    "sourcesCount": "{found} encontradas, {read} leídas, {blocked} bloqueadas",
-    "pointDone": "Hecho",
-    "pointOpen": "Aún abierto",
-    "pointNotConfirmed": "Sin confirmar",
-    "depthLabel": "¿Qué tan a fondo?"
+    "answerNow": "Responder ahora",
+    "answerNowConsequence": {
+      "reading": "Responder ahora redacta el informe con lo ya leído.",
+      "early": "Responder ahora contesta sin la búsqueda adicional.",
+      "writing": "El informe está casi listo."
+    },
+    "answerNowFailed": "Responder ahora no llegó a la investigación. Sigue en marcha.",
+    "answeredWithout": "Respondido sin la búsqueda adicional.",
+    "lookDeeper": "Investigar a fondo",
+    "turn": {
+      "working": "Investigando…",
+      "stepOf": "Paso {n} de {total}",
+      "stepsSoFar": "{steps} pasos hasta ahora · {sources} fuentes leídas",
+      "draftWriting": "Borrador de la respuesta: a continuación se comprueba cada afirmación.",
+      "draftChecking": "Borrador de la respuesta: comprobando cada afirmación ahora. Sigue el texto final.",
+      "summary": {
+        "complete": "Investigado: {steps} pasos · {sources} fuentes leídas",
+        "stopped": "Investigación detenida tras {steps} pasos",
+        "failed": "La investigación no pudo terminar"
+      }
+    },
+    "phase": {
+      "understand": "Entender la pregunta",
+      "plan": "Planificar la respuesta",
+      "gather": "Buscar y leer",
+      "write": "Escribir la respuesta",
+      "check": "Comprobar cada afirmación",
+      "points": "{count} punto | {count} puntos",
+      "answered": "{count} respondidos",
+      "searches": "{count} búsqueda | {count} búsquedas",
+      "sourcesRead": "{count} fuente leída | {count} fuentes leídas",
+      "findings": "{count} hallazgo | {count} hallazgos",
+      "gatherBlocked": "{count} no se pudieron abrir",
+      "softened": "{count} matizadas.",
+      "sectionsWritten": "{count} sección escrita | {count} secciones escritas",
+      "earlier": "Mostrar {count} paso anterior | Mostrar {count} pasos anteriores"
+    },
+    "step": {
+      "brief": "Pregunta entendida",
+      "plan": "{count} puntos planificados",
+      "search": "Buscado",
+      "searchFiles": "Buscado en los archivos",
+      "searchSkipped": "Búsqueda no añadida: esta parte ya tiene suficiente",
+      "searchResults": "{count} resultados",
+      "source": {
+        "found": "Encontrada",
+        "reading": "Leyendo",
+        "read": "Leída",
+        "blocked": "No se pudo abrir"
+      },
+      "finding": "Hallazgo",
+      "sourceFindings": "{count} hallazgo | {count} hallazgos",
+      "sourceNothingNew": "nada nuevo para el plan",
+      "point": {
+        "answered": "Respondido",
+        "not_confirmed": "Sin confirmar",
+        "open": "Abierto"
+      },
+      "round": "Ronda {round}",
+      "roundAgain": "Aún no basta: sigo buscando (ronda {round})",
+      "roundWrite": "Suficiente encontrado: escribiendo la respuesta",
+      "roundWait": "Esperando tu respuesta",
+      "roundReason": {
+        "write_now": "Pediste la respuesta ahora.",
+        "finish": "La dirección decidió que hay suficiente para responder.",
+        "covered": "Todos los puntos están respondidos.",
+        "answered": "Todos los puntos están respondidos.",
+        "budget": "El presupuesto de investigación se agotó.",
+        "no_progress": "La última ronda no encontró nada nuevo.",
+        "calls": "Se alcanzó el límite de llamadas al modelo.",
+        "wall": "Se alcanzó el límite de tiempo.",
+        "cost": "Se alcanzó el límite de coste.",
+        "rounds": "Se alcanzó el límite de rondas.",
+        "gather": "No quedan búsquedas ni lecturas.",
+        "nothing_queued": "No quedaba nada por consultar."
+      },
+      "writing": "Escribiendo",
+      "section": "Escrito",
+      "checking": "Comprobando cada afirmación",
+      "verdict": {
+        "partial": "Matizada",
+        "contradicted": "Contradicha: fuera de la respuesta",
+        "unsupported": "Sin respaldo: fuera de la respuesta",
+        "removed": "Fuera de la respuesta"
+      },
+      "verdictReason": {
+        "uncited": "Ninguna fuente la respalda.",
+        "number": "La cifra no está en la fuente citada.",
+        "name": "El nombre no está en la fuente citada.",
+        "unknown_id": "Cita una fuente que la investigación nunca leyó."
+      },
+      "check": "Verificación: {ratio} afirmaciones respaldadas",
+      "checkRemoved": "{count} fuera de la respuesta porque ninguna fuente las confirmó.",
+      "checkSameProvider": "Revisado por un modelo del mismo proveedor.",
+      "complete": "Listo",
+      "stopped": "Detenida",
+      "failed": "No terminó"
+    }
   }
 }
