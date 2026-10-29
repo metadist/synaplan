@@ -200,19 +200,20 @@ final class EvidenceLedger
         return true;
     }
 
-    /** A planned search that has not run yet. Pass false to ignore a files-only query. */
-    public function hasPlannedSearch(bool $includeFiles = true): bool
+    /** A planned web or file search that has not run. Each scope is tracked on its own. */
+    public function hasPlannedSearch(bool $includeFiles = true, bool $includeWeb = true): bool
     {
-        $ran = [];
+        $ran = ['files' => [], 'web' => []];
         foreach ($this->queries as $query) {
-            $ran[$query->pointId.'|'.$query->query] = true;
+            $side = 'files' === $query->scope ? 'files' : 'web';
+            $ran[$side][$query->pointId.'|'.$query->query] = true;
         }
         foreach ($this->points as $point) {
             foreach ($point->queries as $query) {
-                if (!$includeFiles && 'files' === $query['scope']) {
-                    continue;
-                }
-                if (!isset($ran[$point->id.'|'.$query['q']])) {
+                $key = $point->id.'|'.$query['q'];
+                $fileLeft = $includeFiles && 'web' !== $query['scope'] && !isset($ran['files'][$key]);
+                $webLeft = $includeWeb && 'files' !== $query['scope'] && !isset($ran['web'][$key]);
+                if ($fileLeft || $webLeft) {
                     return true;
                 }
             }

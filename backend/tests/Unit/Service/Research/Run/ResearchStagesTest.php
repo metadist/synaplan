@@ -296,6 +296,124 @@ final class ResearchStagesTest extends TestCase
         self::assertTrue($ctx->state->ledger->hasPlannedSearch());
     }
 
+    public function testTheSameWordsStillSearchFilesAfterTheyRanOnTheWeb(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard, 'web files');
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the clause', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Warranty', 'Needed.', [[
+            'q' => 'warranty terms',
+            'language' => 'en',
+            'scope' => 'web',
+        ]]);
+        $ctx->state->ledger->addQuery('p1', 'warranty terms', 'web', 2);
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = $this->json([
+            'actions' => [[
+                'type' => 'search',
+                'point' => 'p1',
+                'query' => 'warranty terms',
+                'language' => 'en',
+                'scope' => 'files',
+            ]],
+            'finish' => null,
+        ]);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+        $scopes = array_column($ctx->state->ledger->points()[0]->queries, 'scope');
+
+        self::assertSame('round', $result->next);
+        self::assertSame(['web', 'files'], $scopes);
+        self::assertTrue($ctx->state->ledger->hasPlannedSearch(true, true));
+    }
+
+    public function testABothQueryKeepsTheFileHalfAfterTheWebHalfRan(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard, 'web files');
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the clause', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Warranty', 'Needed.', [[
+            'q' => 'warranty terms',
+            'language' => 'en',
+            'scope' => 'both',
+        ]]);
+        $ctx->state->ledger->addQuery('p1', 'warranty terms', 'both', 2);
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = $this->json([
+            'actions' => [],
+            'finish' => null,
+        ]);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('round', $result->next);
+        self::assertTrue($ctx->state->ledger->hasPlannedSearch(true, true));
+    }
+
+    public function testABothQueryKeepsTheWebHalfAfterTheFileHalfRan(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard, 'web files');
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the clause', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Warranty', 'Needed.', [[
+            'q' => 'warranty terms',
+            'language' => 'en',
+            'scope' => 'both',
+        ]]);
+        $ctx->state->ledger->addQuery('p1', 'warranty terms', 'files', 1);
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = $this->json([
+            'actions' => [],
+            'finish' => null,
+        ]);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('round', $result->next);
+        self::assertTrue($ctx->state->ledger->hasPlannedSearch(true, true));
+    }
+
+    public function testAFinishedBothQueryDoesNotStartAnotherRound(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard, 'web files');
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the clause', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Warranty', 'Needed.', [[
+            'q' => 'warranty terms',
+            'language' => 'en',
+            'scope' => 'both',
+        ]]);
+        $ctx->state->ledger->addQuery('p1', 'warranty terms', 'files', 1);
+        $ctx->state->ledger->addQuery('p1', 'warranty terms', 'both', 2);
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = $this->json([
+            'actions' => [],
+            'finish' => null,
+        ]);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('write', $result->next);
+        self::assertFalse($ctx->state->ledger->hasPlannedSearch(true, true));
+    }
+
+    public function testAWebQueryOnAFilesOnlyRunDoesNotStartAnotherRound(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard, 'files');
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the clause', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Warranty', 'Needed.', [[
+            'q' => 'warranty terms',
+            'language' => 'en',
+            'scope' => 'web',
+        ]]);
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = $this->json([
+            'actions' => [],
+            'finish' => null,
+        ]);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('write', $result->next);
+        self::assertFalse($ctx->state->ledger->hasPlannedSearch(true, false));
+    }
+
     public function testASearchThePlanCannotHoldIsRecorded(): void
     {
         [$ctx, $caller] = $this->open(ResearchDepth::Standard, 'files');

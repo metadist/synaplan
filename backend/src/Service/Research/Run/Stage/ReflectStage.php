@@ -125,7 +125,7 @@ final readonly class ReflectStage implements ResearchStage
     private function hasWork(StageContext $ctx): bool
     {
         $budget = $ctx->state->budget;
-        if ($budget->canSearch() && $ctx->state->ledger->hasPlannedSearch($ctx->filesOn())) {
+        if ($budget->canSearch() && $ctx->state->ledger->hasPlannedSearch($ctx->filesOn(), $ctx->webOn())) {
             return true;
         }
         if (!$budget->canRead()) {
