@@ -225,15 +225,15 @@ final class ApiKeyScope
     /**
      * Scopes minted for a linked Nextcloud / ownCloud user. Equal to the
      * strings `POST /api/v1/admin/users/{id}/api-keys` receives from the
-     * partner apps today (`chat`, `files`, `rag`) plus `memories` when the
-     * partner admin enabled them. Names are frozen — already-issued keys
-     * carry exactly this list; {@see requiredScopesForPath()} maps them.
+     * partner apps (`chat`, `files`, `rag`, `cloud:watch`) plus `memories`
+     * when the partner admin enabled them. A key already issued keeps the
+     * list it was minted with; {@see requiredScopesForPath()} maps them.
      *
      * @return list<string>
      */
     public static function platformLinkScopes(bool $withMemories = false): array
     {
-        $scopes = [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG];
+        $scopes = [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG, self::PLATFORM_WATCH];
         if ($withMemories) {
             $scopes[] = self::PLATFORM_MEMORIES;
         }
@@ -250,7 +250,7 @@ final class ApiKeyScope
      */
     public static function provisionedPlatformScopes(): array
     {
-        return [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG];
+        return [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG, self::PLATFORM_WATCH];
     }
 
     /**
