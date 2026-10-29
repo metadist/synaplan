@@ -7,14 +7,14 @@ D1–D6 as proposed).
 | Step | State | Note |
 | ---- | ----- | ---- |
 | RV0 | merged | [#2856](https://github.com/metadist/synaplan/pull/2856), [#2857](https://github.com/metadist/synaplan/pull/2857), against `main` `fa64e4c82` |
-| RV1 | in review | [#2868](https://github.com/metadist/synaplan/pull/2868). A files-only search stays on the point and the next round runs it. Before `RESEARCH.ENABLED` |
+| RV1 | merged | [#2868](https://github.com/metadist/synaplan/pull/2868). A files-only search stays on the point and the next round runs it. Before `RESEARCH.ENABLED` |
 | RV2 | merged | [#2867](https://github.com/metadist/synaplan/pull/2867). A Messages request gets its own usage turn. The session key stays the key for conversation memory. Before `AI.USAGE_HOOK=on` |
 | RV3 | merged | [#2865](https://github.com/metadist/synaplan/pull/2865). A Messages stream releases the database connection before every provider stream, including one with no server tools. Live today |
 | RV4 | merged | [#2860](https://github.com/metadist/synaplan/pull/2860) — pickup copy stores the claiming platform instance on the file. Live where platform links are on |
 | RV5 | merged | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
 | RV6 | merged | [#2862](https://github.com/metadist/synaplan/pull/2862). A copy counts as sent only after the download. A claimed row expires unconfirmed. Live, same |
-| RV7 | planned | Regression lock: do not mark an inbound watch upload as an own write. Before `cloud_files` |
-| RV8 | planned | Calls in one step whose waits sum past the lease pay the step twice. Waits on `RESEARCH.ENABLED` |
+| RV7 | in review | [#2870](https://github.com/metadist/synaplan/pull/2870). An inbound watch upload is not an own write. A new version of the same remote id stays accepted. Before `cloud_files` |
+| RV8 | in review | [#2871](https://github.com/metadist/synaplan/pull/2871). A live step renews its lease through every model call. Before `RESEARCH.ENABLED` |
 
 ## 2026-10-28 — review
 
@@ -103,4 +103,14 @@ when this run may search files. An unread file keeps the round while
 reads remain. A search the plan cannot hold is recorded, with the
 reason, instead of being dropped in silence. RV1 is
 [#2868](https://github.com/metadist/synaplan/pull/2868).
+`RESEARCH.ENABLED` stays off.
+
+## 2026-10-29 — RV8
+
+A live research step renews the claim it already holds. The lease stays
+four minutes. A call that waits longer than that, two check calls whose
+waits sum past it, and `once()` plus its retry do not pay the step
+twice. A renewal that loses the token does not call the model again. A
+claim nobody renews is still redispatched once. RV8 is
+[#2871](https://github.com/metadist/synaplan/pull/2871).
 `RESEARCH.ENABLED` stays off.
