@@ -52,7 +52,7 @@ final readonly class TurnWebSearch
      * @param array<int, Message|array{role: string, content: string}> $history
      *
      * `searchOnRequest` is true when no search ran but the answering model may
-     * still ask for one ({@see FreshInfoRequest}).
+     * still ask for one ({@see FreshInfoRequest})
      *
      * @return array{classification: array<string, mixed>, searchResults: array<string, mixed>|null, searchOnRequest: bool}
      */

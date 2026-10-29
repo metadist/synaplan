@@ -32,9 +32,9 @@ final readonly class FreshInfoRetry
     }
 
     /**
-     * @param array<string, mixed>                              $classification
-     * @param array<string, mixed>                              $options
-     * @param array<string, mixed>                              $response       the handler result of the first dispatch
+     * @param array<string, mixed>                                 $classification
+     * @param array<string, mixed>                                 $options
+     * @param array<string, mixed>                                 $response       the handler result of the first dispatch
      * @param callable(array<string, mixed>): array<string, mixed> $dispatch       runs the handler again with the given options
      *
      * @return array{0: array<string, mixed>, 1: array<string, mixed>|null} the final handler result and the search results it was given

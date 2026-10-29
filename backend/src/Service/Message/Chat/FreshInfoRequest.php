@@ -41,7 +41,7 @@ final readonly class FreshInfoRequest
     public static function instruction(): string
     {
         return "\n\n## When you lack current information\n\n"
-            ."If a correct answer depends on facts that may have changed since your training — "
+            .'If a correct answer depends on facts that may have changed since your training — '
             .'the current holder of an office or job, the latest version or release, a price, '
             .'a date, a schedule, the outcome of a recent event — and this conversation does not '
             ."contain them, do NOT guess, hedge, or explain what you cannot know.\n"
