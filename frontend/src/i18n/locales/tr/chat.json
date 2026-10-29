@@ -793,6 +793,7 @@
       "preprocessingDone": "Ekler işlendi",
       "understoodDone": "İsteğiniz anlaşıldı",
       "searchFailed": "Web araması kullanılamıyor — aramasız yanıtlanıyor",
+      "searchRequestedByModel": "Yanıt güncel bilgi gerektiriyor — model web'e bakılmasını istedi",
       "plannedDone": "Adımlar planlandı",
       "promptDone": "Talimatlar hazırlandı",
       "filesDone": "Dosyalarınız kontrol edildi",

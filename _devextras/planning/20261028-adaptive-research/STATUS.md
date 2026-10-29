@@ -306,3 +306,37 @@ absent (U11).
   `ModelConfigService::getConfiguredDefaultModel()` first so a per-user
   `READ` or `VERIFY` override wins over the seeded `-1` instance row.
 - OpenAPI & Zod schemas regenerated; all five locales updated.
+
+## 2026-10-29 — The model asks for the web; the research reply shows its spend
+
+**Web search on request.** The sorter decides before the answer whether a
+turn searches (`BWEBSEARCH`); nothing caught the case where it said no and
+the model then found it had no current facts. Now, on a direct-route turn
+where web search is available but was not chosen, the system prompt ends
+with one instruction (`FreshInfoRequest::instruction()`): when the model
+lacks current information it replies with exactly one line,
+`[[SEARCH_WEB: <phrase>]]`. `FreshInfoGuard` holds the head of the stream
+until it is known not to be the marker, so the person never sees it.
+`ChatHandler` returns the request instead of an answer; `FreshInfoRetry`
+(in `MessageProcessor`, stream and buffered) searches with the model's own
+phrase (`TurnWebSearch::searchRequested`, short page reads), then
+dispatches the same turn again with the results and without the
+instruction — one request per turn, no loop. If the search finds nothing
+the model answers from what it has. The probe call's tokens are kept under
+the reply's usage (`web_search_request_usage` → `ai_usage_extra`, kind
+`LLM`), so the info panel is honest. Widget turns, multitask routing and
+topics the sorter never searches for stay as they were.
+
+UX: the processing timeline's web step says "The answer needs current
+information — the model asked to check the web" (five locales) via the
+`searching` status metadata `reason: model_requested`.
+
+**Research reply usage.** A research reply showed only the sorting's
+tokens and cost because the run's model calls were never written to the
+message. `ResearchSpend` (in the run state, stored with it) sums every
+call per role and model with the charged cost (`facade_charged_cost`,
+falling back to the catalog price); `StageCall`, `LeadStage` and
+`ResearchDirectAnswer` feed it; `ResearchReportDelivery` writes the rows to
+the reply's `ai_usage_extra` next to the existing sorting row and
+replaces its own rows on a second delivery. The info panel now shows
+`LEAD`, `READ`, `WRITE`, `VERIFY` lines and a total that is the run's.

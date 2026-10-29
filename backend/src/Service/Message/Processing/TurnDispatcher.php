@@ -6,6 +6,7 @@ namespace App\Service\Message\Processing;
 
 use App\Entity\Message;
 use App\Service\Infrastructure\PerfTimer;
+use App\Service\Message\Chat\FreshInfoRequest;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
@@ -72,6 +73,17 @@ final readonly class TurnDispatcher
         return $this->isMultitaskRoutingEnabled($message)
             ? $this->taskPlanExecutor->executeStream($message, $history, $classification, $streamCallback, $statusCallback, $options)
             : $this->router->routeStream($message, $history, $classification, $streamCallback, $statusCallback, $options);
+    }
+
+    /**
+     * Whether the handler's result reaches the processor as the handler
+     * returned it. The task-plan executor folds node results into a plan, so
+     * a handler's request to dispatch again ({@see FreshInfoRequest}) can
+     * only be honoured on the direct route.
+     */
+    public function returnsHandlerResult(Message $message): bool
+    {
+        return !$this->isMultitaskRoutingEnabled($message);
     }
 
     /**

@@ -785,6 +785,7 @@
       "preprocessingDone": "Attachments processed",
       "understoodDone": "Understood your request",
       "searchFailed": "Web search unavailable — answering without it",
+      "searchRequestedByModel": "The answer needs current information — the model asked to check the web",
       "plannedDone": "Steps planned",
       "promptDone": "Instructions prepared",
       "filesDone": "Checked your files",

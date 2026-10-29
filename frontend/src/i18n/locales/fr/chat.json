@@ -785,6 +785,7 @@
       "preprocessingDone": "Pièces jointes traitées",
       "understoodDone": "Demande comprise",
       "searchFailed": "Recherche web indisponible — réponse sans recherche",
+      "searchRequestedByModel": "La réponse nécessite des informations actuelles — le modèle a demandé une recherche web",
       "plannedDone": "Étapes planifiées",
       "promptDone": "Instructions préparées",
       "filesDone": "Vos fichiers vérifiés",

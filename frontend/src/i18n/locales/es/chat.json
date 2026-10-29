@@ -793,6 +793,7 @@
       "preprocessingDone": "Adjuntos procesados",
       "understoodDone": "Solicitud entendida",
       "searchFailed": "Búsqueda web no disponible — respondiendo sin ella",
+      "searchRequestedByModel": "La respuesta necesita información actual — el modelo pidió consultar la web",
       "plannedDone": "Pasos planificados",
       "promptDone": "Instrucciones preparadas",
       "filesDone": "Tus archivos revisados",

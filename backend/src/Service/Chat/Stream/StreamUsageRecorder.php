@@ -6,6 +6,7 @@ namespace App\Service\Chat\Stream;
 
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Message\Processing\FreshInfoRetry;
 use App\Service\RateLimitService;
 use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\RecordedUsage;
@@ -215,6 +216,12 @@ final readonly class StreamUsageRecorder
         $planningUsage = $metadata['planning_usage'] ?? null;
         if (is_array($planningUsage)) {
             $extra[] = $planningUsage;
+        }
+
+        // The call that asked for a web search instead of answering.
+        $requestUsage = $metadata[FreshInfoRetry::USAGE_KEY] ?? null;
+        if (is_array($requestUsage)) {
+            $extra[] = $requestUsage;
         }
 
         $rawTranscriptionUsage = $incoming->getMeta('ai_transcription_usage');

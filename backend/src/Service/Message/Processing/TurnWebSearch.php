@@ -9,6 +9,7 @@ use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\SearchResultRepository;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Message\AttachmentSearchContextResolver;
+use App\Service\Message\Chat\FreshInfoRequest;
 use App\Service\Message\ReadPagesPolicy;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\Message\WebSearchTopicPolicy;
@@ -30,6 +31,9 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TurnWebSearch
 {
+    /** `searching` metadata: the answering model, not the sorter, asked for this search. */
+    public const REASON_MODEL_REQUESTED = 'model_requested';
+
     public function __construct(
         private WebSearchGateway $webSearch,
         private SearchQueryGenerator $searchQueryGenerator,
@@ -47,7 +51,10 @@ final readonly class TurnWebSearch
      * @param array<string, mixed>                                     $options
      * @param array<int, Message|array{role: string, content: string}> $history
      *
-     * @return array{classification: array<string, mixed>, searchResults: array<string, mixed>|null}
+     * `searchOnRequest` is true when no search ran but the answering model may
+     * still ask for one ({@see FreshInfoRequest}).
+     *
+     * @return array{classification: array<string, mixed>, searchResults: array<string, mixed>|null, searchOnRequest: bool}
      */
     public function run(Message $message, array $classification, array $promptMetadata, array $options, array $history, TurnStatus $status, ?PerfTimer $perfTimer = null): array
     {
@@ -122,7 +129,36 @@ final readonly class TurnWebSearch
             $searchResults = $this->search($message, $classification, $options, $history, $status, $perfTimer, $attachmentContext, $userRequestedSearch);
         }
 
-        return ['classification' => $classification, 'searchResults' => $searchResults];
+        // The sorter saw no need for the web; the model may still find that
+        // the answer needs facts newer than its training. Only where a search
+        // would have been allowed: not a widget turn, not a prompt opt-out,
+        // not an asset or document topic.
+        $searchOnRequest = !$shouldSearch && !$widgetTurn && $braveEnabled
+            && false !== $promptToolInternet
+            && !WebSearchTopicPolicy::isNonWebSearchTopic($topic);
+
+        return ['classification' => $classification, 'searchResults' => $searchResults, 'searchOnRequest' => $searchOnRequest];
+    }
+
+    /**
+     * The search the answering model asked for ({@see FreshInfoRequest}):
+     * its own phrase goes to the search engine, two result pages are read.
+     * Null when nothing was found, so the model answers from what it has.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>|null
+     */
+    public function searchRequested(Message $message, array $classification, array $options, TurnStatus $status, string $query, ?PerfTimer $perfTimer = null): ?array
+    {
+        $this->logger->info('MessageProcessor: Web search requested by the answering model', [
+            'message_id' => $message->getId(),
+            'query' => !empty($options['incognito']) ? '[incognito]' : $query,
+        ]);
+        $classification['read_pages'] = max((int) ($classification['read_pages'] ?? 0), ReadPagesPolicy::SHORT);
+
+        return $this->search($message, $classification, $options, [], $status, $perfTimer, null, false, $query);
     }
 
     /**
@@ -132,16 +168,17 @@ final readonly class TurnWebSearch
      *
      * @return array<string, mixed>|null
      */
-    private function search(Message $message, array $classification, array $options, array $history, TurnStatus $status, ?PerfTimer $perfTimer, ?string $attachmentContext, bool $userRequestedSearch): ?array
+    private function search(Message $message, array $classification, array $options, array $history, TurnStatus $status, ?PerfTimer $perfTimer, ?string $attachmentContext, bool $userRequestedSearch, ?string $modelQuery = null): ?array
     {
-        $status->report('searching', 'Searching the web...');
+        $status->report('searching', 'Searching the web...', null === $modelQuery ? [] : ['reason' => self::REASON_MODEL_REQUESTED]);
         $incognito = !empty($options['incognito']);
         $searchResults = null;
 
         try {
-            // A linked page just read is the best hint for what a thin message wants.
+            // A linked page just read is the best hint for what a thin message
+            // wants. The answering model's own phrase needs no generator.
             $perfTimer?->start('search_query');
-            $searchQuery = $this->searchQueryGenerator->generate(
+            $searchQuery = $modelQuery ?? $this->searchQueryGenerator->generate(
                 $message->getText(),
                 $message->getUserId(),
                 $attachmentContext ?? $this->linkedPageContext($classification),

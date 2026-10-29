@@ -783,6 +783,7 @@
       "preprocessingDone": "Anhänge verarbeitet",
       "understoodDone": "Anfrage verstanden",
       "searchFailed": "Websuche nicht verfügbar — Antwort ohne Suche",
+      "searchRequestedByModel": "Die Antwort braucht aktuelle Informationen — das Modell hat eine Websuche angefordert",
       "plannedDone": "Schritte geplant",
       "promptDone": "Anweisungen vorbereitet",
       "filesDone": "Deine Dateien geprüft",
