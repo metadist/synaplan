@@ -941,61 +941,34 @@
               @look-deeper="emit('look-deeper')"
             />
             <template v-if="backendMessageId">
-            <!-- Not correct and Report sit in one menu (Apple 1.2 still
+              <!-- Not correct and Report sit in one menu (Apple 1.2 still
                  reaches Report). Look deeper stays a button of its own. -->
-            <MessageMoreActions
-              :show-false-positive="isFeedbackServiceAvailable"
-              :show-report="!isGuestMode"
-              :false-positive-disabled="isSuperseded || isGuestMode"
-              :guest="isGuestMode"
-              @false-positive="!isGuestMode && handleFalsePositive()"
-              @report="handleReport"
-            />
+              <MessageMoreActions
+                :show-false-positive="isFeedbackServiceAvailable"
+                :show-report="!isGuestMode"
+                :false-positive-disabled="isSuperseded || isGuestMode"
+                :guest="isGuestMode"
+                @false-positive="!isGuestMode && handleFalsePositive()"
+                @report="handleReport"
+              />
 
-            <!-- Multitask (DAG) turn: a single model pick can't represent the
+              <!-- Multitask (DAG) turn: a single model pick can't represent the
                  whole plan, so offer one plain "Again" that re-runs the full
                  pipeline (re-classify + re-plan). -->
-            <button
-              v-if="isMultitaskTurn && canRewrite !== false"
-              type="button"
-              :disabled="isSuperseded || isGuestMode"
-              :class="[
-                'pill text-xs whitespace-nowrap relative',
-                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
-              ]"
-              :aria-label="$t('chatMessage.again')"
-              data-testid="btn-message-again"
-              @click.stop="!isGuestMode && handleSimpleAgain()"
-            >
-              <ArrowPathIcon class="w-4 h-4" />
-              <span class="font-medium">{{ $t('chatMessage.again') }}</span>
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
-              />
-            </button>
-
-            <div v-else-if="canRewrite !== false" class="relative">
-              <!-- Single "Again with… ▾" control: opening the dropdown and
-                   picking a model re-runs the prompt (see selectModel). The old
-                   standalone "Again with <model>" button was merged into this to
-                   save horizontal space. -->
               <button
+                v-if="isMultitaskTurn && canRewrite !== false"
                 type="button"
-                :disabled="isSuperseded || isGuestMode || !hasModels"
+                :disabled="isSuperseded || isGuestMode"
                 :class="[
                   'pill text-xs whitespace-nowrap relative',
-                  isSuperseded || isGuestMode || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
+                  isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
                 ]"
-                :aria-label="$t('chatMessage.regenerateWith')"
+                :aria-label="$t('chatMessage.again')"
                 data-testid="btn-message-again"
-                @click.stop="!isGuestMode && toggleModelDropdown()"
-                @keydown.escape="closeModelDropdown"
+                @click.stop="!isGuestMode && handleSimpleAgain()"
               >
                 <ArrowPathIcon class="w-4 h-4" />
-                <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
-                <ChevronDownIcon class="w-4 h-4" />
+                <span class="font-medium">{{ $t('chatMessage.again') }}</span>
                 <Icon
                   v-if="isGuestMode"
                   icon="mdi:lock-outline"
@@ -1003,30 +976,59 @@
                 />
               </button>
 
-              <Transition
-                enter-active-class="transition ease-out duration-100"
-                enter-from-class="transform opacity-0 scale-95"
-                enter-to-class="transform opacity-100 scale-100"
-                leave-active-class="transition ease-in duration-75"
-                leave-from-class="transform opacity-100 scale-100"
-                leave-to-class="transform opacity-0 scale-95"
-              >
-                <div
-                  v-if="modelDropdownOpen && !isSuperseded"
-                  v-click-outside="closeModelDropdown"
-                  data-testid="dropdown-again-models"
-                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
+              <div v-else-if="canRewrite !== false" class="relative">
+                <!-- Single "Again with… ▾" control: opening the dropdown and
+                   picking a model re-runs the prompt (see selectModel). The old
+                   standalone "Again with <model>" button was merged into this to
+                   save horizontal space. -->
+                <button
+                  type="button"
+                  :disabled="isSuperseded || isGuestMode || !hasModels"
+                  :class="[
+                    'pill text-xs whitespace-nowrap relative',
+                    isSuperseded || isGuestMode || !hasModels
+                      ? 'opacity-50 cursor-not-allowed'
+                      : '',
+                  ]"
+                  :aria-label="$t('chatMessage.regenerateWith')"
+                  data-testid="btn-message-again"
+                  @click.stop="!isGuestMode && toggleModelDropdown()"
                   @keydown.escape="closeModelDropdown"
                 >
-                  <AgainModelMenu
-                    :options="modelOptions"
-                    :selected="selectedModel"
-                    :peers="peerModelsForCost"
-                    @select="selectModel"
+                  <ArrowPathIcon class="w-4 h-4" />
+                  <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
+                  <ChevronDownIcon class="w-4 h-4" />
+                  <Icon
+                    v-if="isGuestMode"
+                    icon="mdi:lock-outline"
+                    class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
                   />
-                </div>
-              </Transition>
-            </div>
+                </button>
+
+                <Transition
+                  enter-active-class="transition ease-out duration-100"
+                  enter-from-class="transform opacity-0 scale-95"
+                  enter-to-class="transform opacity-100 scale-100"
+                  leave-active-class="transition ease-in duration-75"
+                  leave-from-class="transform opacity-100 scale-100"
+                  leave-to-class="transform opacity-0 scale-95"
+                >
+                  <div
+                    v-if="modelDropdownOpen && !isSuperseded"
+                    v-click-outside="closeModelDropdown"
+                    data-testid="dropdown-again-models"
+                    class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 w-[17rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin leading-tight"
+                    @keydown.escape="closeModelDropdown"
+                  >
+                    <AgainModelMenu
+                      :options="modelOptions"
+                      :selected="selectedModel"
+                      :peers="peerModelsForCost"
+                      @select="selectModel"
+                    />
+                  </div>
+                </Transition>
+              </div>
             </template>
           </div>
         </div>

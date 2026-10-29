@@ -57,7 +57,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { EllipsisHorizontalIcon, FlagIcon, HandThumbDownIcon, LockClosedIcon } from '@heroicons/vue/24/outline'
+import {
+  EllipsisHorizontalIcon,
+  FlagIcon,
+  HandThumbDownIcon,
+  LockClosedIcon,
+} from '@heroicons/vue/24/outline'
 
 /**
  * "Not correct" and "Report" live behind one control so the message footer

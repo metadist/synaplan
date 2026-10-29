@@ -20,10 +20,18 @@ export interface ResearchStep {
   kind: string
   /** The words the row quotes: the query, the source title or host, the section title, the goal. */
   text: string
-  /** A source's `found`/`read`/`blocked`, a point's `answered`/`not_confirmed`/`open`; null otherwise. */
+  /**
+   * A source's `found`/`reading`/`read`/`blocked`, a point's `answered`/`not_confirmed`/`open`,
+   * a search's scope (`web`/`files`) or `skipped`, a round's decision (`round`/`write`/`wait_answer`);
+   * null otherwise.
+   */
   status: string | null
   /** The source or point id, so a later frame updates the row instead of adding a second one. */
   ref: string | null
+  /** For `search`: how many results it returned. */
+  count?: number
+  /** For a blocked `source`: why it could not be read, in one sentence. */
+  note?: string
   /** For `check`: what the fact-check left out, and whether a model of the same provider checked. */
   check?: { removed: number; sameProvider: boolean }
 }
@@ -45,6 +53,8 @@ export interface ResearchProgress {
   outcome: string | null
   /** Everything the run did so far, oldest first; empty when the progress came from the run summary. */
   steps: ResearchStep[]
+  /** When the run started (the server's stamp, or when this client first saw it); null when unknown. */
+  startedAt: number | null
   lastSeq: number
 }
 
@@ -75,6 +85,7 @@ export function emptyProgress(id: string, chatId: number, question: string): Res
     ceiling: null,
     outcome: null,
     steps: [],
+    startedAt: Date.now(),
     lastSeq: 0,
   }
 }
@@ -200,6 +211,7 @@ export function progressFromRun(
     check?: { statements?: number; supported?: number; removed?: number } | null
     ceiling?: string | null
     outcome?: { code?: string } | null
+    created_at?: string | null
   }
 ): ResearchProgress {
   const plan =
@@ -212,6 +224,7 @@ export function progressFromRun(
   progress.queuedSeconds = run.queued_since ?? null
   progress.ceiling = run.ceiling ?? null
   progress.outcome = run.outcome?.code ?? null
+  progress.startedAt = parseStamp(run.created_at)
   progress.points = readPoints(plan).map((point) => ({
     ...point,
     status: point.status || 'open',
@@ -237,17 +250,29 @@ function stepFor(frame: ResearchFrame): ResearchStep | null {
       return { kind: 'brief', text: text('goal'), status: null, ref: null }
     case 'plan':
       return { kind: 'plan', text: String(readPoints(data.points).length), status: null, ref: null }
-    case 'search':
-      return { kind: 'search', text: text('query'), status: text('scope') || null, ref: null }
+    case 'search': {
+      const results = numberOrNull(data.results)
+      const step: ResearchStep = {
+        kind: 'search',
+        text: text('query'),
+        status: data.kept === false ? 'skipped' : text('scope') || null,
+        ref: null,
+      }
+      if (results !== null) step.count = results
+      return step
+    }
     case 'source': {
       const id = text('id')
       if (id === '') return null
-      return {
+      const step: ResearchStep = {
         kind: 'source',
         text: text('title') || text('host') || text('url'),
         status: text('status') || 'found',
         ref: id,
       }
+      const reason = text('reason')
+      if (reason !== '') step.note = reason
+      return step
     }
     case 'point': {
       const id = text('id')
@@ -260,7 +285,7 @@ function stepFor(frame: ResearchFrame): ResearchStep | null {
       return {
         kind: 'round',
         text: n !== null && max !== null ? `${n}/${max}` : '',
-        status: null,
+        status: text('next') || null,
         ref: null,
       }
     }
@@ -303,6 +328,7 @@ function appendStep(steps: ResearchStep[], step: ResearchStep | null): ResearchS
     if (index >= 0) {
       const kept = steps[index]
       steps[index] = { ...kept, status: step.status, text: step.text || kept.text }
+      if (step.note !== undefined) steps[index].note = step.note
       return steps
     }
   }
@@ -398,4 +424,10 @@ function readSnippets(sources: unknown, evidence: unknown): ResearchSnippet[] {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function parseStamp(value: string | null | undefined): number | null {
+  if (typeof value !== 'string' || value === '') return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
 }

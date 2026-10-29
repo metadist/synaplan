@@ -1094,6 +1094,7 @@
     "lookDeeper": "Investigar a fondo",
     "turn": {
       "working": "Investigando…",
+      "stepOf": "Paso {n} de {total}",
       "stepsSoFar": "{steps} pasos hasta ahora · {sources} fuentes leídas",
       "summary": {
         "complete": "Investigado: {steps} pasos · {sources} fuentes leídas",
@@ -1101,13 +1102,30 @@
         "failed": "La investigación no pudo terminar"
       }
     },
+    "phase": {
+      "understand": "Entender la pregunta",
+      "plan": "Planificar la respuesta",
+      "gather": "Buscar y leer",
+      "write": "Escribir la respuesta",
+      "check": "Comprobar cada afirmación",
+      "points": "{count} punto | {count} puntos",
+      "answered": "{count} respondidos",
+      "searches": "{count} búsqueda | {count} búsquedas",
+      "sourcesRead": "{count} fuente leída | {count} fuentes leídas",
+      "gatherBlocked": "{count} no se pudieron abrir",
+      "sectionsWritten": "{count} sección escrita | {count} secciones escritas",
+      "earlier": "Mostrar {count} paso anterior | Mostrar {count} pasos anteriores"
+    },
     "step": {
       "brief": "Pregunta entendida",
       "plan": "{count} puntos planificados",
       "search": "Buscado",
       "searchFiles": "Buscado en los archivos",
+      "searchSkipped": "Búsqueda no añadida: esta parte ya tiene suficiente",
+      "searchResults": "{count} resultados",
       "source": {
         "found": "Encontrada",
+        "reading": "Leyendo",
         "read": "Leída",
         "blocked": "No se pudo abrir"
       },
@@ -1117,6 +1135,9 @@
         "open": "Abierto"
       },
       "round": "Ronda {round}",
+      "roundAgain": "Aún no basta: sigo buscando (ronda {round})",
+      "roundWrite": "Suficiente encontrado: escribiendo la respuesta",
+      "roundWait": "Esperando tu respuesta",
       "writing": "Escribiendo",
       "section": "Escrito",
       "checking": "Comprobando cada afirmación",

@@ -33,18 +33,30 @@ rating simply never researches on its own.
 When the rating is `research`, the turn starts a run of depth `auto` for the
 person. The stream carries `research_started` with the run id first; the
 reply then carries `researchRunId` (meta `research_run_id`), live and after
-a reload. In the web chat that reply bubble shows the run working — a
-spinner, the last thing the run did (the query it searched, the source it
-read, the section it writes), a fold with every step so far, and **Answer
-now** with its consequence. **Stop** is the send button in the composer;
-the live-speech button does not take that place while a run is going. The
-bubble hides the fallback sentence meanwhile. The one sentence the stream writes ("I am looking through several
-sources for this — about N minutes. The question has several parts.") is
-what a channel without that UI gets. When the run finishes, the report
-replaces that reply's text (see "Where the report goes"), so the person
-reads the answer where they watched it being made; one muted line below the
-report ("Researched: 12 steps · 8 sources read") opens the steps again, in
-any later session too. Only an ordinary signed-in web chat turn
+a reload. In the web chat that reply bubble shows the run working as five
+phases a person can follow — understanding the question, planning the
+answer, searching and reading, writing the answer, checking every
+statement. The headline says which step of how many the run is in and how
+long it has been going (the admin timing switch hides the clock). A phase
+the run has passed folds to its title and one summary line ("2 points · 1
+answered", "4 searches · 6 sources read · 1 could not be opened") and opens
+again on a click; the phase it is in is open and shows what it does right
+now — the query it searched and how many results came back, the source it
+reads, the decision at the end of a round ("Not enough yet — looking
+again"), the section it writes — with the newest row in the primary ink and
+the earlier ones muted, at most six rows before a "Show N earlier steps"
+line; the phases still to come are listed muted. When the run moves on, the
+phase it left folds and the next one opens. **Answer now** with its
+consequence is under the phases. **Stop** is the send button in the
+composer; the live-speech button does not take that place while a run is
+going. The bubble hides the fallback sentence meanwhile. The one sentence
+the stream writes ("I am looking through several sources for this — about N
+minutes. The question has several parts.") is what a channel without that
+UI gets. When the run finishes, the report replaces that reply's text (see
+"Where the report goes"), so the person reads the answer where they watched
+it being made; one muted line below the report ("Researched: 12 steps · 8
+sources read") opens the phases again, folded, in any later session too.
+Only an ordinary signed-in web chat turn
 does this: never a widget, a saved task, an incognito chat, an "Again", a
 turn with a fixed task prompt, or a channel without a chat.
 

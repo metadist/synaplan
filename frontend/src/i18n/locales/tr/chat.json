@@ -1094,6 +1094,7 @@
     "lookDeeper": "Daha derin bak",
     "turn": {
       "working": "Araştırılıyor…",
+      "stepOf": "Adım {n} / {total}",
       "stepsSoFar": "Şimdiye kadar {steps} adım · {sources} kaynak okundu",
       "summary": {
         "complete": "Araştırıldı: {steps} adım · {sources} kaynak okundu",
@@ -1101,13 +1102,30 @@
         "failed": "Araştırma tamamlanamadı"
       }
     },
+    "phase": {
+      "understand": "Soruyu anlama",
+      "plan": "Yanıtı planlama",
+      "gather": "Arama ve okuma",
+      "write": "Yanıtı yazma",
+      "check": "Her ifadeyi kontrol etme",
+      "points": "{count} nokta",
+      "answered": "{count} yanıtlandı",
+      "searches": "{count} arama",
+      "sourcesRead": "{count} kaynak okundu",
+      "gatherBlocked": "{count} açılamadı",
+      "sectionsWritten": "{count} bölüm yazıldı",
+      "earlier": "{count} önceki adımı göster"
+    },
     "step": {
       "brief": "Soru anlaşıldı",
       "plan": "{count} nokta planlandı",
       "search": "Arandı",
       "searchFiles": "Dosyalarda arandı",
+      "searchSkipped": "Arama eklenmedi — bu bölümde zaten yeterince var",
+      "searchResults": "{count} sonuç",
       "source": {
         "found": "Bulundu",
+        "reading": "Okunuyor",
         "read": "Okundu",
         "blocked": "Açılamadı"
       },
@@ -1117,6 +1135,9 @@
         "open": "Açık"
       },
       "round": "Tur {round}",
+      "roundAgain": "Henüz yeterli değil — aramaya devam (tur {round})",
+      "roundWrite": "Yeterince bulundu — yanıt yazılıyor",
+      "roundWait": "Yanıtınız bekleniyor",
       "writing": "Yazılıyor",
       "section": "Yazıldı",
       "checking": "Her ifade kontrol ediliyor",

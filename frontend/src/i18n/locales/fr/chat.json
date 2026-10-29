@@ -1159,6 +1159,7 @@
     "lookDeeper": "Approfondir la recherche",
     "turn": {
       "working": "Recherche en cours…",
+      "stepOf": "Étape {n} sur {total}",
       "stepsSoFar": "{steps} étapes jusqu’ici · {sources} sources lues",
       "summary": {
         "complete": "Recherché : {steps} étapes · {sources} sources lues",
@@ -1166,13 +1167,30 @@
         "failed": "La recherche n’a pas pu aboutir"
       }
     },
+    "phase": {
+      "understand": "Comprendre la question",
+      "plan": "Planifier la réponse",
+      "gather": "Chercher et lire",
+      "write": "Rédiger la réponse",
+      "check": "Vérifier chaque affirmation",
+      "points": "{count} point | {count} points",
+      "answered": "{count} répondus",
+      "searches": "{count} recherche | {count} recherches",
+      "sourcesRead": "{count} source lue | {count} sources lues",
+      "gatherBlocked": "{count} impossibles à ouvrir",
+      "sectionsWritten": "{count} section rédigée | {count} sections rédigées",
+      "earlier": "Afficher {count} étape précédente | Afficher {count} étapes précédentes"
+    },
     "step": {
       "brief": "Question comprise",
       "plan": "{count} points planifiés",
       "search": "Recherché",
       "searchFiles": "Recherché dans les fichiers",
+      "searchSkipped": "Recherche non ajoutée : cette partie en a déjà assez",
+      "searchResults": "{count} résultats",
       "source": {
         "found": "Trouvée",
+        "reading": "Lecture",
         "read": "Lue",
         "blocked": "Impossible à ouvrir"
       },
@@ -1182,6 +1200,9 @@
         "open": "Ouvert"
       },
       "round": "Tour {round}",
+      "roundAgain": "Pas encore assez : je continue (tour {round})",
+      "roundWrite": "Assez trouvé : rédaction de la réponse",
+      "roundWait": "En attente de votre réponse",
       "writing": "Rédaction",
       "section": "Rédigé",
       "checking": "Vérification de chaque affirmation",

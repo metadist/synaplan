@@ -258,9 +258,17 @@ export const selectors = {
     /** The research inside the reply bubble; `data-status` carries the run status */
     turn: '[data-testid="research-turn"]',
     working: '[data-testid="research-turn-working"]',
+    /** "Step 3 of 5" beside the headline while the run works */
+    stepOf: '[data-testid="text-research-step-of"]',
+    /** The row of the open phase that is happening right now */
     activity: '[data-testid="text-research-activity"]',
     stepsToggle: '[data-testid="btn-research-steps"]',
     summary: '[data-testid="text-research-summary"]',
+    /** One phase of the run; `data-phase` names it, `data-state` is done, active or upcoming */
+    phase: (id: 'understand' | 'plan' | 'gather' | 'write' | 'check') =>
+      `[data-testid="research-phase"][data-phase="${id}"]`,
+    phaseToggle: '[data-testid="btn-research-phase"]',
+    phaseSummary: '[data-testid="text-research-phase-summary"]',
     steps: '[data-testid="list-research-steps"]',
     lookDeeper: '[data-testid="btn-look-deeper"]',
     lookDeeperSection: '[data-testid="section-look-deeper"]',

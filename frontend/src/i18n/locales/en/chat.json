@@ -1159,6 +1159,7 @@
     "lookDeeper": "Look deeper",
     "turn": {
       "working": "Researching…",
+      "stepOf": "Step {n} of {total}",
       "stepsSoFar": "{steps} steps so far · {sources} sources read",
       "summary": {
         "complete": "Researched: {steps} steps · {sources} sources read",
@@ -1166,13 +1167,30 @@
         "failed": "Research could not finish"
       }
     },
+    "phase": {
+      "understand": "Understanding the question",
+      "plan": "Planning the answer",
+      "gather": "Searching and reading",
+      "write": "Writing the answer",
+      "check": "Checking every statement",
+      "points": "{count} point | {count} points",
+      "answered": "{count} answered",
+      "searches": "{count} search | {count} searches",
+      "sourcesRead": "{count} source read | {count} sources read",
+      "gatherBlocked": "{count} could not be opened",
+      "sectionsWritten": "{count} section written | {count} sections written",
+      "earlier": "Show {count} earlier step | Show {count} earlier steps"
+    },
     "step": {
       "brief": "Understood the question",
       "plan": "Planned {count} points",
       "search": "Searched",
       "searchFiles": "Searched the files",
+      "searchSkipped": "Search not added — this part already has enough",
+      "searchResults": "{count} results",
       "source": {
         "found": "Found",
+        "reading": "Reading",
         "read": "Read",
         "blocked": "Could not open"
       },
@@ -1182,6 +1200,9 @@
         "open": "Open"
       },
       "round": "Round {round}",
+      "roundAgain": "Not enough yet — looking again (round {round})",
+      "roundWrite": "Enough found — writing the answer",
+      "roundWait": "Waiting for your answer",
       "writing": "Writing",
       "section": "Wrote",
       "checking": "Checking every statement",

@@ -6,63 +6,50 @@
     :data-status="progress.status"
   >
     <template v-if="running">
-      <div class="flex items-start gap-3" role="status" data-testid="research-turn-working">
-        <svg
-          class="w-5 h-5 animate-spin txt-brand flex-shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
-        <div class="flex-1 min-w-0">
-          <div class="font-medium animate-pulse truncate txt-primary">{{ headline }}</div>
-          <div
-            v-if="activity"
-            :key="activity.title + activity.detail"
-            class="text-sm txt-secondary mt-0.5 truncate processing-enter"
-            :title="activity.detail"
-            data-testid="text-research-activity"
+      <div
+        class="flex items-center gap-3 min-w-0"
+        role="status"
+        data-testid="research-turn-working"
+      >
+        <ResearchSpinner class="w-5 h-5" />
+        <div class="flex-1 min-w-0 flex items-baseline gap-2">
+          <span class="font-medium txt-primary truncate">{{ headline }}</span>
+          <span
+            v-if="stepOf"
+            class="text-xs txt-tertiary flex-shrink-0"
+            data-testid="text-research-step-of"
+            >{{ stepOf }}</span
           >
-            {{ activity.title }}<span v-if="activity.detail"> · {{ activity.detail }}</span>
-          </div>
+          <span
+            v-if="elapsed"
+            class="ml-auto text-xs tabular-nums txt-tertiary flex-shrink-0"
+            data-testid="text-research-elapsed"
+            aria-hidden="true"
+            >{{ elapsed }}</span
+          >
         </div>
       </div>
+      <ResearchPhases :progress="progress" />
     </template>
 
-    <button
-      v-if="progress.steps.length > 0 || !running"
-      type="button"
-      class="btn-secondary px-2 py-1 rounded-xl text-xs font-medium inline-flex items-center gap-2 self-start max-w-full"
-      :aria-expanded="open"
-      data-testid="btn-research-steps"
-      @click="open = !open"
-    >
-      <CheckCircleIcon
-        v-if="!running"
-        class="w-3.5 h-3.5 txt-brand flex-shrink-0"
-        aria-hidden="true"
-      />
-      <span class="truncate" data-testid="text-research-summary">{{ summary }}</span>
-      <ChevronDownIcon
-        class="w-3 h-3 transition-transform flex-shrink-0"
-        :class="{ 'rotate-180': open }"
-        aria-hidden="true"
-      />
-    </button>
-    <ResearchSteps v-if="open" :steps="progress.steps" :points="progress.points" />
+    <template v-else>
+      <button
+        type="button"
+        class="btn-secondary px-2 py-1 rounded-xl text-xs font-medium inline-flex items-center gap-2 self-start max-w-full"
+        :aria-expanded="open"
+        data-testid="btn-research-steps"
+        @click="open = !open"
+      >
+        <CheckCircleIcon class="w-3.5 h-3.5 txt-brand flex-shrink-0" aria-hidden="true" />
+        <span class="truncate" data-testid="text-research-summary">{{ summary }}</span>
+        <ChevronDownIcon
+          class="w-3 h-3 transition-transform flex-shrink-0"
+          :class="{ 'rotate-180': open }"
+          aria-hidden="true"
+        />
+      </button>
+      <ResearchPhases v-if="open" :progress="progress" class="processing-enter" />
+    </template>
 
     <div v-if="running" class="flex flex-col gap-2 pt-1">
       <div class="flex flex-wrap items-center gap-2">
@@ -91,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CheckCircleIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { useChatsStore } from '@/stores/chats'
@@ -99,21 +86,24 @@ import { useResearchStore } from '@/stores/research'
 import { fetchResearchEvents } from '@/services/api/researchApi'
 import {
   applyResearchSse,
-  currentStep,
   emptyProgress,
   isTerminalStatus,
   sourceCounts,
   type ResearchProgress,
 } from '@/services/chat/stream/handlers/research'
-import ResearchSteps from './ResearchSteps.vue'
-import { researchStepCopy } from './researchStepCopy'
+import { progressNarrationSwitches } from '@/utils/progressNarrationConfig'
+import ResearchPhases from './ResearchPhases.vue'
+import ResearchSpinner from './ResearchSpinner.vue'
+import { formatElapsed, researchPhases } from './researchPhases'
 
 /**
  * The research inside the reply bubble. While the run works the bubble
- * shows a spinner, the last thing the run did and a fold with every step
- * so far, plus Answer now. Stop is the composer's send button. Once the
- * run is done the report is the bubble's text and one muted line stays
- * below it — open it to see what the research actually did.
+ * shows a headline with the phase it is in and how long it has been going,
+ * then the phases: the finished ones folded to a line each, the current one
+ * open with what it does right now, the coming ones muted. Answer now is
+ * under it; Stop is the composer's send button. Once the run is done the
+ * report is the bubble's text and one muted line stays below it — open it
+ * to see the phases again, each one unfolding on a click.
  *
  * A run the store follows is read live. Any other (a reload, an old chat)
  * is rebuilt once from its recorded events; one still running is then
@@ -123,12 +113,16 @@ const props = defineProps<{
   runId: string
 }>()
 
+const TICK_MS = 1000
+
 const { t } = useI18n()
 const research = useResearchStore()
 const chats = useChatsStore()
 
 const open = ref(false)
 const recorded = ref<ResearchProgress | null>(null)
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | null = null
 
 const live = computed(() =>
   research.progress && research.progress.id === props.runId ? research.progress : null
@@ -145,12 +139,6 @@ const counts = computed(() =>
   progress.value ? sourceCounts(progress.value) : { found: 0, read: 0, blocked: 0 }
 )
 
-const activity = computed(() => {
-  const current = progress.value
-  const step = current ? currentStep(current) : null
-  return step && current ? researchStepCopy(t, step, current.points) : null
-})
-
 const headline = computed(() => {
   const current = progress.value
   if (!current) return ''
@@ -158,6 +146,24 @@ const headline = computed(() => {
     return t('research.queued', { seconds: current.queuedSeconds })
   }
   return t('research.turn.working')
+})
+
+/** "Step 3 of 5": where the run is on its road. */
+const stepOf = computed(() => {
+  const current = progress.value
+  if (!current || !running.value) return ''
+  const phases = researchPhases(current)
+  const index = phases.findIndex((phase) => phase.state === 'active')
+  if (index < 0) return ''
+  return t('research.turn.stepOf', { n: index + 1, total: phases.length })
+})
+
+/** How long the run has been going; an admin switch hides timings altogether. */
+const elapsed = computed(() => {
+  const current = progress.value
+  if (!current || !running.value || current.startedAt === null) return ''
+  if (!progressNarrationSwitches().timings) return ''
+  return formatElapsed(now.value - current.startedAt)
 })
 
 const summary = computed(() => {
@@ -181,6 +187,27 @@ const answerNowConsequence = computed(() => {
   if (counts.value.read > 0) return t('research.answerNowConsequence.reading')
   return t('research.answerNowConsequence.early')
 })
+
+watch(
+  running,
+  (isRunning) => {
+    stopTicker()
+    if (!isRunning) return
+    now.value = Date.now()
+    ticker = setInterval(() => {
+      now.value = Date.now()
+    }, TICK_MS)
+  },
+  { immediate: true }
+)
+
+onUnmounted(stopTicker)
+
+function stopTicker(): void {
+  if (ticker === null) return
+  clearInterval(ticker)
+  ticker = null
+}
 
 watch(
   () => props.runId,

@@ -267,28 +267,57 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await chat.startNewChat()
     await chat.sendMessage(QUESTION)
 
-    // While the run works the reply shows the run, not the fallback sentence.
+    // While the run works the reply shows the run as phases, not the fallback
+    // sentence: the planning folded to a line, searching open with the thing
+    // happening now, writing and checking still to come. The stub sends no
+    // brief, so the run has four phases and is in the second.
     const bubble = chat.conversationBubbles().last()
     const turn = bubble.locator(selectors.research.turn)
     await expect(turn).toBeVisible()
     await expect(bubble.locator(selectors.research.working)).toContainText('Researching')
+    await expect(bubble.locator(selectors.research.stepOf)).toContainText('Step 2 of 4')
+    await expect(bubble.locator(selectors.research.phase('plan'))).toHaveAttribute(
+      'data-state',
+      'done'
+    )
+    await expect(
+      bubble.locator(selectors.research.phase('plan')).locator(selectors.research.phaseSummary)
+    ).toContainText('1 point')
+    await expect(bubble.locator(selectors.research.phase('gather'))).toHaveAttribute(
+      'data-state',
+      'active'
+    )
     await expect(bubble.locator(selectors.research.activity)).toContainText('Embassy notice')
+    await expect(bubble.locator(selectors.research.phase('write'))).toHaveAttribute(
+      'data-state',
+      'upcoming'
+    )
     await expect(bubble).not.toContainText('about 6 minutes')
     await expect(page.locator(selectors.research.answerNow)).toBeVisible()
 
     // Once it is done, the report is the reply and one line stays below it.
+    // Opening it lists the phases folded; each unfolds on a click.
     const done = chat.conversationBubbles().last().locator(selectors.research.turn)
     await expect(done).toHaveAttribute('data-status', 'complete')
     await expect(chat.conversationBubbles().last()).toContainText(ANSWER)
     await expect(done.locator(selectors.research.summary)).toContainText('sources read')
     await expect(page.locator(selectors.research.answerNow)).toHaveCount(0)
     await done.locator(selectors.research.stepsToggle).click()
-    const steps = done.locator(selectors.research.steps)
+    await expect(done.locator(selectors.research.phase('write'))).toHaveCount(0)
+    const gather = done.locator(selectors.research.phase('gather'))
+    await expect(gather.locator(selectors.research.phaseSummary)).toContainText('1 source read')
+    await expect(gather.locator(selectors.research.steps)).toHaveCount(0)
+    await gather.locator(selectors.research.phaseToggle).click()
+    const steps = gather.locator(selectors.research.steps)
     await expect(steps).toContainText('japan tourist visa')
     await expect(steps).toContainText('Embassy notice')
-    await expect(steps).toContainText('3/4')
-    await expect(steps).toContainText('1 left out of the answer')
-    await expect(steps).toContainText('same provider')
+    const check = done.locator(selectors.research.phase('check'))
+    await expect(check.locator(selectors.research.phaseSummary)).toContainText('3/4')
+    await expect(check.locator(selectors.research.phaseSummary)).toContainText(
+      '1 left out of the answer'
+    )
+    await check.locator(selectors.research.phaseToggle).click()
+    await expect(check.locator(selectors.research.steps)).toContainText('same provider')
 
     // The citation is a numbered badge that leads to the source card, and the
     // fold replaces the "Web Search" badge.

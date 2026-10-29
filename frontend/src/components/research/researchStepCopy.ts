@@ -25,18 +25,24 @@ export function researchStepCopy(
       return { title: t('research.step.plan', { count: Number(step.text) || 0 }), detail: '' }
     case 'search':
       return {
-        title: t(step.status === 'files' ? 'research.step.searchFiles' : 'research.step.search'),
-        detail: step.text,
+        title: t(searchTitle(step.status)),
+        detail: joinDetail(
+          step.text,
+          step.count === undefined ? '' : t('research.step.searchResults', { count: step.count })
+        ),
       }
     case 'source':
-      return { title: t(`research.step.source.${sourceStatus(step.status)}`), detail: step.text }
+      return {
+        title: t(`research.step.source.${sourceStatus(step.status)}`),
+        detail: joinDetail(step.text, step.status === 'blocked' ? (step.note ?? '') : ''),
+      }
     case 'point':
       return {
         title: t(`research.step.point.${pointStatus(step.status)}`),
         detail: step.text || (points.find((point) => point.id === step.ref)?.title ?? ''),
       }
     case 'round':
-      return { title: t('research.step.round', { round: step.text }), detail: '' }
+      return { title: t(roundTitle(step.status), { round: step.text }), detail: '' }
     case 'writing':
       return { title: t('research.step.writing'), detail: step.text }
     case 'section':
@@ -73,8 +79,25 @@ function checkDetail(t: Translate, step: ResearchStep): string {
   return parts.join(' ')
 }
 
-function sourceStatus(status: string | null): 'read' | 'blocked' | 'found' {
-  return status === 'read' || status === 'blocked' ? status : 'found'
+function joinDetail(first: string, second: string): string {
+  return [first, second].filter((part) => part !== '').join(' · ')
+}
+
+function searchTitle(status: string | null): string {
+  if (status === 'skipped') return 'research.step.searchSkipped'
+  return status === 'files' ? 'research.step.searchFiles' : 'research.step.search'
+}
+
+/** What the run decided at the end of a round: look again, write, or wait for the person. */
+function roundTitle(next: string | null): string {
+  if (next === 'round') return 'research.step.roundAgain'
+  if (next === 'write') return 'research.step.roundWrite'
+  if (next === 'wait_answer') return 'research.step.roundWait'
+  return 'research.step.round'
+}
+
+function sourceStatus(status: string | null): 'reading' | 'read' | 'blocked' | 'found' {
+  return status === 'reading' || status === 'read' || status === 'blocked' ? status : 'found'
 }
 
 function pointStatus(status: string | null): 'answered' | 'not_confirmed' | 'open' {

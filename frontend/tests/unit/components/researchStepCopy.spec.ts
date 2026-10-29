@@ -24,6 +24,44 @@ describe('researchStepCopy', () => {
     )
   })
 
+  it('names the decision a round ended with', () => {
+    const again = researchStepCopy(
+      t,
+      { kind: 'round', text: '2/4', status: 'round', ref: null },
+      []
+    )
+    const write = researchStepCopy(
+      t,
+      { kind: 'round', text: '3/4', status: 'write', ref: null },
+      []
+    )
+
+    expect(again.title).toBe('research.step.roundAgain:{"round":"2/4"}')
+    expect(write.title).toBe('research.step.roundWrite:{"round":"3/4"}')
+  })
+
+  it('quotes how many results a search returned and why a source could not be read', () => {
+    const search = researchStepCopy(
+      t,
+      { kind: 'search', text: 'japan visa', status: 'web', ref: null, count: 8 },
+      []
+    )
+    const blocked = researchStepCopy(
+      t,
+      { kind: 'source', text: 'Old forum', status: 'blocked', ref: 's2', note: 'No text.' },
+      []
+    )
+    const skipped = researchStepCopy(
+      t,
+      { kind: 'search', text: 'japan visa fees', status: 'skipped', ref: null },
+      []
+    )
+
+    expect(search.detail).toBe('japan visa · research.step.searchResults:{"count":8}')
+    expect(blocked.detail).toBe('Old forum · No text.')
+    expect(skipped.title).toBe('research.step.searchSkipped')
+  })
+
   it('says nothing more when every statement stayed', () => {
     const copy = researchStepCopy(
       t,

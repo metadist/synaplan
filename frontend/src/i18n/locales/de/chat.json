@@ -1157,6 +1157,7 @@
     "lookDeeper": "Gründlicher nachsehen",
     "turn": {
       "working": "Recherchiere…",
+      "stepOf": "Schritt {n} von {total}",
       "stepsSoFar": "Bisher {steps} Schritte · {sources} Quellen gelesen",
       "summary": {
         "complete": "Recherchiert: {steps} Schritte · {sources} Quellen gelesen",
@@ -1164,13 +1165,30 @@
         "failed": "Recherche konnte nicht abgeschlossen werden"
       }
     },
+    "phase": {
+      "understand": "Frage verstehen",
+      "plan": "Antwort planen",
+      "gather": "Suchen und lesen",
+      "write": "Antwort schreiben",
+      "check": "Jede Aussage prüfen",
+      "points": "{count} Punkt | {count} Punkte",
+      "answered": "{count} beantwortet",
+      "searches": "{count} Suche | {count} Suchen",
+      "sourcesRead": "{count} Quelle gelesen | {count} Quellen gelesen",
+      "gatherBlocked": "{count} nicht öffenbar",
+      "sectionsWritten": "{count} Abschnitt geschrieben | {count} Abschnitte geschrieben",
+      "earlier": "{count} früheren Schritt anzeigen | {count} frühere Schritte anzeigen"
+    },
     "step": {
       "brief": "Frage verstanden",
       "plan": "{count} Punkte geplant",
       "search": "Gesucht",
       "searchFiles": "In den Dateien gesucht",
+      "searchSkipped": "Suche nicht aufgenommen — dieser Teil hat schon genug",
+      "searchResults": "{count} Treffer",
       "source": {
         "found": "Gefunden",
+        "reading": "Lese",
         "read": "Gelesen",
         "blocked": "Nicht öffenbar"
       },
@@ -1180,6 +1198,9 @@
         "open": "Offen"
       },
       "round": "Runde {round}",
+      "roundAgain": "Noch nicht genug — schaue weiter (Runde {round})",
+      "roundWrite": "Genug gefunden — schreibe die Antwort",
+      "roundWait": "Warte auf deine Antwort",
       "writing": "Schreibe",
       "section": "Geschrieben",
       "checking": "Prüfe jede Aussage",
