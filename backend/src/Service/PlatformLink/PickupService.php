@@ -28,6 +28,7 @@ final readonly class PickupService
 {
     private const TICKET_PREFIX = 'pickup:ticket:';
     private const UPLOAD_PREFIX = 'pickup:upload:';
+    private const DECISION_PREFIX = 'pickup:decision:';
     private const TTL = 600;
     private const HOUR_LIMIT = 20;
     /** Longer than the ticket and the run's wait together. */
@@ -136,61 +137,42 @@ final readonly class PickupService
     public function listing(PlatformInstance $instance, int $id, array $items): array
     {
         $pickup = $this->requireClaimed($instance, $id);
+        $known = $this->acceptedDecisions($id);
         $upload = [];
+        $reserve = [];
         $reuse = [];
         $skip = [];
-        $names = [];
-        $namesOnly = CloudPickup::MODE_LIST === $pickup->getMode();
+        $recordSkip = [];
+        $emitted = [];
         foreach (array_slice($items, 0, 500) as $item) {
-            if (!is_array($item) || !is_string($item['id'] ?? null)) {
+            $row = $this->listingRow($item);
+            if (null === $row || isset($emitted[$row['id']])) {
                 continue;
             }
-            $remoteId = $item['id'];
-            $version = is_string($item['version'] ?? null) ? $item['version'] : '';
-            $size = is_numeric($item['size'] ?? null) ? (int) $item['size'] : 0;
-            $name = is_string($item['name'] ?? null) ? $item['name'] : '';
-            if (strlen($remoteId) > 255 || strlen($version) > 255) {
+            $emitted[$row['id']] = true;
+            $prior = $known[$row['id']] ?? null;
+            if (is_array($prior)) {
+                $this->repeatDecision($prior, $row['id'], $upload, $reuse, $skip);
                 continue;
             }
-            $names[$remoteId] = $name;
-            if (!$this->nameMatches($pickup, $name)) {
-                $skip[] = ['id' => $remoteId, 'reason' => 'type_not_read'];
-                continue;
+            $decision = $this->decideListing($pickup, $instance, $row);
+            $known[$row['id']] = $decision;
+            $this->repeatDecision($decision, $row['id'], $upload, $reuse, $skip);
+            if ('upload' === $decision['outcome']) {
+                $reserve[$row['id']] = $row['size'];
             }
-            if ($namesOnly) {
-                $pickup->rememberName($name);
-                continue;
+            $reason = $decision['reason'] ?? null;
+            if ('skip' === $decision['outcome'] && is_string($reason)) {
+                $recordSkip[] = ['id' => $row['id'], 'name' => $row['name'], 'reason' => $reason];
             }
-            if ($size > self::MAX_FILE_BYTES) {
-                $skip[] = ['id' => $remoteId, 'reason' => 'too_large'];
-                continue;
-            }
-            if ($pickup->acceptCount() >= self::MAX_FILES || $pickup->acceptBytes() + $size > self::MAX_BYTES) {
-                $skip[] = ['id' => $remoteId, 'reason' => 'over_limit'];
-                continue;
-            }
-            $reuseId = $this->reusable($pickup, $instance, $remoteId, $version);
-            if (null !== $reuseId) {
-                $reuse[] = ['id' => $remoteId, 'file_id' => $reuseId];
-                $pickup->rememberFile($reuseId);
-                $pickup->rememberName($name);
-                $pickup->addAccepted(1, $size);
-                continue;
-            }
-            $upload[$remoteId] = $size;
-            $pickup->rememberName($name);
-            $pickup->addAccepted(1, $size);
         }
         $pickup->addListed(count($items));
-        $pickup->addSkipped(array_map(
-            static fn (array $row): array => ['id' => $row['id'], 'name' => $names[$row['id']] ?? '', 'reason' => $row['reason']],
-            $skip,
-        ));
+        $pickup->addSkipped($recordSkip);
         $this->pickups->save($pickup);
-        $this->rememberUploads($id, $upload);
+        $this->rememberUploads($id, $reserve);
+        $this->rememberDecisions($id, $known);
 
-        // Numeric remote ids (Nextcloud file ids) became integer keys above.
-        return ['upload' => array_map('strval', array_keys($upload)), 'reuse' => $reuse, 'skip' => $skip];
+        return ['upload' => array_map('strval', $upload), 'reuse' => $reuse, 'skip' => $skip];
     }
 
     public function storeFile(PlatformInstance $instance, int $id, string $remoteId, string $version, string $bytes, string $name, string $mime): int
@@ -501,6 +483,121 @@ final readonly class PickupService
     }
 
     /**
+     * @return array{id: string, version: string, size: int, name: string}|null
+     */
+    private function listingRow(mixed $item): ?array
+    {
+        if (!is_array($item) || !is_string($item['id'] ?? null)) {
+            return null;
+        }
+        $remoteId = $item['id'];
+        $version = is_string($item['version'] ?? null) ? $item['version'] : '';
+        if (strlen($remoteId) > 255 || strlen($version) > 255) {
+            return null;
+        }
+
+        return [
+            'id' => $remoteId,
+            'version' => $version,
+            'size' => is_numeric($item['size'] ?? null) ? (int) $item['size'] : 0,
+            'name' => is_string($item['name'] ?? null) ? $item['name'] : '',
+        ];
+    }
+
+    /**
+     * @param array{id: string, version: string, size: int, name: string} $row
+     *
+     * @return array{outcome: string, file_id?: int, reason?: string}
+     */
+    private function decideListing(CloudPickup $pickup, PlatformInstance $instance, array $row): array
+    {
+        if (!$this->nameMatches($pickup, $row['name'])) {
+            return ['outcome' => 'skip', 'reason' => 'type_not_read'];
+        }
+        if (CloudPickup::MODE_LIST === $pickup->getMode()) {
+            $pickup->rememberName($row['name']);
+
+            return ['outcome' => 'name'];
+        }
+        if ($row['size'] > self::MAX_FILE_BYTES) {
+            return ['outcome' => 'skip', 'reason' => 'too_large'];
+        }
+        if ($pickup->acceptCount() >= self::MAX_FILES || $pickup->acceptBytes() + $row['size'] > self::MAX_BYTES) {
+            return ['outcome' => 'skip', 'reason' => 'over_limit'];
+        }
+        $reuseId = $this->reusable($pickup, $instance, $row['id'], $row['version']);
+        if (null !== $reuseId) {
+            $pickup->rememberFile($reuseId);
+            $pickup->rememberName($row['name']);
+            $pickup->addAccepted(1, $row['size']);
+
+            return ['outcome' => 'reuse', 'file_id' => $reuseId];
+        }
+        $pickup->rememberName($row['name']);
+        $pickup->addAccepted(1, $row['size']);
+
+        return ['outcome' => 'upload'];
+    }
+
+    /**
+     * @param array<string, mixed>                    $decision
+     * @param list<string>                            $upload
+     * @param list<array{id: string, file_id: int}>   $reuse
+     * @param list<array{id: string, reason: string}> $skip
+     */
+    private function repeatDecision(array $decision, string $remoteId, array &$upload, array &$reuse, array &$skip): void
+    {
+        $outcome = $decision['outcome'] ?? '';
+        if ('upload' === $outcome) {
+            $upload[] = $remoteId;
+
+            return;
+        }
+        $fileId = $decision['file_id'] ?? null;
+        if ('reuse' === $outcome && is_numeric($fileId)) {
+            $reuse[] = ['id' => $remoteId, 'file_id' => (int) $fileId];
+
+            return;
+        }
+        $reason = $decision['reason'] ?? null;
+        if ('skip' === $outcome && is_string($reason)) {
+            $skip[] = ['id' => $remoteId, 'reason' => $reason];
+        }
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function acceptedDecisions(int $id): array
+    {
+        $decoded = json_decode((string) $this->redis->get(self::DECISION_PREFIX.$id), true);
+        if (!is_array($decoded) || array_is_list($decoded)) {
+            return [];
+        }
+        $decisions = [];
+        foreach ($decoded as $remoteId => $decision) {
+            if (!is_array($decision)) {
+                continue;
+            }
+            $outcome = $decision['outcome'] ?? null;
+            if (!is_string($outcome)) {
+                continue;
+            }
+            $decisions[(string) $remoteId] = $decision;
+        }
+
+        return $decisions;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $decisions
+     */
+    private function rememberDecisions(int $id, array $decisions): void
+    {
+        $this->redis->set(self::DECISION_PREFIX.$id, json_encode($decisions, JSON_THROW_ON_ERROR), self::TTL);
+    }
+
+    /**
      * @param array<string, int> $upload remote id => reserved size
      */
     private function rememberUploads(int $id, array $upload): void
@@ -509,8 +606,9 @@ final readonly class PickupService
         $map = [];
         if (is_array($known) && !array_is_list($known)) {
             foreach ($known as $remoteId => $size) {
-                if (is_string($remoteId) && is_numeric($size)) {
-                    $map[$remoteId] = (int) $size;
+                // A numeric remote id (a Nextcloud file id) is an int key after JSON.
+                if (is_numeric($size)) {
+                    $map[(string) $remoteId] = (int) $size;
                 }
             }
         }

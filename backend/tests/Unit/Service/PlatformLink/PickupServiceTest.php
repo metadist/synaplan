@@ -368,11 +368,15 @@ final class PickupServiceTest extends TestCase
         $pickups = $this->createStub(CloudPickupRepository::class);
         $pickups->method('find')->willReturn($pickup);
 
-        $answer = $this->service($pickups)->listing($this->instance(), 3, [
-            ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
-        ]);
+        $store = [];
+        $service = $this->service($pickups, redis: $this->memoryRedis($store));
+        $items = [['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10]];
 
-        self::assertSame([], $answer['upload']);
+        $first = $service->listing($this->instance(), 3, $items);
+        $second = $service->listing($this->instance(), 3, $items);
+
+        self::assertSame($first, $second);
+        self::assertSame([], $first['upload']);
         self::assertSame(['a.pdf'], $pickup->names());
     }
 
@@ -389,6 +393,87 @@ final class PickupServiceTest extends TestCase
         ]);
 
         self::assertSame([['id' => 'remote-9', 'reason' => 'over_limit']], $answer['skip']);
+    }
+
+    public function testARepeatedListingDoesNotSpendTheLimitTwice(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $store = [];
+        $redis = $this->memoryRedis($store);
+        $service = $this->service($pickups, redis: $redis);
+        $two = [
+            ['id' => '1027191588', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+            ['id' => 'remote-2', 'version' => 'v1', 'name' => 'b.pdf', 'size' => 20],
+            ['id' => 'big', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
+        ];
+
+        $first = $service->listing($this->instance(), 3, $two);
+        $second = $service->listing($this->instance(), 3, $two);
+
+        self::assertSame(['1027191588', 'remote-2'], $first['upload']);
+        self::assertSame([['id' => 'big', 'reason' => 'too_large']], $first['skip']);
+        self::assertSame($first, $second);
+        self::assertSame(2, $pickup->acceptCount());
+        self::assertSame(30, $pickup->acceptBytes());
+        self::assertSame([['id' => 'big', 'name' => 'big.pdf', 'reason' => 'too_large']], $pickup->skipped());
+        self::assertSame(['a.pdf', 'b.pdf'], $pickup->names());
+        $reserved = json_decode($store['pickup:upload:3'] ?? '', true);
+        self::assertSame(10, $reserved['1027191588'] ?? null);
+        self::assertSame(20, $reserved['remote-2'] ?? null);
+
+        $third = $service->listing($this->instance(), 3, [
+            ...$two,
+            ['id' => 'remote-3', 'version' => 'v1', 'name' => 'c.pdf', 'size' => 5],
+        ]);
+
+        self::assertSame(['1027191588', 'remote-2', 'remote-3'], $third['upload']);
+        self::assertSame([['id' => 'big', 'reason' => 'too_large']], $third['skip']);
+        self::assertSame(3, $pickup->acceptCount());
+        self::assertSame(35, $pickup->acceptBytes());
+        self::assertSame(['a.pdf', 'b.pdf', 'c.pdf'], $pickup->names());
+        self::assertCount(1, $pickup->skipped());
+
+        $duplicate = $service->listing($this->instance(), 3, [
+            ['id' => 'remote-3', 'version' => 'v1', 'name' => 'c.pdf', 'size' => 5],
+            ['id' => 'remote-3', 'version' => 'v1', 'name' => 'c.pdf', 'size' => 5],
+        ]);
+
+        self::assertSame(['remote-3'], $duplicate['upload']);
+        self::assertSame(3, $pickup->acceptCount());
+        self::assertSame(35, $pickup->acceptBytes());
+    }
+
+    public function testARepeatedReuseReturnsTheSameFileWithoutSpendingAgain(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $heldRow = new CloudPickupFile(7, 'pi_abc', 'remote-1', 'v1', 99);
+        $held = $this->createStub(CloudPickupFileRepository::class);
+        $held->method('findHeld')->willReturn($heldRow);
+        $file = (new File())->setFilePath('07/a.pdf');
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('find')->willReturn($file);
+        $storage = $this->createStub(FileStorageService::class);
+        $storage->method('fileExists')->willReturn(true);
+        $store = [];
+        $service = $this->service($pickups, held: $held, storage: $storage, em: $em, redis: $this->memoryRedis($store));
+        $items = [['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10]];
+
+        $first = $service->listing($this->instance(), 3, $items);
+        $second = $service->listing($this->instance(), 3, $items);
+
+        self::assertSame([['id' => 'remote-1', 'file_id' => 99]], $first['reuse']);
+        self::assertSame($first, $second);
+        self::assertSame([], $first['upload']);
+        self::assertSame(1, $pickup->acceptCount());
+        self::assertSame(10, $pickup->acceptBytes());
+        self::assertSame([99], $pickup->fileIds());
+        self::assertSame(['a.pdf'], $pickup->names());
     }
 
     public function testAMissingWorkingCopyIsUploadedAgain(): void
@@ -504,6 +589,24 @@ final class PickupServiceTest extends TestCase
         );
 
         return $pickups;
+    }
+
+    /**
+     * @param array<string, string> $store
+     */
+    private function memoryRedis(array &$store): RedisService
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('get')->willReturnCallback(static function (string $key) use (&$store): ?string {
+            return $store[$key] ?? null;
+        });
+        $redis->method('set')->willReturnCallback(static function (string $key, string $value, ?int $ttl = null) use (&$store): bool {
+            $store[$key] = $value;
+
+            return true;
+        });
+
+        return $redis;
     }
 
     private function links(bool $enabled = true): PlatformLinksConfig
