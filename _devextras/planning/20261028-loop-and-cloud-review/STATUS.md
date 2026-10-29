@@ -1,7 +1,9 @@
 # Status — loop and cloud-file review
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry
-here, not a chat message. §0 is not ticked. No fix starts until it is.
+here, not a chat message. §0 is ticked on
+[#2860](https://github.com/metadist/synaplan/pull/2860). This branch is
+from `main` and does not repeat that tick.
 
 | Step | State | Note |
 | ---- | ----- | ---- |
@@ -11,7 +13,7 @@ here, not a chat message. §0 is not ticked. No fix starts until it is.
 | RV3 | planned | Messages stream must release before every provider stream, including one with no server tools. Live today |
 | RV4 | planned | Pickup copy leaves `BSOURCEINSTANCE` null. Live where platform links are on |
 | RV5 | planned | A repeated listing spends the file limit again. Live, same |
-| RV6 | planned | `delivered` needs a recorded download, and a claimed row must expire. Live, same |
+| RV6 | in review | [#2862](https://github.com/metadist/synaplan/pull/2862). A copy counts as sent only after the download. A claimed row expires unconfirmed. Live, same |
 | RV7 | planned | Regression lock: do not mark an inbound watch upload as an own write. Before `cloud_files` |
 | RV8 | planned | Calls in one step whose waits sum past the lease pay the step twice. Waits on `RESEARCH.ENABLED` |
 
@@ -49,3 +51,10 @@ Two findings on the corrected plan, both accepted. No product code.
 
 - RV3 also releases on the direct stream. `tool_loop` is false when the catalog is empty, and `executeStream()` then calls `stream()` without entering `GatewayToolLoop`. The test includes a request with no server-side tools.
 - RV8 bounds the whole step, not each call on its own. `CheckStage` makes one call per batch, `StageCall::once()` can retry, and the worker checkpoints only after the step returns. Two waits that each fit under 240 seconds can still outlast the lease. The deadline is the time left on the claim, or the worker renews before every call in the step.
+
+## 2026-10-29 — RV6
+
+A copy counts as sent only after the cloud downloaded the file. A claim
+hands out the download and stays pending. A claimed row with no result
+expires with the same unconfirmed sentence as a queued one. RV6 is
+[#2862](https://github.com/metadist/synaplan/pull/2862).
