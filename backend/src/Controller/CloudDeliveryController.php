@@ -76,6 +76,7 @@ final class CloudDeliveryController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 200, description: 'File bytes'),
+            new OA\Response(response: 405, description: 'A header-only request cannot take the file'),
             new OA\Response(response: 410, description: 'Ticket already used or unknown'),
         ]
     )]
@@ -83,7 +84,12 @@ final class CloudDeliveryController extends AbstractController
     {
         $this->guard();
         try {
-            $file = $this->deliveries->download($this->instance($request), $id, (string) $request->query->get('ticket', ''));
+            $file = $this->deliveries->download(
+                $this->instance($request),
+                $id,
+                (string) $request->query->get('ticket', ''),
+                $request->isMethod('GET'),
+            );
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
