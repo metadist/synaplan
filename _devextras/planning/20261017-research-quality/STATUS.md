@@ -1,5 +1,15 @@
 # Research quality — status
 
+> **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
+> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> Do not turn `RESEARCH.ENABLED` on until RV1 and RV8 are merged.
+> RV8 keeps one paid attempt when the calls in one step, together,
+> run longer than the lease (240 seconds). A per-call cap that
+> ignores the calls already made is not enough, and renewing only
+> before the first call is not enough.
+> OpenAI `/v1/chat/completions` parity stays on this track (RS2, RS3)
+> and becomes one loop on row 22 (AU24), not a third loop.
+
 Every result here names the command, the versions and the stack it came from.
 Quality, cost and latency numbers come only from `app:research:eval` or the
 desktop use-case runner (`06_evaluation.md` §6). A walk is a dated entry, not a
@@ -40,7 +50,7 @@ chat message.
 
 ---
 
-## 2026-10-28 — §0 #5 and #15 superseded by adaptive research (row 31)
+## 2026-10-28 — §0 #5 and #15 superseded by adaptive research (row 32)
 
 **Superseded, 2026-10-28:** §0 #5 (people choose Standard or Thorough) and
 #15 (the Research chip on Desktop) are replaced by

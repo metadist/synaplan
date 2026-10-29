@@ -8,7 +8,7 @@ chat message.
 
 | Step | State | Note |
 | ---- | ----- | ---- |
-| AR0 | done | Plan written 2026-10-28; registered as roadmap row 31. §0 unticked. No code. |
+| AR0 | done | Plan written 2026-10-28; registered as roadmap row 32 (`main` already uses row 31 for the loop and cloud-file review). §0 unticked. No code. |
 | AR1 | done | 2026-10-28. `BEFFORT` / `BEFFORT_WHY` in `tools:sort`; router corpus and `app:research:router-eval`; gate passed (entry below) |
 | AR2 | done | 2026-10-28. Depth `auto` with the ceiling from the plan, `hint`, `answer_now`, `RESEARCH.AUTO_ENABLED`, `TOOL_MODE_MODELS` seeded (`Version20261028120000`) |
 | AR3 | done | 2026-10-28. Gate in `MessageProcessor`, notice, `research_started`, card on the message, Answer now, Look deeper, limit sentences; Tools → Research and `ResearchComposer.vue` removed; J-AR-1 walked (entry below) |

@@ -8,7 +8,7 @@
 # are omitted to save ~2 GB of images and RAM. Same volume names as compose.yaml,
 # so switching between compose.lite.yaml and compose.yaml keeps every chat and file.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.6.0}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.6.2}
 
 x-app-command: &app-command
   - |
@@ -27,7 +27,7 @@ x-app-environment: &app-environment
   FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
   FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: lite
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.6.0}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.6.2}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000} http://localhost:${SYNAPLAN_HTTP_PORT:-8000}}
@@ -390,7 +390,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: mariadb:13.0.2@sha256:0e4bb0f339feba125d1154fbacd36c16ec8518f52e44e1f82ecec7d6771caf39
+    image: mariadb:13.0.2@sha256:f4054da26e3a9dd6c8b5cc97363e544408b15c0fb369d7359c25dc04826eb6e1
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
@@ -416,7 +416,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    image: redis:7.4-alpine@sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis:/data

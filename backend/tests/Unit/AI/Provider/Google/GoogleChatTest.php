@@ -48,6 +48,54 @@ final class GoogleChatTest extends TestCase
         self::assertSame(['thinkingBudget' => 512], $this->requests()[0]['body']['generationConfig']['thinkingConfig']);
     }
 
+    public function testArgonDropsSamplingAndBillsThinkingTokens(): void
+    {
+        $chat = $this->chat([self::json([
+            'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => [
+                'promptTokenCount' => 10,
+                'candidatesTokenCount' => 4,
+                'thoughtsTokenCount' => 6,
+                'cachedContentTokenCount' => 3,
+            ],
+        ])]);
+
+        $result = $chat->chat([['role' => 'user', 'content' => 'Hi']], [
+            'model' => 'gemini-4-argon',
+            'temperature' => 0.1,
+            'thinking_budget' => 2048,
+        ]);
+
+        $request = $this->requests()[0];
+        $config = $request['body']['generationConfig'];
+        self::assertArrayNotHasKey('thinkingConfig', $config);
+        self::assertArrayNotHasKey('temperature', $config);
+        self::assertArrayNotHasKey('topP', $config);
+        self::assertArrayNotHasKey('topK', $config);
+        self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
+        self::assertSame([10, 3, 20], [$result['usage']['completion_tokens'], $result['usage']['cached_tokens'], $result['usage']['total_tokens']]);
+    }
+
+    public function testArgonMapsEffortOffToTheLowestThinkingLevel(): void
+    {
+        $chunk = static fn (array $data): string => 'data: '.json_encode($data)."\r\n\r\n";
+        $chat = $this->chat([new MockResponse([
+            $chunk([
+                'candidates' => [['content' => ['parts' => [['text' => 'Done.']]], 'finishReason' => 'STOP']],
+                'usageMetadata' => ['promptTokenCount' => 1000, 'candidatesTokenCount' => 20, 'thoughtsTokenCount' => 80, 'cachedContentTokenCount' => 200],
+            ]),
+        ])]);
+
+        $result = $chat->chatStream([['role' => 'user', 'content' => 'Hi']], static function (mixed $event): void {
+        }, ['model' => 'gemini-4-argon', 'reasoning_effort' => 'off', 'temperature' => 0.2, 'thinking_budget' => 0]);
+
+        $config = $this->requests()[0]['body']['generationConfig'];
+        self::assertSame(['thinkingLevel' => 'low'], $config['thinkingConfig']);
+        self::assertArrayNotHasKey('temperature', $config);
+        self::assertEqualsWithDelta(900, (float) $this->requests()[0]['timeout'], 0.001);
+        self::assertSame([100, 200, 1100], [$result['usage']['completion_tokens'], $result['usage']['cached_tokens'], $result['usage']['total_tokens']]);
+    }
+
     /**
      * @param list<MockResponse> $responses
      */

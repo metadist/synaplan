@@ -1,6 +1,6 @@
 name: synaplan
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:5.6.0
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.6.2
 
 x-app-command: &app-command
   - |
@@ -19,7 +19,7 @@ x-app-environment: &app-environment
   FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
   FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: selfhost
-  APP_VERSION: "5.6.0"
+  APP_VERSION: "5.6.2"
   APP_URL: ${SYNAPLAN_URL:-http://localhost:8300}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://localhost:8300}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://localhost:8300}
@@ -425,7 +425,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: mariadb:13.0.2@sha256:0e4bb0f339feba125d1154fbacd36c16ec8518f52e44e1f82ecec7d6771caf39
+    image: mariadb:13.0.2@sha256:f4054da26e3a9dd6c8b5cc97363e544408b15c0fb369d7359c25dc04826eb6e1
     container_name: synaplan_db
     entrypoint: ["/bin/sh", "-ec"]
     command:
@@ -459,7 +459,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    image: redis:7.4-alpine@sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af
     container_name: synaplan_redis
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
@@ -556,7 +556,7 @@ services:
     restart: unless-stopped
 
   tts:
-    image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:4efc4535b90bf348b6c5598e3793ca5aa7b5bdb4c051456f74a1d2b0b1328388
     container_name: synaplan_tts
     networks:
       - default
@@ -631,7 +631,7 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  version: "5.6.0"
+  version: "5.6.2"
   update_at: "2026-10-18"
   release_notes:
     en_US: "Synaplan 5.5.0"

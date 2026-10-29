@@ -8,7 +8,8 @@ should make the answer better and more complete on its own."* The owner
 decided: **no option; the chat adapts itself** (web chat, Synaplan Desktop
 and the gateway route together; Tools → Research and the Desktop chip go;
 the only escapes are in the moment itself).
-**Priority:** Roadmap row 31. Supersedes row 21's §0 #5 (people choose the
+**Priority:** Roadmap row 32. `main` already uses row 31 for the loop and
+cloud-file review. Supersedes row 21's §0 #5 (people choose the
 depth) and #15 (the Research chip); everything else of row 21 stays and is
 the engine this plan drives.
 **Base:** `main` after research quality RS10 and RW1–RW3 merged; research

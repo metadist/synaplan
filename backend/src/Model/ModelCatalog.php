@@ -3591,6 +3591,59 @@ class ModelCatalog
             ],
         ],
         // ----------------------------------------------------------------
+        // Gemini 4 Argon. Developer guide 2026-10-13, model id gemini-4-argon.
+        // Intro through 2026-11-30: $2 input / $10 output per 1M, cached input
+        // 95% off ($0.10). From 2026-12-01: $4 / $20, cache $0.20. One rate for
+        // the whole 1M window. The catalog stores the price in force today;
+        // there is no automatic date switch.
+        // ----------------------------------------------------------------
+        [
+            'id' => 400,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Argon',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-argon',
+            'priceIn' => 2.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.0,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Argon - frontier model for long-horizon engineering, enterprise knowledge work, and security remediation. 1M token context, thinking levels low, medium (default), and high. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20. Cached input is 95% off ($0.10, then $0.20).',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-4-argon'],
+                'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.10,
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536'],
+            ],
+        ],
+        [
+            'id' => 401,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Argon (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-argon',
+            'priceIn' => 2.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.0,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Argon for image analysis, video understanding, and multimodal tasks. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20 (cached input $0.10, then $0.20).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-4-argon'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.10,
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
         // Google Gemini 3.6 / 3.7 / 3.8 Flash + 3.5 Flash-Lite + Omni video
         // + Nano Banana 2 Lite + Gemini 3.5 Transcribe.
         // Live-probed against generativelanguage.googleapis.com/v1beta on
