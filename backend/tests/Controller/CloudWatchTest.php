@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\ApiKey;
+use App\Entity\CloudDelivery;
 use App\Entity\CloudWatch;
 use App\Entity\ExternalIdentity;
 use App\Entity\File;
@@ -209,6 +210,64 @@ final class CloudWatchTest extends WebTestCase
         self::assertSame(['5678'], $this->json()['forget']);
     }
 
+    public function testAnInboundUploadIsNotAnOwnWrite(): void
+    {
+        $this->enable();
+        $cloud = $this->cloud('inbound');
+        $identityId = $cloud['identity']->getId();
+        self::assertIsInt($identityId);
+        $this->client->request('POST', '/api/v1/cloud/watches', server: $cloud['server'] + ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'target_kind' => 'folder',
+            'target_id' => 'incoming',
+            'target_path' => 'Incoming',
+            'preset' => 'keep_searchable',
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $watchId = $this->json()['id'];
+        if (!is_int($watchId) && !is_string($watchId)) {
+            self::fail('The watch id is missing.');
+        }
+        $path = tempnam(sys_get_temp_dir(), 'watch');
+        self::assertIsString($path);
+        file_put_contents($path, 'notes');
+        $before = $this->deliveriesFor($identityId);
+
+        $this->sendWatchFile($watchId, $cloud['server'], 'doc-1', 'v1', $path);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        self::assertSame('waiting', $this->json()['state']);
+        self::assertNull($this->json()['reason']);
+
+        $this->sendWatchFile($watchId, $cloud['server'], 'doc-1', 'v1', $path);
+        self::assertSame('already_handled', $this->json()['state']);
+
+        $this->sendWatchFile($watchId, $cloud['server'], 'doc-1', 'v2', $path);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        self::assertSame('waiting', $this->json()['state']);
+        self::assertNull($this->json()['reason']);
+        self::assertSame($before, $this->deliveriesFor($identityId));
+
+        $this->sendWatchFile($watchId, $cloud['server'], 'doc-1', 'v3', $path, true);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        self::assertSame('skipped', $this->json()['state']);
+        self::assertSame('own_write', $this->json()['reason']);
+        self::assertSame($before, $this->deliveriesFor($identityId));
+
+        $this->recordCopyOut((int) $cloud['user']->getId(), $identityId, 'doc-1');
+        self::assertSame($before + 1, $this->deliveriesFor($identityId));
+
+        $this->sendWatchFile($watchId, $cloud['server'], 'doc-1', 'v4', $path);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        self::assertSame('skipped', $this->json()['state']);
+        self::assertSame('own_write', $this->json()['reason']);
+        self::assertSame($before + 1, $this->deliveriesFor($identityId));
+
+        $this->sendWatchFile($watchId, $cloud['server'], 'doc-2', 'v1', $path);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        self::assertSame('waiting', $this->json()['state']);
+        self::assertNull($this->json()['reason']);
+        self::assertSame($before + 1, $this->deliveriesFor($identityId));
+    }
+
     public function testTheIndexPagesChangesAndExpiresACursor(): void
     {
         $this->enable();
@@ -358,6 +417,54 @@ final class CloudWatchTest extends WebTestCase
         $this->em->flush();
 
         return $user;
+    }
+
+    /**
+     * @param array<string, string> $server
+     */
+    private function sendWatchFile(int|string $watchId, array $server, string $remoteId, string $version, string $path, bool $ownWrite = false): void
+    {
+        $fields = [
+            'id' => $remoteId,
+            'version' => $version,
+            'name' => 'notes.txt',
+            'event' => 'created',
+        ];
+        if ($ownWrite) {
+            $fields['own_write'] = '1';
+        }
+        $this->client->request(
+            'POST',
+            '/api/v1/cloud/watches/'.$watchId.'/files',
+            $fields,
+            ['file' => new UploadedFile($path, 'notes.txt', 'text/plain', null, true)],
+            $server,
+        );
+    }
+
+    private function recordCopyOut(int $ownerId, int $identityId, string $remoteId): void
+    {
+        $file = new File();
+        $file->setUserId($ownerId);
+        $file->setFileName('copied.txt');
+        $file->setFilePath('/uploads/copied.txt');
+        $file->setFileType('txt');
+        $file->setFileSize(4);
+        $file->setFileMime('text/plain');
+        $file->setStatus('uploaded');
+        $this->em->persist($file);
+        $this->em->flush();
+        $fileId = $file->getId();
+        self::assertIsInt($fileId);
+        $delivery = new CloudDelivery($ownerId, $fileId, $identityId, CloudDelivery::TARGET_KIND_FOLDER, 'Incoming', CloudDelivery::CONFLICT_RENAME);
+        $delivery->markDelivered('/Incoming/copied.txt', $remoteId, null);
+        $this->em->persist($delivery);
+        $this->em->flush();
+    }
+
+    private function deliveriesFor(int $identityId): int
+    {
+        return $this->em->getRepository(CloudDelivery::class)->count(['identityId' => $identityId]);
     }
 
     /** @return array<string, mixed> */
