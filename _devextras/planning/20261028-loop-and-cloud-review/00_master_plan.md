@@ -1,6 +1,6 @@
 # Loop and cloud-file review — 2026-10-28
 
-**Status:** Plan. §0 is not ticked. No fix starts until the owner ticks it.
+**Status:** In progress. §0 ticked 2026-10-29 (owner: start the plan; D1–D6 as proposed).
 Corrected after the Copilot review of #2856: a silent shadow compare
 is not proof, the Messages stream releases before every provider
 stream, "sent" needs a recorded download, a claimed delivery expires,
@@ -101,16 +101,16 @@ and returns a zero-cost receipt.
 
 ## 3. Decisions (§0)
 
-Proposed. Not ticked.
+Ticked 2026-10-29. Every row as proposed.
 
 | # | Decision | Why |
 | - | -------- | --- |
-| D1 | [ ] **RV4, RV5, RV6 and RV3 go first.** They run with today's flags. | Platform links seed on. The Messages API is the Desktop and Claude Code path. |
-| D2 | [ ] **RV2 merges before `AI.USAGE_HOOK` is set to `on`, and before a shadow soak is treated as proof.** A clean shadow run can hide the collision: a reused turn whose `close()` returns null is compared with the caller's own metadata. | `on` drops later turns in a session to a zero-cost receipt. The soak in row 22 does not catch that. |
-| D3 | [ ] **RV1 and RV8 merge before `RESEARCH.ENABLED` is turned on.** | Round mode is the default, and the files-only walk has not been run. |
-| D4 | [ ] **RV7 merges before `cloud_files` is turned on.** It is a regression lock: an inbound watch upload is not recorded as an own write. | The first draft of RV7 would have suppressed a real new version for 10 minutes. Watches are off today. |
-| D5 | [ ] **The shared tool executor stays on row 22 (AU24).** This plan does not open a second loop. AU24 must keep the Messages wrap-up prompt and the `TOOLS` usage row, which the OpenAI loop does not have. | Two catalogs already diverged on purpose (`OpenAiGatewayToolCatalog`). Copying one into the other makes that worse. |
-| D6 | [ ] **One pull request per step, from `main`.** Subject `fix`, except RV7, which is `test`. No flag change in the diff. | A flag flip hides whether the fix is the thing that shipped. |
+| D1 | [x] **RV4, RV5, RV6 and RV3 go first.** They run with today's flags. | Platform links seed on. The Messages API is the Desktop and Claude Code path. |
+| D2 | [x] **RV2 merges before `AI.USAGE_HOOK` is set to `on`, and before a shadow soak is treated as proof.** A clean shadow run can hide the collision: a reused turn whose `close()` returns null is compared with the caller's own metadata. | `on` drops later turns in a session to a zero-cost receipt. The soak in row 22 does not catch that. |
+| D3 | [x] **RV1 and RV8 merge before `RESEARCH.ENABLED` is turned on.** | Round mode is the default, and the files-only walk has not been run. |
+| D4 | [x] **RV7 merges before `cloud_files` is turned on.** It is a regression lock: an inbound watch upload is not recorded as an own write. | The first draft of RV7 would have suppressed a real new version for 10 minutes. Watches are off today. |
+| D5 | [x] **The shared tool executor stays on row 22 (AU24).** This plan does not open a second loop. AU24 must keep the Messages wrap-up prompt and the `TOOLS` usage row, which the OpenAI loop does not have. | Two catalogs already diverged on purpose (`OpenAiGatewayToolCatalog`). Copying one into the other makes that worse. |
+| D6 | [x] **One pull request per step, from `main`.** Subject `fix`, except RV7, which is `test`. No flag change in the diff. | A flag flip hides whether the fix is the thing that shipped. |
 
 ---
 

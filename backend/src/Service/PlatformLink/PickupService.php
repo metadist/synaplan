@@ -727,6 +727,7 @@ final readonly class PickupService
         $file->setSource($this->sourceFor($instance));
         $file->setSourceId($remoteId);
         $file->setSourceEtag($version);
+        $file->setSourceInstance($instance->getInstanceId());
         $file->setIncoming(false);
         $file->setEphemeral(true);
         $this->em->persist($file);

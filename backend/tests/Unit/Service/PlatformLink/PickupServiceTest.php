@@ -259,6 +259,8 @@ final class PickupServiceTest extends TestCase
                 self::assertFalse($entity->isIncoming());
                 self::assertTrue($entity->isEphemeral());
                 self::assertSame('nextcloud', $entity->getSource());
+                self::assertSame('remote-1', $entity->getSourceId());
+                self::assertSame('pi_abc', $entity->getSourceInstance());
             }
         });
         $held = $this->createMock(CloudPickupFileRepository::class);
@@ -269,6 +271,95 @@ final class PickupServiceTest extends TestCase
 
         self::assertSame(42, $fileId);
         self::assertSame([42], $pickup->fileIds());
+    }
+
+    public function testASecondInstanceWithTheSameRemoteIdDoesNotReuseThatFile(): void
+    {
+        $files = [];
+        $nextId = 42;
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$files, &$nextId): void {
+            if ($entity instanceof File) {
+                (new \ReflectionProperty(File::class, 'id'))->setValue($entity, $nextId);
+                $files[] = $entity;
+                ++$nextId;
+            }
+        });
+        $em->method('find')->willReturnCallback(static function (string $class, int $id) use (&$files): ?File {
+            if (File::class !== $class) {
+                return null;
+            }
+            foreach ($files as $file) {
+                if ((int) $file->getId() === $id) {
+                    return $file;
+                }
+            }
+
+            return null;
+        });
+        $heldRows = [];
+        $held = $this->createStub(CloudPickupFileRepository::class);
+        $held->method('insertIgnore')->willReturnCallback(static function (CloudPickupFile $row) use (&$heldRows): bool {
+            $heldRows[] = $row;
+
+            return true;
+        });
+        $held->method('findHeld')->willReturnCallback(
+            static function (int $owner, string $instance, string $remote, string $version) use (&$heldRows): ?CloudPickupFile {
+                foreach ($heldRows as $row) {
+                    $same = $row->getOwnerId() === $owner
+                        && $row->getInstanceId() === $instance
+                        && $row->getRemoteId() === $remote
+                        && $row->getVersion() === $version;
+                    if ($same) {
+                        return $row;
+                    }
+                }
+
+                return null;
+            },
+        );
+        $storage = $this->createStub(FileStorageService::class);
+        $storage->method('storeRawContent')->willReturn([
+            'success' => true,
+            'path' => '07/file.txt',
+            'size' => 2,
+            'mime' => 'text/plain',
+            'error' => null,
+        ]);
+        $storage->method('fileExists')->willReturn(true);
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('get')->willReturn('{"remote-1":2}');
+
+        $firstPickup = $this->pickup(3);
+        $firstPickup->markClaimed();
+        $firstLedger = $this->createStub(CloudPickupRepository::class);
+        $firstLedger->method('find')->willReturn($firstPickup);
+        $first = $this->service($firstLedger, held: $held, storage: $storage, em: $em, redis: $redis)
+            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+
+        $secondPickup = $this->pickup(4, 'pi_other');
+        $secondPickup->markClaimed();
+        $secondLedger = $this->createStub(CloudPickupRepository::class);
+        $secondLedger->method('find')->willReturn($secondPickup);
+        $otherIdentity = $this->identity();
+        $otherIdentity->setInstanceId('pi_other');
+        $otherIdentities = $this->createStub(ExternalIdentityRepository::class);
+        $otherIdentities->method('find')->willReturn($otherIdentity);
+        $second = $this->service($secondLedger, identities: $otherIdentities, held: $held, storage: $storage, em: $em, redis: $redis)
+            ->storeFile($this->instance('pi_other'), 4, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+
+        $again = $this->service($firstLedger, held: $held, storage: $storage, em: $em, redis: $redis)
+            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+
+        self::assertSame(42, $first);
+        self::assertSame(43, $second);
+        self::assertNotSame($first, $second);
+        self::assertSame($first, $again);
+        self::assertSame('pi_abc', $files[0]->getSourceInstance());
+        self::assertSame('pi_other', $files[1]->getSourceInstance());
+        self::assertSame('remote-1', $files[0]->getSourceId());
+        self::assertSame('remote-1', $files[1]->getSourceId());
     }
 
     public function testLinkingTurnedOffNeverOpensATicket(): void
