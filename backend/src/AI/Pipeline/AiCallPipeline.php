@@ -8,6 +8,7 @@ use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Stream\StreamChunk;
 use App\Observability\EventRingStore;
 use App\Service\Exception\StreamCancelledException;
+use App\Service\Infrastructure\DatabaseConnectionRelease;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
@@ -40,9 +41,34 @@ final readonly class AiCallPipeline
         private ?EventRingStore $eventRing = null,
         ?\Closure $clockNs = null,
         private ?\Closure $flagReader = null,
+        private ?DatabaseConnectionRelease $connections = null,
     ) {
         $this->clockNs = $clockNs ?? static fn (): int => hrtime(true);
         $this->hooks = self::sortHooks($hooks);
+    }
+
+    /**
+     * Gives this worker's database connections back before a provider wait.
+     * A connection inside a transaction stays open. The Messages stream calls
+     * this on every provider round: a usage write between rounds reopens one.
+     */
+    public function releaseBeforeProvider(string $reason): void
+    {
+        $this->connections?->release($reason);
+    }
+
+    /**
+     * The first chunk of one provider stream releases again, when provider
+     * setup reopened a connection after {@see releaseBeforeProvider()}. Later
+     * chunks of that same stream do not.
+     */
+    public function releaseOnFirstChunk(callable $callback, string $reason): callable
+    {
+        if (null === $this->connections) {
+            return $callback;
+        }
+
+        return $this->connections->releaseOnFirstCall($callback, $reason);
     }
 
     /**

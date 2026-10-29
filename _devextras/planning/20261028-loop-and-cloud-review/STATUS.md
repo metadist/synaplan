@@ -9,10 +9,10 @@ D1–D6 as proposed).
 | RV0 | merged | [#2856](https://github.com/metadist/synaplan/pull/2856), [#2857](https://github.com/metadist/synaplan/pull/2857), against `main` `fa64e4c82` |
 | RV1 | planned | Round mode drops `scope: files` |
 | RV2 | planned | Messages session reuses `call-1` once the usage hook is `on`. A silent shadow compare can hide it |
-| RV3 | planned | Messages stream must release before every provider stream, including one with no server tools. Live today |
+| RV3 | in review | [#2865](https://github.com/metadist/synaplan/pull/2865). A Messages stream releases the database connection before every provider stream, including one with no server tools. Live today |
 | RV4 | merged | [#2860](https://github.com/metadist/synaplan/pull/2860) — pickup copy stores the claiming platform instance on the file. Live where platform links are on |
-| RV5 | in review | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
-| RV6 | in review | [#2862](https://github.com/metadist/synaplan/pull/2862). A copy counts as sent only after the download. A claimed row expires unconfirmed. Live, same |
+| RV5 | merged | [#2861](https://github.com/metadist/synaplan/pull/2861). A repeated listing returns the same upload, reuse or skip and does not spend the limit again. Live, same |
+| RV6 | merged | [#2862](https://github.com/metadist/synaplan/pull/2862). A copy counts as sent only after the download. A claimed row expires unconfirmed. Live, same |
 | RV7 | planned | Regression lock: do not mark an inbound watch upload as an own write. Before `cloud_files` |
 | RV8 | planned | Calls in one step whose waits sum past the lease pay the step twice. Waits on `RESEARCH.ENABLED` |
 
@@ -77,3 +77,12 @@ A copy counts as sent only after the cloud downloaded the file. A claim
 hands out the download and stays pending. A claimed row with no result
 expires with the same unconfirmed sentence as a queued one. RV6 is
 [#2862](https://github.com/metadist/synaplan/pull/2862).
+
+## 2026-10-29 — RV3
+
+A Messages stream gives the database connection back before every
+provider wait. The direct path releases before `stream()`. A tool
+round that writes a usage row reopens the connection, and the next
+provider stream releases it again. A later chunk of the same stream
+does not. A connection inside a transaction stays open. RV3 is
+[#2865](https://github.com/metadist/synaplan/pull/2865).
