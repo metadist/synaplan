@@ -210,7 +210,11 @@ file lists them at the end. What the check removed, and whether a model of
 the same provider checked, is told in the research fold under the reply
 (`check` event: `statements`, `supported`, `softened`, `removed`,
 `same_provider`), and **Look deeper** still seeds its plan from the checked
-report's "Not confirmed" list.
+report's "Not confirmed" list. The reply's info panel shows what the run
+spent: every model call is summed per role and model (`LEAD`, `READ`,
+`WRITE`, `VERIFY`, `SORT`) next to the sorting that started the run, with
+the cost the person was charged. Tokens and cost on a research reply are
+the run's, not just the one chat call.
 - **Stopped or failed with something found:** the sentence why it ended
   stands above the report, so a partial report never reads as a finished one.
 - **Stopped or failed with nothing found:** only that sentence, no file.

@@ -197,6 +197,9 @@ final readonly class LeadStage
         if (null !== $turn->cost) {
             $ctx->state->budget->addCost($turn->cost);
         }
+        if (null !== $turn->usage) {
+            $ctx->state->spend->add('lead', $turn->modelKey, $turn->usage);
+        }
     }
 
     /**

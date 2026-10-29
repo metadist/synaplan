@@ -26,6 +26,7 @@ use App\Service\Research\Run\ResearchReportDelivery;
 use App\Service\Research\Run\ResearchRunRef;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStatus;
+use App\Service\Research\Run\Stage\ResearchCallUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -118,6 +119,28 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame('1', $this->posted[0]->getMeta('web_search_results_count'));
         self::assertSame(['Portugal'], array_column($this->savedSources, 'title'));
         self::assertSame("The fee is 90 EUR. [1]\n\n## de:research.report.sources\n\n1. Portugal — https://pt.example/visa", $this->storedFile);
+    }
+
+    public function testTheReplyShowsTheRunsTokensAndCostNextToTheSorting(): void
+    {
+        $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, 'Report.', 11);
+        $state->spend->add('reading', 'groq:llama', new ResearchCallUsage(900, 100, 1000, '0.010000'));
+        $state->spend->add('writing', 'anthropic:claude', new ResearchCallUsage(2000, 500, 2500, '0.050000'));
+        $reply = (new Message())->setText('Looking into this.')->setStatus('complete');
+        $reply->setMeta('research_run_id', $state->ref->id);
+        $reply->setMeta('ai_usage_extra', (string) json_encode([
+            ['promptTokens' => 10, 'completionTokens' => 5, 'totalTokens' => 15, 'cost' => '0.000100', 'modelKey' => 'anthropic:sonnet', 'kind' => 'SORT', 'priceKnown' => true],
+        ]));
+
+        $delivery = $this->delivery($reply);
+        $delivery->deliver($state);
+        $delivery->deliver(ResearchRunState::fromStorage($state->toStorage()));
+
+        $rows = json_decode((string) $reply->getMeta('ai_usage_extra'), true);
+        self::assertIsArray($rows);
+        self::assertSame(['SORT', 'READ', 'WRITE'], array_column($rows, 'kind'));
+        self::assertSame([15, 1000, 2500], array_column($rows, 'totalTokens'));
+        self::assertSame(['0.000100', '0.010000', '0.050000'], array_column($rows, 'cost'));
     }
 
     public function testNothingIsPostedForAnApiRunOrSomeoneElsesChat(): void

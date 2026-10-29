@@ -57,8 +57,9 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         $data = self::objectFrom($text);
         $ok = null === $schema ? '' !== trim($text) : is_array($data);
         $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $cost = $this->cost($usage, $modelId);
 
-        return new ResearchModelReply($ok, true, $data, $text, $provider.':'.$name, $this->cost($usage, $modelId));
+        return new ResearchModelReply($ok, true, $data, $text, $provider.':'.$name, $cost, ResearchCallUsage::fromResponse($response, $cost));
     }
 
     /**

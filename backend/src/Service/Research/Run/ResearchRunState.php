@@ -40,6 +40,9 @@ final class ResearchRunState
     /** Tool turns of a lead that calls tools. Empty in round mode. */
     public LeadConversation $conversation;
 
+    /** Every model call of the run, summed per role and model, for the reply's usage lines. */
+    public ResearchSpend $spend;
+
     /** Questions the run is waiting on. Null once they are all answered or skipped. */
     public ?ResearchQuestions $questions = null;
 
@@ -97,6 +100,7 @@ final class ResearchRunState
         public ?\DateTimeImmutable $updatedAt = null,
     ) {
         $this->conversation = new LeadConversation();
+        $this->spend = new ResearchSpend();
         $this->assertShape();
     }
 
@@ -153,6 +157,7 @@ final class ResearchRunState
             'knowledge_keys' => $this->knowledgeKeys,
             'hint' => $this->hint,
             'ceiling' => $this->ceiling?->value,
+            'spend' => $this->spend->toArray(),
         ];
     }
 
@@ -269,6 +274,7 @@ final class ResearchRunState
         $state->hint = is_string($hint) && in_array($hint, [ResearchRequest::HINT_BRIEF, ResearchRequest::HINT_DEEPER], true) ? $hint : null;
         $ceiling = $data['ceiling'] ?? null;
         $state->ceiling = is_string($ceiling) ? ResearchDepth::tryFrom($ceiling) : null;
+        $state->spend = ResearchSpend::fromArray($data['spend'] ?? null);
 
         return $state;
     }

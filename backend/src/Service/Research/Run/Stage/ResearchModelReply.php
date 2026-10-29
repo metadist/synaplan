@@ -17,6 +17,7 @@ final readonly class ResearchModelReply
         public string $text,
         public string $modelKey,
         public ?float $cost,
+        public ?ResearchCallUsage $usage = null,
     ) {
     }
 

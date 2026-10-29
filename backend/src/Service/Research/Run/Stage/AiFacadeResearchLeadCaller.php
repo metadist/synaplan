@@ -53,8 +53,9 @@ final readonly class AiFacadeResearchLeadCaller implements ResearchLeadCaller
 
         $text = is_string($response['content'] ?? null) ? $response['content'] : '';
         $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $cost = $this->cost($usage, $modelId);
 
-        return new ResearchLeadTurn(true, true, $text, $this->calls($response['tool_calls'] ?? null), $provider.':'.$name, $this->cost($usage, $modelId));
+        return new ResearchLeadTurn(true, true, $text, $this->calls($response['tool_calls'] ?? null), $provider.':'.$name, $cost, ResearchCallUsage::fromResponse($response, $cost));
     }
 
     /**

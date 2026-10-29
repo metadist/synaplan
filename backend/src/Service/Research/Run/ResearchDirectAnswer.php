@@ -6,6 +6,7 @@ namespace App\Service\Research\Run;
 
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
+use App\Service\Research\Run\Stage\ResearchCallUsage;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -45,6 +46,10 @@ final readonly class ResearchDirectAnswer
             return null;
         }
         $text = trim((string) ($response['content'] ?? ''));
+        $usage = ResearchCallUsage::fromResponse($response, 0.0);
+        if ($usage->totalTokens > 0) {
+            $state->spend->add('answer', $provider.':'.$model, $usage);
+        }
 
         return '' === $text ? null : $text;
     }

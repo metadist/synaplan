@@ -78,6 +78,9 @@ final readonly class StageCall
             if (null !== $reply->cost) {
                 $ctx->state->budget->addCost($reply->cost);
             }
+            if (null !== $reply->usage) {
+                $ctx->state->spend->add($role, $reply->modelKey, $reply->usage);
+            }
             $ledgerRole = self::LEDGER_ROLE[$role] ?? null;
             if (null !== $ledgerRole && '' !== $reply->modelKey) {
                 $ctx->state->ledger->setModel($ledgerRole, $reply->modelKey);
