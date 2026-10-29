@@ -68,6 +68,9 @@ class CloudPickup
     #[ORM\Column(name: 'BACCEPTBYTES', type: 'integer', options: ['default' => 0])]
     private int $acceptBytes = 0;
 
+    #[ORM\Column(name: 'BDECISIONS', type: 'text', nullable: true)]
+    private ?string $decisions = null;
+
     #[ORM\Column(name: 'BERRORCODE', length: 64, nullable: true)]
     private ?string $errorCode = null;
 
@@ -240,6 +243,66 @@ class CloudPickup
     {
         $this->acceptCount += $files;
         $this->acceptBytes += $bytes;
+    }
+
+    /**
+     * Remote id to the decision saved with the counters. A JSON list is how
+     * keys 0, 1, 2… come back; the id is the entry's id, or that key.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function decisions(): array
+    {
+        $decoded = null !== $this->decisions ? json_decode($this->decisions, true) : [];
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $decisions = [];
+        foreach ($decoded as $remoteId => $decision) {
+            if (!is_array($decision)) {
+                continue;
+            }
+            $id = $decision['id'] ?? null;
+            if (!is_string($id)) {
+                $id = (string) $remoteId;
+            }
+            $outcome = $decision['outcome'] ?? null;
+            if (!is_string($outcome)) {
+                continue;
+            }
+            $decisions[$id] = $decision;
+        }
+
+        return $decisions;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $decisions
+     */
+    public function replaceDecisions(array $decisions): void
+    {
+        $rows = [];
+        foreach ($decisions as $remoteId => $decision) {
+            $outcome = $decision['outcome'] ?? null;
+            if (!is_string($outcome)) {
+                continue;
+            }
+            $row = ['id' => (string) $remoteId, 'outcome' => $outcome];
+            $fileId = $decision['file_id'] ?? null;
+            if (is_numeric($fileId)) {
+                $row['file_id'] = (int) $fileId;
+            }
+            $reason = $decision['reason'] ?? null;
+            if (is_string($reason)) {
+                $row['reason'] = $reason;
+            }
+            $size = $decision['size'] ?? null;
+            if (is_numeric($size)) {
+                $row['size'] = (int) $size;
+            }
+            $rows[] = $row;
+        }
+        $this->decisions = json_encode($rows, JSON_THROW_ON_ERROR);
     }
 
     public function rememberName(string $name): void

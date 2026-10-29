@@ -20,8 +20,10 @@ use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\DeliveryNotifier;
 use App\Service\PlatformLink\PickupService;
 use App\Service\PlatformLink\PlatformLinksConfig;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Response;
 
 final class PickupServiceTest extends TestCase
 {
@@ -138,6 +140,7 @@ final class PickupServiceTest extends TestCase
         $file = (new File())->setFilePath('07/a.pdf');
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('find')->willReturn($file);
+        $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
         $storage = $this->createStub(FileStorageService::class);
         $storage->method('fileExists')->willReturn(true);
         $same = $this->createStub(CloudPickupRepository::class);
@@ -147,6 +150,7 @@ final class PickupServiceTest extends TestCase
         $other = $this->createStub(CloudPickupRepository::class);
         $other->method('find')->willReturn($otherPickup);
         $redis = $this->createStub(RedisService::class);
+        $redis->method('set')->willReturn(true);
 
         $reused = $this->service(pickups: $same, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->instance(), 3, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
@@ -446,6 +450,97 @@ final class PickupServiceTest extends TestCase
         self::assertSame(35, $pickup->acceptBytes());
     }
 
+    public function testIdsZeroAndOneStayReservedWhenTheNextListingIsSmaller(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $store = [];
+        $service = $this->service($pickups, redis: $this->memoryRedis($store));
+        $both = [
+            ['id' => '0', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+            ['id' => '1', 'version' => 'v1', 'name' => 'b.pdf', 'size' => 20],
+        ];
+
+        $first = $service->listing($this->instance(), 3, $both);
+        $second = $service->listing($this->instance(), 3, [
+            ['id' => '0', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+        ]);
+
+        self::assertSame(['0', '1'], $first['upload']);
+        self::assertSame(['0'], $second['upload']);
+        self::assertSame(2, $pickup->acceptCount());
+        self::assertSame(30, $pickup->acceptBytes());
+        $reserved = json_decode($store['pickup:upload:3'] ?? '', true);
+        self::assertSame(10, $reserved['0'] ?? null);
+        self::assertSame(20, $reserved['1'] ?? null);
+    }
+
+    public function testAListShapedDecisionIsReplayedInsteadOfChargedAgain(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        (new \ReflectionProperty(CloudPickup::class, 'decisions'))->setValue($pickup, json_encode([
+            ['outcome' => 'upload', 'size' => 10],
+            ['outcome' => 'skip', 'reason' => 'too_large'],
+        ], JSON_THROW_ON_ERROR));
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+
+        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+            ['id' => '0', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+            ['id' => '1', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
+        ]);
+
+        self::assertSame(['0'], $answer['upload']);
+        self::assertSame([['id' => '1', 'reason' => 'too_large']], $answer['skip']);
+        self::assertSame(0, $pickup->acceptCount());
+        self::assertSame([], $pickup->skipped());
+    }
+
+    public function testAFailedReservationDoesNotRecordTheAcceptance(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createMock(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $pickups->expects(self::never())->method('save');
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('set')->willReturn(false);
+
+        try {
+            $this->service($pickups, redis: $redis)->listing($this->instance(), 3, [
+                ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+            ]);
+            self::fail('A failed reservation must not look like a successful listing.');
+        } catch (CloudDeliveryException $e) {
+            self::assertSame(Response::HTTP_SERVICE_UNAVAILABLE, $e->status);
+            self::assertSame('unreachable', $e->errorCode);
+        }
+
+        self::assertSame(0, $pickup->acceptCount());
+        self::assertSame([], $pickup->decisions());
+    }
+
+    public function testListingHoldsThePickupRowUntilTheDecisionIsSaved(): void
+    {
+        $pickup = $this->pickup(3);
+        $pickup->markClaimed();
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($pickup);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('lock')->with($pickup, LockMode::PESSIMISTIC_WRITE);
+        $em->expects(self::once())->method('refresh')->with($pickup);
+        $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
+
+        $answer = $this->service($pickups, em: $em)->listing($this->instance(), 3, [
+            ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
+        ]);
+
+        self::assertSame(['remote-1'], $answer['upload']);
+    }
+
     public function testARepeatedReuseReturnsTheSameFileWithoutSpendingAgain(): void
     {
         $pickup = $this->pickup(3);
@@ -458,6 +553,7 @@ final class PickupServiceTest extends TestCase
         $file = (new File())->setFilePath('07/a.pdf');
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('find')->willReturn($file);
+        $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
         $storage = $this->createStub(FileStorageService::class);
         $storage->method('fileExists')->willReturn(true);
         $store = [];
@@ -486,6 +582,7 @@ final class PickupServiceTest extends TestCase
         $pickups->method('find')->willReturn($pickup);
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('find')->willReturn(null);
+        $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
 
         $answer = $this->service(pickups: $pickups, held: $held, em: $em)->listing($this->instance(), 3, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
@@ -560,8 +657,8 @@ final class PickupServiceTest extends TestCase
             $identities ?? $this->identities(),
             $platforms ?? $this->platforms(),
             $storage ?? $this->createStub(FileStorageService::class),
-            $em ?? $this->createStub(EntityManagerInterface::class),
-            $redis ?? $this->createStub(RedisService::class),
+            $em ?? $this->transactionalEm(),
+            $redis ?? $this->reservingRedis(),
             $this->createStub(DeliveryNotifier::class),
             $this->createStub(AuditLogWriter::class),
             $links ?? $this->links(),
@@ -589,6 +686,22 @@ final class PickupServiceTest extends TestCase
         );
 
         return $pickups;
+    }
+
+    private function transactionalEm(): EntityManagerInterface
+    {
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
+
+        return $em;
+    }
+
+    private function reservingRedis(): RedisService
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('set')->willReturn(true);
+
+        return $redis;
     }
 
     /**
