@@ -14,6 +14,18 @@ export interface ResearchSnippet {
   quote: string
 }
 
+/** One thing the run did, in the order it did it — what the bubble shows while working and on request later. */
+export interface ResearchStep {
+  /** `brief`, `plan`, `search`, `source`, `point`, `round`, `writing`, `section`, `checking`, `check` or a terminal status. */
+  kind: string
+  /** The words the row quotes: the query, the source title or host, the section title, the goal. */
+  text: string
+  /** A source's `found`/`read`/`blocked`, a point's `answered`/`not_confirmed`/`open`; null otherwise. */
+  status: string | null
+  /** The source or point id, so a later frame updates the row instead of adding a second one. */
+  ref: string | null
+}
+
 export interface ResearchProgress {
   id: string
   chatId: number
@@ -29,6 +41,8 @@ export interface ResearchProgress {
   ceiling: string | null
   /** Why a finished run ended the way it did (`answered_without_research`, …). */
   outcome: string | null
+  /** Everything the run did so far, oldest first; empty when the progress came from the run summary. */
+  steps: ResearchStep[]
   lastSeq: number
 }
 
@@ -58,8 +72,14 @@ export function emptyProgress(id: string, chatId: number, question: string): Res
     queuedSeconds: null,
     ceiling: null,
     outcome: null,
+    steps: [],
     lastSeq: 0,
   }
+}
+
+/** The last thing the run did — the line the bubble shows while it works. */
+export function currentStep(progress: ResearchProgress): ResearchStep | null {
+  return progress.steps.length > 0 ? progress.steps[progress.steps.length - 1] : null
 }
 
 export function sourceCounts(progress: ResearchProgress): {
@@ -104,6 +124,13 @@ export function parseResearchSse(body: string): ResearchFrame[] {
   return frames
 }
 
+/** Every frame of an events response applied in order. */
+export function applyResearchSse(state: ResearchProgress, body: string): ResearchProgress {
+  let next = state
+  for (const frame of parseResearchSse(body)) next = applyResearchFrame(next, frame)
+  return next
+}
+
 export function applyResearchFrame(
   state: ResearchProgress,
   frame: ResearchFrame
@@ -113,9 +140,13 @@ export function applyResearchFrame(
     points: state.points.map((point) => ({ ...point })),
     sourceStatus: { ...state.sourceStatus },
     snippets: state.snippets.map((snippet) => ({ ...snippet })),
+    steps: state.steps.map((step) => ({ ...step })),
     lastSeq: frame.seq !== null && frame.seq > state.lastSeq ? frame.seq : state.lastSeq,
   }
   if (isTerminalStatus(state.status) && frame.event !== 'check') return next
+  // A frame already applied (a replayed page) must not add its step twice.
+  if (frame.seq !== null && frame.seq <= state.lastSeq) return next
+  next.steps = appendStep(next.steps, stepFor(frame))
 
   if (frame.event === 'plan') {
     next.phase = 'plan'
@@ -193,6 +224,87 @@ export function progressFromRun(
       }
     : null
   return progress
+}
+
+/** The row a frame adds to the steps; null for frames that are bookkeeping only (`run`, `queued`, `question`). */
+function stepFor(frame: ResearchFrame): ResearchStep | null {
+  const data = frame.data
+  const text = (key: string): string => (typeof data[key] === 'string' ? data[key] : '')
+  switch (frame.event) {
+    case 'brief':
+      return { kind: 'brief', text: text('goal'), status: null, ref: null }
+    case 'plan':
+      return { kind: 'plan', text: String(readPoints(data.points).length), status: null, ref: null }
+    case 'search':
+      return { kind: 'search', text: text('query'), status: text('scope') || null, ref: null }
+    case 'source': {
+      const id = text('id')
+      if (id === '') return null
+      return {
+        kind: 'source',
+        text: text('title') || text('host') || text('url'),
+        status: text('status') || 'found',
+        ref: id,
+      }
+    }
+    case 'point': {
+      const id = text('id')
+      if (id === '') return null
+      return { kind: 'point', text: text('title'), status: text('status') || 'open', ref: id }
+    }
+    case 'round': {
+      const n = numberOrNull(data.n)
+      const max = numberOrNull(data.max)
+      return {
+        kind: 'round',
+        text: n !== null && max !== null ? `${n}/${max}` : '',
+        status: null,
+        ref: null,
+      }
+    }
+    case 'writing':
+      return { kind: 'writing', text: text('section'), status: null, ref: null }
+    case 'section':
+      return { kind: 'section', text: text('title'), status: null, ref: null }
+    case 'checking':
+      return { kind: 'checking', text: '', status: null, ref: null }
+    case 'check': {
+      const check = readCheck(data) ?? { supported: 0, statements: 0 }
+      return {
+        kind: 'check',
+        text: `${check.supported}/${check.statements}`,
+        status: null,
+        ref: null,
+      }
+    }
+    default:
+      if (isTerminalStatus(frame.event)) {
+        const outcome = data.outcome
+        const code =
+          outcome &&
+          typeof outcome === 'object' &&
+          typeof (outcome as { code?: unknown }).code === 'string'
+            ? (outcome as { code: string }).code
+            : ''
+        return { kind: frame.event, text: code, status: null, ref: null }
+      }
+      return null
+  }
+}
+
+/** A source or point frame updates its earlier row; everything else is a new row. */
+function appendStep(steps: ResearchStep[], step: ResearchStep | null): ResearchStep[] {
+  if (step === null) return steps
+  if (step.ref !== null) {
+    const index = steps.findIndex((row) => row.kind === step.kind && row.ref === step.ref)
+    if (index >= 0) {
+      const kept = steps[index]
+      steps[index] = { ...kept, status: step.status, text: step.text || kept.text }
+      return steps
+    }
+  }
+  steps.push(step.kind === 'source' && step.text === '' ? { ...step, text: step.ref ?? '' } : step)
+  return steps
 }
 
 function mergePoints(current: ResearchPoint[], incoming: ResearchPoint[]): ResearchPoint[] {

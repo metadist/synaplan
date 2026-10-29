@@ -31,11 +31,19 @@ and the chat answers directly — an install whose sorter cannot carry the
 rating simply never researches on its own.
 
 When the rating is `research`, the turn starts a run of depth `auto` for the
-person and answers with one sentence: "I am looking through several sources
-for this — about N minutes. The question has several parts." The stream
-carries `research_started` with the run id first, so the card appears under
-the thread at once and follows the run like any other. The report arrives in
-the chat when the run finishes. Only an ordinary signed-in web chat turn
+person. The stream carries `research_started` with the run id first; the
+reply then carries `researchRunId` (meta `research_run_id`), live and after
+a reload. In the web chat that reply bubble shows the run working — a
+spinner, the last thing the run did (the query it searched, the source it
+read, the section it writes), a fold with every step so far, and **Answer
+now** / **Stop** with their consequence — and hides the fallback sentence
+meanwhile. The one sentence the stream writes ("I am looking through several
+sources for this — about N minutes. The question has several parts.") is
+what a channel without that UI gets. When the run finishes, the report
+replaces that reply's text (see "Where the report goes"), so the person
+reads the answer where they watched it being made; one muted line below the
+report ("Researched: 12 steps · 8 sources read") opens the steps again, in
+any later session too. Only an ordinary signed-in web chat turn
 does this: never a widget, a saved task, an incognito chat, an "Again", a
 turn with a fixed task prompt, or a channel without a chat.
 
@@ -179,8 +187,12 @@ one person, and at most `RESEARCH.MAX_ACTIVE_THOROUGH_PER_USER` thorough runs
 
 ## Where the report goes
 
-When the run has a `chat_id`, the server posts one assistant message into
-that chat however the run ends, in the person's language:
+When the run has a `chat_id`, the server writes one assistant message into
+that chat however the run ends, in the person's language. A run the chat
+started on its own already has a reply — the one stamped with the run id
+(`research_run_id`) — and that reply's text becomes the report; a run
+started by **Look deeper** or the research API gets a new reply carrying the
+same stamp, which is how the chat shows the run and later its steps:
 
 - **Complete:** the report is the message, and the markdown file is attached
   to it. The file also shows in the file manager's Generated gallery with

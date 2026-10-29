@@ -20,6 +20,9 @@ final readonly class AutoResearchTurn
     /** The classification key that carries the limit reason to the caller. */
     public const NOTICE_KEY = 'effort_notice';
 
+    /** The classification key that carries the started run to the reply's metadata. */
+    public const RUN_KEY = 'research_run_id';
+
     /** The metadata a notice reply carries instead of a model's. */
     public const NOTICE_METADATA = ['provider' => 'research', 'model' => 'research', 'research_notice' => true];
 
@@ -46,7 +49,7 @@ final readonly class AutoResearchTurn
                 'minutes' => $decision->minutes,
                 'why' => $decision->why,
             ]);
-            $classification['research_run_id'] = $decision->runId;
+            $classification[self::RUN_KEY] = $decision->runId;
 
             return [$classification, $this->texts->notice($decision->minutes, (string) $decision->why, $locale), null];
         }

@@ -243,8 +243,7 @@ final readonly class MessageApiFormatter
             // a persistent "generating in background" banner after reload.
             'mediaJob' => $mediaJob,
             ...$errorFields,
-            'effort' => $m->getMeta(StreamMessageMeta::EFFORT),
-            'effortNotice' => $m->getMeta(StreamMessageMeta::EFFORT_NOTICE),
+            ...StreamMessageMeta::effortPayload($m),
             'voiceReplyFailed' => $this->voiceReplyFailedReason($m),
             'agentId' => $this->agentIdFromMeta($m),
             'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),

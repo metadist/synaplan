@@ -4,8 +4,8 @@ import {
   answerNow,
   attachChat,
   createResearchBag,
-  dismissResearch,
   ensureCapabilities,
+  followRun,
   forgetCapabilities,
   lookDeeper,
   pauseResearch,
@@ -27,10 +27,10 @@ export const useResearchStore = defineStore('research', () => {
     forgetCapabilities: () => forgetCapabilities(bag),
     attachChat: (chatId: number | null) => attachChat(bag, chatId),
     adopt: (chatId: number, id: string, question: string) => adoptRun(bag, chatId, id, question),
+    follow: (chatId: number, id: string) => followRun(bag, chatId, id),
     lookDeeper: (input: LookDeeperInput) => lookDeeper(bag, input),
     answerNow: () => answerNow(bag),
     stop: () => stopResearch(bag),
-    dismiss: () => dismissResearch(bag),
     pause: () => pauseResearch(bag),
   }
 })

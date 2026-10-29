@@ -411,6 +411,7 @@
             :docs="docs"
             :foreign-memory="foreignMemory"
           />
+          <ResearchTurn v-if="researchRunId" :run-id="researchRunId" />
 
           <p
             v-if="role === 'assistant' && voiceReplyFailed"
@@ -1170,6 +1171,8 @@ import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import LookDeeperAction from '@/components/research/LookDeeperAction.vue'
+import ResearchTurn from '@/components/research/ResearchTurn.vue'
+import { useResearchTurn } from '@/composables/useResearchTurn'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
@@ -1335,6 +1338,7 @@ interface Props {
   effort?: string | null
   /** Why a research the question needed was not started. */
   effortNotice?: string | null
+  researchRunId?: string | null
   searchResults?: Array<{
     title: string
     url: string
@@ -2066,10 +2070,10 @@ const hasPartialAnswer = computed(() => {
   return true
 })
 
+const researchTurn = useResearchTurn(() => props.researchRunId)
 const visibleContentParts = computed(() => {
-  if (!props.errorReason || hasPartialAnswer.value) {
-    return contentParts.value
-  }
+  if (researchTurn.running.value) return []
+  if (!props.errorReason || hasPartialAnswer.value) return contentParts.value
   return contentParts.value.filter((part) => part.type !== 'text')
 })
 

@@ -254,10 +254,13 @@ export const selectors = {
     stop: '[data-testid="btn-research-stop"]',
     answerNow: '[data-testid="btn-research-answer-now"]',
     answerNowConsequence: '[data-testid="text-research-answer-now-consequence"]',
-    card: '[data-testid="card-research"]',
-    ceiling: '[data-testid="text-research-ceiling"]',
-    factCheck: '[data-testid="text-research-fact-check"]',
-    find: '[data-testid="text-research-find"]',
+    /** The research inside the reply bubble; `data-status` carries the run status */
+    turn: '[data-testid="research-turn"]',
+    working: '[data-testid="research-turn-working"]',
+    activity: '[data-testid="text-research-activity"]',
+    stepsToggle: '[data-testid="btn-research-steps"]',
+    summary: '[data-testid="text-research-summary"]',
+    steps: '[data-testid="list-research-steps"]',
     lookDeeper: '[data-testid="btn-look-deeper"]',
     lookDeeperSection: '[data-testid="section-look-deeper"]',
     /** Admin tab: the automatic-research switch under the research switch */

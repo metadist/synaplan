@@ -2,28 +2,44 @@ import { describe, expect, it } from 'vitest'
 import { adoptEffort, effortFields, type MessageEffort } from '@/utils/messageEffort'
 
 describe('effortFields', () => {
-  it('keeps the effort of an assistant row', () => {
-    expect(effortFields('assistant', { effort: 'lookup', effortNotice: 'Budget spent.' })).toEqual({
-      effort: 'lookup',
+  it('keeps the effort and the research run of an assistant row', () => {
+    expect(
+      effortFields('assistant', {
+        effort: 'research',
+        effortNotice: 'Budget spent.',
+        researchRunId: 'rr_1',
+      })
+    ).toEqual({
+      effort: 'research',
       effortNotice: 'Budget spent.',
+      researchRunId: 'rr_1',
     })
   })
 
   it('fills null for a row without effort and for every user turn', () => {
-    expect(effortFields('assistant', {})).toEqual({ effort: null, effortNotice: null })
-    expect(effortFields('user', { effort: 'research' })).toEqual({
+    expect(effortFields('assistant', {})).toEqual({
       effort: null,
       effortNotice: null,
+      researchRunId: null,
+    })
+    expect(effortFields('user', { effort: 'research', researchRunId: 'rr_1' })).toEqual({
+      effort: null,
+      effortNotice: null,
+      researchRunId: null,
     })
   })
 })
 
 describe('adoptEffort', () => {
-  it('carries the persisted effort and notice onto the local reply', () => {
+  it('carries the persisted effort, notice and run onto the local reply', () => {
     const local: MessageEffort = {}
-    adoptEffort(local, { effort: 'research', effortNotice: 'Off for now.' })
+    adoptEffort(local, { effort: 'research', effortNotice: 'Off for now.', researchRunId: 'rr_1' })
 
-    expect(local).toEqual({ effort: 'research', effortNotice: 'Off for now.' })
+    expect(local).toEqual({
+      effort: 'research',
+      effortNotice: 'Off for now.',
+      researchRunId: 'rr_1',
+    })
   })
 
   it('leaves the local reply alone when the persisted one has no effort', () => {

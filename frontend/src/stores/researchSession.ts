@@ -10,13 +10,13 @@ import {
   type ResearchCapabilities,
 } from '@/services/api/researchApi'
 import {
-  applyResearchFrame,
+  applyResearchSse,
   emptyProgress,
   isTerminalStatus,
-  parseResearchSse,
   progressFromRun,
   type ResearchProgress,
 } from '@/services/chat/stream/handlers/research'
+import { createUuid } from '@/utils/uuid'
 import { useChatsStore } from './chats'
 import { useHistoryStore } from './history'
 import { useIncognitoStore } from './incognito'
@@ -90,13 +90,27 @@ export function attachChat(bag: ResearchBag, chatId: number | null): void {
 
 /**
  * The chat started a research on its own (`research_started` on the stream):
- * show its card at once and follow it, the same way a run of our own is followed.
+ * follow it at once, the same way a run of our own is followed. The reply
+ * bubble that carries the run id shows what it does.
  */
 export function adoptRun(bag: ResearchBag, chatId: number, id: string, question: string): void {
   bag.startError.value = null
   localStorage.setItem(storageKey(chatId), id)
   if (bag.boundChatId !== chatId) return
   bag.progress.value = emptyProgress(id, chatId, question)
+  startPoll(bag)
+}
+
+/**
+ * A reply that was found after the fact — a reload, another device — still
+ * running: follow it from where it is. A finished one is left alone.
+ */
+export async function followRun(bag: ResearchBag, chatId: number, id: string): Promise<void> {
+  if (bag.progress.value?.id === id) return
+  const run = await fetchResearchRun(id)
+  if (isTerminalStatus(run.status) || bag.boundChatId !== chatId) return
+  bag.progress.value = progressFromRun(chatId, run)
+  localStorage.setItem(storageKey(chatId), id)
   startPoll(bag)
 }
 
@@ -138,7 +152,7 @@ async function endRun(
   try {
     const run = await send(current.id)
     if (bag.progress.value?.id === current.id) {
-      bag.progress.value = progressFromRun(current.chatId, run)
+      bag.progress.value = withSteps(progressFromRun(current.chatId, run), bag.progress.value)
       if (isTerminalStatus(run.status)) stopPoll(bag)
       else startPoll(bag)
     }
@@ -148,13 +162,6 @@ async function endRun(
   } finally {
     bag.stopping.value = false
   }
-}
-
-export function dismissResearch(bag: ResearchBag): void {
-  const current = bag.progress.value
-  if (current !== null) localStorage.removeItem(storageKey(current.chatId))
-  bag.progress.value = null
-  stopPoll(bag)
 }
 
 export function pauseResearch(bag: ResearchBag): void {
@@ -199,7 +206,23 @@ async function acceptRun(bag: ResearchBag, chatId: number, input: LookDeeperInpu
   localStorage.setItem(storageKey(chatId), accepted.id)
   if (bag.boundChatId !== chatId) return
   bag.progress.value = next
+  addReplyFor(chatId, accepted.id)
   startPoll(bag)
+}
+
+/**
+ * The bubble a Look deeper run works in: an empty reply bound to the run,
+ * until the reload after the run brings the persisted one with the report.
+ */
+function addReplyFor(chatId: number, runId: string): void {
+  if (useChatsStore().activeChatId !== chatId) return
+  useHistoryStore().messages.push({
+    id: createUuid(),
+    role: 'assistant',
+    parts: [],
+    timestamp: new Date(),
+    researchRunId: runId,
+  })
 }
 
 async function resume(bag: ResearchBag, chatId: number, id: string): Promise<void> {
@@ -261,8 +284,7 @@ async function framesSince(
   if (bag.progress.value?.id !== current.id || isTerminalStatus(bag.progress.value.status)) {
     return bag.progress.value
   }
-  let next = current
-  for (const frame of parseResearchSse(body)) next = applyResearchFrame(next, frame)
+  const next = applyResearchSse(current, body)
   if (bag.progress.value?.id !== current.id || isTerminalStatus(bag.progress.value.status)) {
     return bag.progress.value
   }
@@ -273,8 +295,14 @@ async function settle(bag: ResearchBag, current: ResearchProgress): Promise<void
   stopPoll(bag)
   const run = await fetchResearchRun(current.id)
   if (bag.progress.value?.id !== current.id) return
-  bag.progress.value = progressFromRun(current.chatId, run)
+  bag.progress.value = withSteps(progressFromRun(current.chatId, run), current)
   await reloadChat(current.chatId)
+}
+
+/** The run summary has no steps; the ones followed so far stay with it. */
+function withSteps(summary: ResearchProgress, followed: ResearchProgress): ResearchProgress {
+  summary.steps = followed.steps
+  return summary
 }
 
 async function reloadChat(chatId: number): Promise<void> {

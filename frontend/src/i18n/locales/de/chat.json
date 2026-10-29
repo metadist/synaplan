@@ -1137,25 +1137,13 @@
     "deleteConfirm": "/{command} verschwindet aus dem Chat-Menü. Bereits gesendete Nachrichten bleiben unverändert."
   },
   "research": {
-    "title": "Recherche",
     "noChat": "Öffne einen Chat und starte dann die Recherche.",
     "startFailed": "Die Recherche konnte nicht starten. Prüfe die Frage und versuche es erneut.",
     "stopFailed": "Die Recherche konnte nicht gestoppt werden. Sie läuft noch.",
     "incognito": "Die Recherche speichert einen Bericht im Chat. Beende zuerst den Inkognito-Chat.",
-    "close": "Schließen",
     "stop": "Stopp",
     "stopConsequence": "Stoppen behält, was schon geschrieben ist, und sucht nicht weiter.",
-    "stopped": "Die Recherche wurde gestoppt. Was schon geschrieben ist, bleibt in diesem Chat. Es wurde nicht weiter gesucht.",
-    "failed": "Die Recherche konnte nicht fertig werden. In diesem Chat ist nichts Neues hinzugekommen.",
-    "working": "Die Recherche läuft.",
-    "workingDone": "Die Recherche ist fertig.",
     "queued": "Die Recherche wartet. Sie wartet seit {seconds} Sekunden.",
-    "factCheck": "Faktenprüfung: {supported} von {total} Aussagen sind belegt. {removed} wurden entfernt.",
-    "find": "Der Bericht ist in diesem Chat. Du kannst ihn auch unter Bibliothek, dann Dateien, öffnen oder nach dem Titel suchen.",
-    "sourcesCount": "{found} gefunden, {read} gelesen, {blocked} blockiert",
-    "pointDone": "Fertig",
-    "pointOpen": "Noch offen",
-    "pointNotConfirmed": "Nicht bestätigt",
     "answerNow": "Jetzt antworten",
     "answerNowConsequence": {
       "reading": "Jetzt antworten schreibt den Bericht aus dem, was schon gelesen ist.",
@@ -1166,9 +1154,38 @@
     "answeredWithout": "Ohne die zusätzliche Suche beantwortet.",
     "lookDeeper": "Gründlicher nachsehen",
     "lookDeeperHint": "Liest mehr Quellen und prüft jede Aussage. Etwa {minutes} Minuten.",
-    "ceiling": {
-      "quick": "{points} Punkte — ein kurzer Blick",
-      "standard": "{points} Punkte — eine normale Recherche"
+    "turn": {
+      "working": "Recherchiere…",
+      "stepsSoFar": "Bisher {steps} Schritte · {sources} Quellen gelesen",
+      "summary": {
+        "complete": "Recherchiert: {steps} Schritte · {sources} Quellen gelesen",
+        "stopped": "Recherche nach {steps} Schritten gestoppt",
+        "failed": "Recherche konnte nicht abgeschlossen werden"
+      }
+    },
+    "step": {
+      "brief": "Frage verstanden",
+      "plan": "{count} Punkte geplant",
+      "search": "Gesucht",
+      "searchFiles": "In den Dateien gesucht",
+      "source": {
+        "found": "Gefunden",
+        "read": "Gelesen",
+        "blocked": "Nicht öffenbar"
+      },
+      "point": {
+        "answered": "Beantwortet",
+        "not_confirmed": "Nicht bestätigt",
+        "open": "Offen"
+      },
+      "round": "Runde {round}",
+      "writing": "Schreibe",
+      "section": "Geschrieben",
+      "checking": "Prüfe jede Aussage",
+      "check": "Faktencheck: {ratio} Aussagen belegt",
+      "complete": "Fertig",
+      "stopped": "Gestoppt",
+      "failed": "Nicht abgeschlossen"
     }
   }
 }

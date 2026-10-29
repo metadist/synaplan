@@ -143,10 +143,7 @@ final readonly class StreamCompletion
             'searchResults' => $searchResults,
             'ragSources' => $reply->ragSources,
             'aiModels' => $this->meta->buildAiModelsPayload($outgoing),
-            // Same two fields as the history endpoint, so Look deeper shows
-            // under the live answer and after a reload alike.
-            'effort' => $outgoing->getMeta(StreamMessageMeta::EFFORT),
-            'effortNotice' => $outgoing->getMeta(StreamMessageMeta::EFFORT_NOTICE),
+            ...StreamMessageMeta::effortPayload($outgoing),
         ]);
 
         // Only on the turn that named the chat, so the sidebar needs no refetch.

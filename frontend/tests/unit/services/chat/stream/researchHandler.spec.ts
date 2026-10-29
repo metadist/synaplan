@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { autoResearchHandlers } from '@/services/chat/stream/handlers/autoResearch'
 import {
   applyResearchFrame,
+  applyResearchSse,
+  currentStep,
   emptyProgress,
   parseResearchSse,
   progressFromRun,
@@ -53,6 +55,60 @@ describe('research event handler', () => {
     expect(progress.points).toEqual([{ id: 'p1', title: 'Delivery times', status: 'answered' }])
     expect(sourceCounts(progress)).toEqual({ found: 1, read: 1, blocked: 0 })
     expect(progress.check).toEqual({ statements: 4, supported: 3, removed: 1 })
+  })
+
+  it('records every step once, in order, and updates a source or point in place', () => {
+    let progress = emptyProgress('run-1', 7, 'When do the ferries run?')
+    for (const frame of parseResearchSse(FIXTURE)) progress = applyResearchFrame(progress, frame)
+
+    expect(progress.steps).toEqual([
+      { kind: 'plan', text: '1', status: null, ref: null },
+      { kind: 'source', text: 'Harbour notice', status: 'read', ref: 's1' },
+      { kind: 'point', text: '', status: 'answered', ref: 'p1' },
+      { kind: 'check', text: '3/4', status: null, ref: null },
+      { kind: 'complete', text: 'complete', status: null, ref: null },
+    ])
+    expect(currentStep(progress)).toEqual({
+      kind: 'complete',
+      text: 'complete',
+      status: null,
+      ref: null,
+    })
+  })
+
+  it('applies a replayed page once', () => {
+    let progress = emptyProgress('run-1', 7, 'When do the ferries run?')
+    const page = parseResearchSse(FIXTURE).slice(0, 3)
+    for (const frame of [...page, ...page]) progress = applyResearchFrame(progress, frame)
+
+    expect(progress.steps.map((step) => step.kind)).toEqual(['plan', 'source'])
+    expect(progress.lastSeq).toBe(3)
+  })
+
+  it('quotes the query, the goal and the section a step concerned', () => {
+    const body = [
+      'event: brief',
+      'data: {"goal":"Ferry times for Friday","language":"en","output":"brief"}',
+      '',
+      'event: search',
+      'data: {"point":"p1","query":"ferry timetable friday","scope":"web"}',
+      '',
+      'event: writing',
+      'data: {"section":"Times"}',
+      '',
+      'event: round',
+      'data: {"n":1,"max":2,"next":"read"}',
+      '',
+    ].join('\n')
+
+    const progress = applyResearchSse(emptyProgress('run-3', 7, 'Ferries?'), body)
+
+    expect(progress.steps.map((step) => [step.kind, step.text])).toEqual([
+      ['brief', 'Ferry times for Friday'],
+      ['search', 'ferry timetable friday'],
+      ['writing', 'Times'],
+      ['round', '1/2'],
+    ])
   })
 
   it('marks a stop and keeps the check that arrived with the run', () => {
@@ -113,6 +169,7 @@ describe('research_started on the chat stream', () => {
     )
 
     expect(turn.research.adopt).toHaveBeenCalledWith('rr_0123456789abcdef')
+    expect(turn.message()?.researchRunId).toBe('rr_0123456789abcdef')
   })
 
   it('ignores an event without a run id', () => {

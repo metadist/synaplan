@@ -1139,25 +1139,13 @@
     "deleteConfirm": "/{command} disappears from the chat menu. Messages you already sent stay as they are."
   },
   "research": {
-    "title": "Research",
     "noChat": "Open a chat, then start research.",
     "startFailed": "Research could not start. Check the question and try again.",
     "stopFailed": "Research could not be stopped. It is still running.",
     "incognito": "Research saves a report in the chat. End the incognito chat first.",
-    "close": "Close",
     "stop": "Stop",
     "stopConsequence": "Stopping keeps what was already written and does not search further.",
-    "stopped": "Research stopped. What was already written stays in this chat. Nothing further was searched.",
-    "failed": "Research could not finish. Nothing new was added to this chat.",
-    "working": "Research is working.",
-    "workingDone": "Research finished.",
     "queued": "Research is queued. It has been waiting {seconds} seconds.",
-    "factCheck": "Fact-check: {supported} of {total} statements are backed. {removed} were removed.",
-    "find": "The report is in this chat. You can also open it under Library, then Files, or search for its title.",
-    "sourcesCount": "{found} found, {read} read, {blocked} blocked",
-    "pointDone": "Done",
-    "pointOpen": "Still open",
-    "pointNotConfirmed": "Not confirmed",
     "answerNow": "Answer now",
     "answerNowConsequence": {
       "reading": "Answer now writes the report from what was already read.",
@@ -1168,9 +1156,38 @@
     "answeredWithout": "Answered without the extra look.",
     "lookDeeper": "Look deeper",
     "lookDeeperHint": "Reads more sources and checks every statement. About {minutes} minutes.",
-    "ceiling": {
-      "quick": "{points} points — a short look",
-      "standard": "{points} points — a standard look"
+    "turn": {
+      "working": "Researching…",
+      "stepsSoFar": "{steps} steps so far · {sources} sources read",
+      "summary": {
+        "complete": "Researched: {steps} steps · {sources} sources read",
+        "stopped": "Research stopped after {steps} steps",
+        "failed": "Research could not finish"
+      }
+    },
+    "step": {
+      "brief": "Understood the question",
+      "plan": "Planned {count} points",
+      "search": "Searched",
+      "searchFiles": "Searched the files",
+      "source": {
+        "found": "Found",
+        "read": "Read",
+        "blocked": "Could not open"
+      },
+      "point": {
+        "answered": "Answered",
+        "not_confirmed": "Not confirmed",
+        "open": "Open"
+      },
+      "round": "Round {round}",
+      "writing": "Writing",
+      "section": "Wrote",
+      "checking": "Checking every statement",
+      "check": "Fact-check: {ratio} statements backed",
+      "complete": "Done",
+      "stopped": "Stopped",
+      "failed": "Could not finish"
     }
   }
 }

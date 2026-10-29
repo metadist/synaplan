@@ -1074,25 +1074,13 @@
     "deleteConfirm": "/{command} sohbet menüsünden kaldırılır. Daha önce gönderdiğiniz mesajlar olduğu gibi kalır."
   },
   "research": {
-    "title": "Araştırma",
     "noChat": "Bir sohbet aç, sonra araştırmayı başlat.",
     "startFailed": "Araştırma başlatılamadı. Soruyu kontrol edip yeniden dene.",
     "stopFailed": "Araştırma durdurulamadı. Hâlâ sürüyor.",
     "incognito": "Araştırma raporu sohbete kaydeder. Önce gizli sohbeti bitir.",
-    "close": "Kapat",
     "stop": "Durdur",
     "stopConsequence": "Durdurmak şimdiye kadar yazılanı tutar ve başka arama yapmaz.",
-    "stopped": "Araştırma durdu. Şimdiye kadar yazılan bu sohbette kalır. Başka arama yapılmadı.",
-    "failed": "Araştırma bitirilemedi. Bu sohbete yeni bir şey eklenmedi.",
-    "working": "Araştırma sürüyor.",
-    "workingDone": "Araştırma bitti.",
     "queued": "Araştırma sırada. {seconds} saniyedir bekliyor.",
-    "factCheck": "Olgu kontrolü: {total} ifadeden {supported} tanesi destekleniyor. {removed} tanesi çıkarıldı.",
-    "find": "Rapor bu sohbette. Kitaplık, sonra Dosyalar altında da açabilir veya başlığıyla arayabilirsin.",
-    "sourcesCount": "{found} bulundu, {read} okundu, {blocked} engellendi",
-    "pointDone": "Bitti",
-    "pointOpen": "Açık",
-    "pointNotConfirmed": "Doğrulanmadı",
     "answerNow": "Şimdi yanıtla",
     "answerNowConsequence": {
       "reading": "Şimdi yanıtla, okunanlardan raporu yazar.",
@@ -1103,9 +1091,38 @@
     "answeredWithout": "Ek arama olmadan yanıtlandı.",
     "lookDeeper": "Daha derin bak",
     "lookDeeperHint": "Daha fazla kaynak okur ve her ifadeyi kontrol eder. Yaklaşık {minutes} dakika.",
-    "ceiling": {
-      "quick": "{points} madde — kısa bir bakış",
-      "standard": "{points} madde — standart bir araştırma"
+    "turn": {
+      "working": "Araştırılıyor…",
+      "stepsSoFar": "Şimdiye kadar {steps} adım · {sources} kaynak okundu",
+      "summary": {
+        "complete": "Araştırıldı: {steps} adım · {sources} kaynak okundu",
+        "stopped": "Araştırma {steps} adımdan sonra durduruldu",
+        "failed": "Araştırma tamamlanamadı"
+      }
+    },
+    "step": {
+      "brief": "Soru anlaşıldı",
+      "plan": "{count} nokta planlandı",
+      "search": "Arandı",
+      "searchFiles": "Dosyalarda arandı",
+      "source": {
+        "found": "Bulundu",
+        "read": "Okundu",
+        "blocked": "Açılamadı"
+      },
+      "point": {
+        "answered": "Yanıtlandı",
+        "not_confirmed": "Doğrulanmadı",
+        "open": "Açık"
+      },
+      "round": "Tur {round}",
+      "writing": "Yazılıyor",
+      "section": "Yazıldı",
+      "checking": "Her ifade kontrol ediliyor",
+      "check": "Doğrulama: {ratio} ifade desteklendi",
+      "complete": "Bitti",
+      "stopped": "Durduruldu",
+      "failed": "Tamamlanamadı"
     }
   }
 }

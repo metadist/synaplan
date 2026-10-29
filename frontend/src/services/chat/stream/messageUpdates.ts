@@ -231,4 +231,5 @@ export function applyRouting(message: Message, data: StreamUpdatePayload): void 
     message.effort = data.effort
     message.effortNotice = data.effortNotice ?? null
   }
+  if (data.researchRunId) message.researchRunId = data.researchRunId
 }

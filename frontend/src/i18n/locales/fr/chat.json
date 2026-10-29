@@ -1139,25 +1139,13 @@
     "deleteConfirm": "/{command} disparaît du menu du chat. Les messages déjà envoyés restent inchangés."
   },
   "research": {
-    "title": "Recherche",
     "noChat": "Ouvrez un chat, puis lancez la recherche.",
     "startFailed": "La recherche n'a pas pu démarrer. Vérifiez la question et réessayez.",
     "stopFailed": "La recherche n'a pas pu être arrêtée. Elle continue.",
     "incognito": "La recherche enregistre un rapport dans le chat. Terminez d'abord le chat incognito.",
-    "close": "Fermer",
     "stop": "Arrêter",
     "stopConsequence": "Arrêter conserve ce qui est déjà écrit et ne cherche plus.",
-    "stopped": "La recherche est arrêtée. Ce qui était déjà écrit reste dans ce chat. Rien de plus n'a été cherché.",
-    "failed": "La recherche n'a pas pu se terminer. Rien de nouveau n'a été ajouté à ce chat.",
-    "working": "La recherche est en cours.",
-    "workingDone": "La recherche est terminée.",
     "queued": "La recherche est en attente. Elle attend depuis {seconds} secondes.",
-    "factCheck": "Vérification : {supported} affirmations sur {total} sont étayées. {removed} ont été retirées.",
-    "find": "Le rapport est dans ce chat. Vous pouvez aussi l'ouvrir sous Bibliothèque, puis Fichiers, ou le chercher par son titre.",
-    "sourcesCount": "{found} trouvées, {read} lues, {blocked} bloquées",
-    "pointDone": "Fait",
-    "pointOpen": "Encore ouvert",
-    "pointNotConfirmed": "Non confirmé",
     "answerNow": "Répondre maintenant",
     "answerNowConsequence": {
       "reading": "Répondre maintenant rédige le rapport à partir de ce qui a déjà été lu.",
@@ -1168,9 +1156,38 @@
     "answeredWithout": "Répondu sans la recherche supplémentaire.",
     "lookDeeper": "Approfondir la recherche",
     "lookDeeperHint": "Lit plus de sources et vérifie chaque affirmation. Environ {minutes} minutes.",
-    "ceiling": {
-      "quick": "{points} points — un coup d'œil rapide",
-      "standard": "{points} points — une recherche standard"
+    "turn": {
+      "working": "Recherche en cours…",
+      "stepsSoFar": "{steps} étapes jusqu’ici · {sources} sources lues",
+      "summary": {
+        "complete": "Recherché : {steps} étapes · {sources} sources lues",
+        "stopped": "Recherche arrêtée après {steps} étapes",
+        "failed": "La recherche n’a pas pu aboutir"
+      }
+    },
+    "step": {
+      "brief": "Question comprise",
+      "plan": "{count} points planifiés",
+      "search": "Recherché",
+      "searchFiles": "Recherché dans les fichiers",
+      "source": {
+        "found": "Trouvée",
+        "read": "Lue",
+        "blocked": "Impossible à ouvrir"
+      },
+      "point": {
+        "answered": "Répondu",
+        "not_confirmed": "Non confirmé",
+        "open": "Ouvert"
+      },
+      "round": "Tour {round}",
+      "writing": "Rédaction",
+      "section": "Rédigé",
+      "checking": "Vérification de chaque affirmation",
+      "check": "Vérification : {ratio} affirmations étayées",
+      "complete": "Terminé",
+      "stopped": "Arrêtée",
+      "failed": "Non aboutie"
     }
   }
 }

@@ -7,7 +7,8 @@ import { ChatHelper } from '../helpers/chat'
 /**
  * Research the chat starts on its own. The chat stream is stubbed: the
  * sorter's verdict is a model call, and the test asserts the journey around
- * it — the notice sentence, the card, Answer now, Look deeper — not the verdict.
+ * it — the reply bubble working, the report in that bubble, the steps fold,
+ * Answer now, Look deeper — not the verdict.
  */
 
 const CAPABILITIES = {
@@ -29,6 +30,7 @@ const QUESTION = 'Which visa do I need for Japan and how long does it take?'
 const NOTICE =
   'I am looking through several sources for this — about 6 minutes. The question has several parts.'
 const DIRECT_ANSWER = 'Most tourists need no visa for up to 90 days.'
+const REPORT = 'No visa for 90 days.'
 
 function showBody(status: string, outcome: { code: string } | null = null) {
   return {
@@ -48,7 +50,7 @@ function showBody(status: string, outcome: { code: string } | null = null) {
     plan: { points: [{ id: 'p1', title: 'Visa types', status: 'answered' }] },
     sources: [{ id: 's1', title: 'Embassy notice', status: 'read' }],
     evidence: [{ source: 's1', quotes: [{ text: 'A tourist stay is visa-free for 90 days.' }] }],
-    report: status === 'complete' ? { markdown: 'No visa for 90 days.', version: 1 } : null,
+    report: status === 'complete' ? { markdown: REPORT, version: 1 } : null,
     check: { statements: 4, supported: 3, removed: 1 },
     outcome: outcome ? { ...outcome, params: {}, text: '' } : null,
     models: {},
@@ -109,8 +111,48 @@ async function stubChatStream(page: Page, mode: 'research' | 'lookup') {
   })
 }
 
+/**
+ * The research stubs. The chat's message history is stubbed too: once the
+ * run is complete the reply that announced it carries the report and the
+ * run id, exactly as the backend rewrites it — the stream above never
+ * reaches the real backend, so nothing else would be there to reload.
+ */
 async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
+  // The run stays busy for three polls (about four seconds), so the working
+  // reply can be looked at before the report replaces it.
   let framesSent = 0
+  let ended = false
+  const finished = () => ended || (mode !== 'answer_now' && framesSent >= 3)
+  await page.route('**/api/v1/chats/*/messages**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    const messages = finished()
+      ? [
+          { id: 1, direction: 'IN', text: QUESTION, timestamp: 1_790_000_000 },
+          {
+            id: 2,
+            direction: 'OUT',
+            text: REPORT,
+            timestamp: 1_790_000_001,
+            provider: 'research',
+            effort: 'research',
+            effortNotice: null,
+            researchRunId: RUN_ID,
+          },
+        ]
+      : []
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        messages,
+        pagination: { offset: 0, limit: 50, total: messages.length, hasMore: false },
+      }),
+    })
+  })
   await page.route('**/api/v1/research/*', async (route) => {
     const url = route.request().url()
     if (
@@ -126,7 +168,7 @@ async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
       await route.fallback()
       return
     }
-    const status = mode === 'answer_now' ? 'gathering' : framesSent > 1 ? 'complete' : 'gathering'
+    const status = finished() ? 'complete' : 'gathering'
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -157,14 +199,15 @@ async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
   await page.route('**/api/v1/research/*/events**', async (route) => {
     framesSent += 1
     const body =
-      mode === 'answer_now' || framesSent === 1
-        ? 'id: 1\nevent: plan\ndata: {"points":[{"id":"p1","title":"Visa types"}],"ceiling":"quick"}\n\nid: 2\nevent: source\ndata: {"id":"s1","status":"read"}\n\n'
-        : 'id: 3\nevent: check\ndata: {"statements":4,"supported":3,"removed":1}\n\nid: 4\nevent: complete\ndata: {}\n\n'
+      mode === 'answer_now' || framesSent < 3
+        ? 'id: 1\nevent: plan\ndata: {"points":[{"id":"p1","title":"Visa types"}],"ceiling":"quick"}\n\nid: 2\nevent: search\ndata: {"point":"p1","query":"japan tourist visa","scope":"web"}\n\nid: 3\nevent: source\ndata: {"id":"s1","title":"Embassy notice","status":"read"}\n\n'
+        : 'id: 4\nevent: check\ndata: {"statements":4,"supported":3,"removed":1}\n\nid: 5\nevent: complete\ndata: {"outcome":{"code":"complete"}}\n\n'
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body })
   })
   await page.route('**/api/v1/research/*/input', async (route) => {
     const body = route.request().postDataJSON() as { type?: string }
     expect(body.type).toBe('answer_now')
+    ended = true
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -205,7 +248,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator(selectors.research.menu)).toHaveCount(0)
   })
 
-  test('a question that needs several sources gets the notice, the card, the fact-check, and survives a reload', async ({
+  test('a question that needs several sources shows the research working in the reply, then the report, and survives a reload', async ({
     page,
   }) => {
     await stubResearch(page, 'run')
@@ -213,21 +256,34 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await openApp(page)
     const chat = new ChatHelper(page)
     await chat.startNewChat()
+    await chat.sendMessage(QUESTION)
 
-    const previousCount = await chat.sendMessage(QUESTION)
-    const answer = await chat.waitForAnswer(previousCount)
-    expect(answer).toContain('about 6 minutes')
+    // While the run works the reply shows the run, not the fallback sentence.
+    const bubble = chat.conversationBubbles().last()
+    const turn = bubble.locator(selectors.research.turn)
+    await expect(turn).toBeVisible()
+    await expect(bubble.locator(selectors.research.working)).toContainText('Researching')
+    await expect(bubble.locator(selectors.research.activity)).toContainText('Embassy notice')
+    await expect(bubble).not.toContainText('about 6 minutes')
+    await expect(page.locator(selectors.research.answerNow)).toBeVisible()
 
-    const card = page.locator(selectors.research.card)
-    await expect(card).toBeVisible()
-    await expect(card).toContainText(QUESTION)
-    await expect(page.locator(selectors.research.ceiling)).toContainText('a short look')
-    await expect(page.locator(selectors.research.factCheck)).toContainText('3 of 4')
-    await expect(page.locator(selectors.research.find)).toBeVisible()
+    // Once it is done, the report is the reply and one line stays below it.
+    const done = chat.conversationBubbles().last().locator(selectors.research.turn)
+    await expect(done).toHaveAttribute('data-status', 'complete')
+    await expect(chat.conversationBubbles().last()).toContainText(REPORT)
+    await expect(done.locator(selectors.research.summary)).toContainText('sources read')
+    await expect(page.locator(selectors.research.answerNow)).toHaveCount(0)
+    await done.locator(selectors.research.stepsToggle).click()
+    const steps = done.locator(selectors.research.steps)
+    await expect(steps).toContainText('japan tourist visa')
+    await expect(steps).toContainText('Embassy notice')
+    await expect(steps).toContainText('3/4')
 
     await page.reload()
-    await expect(page.locator(selectors.research.factCheck)).toBeVisible()
-    await expect(page.locator(selectors.research.find)).toBeVisible()
+    const reloaded = page.locator(selectors.research.turn)
+    await expect(reloaded).toHaveAttribute('data-status', 'complete')
+    await expect(reloaded.locator(selectors.research.summary)).toBeVisible()
+    await expect(page.locator(selectors.chat.messageText).last()).toContainText(REPORT)
   })
 
   test('Answer now is the primary action and says what it does right now', async ({ page }) => {
@@ -236,23 +292,21 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await openApp(page)
     const chat = new ChatHelper(page)
     await chat.startNewChat()
+    await chat.sendMessage(QUESTION)
 
-    const previousCount = await chat.sendMessage(QUESTION)
-    await chat.waitForAnswer(previousCount)
-
-    const card = page.locator(selectors.research.card)
-    await expect(card).toBeVisible()
+    const turn = page.locator(selectors.research.turn)
+    await expect(turn).toBeVisible()
     await expect(page.locator(selectors.research.answerNowConsequence)).toContainText(
       'from what was already read'
     )
     await expect(page.locator(selectors.research.stop)).toBeVisible()
     await page.locator(selectors.research.answerNow).click()
 
-    await expect(card).toHaveAttribute('data-status', 'complete')
-    await expect(page.locator(selectors.research.find)).toBeVisible()
+    await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
+    await expect(page.locator(selectors.chat.messageText).last()).toContainText(REPORT)
   })
 
-  test('Look deeper under a direct answer starts the research the chat skipped', async ({
+  test('Look deeper under a direct answer starts the research the chat skipped in a new reply', async ({
     page,
   }) => {
     await stubResearch(page, 'run')
@@ -272,10 +326,10 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     )
     await lookDeeper.click()
 
-    const card = page.locator(selectors.research.card)
-    await expect(card).toBeVisible()
-    await expect(card).toContainText(QUESTION)
-    await expect(page.locator(selectors.research.factCheck)).toContainText('3 of 4')
+    const turn = chat.conversationBubbles().last().locator(selectors.research.turn)
+    await expect(turn).toBeVisible()
+    await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
+    await expect(page.locator(selectors.chat.messageText).last()).toContainText(REPORT)
   })
 
   test('Look deeper is absent when automatic research is off', async ({ page }) => {
@@ -291,23 +345,21 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator(selectors.research.lookDeeper)).toHaveCount(0)
   })
 
-  test('the card fits a 320 px width in the dark theme', async ({ page }) => {
+  test('the working reply fits a 320 px width in the dark theme', async ({ page }) => {
     await stubResearch(page, 'answer_now')
     await stubChatStream(page, 'research')
     await openApp(page)
     const chat = new ChatHelper(page)
     await chat.startNewChat()
+    await chat.sendMessage(QUESTION)
 
-    const previousCount = await chat.sendMessage(QUESTION)
-    await chat.waitForAnswer(previousCount)
-
-    const card = page.locator(selectors.research.card)
-    await expect(card).toBeVisible()
+    const turn = page.locator(selectors.research.turn)
+    await expect(turn).toBeVisible()
     await page.setViewportSize({ width: 320, height: 700 })
     await page.evaluate(() => document.documentElement.classList.add('dark'))
-    await expect(card).toBeVisible()
+    await expect(turn).toBeVisible()
     await expect(page.locator(selectors.research.answerNow)).toBeVisible()
-    const box = await card.boundingBox()
+    const box = await turn.boundingBox()
     expect(box).not.toBeNull()
     expect(box!.x).toBeGreaterThanOrEqual(0)
     expect(box!.x + box!.width).toBeLessThanOrEqual(321)

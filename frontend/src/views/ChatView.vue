@@ -251,6 +251,7 @@
               :voice-reply-failed="message.voiceReplyFailed"
               :effort="message.effort"
               :effort-notice="message.effortNotice"
+              :research-run-id="message.researchRunId"
               :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
               :rag-sources="message.ragSources"

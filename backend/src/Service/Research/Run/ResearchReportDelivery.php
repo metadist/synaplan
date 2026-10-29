@@ -8,7 +8,9 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Repository\MessageMetaRepository;
 use App\Repository\UserRepository;
+use App\Service\Chat\Stream\StreamMessageMeta;
 use App\Service\File\FileStorageService;
 use App\Service\Media\GeneratedFileRegistrar;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,6 +21,12 @@ use Psr\Log\LoggerInterface;
  * assistant's message with the markdown file attached, or the sentence why
  * the run ended without one. A run that did not complete says so above the
  * report, so a partial report never reads as a finished one.
+ *
+ * A run the chat started on its own already has a reply — the one stamped
+ * with the run id — and the report replaces that reply's text, so the person
+ * reads the answer in the bubble that showed the research. A run started
+ * by Look deeper has none, so its report becomes a new reply carrying the
+ * same stamp.
  *
  * An API run has no chat, so this does nothing for it. Posting happens once
  * per run; a failure is logged and never undoes the finished run.
@@ -34,6 +42,7 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         private ResearchStateStore $store,
         private ResearchOutcomeText $outcomes,
         private LoggerInterface $logger,
+        private MessageMetaRepository $metas,
         private ?ResearchDirectAnswer $direct = null,
     ) {
     }
@@ -70,8 +79,24 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
     private function post(ResearchRunState $state, Chat $chat): Message
     {
         $locale = $this->locale($state->ref->userId);
+        $message = $this->metas->findMessageInChatByMeta((int) $chat->getId(), StreamMessageMeta::RESEARCH_RUN, $state->ref->id)
+            ?? $this->newReply($state, $chat, $locale);
+        $message
+            ->setText($this->text($state, $locale))
+            ->setStatus('complete')
+            ->setMeta(StreamMessageMeta::RESEARCH_RUN, $state->ref->id);
+        $this->em->persist($message);
+        $chat->updateTimestamp();
+        $this->em->flush();
+
+        return $message;
+    }
+
+    private function newReply(ResearchRunState $state, Chat $chat, string $locale): Message
+    {
         $now = time();
-        $message = (new Message())
+
+        return (new Message())
             ->setUserId($state->ref->userId)
             ->setChat($chat)
             ->setTrackingId($now)
@@ -82,14 +107,7 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
             ->setFile(0)
             ->setTopic('CHAT')
             ->setLanguage($locale)
-            ->setText($this->text($state, $locale))
-            ->setDirection('OUT')
-            ->setStatus('complete');
-        $this->em->persist($message);
-        $chat->updateTimestamp();
-        $this->em->flush();
-
-        return $message;
+            ->setDirection('OUT');
     }
 
     private function text(ResearchRunState $state, string $locale): string

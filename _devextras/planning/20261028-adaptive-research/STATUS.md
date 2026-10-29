@@ -202,3 +202,45 @@ ceiling `standard`; `POST /v1/research/{id}/cancel` → 200.
 The eval needed the gateway on (`MESSAGES_GATEWAY.ENABLED`,
 `ALLOW_OPERATOR_KEY`) on the dev database; both rows were set back to `0`
 afterwards.
+
+## 2026-10-29 — The research lives in the reply bubble
+
+Owner feedback after walking J-AR-1 on the dev stack: the research card
+under the thread was a second surface, and the notice sentence read as
+boilerplate. The card is gone. The reply the chat gives when it starts a
+run is the surface, from the first second to the finished report:
+
+- Backend: the reply is stamped `research_run_id` (meta, exposed as
+  `researchRunId` on the history row and on the stream's `complete`).
+  `ResearchReportDelivery` now finds that reply
+  (`MessageMetaRepository::findMessageInChatByMeta`) and writes the report
+  into its text — status `complete`, file attached — instead of posting a
+  second message; a run without such a reply (Look deeper, the API) still
+  gets a new one, stamped the same way. The notice sentence stays as the
+  text a channel without the UI reads and the text the report replaces.
+- Frontend: `ResearchTurn.vue` inside the bubble. Running: spinner,
+  "Researching…", the last step as a live line ("Read · Embassy notice"),
+  a fold "3 steps so far · 1 sources read" that opens the full step list
+  (`ResearchSteps.vue`: plan, searches with their queries, sources
+  found/read/blocked, points, rounds, sections written, the fact-check),
+  **Answer now** / **Stop** with their consequence in one line; the
+  fallback sentence is hidden while the run is live. Done: the report is
+  the bubble's text and one muted line stays below it ("Researched: 7
+  steps · 1 sources read") that opens the same list — after a reload the
+  list is rebuilt once from `GET /research/{id}/events?after=0`, and a run
+  still going is followed again from there. The event handler keeps an
+  ordered `steps[]` and ignores a replayed page by sequence.
+  Look deeper appends an empty reply bound to the new run, so it works in
+  its own bubble, and the reload after the run brings the persisted one.
+- Removed: `ResearchHost.vue`, `ResearchCard.vue`, the teleport under the
+  thread; the chat binding moved to `useResearchBinding()` in
+  `MainLayout`. Locale keys for the card went, `research.turn.*` and
+  `research.step.*` came, in all five locales.
+
+Walked (Playwright, stubbed stream and run, chromium): the working reply
+with the live line and Answer now; the report replacing it with the
+steps line below; the fold showing the query, the source and "3/4"; the
+reload showing the report and the line; Answer now ending the run in the
+same bubble; Look deeper opening its own reply that ends with the report;
+320 px dark. Screenshots were taken for the two states and reviewed
+(light working state, dark 320 px working state).

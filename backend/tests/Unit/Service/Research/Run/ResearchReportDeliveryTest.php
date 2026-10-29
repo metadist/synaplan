@@ -9,6 +9,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Repository\MessageMetaRepository;
 use App\Repository\UserRepository;
 use App\Service\File\FileStorageService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -70,6 +71,30 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame(0, $this->registered);
     }
 
+    public function testTheReportReplacesTheReplyThatAnnouncedTheRun(): void
+    {
+        $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, '# Prices'."\n\nThe price is 12.", 11);
+        $reply = (new Message())->setText('Looking into this in several sources.')->setStatus('complete');
+        $reply->setMeta('research_run_id', $state->ref->id);
+
+        $this->delivery($reply)->deliver($state);
+
+        self::assertCount(1, $this->posted);
+        self::assertSame($reply, $this->posted[0]);
+        self::assertSame("# Prices\n\nThe price is 12.", $reply->getText());
+        self::assertSame($state->ref->id, $reply->getMeta('research_run_id'));
+        self::assertCount(1, $reply->getFiles());
+    }
+
+    public function testANewReplyCarriesTheRunIdSoTheStepsCanBeOpenedLater(): void
+    {
+        $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, 'Report.', 11);
+
+        $this->delivery()->deliver($state);
+
+        self::assertSame($state->ref->id, $this->posted[0]->getMeta('research_run_id'));
+    }
+
     public function testNothingIsPostedForAnApiRunOrSomeoneElsesChat(): void
     {
         $this->delivery()->deliver($this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, 'Report.', null));
@@ -93,8 +118,10 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         return $state;
     }
 
-    private function delivery(): ResearchReportDelivery
+    private function delivery(?Message $announcing = null): ResearchReportDelivery
     {
+        $metas = $this->createStub(MessageMetaRepository::class);
+        $metas->method('findMessageInChatByMeta')->willReturn($announcing);
         $mine = $this->createStub(Chat::class);
         $mine->method('getUserId')->willReturn(7);
         $theirs = $this->createStub(Chat::class);
@@ -139,6 +166,7 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
             $this->store,
             new ResearchOutcomeText($translator),
             new NullLogger(),
+            $metas,
         );
     }
 }
