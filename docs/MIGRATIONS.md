@@ -17,6 +17,7 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 | Saved Tasks + connections (`BSAVEDTASKS`, `BSAVEDTASK_RUNS`, `BCONNECTIONS`, `BCREDENTIALS`) | Doctrine migration `Version20260815140000` | dev + prod      |
 | Demo widget config (`BCONFIG`)   | `App\Seed\DemoWidgetConfigSeeder`                                | dev + test only |
 | Demo users (`BUSER`)             | `App\DataFixtures\UserFixtures`                                  | dev + test only |
+| Test cloud instance (`BPLATFORMINSTANCES`) | `App\DataFixtures\PlatformInstanceFixtures` — one approved OpenCloud instance with a fixed id and secret, so the cloud apps' CI never mints a credential | dev + test only |
 
 
 The orchestrator `app:seed` runs all idempotent seeders in the correct dependency order
