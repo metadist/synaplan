@@ -1,6 +1,8 @@
 import {
   GetApiConfigModelsListResponseSchema,
+  GetApiConfigRoutingPlannerModelGetResponseSchema,
   PostApiConfigModelsDefaultsSaveResponseSchema,
+  PostApiConfigRoutingPlannerModelSaveResponseSchema,
 } from '@/generated/api-schemas'
 import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import { httpClient } from './httpClient'
@@ -97,33 +99,42 @@ export interface ResetDefaultsResponse {
   defaults: Record<string, number>
 }
 
-export interface PlannerModelResponse {
-  success: boolean
-  modelId: number | null
-  fallbackModelId: number | null
+export type PlannerModelResponse = z.infer<typeof GetApiConfigRoutingPlannerModelGetResponseSchema>
+
+export type SavePlannerModelResponse = z.infer<
+  typeof PostApiConfigRoutingPlannerModelSaveResponseSchema
+>
+
+export interface SaveAgentModelsRequest {
+  modelId?: number | null
+  readingModelId?: number | null
+  checkingModelId?: number | null
 }
 
 /**
- * Get the planner model selection (DEFAULTMODEL.PLAN) for the current user,
- * plus the Sorting model id it falls back to when no planner model is set.
+ * Get the planner and research model selections for the current user.
  */
 export const getPlannerModel = async (): Promise<PlannerModelResponse> => {
-  return httpClient<PlannerModelResponse>('/api/v1/config/routing/planner-model')
+  return httpClient('/api/v1/config/routing/planner-model', {
+    schema: GetApiConfigRoutingPlannerModelGetResponseSchema,
+  })
 }
 
 /**
- * Save (modelId) or clear (null) the per-user planner model override.
+ * Save (modelId) or clear (null) the per-user planner or research model overrides.
  */
 export const savePlannerModel = async (
-  modelId: number | null
-): Promise<{ success: boolean; modelId: number | null }> => {
-  return httpClient<{ success: boolean; modelId: number | null }>(
-    '/api/v1/config/routing/planner-model',
-    {
-      method: 'POST',
-      body: JSON.stringify({ modelId }),
-    }
-  )
+  modelIdOrPayload: number | null | SaveAgentModelsRequest
+): Promise<SavePlannerModelResponse> => {
+  const payload: SaveAgentModelsRequest =
+    typeof modelIdOrPayload === 'object' && modelIdOrPayload !== null
+      ? modelIdOrPayload
+      : { modelId: modelIdOrPayload }
+  return httpClient('/api/v1/config/routing/planner-model', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    schema: PostApiConfigRoutingPlannerModelSaveResponseSchema,
+  })
 }
 
 /**

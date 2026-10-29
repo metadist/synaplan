@@ -384,4 +384,28 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator('html')).toHaveClass(/design-v2/)
     await expect(page.locator('html')).toHaveClass(/dark/)
   })
+
+  test('fine-tuning under /ai/models is collapsed by default and offers reading and fact-checking overrides', async ({
+    page,
+  }) => {
+    await openApp(page)
+    await page.goto('/ai/models')
+
+    const section = page.locator('[data-testid="section-routing-planner-model"]')
+    await expect(section).toBeVisible()
+    const toggle = section.locator('[data-testid="btn-toggle-agent-models"]')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(section.locator('[data-testid="badge-agent-models-summary"]')).toContainText(
+      'All automatic'
+    )
+
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(section.locator('[data-testid="select-planner-model"]')).toBeVisible()
+    await expect(section.locator('[data-testid="select-research-reading-model"]')).toBeVisible()
+    await expect(section.locator('[data-testid="select-research-checking-model"]')).toBeVisible()
+    await expect(section.locator('[data-testid="text-research-lead-note"]')).toContainText(
+      'always use the model selected in your chat'
+    )
+  })
 })

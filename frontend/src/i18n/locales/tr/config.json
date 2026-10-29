@@ -563,7 +563,20 @@
       "plannerModelSaveFailed": "Planlayıcı modeli kaydedilemedi.",
       "plannerModelLoadFailed": "Planlayıcı modeli yüklenemedi.",
       "legacyTitle": "Eski yedek (yönetici)",
-      "legacyDesc": "Tek konulu yapay zeka sıralayıcı promptu; yalnızca çoklu görev yönlendirmesi kapalıyken kullanılır."
+      "legacyDesc": "Tek konulu yapay zeka sıralayıcı promptu; yalnızca çoklu görev yönlendirmesi kapalıyken kullanılır.",
+      "agentTuningTitle": "Ajanlar ve Araştırma için İnce Ayar (İsteğe Bağlı)",
+      "agentTuningDesc": "Görev planlama, kaynak okuma ve doğrulama işlemlerini hangi modellerin yapacağını isteğe bağlı olarak seçin. Varsayılan olarak Sıralama ve Metin Analizi modelleriniz otomatik kullanılır.",
+      "agentTuningAllAuto": "Tümü otomatik",
+      "agentTuningCustomCount": "{count} özel seçim",
+      "plannerSlotLabel": "Görev planlama",
+      "plannerSlotHint": "Karmaşık istekleri adımlara ayırır.",
+      "readingSlotLabel": "Kaynak okuma",
+      "readingModelAuto": "Otomatik (Sıralama modelini kullan)",
+      "readingSlotHint": "Açılan her kaynağı okur ve kanıtları çıkarır.",
+      "checkingSlotLabel": "Doğrulama (Faktencheck)",
+      "checkingModelAuto": "Otomatik (farklı sağlayıcı / Metin Analizi)",
+      "checkingSlotHint": "Alıntılanan her ifadeyi kaynağıyla karşılaştırır.",
+      "researchLeadNote": "Araştırmayı yönetmek ve yanıtı yazmak her zaman sohbette seçtiğiniz modeli kullanır."
     },
     "sortingPrompt": {
       "title": "Önişlemci",

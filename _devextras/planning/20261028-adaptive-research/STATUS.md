@@ -286,3 +286,23 @@ report, and `[e47]`-style evidence ids as raw text.
 Walked (Playwright, stubbed): the report with the `1` badge, the source
 card with its host, the fact-check row with its detail, no "Web Search"
 badge, the reload; 320 px dark. Screenshot reviewed.
+
+## 2026-10-29 — Fine-tuning for agents & research under `/ai/models`
+
+Instead of adding five research role dropdowns or a second card beneath
+the 11-capability grid, `PlannerModelCard.vue` is now a collapsible
+"Fine-Tuning for Agents & Research (Optional)" card (collapsed by
+default, summary badge showing "All automatic" or "{count} custom") with
+a 3-column row when research is enabled (`PLAN` task planning, `READ`
+reading sources, `VERIFY` fact-checking) and the note that leading the
+research and writing the answer always use the model selected in the
+chat. When research is off, the two research slots and the note are
+absent (U11).
+
+- Backend: `RoutingModelsService::plannerSelection()` and
+  `saveAgentModels()` expose and store per-user `DEFAULTMODEL.READ` and
+  `DEFAULTMODEL.VERIFY` alongside `DEFAULTMODEL.PLAN`, plus
+  `researchEnabled`. `ConfigResearchModelLookup::slot()` checks
+  `ModelConfigService::getConfiguredDefaultModel()` first so a per-user
+  `READ` or `VERIFY` override wins over the seeded `-1` instance row.
+- OpenAPI & Zod schemas regenerated; all five locales updated.
