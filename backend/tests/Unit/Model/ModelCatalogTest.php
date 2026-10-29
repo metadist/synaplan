@@ -658,6 +658,7 @@ class ModelCatalogTest extends TestCase
             'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
             'mistral-large-4' => ['mistral:mistral-large-4', 0.068],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
+            'gemini-4-argon' => ['google:gemini-4-argon', 0.10],
             'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
             'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
             'gemini-3.5-flash-lite' => ['google:gemini-3.5-flash-lite', 0.03],
@@ -1802,5 +1803,33 @@ class ModelCatalogTest extends TestCase
         $this->assertSame(360, $stt[0]['id']);
         $this->assertSame('per_second', $stt[0]['json']['pricing_mode'] ?? null);
         $this->assertEqualsWithDelta(0.003, (float) $stt[0]['priceIn'], 1e-9);
+    }
+
+    /**
+     * Gemini 4 Argon intro price through 2026-11-30: $2 / $10 per 1M, cached
+     * input 95% off ($0.10). One rate for the whole 1M window.
+     */
+    public function testGemini4ArgonIsCataloguedAtTheIntroPrice(): void
+    {
+        $chat = ModelCatalog::find('google:gemini-4-argon:chat');
+        $vision = ModelCatalog::find('google:gemini-4-argon:pic2text');
+        $this->assertCount(1, $chat);
+        $this->assertCount(1, $vision);
+        $this->assertSame(400, $chat[0]['id']);
+        $this->assertSame(401, $vision[0]['id']);
+        $this->assertNull(ModelCatalog::contextPricing('gemini-4-argon'));
+
+        foreach ([$chat[0], $vision[0]] as $row) {
+            $this->assertSame('gemini-4-argon', $row['providerId']);
+            $this->assertSame('per1M', $row['inUnit']);
+            $this->assertSame('per1M', $row['outUnit']);
+            $this->assertEqualsWithDelta(2.0, (float) $row['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $row['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.10, (float) ($row['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        }
+
+        $this->assertContains('tool_use', $chat[0]['json']['features'] ?? []);
+        $this->assertSame('1048576', $chat[0]['json']['meta']['context_window'] ?? null);
+        $this->assertSame(65536, $chat[0]['json']['max_tokens'] ?? null);
     }
 }

@@ -27,6 +27,13 @@ final class GoogleChat
      */
     private const LOW_THINKING_BUDGET = 512;
 
+    /** Gemini 4 Argon can think for minutes before the first token. */
+    private const ARGON_TIMEOUT_SECONDS = 900;
+
+    private const DEFAULT_CHAT_TIMEOUT_SECONDS = 60;
+
+    private const DEFAULT_STREAM_TIMEOUT_SECONDS = 120;
+
     public function __construct(
         private readonly GoogleApiClient $api,
         private readonly LoggerInterface $logger,
@@ -50,12 +57,7 @@ final class GoogleChat
 
             $payload = [
                 'contents' => $contents,
-                'generationConfig' => [
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'topP' => $options['top_p'] ?? 0.95,
-                    'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-                ],
+                'generationConfig' => $this->generationConfig($options, $model, $this->usesThinkingLevel($model)),
             ];
             $payload = GoogleMessageFormat::withTools($payload, $options);
 
@@ -66,24 +68,18 @@ final class GoogleChat
                 'message_count' => count($messages),
             ]);
 
-            $response = $this->api->postJson($url, $payload, $key, 60);
+            $response = $this->api->postJson(
+                $url,
+                $payload,
+                $key,
+                $this->requestTimeout($model, self::DEFAULT_CHAT_TIMEOUT_SECONDS),
+            );
 
             $data = $response->toArray();
 
             $this->api->checkFinishReason($data);
 
-            $usageMetadata = $data['usageMetadata'] ?? [];
-            $promptTokens = $usageMetadata['promptTokenCount'] ?? 0;
-            $completionTokens = $usageMetadata['candidatesTokenCount'] ?? 0;
-            $cachedTokens = $usageMetadata['cachedContentTokenCount'] ?? 0;
-
-            $usage = [
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $promptTokens + $completionTokens,
-                'cached_tokens' => $cachedTokens,
-                'cache_creation_tokens' => 0,
-            ];
+            $usage = GoogleUsage::fromMetadata(\is_array($data['usageMetadata'] ?? null) ? $data['usageMetadata'] : []);
 
             $textContent = '';
             $toolCalls = [];
@@ -135,7 +131,13 @@ final class GoogleChat
             // surface to the user so they can switch models or wait.
             // Only the request/header phase is retried — once chunks start
             // flowing, we never restart mid-stream.
-            $response = $this->requestWithSingleRetryOn503($this->api->modelUrl($model, 'streamGenerateContent?alt=sse'), $payload, $key, $model);
+            $response = $this->requestWithSingleRetryOn503(
+                $this->api->modelUrl($model, 'streamGenerateContent?alt=sse'),
+                $payload,
+                $key,
+                $model,
+                $this->requestTimeout($model, self::DEFAULT_STREAM_TIMEOUT_SECONDS),
+            );
 
             return ['usage' => $this->readStream($response, $callback)];
         } catch (ProviderException $e) {
@@ -155,33 +157,9 @@ final class GoogleChat
      */
     private function streamPayload(array $messages, array $options, string $model): array
     {
-        $generationConfig = [
-            'temperature' => $options['temperature'] ?? 0.7,
-            'topP' => $options['top_p'] ?? 0.95,
-            'topK' => $options['top_k'] ?? 40,
-            'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-        ];
-
-        // Phase 1e: Gemini 2.5+ Pro / 3.x "thinking" models otherwise
-        // burn 5-10s on internal reasoning before emitting the first
-        // visible token. Map an optional `reasoning_effort` knob onto
-        // Google's `thinkingConfig.thinkingBudget` so chat (default
-        // `low`) gets near-instant TTFT on FLASH models, while leaving
-        // Pro models (which mandate non-zero thinking) on Google's
-        // server-side default.
-        //
-        // Budget interpretation (per Google docs):
-        //   - 0      → thinking disabled (Flash only — Pro rejects this with HTTP 4xx)
-        //   - >0     → token budget reserved for hidden reasoning
-        //   - -1     → "dynamic" — model decides
-        $thinkingConfig = $this->resolveThinkingConfig($options, $model);
-        if (null !== $thinkingConfig) {
-            $generationConfig['thinkingConfig'] = $thinkingConfig;
-        }
-
         $payload = [
             'contents' => GoogleMessageFormat::contents($messages),
-            'generationConfig' => $generationConfig,
+            'generationConfig' => $this->generationConfig($options, $model, true),
         ];
         $payload = GoogleMessageFormat::withTools($payload, $options);
 
@@ -224,19 +202,8 @@ final class GoogleChat
                     $this->api->checkFinishReason($data);
                 }
 
-                // Capture usage from each chunk (last chunk has final values)
-                if (isset($data['usageMetadata'])) {
-                    $usageMetadata = $data['usageMetadata'];
-                    $promptTokens = $usageMetadata['promptTokenCount'] ?? 0;
-                    $completionTokens = $usageMetadata['candidatesTokenCount'] ?? 0;
-                    $cachedTokens = $usageMetadata['cachedContentTokenCount'] ?? 0;
-                    $usage = [
-                        'prompt_tokens' => $promptTokens,
-                        'completion_tokens' => $completionTokens,
-                        'total_tokens' => $promptTokens + $completionTokens,
-                        'cached_tokens' => $cachedTokens,
-                        'cache_creation_tokens' => 0,
-                    ];
+                if (isset($data['usageMetadata']) && \is_array($data['usageMetadata'])) {
+                    $usage = GoogleUsage::fromMetadata($data['usageMetadata']);
                 }
 
                 $parts = $data['candidates'][0]['content']['parts'] ?? [];
@@ -365,14 +332,14 @@ final class GoogleChat
      *
      * @param array<string, mixed> $payload
      */
-    private function requestWithSingleRetryOn503(string $url, array $payload, string $key, string $model): ResponseInterface
+    private function requestWithSingleRetryOn503(string $url, array $payload, string $key, string $model, int $timeout): ResponseInterface
     {
         $maxAttempts = 2;
         $attempt = 0;
 
         while (true) {
             ++$attempt;
-            $response = $this->api->postJson($url, $payload, $key, 120);
+            $response = $this->api->postJson($url, $payload, $key, $timeout);
 
             try {
                 $status = $response->getStatusCode();
@@ -436,10 +403,16 @@ final class GoogleChat
      *
      * @param array<string, mixed> $options
      *
-     * @return array<string, int|bool>|null
+     * @return array<string, int|bool|string>|null
      */
     private function resolveThinkingConfig(array $options, string $model = ''): ?array
     {
+        // Gemini 4 Argon ignores thinking_budget and sampling. Map the effort
+        // onto thinkingLevel so a deprecated budget is never sent.
+        if ('' !== $model && $this->usesThinkingLevel($model)) {
+            return $this->argonThinkingConfig($options);
+        }
+
         // Native passthrough — admin/per-prompt override wins over the
         // generic effort knob (and bypasses the Pro-tier guard, since the
         // caller is explicit about the budget).
@@ -452,14 +425,7 @@ final class GoogleChat
         // Cross-provider semantic levels. Thinking off stays a zero budget
         // on Flash (and is omitted on Pro, which rejects 0). A chosen `low`
         // is a real, smaller budget — not off.
-        $effort = $options['reasoning_effort'] ?? null;
-
-        // The legacy `reasoning => true/false` flag maps to high / off so
-        // callers that flip reasoning without choosing a level keep the
-        // previous on/off behaviour.
-        if (null === $effort && array_key_exists('reasoning', $options)) {
-            $effort = ((bool) $options['reasoning']) ? 'high' : 'off';
-        }
+        $effort = $this->reasoningEffort($options);
 
         if (null === $effort) {
             return null;
@@ -480,5 +446,88 @@ final class GoogleChat
             'dynamic' => ['thinkingBudget' => -1],
             default => null,
         };
+    }
+
+    /**
+     * Sampling stays on every Gemini model except Argon, which ignores
+     * temperature, topP and topK and warns when they are sent.
+     *
+     * Buffered chat only attaches a thinking config for Argon. Other models keep
+     * the previous buffered request, which never sent `thinkingBudget`.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function generationConfig(array $options, string $model, bool $includeThinking): array
+    {
+        $config = [
+            'temperature' => $options['temperature'] ?? 0.7,
+            'topP' => $options['top_p'] ?? 0.95,
+            'topK' => $options['top_k'] ?? 40,
+            'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+        ];
+
+        if ($this->usesThinkingLevel($model)) {
+            unset($config['temperature'], $config['topP'], $config['topK']);
+        }
+
+        if ($includeThinking) {
+            $thinking = $this->resolveThinkingConfig($options, $model);
+            if (null !== $thinking) {
+                $config['thinkingConfig'] = $thinking;
+            }
+        }
+
+        return $config;
+    }
+
+    private function requestTimeout(string $model, int $default): int
+    {
+        return $this->usesThinkingLevel($model) ? self::ARGON_TIMEOUT_SECONDS : $default;
+    }
+
+    private function usesThinkingLevel(string $model): bool
+    {
+        return 1 === preg_match('/(?:^|\/)gemini-4-argon(?:$|[:\/])/', strtolower($model));
+    }
+
+    /**
+     * Argon has no off switch. The lowest level is `low`; an omitted effort
+     * leaves Google's default (`medium`) in place. An explicit thinking_budget
+     * is ignored.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{thinkingLevel: string}|null
+     */
+    private function argonThinkingConfig(array $options): ?array
+    {
+        $effort = $this->reasoningEffort($options);
+        if (null === $effort) {
+            return null;
+        }
+
+        $level = match ($effort) {
+            'off', 'none', 'disabled', 'low' => 'low',
+            'medium', 'dynamic' => 'medium',
+            'high' => 'high',
+            default => null,
+        };
+
+        return null === $level ? null : ['thinkingLevel' => $level];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function reasoningEffort(array $options): ?string
+    {
+        $effort = $options['reasoning_effort'] ?? null;
+        if (null === $effort && array_key_exists('reasoning', $options)) {
+            $effort = ((bool) $options['reasoning']) ? 'high' : 'off';
+        }
+
+        return \is_string($effort) ? $effort : null;
     }
 }
