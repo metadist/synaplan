@@ -10,8 +10,11 @@ a socket opens. The extra allowlist is `EGRESS.ALLOW`. `EGRESS_PROXY`
 overrides `HTTPS_PROXY` when it is set; an empty value leaves the
 environment proxy alone. A URL a person typed is not added to the list:
 `SsrfGuard` decides, and behind a proxy the tunnel goes to the pinned
-address (`CURLOPT_CONNECT_TO`). Raw cURL and the SDKs are still outside
-this client until AU16 and AU17.
+address (`CURLOPT_CONNECT_TO`). Raw cURL moved onto this client in AU16.
+The OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA
+moved on in AU17. Apple's verifier has no HTTP hook: online checks are
+off unless the operator turns them on, and then OCSP stays inside the
+library.
 
 The 2026-10-21 map in `STATUS.md` counted 9 `curl_init` calls, one
 `file_get_contents` fallback, and one `HttpClient::create()`. The scan of
@@ -28,19 +31,7 @@ These sites do not.
 
 | Kind | Where | What it calls |
 | ---- | ----- | ------------- |
-| `curl_init` | `MediaDownloader` | The URL a provider returned for a generated file. Falls back to `file_get_contents($url)` when the cURL extension is missing. |
-| `curl_init` | `MediaGenerationService` | Saves generated media. |
-| `curl_init` | `OpenAICurlTransport` | Multipart upload for `gpt-image`. |
-| `curl_init` | `CloudflareProvider` | Embeddings. |
-| `curl_init` ×5 | `SystemConfigService` | Health probes for Ollama, Tika, Docling, Qdrant, and Piper. |
-| `file_get_contents` ×3 | `OpenAIImageGeneration` | Downloads an image URL (and a mask URL) before an edit or a variation. |
-| `HttpClient::create()` | `MetaProvider` | Its own Symfony client when none is injected. |
-| OpenAI PHP SDK, no injected client | `GroqProvider`, `XaiProvider`, `PerplexityProvider`, `AbstractChatCompletionsCloudProvider`, `OpenAiCompatibleClients`, `OpenAIApiClient` | `OpenAI::factory()->make()` and `OpenAI::client()` discover a PSR-18 client. |
-| Ollama PHP SDK | `OllamaProvider` | `Ollama::client()`, which uses Guzzle. |
-| Stripe PHP SDK | `SubscriptionController` (6), `StripeWebhookController` (2), `StripeCheckoutSessionGateway` (3) | `Stripe::setApiKey()` leaves the SDK on its default cURL client. |
-| Google API client | `GooglePlayVerifier` | `new GoogleClient()` for the Play Developer API. The client uses Guzzle. |
-| Apple App Store library | `AppleStoreKitVerifier` | `new SignedDataVerifier(...)`. Online checks, when enabled, use the library's own HTTP client. |
-| reCAPTCHA | `RecaptchaService` | `new ReCaptcha($secret)`, which calls Google's siteverify endpoint. |
+| Apple App Store library | `AppleStoreKitVerifier` | `new SignedDataVerifier(...)`. Online checks, when enabled, use the library's own HTTP client. The constructor has no client argument, so OCSP cannot be moved onto the shared client. The default is off. |
 
 `EgressInventoryTest` fails when any of these patterns appears at a new
 site. The baseline may only shrink (`UPDATE_EGRESS_INVENTORY=1` drops sites
@@ -62,8 +53,9 @@ Nothing else in this table moves onto the HTTP client.
 | WebSocket | The voice sidecar's provider socket | The voice service URL. PHP does not open it. |
 
 No compose file sets `HTTP_PROXY`, `HTTPS_PROXY`, or `NO_PROXY`. Symfony
-HttpClient honours those environment variables on its own. Raw cURL and the
-SDKs above do not, until they move onto the shared client (AU16, AU17).
+HttpClient honours those environment variables on its own. The SDKs that
+accept a client now use that client. Apple OCSP does not, and only when
+online checks are on.
 
 ## What is deliberately not a shared allowlist entry
 

@@ -18,7 +18,7 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
     public function create(array $params): array
     {
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
             $session = \Stripe\Checkout\Session::create($params);
         } catch (\Stripe\Exception\ApiErrorException $e) {
             $this->logger->error('Pay-first checkout session could not be created', [
@@ -35,7 +35,7 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
     public function retrieve(string $sessionId): ?PaidCheckout
     {
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
             $session = \Stripe\Checkout\Session::retrieve($sessionId);
         } catch (\Stripe\Exception\InvalidRequestException) {
             return null;
@@ -68,7 +68,7 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
     public function subscription(string $subscriptionId): StripeObject
     {
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             return \Stripe\Subscription::retrieve(['id' => $subscriptionId, 'expand' => ['latest_invoice']]);
         } catch (\Stripe\Exception\ApiErrorException $e) {

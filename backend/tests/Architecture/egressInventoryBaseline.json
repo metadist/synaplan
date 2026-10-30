@@ -1,24 +1,3 @@
 [
-    "backend/src/AI/Provider/AbstractChatCompletionsCloudProvider.php#openai_sdk#client#$this->client = \\OpenAI::factory()",
-    "backend/src/AI/Provider/GroqProvider.php#openai_sdk#client#$this->client = \\OpenAI::factory()",
-    "backend/src/AI/Provider/MetaProvider.php#http_client_create#__construct#$this->httpClient = $httpClient ?? HttpClient::create();",
-    "backend/src/AI/Provider/OllamaProvider.php#ollama_sdk#__construct#$this->client = Ollama::client($this->baseUrl);",
-    "backend/src/AI/Provider/OpenAI/OpenAIApiClient.php#openai_sdk#sdk#$this->client = null !== $this->sdkFactory ? ($this->sdkFactory)($key) : \\OpenAI::client($key);",
-    "backend/src/AI/Provider/OpenAiCompatibleClients.php#openai_sdk#clientFor#$factory = \\OpenAI::factory()",
-    "backend/src/AI/Provider/PerplexityProvider.php#openai_sdk#client#: \\OpenAI::factory()",
-    "backend/src/AI/Provider/XaiProvider.php#openai_sdk#client#$this->client = \\OpenAI::factory()",
-    "backend/src/Controller/StripeWebhookController.php#stripe_default_http#cancelOtherSubscriptions#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/StripeWebhookController.php#stripe_default_http#handleWebhook#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/SubscriptionController.php#stripe_default_http#cancelSubscription#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/SubscriptionController.php#stripe_default_http#createCheckoutSession#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/SubscriptionController.php#stripe_default_http#createPortalSession#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/SubscriptionController.php#stripe_default_http#createTopupSession#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/SubscriptionController.php#stripe_default_http#getOrCreateStripeCustomer#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Controller/SubscriptionController.php#stripe_default_http#syncFromStripe#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Service/Auth/RecaptchaService.php#recaptcha#__construct#$this->recaptcha = new ReCaptcha($secretKey);",
-    "backend/src/Service/Billing/PayFirst/StripeCheckoutSessionGateway.php#stripe_default_http#create#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Service/Billing/PayFirst/StripeCheckoutSessionGateway.php#stripe_default_http#retrieve#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Service/Billing/PayFirst/StripeCheckoutSessionGateway.php#stripe_default_http#subscription#\\Stripe\\Stripe::setApiKey($this->stripeSecretKey);",
-    "backend/src/Service/Iap/AppleStoreKitVerifier.php#apple_store_sdk#verifier#$this->verifier = new SignedDataVerifier(",
-    "backend/src/Service/Iap/GooglePlayVerifier.php#google_api_client#service#$client = new GoogleClient();"
+    "backend/src/Service/Iap/AppleStoreKitVerifier.php#apple_store_sdk#verifier#$this->verifier = new SignedDataVerifier("
 ]

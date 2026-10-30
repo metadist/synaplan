@@ -292,7 +292,7 @@ class MetaProviderTest extends TestCase
 
     private function makeProvider(?string $apiKey = 'test-key', ?MockHttpClient $httpClient = null): MetaProvider
     {
-        return new MetaProvider(new NullLogger(), $apiKey, httpClient: $httpClient);
+        return new MetaProvider(new NullLogger(), $apiKey, httpClient: $httpClient ?? new MockHttpClient());
     }
 
     /**

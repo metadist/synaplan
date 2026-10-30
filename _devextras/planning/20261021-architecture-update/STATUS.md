@@ -1,10 +1,16 @@
 # Architecture update — status
 
+> **2026-10-30 — AU17.** The OpenAI-compatible SDKs, Ollama chat and
+> embeddings, Stripe, Google Play and reCAPTCHA send through the shared
+> HTTP client. Apple's verifier has no HTTP hook. Online checks stay off
+> unless an operator turns them on, and then OCSP stays inside the library.
+> Every streaming provider that Synaplan calls itself uses Symfony HttpClient.
+
 > **2026-10-30 — AU15.** `EgressHttpClient` decorates `http_client`. `EGRESS.MODE`
 > is seeded `off`. `report` records `egress.would_block` and still sends.
 > `enforce` refuses before a socket opens. A typed URL behind `EGRESS_PROXY`
-> tunnels to the pinned address. Raw cURL and the SDKs are still outside
-> this client (AU16, AU17). This is [#2883](https://github.com/metadist/synaplan/pull/2883).
+> tunnels to the pinned address. AU16 moved raw cURL onto this client.
+> This is [#2883](https://github.com/metadist/synaplan/pull/2883).
 
 > **2026-10-30.** The production reading is one day, not a week. A worker is
 > listed only when it reported in the last 24 hours; a web server still
