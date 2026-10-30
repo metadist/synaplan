@@ -406,6 +406,29 @@ final class GroupPolicyServiceTest extends TestCase
         self::assertTrue($service->isModelAllowedForGroup(7, 8));
     }
 
+    public function testALockedInstanceAllowListWinsOverTheGroupList(): void
+    {
+        $locked = (new Config())->setValue('["anthropic:claude:chat"]')->setBlocked(true);
+        $configs = $this->createStub(ConfigRepository::class);
+        $configs->method('findByOwnerGroupAndSetting')->willReturn($locked);
+        $groups = $this->createStub(GroupConfigRepository::class);
+        $groups->method('getValue')->willReturn('["groq:deleted:chat"]');
+        $allowed = (new Model())->setService('anthropic')->setProviderId('claude')->setTag('chat');
+        (new \ReflectionProperty(Model::class, 'id'))->setValue($allowed, 9);
+        $models = $this->createStub(ModelRepository::class);
+        $models->method('find')->willReturn($allowed);
+
+        $service = new GroupPolicyService(
+            $this->createStub(LayeredConfigResolver::class),
+            $groups,
+            $configs,
+            $models,
+            $this->createStub(AuditLogWriter::class),
+        );
+
+        self::assertTrue($service->isModelAllowedForGroup(7, 9));
+    }
+
     public function testFallbackSourceIsTheLayerThatStillNamesTheModel(): void
     {
         $resolver = $this->createMock(LayeredConfigResolver::class);

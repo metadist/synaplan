@@ -58,6 +58,7 @@ final readonly class DefaultModelMover
         $cleared = [];
         $candidates = $this->needsReplacement($bindings) ? $this->candidates() : [];
         $offline = [] === $candidates ? [] : array_flip($this->offlineIds());
+        $available = [] === $candidates ? null : $this->availableProviderNames();
 
         foreach ($bindings as $binding) {
             $setting = $binding['setting'];
@@ -69,7 +70,7 @@ final readonly class DefaultModelMover
                 continue;
             }
 
-            $replacement = $this->replacement($candidates, $model, $setting, $ownerId, $scope, $offline, $id);
+            $replacement = $this->replacement($candidates, $model, $setting, $ownerId, $scope, $offline, $id, $available);
             if (null === $replacement) {
                 $this->em->remove($binding['row']);
                 $cleared[] = ['setting' => $setting, 'scope' => $scope, 'ownerId' => $ownerId];
@@ -169,8 +170,9 @@ final readonly class DefaultModelMover
     /**
      * @param list<Model>       $candidates
      * @param array<int, mixed> $offline
+     * @param list<string>|null $available  lowercased provider names, or null when the registry is not injected
      */
-    private function replacement(array $candidates, Model $deleted, string $setting, int $ownerId, string $scope, array $offline, int $deletedId): ?Model
+    private function replacement(array $candidates, Model $deleted, string $setting, int $ownerId, string $scope, array $offline, int $deletedId, ?array $available): ?Model
     {
         $same = [];
         $other = [];
@@ -185,7 +187,7 @@ final readonly class DefaultModelMover
             if ($candidate->isRetired() || $candidate->isHiddenBecauseFree() || isset($offline[$candidateId])) {
                 continue;
             }
-            if (!$this->providerReady($candidate) || !$this->usable->isConfiguredModelUsable($candidateId)) {
+            if (!$this->providerReady($candidate, $available) || !$this->usable->isConfiguredModelUsable($candidateId)) {
                 continue;
             }
             if ('global' === $scope && $ownerId > 0 && null !== $this->groupPolicy && !$this->groupPolicy->isModelAllowed($ownerId, $candidateId, $setting)) {
@@ -226,13 +228,13 @@ final readonly class DefaultModelMover
      * when the usable-provider list is empty and the shared check cannot tell.
      * Rerank rows are outside that list; their key and endpoint decide.
      */
-    private function providerReady(Model $candidate): bool
+    /**
+     * @return list<string>|null null when no registry is injected, so unit tests keep stubbing usability alone
+     */
+    private function availableProviderNames(): ?array
     {
-        if ('rerank' === $this->canonicalTag($candidate->getTag())) {
-            return null !== $this->rerank && $this->rerank->healthForModel($candidate)->available;
-        }
         if (null === $this->providers) {
-            return true;
+            return null;
         }
 
         $available = [];
@@ -241,6 +243,25 @@ final readonly class DefaultModelMover
                 continue;
             }
             $available[] = strtolower($provider->getName());
+        }
+
+        return $available;
+    }
+
+    /**
+     * A provider that reports itself unavailable is not a replacement, even
+     * when the usable-provider list is empty and the shared check cannot tell.
+     * Rerank rows are outside that list; their key and endpoint decide.
+     *
+     * @param list<string>|null $available
+     */
+    private function providerReady(Model $candidate, ?array $available): bool
+    {
+        if ('rerank' === $this->canonicalTag($candidate->getTag())) {
+            return null !== $this->rerank && $this->rerank->healthForModel($candidate)->available;
+        }
+        if (null === $available) {
+            return true;
         }
         if ([] === $available) {
             return false;

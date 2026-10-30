@@ -244,7 +244,10 @@ final readonly class GroupPolicyService
      */
     public function isModelAllowedForGroup(int $groupId, int $modelId): bool
     {
-        $raw = $this->groupConfigRepository->getValue($groupId, 'MODELS', 'ALLOWED');
+        $instance = $this->configRepository->findByOwnerGroupAndSetting(0, 'MODELS', 'ALLOWED');
+        $raw = $instance instanceof Config && $instance->isBlocked()
+            ? $instance->getValue()
+            : $this->groupConfigRepository->getValue($groupId, 'MODELS', 'ALLOWED');
         if (null === $raw || '' === trim($raw)) {
             return true;
         }

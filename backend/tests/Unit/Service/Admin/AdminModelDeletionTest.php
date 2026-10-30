@@ -235,6 +235,28 @@ final class AdminModelDeletionTest extends TestCase
         self::assertSame(9, $result['moved'][0]['modelId']);
     }
 
+    public function testProviderAvailabilityIsReadOnceForEveryDefault(): void
+    {
+        $gone = $this->model(5, 'Old chat', 'Groq');
+        $next = $this->model(9, 'Next chat', 'Anthropic');
+        $chat = $this->config(0, 'CHAT', '5');
+        $tools = $this->config(0, 'TOOLS', '5');
+        $removed = [];
+        $groq = $this->createMock(ProviderMetadataInterface::class);
+        $groq->expects($this->once())->method('isAvailable')->willReturn(false);
+        $groq->method('getName')->willReturn('Groq');
+        $anthropic = $this->createMock(ProviderMetadataInterface::class);
+        $anthropic->expects($this->once())->method('isAvailable')->willReturn(true);
+        $anthropic->method('getName')->willReturn('Anthropic');
+        $registry = $this->createStub(ProviderRegistry::class);
+        $registry->method('getUniqueProviders')->willReturn(['Groq' => $groq, 'Anthropic' => $anthropic]);
+
+        $result = $this->delete($gone, [$chat, $tools], [$gone, $next], $removed, providers: $registry);
+
+        self::assertCount(2, $result['moved']);
+        self::assertSame([9, 9], array_column($result['moved'], 'modelId'));
+    }
+
     public function testAnUnavailableProviderIsNotTheReplacement(): void
     {
         $gone = $this->model(5, 'Old chat', 'Groq');
