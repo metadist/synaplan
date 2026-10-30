@@ -27,16 +27,33 @@ final class EgressCall
     }
 
     /**
+     * True only when the caller marked the URL as one a person typed.
+     * A `resolve` pin is an operator's own address override and is not a
+     * typed URL: inferring that would let a DNS override skip the allowlist.
+     *
      * @param array<string, mixed> $options
      */
     public static function isTyped(array $options): bool
     {
         $extra = $options['extra'] ?? null;
-        if (\is_array($extra) && true === ($extra[self::TYPED] ?? false)) {
-            return true;
-        }
 
-        return isset($options['resolve']) && \is_array($options['resolve']) && [] !== $options['resolve'];
+        return \is_array($extra) && true === ($extra[self::TYPED] ?? false);
+    }
+
+    /**
+     * The address the caller already checked, when it pinned one.
+     *
+     * @param array<string, mixed> $options
+     */
+    public static function pinnedAddress(array $options, string $host): ?string
+    {
+        $resolve = $options['resolve'] ?? null;
+        if (!\is_array($resolve)) {
+            return null;
+        }
+        $address = $resolve[$host] ?? $resolve[strtolower($host)] ?? null;
+
+        return \is_string($address) && '' !== $address ? $address : null;
     }
 
     /**

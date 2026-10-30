@@ -30,6 +30,13 @@ final readonly class EgressPolicy
             return EgressDecision::refuse('scheme');
         }
 
+        // A URL a person typed is checked before the allowlist. Otherwise a
+        // typed redirect to localhost would pass because localhost is a
+        // built-in name, and the guard would never see it.
+        if (EgressCall::isTyped($options) && !$this->typedUrls->allows($url)) {
+            return EgressDecision::refuse('typed_refused');
+        }
+
         foreach ($this->rules() as $rule) {
             if ($rule->matches($destination)) {
                 return EgressDecision::allow($rule->label(), 'allowlist');
@@ -37,19 +44,16 @@ final readonly class EgressPolicy
         }
 
         if (EgressCall::isTyped($options)) {
-            if ($this->typedUrls->allows($url)) {
-                return EgressDecision::allow('typed', 'typed');
-            }
-
-            return EgressDecision::refuse('typed_refused');
+            return EgressDecision::allow('typed', 'typed');
         }
 
         return EgressDecision::refuse('not_allowed');
     }
 
     /**
-     * The metric label: an allowlist `host:port` when a rule matched, else
-     * `other`, so a refused host cannot grow the label set.
+     * The metric label is the matched rule (`api.openai.com`, `*.example.org`,
+     * `api.example.com:443`). A typed or refused call is `other`, so a new
+     * host cannot grow the label set.
      *
      * @param array<string, mixed> $options
      */
@@ -57,9 +61,9 @@ final readonly class EgressPolicy
     {
         $decision = $this->decide($url, $options);
         if ($decision->allowed && null !== $decision->rule && 'typed' !== $decision->rule) {
-            $destination = EgressDestination::fromUrl($url);
-
-            return null === $destination ? 'other' : $destination->label();
+            // The rule id is bounded: `api.openai.com`, `api.example.com:443`
+            // or `*.example.org`. The concrete host of a wildcard is not a label.
+            return $decision->rule;
         }
 
         return 'other';

@@ -8,7 +8,8 @@ use App\Service\Infrastructure\RedisService;
 
 /**
  * Counts outbound calls by allowlisted destination and outcome.
- * `destination` is `host:port` of a rule, or `other`. The same counters are
+ * `destination` is the matched rule (`api.openai.com`, `*.example.org`),
+ * or `other`. The same counters are
  * written to Redis when it is up, under `egress:req:{destination}:{outcome}`.
  */
 final class EgressMetrics
@@ -28,7 +29,7 @@ final class EgressMetrics
 
     public function record(string $destination, string $outcome, int $durationMs = 0): void
     {
-        if (1 !== preg_match('/^[a-z0-9.:_-]+$/', $destination)) {
+        if (1 !== preg_match('/^[a-z0-9.:_*-]+$/', $destination)) {
             $destination = 'other';
         }
         if (!\in_array($outcome, self::OUTCOMES, true)) {

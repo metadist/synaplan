@@ -15,15 +15,19 @@ use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 /**
  * The one outbound HTTP client. In `off` mode it is a pass-through, so a
  * request is unchanged unless `EGRESS_PROXY` is set. In `report` and
- * `enforce` it checks every hop, follows redirects itself, and pins a typed
- * URL to the guard's address when a proxy would otherwise resolve the name
- * again.
+ * `enforce` it checks the first hop before a socket opens, returns without
+ * waiting for headers, and follows redirects only when the response is read.
+ * A typed URL behind a proxy is pinned to an address the guard already
+ * accepted. Without that pin the hostname is not sent.
  */
 #[AsDecorator(decorates: 'http_client')]
 final class EgressHttpClient implements HttpClientInterface
 {
     private const DEFAULT_REDIRECTS = 20;
 
+    /**
+     * @param array<string, mixed> $defaultOptions
+     */
     public function __construct(
         #[AutowireDecorated]
         private readonly HttpClientInterface $inner,
@@ -33,67 +37,58 @@ final class EgressHttpClient implements HttpClientInterface
         private readonly EgressMetrics $metrics,
         private readonly ?EventRingStore $events = null,
         private readonly ?RequestTimelineContext $timeline = null,
+        private readonly array $defaultOptions = [],
     ) {
     }
 
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
+        $options = $this->mergeOptions($this->defaultOptions, $options);
+        $url = $this->absoluteUrl($url, $options);
         $options = $this->applyProxy($options);
         if (EgressMode::Off === $this->config->mode()) {
             return $this->inner->request($method, $url, $options);
         }
 
+        $this->guardHop($url, $options);
         $limit = $this->redirectLimit($options);
-        $hopUrl = $url;
-        $hopMethod = $method;
-        $hopOptions = $options;
-        $started = hrtime(true);
+        $startedAt = hrtime(true);
+        $started = $this->inner->request($method, $url, $this->prepare($url, $options));
 
-        for ($hop = 0; $hop <= $limit; ++$hop) {
-            $decision = $this->policy->decide($hopUrl, $hopOptions);
-            if (!$decision->allowed && EgressMode::Enforce === $this->config->mode()) {
-                $this->observe($hopUrl, $hopOptions, 'refused', $started, 0);
-                $destination = EgressDestination::fromUrl($hopUrl);
-                throw new EgressRefusedException($destination ?? new EgressDestination('https', 'invalid', 443));
-            }
-            if (!$decision->allowed) {
-                $this->wouldBlock($hopUrl);
-            }
-
-            $send = $this->prepare($hopUrl, $hopOptions);
-            $response = $this->inner->request($hopMethod, $hopUrl, $send);
-            $status = $response->getStatusCode();
-            $outcome = $decision->allowed ? 'allowed' : 'would_block';
-            if ($status < 300 || $status >= 400 || 0 === $limit || $hop === $limit) {
-                $this->observe($hopUrl, $hopOptions, $outcome, $started, $status);
-
-                return $response;
-            }
-
-            $location = $this->location($response);
-            if (null === $location) {
-                $this->observe($hopUrl, $hopOptions, $outcome, $started, $status);
-
-                return $response;
-            }
-            $response->cancel();
-            $next = $this->resolveLocation($hopUrl, $location);
-            $hopOptions = $this->nextHop($hopUrl, $next, $status, $hopOptions);
-            $hopMethod = \in_array($status, [307, 308], true) ? $hopMethod : 'GET';
-            $hopUrl = $next;
-        }
-
-        throw new EgressRefusedException(new EgressDestination('https', 'redirect', 443));
+        return new EgressPendingResponse(
+            function (ResponseInterface $response) use ($method, $url, $options, $limit, $startedAt): ResponseInterface {
+                return $this->follow($response, $method, $url, $options, $limit, $startedAt);
+            },
+            $started,
+            $limit,
+        );
     }
 
     public function stream(iterable|ResponseInterface $responses, ?float $timeout = null): ResponseStreamInterface
     {
-        return $this->inner->stream($responses, $timeout);
+        if ($responses instanceof ResponseInterface) {
+            $target = $this->streamTarget($responses);
+            $alias = $responses instanceof EgressPendingResponse ? [spl_object_id($target) => $responses] : [];
+
+            return new EgressResponseStream($this->inner->stream($target, $timeout), $alias);
+        }
+
+        $targets = [];
+        $alias = [];
+        foreach ($responses as $response) {
+            $target = $this->streamTarget($response);
+            $targets[] = $target;
+            if ($response instanceof EgressPendingResponse) {
+                $alias[spl_object_id($target)] = $response;
+            }
+        }
+
+        return new EgressResponseStream($this->inner->stream($targets, $timeout), $alias);
     }
 
     public function withOptions(array $options): static
     {
-        $clone = new self(
+        return new self(
             $this->inner->withOptions($options),
             $this->policy,
             $this->config,
@@ -101,9 +96,95 @@ final class EgressHttpClient implements HttpClientInterface
             $this->metrics,
             $this->events,
             $this->timeline,
+            $this->mergeOptions($this->defaultOptions, $options),
         );
+    }
 
-        return $clone;
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function guardHop(string $url, array $options): void
+    {
+        $decision = $this->policy->decide($url, $options);
+        if ($decision->allowed || EgressMode::Enforce !== $this->config->mode()) {
+            return;
+        }
+        $this->observe($url, $options, 'refused', hrtime(true), 0);
+        throw new EgressRefusedException(EgressDestination::fromUrl($url) ?? new EgressDestination('https', 'invalid', 443));
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function follow(ResponseInterface $response, string $method, string $url, array $options, int $limit, int $started): ResponseInterface
+    {
+        for ($hop = 0;; ++$hop) {
+            $status = $response->getStatusCode();
+            $decision = $this->policy->decide($url, $options);
+            $this->observe($url, $options, $decision->allowed ? 'allowed' : 'would_block', $started, $status);
+            $location = $status >= 300 && $status < 400 && $hop < $limit ? $this->location($response) : null;
+            if (null === $location) {
+                return $response;
+            }
+
+            $response->cancel();
+            $next = $this->resolveLocation($url, $location);
+            $nextMethod = $this->redirectedMethod($method, $status);
+            $nextOptions = $this->nextHop($method, $status, $url, $next, $options);
+            $this->guardHop($next, $nextOptions);
+            $method = $nextMethod;
+            $url = $next;
+            $options = $nextOptions;
+            $started = hrtime(true);
+            $response = $this->inner->request($method, $url, $this->prepare($url, $options));
+        }
+    }
+
+    private function streamTarget(ResponseInterface $response): ResponseInterface
+    {
+        if (!$response instanceof EgressPendingResponse) {
+            return $response;
+        }
+
+        return $response->redirectsRemaining() > 0 ? $response->settle() : $response->transport();
+    }
+
+    /**
+     * @param array<string, mixed> $base
+     * @param array<string, mixed> $over
+     *
+     * @return array<string, mixed>
+     */
+    private function mergeOptions(array $base, array $over): array
+    {
+        $merged = $over + $base;
+        foreach (['headers', 'extra', 'resolve'] as $key) {
+            if (isset($base[$key], $over[$key]) && \is_array($base[$key]) && \is_array($over[$key])) {
+                $merged[$key] = $over[$key] + $base[$key];
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function absoluteUrl(string $url, array $options): string
+    {
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $url)) {
+            return $url;
+        }
+        $base = $options['base_uri'] ?? null;
+        if (!\is_string($base) || '' === $base) {
+            return $url;
+        }
+        $path = parse_url($base, \PHP_URL_PATH);
+        if (!str_ends_with($base, '/') && (!\is_string($path) || '' === $path)) {
+            $base .= '/';
+        }
+
+        return $this->resolveLocation($base, $url);
     }
 
     /**
@@ -134,12 +215,11 @@ final class EgressHttpClient implements HttpClientInterface
     {
         $typed = EgressCall::isTyped($options);
         $options['max_redirects'] = 0;
-        $options = EgressCall::strip($options);
         if ($typed) {
             $options = $this->pinThroughProxy($url, $options);
         }
 
-        return $options;
+        return EgressCall::strip($options);
     }
 
     /**
@@ -152,17 +232,21 @@ final class EgressHttpClient implements HttpClientInterface
         if (!$this->proxyInUse($options)) {
             return $options;
         }
-        $destination = EgressDestination::fromUrl($url);
-        if (null === $destination || false !== filter_var($destination->host, \FILTER_VALIDATE_IP)) {
+        $destination = EgressDestination::fromUrl($url) ?? new EgressDestination('https', 'invalid', 443);
+        if (false !== filter_var($destination->host, \FILTER_VALIDATE_IP)) {
             return $options;
         }
-        $pins = $this->typedUrls->pins($destination->host);
-        if ([] === $pins || !\defined('CURLOPT_CONNECT_TO')) {
-            return $options;
+        $pin = EgressCall::pinnedAddress($options, $destination->host);
+        if (null === $pin) {
+            $pin = $this->typedUrls->pins($destination->host)[0] ?? null;
+        }
+        if (!\is_string($pin) || false === filter_var($pin, \FILTER_VALIDATE_IP) || !\defined('CURLOPT_CONNECT_TO')) {
+            throw new EgressRefusedException($destination);
         }
         $extra = \is_array($options['extra'] ?? null) ? $options['extra'] : [];
         $curl = \is_array($extra['curl'] ?? null) ? $extra['curl'] : [];
-        $curl[\CURLOPT_CONNECT_TO] = [$destination->host.':'.$destination->port.':'.$pins[0].':'.$destination->port];
+        $address = str_contains($pin, ':') && !str_starts_with($pin, '[') ? '['.$pin.']' : $pin;
+        $curl[\CURLOPT_CONNECT_TO] = [$destination->host.':'.$destination->port.':'.$address.':'.$destination->port];
         $extra['curl'] = $curl;
         $options['extra'] = $extra;
 
@@ -206,27 +290,112 @@ final class EgressHttpClient implements HttpClientInterface
     {
         $headers = $response->getHeaders(false);
         $location = $headers['location'][0] ?? null;
+        if (!\is_string($location)) {
+            return null;
+        }
+        $location = trim($location);
+        if ('' === $location || str_starts_with($location, '#')) {
+            return null;
+        }
+        $hash = strpos($location, '#');
 
-        return \is_string($location) && '' !== $location ? $location : null;
+        return false === $hash ? $location : substr($location, 0, $hash);
     }
 
-    private function resolveLocation(string $current, string $location): string
+    private function resolveLocation(string $base, string $ref): string
     {
-        if (str_starts_with($location, 'http://') || str_starts_with($location, 'https://')) {
-            return $location;
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $ref)) {
+            return $this->normalizeAbsolute($ref);
         }
-        $parts = parse_url($current);
+        $parts = parse_url($base);
         if (!\is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
-            return $location;
+            return $ref;
         }
-        $origin = $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
-        if (str_starts_with($location, '/')) {
-            return $origin.$location;
+        if (str_starts_with($ref, '//')) {
+            return $this->normalizeAbsolute($parts['scheme'].':'.$ref);
+        }
+        $query = null;
+        $split = strpos($ref, '?');
+        if (false !== $split) {
+            $query = substr($ref, $split);
+            $ref = substr($ref, 0, $split);
         }
         $path = \is_string($parts['path'] ?? null) ? $parts['path'] : '/';
-        $dir = rtrim(\dirname($path), '/');
+        if (str_starts_with($ref, '/')) {
+            $path = $this->removeDotSegments($ref);
+        } elseif ('' !== $ref) {
+            $slash = strrpos($path, '/');
+            $dir = false === $slash ? '/' : substr($path, 0, $slash + 1);
+            $path = $this->removeDotSegments($dir.$ref);
+        }
+        if ('' === $path) {
+            $path = '/';
+        }
 
-        return $origin.$dir.'/'.$location;
+        return $this->origin($parts).$path.($query ?? '');
+    }
+
+    private function normalizeAbsolute(string $url): string
+    {
+        $parts = parse_url($url);
+        if (!\is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return $url;
+        }
+        $path = $this->removeDotSegments(\is_string($parts['path'] ?? null) ? $parts['path'] : '/');
+        if ('' === $path) {
+            $path = '/';
+        }
+        $query = isset($parts['query']) ? '?'.$parts['query'] : '';
+
+        return $this->origin($parts).$path.$query;
+    }
+
+    /**
+     * @param array<string, mixed> $parts
+     */
+    private function origin(array $parts): string
+    {
+        $host = \is_string($parts['host'] ?? null) ? $parts['host'] : '';
+        if (str_contains($host, ':') && !str_starts_with($host, '[')) {
+            $host = '['.$host.']';
+        }
+        $scheme = \is_string($parts['scheme'] ?? null) ? $parts['scheme'] : 'https';
+        $port = isset($parts['port']) ? ':'.(int) $parts['port'] : '';
+
+        return $scheme.'://'.$host.$port;
+    }
+
+    private function removeDotSegments(string $path): string
+    {
+        $absolute = str_starts_with($path, '/');
+        $trailing = str_ends_with($path, '/');
+        $out = [];
+        foreach (explode('/', $path) as $segment) {
+            if ('' === $segment || '.' === $segment) {
+                continue;
+            }
+            if ('..' === $segment) {
+                array_pop($out);
+                continue;
+            }
+            $out[] = $segment;
+        }
+        $joined = ($absolute ? '/' : '').implode('/', $out);
+        if ($trailing && !str_ends_with($joined, '/')) {
+            $joined .= '/';
+        }
+
+        return '' === $joined ? '/' : $joined;
+    }
+
+    private function redirectedMethod(string $method, int $status): string
+    {
+        $method = strtoupper($method);
+        if (303 === $status || ('POST' === $method && \in_array($status, [301, 302], true))) {
+            return 'HEAD' === $method ? 'HEAD' : 'GET';
+        }
+
+        return $method;
     }
 
     /**
@@ -234,38 +403,52 @@ final class EgressHttpClient implements HttpClientInterface
      *
      * @return array<string, mixed>
      */
-    private function nextHop(string $from, string $to, int $status, array $options): array
+    private function nextHop(string $method, int $status, string $from, string $to, array $options): array
     {
-        $fromHost = EgressDestination::fromUrl($from)?->host;
-        $toHost = EgressDestination::fromUrl($to)?->host;
-        if (null !== $fromHost && $fromHost !== $toHost) {
+        if (!$this->sameOrigin($from, $to)) {
+            unset($options['auth_basic'], $options['auth_bearer']);
             $headers = \is_array($options['headers'] ?? null) ? $options['headers'] : [];
-            $options['headers'] = $this->dropCredentials($headers);
+            $options['headers'] = $this->dropHeaders($headers, ['authorization', 'cookie']);
         }
-        if (!\in_array($status, [307, 308], true)) {
+        $dropsBody = 303 === $status || ('POST' === strtoupper($method) && \in_array($status, [301, 302], true));
+        if ($dropsBody) {
             unset($options['body'], $options['json']);
+            $headers = \is_array($options['headers'] ?? null) ? $options['headers'] : [];
+            $options['headers'] = $this->dropHeaders($headers, ['content-length', 'content-type', 'transfer-encoding']);
         }
 
         return $options;
     }
 
+    private function sameOrigin(string $from, string $to): bool
+    {
+        $left = EgressDestination::fromUrl($from);
+        $right = EgressDestination::fromUrl($to);
+
+        return null !== $left && null !== $right
+            && $left->scheme === $right->scheme
+            && $left->host === $right->host
+            && $left->port === $right->port;
+    }
+
     /**
      * @param array<mixed> $headers
+     * @param list<string> $names
      *
      * @return array<mixed>
      */
-    private function dropCredentials(array $headers): array
+    private function dropHeaders(array $headers, array $names): array
     {
         $kept = [];
         foreach ($headers as $name => $value) {
             if (\is_int($name)) {
-                if (\is_string($value) && 1 === preg_match('/^(authorization|cookie)\s*:/i', $value)) {
+                if (\is_string($value) && 1 === preg_match('/^('.implode('|', $names).')\s*:/i', $value)) {
                     continue;
                 }
                 $kept[] = $value;
                 continue;
             }
-            if (\in_array(strtolower((string) $name), ['authorization', 'cookie'], true)) {
+            if (\in_array(strtolower((string) $name), $names, true)) {
                 continue;
             }
             $kept[$name] = $value;
@@ -274,28 +457,29 @@ final class EgressHttpClient implements HttpClientInterface
         return $kept;
     }
 
-    private function wouldBlock(string $url): void
-    {
-        $destination = EgressDestination::fromUrl($url);
-        $label = $destination?->label() ?? 'invalid';
-        $this->events?->record([
-            'level' => 'warning',
-            'channel' => 'egress',
-            'event' => 'egress.would_block',
-            'message' => $label.' '.$this->caller(),
-        ]);
-    }
-
     /**
      * @param array<string, mixed> $options
      */
     private function observe(string $url, array $options, string $outcome, int $started, int $status): void
     {
+        if ('would_block' === $outcome) {
+            $this->wouldBlock($url);
+        }
         $ms = (int) ((hrtime(true) - $started) / 1_000_000);
         $this->metrics->record($this->policy->metricDestination($url, $options), $outcome, $ms);
         if (null !== $this->timeline && $this->timeline->isStarted()) {
             $this->timeline->recordEgress($url, 'refused' === $outcome ? 0 : $status, $ms);
         }
+    }
+
+    private function wouldBlock(string $url): void
+    {
+        $this->events?->record([
+            'level' => 'warning',
+            'channel' => 'egress',
+            'event' => 'egress.would_block',
+            'message' => (EgressDestination::fromUrl($url)?->label() ?? 'invalid').' '.$this->caller(),
+        ]);
     }
 
     private function caller(): string
