@@ -747,6 +747,7 @@ import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitChec
 import { useNotification } from '@/composables/useNotification'
 import { busyGuard, busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
 import { chatApi } from '@/services/api'
+import { conversationFilesApi } from '@/services/api/conversationFilesApi'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
@@ -870,7 +871,7 @@ const removeConversationFile = async (file: { id: number | null; name: string })
   }
   const undo = dismissConversationFile(file.id)
   try {
-    await chatApi.detachConversationFile(chatId, file.id)
+    await conversationFilesApi.detachConversationFile(chatId, file.id)
     showSuccessToast(t('chat.conversationFiles.deleted', { name: file.name }))
   } catch {
     undo()
