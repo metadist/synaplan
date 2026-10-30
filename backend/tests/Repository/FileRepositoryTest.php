@@ -154,6 +154,47 @@ class FileRepositoryTest extends KernelTestCase
         $this->assertSame(1, $leadingComma[$sheetFolder]);
     }
 
+    public function testExcludeSourceHidesGeneratedFilesFromListAndFolderCounts(): void
+    {
+        $user = $this->createUser('exclude-source');
+        $folder = 'Mine_'.bin2hex(random_bytes(3));
+
+        $upload = $this->createFile($user, 'notes-'.bin2hex(random_bytes(3)).'.pdf');
+        $upload->setGroupKey($folder);
+
+        $generated = $this->createFile($user, 'picture-'.bin2hex(random_bytes(3)).'.png');
+        $generated->setSource('generated');
+        $generated->setStatus('generated');
+        $generated->setGroupKey($folder);
+
+        $compute = $this->createFile($user, 'sheet-'.bin2hex(random_bytes(3)).'.xlsx');
+        $compute->setSource('compute');
+        $compute->setGroupKey($folder);
+        $this->em->flush();
+
+        $userId = (int) $user->getId();
+        $filters = ['exclude_source' => 'generated,compute'];
+
+        $listed = $this->repository->findByUserPaginated($userId, null, 0, 50, [], $filters);
+        $ids = $this->idsOf($listed['files']);
+        $this->assertContains($upload->getId(), $ids);
+        $this->assertNotContains($generated->getId(), $ids);
+        $this->assertNotContains($compute->getId(), $ids);
+        $this->assertSame(1, $listed['total']);
+
+        $unfiltered = $this->repository->findByUserPaginated($userId, null, 0, 50);
+        $allIds = $this->idsOf($unfiltered['files']);
+        $this->assertContains($generated->getId(), $allIds);
+        $this->assertContains($compute->getId(), $allIds);
+        $this->assertSame(3, $unfiltered['total']);
+
+        $counts = $this->repository->getGroupCountsByUser($userId, $filters);
+        $this->assertSame(1, $counts[$folder]);
+
+        $allCounts = $this->repository->getGroupCountsByUser($userId);
+        $this->assertSame(3, $allCounts[$folder]);
+    }
+
     public function testFindFilesByChatIdRespectsLimitNewestFirst(): void
     {
         $user = $this->createUser('files-chat-limit');

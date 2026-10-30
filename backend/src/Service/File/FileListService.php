@@ -29,7 +29,7 @@ final readonly class FileListService
     /**
      * Build a paginated, fully-serialized file listing for a user.
      *
-     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, exclude_source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
      *
      * @return array{files: array<int, array<string, mixed>>, total: int}
      */

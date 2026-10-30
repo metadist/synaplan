@@ -941,16 +941,15 @@ export const useChatsStore = defineStore('chats', () => {
     })
 
     if (emptyChats.length > 0) {
-      // Use the first (most recent) empty chat
-      const chatToReuse = emptyChats[0]
+      const chatToReuse = emptyChats.find((chat) => chat.id === activeChatId.value) ?? emptyChats[0]
       console.log('♻️ Reusing existing empty chat:', chatToReuse.id)
 
-      // Clean up extra empty chats in the background (keep only the one we're using)
-      if (emptyChats.length > 1) {
-        console.log(`🧹 Cleaning up ${emptyChats.length - 1} stale empty chat(s)`)
-        for (let i = 1; i < emptyChats.length; i++) {
+      const staleEmptyChats = emptyChats.filter((chat) => chat.id !== chatToReuse.id)
+      if (staleEmptyChats.length > 0) {
+        console.log(`🧹 Cleaning up ${staleEmptyChats.length} stale empty chat(s)`)
+        for (const extra of staleEmptyChats) {
           // Delete silently to avoid UI noise
-          deleteChat(emptyChats[i].id, true).catch((err) => {
+          deleteChat(extra.id, true).catch((err) => {
             console.warn('Failed to clean up stale empty chat:', err)
           })
         }

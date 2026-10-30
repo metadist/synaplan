@@ -111,6 +111,24 @@ describe('ToolsDropdown summarize', () => {
     hasActiveDevices.value = false
   })
 
+  it('opens on hover when the pointer can hover, and a click does not close it', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('hover'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }))
+    )
+    const wrapper = await mountDropdown()
+    const toggle = wrapper.get('[data-testid="btn-tools-toggle"]')
+    await toggle.trigger('mouseenter')
+    expect(wrapper.find('[data-testid="dropdown-tools-panel"]').exists()).toBe(true)
+    await toggle.trigger('click')
+    expect(wrapper.find('[data-testid="dropdown-tools-panel"]').exists()).toBe(true)
+  })
+
   it('lists Summarize a document and emits summarizeDocument', async () => {
     const wrapper = await mountDropdown()
     await wrapper.get('[data-testid="btn-tools-toggle"]').trigger('click')

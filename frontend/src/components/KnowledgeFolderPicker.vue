@@ -1,26 +1,44 @@
 <template>
-  <div ref="rootRef" class="relative" data-testid="comp-knowledge-folder-picker">
+  <div ref="rootRef" class="relative w-full" data-testid="comp-knowledge-folder-picker">
     <button
       type="button"
-      :class="['pill', modelValue && 'pill--active', isOpen && 'pill--active']"
+      class="plus-menu-row w-full"
+      data-beside-row
       :aria-label="$t('chatInput.knowledgeGroup')"
-      :title="$t('chatInput.knowledgeGroup')"
+      :title="selectedLabel"
+      :aria-expanded="isOpen"
+      aria-haspopup="menu"
       data-testid="btn-knowledge-folder"
-      @click="toggleOpen"
+      @click="onToggleClick"
+      @mouseenter="onRowEnter"
+      @mouseleave="onRowLeave"
       @keydown.escape="close"
+      @keydown.right.prevent="onArrowRight"
+      @keydown.down.prevent="onArrowRight"
     >
-      <FolderIcon class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-      <span class="text-xs md:text-sm font-medium truncate max-w-[28vw] md:max-w-[160px]">
+      <FolderIcon
+        :class="['w-4 h-4 md:w-5 md:h-5 shrink-0', modelValue && 'text-[var(--brand)]']"
+      />
+      <span class="text-xs md:text-sm font-medium truncate min-w-0">
         {{ selectedLabel }}
       </span>
-      <ChevronUpIcon class="w-4 h-4 flex-shrink-0" />
+      <span class="flex-1" aria-hidden="true" />
+      <ChevronLeftIcon v-if="opensLeft" class="w-4 h-4 shrink-0" />
+      <ChevronRightIcon v-else class="w-4 h-4 shrink-0" />
     </button>
 
     <div
       v-if="isOpen"
-      class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-72 max-h-[50vh] overflow-y-auto scroll-thin"
+      ref="panelRef"
+      class="dropdown-up side-flyout"
       data-testid="dropdown-knowledge-folder"
+      data-dropdown-placement="manual"
+      role="menu"
+      @mouseenter="onPanelEnter"
+      @mouseleave="onPanelLeave"
+      @pointerdown="onPanelPointerDown"
       @keydown.escape="close"
+      @keydown.left.prevent="onArrowLeft"
     >
       <button
         type="button"
@@ -84,11 +102,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   ArrowTopRightOnSquareIcon,
   CheckIcon,
-  ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   FolderIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -97,6 +116,7 @@ import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { iamApi } from '@/services/api/iamApi'
+import { useBesideMenu } from '@/composables/useBesideMenu'
 
 interface Props {
   /** Selected knowledge-folder (RAG group) key; '' = none. */
@@ -114,7 +134,19 @@ const { t } = useI18n()
 const router = useRouter()
 
 const rootRef = ref<HTMLElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
+const {
+  opensLeft,
+  onRowEnter,
+  onRowLeave,
+  onPanelEnter,
+  onPanelPointerDown,
+  onPanelLeave,
+  onRowClick,
+  openFromKeyboard,
+  close,
+} = useBesideMenu('knowledge', isOpen, rootRef, panelRef)
 
 const sharedFolders = ref<Array<{ name: string; value: string }>>([])
 
@@ -144,13 +176,22 @@ onMounted(() => {
   void loadSharedFolders()
 })
 
-const toggleOpen = () => {
-  triggerHapticImpact('light')
-  isOpen.value = !isOpen.value
+const onToggleClick = () => {
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    triggerHapticImpact('light')
+  }
+  onRowClick()
 }
 
-const close = () => {
-  isOpen.value = false
+const onArrowRight = async () => {
+  openFromKeyboard()
+  await nextTick()
+  panelRef.value?.querySelector('button')?.focus()
+}
+
+const onArrowLeft = () => {
+  close()
+  rootRef.value?.querySelector('button')?.focus()
 }
 
 const select = (name: string) => {

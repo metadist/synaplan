@@ -52,8 +52,12 @@ test.describe('@ci Incognito Chat', () => {
     })
 
     await test.step('Assert: the chat list has no row for the incognito turn', async () => {
-      await page.locator(selectors.nav.sidebarV2ChatNav).click()
       const list = page.locator(selectors.nav.sidebarChats)
+      // The rail icon starts a new chat and would end this session. The list
+      // is already open on the chat page.
+      if (!(await list.isVisible())) {
+        await page.locator(selectors.nav.sidebarV2ChatNav).click()
+      }
       await list.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await expect(
         list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
@@ -80,8 +84,10 @@ test.describe('@ci Incognito Chat', () => {
     await test.step('Assert: nothing survived a reload', async () => {
       await openApp(page)
       await expect(page.getByText(uniqueMessage)).toHaveCount(0)
-      await page.locator(selectors.nav.sidebarV2ChatNav).click()
       const list = page.locator(selectors.nav.sidebarChats)
+      if (!(await list.isVisible())) {
+        await page.locator(selectors.nav.sidebarV2ChatNav).click()
+      }
       await list.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await expect(
         list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })

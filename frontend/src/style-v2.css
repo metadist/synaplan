@@ -1633,3 +1633,34 @@
   background: var(--bg-card) !important;
   color: var(--txt-primary) !important;
 }
+
+/* The plus menu uses the pill fill for the whole box. Its rows do not. */
+.design-v2 [data-testid='dropdown-plus-panel'] {
+  background: #e6e7eb;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.design-v2.dark [data-testid='dropdown-plus-panel'] {
+  background: #2c3344;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.design-v2 [data-testid='dropdown-plus-panel'] .plus-menu-row {
+  color: #2f3743;
+}
+.design-v2.dark [data-testid='dropdown-plus-panel'] .plus-menu-row {
+  color: #d0d3db;
+}
+.design-v2.dark.theme-oled [data-testid='dropdown-plus-panel'] {
+  background: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.design-v2.dark.theme-oled [data-testid='dropdown-plus-panel'] .plus-menu-row:hover,
+.design-v2.dark.theme-oled [data-testid='dropdown-plus-panel'] .plus-menu-row:focus-visible,
+.design-v2.dark.theme-oled
+  [data-testid='dropdown-plus-panel']
+  .plus-menu-row[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e4e5e9;
+}

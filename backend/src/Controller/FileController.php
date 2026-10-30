@@ -17,6 +17,7 @@ use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGroupDeletionService;
 use App\Service\File\FileHelper;
+use App\Service\File\FileListingQuery;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
@@ -944,6 +945,7 @@ class FileController extends AbstractController
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
             new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
+            new OA\Parameter(name: 'exclude_source', in: 'query', required: false, description: 'Exclude provenance source(s), comma-separated. Omitted, the list is unchanged.', schema: new OA\Schema(type: 'string', example: 'generated,compute')),
             new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s): none, pending, vectorized, failed, not_applicable, stale (comma-separated for groups)', schema: new OA\Schema(type: 'string', example: 'stale')),
             new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter by origin kind: image, video, audio, calendar, document, artefact', schema: new OA\Schema(type: 'string', example: 'image')),
             new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
@@ -983,7 +985,7 @@ class FileController extends AbstractController
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
 
-        $filters = $this->listingFilters($request);
+        $filters = FileListingQuery::fromRequest($request);
 
         $result = $this->fileListService->buildListing($listUserId, is_string($groupKey) ? $groupKey : null, $offset, $limit, $filters);
 
@@ -1010,6 +1012,7 @@ class FileController extends AbstractController
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
             new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
+            new OA\Parameter(name: 'exclude_source', in: 'query', required: false, description: 'Exclude provenance source(s), comma-separated. Omitted, the counts are unchanged.', schema: new OA\Schema(type: 'string', example: 'generated,compute')),
             new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'vectorized')),
             new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter by origin kind', schema: new OA\Schema(type: 'string', example: 'image')),
             new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
@@ -1028,12 +1031,12 @@ class FileController extends AbstractController
         }
 
         try {
-            $filters = $this->listingFilters($request);
+            $filters = FileListingQuery::fromRequest($request);
             $merged = $this->fileRepository->getGroupCountsByUser($user->getId(), $filters);
 
             // Vector-only folders have no file row to match a type, source, or
             // date filter, so they stay in the unfiltered library view only.
-            if (!$this->listingIsNarrowed($filters)) {
+            if (!FileListingQuery::isNarrowed($filters)) {
                 try {
                     $vectorGroups = [];
                     $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
@@ -1824,50 +1827,6 @@ class FileController extends AbstractController
         }
 
         return $this->sharedFileAccess->canRead($user, $file);
-    }
-
-    /**
-     * @return array{search: ?string, file_type: ?string, source: ?string, vector_state: ?string, origin_kind: ?string, incoming: ?bool, sort: ?string, date_from: ?int, date_to: ?int}
-     */
-    private function listingFilters(Request $request): array
-    {
-        return [
-            'search' => $this->optionalQueryString($request, 'search'),
-            'file_type' => $this->optionalQueryString($request, 'file_type'),
-            'source' => $this->optionalQueryString($request, 'source'),
-            'vector_state' => $this->optionalQueryString($request, 'vector_state'),
-            'origin_kind' => $this->optionalQueryString($request, 'origin_kind'),
-            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
-            'sort' => $this->optionalQueryString($request, 'sort'),
-            'date_from' => $request->query->getInt('date_from') ?: null,
-            'date_to' => $request->query->getInt('date_to') ?: null,
-        ];
-    }
-
-    private function optionalQueryString(Request $request, string $key): ?string
-    {
-        $value = $request->query->get($key);
-
-        return is_string($value) ? $value : null;
-    }
-
-    /**
-     * @param array{search?: ?string, file_type?: ?string, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, date_from?: ?int, date_to?: ?int} $filters
-     */
-    private function listingIsNarrowed(array $filters): bool
-    {
-        foreach (['search', 'file_type', 'source', 'vector_state', 'origin_kind'] as $key) {
-            $value = $filters[$key] ?? null;
-            if (is_string($value) && '' !== trim($value)) {
-                return true;
-            }
-        }
-
-        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
-            return true;
-        }
-
-        return null !== ($filters['incoming'] ?? null);
     }
 
     /**

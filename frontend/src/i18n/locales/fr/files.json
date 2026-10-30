@@ -178,11 +178,11 @@
     },
     "tabBrowse": "Parcourir",
     "tabIncoming": "Entrants",
-    "tabGenerated": "Générés",
+    "tabGenerated": "Créés par l'IA",
     "tabWorkspace": "Espace de travail",
     "workspace": {
-      "subtitle": "Le dossier de travail de l’IA pour le travail sur fichiers : elle y lit et écrit des fichiers et les réutilise d’une exécution à l’autre. Les résultats finaux sont enregistrés dans Générés.",
-      "empty": "S’affiche lorsque vous demandez à l’IA de continuer à travailler sur des fichiers d’une exécution à l’autre. Les résultats ponctuels sont enregistrés dans Générés.",
+      "subtitle": "Le dossier de travail de l’IA pour le travail sur fichiers : elle y lit et écrit des fichiers et les réutilise d’une exécution à l’autre. Les résultats finaux sont enregistrés dans Créés par l'IA.",
+      "empty": "S’affiche lorsque vous demandez à l’IA de continuer à travailler sur des fichiers d’une exécution à l’autre. Les résultats ponctuels sont enregistrés dans Créés par l'IA.",
       "emptyAction": "Retour au chat",
       "usage": "{used} Mo sur {quota} Mo utilisés",
       "delete": "Supprimer l’espace de travail",
@@ -288,7 +288,7 @@
     },
     "empty": {
       "browseTitle": "Votre bibliothèque de fichiers",
-      "browseBody": "Chaque téléversement, pièce jointe de chat et fichier généré par l’IA se trouve ici, prêt à être recherché et réutilisé.",
+      "browseBody": "Vos téléversements et pièces jointes de chat se trouvent ici, prêts à être recherchés et réutilisés.",
       "browseAction": "Téléverser votre premier fichier",
       "filteredBody": "Aucun fichier ne correspond à ces filtres.",
       "filteredAction": "Effacer les filtres",
@@ -357,7 +357,19 @@
       "deleteConfirmTitle": "Supprimer le fichier généré ?",
       "deleteConfirmMessage": "« {name} » sera définitivement supprimé, y compris son contenu indexé dans votre base de connaissances. Cette action est irréversible.",
       "deleted": "Fichier supprimé, y compris son contenu indexé.",
-      "deleteFailed": "Impossible de supprimer le fichier. Veuillez réessayer."
+      "deleteFailed": "Impossible de supprimer le fichier. Veuillez réessayer.",
+      "searchPlaceholder": "Rechercher dans les fichiers créés par l'IA"
+    },
+    "aiCreated": {
+      "title": "Créés par l'IA",
+      "count": "{count} fichiers",
+      "searchHint": "{count} de plus dans Créés par l'IA",
+      "searchHintAction": "Afficher",
+      "mineEmpty": "Vos propres fichiers apparaissent ici. Téléversez-en un pour commencer.",
+      "mineEmptyAction": "Téléverser un fichier",
+      "empty": "Les images, vidéos et documents que l'IA crée pour vous apparaissent ici.",
+      "emptyAction": "Retour à mes fichiers",
+      "loadMore": "Charger plus"
     },
     "explainer": {
       "text": "Tout ce que vous téléversez ou créez se trouve ici. L’assistant peut utiliser les fichiers marqués recherchables par l’IA. Photos, enregistrements et fichiers créés par l’IA doivent d’abord être rendus recherchables.",
@@ -402,6 +414,8 @@
   },
   "fileSelection": {
     "title": "Sélectionner ou téléverser des fichiers",
+    "tabMine": "Mes fichiers",
+    "tabAiCreated": "Créés par l'IA",
     "searchPlaceholder": "Rechercher des fichiers…",
     "allStatuses": "Tous les statuts",
     "selectedCount": "{count} fichier(s) sélectionné(s)",

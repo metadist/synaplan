@@ -178,11 +178,11 @@
     },
     "tabBrowse": "Browse",
     "tabIncoming": "Incoming",
-    "tabGenerated": "Generated",
+    "tabGenerated": "AI-created",
     "tabWorkspace": "Workspace",
     "workspace": {
-      "subtitle": "The AI's working folder for file work — it reads and writes files here and reuses them across runs. Finished results are saved to Generated.",
-      "empty": "This appears when you ask the AI to keep working on files across runs. One-off results are saved to Generated instead.",
+      "subtitle": "The AI's working folder for file work — it reads and writes files here and reuses them across runs. Finished results are saved to AI-created.",
+      "empty": "This appears when you ask the AI to keep working on files across runs. One-off results are saved to AI-created instead.",
       "emptyAction": "Back to chat",
       "usage": "{used} MB of {quota} MB used",
       "delete": "Delete workspace",
@@ -288,7 +288,7 @@
     },
     "empty": {
       "browseTitle": "Your file library",
-      "browseBody": "Every upload, chat attachment and AI-generated file lives here, ready to search and reuse.",
+      "browseBody": "Your uploads and chat attachments live here, ready to search and reuse.",
       "browseAction": "Upload your first file",
       "filteredBody": "No files match these filters.",
       "filteredAction": "Clear filters",
@@ -357,7 +357,19 @@
       "deleteConfirmTitle": "Delete generated file?",
       "deleteConfirmMessage": "\"{name}\" will be permanently deleted, including its indexed content in your knowledge base. This cannot be undone.",
       "deleted": "File deleted, including its indexed content.",
-      "deleteFailed": "Couldn't delete the file. Please try again."
+      "deleteFailed": "Couldn't delete the file. Please try again.",
+      "searchPlaceholder": "Search AI-created files"
+    },
+    "aiCreated": {
+      "title": "AI-created",
+      "count": "{count} files",
+      "searchHint": "{count} more in AI-created",
+      "searchHintAction": "Show",
+      "mineEmpty": "Your own files show up here. Upload one to get started.",
+      "mineEmptyAction": "Upload a file",
+      "empty": "Images, videos and documents the AI creates for you appear here.",
+      "emptyAction": "Back to my files",
+      "loadMore": "Load more"
     },
     "explainer": {
       "text": "Everything you upload or create lives here. The assistant can use files marked searchable by AI. Photos, recordings, and AI-created files need you to make them searchable first.",
@@ -402,6 +414,8 @@
   },
   "fileSelection": {
     "title": "Select or Upload Files",
+    "tabMine": "My files",
+    "tabAiCreated": "AI-created",
     "searchPlaceholder": "Search files...",
     "allStatuses": "All statuses",
     "selectedCount": "{count} file(s) selected",

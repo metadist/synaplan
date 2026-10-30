@@ -263,6 +263,38 @@ describe('Chats Store', () => {
       expect(httpClientMock).toHaveBeenCalledTimes(1)
       expect(httpClientMock.mock.calls[0][0]).toBe('/api/v1/chats?archived=0')
     })
+
+    it('keeps the open empty chat so its unsent draft stays with that chat', async () => {
+      localStorage.setItem('synaplan_active_chat_id', '5')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [
+          {
+            id: 8,
+            title: 'New Chat',
+            createdAt: '2026-01-02T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            messageCount: 0,
+            firstMessagePreview: null,
+          },
+          {
+            id: 5,
+            title: 'New Chat',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            messageCount: 0,
+            firstMessagePreview: null,
+          },
+        ],
+        activeRunChatIds: [],
+      })
+      await store.loadChats()
+
+      const chat = await store.findOrCreateEmptyChat()
+
+      expect(chat?.id).toBe(5)
+      expect(store.activeChatId).toBe(5)
+    })
   })
 
   describe('loadChats / ensureValidActiveChat', () => {

@@ -39,7 +39,8 @@ vi.mock('@/stores/chats', () => ({
 }))
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRoute: () => ({ query: {} }),
 }))
 
 const i18n = createI18n({

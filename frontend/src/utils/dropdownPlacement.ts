@@ -62,12 +62,16 @@ function visibleFrame(panel: HTMLElement): { top: number; bottom: number } {
   let bottom = top + (viewport ? viewport.height : window.innerHeight)
   let node = panel.parentElement
   while (node && node !== document.documentElement) {
-    const overflow = getComputedStyle(node).overflowY
-    if (overflow === 'auto' || overflow === 'scroll') {
-      const rect = node.getBoundingClientRect()
-      top = Math.max(top, rect.top)
-      bottom = Math.min(bottom, rect.bottom)
-      break
+    // A menu nested in another menu (the tools list inside the plus menu)
+    // must size against the page, not against the parent menu's box.
+    if (!isMenu(node)) {
+      const overflow = getComputedStyle(node).overflowY
+      if (overflow === 'auto' || overflow === 'scroll') {
+        const rect = node.getBoundingClientRect()
+        top = Math.max(top, rect.top)
+        bottom = Math.min(bottom, rect.bottom)
+        break
+      }
     }
     node = node.parentElement
   }
@@ -143,12 +147,13 @@ export function applyDropdownPlacement(panel: HTMLElement): void {
   }
 
   const frame = visibleFrame(panel)
+  const natural = contentHeight(panel)
   const placement = chooseDropdownPlacement({
     anchorTop: anchorRect.top,
     anchorBottom: anchorRect.bottom,
     frameTop: frame.top,
     frameBottom: frame.bottom,
-    contentHeight: contentHeight(panel),
+    contentHeight: natural,
     preferAbove: panel.classList.contains('dropdown-up'),
   })
 
@@ -156,8 +161,16 @@ export function applyDropdownPlacement(panel: HTMLElement): void {
   panel.style.position = 'absolute'
   panel.style.marginTop = '0'
   panel.style.marginBottom = '0'
-  panel.style.maxHeight = `${placement.maxHeight}px`
-  enableMenuScroll(panel)
+  // A menu that fits its items must not grow a scrollbar. Capping max-height
+  // to the content height still overflows by the border and shows a bar.
+  if (natural > placement.maxHeight + 1) {
+    panel.style.maxHeight = `${placement.maxHeight}px`
+    enableMenuScroll(panel)
+  } else {
+    panel.style.maxHeight = 'none'
+    panel.style.overflowY = 'visible'
+    panel.style.overscrollBehavior = ''
+  }
   if (placement.openAbove) {
     const bottom = parentRect.bottom - anchorRect.top + GAP_PX
     panel.style.top = 'auto'

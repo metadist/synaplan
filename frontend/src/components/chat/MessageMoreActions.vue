@@ -1,5 +1,5 @@
 <template>
-  <div v-if="showFalsePositive || showReport" class="relative">
+  <div v-if="showFalsePositive || showReport" ref="root" class="relative">
     <button
       type="button"
       :class="['pill text-xs', open && 'pill--active']"
@@ -14,7 +14,6 @@
     </button>
     <div
       v-if="open"
-      v-click-outside="close"
       class="dropdown-up right-0 w-52 max-w-[calc(100vw-1rem)]"
       role="menu"
       data-testid="dropdown-message-more"
@@ -55,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   EllipsisHorizontalIcon,
@@ -82,10 +81,38 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const open = ref(false)
+const root = ref<HTMLElement | null>(null)
 
 const close = () => {
   open.value = false
 }
+
+const onPointerDown = (event: Event) => {
+  const target = event.target
+  if (target instanceof Node && root.value?.contains(target)) return
+  close()
+}
+
+const onKeyDown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape' || !open.value) return
+  event.stopPropagation()
+  close()
+}
+
+watch(open, (isOpen) => {
+  if (isOpen) {
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown, true)
+    return
+  }
+  document.removeEventListener('pointerdown', onPointerDown)
+  document.removeEventListener('keydown', onKeyDown, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onPointerDown)
+  document.removeEventListener('keydown', onKeyDown, true)
+})
 
 const chooseFalsePositive = () => {
   close()

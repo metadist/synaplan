@@ -7,14 +7,13 @@
     "functionLines": 100
   },
   "counts": {
-    "fileLines": 29,
+    "fileLines": 28,
     "functionLines": 79
   },
   "fileLines": {
     "src/components/ChatBrowser.vue": 999,
     "src/components/ChatInput.vue": 2543,
     "src/components/ChatMessage.vue": 2373,
-    "src/components/FileSelectionModal.vue": 889,
     "src/components/MemoryGraphView.vue": 934,
     "src/components/MessageText.vue": 1333,
     "src/components/MobileNav.vue": 1148,

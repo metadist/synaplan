@@ -219,11 +219,11 @@
     },
     "tabBrowse": "Durchsuchen",
     "tabIncoming": "Eingang",
-    "tabGenerated": "Erzeugt",
+    "tabGenerated": "KI-erstellt",
     "tabWorkspace": "Arbeitsbereich",
     "workspace": {
-      "subtitle": "Der Arbeitsordner der KI für die Dateiarbeit – hier liest und schreibt sie Dateien und verwendet sie über mehrere Läufe hinweg wieder. Fertige Ergebnisse werden unter „Erzeugt“ gespeichert.",
-      "empty": "Erscheint, wenn du die KI bittest, über mehrere Läufe hinweg an Dateien weiterzuarbeiten. Einmalige Ergebnisse werden stattdessen unter „Erzeugt“ gespeichert.",
+      "subtitle": "Der Arbeitsordner der KI für die Dateiarbeit – hier liest und schreibt sie Dateien und verwendet sie über mehrere Läufe hinweg wieder. Fertige Ergebnisse werden unter „KI-erstellt“ gespeichert.",
+      "empty": "Erscheint, wenn du die KI bittest, über mehrere Läufe hinweg an Dateien weiterzuarbeiten. Einmalige Ergebnisse werden stattdessen unter „KI-erstellt“ gespeichert.",
       "emptyAction": "Zurück zum Chat",
       "usage": "{used} MB von {quota} MB belegt",
       "delete": "Arbeitsbereich löschen",
@@ -329,7 +329,7 @@
     },
     "empty": {
       "browseTitle": "Deine Dateibibliothek",
-      "browseBody": "Jeder Upload, Chat-Anhang und jede KI-erzeugte Datei liegt hier – bereit zum Suchen und Wiederverwenden.",
+      "browseBody": "Deine Uploads und Chat-Anhänge liegen hier – bereit zum Suchen und Wiederverwenden.",
       "browseAction": "Erste Datei hochladen",
       "filteredBody": "Keine Dateien passen zu diesen Filtern.",
       "filteredAction": "Filter zurücksetzen",
@@ -398,7 +398,19 @@
       "deleteConfirmTitle": "Erzeugte Datei löschen?",
       "deleteConfirmMessage": "\"{name}\" wird dauerhaft gelöscht, einschließlich der indexierten Inhalte in deiner Wissensbasis. Das kann nicht rückgängig gemacht werden.",
       "deleted": "Datei gelöscht, einschließlich der indexierten Inhalte.",
-      "deleteFailed": "Datei konnte nicht gelöscht werden. Bitte versuche es erneut."
+      "deleteFailed": "Datei konnte nicht gelöscht werden. Bitte versuche es erneut.",
+      "searchPlaceholder": "KI-erstellte Dateien suchen"
+    },
+    "aiCreated": {
+      "title": "KI-erstellt",
+      "count": "{count} Dateien",
+      "searchHint": "{count} weitere in KI-erstellt",
+      "searchHintAction": "Anzeigen",
+      "mineEmpty": "Hier liegen deine eigenen Dateien. Lade eine hoch, um zu starten.",
+      "mineEmptyAction": "Datei hochladen",
+      "empty": "Hier erscheinen Bilder, Videos und Dokumente, die die KI für dich erstellt hat.",
+      "emptyAction": "Zu meinen Dateien",
+      "loadMore": "Mehr laden"
     },
     "explainer": {
       "text": "Alles, was du hochlädst oder erstellst, liegt hier. Der Assistent nutzt Dateien, die als „KI-durchsuchbar“ markiert sind. Fotos, Aufnahmen und KI-erzeugte Dateien musst du zuerst durchsuchbar machen.",
@@ -443,6 +455,8 @@
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",
+    "tabMine": "Meine Dateien",
+    "tabAiCreated": "KI-erstellt",
     "searchPlaceholder": "Dateien durchsuchen...",
     "allStatuses": "Alle Status",
     "selectedCount": "{count} Datei(en) ausgewählt",

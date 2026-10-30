@@ -1,6 +1,8 @@
 {
   "fileSelection": {
     "title": "Seleccionar o Subir Archivos",
+    "tabMine": "Mis archivos",
+    "tabAiCreated": "Creados por IA",
     "searchPlaceholder": "Buscar archivos...",
     "allStatuses": "Todos los estados",
     "selectedCount": "{count} archivo(s) seleccionado(s)",
@@ -232,11 +234,11 @@
     },
     "tabBrowse": "Explorar",
     "tabIncoming": "Entrantes",
-    "tabGenerated": "Generados",
+    "tabGenerated": "Creados por IA",
     "tabWorkspace": "Espacio de trabajo",
     "workspace": {
-      "subtitle": "La carpeta de trabajo de la IA para el trabajo con archivos: aquí lee y escribe archivos y los reutiliza entre ejecuciones. Los resultados finales se guardan en Generados.",
-      "empty": "Aparece cuando pides a la IA que siga trabajando con archivos entre ejecuciones. Los resultados puntuales se guardan en Generados.",
+      "subtitle": "La carpeta de trabajo de la IA para el trabajo con archivos: aquí lee y escribe archivos y los reutiliza entre ejecuciones. Los resultados finales se guardan en Creados por IA.",
+      "empty": "Aparece cuando pides a la IA que siga trabajando con archivos entre ejecuciones. Los resultados puntuales se guardan en Creados por IA.",
       "emptyAction": "Volver al chat",
       "usage": "{used} MB de {quota} MB usados",
       "delete": "Eliminar espacio de trabajo",
@@ -342,7 +344,7 @@
     },
     "empty": {
       "browseTitle": "Tu biblioteca de archivos",
-      "browseBody": "Aquí están todas tus subidas, adjuntos de chat y archivos generados por IA, listos para buscar y reutilizar.",
+      "browseBody": "Tus subidas y adjuntos de chat están aquí, listos para buscar y reutilizar.",
       "browseAction": "Sube tu primer archivo",
       "filteredBody": "Ningún archivo coincide con estos filtros.",
       "filteredAction": "Quitar filtros",
@@ -411,7 +413,19 @@
       "deleteConfirmTitle": "¿Eliminar archivo generado?",
       "deleteConfirmMessage": "\"{name}\" se eliminará permanentemente, incluido su contenido indexado en tu base de conocimiento. Esta acción no se puede deshacer.",
       "deleted": "Archivo eliminado, incluido su contenido indexado.",
-      "deleteFailed": "No se pudo eliminar el archivo. Inténtalo de nuevo."
+      "deleteFailed": "No se pudo eliminar el archivo. Inténtalo de nuevo.",
+      "searchPlaceholder": "Buscar archivos creados por IA"
+    },
+    "aiCreated": {
+      "title": "Creados por IA",
+      "count": "{count} archivos",
+      "searchHint": "{count} más en Creados por IA",
+      "searchHintAction": "Ver",
+      "mineEmpty": "Aquí aparecen tus propios archivos. Sube uno para empezar.",
+      "mineEmptyAction": "Subir un archivo",
+      "empty": "Aquí aparecen las imágenes, los vídeos y los documentos que la IA crea para ti.",
+      "emptyAction": "Volver a mis archivos",
+      "loadMore": "Cargar más"
     },
     "explainer": {
       "text": "Todo lo que subes o creas está aquí. El asistente puede usar los archivos marcados como consultables por IA. Fotos, grabaciones y archivos creados por IA necesitan que los hagas consultables primero.",

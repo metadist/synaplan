@@ -225,7 +225,7 @@ function openSection(key: NavSection['key']) {
     return
   }
   if (!panelVisible.value) openPanel()
-  selectSection(key)
+  void selectSection(key)
 }
 
 function hideTipNow() {

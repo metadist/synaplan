@@ -4,6 +4,8 @@
       <div
         v-if="visible"
         class="modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50"
+        role="dialog"
+        aria-modal="true"
         data-testid="modal-file-selection-root"
         @click.self="emit('close')"
       >
@@ -116,183 +118,21 @@
             </div>
           </div>
 
-          <!-- Search and Filter -->
-          <div class="px-3 py-2 sm:p-4 border-b border-light-border/20 dark:border-dark-border/15">
-            <div class="flex gap-2 sm:gap-3">
-              <input
-                v-model="searchQuery"
-                type="text"
-                :placeholder="$t('fileSelection.searchPlaceholder')"
-                class="flex-1 min-w-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                data-testid="input-file-selection-search"
-              />
-              <select
-                v-model="filterStatus"
-                class="shrink-0 min-w-[7rem] px-2 py-1.5 sm:px-4 sm:py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                data-testid="select-file-selection-status"
-              >
-                <option value="all">{{ $t('fileSelection.allStatuses') }}</option>
-                <option value="vectorized">{{ $t('files.status_vectorized') }}</option>
-                <option value="extracted">{{ $t('files.status_extracted') }}</option>
-                <option value="uploaded">{{ $t('files.status_uploaded') }}</option>
-              </select>
-            </div>
-            <!-- §4.10.3: type filter chips (horizontally scrollable on mobile) -->
-            <div
-              class="flex items-center gap-1.5 mt-2 overflow-x-auto scroll-thin"
-              data-testid="file-selection-type-chips"
-            >
-              <button
-                v-for="chip in typeChips"
-                :key="chip.value"
-                class="shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors"
-                :class="
-                  filterType === chip.value
-                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
-                    : 'border-light-border/30 dark:border-dark-border/15 txt-secondary hover:text-[var(--brand)] hover:border-[var(--brand)]/40'
-                "
-                :data-testid="`file-selection-type-${chip.value}`"
-                @click="filterType = chip.value"
-              >
-                {{ $t(chip.labelKey) }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Files List -->
-          <div class="flex-1 overflow-y-auto px-2 py-1.5 sm:p-4">
-            <div v-if="isLoading" class="flex items-center justify-center py-12">
-              <Icon icon="mdi:loading" class="w-8 h-8 animate-spin txt-secondary" />
-            </div>
-
-            <div v-else-if="filteredFiles.length === 0" class="text-center py-12 txt-secondary">
-              {{ $t('files.noFiles') }}
-            </div>
-
-            <div v-else class="space-y-1 sm:space-y-2">
-              <div
-                v-for="file in filteredFiles"
-                :key="file.id"
-                class="group flex items-center gap-2 sm:gap-4 px-2 py-2 sm:p-4 rounded-lg sm:rounded-xl border cursor-pointer transition-all"
-                :class="
-                  isSelected(file.id)
-                    ? 'border-[var(--brand)]/40 bg-[var(--brand)]/[0.04] ring-1 ring-[var(--brand)]/30'
-                    : 'border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.15] hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'
-                "
-                @click="toggleFileSelection(file)"
-              >
-                <input
-                  type="checkbox"
-                  :checked="isSelected(file.id)"
-                  class="w-4 h-4 sm:w-5 sm:h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] flex-shrink-0"
-                  @click.stop
-                  @change="toggleFileSelection(file)"
-                />
-
-                <!-- Thumbnail / Icon -->
-                <div
-                  class="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center"
-                >
-                  <img
-                    v-if="isImageFile(file.file_type) && getDownloadUrl(file.id)"
-                    :src="getDownloadUrl(file.id)"
-                    :alt="file.filename"
-                    class="w-full h-full object-cover"
-                    loading="lazy"
-                    @error="
-                      ;($event.target as HTMLImageElement).style.display = 'none'
-                      ;($event.target as HTMLImageElement).nextElementSibling?.classList.remove(
-                        'hidden'
-                      )
-                    "
-                  />
-                  <Icon
-                    :icon="getFileIcon(file.file_type)"
-                    :class="[
-                      'w-6 h-6 txt-secondary',
-                      isImageFile(file.file_type) && getDownloadUrl(file.id) ? 'hidden' : '',
-                    ]"
-                  />
-                </div>
-
-                <div class="flex-1 min-w-0">
-                  <div class="text-sm sm:text-base font-medium txt-primary truncate">
-                    {{ file.filename }}
-                  </div>
-                  <div class="text-xs sm:text-sm txt-secondary flex items-center gap-1.5 mt-0.5">
-                    <span>{{ formatFileSize(file.file_size) }}</span>
-                    <span>·</span>
-                    <span
-                      class="inline-flex items-center gap-0.5"
-                      :class="{
-                        'text-green-600 dark:text-green-400':
-                          file.status === 'vectorized' || file.status === 'processed',
-                        'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
-                        'text-blue-500 dark:text-blue-400':
-                          file.status === 'extracting' || file.status === 'vectorizing',
-                        'text-gray-600 dark:text-gray-400': file.status === 'uploaded',
-                        'text-red-600 dark:text-red-400': file.status === 'error',
-                      }"
-                    >
-                      <Icon
-                        v-if="file.status === 'extracting' || file.status === 'vectorizing'"
-                        icon="mdi:loading"
-                        class="w-3 h-3 animate-spin"
-                      />
-                      {{ $t(`files.status_${file.status}`) }}
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Per-file action buttons (desktop: hover, mobile: always visible but compact) -->
-                <div
-                  class="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0"
-                  @click.stop
-                >
-                  <button
-                    v-if="
-                      !['vectorized', 'extracting', 'vectorizing'].includes(file.status) &&
-                      !skipsExtraction(extensionOf(file.filename) || file.file_type)
-                    "
-                    class="p-1 sm:p-1.5 rounded-xl hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
-                    :title="$t('fileSelection.reVectorize')"
-                    data-testid="btn-file-revectorize"
-                    @click="handleReVectorize(file.id)"
-                  >
-                    <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-                  <button
-                    class="p-1 sm:p-1.5 rounded-xl hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
-                    :title="$t('fileSelection.viewContent')"
-                    data-testid="btn-file-view"
-                    @click="openContentModal(file.id)"
-                  >
-                    <Icon icon="heroicons:eye" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-                  <button
-                    class="hidden sm:block p-1.5 rounded-xl hover:bg-blue-500/10 text-blue-400 transition-colors"
-                    :title="$t('fileSelection.download')"
-                    data-testid="btn-file-download"
-                    @click="handleDownload(file.id, file.filename)"
-                  >
-                    <ArrowDownTrayIcon class="w-4 h-4" />
-                  </button>
-                  <button
-                    class="p-1 sm:p-1.5 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors"
-                    :title="$t('fileSelection.deleteFile')"
-                    data-testid="btn-file-delete"
-                    @click="confirmDeleteFile(file.id)"
-                  >
-                    <TrashIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <FilePickerBrowser
+            ref="pickerRef"
+            class="flex-1 overflow-y-auto px-2 py-1.5 sm:p-4"
+            :selected-ids="selectedIdList"
+            @toggle="toggleFileSelection"
+            @view="openContentModal"
+            @download="handleDownload"
+            @delete="confirmDeleteFile"
+            @revectorize="handleReVectorize"
+            @upload="triggerFileUpload"
+          />
 
           <!-- §4.10.2 helper line: clarify the consequence of attaching. -->
           <p
-            class="px-3 sm:px-6 pt-2 text-[11px] sm:text-xs txt-secondary"
+            class="px-3 sm:px-6 py-3 text-[11px] sm:text-xs txt-secondary leading-relaxed"
             data-testid="file-selection-helper"
           >
             {{ $t('fileSelection.helper') }}
@@ -360,7 +200,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import filesService, {
   type FileItem,
@@ -368,12 +208,10 @@ import filesService, {
   UploadBlockedError,
   UploadFailedError,
 } from '@/services/filesService'
-import { extensionOf, skipsExtraction } from '@/services/filePreview'
-import { getApiBaseUrl } from '@/services/api/httpClient'
-import { useMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import FilePickerBrowser from './files/FilePickerBrowser.vue'
 
 const { t } = useI18n()
 
@@ -419,41 +257,16 @@ const translateUploadFailed = (filename: string, err: UploadFailedError): string
 }
 
 // State
-const isLoading = ref(false)
 const isUploading = ref(false)
 const uploadAbortController = ref<AbortController | null>(null)
-const files = ref<FileItem[]>([])
-const selectedFileIds = ref<Set<number>>(new Set())
-const searchQuery = ref('')
-const filterStatus = ref('all')
-// §4.10.3: type filter chips inside the picker — the counterpart of the
-// manager's Type filter, so the right file is findable in seconds.
-type AttachTypeFilter = 'all' | 'docs' | 'images' | 'video' | 'audio'
-const filterType = ref<AttachTypeFilter>('all')
-const typeChips: Array<{ value: AttachTypeFilter; labelKey: string }> = [
-  { value: 'all', labelKey: 'fileSelection.typeAll' },
-  { value: 'docs', labelKey: 'fileSelection.typeDocs' },
-  { value: 'images', labelKey: 'fileSelection.typeImages' },
-  { value: 'video', labelKey: 'fileSelection.typeVideo' },
-  { value: 'audio', labelKey: 'fileSelection.typeAudio' },
-]
-
-const matchesTypeFilter = (fileType: string): boolean => {
-  if (filterType.value === 'all') return true
-  const type = (fileType || '').toLowerCase()
-  switch (filterType.value) {
-    case 'images':
-      return /jpg|jpeg|png|gif|webp|heic|heif|image/.test(type)
-    case 'video':
-      return /mp4|webm|mov|avi|mkv|video/.test(type)
-    case 'audio':
-      return /mp3|wav|ogg|m4a|audio/.test(type)
-    case 'docs':
-      return /pdf|docx?|txt|xlsx?|csv|pptx?|md|word|excel|powerpoint|document/.test(type)
-    default:
-      return true
-  }
-}
+const pickerRef = ref<{
+  reload: () => Promise<void>
+  resetToMine: () => Promise<void>
+  files: FileItem[]
+} | null>(null)
+const selectedById = ref(new Map<number, FileItem>())
+const selectedIdList = computed(() => [...selectedById.value.keys()])
+const selectedFiles = computed(() => [...selectedById.value.values()])
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<{ current: number; total: number } | null>(null)
 /** Byte upload progress (XHR); null when not active */
@@ -470,62 +283,18 @@ const contentModalFileId = ref<number | null>(null)
 const confirmDialogOpen = ref(false)
 const pendingDeleteIds = ref<number[]>([])
 
-// Computed
-const filteredFiles = computed(() => {
-  let result = files.value
-
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(
-      (f) =>
-        f.filename.toLowerCase().includes(query) ||
-        (f.original_name?.toLowerCase().includes(query) ?? false)
-    )
-  }
-
-  if (filterStatus.value !== 'all') {
-    result = result.filter((f) => f.status === filterStatus.value)
-  }
-
-  if (filterType.value !== 'all') {
-    result = result.filter((f) => matchesTypeFilter(f.file_type))
-  }
-
-  return result
-})
-
-const selectedFiles = computed(() => {
-  return files.value.filter((f) => selectedFileIds.value.has(f.id))
-})
-
-// Methods
-const loadFiles = async () => {
-  isLoading.value = true
-  try {
-    const response = await filesService.listFiles({ limit: 100 })
-    files.value = response.files
-  } catch (err) {
-    console.error('Failed to load files:', err)
-  } finally {
-    isLoading.value = false
-  }
-}
+const reloadPicker = () => pickerRef.value?.reload() ?? Promise.resolve()
 
 const toggleFileSelection = (file: FileItem) => {
-  if (selectedFileIds.value.has(file.id)) {
-    selectedFileIds.value.delete(file.id)
-  } else {
-    selectedFileIds.value.add(file.id)
-  }
-}
-
-const isSelected = (fileId: number) => {
-  return selectedFileIds.value.has(fileId)
+  const next = new Map(selectedById.value)
+  if (next.has(file.id)) next.delete(file.id)
+  else next.set(file.id, file)
+  selectedById.value = next
 }
 
 const attachFiles = () => {
   emit('select', selectedFiles.value)
-  selectedFileIds.value.clear()
+  selectedById.value = new Map()
   emit('close')
 }
 
@@ -550,7 +319,7 @@ const confirmDeleteFile = (fileId: number) => {
 }
 
 const confirmDeleteSelected = () => {
-  pendingDeleteIds.value = Array.from(selectedFileIds.value)
+  pendingDeleteIds.value = selectedIdList.value
   confirmDialogOpen.value = true
 }
 
@@ -575,8 +344,12 @@ const executeDelete = async () => {
       }
     }
 
-    ids.forEach((id) => selectedFileIds.value.delete(id))
-    await loadFiles()
+    ids.forEach((id) => {
+      const next = new Map(selectedById.value)
+      next.delete(id)
+      selectedById.value = next
+    })
+    await reloadPicker()
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : t('fileSelection.deleteFailed')
     showError(msg)
@@ -590,7 +363,7 @@ const handleReVectorize = async (fileId: number) => {
     const result = await filesService.reVectorizeFile(fileId)
     if (result.success) {
       success(t('fileSelection.reVectorizeSuccess', { chunks: result.chunksCreated }))
-      await loadFiles()
+      await reloadPicker()
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : t('fileSelection.reVectorizeFailed')
@@ -647,7 +420,7 @@ const abortUpload = () => {
 
 /** Abort only closes the HTTP wait — server may already have stored the file (#589). */
 const notifyUploadInterrupted = async () => {
-  await loadFiles()
+  await reloadPicker()
   warning(t('fileSelection.uploadInterrupted'))
 }
 
@@ -699,10 +472,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
         if (result.success && result.files.length > 0) {
           successCount++
           result.files.forEach((f) => {
-            if (f.id) {
-              selectedFileIds.value.add(f.id)
-              newFileIds.push(f.id)
-            }
+            if (f.id) newFileIds.push(f.id)
           })
         }
 
@@ -725,7 +495,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
           // server (#589) — refresh the list so a stored-but-unfinished
           // upload is visible rather than appearing lost.
           if (err.code === 'transfer_stalled' || err.code === 'server_timeout') {
-            await loadFiles()
+            await reloadPicker()
           }
           showError(translateUploadFailed(file.name, err))
           continue
@@ -742,9 +512,10 @@ const uploadFiles = async (filesToUpload: File[]) => {
 
     if (successCount > 0) {
       success(t('fileSelection.uploadSuccess', { count: successCount }))
-      await loadFiles()
+      await (pickerRef.value?.resetToMine() ?? Promise.resolve())
 
       for (const fileId of newFileIds) {
+        selectUploaded(fileId)
         pendingProcessingIds.value.add(fileId)
         filesService
           .processFile(fileId)
@@ -754,7 +525,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
             showError(`Background processing failed for file: ${msg}`)
           })
           .finally(() => {
-            loadFiles()
+            reloadPicker()
           })
       }
       startPolling()
@@ -777,6 +548,14 @@ const uploadFiles = async (filesToUpload: File[]) => {
   }
 }
 
+const selectUploaded = (id: number) => {
+  const file = pickerRef.value?.files.find((item) => item.id === id)
+  if (!file) return
+  const next = new Map(selectedById.value)
+  next.set(file.id, file)
+  selectedById.value = next
+}
+
 const startPolling = () => {
   if (pollingTimer) return
   pollingTimer = setInterval(async () => {
@@ -787,13 +566,13 @@ const startPolling = () => {
     if (isPolling.value) return
     isPolling.value = true
     try {
-      const response = await filesService.listFiles({ limit: 100 })
-      files.value = response.files
+      await reloadPicker()
+      const current = pickerRef.value?.files ?? []
 
       const terminalStates = ['vectorized', 'processed', 'extracted', 'error']
       const stillProcessing = new Set<number>()
       for (const id of pendingProcessingIds.value) {
-        const file = response.files.find((f) => f.id === id)
+        const file = current.find((item) => item.id === id)
         if (file && !terminalStates.includes(file.status)) {
           stillProcessing.add(id)
         }
@@ -818,55 +597,19 @@ const stopPolling = () => {
   }
 }
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
-}
-
-const isImageFile = (fileType: string): boolean => {
-  const type = fileType.toLowerCase()
-  return type.includes('image') || /jpg|jpeg|png|gif|webp/.test(type)
-}
-
-// Used for the bare <img> thumbnail: a no-op on web, on native it appends a
-// read-only media token because <img> can't send auth headers
-// (MOBILE-APP SEAM, see mediaAuth.ts).
-const { mediaSrc } = useMediaSrc()
-const getDownloadUrl = (fileId: number): string => {
-  return mediaSrc(`${getApiBaseUrl()}/api/v1/files/${fileId}/download`)
-}
-
-const getFileIcon = (fileType: string): string => {
-  const type = fileType.toLowerCase()
-  if (type.includes('pdf')) return 'mdi:file-pdf-box'
-  if (type.includes('doc')) return 'mdi:file-word'
-  if (type.includes('xls') || type.includes('csv')) return 'mdi:file-excel'
-  if (type.includes('ppt')) return 'mdi:file-powerpoint'
-  if (type.includes('txt')) return 'mdi:file-document'
-  if (isImageFile(type)) return 'mdi:file-image'
-  if (type.includes('audio') || /mp3|wav|ogg/.test(type)) return 'mdi:file-music'
-  if (type.includes('video') || /mp4|avi|mov/.test(type)) return 'mdi:file-video'
-  return 'mdi:file'
-}
-
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) {
-      loadFiles()
-    } else {
-      abortUpload()
-      stopPolling()
-      pendingProcessingIds.value.clear()
-      uploadBytePercent.value = null
-      isFinishingUpload.value = false
-      isUploadSlow.value = false
-      selectedFileIds.value.clear()
-      contentModalOpen.value = false
-      confirmDialogOpen.value = false
-    }
+    if (visible) return
+    abortUpload()
+    stopPolling()
+    pendingProcessingIds.value.clear()
+    uploadBytePercent.value = null
+    isFinishingUpload.value = false
+    isUploadSlow.value = false
+    selectedById.value = new Map()
+    contentModalOpen.value = false
+    confirmDialogOpen.value = false
   }
 )
 

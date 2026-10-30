@@ -745,6 +745,7 @@ import {
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { requestComposerFocus } from '@/composables/useComposerTyping'
 import { busyGuard, busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
 import { chatApi } from '@/services/api'
 import { conversationFilesApi } from '@/services/api/conversationFilesApi'
@@ -1685,12 +1686,8 @@ onMounted(async () => {
       router.replace({ query: {} })
     }
 
-    setTimeout(() => {
-      if (isViewUnmounted) return
-      if (chatInputRef.value?.textareaRef) {
-        chatInputRef.value.textareaRef.focus()
-      }
-    }, 100)
+    if (isViewUnmounted) return
+    requestComposerFocus()
 
     if (isViewUnmounted) return
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
@@ -1811,15 +1808,7 @@ onMounted(async () => {
     scrollToBottom(true)
   }
 
-  // Auto-focus ChatInput after mounting with delay
-  setTimeout(() => {
-    if (isViewUnmounted) return
-    if (chatInputRef.value?.textareaRef) {
-      chatInputRef.value.textareaRef.focus()
-    } else {
-      console.warn('⚠️ ChatInput ref not available for auto-focus')
-    }
-  }, 100)
+  requestComposerFocus()
 
   // Setup window event listener for memory dialog (used by MessageText.vue)
   window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
@@ -2233,9 +2222,7 @@ watch(
     if (!bottomScrollYieldsToFocus(focusAtStart)) {
       scrollToBottom(true)
     }
-    setTimeout(() => {
-      chatInputRef.value?.textareaRef?.focus()
-    }, 100)
+    requestComposerFocus()
   }
 )
 
@@ -2333,12 +2320,7 @@ watch(
         scrollToBottom(true)
       }
 
-      // Auto-focus input when switching chats
-      setTimeout(() => {
-        if (chatInputRef.value?.textareaRef) {
-          chatInputRef.value.textareaRef.focus()
-        }
-      }, 100)
+      requestComposerFocus()
     }
   }
 )

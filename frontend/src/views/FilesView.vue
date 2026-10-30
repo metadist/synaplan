@@ -579,10 +579,12 @@
               </span>
               <span class="text-xs txt-secondary">({{ totalCount }})</span>
             </div>
+            <AiCreatedSearchHint v-if="searchQuery.trim()" :search="searchQuery.trim()" />
           </div>
 
           <!-- ====== ROOT VIEW: Folders + All Files ====== -->
           <template v-if="!openFolder">
+            <AiCreatedShortcut v-if="!filterSharedWithMe" />
             <!-- Loading -->
             <div
               v-if="isLoading"
@@ -1402,6 +1404,8 @@ import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import FilesTable from '@/components/files/FilesTable.vue'
+import AiCreatedShortcut from '@/components/files/AiCreatedShortcut.vue'
+import AiCreatedSearchHint from '@/components/files/AiCreatedSearchHint.vue'
 import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
 import { Icon } from '@iconify/vue'
 import {
@@ -1418,7 +1422,11 @@ import filesService, {
   type UploadProgress,
   UploadBlockedError,
 } from '@/services/filesService'
-import { fileSourceSchema } from '@/services/fileSources'
+import {
+  fileSourceSchema,
+  AI_CREATED_SOURCE_QUERY,
+  librarySourceParams,
+} from '@/services/fileSources'
 import {
   extensionOf,
   kindFromExtension,
@@ -2228,17 +2236,21 @@ const buildDateTimestamp = (dateStr: string, end = false): number | undefined =>
 let loadFilesSeq = 0
 
 /** The filters behind the visible list. Select-all must use the same set, or it picks hidden files. */
-const activeListFilters = () => ({
-  groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
-  sharedFolder: openSharedFolder.value?.resourceId,
-  search: searchQuery.value.trim() || undefined,
-  fileType: filterFileType.value || undefined,
-  source: filterSource.value || undefined,
-  vectorState: filterVectorized.value || undefined,
-  incoming: filterIncoming.value ? true : undefined,
-  dateFrom: buildDateTimestamp(filterDateFrom.value),
-  dateTo: buildDateTimestamp(filterDateTo.value, true),
-})
+const activeListFilters = () => {
+  const sourceParams = librarySourceParams(filterSource.value)
+  return {
+    groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
+    sharedFolder: openSharedFolder.value?.resourceId,
+    search: searchQuery.value.trim() || undefined,
+    fileType: filterFileType.value || undefined,
+    source: sourceParams.source,
+    excludeSource: sourceParams.excludeSource,
+    vectorState: filterVectorized.value || undefined,
+    incoming: filterIncoming.value ? true : undefined,
+    dateFrom: buildDateTimestamp(filterDateFrom.value),
+    dateTo: buildDateTimestamp(filterDateTo.value, true),
+  }
+}
 
 const loadFiles = async (page = currentPage.value) => {
   const seq = ++loadFilesSeq
@@ -2337,7 +2349,9 @@ const loadFacets = async () => {
 
 const loadFileGroups = async () => {
   try {
-    fileGroups.value = await filesService.getFileGroups()
+    fileGroups.value = await filesService.getFileGroups({
+      excludeSource: AI_CREATED_SOURCE_QUERY,
+    })
   } catch (error: unknown) {
     console.error('Failed to load file groups:', error)
 

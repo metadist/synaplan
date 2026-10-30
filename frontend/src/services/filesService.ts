@@ -668,6 +668,8 @@ export interface FileListOptions {
   fileType?: string
   /** Comma-separated provenance source(s) to filter by (§5). */
   source?: string
+  /** Comma-separated provenance source(s) to leave out. Omitted, nothing is excluded. */
+  excludeSource?: string
   /** Comma-separated vector state(s) to filter by (§5). */
   vectorState?: string
   /** Comma-separated generated origin kind(s) to filter by (§5). */
@@ -683,19 +685,20 @@ export interface FileListOptions {
   sharedFolder?: string
 }
 
-/**
- * List user's files with optional filtering, faceting and search
- */
-export const listFiles = async (options: FileListOptions = {}): Promise<FileListResponse> => {
-  const params: Record<string, string | number> = {
-    page: options.page ?? 1,
-    limit: options.limit ?? 50,
+function fileListParams(
+  options: FileListOptions,
+  paging: boolean
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {}
+  if (paging) {
+    params.page = options.page ?? 1
+    params.limit = options.limit ?? 50
   }
-
   if (options.groupKey) params.group_key = options.groupKey
   if (options.search) params.search = options.search
   if (options.fileType) params.file_type = options.fileType
   if (options.source) params.source = options.source
+  if (options.excludeSource) params.exclude_source = options.excludeSource
   if (options.vectorState) params.vector_state = options.vectorState
   if (options.originKind) params.origin_kind = options.originKind
   if (options.incoming !== undefined) params.incoming = options.incoming ? 1 : 0
@@ -703,11 +706,13 @@ export const listFiles = async (options: FileListOptions = {}): Promise<FileList
   if (options.dateFrom) params.date_from = options.dateFrom
   if (options.dateTo) params.date_to = options.dateTo
   if (options.sharedFolder) params.shared_folder = options.sharedFolder
+  return params
+}
+
+export const listFiles = async (options: FileListOptions = {}): Promise<FileListResponse> => {
+  const params = fileListParams(options, true)
 
   const response = await api.get('/api/v1/files', { params })
-  // Validate at runtime: the schema is the same definition the FileListResponse
-  // type is inferred from, so a backend contract drift surfaces here instead of
-  // as a confusing render bug downstream.
   return fileListResponseSchema.parse(response.data)
 }
 
@@ -811,6 +816,7 @@ export const getFileGroups = async (
     | 'search'
     | 'fileType'
     | 'source'
+    | 'excludeSource'
     | 'vectorState'
     | 'originKind'
     | 'incoming'
@@ -818,15 +824,7 @@ export const getFileGroups = async (
     | 'dateTo'
   > = {}
 ): Promise<Array<{ name: string; count: number }>> => {
-  const params: Record<string, string | number> = {}
-  if (options.search) params.search = options.search
-  if (options.fileType) params.file_type = options.fileType
-  if (options.source) params.source = options.source
-  if (options.vectorState) params.vector_state = options.vectorState
-  if (options.originKind) params.origin_kind = options.originKind
-  if (options.incoming !== undefined) params.incoming = options.incoming ? 1 : 0
-  if (options.dateFrom) params.date_from = options.dateFrom
-  if (options.dateTo) params.date_to = options.dateTo
+  const params = fileListParams(options, false)
 
   const response = await api.get<{
     success: boolean

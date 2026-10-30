@@ -287,17 +287,12 @@
 
               <div
                 v-if="plusMenuOpen"
-                class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
+                class="dropdown-up left-0 min-w-[220px] max-w-[calc(100vw-1.5rem)] flex flex-col gap-1"
                 data-testid="dropdown-plus-panel"
               >
-                <!-- Same `.pill` chip style as the Model/Tools/Knowledge triggers
-                 below it (previously this used the flat `.dropdown-item` row
-                 style). Unlike those rows it has no secondary value to push
-                 right, so `self-start` keeps it sized to its content instead
-                 of stretching across the panel like the full-width rows. -->
                 <button
                   type="button"
-                  class="pill text-xs md:text-sm self-start"
+                  class="plus-menu-row text-xs md:text-sm"
                   data-testid="btn-plus-attach"
                   @click="handlePlusAttach"
                 >
@@ -310,7 +305,7 @@
                  desktop — no detour through the file-manager modal. -->
                 <button
                   type="button"
-                  class="pill text-xs md:text-sm self-start"
+                  class="plus-menu-row text-xs md:text-sm"
                   data-testid="btn-plus-photo"
                   @click="handlePlusPhoto"
                 >
@@ -318,13 +313,10 @@
                   <span class="font-medium">{{ $t('chatInput.plusMenu.photo') }}</span>
                 </button>
 
-                <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
-                     above. The model chip lives in the control bar and gates
-                     itself. -->
                 <template v-if="isGuestMode">
                   <button
                     type="button"
-                    class="pill text-xs md:text-sm"
+                    class="plus-menu-row text-xs md:text-sm"
                     data-testid="btn-plus-tools"
                     @click="handlePlusGate('tools')"
                   >
@@ -333,7 +325,7 @@
                   </button>
                   <button
                     type="button"
-                    class="pill text-xs md:text-sm"
+                    class="plus-menu-row text-xs md:text-sm"
                     data-testid="btn-plus-knowledge"
                     @click="handlePlusGate('knowledge')"
                   >
@@ -459,7 +451,7 @@
                 data-testid="btn-chat-send"
                 @click="onSendSlot(sendMessage, () => emit('stop'))"
               >
-                <div v-if="composerStopping" class="w-4 h-4 bg-white rounded-sm"></div>
+                <div v-if="composerStopping" class="w-4 h-4 bg-current rounded-sm"></div>
                 <ArrowUpIcon v-else class="w-5 h-5" />
               </button>
             </div>
@@ -584,6 +576,7 @@ import {
   useAttachmentPersist,
   usePastedBlocksPersist,
 } from '@/composables/useInputPersistence'
+import { bindComposerTyping } from '@/composables/useComposerTyping'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
 import { useChatModelPickStore } from '@/stores/chatModelPick'
@@ -711,6 +704,12 @@ const mentionPaletteVisible = ref(false)
 const mentionPaletteRef = ref<InstanceType<typeof FileMentionPalette> | null>(null)
 const mentionQuery = ref('')
 const textareaRef = ref<InstanceType<typeof Textarea> | null>(null)
+
+bindComposerTyping(
+  () => textareaRef.value,
+  () => message.value,
+  (value) => (message.value = value)
+)
 
 // Tools that render as a removable badge inside the input (Cursor-style chips)
 // instead of injecting a "/command" into the textarea. The message text stays

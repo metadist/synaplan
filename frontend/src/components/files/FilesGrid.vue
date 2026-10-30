@@ -1,5 +1,14 @@
 <template>
   <div data-testid="files-grid">
+    <input
+      :value="searchQuery"
+      type="text"
+      :placeholder="$t('files.generated.searchPlaceholder')"
+      class="mb-3 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+      data-testid="input-generated-search"
+      @input="onSearchInput(($event.target as HTMLInputElement).value)"
+    />
+
     <!-- Kind filter: server-side origin_kind facet (image/video/audio/document/calendar) -->
     <div class="flex flex-wrap gap-1.5 mb-4" data-testid="generated-kind-filter">
       <button
@@ -247,9 +256,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import {
   ArrowDownTrayIcon,
@@ -268,6 +277,7 @@ import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
 import { previewKindForFile } from '@/services/filePreview'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
+import { AI_CREATED_SOURCE_QUERY } from '@/services/fileSources'
 import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -281,6 +291,7 @@ const { t, locale } = useI18n()
 const translate = (key: string, values?: Record<string, unknown>): string =>
   t(key, (values ?? {}) as never)
 const router = useRouter()
+const route = useRoute()
 const { success: showSuccess, error: showError } = useNotification()
 const { confirm } = useDialog()
 const chatsStore = useChatsStore()
@@ -303,6 +314,8 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / items
 
 // Kind filter — '' means all kinds; other values map to BORIGINKIND server-side.
 const kindFilter = ref<FileOriginKind | ''>('')
+const searchQuery = ref(typeof route.query.search === 'string' ? route.query.search : '')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 const kindOptions: Array<{ value: FileOriginKind | ''; labelKey: string }> = [
   { value: '', labelKey: 'files.generated.kinds.all' },
   { value: 'image', labelKey: 'files.generated.kinds.image' },
@@ -316,6 +329,21 @@ const setKindFilter = (kind: FileOriginKind | '') => {
   if (kindFilter.value === kind) return
   kindFilter.value = kind
   void load(1)
+}
+
+const onSearchInput = (value: string) => {
+  searchQuery.value = value
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    const current = typeof route.query.search === 'string' ? route.query.search : ''
+    if (current !== value) {
+      const query = { ...route.query }
+      if (value) query.search = value
+      else delete query.search
+      void router.replace({ query })
+    }
+    void load(1)
+  }, 300)
 }
 
 // Knowledge-base menu + per-file busy state for index/delete actions.
@@ -349,11 +377,10 @@ const load = async (page = currentPage.value) => {
   activePlayerId.value = null
   try {
     const list = await filesService.listFiles({
-      // Both AI-generated media (source='generated') and file-work results
-      // (source='compute') are things the user *made* in a chat/task, so the
-      // Generated tab surfaces both — otherwise a compute run's output file has
-      // no home and "Find in Files → Generated" lands on an empty list.
-      source: 'generated,compute',
+      // Both AI-created media (source='generated') and file-work results
+      // (source='compute') belong on this gallery.
+      source: AI_CREATED_SOURCE_QUERY,
+      search: searchQuery.value.trim() || undefined,
       originKind: kindFilter.value || undefined,
       sort: 'date_desc',
       page,
@@ -463,7 +490,17 @@ onMounted(() => {
   document.addEventListener('click', closeKbMenu)
 })
 
+watch(
+  () => (typeof route.query.search === 'string' ? route.query.search : ''),
+  (value) => {
+    if (value === searchQuery.value) return
+    searchQuery.value = value
+    void load(1)
+  }
+)
+
 onUnmounted(() => {
+  if (searchTimer) clearTimeout(searchTimer)
   document.removeEventListener('click', closeKbMenu)
 })
 </script>
