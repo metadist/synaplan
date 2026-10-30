@@ -232,7 +232,31 @@ final readonly class GroupPolicyService
 
     public function isModelAllowed(?int $userId, int $modelId, ?string $capability = null): bool
     {
-        $allowed = $this->resolver->allowedCatalogKeys($userId);
+        return $this->modelMatchesAllowList($modelId, $this->resolver->allowedCatalogKeys($userId));
+    }
+
+    /**
+     * Whether this group's own allow-list accepts the model.
+     *
+     * An empty list is not a restriction. Used when a group default is moved
+     * onto a replacement: the group's members would otherwise fall through
+     * the saved row to a different model.
+     */
+    public function isModelAllowedForGroup(int $groupId, int $modelId): bool
+    {
+        $raw = $this->groupConfigRepository->getValue($groupId, 'MODELS', 'ALLOWED');
+        if (null === $raw || '' === trim($raw)) {
+            return true;
+        }
+
+        return $this->modelMatchesAllowList($modelId, PolicyAllowList::decodeList($raw));
+    }
+
+    /**
+     * @param list<string> $allowed
+     */
+    private function modelMatchesAllowList(int $modelId, array $allowed): bool
+    {
         $scope = $this->allowScope($allowed);
         if ($scope['open']) {
             return true;

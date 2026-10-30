@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Admin;
 
 use App\AI\Credential\ChatReadinessService;
+use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\GroupConfig;
 use App\Entity\Model;
+use App\Plug\PlugHealth;
+use App\Plug\Rerank\Adapter\HttpRerankAdapter;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupConfigRepository;
 use App\Repository\ModelHealthRepository;
@@ -159,6 +163,144 @@ final class AdminModelDeletionTest extends TestCase
         self::assertSame('9', $group->getValue());
     }
 
+    public function testAGroupDefaultSkipsAModelTheGroupDoesNotAllow(): void
+    {
+        $gone = $this->model(5, 'Old chat', 'Groq');
+        $blocked = $this->model(8, 'Blocked', 'Groq');
+        $allowed = $this->model(9, 'Allowed', 'Anthropic');
+        $group = (new GroupConfig())->setGroupId(7)->setGroup('DEFAULTMODEL')->setSetting('CHAT')->setValue('5');
+        $removed = [];
+        $policy = $this->createStub(GroupPolicyService::class);
+        $policy->method('isModelAllowedForGroup')->willReturnCallback(
+            static fn (int $groupId, int $modelId): bool => 7 === $groupId && 9 === $modelId,
+        );
+
+        $result = $this->delete($gone, [], [$gone, $blocked, $allowed], $removed, policy: $policy, groupRows: [$group]);
+
+        self::assertSame(9, $result['moved'][0]['modelId']);
+        self::assertSame([], $result['cleared']);
+    }
+
+    public function testAMemoryDefaultMovesToAHiddenMemoryModel(): void
+    {
+        $gone = $this->model(5, 'Old memory', 'Groq', 'mem');
+        $hidden = $this->model(9, 'Next memory', 'Groq', 'mem');
+        $hidden->setSelectable(0);
+        $chat = $this->model(8, 'Visible chat', 'Groq', 'chat');
+        $row = $this->config(0, 'MEM', '5');
+        $removed = [];
+
+        $result = $this->delete($gone, [$row], [$gone, $chat, $hidden], $removed);
+
+        self::assertSame(9, $result['moved'][0]['modelId']);
+        self::assertSame([], $result['cleared']);
+    }
+
+    public function testASearchDefaultMovesToAnotherChatModel(): void
+    {
+        $gone = $this->model(5, 'Old chat', 'Groq');
+        $next = $this->model(9, 'Next chat', 'Anthropic');
+        $row = $this->config(0, 'SEARCH', '5');
+        $removed = [];
+
+        $result = $this->delete($gone, [$row], [$gone, $next], $removed);
+
+        self::assertSame(9, $result['moved'][0]['modelId']);
+        self::assertSame('SEARCH', $result['moved'][0]['setting']);
+    }
+
+    public function testASearchEmbeddingDefaultIsCleared(): void
+    {
+        $gone = $this->model(5, 'Old embed', 'Ollama', 'vectorize');
+        $other = $this->model(6, 'Other embed', 'Ollama', 'vectorize');
+        $row = $this->config(0, 'SEARCH_EMBED', '5');
+        $removed = [];
+
+        $result = $this->delete($gone, [$row], [$gone, $other], $removed);
+
+        self::assertSame([], $result['moved']);
+        self::assertSame([['setting' => 'SEARCH_EMBED', 'scope' => 'global', 'ownerId' => 0]], $result['cleared']);
+        self::assertContains($row, $removed);
+    }
+
+    public function testAVisionAliasCanReplaceAPictureDefault(): void
+    {
+        $gone = $this->model(5, 'Old vision', 'OpenAI', 'pic2text');
+        $alias = $this->model(9, 'Vision alias', 'OpenAI', 'vision');
+        $row = $this->config(0, 'PIC2TEXT', '5');
+        $removed = [];
+
+        $result = $this->delete($gone, [$row], [$gone, $alias], $removed);
+
+        self::assertSame(9, $result['moved'][0]['modelId']);
+    }
+
+    public function testAnUnavailableProviderIsNotTheReplacement(): void
+    {
+        $gone = $this->model(5, 'Old chat', 'Groq');
+        $down = $this->model(8, 'No key', 'Groq');
+        $up = $this->model(9, 'Ready', 'Anthropic');
+        $row = $this->config(0, 'CHAT', '5');
+        $removed = [];
+
+        $result = $this->delete(
+            $gone,
+            [$row],
+            [$gone, $down, $up],
+            $removed,
+            usable: static fn (int $id): bool => true,
+            providers: $this->providers(['Groq' => false, 'Anthropic' => true]),
+        );
+
+        self::assertSame(9, $result['moved'][0]['modelId']);
+    }
+
+    public function testNoReplacementIsSavedWhenEveryProviderIsUnavailable(): void
+    {
+        $gone = $this->model(5, 'Old chat', 'Groq');
+        $other = $this->model(9, 'Also down', 'Anthropic');
+        $row = $this->config(0, 'CHAT', '5');
+        $removed = [];
+
+        $result = $this->delete(
+            $gone,
+            [$row],
+            [$gone, $other],
+            $removed,
+            usable: static fn (int $id): bool => true,
+            providers: $this->providers(['Groq' => false, 'Anthropic' => false]),
+        );
+
+        self::assertSame([], $result['moved']);
+        self::assertSame([['setting' => 'CHAT', 'scope' => 'global', 'ownerId' => 0]], $result['cleared']);
+    }
+
+    public function testARerankDefaultSkipsAModelWithNoKey(): void
+    {
+        $gone = $this->model(5, 'Old rerank', 'Jina', 'rerank');
+        $noKey = $this->model(8, 'No key', 'Cohere', 'rerank');
+        $ready = $this->model(9, 'Ready', 'Voyage', 'rerank');
+        $row = $this->config(0, 'RERANK', '5');
+        $removed = [];
+        $rerank = $this->createStub(HttpRerankAdapter::class);
+        $rerank->method('healthForModel')->willReturnCallback(
+            static fn (Model $model): PlugHealth => 9 === (int) $model->getId()
+                ? PlugHealth::available()
+                : PlugHealth::unavailable('API key is not configured'),
+        );
+
+        $result = $this->delete(
+            $gone,
+            [$row],
+            [$gone, $noKey, $ready],
+            $removed,
+            usable: static fn (int $id): bool => true,
+            rerank: $rerank,
+        );
+
+        self::assertSame(9, $result['moved'][0]['modelId']);
+    }
+
     public function testAnUnusableProviderIsSkipped(): void
     {
         $gone = $this->model(5, 'Old chat', 'Groq');
@@ -196,6 +338,8 @@ final class AdminModelDeletionTest extends TestCase
         ?GroupPolicyService $policy = null,
         array $groupRows = [],
         ?\Closure $usable = null,
+        ?ProviderRegistry $providers = null,
+        ?HttpRerankAdapter $rerank = null,
     ): array {
         $models = $this->createStub(ModelRepository::class);
         $models->method('find')->willReturn($gone);
@@ -221,7 +365,7 @@ final class AdminModelDeletionTest extends TestCase
         });
         $em->expects($this->once())->method('flush');
 
-        $mover = new DefaultModelMover($models, $configs, $groups, $health, $usability, $em, $policy);
+        $mover = new DefaultModelMover($models, $configs, $groups, $health, $usability, $em, $policy, $providers, $rerank);
         $service = new AdminModelsService(
             $em,
             $models,
@@ -233,6 +377,24 @@ final class AdminModelDeletionTest extends TestCase
         );
 
         return $service->deleteModel((int) $gone->getId());
+    }
+
+    /**
+     * @param array<string, bool> $availability
+     */
+    private function providers(array $availability): ProviderRegistry
+    {
+        $providers = [];
+        foreach ($availability as $name => $available) {
+            $provider = $this->createStub(ProviderMetadataInterface::class);
+            $provider->method('getName')->willReturn($name);
+            $provider->method('isAvailable')->willReturn($available);
+            $providers[$name] = $provider;
+        }
+        $registry = $this->createStub(ProviderRegistry::class);
+        $registry->method('getUniqueProviders')->willReturn($providers);
+
+        return $registry;
     }
 
     private function model(int $id, string $name, string $service, string $tag = 'chat'): Model

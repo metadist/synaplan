@@ -362,6 +362,50 @@ final class GroupPolicyServiceTest extends TestCase
         self::assertFalse($service->isModelAllowed(5, 11, 'PIC2TEXT'));
     }
 
+    public function testAGroupAllowListRejectsAModelTheGroupDidNotName(): void
+    {
+        $groups = $this->createStub(GroupConfigRepository::class);
+        $groups->method('getValue')->willReturnCallback(
+            static function (int $groupId, string $group, string $setting): string {
+                self::assertSame(7, $groupId);
+                self::assertSame('MODELS', $group);
+                self::assertSame('ALLOWED', $setting);
+
+                return '["groq:llama-3:chat"]';
+            },
+        );
+        $blocked = (new Model())->setService('anthropic')->setProviderId('claude')->setTag('chat');
+        $ref = new \ReflectionProperty(Model::class, 'id');
+        $ref->setValue($blocked, 8);
+        $models = $this->createStub(ModelRepository::class);
+        $models->method('find')->willReturn($blocked);
+
+        $service = new GroupPolicyService(
+            $this->createStub(LayeredConfigResolver::class),
+            $groups,
+            $this->createStub(ConfigRepository::class),
+            $models,
+            $this->createStub(AuditLogWriter::class),
+        );
+
+        self::assertFalse($service->isModelAllowedForGroup(7, 8));
+    }
+
+    public function testAGroupWithNoAllowListAcceptsEveryModel(): void
+    {
+        $groups = $this->createStub(GroupConfigRepository::class);
+        $groups->method('getValue')->willReturn(null);
+        $service = new GroupPolicyService(
+            $this->createStub(LayeredConfigResolver::class),
+            $groups,
+            $this->createStub(ConfigRepository::class),
+            $this->createStub(ModelRepository::class),
+            $this->createStub(AuditLogWriter::class),
+        );
+
+        self::assertTrue($service->isModelAllowedForGroup(7, 8));
+    }
+
     public function testFallbackSourceIsTheLayerThatStillNamesTheModel(): void
     {
         $resolver = $this->createMock(LayeredConfigResolver::class);

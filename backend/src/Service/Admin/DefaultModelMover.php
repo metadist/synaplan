@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\GroupConfig;
 use App\Entity\Model;
 use App\Model\ModelCatalog;
+use App\Plug\Rerank\Adapter\HttpRerankAdapter;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupConfigRepository;
 use App\Repository\ModelHealthRepository;
@@ -21,9 +24,13 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * Embedding defaults are cleared and never reassigned: switching that model
  * rebuilds the search index, and that choice already has its own screen.
+ * The same applies to the smart-search embedding slot.
  */
 final readonly class DefaultModelMover
 {
+    /** @var list<string> */
+    private const EMBEDDING_SETTINGS = ['VECTORIZE', 'EMBEDDING', 'SYNAPSE_VECTORIZE', 'SEARCH_EMBED'];
+
     public function __construct(
         private ModelRepository $models,
         private ConfigRepository $configs,
@@ -32,6 +39,8 @@ final readonly class DefaultModelMover
         private ModelConfigService $usable,
         private EntityManagerInterface $em,
         private ?GroupPolicyService $groupPolicy = null,
+        private ?ProviderRegistry $providers = null,
+        private ?HttpRerankAdapter $rerank = null,
     ) {
     }
 
@@ -54,7 +63,7 @@ final readonly class DefaultModelMover
             $setting = $binding['setting'];
             $ownerId = $binding['ownerId'];
             $scope = $binding['scope'];
-            if ('VECTORIZE' === $setting) {
+            if (in_array($setting, self::EMBEDDING_SETTINGS, true)) {
                 $this->em->remove($binding['row']);
                 $cleared[] = ['setting' => $setting, 'scope' => $scope, 'ownerId' => $ownerId];
                 continue;
@@ -138,7 +147,7 @@ final readonly class DefaultModelMover
     private function needsReplacement(array $bindings): bool
     {
         foreach ($bindings as $binding) {
-            if ('VECTORIZE' !== $binding['setting']) {
+            if (!in_array($binding['setting'], self::EMBEDDING_SETTINGS, true)) {
                 return true;
             }
         }
@@ -152,7 +161,7 @@ final readonly class DefaultModelMover
     private function candidates(): array
     {
         /** @var list<Model> $models */
-        $models = $this->models->findBy(['active' => 1, 'selectable' => 1]);
+        $models = $this->models->findBy(['active' => 1]);
 
         return $models;
     }
@@ -170,16 +179,19 @@ final readonly class DefaultModelMover
             if ($candidateId === $deletedId || $candidateId < 1 || !$this->fits($candidate, $setting)) {
                 continue;
             }
-            if (1 !== $candidate->getSelectable() || 1 !== $candidate->getActive()) {
+            if (!$this->offeredFor($candidate, $setting)) {
                 continue;
             }
             if ($candidate->isRetired() || $candidate->isHiddenBecauseFree() || isset($offline[$candidateId])) {
                 continue;
             }
-            if (!$this->usable->isConfiguredModelUsable($candidateId)) {
+            if (!$this->providerReady($candidate) || !$this->usable->isConfiguredModelUsable($candidateId)) {
                 continue;
             }
             if ('global' === $scope && $ownerId > 0 && null !== $this->groupPolicy && !$this->groupPolicy->isModelAllowed($ownerId, $candidateId, $setting)) {
+                continue;
+            }
+            if ('group' === $scope && null !== $this->groupPolicy && !$this->groupPolicy->isModelAllowedForGroup($ownerId, $candidateId)) {
                 continue;
             }
 
@@ -197,10 +209,50 @@ final readonly class DefaultModelMover
         return $same[0] ?? $other[0] ?? null;
     }
 
+    private function offeredFor(Model $candidate, string $setting): bool
+    {
+        if (1 !== $candidate->getActive()) {
+            return false;
+        }
+        if (1 === $candidate->getSelectable()) {
+            return true;
+        }
+
+        return 'MEM' === $setting && 'mem' === $this->canonicalTag($candidate->getTag());
+    }
+
+    /**
+     * A provider that reports itself unavailable is not a replacement, even
+     * when the usable-provider list is empty and the shared check cannot tell.
+     * Rerank rows are outside that list; their key and endpoint decide.
+     */
+    private function providerReady(Model $candidate): bool
+    {
+        if ('rerank' === $this->canonicalTag($candidate->getTag())) {
+            return null !== $this->rerank && $this->rerank->healthForModel($candidate)->available;
+        }
+        if (null === $this->providers) {
+            return true;
+        }
+
+        $available = [];
+        foreach ($this->providers->getUniqueProviders() as $provider) {
+            if (!$provider instanceof ProviderMetadataInterface || !$provider->isAvailable()) {
+                continue;
+            }
+            $available[] = strtolower($provider->getName());
+        }
+        if ([] === $available) {
+            return false;
+        }
+
+        return in_array(strtolower($candidate->getService()), $available, true);
+    }
+
     private function fits(Model $candidate, string $setting): bool
     {
-        $expected = ModelCatalog::CAPABILITY_TAGS[$setting] ?? null;
-        if (null === $expected || strtolower($candidate->getTag()) !== $expected) {
+        $expected = $this->expectedTag($setting);
+        if (null === $expected || $this->canonicalTag($candidate->getTag()) !== $expected) {
             return false;
         }
 
@@ -216,6 +268,32 @@ final readonly class DefaultModelMover
         }
 
         return true;
+    }
+
+    private function expectedTag(string $setting): ?string
+    {
+        return match ($setting) {
+            'SEARCH' => 'chat',
+            'MEM' => 'mem',
+            default => ModelCatalog::CAPABILITY_TAGS[$setting] ?? null,
+        };
+    }
+
+    /**
+     * Picker aliases (VISION, IMAGE, VIDEO, AUDIO, TTS) name the same job as
+     * the catalog tag the default slot stores.
+     */
+    private function canonicalTag(string $tag): string
+    {
+        return match (strtolower($tag)) {
+            'vision' => 'pic2text',
+            'image' => 'text2pic',
+            'video' => 'text2vid',
+            'audio', 'transcription' => 'sound2text',
+            'tts' => 'text2sound',
+            'embedding' => 'vectorize',
+            default => strtolower($tag),
+        };
     }
 
     /**
