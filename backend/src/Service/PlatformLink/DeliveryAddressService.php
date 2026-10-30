@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\PlatformLink;
 
-use App\Entity\PlatformInstance;
 use App\Repository\PlatformInstanceRepository;
-use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 
 /**
@@ -19,7 +17,7 @@ final readonly class DeliveryAddressService
         private PlatformInstanceRepository $platforms,
         private DeliveryOriginPolicy $origins,
         private DeliveryProbe $probe,
-        private AuditLogWriter $auditLog,
+        private PlatformInstanceSupersession $supersession,
     ) {
     }
 
@@ -56,7 +54,7 @@ final readonly class DeliveryAddressService
         }
         if (null !== $oidcClientId) {
             $instance->setOidcClientId('' === trim($oidcClientId) ? null : mb_substr(trim($oidcClientId), 0, 191));
-            $this->supersedeSameHost($instance);
+            $this->supersession->takeOverOlderTwins($instance);
         }
         if (null !== $appVersion) {
             $instance->setAppVersion('' === trim($appVersion) ? null : mb_substr(trim($appVersion), 0, 32));
@@ -74,34 +72,5 @@ final readonly class DeliveryAddressService
             'app_version' => $instance->getAppVersion() ?? '',
             'server_id' => $instance->getServerId() ?? '',
         ];
-    }
-
-    /**
-     * A cloud that registers again — after a lost state file, a reinstall —
-     * is the same cloud: same host, same OIDC client. Keeping the earlier
-     * instance active would leave the bearer's client naming two clouds and
-     * every attributed call failing. The newer registration wins; the older
-     * one is revoked and the audit log says so.
-     */
-    private function supersedeSameHost(PlatformInstance $instance): void
-    {
-        $clientId = $instance->getOidcClientId();
-        if (null === $clientId || '' === $clientId || !$instance->isActive()) {
-            return;
-        }
-        foreach ($this->platforms->findBy(['oidcClientId' => $clientId, 'host' => $instance->getHost()]) as $other) {
-            if ($other === $instance || $other->getInstanceId() === $instance->getInstanceId() || !$other->isActive()) {
-                continue;
-            }
-            $other->setStatus(PlatformInstance::STATUS_REVOKED);
-            $this->platforms->save($other);
-            $this->auditLog->record(
-                $instance->getRegisteredBy(),
-                'platform_instance.superseded',
-                'platform_instance',
-                $other->getInstanceId(),
-                ['by' => $instance->getInstanceId(), 'host' => $instance->getHost()],
-            );
-        }
     }
 }

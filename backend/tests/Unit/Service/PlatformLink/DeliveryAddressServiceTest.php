@@ -6,11 +6,11 @@ namespace App\Tests\Unit\Service\PlatformLink;
 
 use App\Entity\PlatformInstance;
 use App\Repository\PlatformInstanceRepository;
-use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
 use App\Service\PlatformLink\DeliveryProbe;
 use App\Service\PlatformLink\PlatformInstanceService;
+use App\Service\PlatformLink\PlatformInstanceSupersession;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -18,8 +18,7 @@ final class DeliveryAddressServiceTest extends TestCase
 {
     private PlatformInstance $instance;
     private DeliveryProbe&MockObject $probe;
-    private PlatformInstanceRepository&MockObject $platforms;
-    private AuditLogWriter&MockObject $auditLog;
+    private PlatformInstanceSupersession&MockObject $supersession;
     private DeliveryAddressService $service;
 
     protected function setUp(): void
@@ -27,39 +26,27 @@ final class DeliveryAddressServiceTest extends TestCase
         $this->instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE);
         $instances = $this->createStub(PlatformInstanceService::class);
         $instances->method('requireInstance')->willReturn($this->instance);
-        $this->platforms = $this->createMock(PlatformInstanceRepository::class);
+        $platforms = $this->createStub(PlatformInstanceRepository::class);
         $origins = $this->createStub(DeliveryOriginPolicy::class);
         $origins->method('accepts')->willReturn(true);
         $this->probe = $this->createMock(DeliveryProbe::class);
-        $this->auditLog = $this->createMock(AuditLogWriter::class);
-        $this->service = new DeliveryAddressService($instances, $this->platforms, $origins, $this->probe, $this->auditLog);
+        $this->supersession = $this->createMock(PlatformInstanceSupersession::class);
+        $this->service = new DeliveryAddressService($instances, $platforms, $origins, $this->probe, $this->supersession);
     }
 
-    public function testReRegisteringTheSameHostSupersedesTheEarlierInstance(): void
+    public function testAnnouncingTheClientLetsTheInstanceTakeOverOlderTwins(): void
     {
-        $earlier = new PlatformInstance('nextcloud', 'pi_old', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE);
-        $earlier->setOidcClientId('synaplan-nextcloud');
-        $elsewhere = new PlatformInstance('nextcloud', 'pi_other', 'files.example.org', null, PlatformInstance::STATUS_REVOKED);
-        $elsewhere->setOidcClientId('synaplan-nextcloud');
-        $this->platforms->expects($this->once())->method('findBy')
-            ->with(['oidcClientId' => 'synaplan-nextcloud', 'host' => 'files.example.org'])
-            ->willReturn([$earlier, $elsewhere, $this->instance]);
-        $this->auditLog->expects($this->once())->method('record')
-            ->with(0, 'platform_instance.superseded', 'platform_instance', 'pi_old', ['by' => 'pi_abc', 'host' => 'files.example.org']);
+        $this->supersession->expects($this->once())->method('takeOverOlderTwins')->with($this->instance);
 
         $this->service->update('pi_abc', 'secret', null, null, 'synaplan-nextcloud');
-
-        self::assertSame(PlatformInstance::STATUS_REVOKED, $earlier->getStatus());
-        self::assertSame(PlatformInstance::STATUS_REVOKED, $elsewhere->getStatus(), 'already revoked stays revoked');
-        self::assertTrue($this->instance->isActive(), 'the newer registration wins');
     }
 
-    public function testAPendingInstanceSupersedesNothing(): void
+    public function testSavingOnlyTheAddressTakesNothingOver(): void
     {
-        $this->instance->setStatus(PlatformInstance::STATUS_PENDING);
-        $this->platforms->expects($this->never())->method('findBy');
+        $this->probe->method('reachable')->willReturn(true);
+        $this->supersession->expects($this->never())->method('takeOverOlderTwins');
 
-        $this->service->update('pi_abc', 'secret', null, null, 'synaplan-nextcloud');
+        $this->service->update('pi_abc', 'secret', 'https://files.example.org/inbound', null);
     }
 
     public function testSavingTheAddressProbesItAndStoresWhatTheAppReports(): void
