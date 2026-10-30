@@ -41,7 +41,8 @@
     },
     "upgradeNow": "Upgrade Now",
     "topup": {
-      "button": "Add €{amount} budget",
+      "button": "Add €{amount}",
+      "sentence": "€{amount} adds €{amount} to your usage until this period ends. You pay that on the next page.",
       "amountLabel": "Top-up amount (€{step} steps)",
       "error": "Could not start the top-up. Please try again."
     },
@@ -180,6 +181,9 @@
       "startUsing": "Start Using Your Plan",
       "activating": "Activating Your Plan...",
       "activatingDesc": "Please wait while we activate your subscription.",
+      "topupTitle": "€100 added",
+      "topupDescription": "€100 was added to your usage until this period ends. Your plan did not change.",
+      "topupButton": "See usage",
       "almostDone": "Almost Done!",
       "processing": "Your payment was successful, but we're still processing your subscription.",
       "retry": "Retry Activation",

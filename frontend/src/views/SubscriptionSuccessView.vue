@@ -25,18 +25,24 @@
             <Icon icon="mdi:check-circle" class="w-10 h-10 text-green-500" />
           </div>
           <h1 class="text-3xl font-bold txt-primary mb-3">
-            {{ $t('subscription.success.title') }}
+            {{ isTopup ? $t('subscription.success.topupTitle') : $t('subscription.success.title') }}
           </h1>
-          <p class="txt-secondary mb-4">{{ $t('subscription.success.description') }}</p>
+          <p class="txt-secondary mb-4">
+            {{ isTopup ? $t('subscription.success.topupDescription') : $t('subscription.success.description') }}
+          </p>
           <p
-            v-if="newLevel && newLevel !== 'NEW'"
+            v-if="!isTopup && newLevel && newLevel !== 'NEW'"
             data-testid="text-new-level"
             class="text-lg font-semibold text-green-500 mb-8"
           >
             {{ $t('subscription.success.newPlan') }}: {{ newLevel }}
           </p>
-          <button class="btn-primary px-8 py-3 rounded-lg font-semibold" @click="goHome">
-            {{ $t('subscription.success.startUsing') }}
+          <button
+            type="button"
+            class="btn-primary px-8 py-3 rounded-lg font-semibold"
+            @click="isTopup ? goUsage() : goHome()"
+          >
+            {{ isTopup ? $t('subscription.success.topupButton') : $t('subscription.success.startUsing') }}
           </button>
         </template>
 
@@ -74,15 +80,17 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
 import { subscriptionApi } from '@/services/api/subscriptionApi'
 import { useAuthStore } from '@/stores/auth'
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const isTopup = computed(() => route.query.kind === 'topup')
 
 const syncing = ref(true)
 const syncSuccess = ref(false)
@@ -126,8 +134,16 @@ function goHome() {
   router.push('/')
 }
 
+function goUsage() {
+  router.push('/statistics')
+}
+
 onMounted(() => {
-  // Auto-sync on page load
-  syncSubscription()
+  if (isTopup.value) {
+    syncing.value = false
+    syncSuccess.value = true
+    return
+  }
+  void syncSubscription()
 })
 </script>

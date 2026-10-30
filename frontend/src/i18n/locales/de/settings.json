@@ -198,7 +198,8 @@
     },
     "upgradeNow": "Jetzt Upgraden",
     "topup": {
-      "button": "€{amount} Guthaben aufladen",
+      "button": "€{amount} aufladen",
+      "sentence": "€{amount} kommen bis zum Ende dieses Abrechnungszeitraums auf dein Nutzungsguthaben. Du zahlst das auf der nächsten Seite.",
       "amountLabel": "Aufladebetrag (€{step}-Schritte)",
       "error": "Aufladung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
@@ -337,6 +338,9 @@
       "startUsing": "Plan jetzt nutzen",
       "activating": "Plan wird aktiviert...",
       "activatingDesc": "Bitte warte, während wir dein Abonnement aktivieren.",
+      "topupTitle": "€100 aufgeladen",
+      "topupDescription": "€100 sind bis zum Ende dieses Abrechnungszeitraums auf deinem Nutzungsguthaben. Dein Tarif hat sich nicht geändert.",
+      "topupButton": "Verbrauch ansehen",
       "almostDone": "Fast fertig!",
       "processing": "Deine Zahlung war erfolgreich, aber wir verarbeiten noch dein Abonnement.",
       "retry": "Erneut versuchen",

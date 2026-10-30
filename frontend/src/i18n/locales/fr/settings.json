@@ -41,7 +41,8 @@
     },
     "upgradeNow": "Passer à une formule supérieure",
     "topup": {
-      "button": "Ajouter {amount} € de budget",
+      "button": "Ajouter {amount} €",
+      "sentence": "{amount} € s'ajoutent à votre usage jusqu'à la fin de cette période. Vous payez cela sur la page suivante.",
       "amountLabel": "Montant de recharge (pas de {step} €)",
       "error": "Impossible de démarrer la recharge. Veuillez réessayer."
     },
@@ -180,6 +181,9 @@
       "startUsing": "Commencer à utiliser votre formule",
       "activating": "Activation de votre formule…",
       "activatingDesc": "Veuillez patienter pendant que nous activons votre abonnement.",
+      "topupTitle": "100 € ajoutés",
+      "topupDescription": "100 € ont été ajoutés à votre usage jusqu'à la fin de cette période. Votre formule n'a pas changé.",
+      "topupButton": "Voir l'usage",
       "almostDone": "Presque terminé !",
       "processing": "Votre paiement a réussi, mais nous traitons encore votre abonnement.",
       "retry": "Réessayer l’activation",

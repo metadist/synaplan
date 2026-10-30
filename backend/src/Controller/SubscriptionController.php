@@ -578,8 +578,8 @@ class SubscriptionController extends AbstractController
                     'price_data' => [
                         'currency' => 'eur',
                         'product_data' => [
-                            'name' => 'Synaplan usage top-up',
-                            'description' => sprintf('Adds EUR %d to your usage budget for the current period.', $totalEur),
+                            'name' => 'Usage top-up',
+                            'description' => sprintf('Adds EUR %d to your usage until this period ends.', $totalEur),
                         ],
                         'unit_amount' => self::TOPUP_STEP_EUR * 100, // cents
                     ],
@@ -597,7 +597,7 @@ class SubscriptionController extends AbstractController
                 'automatic_tax' => [
                     'enabled' => $this->stripeAutomaticTaxEnabled,
                 ],
-                'success_url' => $this->frontendUrl.'/subscription/success?session_id={CHECKOUT_SESSION_ID}',
+                'success_url' => $this->frontendUrl.'/subscription/success?kind=topup&session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $this->frontendUrl.'/subscription/cancel',
                 'client_reference_id' => (string) $user->getId(),
                 'metadata' => [

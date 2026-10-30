@@ -279,6 +279,9 @@
       "startUsing": "Empieza a Usar Tu Plan",
       "activating": "Activando Tu Plan...",
       "activatingDesc": "Por favor espera mientras activamos tu suscripción.",
+      "topupTitle": "€100 añadidos",
+      "topupDescription": "Se añadieron €100 a tu uso hasta que termine este periodo. Tu plan no cambió.",
+      "topupButton": "Ver el uso",
       "almostDone": "¡Casi Listo!",
       "processing": "Tu pago fue exitoso, pero aún estamos procesando tu suscripción.",
       "retry": "Reintentar Activación",
@@ -317,7 +320,8 @@
     },
     "upgradeNow": "Mejorar Ahora",
     "topup": {
-      "button": "Añadir €{amount} de saldo",
+      "button": "Añadir €{amount}",
+      "sentence": "€{amount} suman €{amount} a tu uso hasta que termine este periodo. Lo pagas en la página siguiente.",
       "amountLabel": "Importe de recarga (pasos de €{step})",
       "error": "No se pudo iniciar la recarga. Inténtalo de nuevo."
     },
