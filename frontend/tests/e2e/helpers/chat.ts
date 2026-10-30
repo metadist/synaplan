@@ -43,6 +43,20 @@ export async function nameActiveChat(page: Page, title: string): Promise<void> {
       `nameActiveChat: PATCH /api/v1/chats/${chatId} failed: ${response.status()} ${await response.text()}`
     )
   }
+  // The sidebar list is a snapshot from before this rename. Reloading picks the
+  // title up. Clicking the Chats rail would start another chat instead.
+  const chatsLoaded = page.waitForResponse(
+    (res) =>
+      new URL(res.url()).pathname.endsWith('/api/v1/chats') &&
+      res.request().method() === 'GET' &&
+      res.ok(),
+    { timeout: TIMEOUTS.VERY_LONG }
+  )
+  await page.reload({ waitUntil: 'commit' })
+  await chatsLoaded
+  await expect(page.locator(selectors.nav.sidebarChats)).toBeVisible({
+    timeout: TIMEOUTS.STANDARD,
+  })
 }
 
 export class ChatHelper {
