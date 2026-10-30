@@ -10,6 +10,7 @@ use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
 use App\Service\PlatformLink\DeliveryProbe;
 use App\Service\PlatformLink\PlatformInstanceService;
+use App\Service\PlatformLink\PlatformInstanceSupersession;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -17,18 +18,35 @@ final class DeliveryAddressServiceTest extends TestCase
 {
     private PlatformInstance $instance;
     private DeliveryProbe&MockObject $probe;
+    private PlatformInstanceSupersession&MockObject $supersession;
     private DeliveryAddressService $service;
 
     protected function setUp(): void
     {
-        $this->instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
+        $this->instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE);
         $instances = $this->createStub(PlatformInstanceService::class);
         $instances->method('requireInstance')->willReturn($this->instance);
         $platforms = $this->createStub(PlatformInstanceRepository::class);
         $origins = $this->createStub(DeliveryOriginPolicy::class);
         $origins->method('accepts')->willReturn(true);
         $this->probe = $this->createMock(DeliveryProbe::class);
-        $this->service = new DeliveryAddressService($instances, $platforms, $origins, $this->probe);
+        $this->supersession = $this->createMock(PlatformInstanceSupersession::class);
+        $this->service = new DeliveryAddressService($instances, $platforms, $origins, $this->probe, $this->supersession);
+    }
+
+    public function testAnnouncingTheClientLetsTheInstanceTakeOverOlderTwins(): void
+    {
+        $this->supersession->expects($this->once())->method('takeOverOlderTwins')->with($this->instance);
+
+        $this->service->update('pi_abc', 'secret', null, null, 'synaplan-nextcloud');
+    }
+
+    public function testSavingOnlyTheAddressTakesNothingOver(): void
+    {
+        $this->probe->method('reachable')->willReturn(true);
+        $this->supersession->expects($this->never())->method('takeOverOlderTwins');
+
+        $this->service->update('pi_abc', 'secret', 'https://files.example.org/inbound', null);
     }
 
     public function testSavingTheAddressProbesItAndStoresWhatTheAppReports(): void

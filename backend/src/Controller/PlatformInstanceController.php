@@ -118,6 +118,7 @@ final class PlatformInstanceController extends AbstractController
                         new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['deliveries']),
                         new OA\Property(property: 'app_capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['deliveries'], description: 'Features the app itself reported.'),
                         new OA\Property(property: 'reachable', type: 'boolean', nullable: true, description: 'Whether the last delivery probe got an answer; null when never probed.'),
+                        new OA\Property(property: 'conflicting_instances', type: 'integer', example: 0, description: 'Other active instances whose tokens name the same OIDC client. Above zero, a bearer from this cloud cannot be attributed until an administrator revokes the stale ones.'),
                         new OA\Property(
                             property: 'notify_keys',
                             type: 'array',

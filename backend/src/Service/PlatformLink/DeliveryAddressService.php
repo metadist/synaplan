@@ -17,6 +17,7 @@ final readonly class DeliveryAddressService
         private PlatformInstanceRepository $platforms,
         private DeliveryOriginPolicy $origins,
         private DeliveryProbe $probe,
+        private PlatformInstanceSupersession $supersession,
     ) {
     }
 
@@ -53,6 +54,7 @@ final readonly class DeliveryAddressService
         }
         if (null !== $oidcClientId) {
             $instance->setOidcClientId('' === trim($oidcClientId) ? null : mb_substr(trim($oidcClientId), 0, 191));
+            $this->supersession->takeOverOlderTwins($instance);
         }
         if (null !== $appVersion) {
             $instance->setAppVersion('' === trim($appVersion) ? null : mb_substr(trim($appVersion), 0, 32));
