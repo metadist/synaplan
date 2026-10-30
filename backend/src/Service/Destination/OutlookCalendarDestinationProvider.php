@@ -85,36 +85,9 @@ final readonly class OutlookCalendarDestinationProvider implements DestinationPr
         }
 
         $messageId = is_numeric($params['message_id'] ?? null) ? (int) $params['message_id'] : 0;
-        $created = 0;
-        $skipped = 0;
-        $lastWebLink = '';
 
         try {
-            foreach ($events as $index => $event) {
-                $result = $this->graph->createEvent(
-                    $connection,
-                    transactionId: CalendarDeliveryId::token(
-                        $messageId,
-                        $index,
-                        $event['summary'],
-                        $event['start']->format('Y-m-d\TH:i:s'),
-                        $event['end']->format('Y-m-d\TH:i:s'),
-                    ),
-                    subject: $event['summary'],
-                    start: $event['start'],
-                    end: $event['end'],
-                    timezone: 'UTC',
-                    body: $event['description'],
-                    location: $event['location'],
-                    attendees: $event['attendees'],
-                );
-                if ($result['created']) {
-                    ++$created;
-                    $lastWebLink = $result['webLink'];
-                } else {
-                    ++$skipped;
-                }
-            }
+            [$created, $skipped, $lastWebLink] = $this->createEvents($connection, $messageId, $events);
         } catch (OAuthReauthRequiredException|OAuthException $e) {
             $this->logger->warning('Outlook calendar delivery failed: token exchange rejected', [
                 'connection_id' => $connection->getId(),
@@ -151,6 +124,46 @@ final readonly class OutlookCalendarDestinationProvider implements DestinationPr
         }
 
         return DestinationResult::success((string) $created, $context);
+    }
+
+    /**
+     * @param list<array{summary: string, description: ?string, location: ?string, start: \DateTimeImmutable, end: \DateTimeImmutable, attendees: list<string>}> $events
+     *
+     * @return array{0: int, 1: int, 2: string}
+     */
+    private function createEvents(Connection $connection, int $messageId, array $events): array
+    {
+        $created = 0;
+        $skipped = 0;
+        $lastWebLink = '';
+
+        foreach ($events as $index => $event) {
+            $result = $this->graph->createEvent(
+                $connection,
+                transactionId: CalendarDeliveryId::token(
+                    $messageId,
+                    $index,
+                    $event['summary'],
+                    $event['start']->format('Y-m-d\TH:i:s'),
+                    $event['end']->format('Y-m-d\TH:i:s'),
+                ),
+                subject: $event['summary'],
+                start: $event['start'],
+                end: $event['end'],
+                timezone: 'UTC',
+                body: $event['description'],
+                location: $event['location'],
+                attendees: $event['attendees'],
+            );
+            if ($result['created']) {
+                ++$created;
+                $lastWebLink = $result['webLink'];
+            } else {
+                ++$skipped;
+            }
+        }
+
+        return [$created, $skipped, $lastWebLink];
     }
 
     /**
