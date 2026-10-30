@@ -1,6 +1,9 @@
 package capacity
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestFoldPeakKeepsTheHighWaterMark(t *testing.T) {
 	low := 0.1
@@ -39,6 +42,15 @@ func TestRaisePeakKeepsTheFirstTimeOfTheHighWaterMark(t *testing.T) {
 	nextDay := RaisePeak(lower, "20261025", Snapshot{UpdatedAt: "2026-10-25T00:00:05Z", Streams: Pool{Total: 24, Busy: 1}})
 	if nextDay.StreamsBusyMax != 1 || nextDay.Day != "20261025" {
 		t.Fatalf("a new day does not inherit yesterday: %+v", nextDay)
+	}
+}
+
+func TestListedTTLKeepsAWorkerForADay(t *testing.T) {
+	if ListedTTL("worker") != WorkerListedTTL || WorkerListedTTL != 24*time.Hour {
+		t.Fatalf("worker window = %s", ListedTTL("worker"))
+	}
+	if ListedTTL("web") != SeenTTL || ListedTTL("scheduler") != SeenTTL || ListedTTL("") != SeenTTL {
+		t.Fatal("only a worker stays for a day")
 	}
 }
 

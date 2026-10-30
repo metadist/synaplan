@@ -383,19 +383,17 @@ five questions and states: `04` §4.1.
 ### Vibe brief
 
 > In `synaplan-charts`, read its `AGENTS.md`. Implement AU8 on a feature
-> branch: values, templates, dashboard, docs. `make all` green. Install into
-> the `vultr-cluster` load-test namespace (not production), run
-> `saturate.py` against it (M6), and enter the pod tables and a screenshot of
-> the dashboard in this track's STATUS. Pull request in `synaplan-charts`,
-> Copilot, CI as `01` §9–§10.
+> branch: values, templates, dashboard, docs. `make all` green. Pull request
+> in `synaplan-charts`, Copilot, CI as `01` §9–§10. The vultr-cluster load
+> test (M6) is not part of this step: the owner left it out on 2026-10-30
+> until S2 (AU15–AU18) has landed.
 
 ### Exit criteria
 
 1. `make all` green in `synaplan-charts`; CI green there.
-2. On the load-test cluster: a pod whose stream pool is saturated stays
-   live, turns not-ready only when its PHP probe misses for 2 s, and comes
-   back when the streams end (observed, in STATUS).
-3. M6 tables in STATUS.
+2. Probe behaviour was observed on a local cluster and is recorded in
+   STATUS (2026-10-25). A vultr-cluster run is not required for this step.
+3. M6 is not required here. It waits until after AU15–AU18.
 
 ---
 
@@ -403,5 +401,7 @@ five questions and states: `04` §4.1.
 
 - AU1–AU8 merged; `make perf-runtime` baseline and after-values in STATUS.
 - J-AU-1 and J-AU-2 walked.
-- One production web node ran a week with two pools and the watchdog; its
-  capacity page and `queue_depth` entered in STATUS; then all three.
+- The production reading is one day, not a week. On the capacity page a
+  worker is listed only when it reported in the last 24 hours. A web server
+  still drops off after an hour. The vultr-cluster load test (M6) is not
+  part of this exit; it waits until after AU15–AU18.

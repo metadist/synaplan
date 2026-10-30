@@ -14,10 +14,14 @@ const (
 	// report time. A server that stops reporting stays listed here, so the
 	// page can say "last report 3 minutes ago" after its snapshot expired.
 	SeenKey = "capacity:seen"
-	// SeenTTL drops a server that has not reported for an hour. A replaced
-	// container keeps its own id, so a longer window fills the page with
-	// servers that are already gone.
+	// SeenTTL drops a web server that has not reported for an hour. A
+	// replaced container keeps its own id, so a longer window fills the
+	// page with servers that are already gone.
 	SeenTTL = time.Hour
+	// WorkerListedTTL is how long a worker stays listed after its last
+	// report. The page omits a worker older than this. It is under a week
+	// so a replaced worker does not stay on the card for days.
+	WorkerListedTTL = 24 * time.Hour
 )
 
 // Pool is one PHP worker pool.
@@ -125,10 +129,18 @@ func SeenHashKey(prefix string) string {
 	return prefix + SeenKey
 }
 
-// LastKey is the last report of a server, kept as long as the seen-list
-// (SeenTTL). The live snapshot expires after 20 seconds; this copy lets the
-// page show a silent server with its role, machine and log source instead
-// of a bare id.
+// ListedTTL is how long a silent server's last report is kept. A worker
+// stays for a day. Every other role stays for an hour.
+func ListedTTL(role string) time.Duration {
+	if role == "worker" {
+		return WorkerListedTTL
+	}
+	return SeenTTL
+}
+
+// LastKey is the last report of a server, kept for ListedTTL of its role.
+// The live snapshot expires after 20 seconds; this copy lets the page show
+// a silent server with its role, machine and log source instead of a bare id.
 func LastKey(prefix, serverID string) string {
 	return prefix + "capacity:last:" + serverID
 }
