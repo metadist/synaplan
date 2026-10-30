@@ -33,8 +33,13 @@ final class RecordingGateway implements CheckoutSessionGateway
         return ['id' => 'cs_test_'.$n, 'url' => 'https://checkout.stripe.test/s/'.$n];
     }
 
-    public function retrieve(string $sessionId): ?PaidCheckout
+    /** @var array<string, StripeObject> */
+    public array $rawSessions = [];
+
+    public function retrieve(string $sessionId, ?StripeObject &$loaded = null): ?PaidCheckout
     {
+        $loaded = $this->rawSessions[$sessionId] ?? null;
+
         return $this->sessions[$sessionId] ?? null;
     }
 

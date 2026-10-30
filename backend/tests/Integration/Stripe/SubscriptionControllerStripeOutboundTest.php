@@ -215,13 +215,13 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
             'customer' => $customerId,
         ]);
 
-        $this->postJson('/api/v1/subscription/topup', ['steps' => 2]);
+        $this->postJson('/api/v1/subscription/topup', ['steps' => 1]);
 
         $this->assertResponseIsSuccessful();
         $body = json_decode((string) $this->client->getResponse()->getContent(), true);
         $this->assertSame($sessionId, $body['sessionId']);
-        $this->assertSame(2, $body['steps']);
-        $this->assertSame(2 * SubscriptionController::TOPUP_STEP_EUR, $body['total_eur']);
+        $this->assertSame(1, $body['steps']);
+        $this->assertSame(SubscriptionController::TOPUP_STEP_EUR, $body['total_eur']);
 
         $checkoutCall = null;
         foreach ($this->stripeMock->captured() as $call) {
@@ -236,6 +236,18 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         $this->assertContains('card', $topupMethods);
         $this->assertNotContains('sepa_debit', $topupMethods,
             'top-ups must not accept an unverified IBAN either');
+        $this->assertSame('100', $checkoutCall['params']['metadata']['topup_eur']);
+        $this->assertSame(1, $checkoutCall['params']['line_items'][0]['quantity']);
+    }
+
+    public function testTopupRefusesAnyCountOtherThanOne(): void
+    {
+        $this->postJson('/api/v1/subscription/topup', ['steps' => 2]);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame('TOPUP_AMOUNT_FIXED', $body['code']);
+        $this->assertSame([], $this->stripeMock->captured());
     }
 
     public function testCheckoutReusesExistingStripeCustomer(): void

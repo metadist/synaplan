@@ -311,7 +311,7 @@
       <article class="node" id="n-files" data-on="knowledge"><h3>Files and knowledge</h3><p>Tika or Whisper, then an embedding.</p></article>
       <article class="node" id="n-pump" data-on="answer"><h3>Stream pump</h3><p>A few PHP processes hold the provider sockets and decode.</p></article>
       <article class="node" id="n-work" data-on="answer"><h3>Messenger workers</h3><p>Tool step, save the reply, memory, media. A research round runs here too.</p></article>
-      <article class="node span2" id="n-retr" data-on="knowledge"><h3>Retrieved into the next prompt</h3><p>Search hits MariaDB VECTOR and Qdrant. Prompt assembly stays as it is.</p></article>
+      <article class="node span2" id="n-retr" data-on="knowledge"><h3>Retrieved into the next prompt</h3><p>Search hits MariaDB VECTOR and Qdrant. Prompt assembly stays as it is: it hits MariaDB or Qdrant, and that choice is configurable. Qdrant is preferred, because it is faster.</p></article>
       <article class="node spine" id="n-pipe" data-on="answer knowledge channel"><h3>AI pipeline</h3><p>Limit, circuit, health, usage, metrics</p></article>
       <article class="node spine" id="n-inv" data-on="answer channel"><h3>Tool invoker</h3><p>Registry, gate, clamp, audit</p></article>
       <article class="node spine" id="n-egr" data-on="answer knowledge channel"><h3>Egress client</h3><p>Proxy, allowlist, every redirect</p></article>
@@ -339,7 +339,7 @@
         <li>The upload arrives on the API pool. It never takes a stream slot.</li>
         <li>Tika extracts a document, Whisper a recording. An embedding call goes through the same pipeline as chat, labelled as vectorize, so it is metered and visible.</li>
         <li>The vectors live in MariaDB, and in Qdrant when that store is on. The file itself stays on disk, with its row in MariaDB.</li>
-        <li>A later chat prepares its turn by searching those vectors. The passages go into the prompt. This plan does not change how the prompt is assembled.</li>
+        <li>A later chat searches those vectors in MariaDB VECTOR and in Qdrant. The passages that enter the prompt still come from one store, MariaDB or Qdrant, and that choice is configurable. Qdrant is preferred, because it is faster. This plan does not change how the prompt is assembled.</li>
         <li>From there the answer follows the streamed path: watchdog, pump, pipeline, and the same server-sent events.</li>
       </ol>
       <ol class="steps" data-for="channel">
