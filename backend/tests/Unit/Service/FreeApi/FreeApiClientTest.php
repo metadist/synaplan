@@ -72,6 +72,26 @@ final class FreeApiClientTest extends TestCase
         }
     }
 
+    public function testABareTooManyRequestsSaysTheDayIsFull(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('<html>Too Many Requests</html>', ['http_code' => 429]),
+            new MockResponse('{"error":"Too Many Requests"}', ['http_code' => 429]),
+        ]);
+        $client = $this->client($http);
+
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            try {
+                $client->status('sk-free-1');
+                $this->fail('expected a refusal');
+            } catch (FreeApiException $e) {
+                $this->assertSame('freeapi_full_today', $e->errorCode);
+                $this->assertSame(429, $e->httpStatus);
+                $this->assertSame('Too many requests on the Synaplan Demo today. Nothing was changed.', $e->getMessage());
+            }
+        }
+    }
+
     public function testAForeignErrorCodeIsNeverPassedOn(): void
     {
         $http = new MockHttpClient([

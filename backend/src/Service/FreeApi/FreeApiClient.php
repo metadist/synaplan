@@ -116,11 +116,20 @@ final readonly class FreeApiClient
         $error = \is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
         $code = \is_string($error['code'] ?? null) ? $error['code'] : '';
         if (!str_starts_with($code, 'freeapi_')) {
-            $code = 401 === $status ? FreeApiException::INVALID_KEY : FreeApiException::INVALID_RESPONSE;
+            // A proxy in front of the Demo often answers 429 with an HTML page
+            // or a bare "Too Many Requests", which has no freeapi_* code. That
+            // used to surface as "could not be started" with no reason.
+            $code = match ($status) {
+                401 => FreeApiException::INVALID_KEY,
+                429 => 'freeapi_full_today',
+                default => FreeApiException::INVALID_RESPONSE,
+            };
         }
         $message = \is_string($error['message'] ?? null) && '' !== $error['message']
             ? substr($error['message'], 0, 300)
-            : sprintf('The Synaplan Demo server refused the request (HTTP %d).', $status);
+            : (429 === $status
+                ? 'Too many requests on the Synaplan Demo today. Nothing was changed.'
+                : sprintf('The Synaplan Demo server refused the request (HTTP %d).', $status));
 
         $retryAfter = $response->getHeaders(false)['retry-after'][0] ?? null;
 

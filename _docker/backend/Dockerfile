@@ -114,9 +114,22 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
     CMD ["/usr/local/bin/container-healthcheck"]
 
 # ---------------------------------------------------------------------------
-# `dev` target ends here: base image (phpredis included) + ENV defaults + entrypoint.
+# PHP libraries for a fresh checkout. Compose bind-mounts the source tree,
+# which would hide this directory, and keeps it on the named volume
+# backend_vendor instead. The fingerprint matches
+# _devextras/backend/docker-entrypoint.d/10-composer-install.sh, so the first
+# boot does not download the same packages again. A composer.lock change
+# rebuilds this layer; application source stays on the bind mount.
+COPY backend/composer.json backend/composer.lock backend/symfony.lock ./
+RUN COMPOSER_PROCESS_TIMEOUT=0 composer install \
+        --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
+    && md5sum composer.lock | cut -d' ' -f1 > vendor/.composer_lock_hash \
+    && chown -R www-data:www-data vendor
+
+# `dev` target ends here: base image (phpredis included) + ENV defaults + entrypoint
+# + the PHP libraries from composer.lock.
 # Everything below builds the self-contained `prod` image and is skipped for
-# dev/worker containers (they bind-mount code/vendor via docker-compose).
+# dev/worker containers (they bind-mount code and keep vendor on backend_vendor).
 # `prod` inherits EXPOSE and ENTRYPOINT from `dev`.
 # ---------------------------------------------------------------------------
 FROM dev AS prod

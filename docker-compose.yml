@@ -289,10 +289,11 @@ services:
       - 8.8.4.4
     image: ghcr.io/metadist/synaplan:latest
     # Always build the lightweight `dev` stage locally so the image carries
-    # ext-redis (phpredis) without baking the app. The published :latest can be
-    # stale; reusing it breaks composer install (symfony/redis-messenger platform
-    # req) and the worker's Redis Streams consumer. The dev stage is independent
-    # of backend source, so every `up -d` is a cache hit after the first build.
+    # ext-redis (phpredis) and the PHP libraries from composer.lock, without
+    # baking the app. The published :latest can be stale; reusing it breaks
+    # composer install (symfony/redis-messenger platform req) and the worker's
+    # Redis Streams consumer. Application source stays bind-mounted, so `up -d`
+    # is a cache hit until composer.lock changes.
     pull_policy: build
     build:
       context: .
@@ -307,6 +308,9 @@ services:
       - "${SYNAPLAN_BACKEND_PORT:-8000}:80"
     volumes:
       - ./backend:/var/www/backend
+      # The dev image already installed these. A bind mount of ./backend would
+      # hide them and make the first boot download every package again.
+      - backend_vendor:/var/www/backend/vendor
       # Writable Symfony cache inside the container. Bind-mounted ./backend/var/cache often
       # inherits host UID/GID (e.g. macOS), so www-data cannot write and PHPUnit fails with
       # "Unable to write in the cache directory (/var/www/backend/var/cache/test)".
@@ -531,8 +535,8 @@ services:
     image: ghcr.io/metadist/synaplan:latest
     # Build the same lightweight `dev` stage as the backend (base + phpredis).
     # The worker bind-mounts ./backend and consumes Redis Streams via
-    # messenger:consume, which needs phpredis at runtime; the dev stage is
-    # source-independent so `up -d` stays a cache hit after the first build.
+    # messenger:consume, which needs phpredis at runtime. Application source
+    # stays bind-mounted, so `up -d` stays a cache hit until composer.lock changes.
     pull_policy: build
     build:
       context: .
@@ -544,6 +548,7 @@ services:
         required: false
     volumes:
       - ./backend:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - whisper_models:/var/www/backend/var/whisper:ro
@@ -769,6 +774,7 @@ services:
         required: false
     volumes:
       - ./backend:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -1451,6 +1457,7 @@ services:
       - synaplan-network
 
 volumes:
+  backend_vendor:
   mysql_data:
   ollama_data:
   whisper_models:

@@ -14,7 +14,7 @@ set -euo pipefail
 # (or is missing), we re-run `composer install`. When nothing changed, the
 # check is a single md5sum + file read — effectively free.
 
-echo "🔧 [dev] Checking Composer dependencies..."
+echo "🔧 [dev] Checking PHP libraries..."
 
 # The backend source tree (incl. vendor/) is bind-mounted from the host, so its
 # files are owned by the host user's UID, not root. Composer runs here as root,
@@ -35,11 +35,33 @@ if [ -f vendor/.composer_lock_hash ]; then
     STORED_HASH=$(cat vendor/.composer_lock_hash)
 fi
 
-if [ ! -d vendor ] || [ ! -f vendor/autoload.php ] || [ "$LOCK_HASH" != "$STORED_HASH" ]; then
-    if [ -f vendor/autoload.php ] && [ "$LOCK_HASH" != "$STORED_HASH" ]; then
-        echo "📦 [dev] composer.lock changed — updating dependencies..."
+# The image installs the libraries and may not have written the sidecar file
+# into this volume yet. installed.php records the lock's content-hash, so a
+# matching tree is already the install we want — running composer again would
+# download every package a second time.
+libraries_match_lock() {
+    [ -f vendor/autoload.php ] || return 1
+    [ -f vendor/composer/installed.php ] || return 1
+    [ -f composer.lock ] || return 1
+    php -r '
+        $installed = include "vendor/composer/installed.php";
+        $lock = json_decode((string) file_get_contents("composer.lock"), true);
+        $installedHash = is_array($installed) ? (string) ($installed["content-hash"] ?? "") : "";
+        $lockHash = is_array($lock) ? (string) ($lock["content-hash"] ?? "") : "";
+        exit($installedHash !== "" && $installedHash === $lockHash ? 0 : 1);
+    '
+}
+
+if [ -f vendor/autoload.php ] && { [ "$LOCK_HASH" = "$STORED_HASH" ] || libraries_match_lock; }; then
+    if [ "$LOCK_HASH" != "$STORED_HASH" ]; then
+        echo "$LOCK_HASH" > vendor/.composer_lock_hash
+    fi
+    echo "✅ [dev] PHP libraries are already installed"
+else
+    if [ -f vendor/autoload.php ]; then
+        echo "📦 [dev] composer.lock changed — updating PHP libraries once..."
     else
-        echo "📦 [dev] Installing Composer dependencies..."
+        echo "📦 [dev] Installing PHP libraries. This runs once on a new checkout..."
     fi
     # Disable Composer's per-process timeout (default 300s). On Apple Silicon the
     # amd64 base image runs under qemu emulation, where unzipping large packages
@@ -48,9 +70,7 @@ if [ ! -d vendor ] || [ ! -f vendor/autoload.php ] || [ "$LOCK_HASH" != "$STORED
     COMPOSER_PROCESS_TIMEOUT=0 composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts
     echo "$LOCK_HASH" > vendor/.composer_lock_hash
     chown -R www-data:www-data vendor/ 2>/dev/null || true
-    echo "✅ [dev] Composer dependencies installed"
-else
-    echo "✅ [dev] Composer dependencies up to date"
+    echo "✅ [dev] PHP libraries installed"
 fi
 
 # lib/grpc/ is gitignored and the install above skips scripts, so a fresh checkout
