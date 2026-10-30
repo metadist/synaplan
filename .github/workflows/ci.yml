@@ -54,10 +54,23 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Scan the checkout
+        env:
+          # A pull_request checkout is GitHub's merge commit, whose message
+          # is synthetic. Scan the commits the pull request introduced.
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bash scripts/campaign-guard.sh
 
       - name: Prove the scan detects a payload
         run: bash scripts/campaign-guard.sh --self-test
+
+      - name: Stop the rest of this run
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-cancel-on-failure.sh
 
   change-scope:
     name: Classify Change Scope
