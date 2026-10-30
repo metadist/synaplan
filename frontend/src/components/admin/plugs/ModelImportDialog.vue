@@ -270,9 +270,18 @@ const allNewSelected = computed(() => {
   return newRows.length > 0 && newRows.every((r) => r.selected)
 })
 
+let previewInFlight: Promise<void> = Promise.resolve()
+let closing = false
+
 onMounted(loadPreview)
 
-async function loadPreview(): Promise<void> {
+function loadPreview(): void {
+  const run = previewInFlight.catch(() => undefined).then(() => runPreview())
+  previewInFlight = run
+  void run
+}
+
+async function runPreview(): Promise<void> {
   loading.value = true
   error.value = null
   try {
@@ -357,7 +366,10 @@ function formatSize(bytes: number): string {
   return `${Math.round(bytes / 1000)} KB`
 }
 
-function close(): void {
+async function close(): Promise<void> {
+  if (closing) return
+  closing = true
+  await previewInFlight
   emit('close')
 }
 </script>

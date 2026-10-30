@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, ref } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
@@ -126,6 +127,48 @@ describe('ModelImportDialog', () => {
     await flushPromises()
 
     expect(wrapper.emitted('reconciled')).toHaveLength(1)
+  })
+
+  it('refreshes the catalog when the dialog is closed before the preview returns', async () => {
+    let resolvePreview: (value: ReturnType<typeof previewResponse>) => void = () => {}
+    importEndpointPreview.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePreview = resolve
+      })
+    )
+    const refreshed = ref(0)
+    const open = ref(true)
+    const Parent = defineComponent({
+      components: { ModelImportDialog },
+      setup() {
+        return { open, refreshed }
+      },
+      template: `
+        <ModelImportDialog
+          v-if="open"
+          source="openai_compatible:vllm"
+          label="vLLM lab"
+          @close="open = false"
+          @reconciled="refreshed++"
+        />
+        <span data-testid="catalog-refreshed">{{ refreshed }}</span>
+      `,
+    })
+    const parent = mount(Parent, {
+      attachTo: document.body,
+      global: { stubs: { Icon: true, Teleport: { template: '<div><slot /></div>' } } },
+    })
+
+    await parent.get('[data-testid="model-import-close"]').trigger('click')
+    expect(parent.get('[data-testid="catalog-refreshed"]').text()).toBe('0')
+    expect(parent.find('[data-testid="model-import-dialog"]').exists()).toBe(true)
+
+    resolvePreview(previewResponse())
+    await flushPromises()
+
+    expect(parent.get('[data-testid="catalog-refreshed"]').text()).toBe('1')
+    expect(parent.find('[data-testid="model-import-dialog"]').exists()).toBe(false)
+    parent.unmount()
   })
 
   it('does not reconcile when the endpoint did not answer', async () => {
