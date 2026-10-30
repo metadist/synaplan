@@ -49,6 +49,8 @@ function canReceiveFile(connection: ConnectionItem): boolean {
 /**
  * Same rule as backend CloudFolderTarget: only Nextcloud / OpenCloud folders.
  * Generic WebDAV and Dropbox stay out of the Files "Send to cloud" list.
+ * A stored ownCloud channel is a platform link, not a WebDAV target: the
+ * backend refuses that kind with 422.
  */
 export function cloudFolderKindFor(connection: ConnectionItem): CloudFolderKind | null {
   if (connection.type !== 'webdav') {
@@ -57,7 +59,8 @@ export function cloudFolderKindFor(connection: ConnectionItem): CloudFolderKind 
 
   const stored = storedChannel(connection)
   if (stored !== '') {
-    return kindFromChannel(stored)
+    const kind = kindFromChannel(stored)
+    return kind === 'owncloud' ? null : kind
   }
 
   const baseUrl = typeof connection.config?.base_url === 'string' ? connection.config.base_url : ''

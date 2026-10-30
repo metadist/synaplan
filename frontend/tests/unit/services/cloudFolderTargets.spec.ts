@@ -81,6 +81,14 @@ describe('cloudFolderTargetsFrom', () => {
     ).toBe('opencloud')
   })
 
+  it('does not offer a WebDAV folder stored as ownCloud', () => {
+    expect(cloudFolderKindFor(connection({ name: 'Files', channel: 'owncloud' }))).toBeNull()
+    expect(cloudFolderKindFor(connection({ name: 'Files', channel: 'owncloud-2' }))).toBeNull()
+    expect(
+      cloudFolderTargetsFrom([connection({ id: '21', name: 'Files', channel: 'owncloud' })])
+    ).toEqual([])
+  })
+
   it('does not treat a generic WebDAV row as OpenCloud just because the host says so', () => {
     expect(
       cloudFolderKindFor(
