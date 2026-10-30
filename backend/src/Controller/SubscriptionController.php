@@ -6,8 +6,11 @@ use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PayFirst\PayFirstException;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Billing\StripeEntitlement;
+use App\Service\Billing\UsageTopup;
+use App\Service\Billing\UsageTopupRejected;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Iap\IapPricingService;
 use App\Service\RateLimitService;
@@ -40,11 +43,8 @@ class SubscriptionController extends AbstractController
     private const CHECKOUT_RATE_LIMIT_WINDOW = 60; // 1 minute
     private const CHECKOUT_RATE_LIMIT_MAX = 20; // max 20 checkout attempts per minute per user
 
-    /** Fixed EUR amount per top-up "step" the user can buy. */
-    public const TOPUP_STEP_EUR = 100;
-
-    /** Max number of EUR-100 steps in a single top-up checkout. */
-    private const TOPUP_MAX_STEPS = 50;
+    /** The one top-up a person can buy: €100 of usage for this period. */
+    public const TOPUP_STEP_EUR = UsageTopup::AMOUNT_EUR;
 
     /**
      * Reference plan catalogue. Display name and price act as FALLBACKS for
@@ -501,15 +501,10 @@ class SubscriptionController extends AbstractController
         ]);
     }
 
-    /**
-     * Create a Stripe one-time Checkout (mode=payment) to top up the user's
-     * cost budget in fixed EUR-100 steps. The webhook credits a BUSER_TOPUPS row
-     * on completion, which raises the budget for the current period.
-     */
     #[Route('/topup', name: 'subscription_topup', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/subscription/topup',
-        summary: 'Create a one-time Stripe Checkout to top up the cost budget in EUR 100 steps',
+        summary: 'Create a Stripe Checkout for one EUR 100 usage top-up',
         security: [['Bearer' => []]],
         tags: ['Subscription'],
     )]
@@ -517,7 +512,7 @@ class SubscriptionController extends AbstractController
         required: false,
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'steps', type: 'integer', example: 1, description: 'Number of EUR 100 steps to buy (1-50)'),
+                new OA\Property(property: 'steps', type: 'integer', example: 1, description: 'Only 1 is accepted. Any other count is refused.'),
             ],
         ),
     )]
@@ -533,27 +528,105 @@ class SubscriptionController extends AbstractController
             ],
         ),
     )]
+    #[OA\Response(response: 400, description: 'A step count other than 1')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     #[OA\Response(response: 503, description: 'Stripe not configured')]
     public function createTopupSession(
         Request $request,
         #[CurrentUser] ?User $user,
+        UsageTopup $topups,
     ): JsonResponse {
-        if (!$user) {
+        if (!$user instanceof User) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
         }
+        if (null !== ($denied = $this->denyTopup($request, $user))) {
+            return $denied;
+        }
 
+        $data = json_decode($request->getContent(), true);
+        $steps = is_array($data) && array_key_exists('steps', $data) ? (int) $data['steps'] : null;
+
+        try {
+            $topups->assertSingleStep($steps);
+            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+
+            return $this->json($topups->start($user, $this->getOrCreateStripeCustomer($user)));
+        } catch (UsageTopupRejected $e) {
+            return $this->json(['error' => $e->getMessage(), 'code' => $e->errorCode], $e->httpStatus);
+        } catch (PayFirstException $e) {
+            $this->logger->error('Stripe API error during top-up checkout', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Payment service error. Please try again later.'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    #[Route('/topup/confirm', name: 'subscription_topup_confirm', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/subscription/topup/confirm',
+        summary: 'Confirm a usage top-up checkout and report whether the credit is recorded',
+        security: [['Bearer' => []]],
+        tags: ['Subscription'],
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['session_id'],
+            properties: [
+                new OA\Property(property: 'session_id', type: 'string', example: 'cs_test_a1b2c3'),
+            ],
+        ),
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'credited once the payment is recorded, pending until Stripe reports it paid',
+        content: new OA\JsonContent(
+            required: ['status', 'amount_eur'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['credited', 'pending'], example: 'credited'),
+                new OA\Property(property: 'amount_eur', type: 'integer', example: 100),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 404, description: 'No such top-up for this account')]
+    #[OA\Response(response: 503, description: 'Stripe not configured')]
+    public function confirmTopup(
+        Request $request,
+        #[CurrentUser] ?User $user,
+        UsageTopup $topups,
+    ): JsonResponse {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (null !== ($denied = $this->denyTopup($request, $user))) {
+            return $denied;
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $sessionId = is_array($data) ? (string) ($data['session_id'] ?? '') : '';
+
+        try {
+            return $this->json($topups->confirmForUser($user, $sessionId));
+        } catch (UsageTopupRejected $e) {
+            return $this->json(['error' => $e->getMessage(), 'code' => $e->errorCode], $e->httpStatus);
+        } catch (PayFirstException) {
+            return $this->json(['error' => 'Payment service error. Please try again later.'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    private function denyTopup(Request $request, User $user): ?JsonResponse
+    {
         if (null !== ($blocked = $this->blockNativeStripeChannel($request))) {
             return $blocked;
         }
-
         if (!$this->checkCheckoutRateLimit($user, $request)) {
             return $this->json([
                 'error' => 'Too many checkout attempts. Please wait a minute and try again.',
                 'code' => 'RATE_LIMIT_EXCEEDED',
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
-
         if (!$this->billingService->isEnabled()) {
             return $this->json([
                 'error' => 'Payment service is currently unavailable. Please contact support.',
@@ -561,80 +634,7 @@ class SubscriptionController extends AbstractController
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        $data = json_decode($request->getContent(), true);
-        $steps = is_array($data) ? (int) ($data['steps'] ?? 1) : 1;
-        $steps = max(1, min(self::TOPUP_MAX_STEPS, $steps));
-        $totalEur = $steps * self::TOPUP_STEP_EUR;
-
-        try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
-            $customerId = $this->getOrCreateStripeCustomer($user);
-            $paymentMethods = array_filter(array_map('trim', explode(',', $this->stripePaymentMethods)));
-
-            $session = \Stripe\Checkout\Session::create([
-                'customer' => $customerId,
-                'allowed_payment_method_types' => $paymentMethods,
-                'line_items' => [[
-                    'price_data' => [
-                        'currency' => 'eur',
-                        'product_data' => [
-                            'name' => 'Usage top-up',
-                            'description' => sprintf('Adds EUR %d to your usage until this period ends.', $totalEur),
-                        ],
-                        'unit_amount' => self::TOPUP_STEP_EUR * 100, // cents
-                    ],
-                    'quantity' => $steps,
-                ]],
-                'mode' => 'payment',
-                'billing_address_collection' => 'required',
-                'customer_update' => [
-                    'name' => 'auto',
-                    'address' => 'auto',
-                ],
-                'tax_id_collection' => [
-                    'enabled' => true,
-                ],
-                'automatic_tax' => [
-                    'enabled' => $this->stripeAutomaticTaxEnabled,
-                ],
-                'success_url' => $this->frontendUrl.'/subscription/success?kind=topup&session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => $this->frontendUrl.'/subscription/cancel',
-                'client_reference_id' => (string) $user->getId(),
-                'metadata' => [
-                    'user_id' => (string) $user->getId(),
-                    'type' => 'topup',
-                    'topup_eur' => (string) $totalEur,
-                ],
-            ]);
-
-            $this->logger->info('Stripe top-up session created', [
-                'user_id' => $user->getId(),
-                'session_id' => $session->id,
-                'steps' => $steps,
-                'total_eur' => $totalEur,
-            ]);
-
-            return $this->json([
-                'sessionId' => $session->id,
-                'url' => $session->url,
-                'steps' => $steps,
-                'total_eur' => $totalEur,
-            ]);
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            $this->logger->error('Stripe API error during top-up checkout', [
-                'user_id' => $user->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->json(['error' => 'Payment service error. Please try again later.'], Response::HTTP_SERVICE_UNAVAILABLE);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to create top-up session', [
-                'user_id' => $user->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->json(['error' => 'Failed to create top-up session'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return null;
     }
 
     /**

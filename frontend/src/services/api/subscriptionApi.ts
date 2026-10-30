@@ -3,6 +3,7 @@ import type { z } from 'zod'
 import {
   GetSubscriptionBudgetResponseSchema,
   GetSubscriptionPlansResponseSchema,
+  PostSubscriptionTopupConfirmResponseSchema,
   PostSubscriptionTopupResponseSchema,
   PostIapVerifyResponseSchema,
 } from '@/generated/api-schemas'
@@ -84,6 +85,7 @@ export type IapVerifyResult = z.infer<typeof PostIapVerifyResponseSchema>
 // Inferred from the generated Zod schemas (per AGENTS.md: never hand-write
 // interfaces for API responses).
 export type TopupSession = z.infer<typeof PostSubscriptionTopupResponseSchema>
+export type TopupConfirmation = z.infer<typeof PostSubscriptionTopupConfirmResponseSchema>
 
 export type BudgetStatus = z.infer<typeof GetSubscriptionBudgetResponseSchema>
 
@@ -142,13 +144,25 @@ export const subscriptionApi = {
   },
 
   /**
-   * Create a one-time Stripe Checkout to top up the cost budget in EUR-100 steps.
+   * Start the one €100 usage top-up. The checkout page charges that amount.
    */
-  async createTopupSession(steps = 1): Promise<TopupSession> {
+  async createTopupSession(): Promise<TopupSession> {
     return httpClient('/api/v1/subscription/topup', {
       method: 'POST',
-      body: JSON.stringify({ steps }),
+      body: JSON.stringify({}),
       schema: PostSubscriptionTopupResponseSchema,
+    })
+  },
+
+  /**
+   * Ask the server whether this checkout is paid and credited. The page
+   * shows success only for `credited`.
+   */
+  async confirmTopup(sessionId: string): Promise<TopupConfirmation> {
+    return httpClient('/api/v1/subscription/topup/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId }),
+      schema: PostSubscriptionTopupConfirmResponseSchema,
     })
   },
 

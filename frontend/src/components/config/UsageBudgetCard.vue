@@ -35,7 +35,7 @@ async function startTopup(): Promise<void> {
   topupLoading.value = true
   topupError.value = null
   try {
-    const session = await subscriptionApi.createTopupSession(1)
+    const session = await subscriptionApi.createTopupSession()
     if (session.url) {
       window.location.href = session.url
       return
