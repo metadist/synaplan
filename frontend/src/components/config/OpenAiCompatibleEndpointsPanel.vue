@@ -315,6 +315,7 @@
       :source="importSource"
       :label="importLabel"
       @close="importSource = null"
+      @reconciled="onReconciled"
       @applied="onImported"
     />
   </div>
@@ -473,6 +474,10 @@ function formatTestResult(r: OpenAiEndpointTestResponse): string {
     return t('config.openaiEndpoints.testOk', { count: r.model_count ?? 0 })
   }
   return t('config.openaiEndpoints.testFail', { error: r.error ?? `HTTP ${r.status ?? '?'}` })
+}
+
+function onReconciled(): void {
+  emit('changed')
 }
 
 async function onImported() {

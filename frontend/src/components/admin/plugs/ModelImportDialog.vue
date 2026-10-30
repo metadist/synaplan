@@ -226,7 +226,7 @@ import { adminModelsApi, type ModelImportPreviewRow } from '@/services/api/admin
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps<{ source: string; label: string }>()
-const emit = defineEmits<{ close: []; applied: [] }>()
+const emit = defineEmits<{ close: []; applied: []; reconciled: [] }>()
 
 const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
@@ -272,9 +272,18 @@ const allNewSelected = computed(() => {
   return newRows.length > 0 && newRows.every((r) => r.selected)
 })
 
+let previewInFlight: Promise<void> = Promise.resolve()
+let closing = false
+
 onMounted(loadPreview)
 
-async function loadPreview(): Promise<void> {
+function loadPreview(): void {
+  const run = previewInFlight.catch(() => undefined).then(() => runPreview())
+  previewInFlight = run
+  void run
+}
+
+async function runPreview(): Promise<void> {
   loading.value = true
   error.value = null
   try {
@@ -287,6 +296,9 @@ async function loadPreview(): Promise<void> {
       selected: !r.exists,
       tagsText: r.guessedTags.join(', '),
     }))
+    if (result.endpointOk) {
+      emit('reconciled')
+    }
   } catch (err) {
     endpointOk.value = false
     error.value = err instanceof Error ? err.message : t('aiInfra.modelImport.unreachable')
@@ -356,7 +368,10 @@ function formatSize(bytes: number): string {
   return `${Math.round(bytes / 1000)} KB`
 }
 
-function close(): void {
+async function close(): Promise<void> {
+  if (closing) return
+  closing = true
+  await previewInFlight
   emit('close')
 }
 </script>

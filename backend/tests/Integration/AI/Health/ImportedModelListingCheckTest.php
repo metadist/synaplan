@@ -14,6 +14,7 @@ use App\Entity\Model;
 use App\Entity\ModelHealth;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -82,7 +83,7 @@ final class ImportedModelListingCheckTest extends KernelTestCase
 
     public function testUnreachableSourceMarksNothing(): void
     {
-        $check = $this->check(DiscoveryResult::unreachable('connection refused'));
+        $check = $this->check(DiscoveryResult::unreachable('connection refused'), false);
 
         $summary = $check->run();
 
@@ -92,7 +93,22 @@ final class ImportedModelListingCheckTest extends KernelTestCase
         self::assertNull($this->healthFor(self::GONE), 'an unreachable source must not write any verdict');
     }
 
-    private function check(DiscoveryResult $result): ImportedModelListingCheck
+    public function testASuccessfulPreviewDropsTheCachedHealthSnapshot(): void
+    {
+        $check = $this->check(DiscoveryResult::listed([
+            new DiscoveredModel(self::PRESENT, 'Present', ['chat'], true),
+        ]));
+
+        $check->applySuccessfulListing(self::SOURCE, DiscoveryResult::listed([
+            new DiscoveredModel(self::PRESENT, 'Present', ['chat'], true),
+        ]));
+
+        $gone = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::GONE]);
+        self::assertInstanceOf(Model::class, $gone);
+        self::assertTrue(true === ($gone->getJson()['meta']['import']['withdrawn'] ?? false));
+    }
+
+    private function check(DiscoveryResult $result, bool $dropsCache = true): ImportedModelListingCheck
     {
         $discoverer = new class($result) implements ModelDiscovererInterface {
             public function __construct(private readonly DiscoveryResult $result)
@@ -105,6 +121,9 @@ final class ImportedModelListingCheckTest extends KernelTestCase
             }
         };
 
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->expects($dropsCache ? self::once() : self::never())->method('invalidateModelHealth');
+
         return new ImportedModelListingCheck(
             $this->models,
             $discoverer,
@@ -112,6 +131,7 @@ final class ImportedModelListingCheckTest extends KernelTestCase
             static::getContainer()->get(ModelAutoDisabler::class),
             $this->em,
             new NullLogger(),
+            $modelConfig,
         );
     }
 
