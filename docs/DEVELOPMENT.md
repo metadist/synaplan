@@ -92,21 +92,20 @@ Website fetches stay off (`COMPUTE.EGRESS_ENABLED`). See
 [COMPUTE.md](./COMPUTE.md) and
 [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
-### Office conversion (optional)
+### Office conversion
 
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
 legacy-format analysis, and “Combine as PDF” need a **Collabora CODE** sidecar
-(`collabora/code`). The sidecar is **off by default** (`profiles: [office]`), so
-`make up` does not pull the image or spend the extra ~2 GB RAM.
-The compose file defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`;
-override that env for an external CODE, or set `OFFICE_CONVERT_URL=disabled`.
+(`collabora/code`). `make up` starts it with the stack (about 2 GB RAM).
+`OFFICE_CONVERT_URL` defaults to `http://collabora:9980` (see
+`backend/.env.example`). Override that for an external CODE, or set
+`OFFICE_CONVERT_URL=disabled`. Stop the container with
+`docker compose stop collabora`.
+
+The lean file and the self-host file still keep it behind the `office` profile:
 
 ```bash
-# Dev / minimal: start the sidecar (URL default is already collabora:9980)
-docker compose --profile office up -d
-
-# Self-host (`deploy/compose.yaml`): the entrypoint sets the URL when the
-# profile is listed
+docker compose -f docker-compose-minimal.yml --profile office up -d
 COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
 ```
 
@@ -386,7 +385,7 @@ make test    # Run tests
 | phpMyAdmin | http://localhost:8082 |
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
-| Collabora CODE (profile `office`, no published port) | `http://collabora:9980` on the compose network |
+| Collabora CODE (no published port) | `http://collabora:9980` on the compose network |
 | Docling (profile `docling`, no published port) | `http://docling:5001` on the compose network |
 | SearXNG (profile `searxng`, no published port) | `http://searxng:8080` on the compose network |
 

@@ -161,6 +161,9 @@ services:
       BACKEND_URL: http://backend
       # Probed by the boot-status onboarding page (no Ollama in the minimal stack).
       BOOT_STATUS_DB_HOST: db
+      # The boot page is shared with the standard file. Collabora stays behind
+      # the office profile here, so the page must not call it on by default.
+      BOOT_STATUS_STACK: minimal
       # Optional building blocks the boot page lists with a live on/off state.
       # No Qdrant here on purpose (see header) -- the page says so explicitly.
       BOOT_STATUS_COMPANIONS: centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200

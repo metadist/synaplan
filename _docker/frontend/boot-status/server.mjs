@@ -22,6 +22,8 @@
  *                                            Tika, Collabora, TTS) as "id=host:port,..." --
  *                                            a TCP probe per entry tells the page which
  *                                            ones this stack actually runs right now.
+ *   - BOOT_STATUS_STACK .................... "minimal" or "standard". The page is shared,
+ *                                            and Collabora is opt-in only on the minimal file.
  */
 import http from 'node:http'
 import net from 'node:net'
@@ -36,6 +38,7 @@ const DB_HOST = process.env.BOOT_STATUS_DB_HOST || ''
 const DB_PORT = Number(process.env.BOOT_STATUS_DB_PORT || 3306)
 const PHASE_FILE = process.env.BOOT_PHASE_FILE || '/tmp/synaplan-boot-phase.json'
 const BACKEND_VAR_DIR = process.env.BOOT_STATUS_BACKEND_VAR || '/synaplan-backend-var'
+const STACK = process.env.BOOT_STATUS_STACK === 'minimal' ? 'minimal' : 'standard'
 
 // "qdrant=qdrant:6333,collabora=collabora:9980,..." -> [{ id, host, port }].
 // Only ids listed here are probed; the page carries the human-readable copy.
@@ -123,6 +126,7 @@ const collectStatus = async () => {
       : null,
     frontend: frontendPhase || { phase: 'init' },
     companions,
+    stack: STACK,
   }
 }
 
