@@ -42,8 +42,26 @@ env:
 # step otherwise occupies a runner until then and still reports success.
 # Caps sit well above observed medians so ordinary variance still passes.
 jobs:
+  # Before every install. An armed checkout carries a payload and editor
+  # hooks, or a package that starts on install. This job is the root of
+  # the graph, so nothing else fetches dependencies from such a tree.
+  campaign-guard:
+    name: Campaign guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Scan the checkout
+        run: bash scripts/campaign-guard.sh
+
+      - name: Prove the scan detects a payload
+        run: bash scripts/campaign-guard.sh --self-test
+
   change-scope:
     name: Classify Change Scope
+    needs: [campaign-guard]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -191,6 +209,7 @@ jobs:
 
   lint:
     name: PHP Code Formatting
+    needs: [campaign-guard]
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -256,6 +275,7 @@ jobs:
 
   deployment-templates:
     name: Deployment Templates (AWS)
+    needs: [campaign-guard]
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -303,6 +323,7 @@ jobs:
 
   mobile-tooling:
     name: Mobile Release Tooling
+    needs: [campaign-guard]
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -2873,7 +2894,7 @@ jobs:
     name: All Checks Passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, watchdog-sidecar, transcriber-sidecar, voice-sidecar, transcriber-push-amd64, transcriber-push-arm64, transcriber-manifest, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [campaign-guard, change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, watchdog-sidecar, transcriber-sidecar, voice-sidecar, transcriber-push-amd64, transcriber-push-arm64, transcriber-manifest, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Checkout the gate rules
@@ -2885,6 +2906,7 @@ jobs:
           MODE: ${{ needs.change-scope.outputs.mode }}
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
+          CAMPAIGN: ${{ needs.campaign-guard.result }}
           CHANGE_SCOPE: ${{ needs.change-scope.result }}
           LINT: ${{ needs.lint.result }}
           TEMPLATES: ${{ needs.deployment-templates.result }}
@@ -2923,6 +2945,7 @@ jobs:
           require() { [ "$2" = success ] || fail "$1 was $2, expected success"; }
           allow_skip() { [ "$2" = success ] || [ "$2" = skipped ] || fail "$1 was $2, expected success or skipped"; }
 
+          require "Campaign guard" "$CAMPAIGN"
           require "Classify Change Scope" "$CHANGE_SCOPE"
           require "PHP Code Formatting" "$LINT"
           require "Deployment Templates (AWS)" "$TEMPLATES"
