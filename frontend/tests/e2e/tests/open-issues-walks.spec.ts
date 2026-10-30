@@ -62,15 +62,12 @@ test.describe('@noci Open issues walks', () => {
       return
     }
 
-    if (answerText.includes('Nordwind') && answerText.includes('386.50')) {
-      expect(answerText).not.toMatch(/Acme Supplies|Beta Logistics|Gamma Tech/)
-      return
-    }
-
+    // Invoice facts without the read card are invented. The only other ending
+    // is one sentence that says the folder was not read.
+    expect(answerText).not.toMatch(/Nordwind|386\.50|Acme Supplies|Beta Logistics|Gamma Tech/)
     const normalized = answerText.toLowerCase().replace(/\u2019/g, "'")
     expect(normalized).toMatch(
       /did not read|nothing was read|could not read|wasn't able to read|can't extract|can't create the requested table/
     )
-    expect(answerText).not.toMatch(/Acme Supplies|Beta Logistics|Gamma Tech/)
   })
 })

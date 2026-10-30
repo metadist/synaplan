@@ -60,6 +60,10 @@ of Invoices (no WebDAV).
   vendors.
 - Local run:
   `cd frontend/tests/e2e && npx playwright test open-issues-walks.spec.ts --project=chromium-noci`.
+- The 2026-10-24 note did not record which of the two endings was seen.
+  `open-issues-walks.spec.ts` now fails an answer that names the invoice
+  contents without the read card. The remaining ending is the refusal
+  sentence, and that sentence must not contain the fixture vendors or amounts.
 
 ### 2026-10-24 — J-OI-5
 
