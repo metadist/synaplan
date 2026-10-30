@@ -169,11 +169,11 @@
       "attach": "{name} in die nächste Nachricht übernehmen",
       "attached": "{name} wird mit der nächsten Nachricht mitgeschickt",
       "count": "{count} Datei | {count} Dateien",
-      "delete": "{name} entfernen",
-      "deleteConfirmTitle": "Datei entfernen?",
-      "deleteConfirmMessage": "„{name}“ wird dauerhaft gelöscht, einschließlich der indexierten Inhalte in deiner Wissensbasis. Das kann nicht rückgängig gemacht werden.",
-      "deleted": "Datei entfernt.",
-      "deleteFailed": "Die Datei konnte nicht entfernt werden. Es wurde nichts gelöscht."
+      "delete": "{name} aus diesem Chat nehmen",
+      "deleteConfirmTitle": "Datei aus dem Chat nehmen?",
+      "deleteConfirmMessage": "„{name}“ verlässt diesen Chat. Die Datei bleibt in deinen Dateien.",
+      "deleted": "{name} ist nicht mehr in diesem Chat. Die Datei bleibt in deinen Dateien.",
+      "deleteFailed": "{name} ist noch in diesem Chat. Es wurde nichts entfernt. Versuche es erneut."
     },
     "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
     "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht.",

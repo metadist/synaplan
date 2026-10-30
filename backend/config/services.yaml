@@ -1145,6 +1145,12 @@ services:
             $cache: '@cache.app'
 
     # Pay first (PF1): Stripe Checkout started with only an email address.
+    App\Service\Billing\UsageTopup:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+            $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
+            $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
+
     App\Service\Billing\PayFirst\PayFirstCheckout:
         arguments:
             $frontendUrl: '%env(FRONTEND_URL)%'

@@ -441,7 +441,7 @@
             :can-delete="canComposeSharedChat && !isGuestMode"
             @attach="attachConversationFile"
             @preview="previewConversationFile"
-            @delete="deleteConversationFile"
+            @remove="removeConversationFile"
           />
         </template>
         <!-- Native onboarding: a signed-out store purchase waiting to be
@@ -746,8 +746,8 @@ import {
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { busyGuard, busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
-import { useDialog } from '@/composables/useDialog'
 import { chatApi } from '@/services/api'
+import { conversationFilesApi } from '@/services/api/conversationFilesApi'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
@@ -851,8 +851,7 @@ const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
-const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
-const { confirm: confirmDialog } = useDialog()
+const { files: conversationFiles, dismiss: dismissConversationFile } = useConversationFiles()
 const {
   conversationPreview,
   previewConversationFile,
@@ -863,30 +862,20 @@ const {
 } = useConversationFilePreview(() => chatInputRef.value)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
 
-// Remove a file the chat can use, from the "Files in this chat" popover. This is
-// a permanent delete of the file (and its indexed knowledge), so it is gated
-// behind a confirm and reports honestly what did/did not happen (U3/U8).
-const deleteConversationFile = async (file: { id: number | null; name: string }) => {
-  if (file.id === null) {
+// Take a file out of this chat. The list and the count update immediately:
+// the file stays in the user's files, so there is nothing to confirm.
+const removeConversationFile = async (file: { id: number | null; name: string }) => {
+  const chatId = chatsStore.activeChatId
+  if (file.id === null || chatId == null) {
     return
   }
-  const ok = await confirmDialog({
-    title: t('chat.conversationFiles.deleteConfirmTitle'),
-    message: t('chat.conversationFiles.deleteConfirmMessage', { name: file.name }),
-    danger: true,
-    confirmText: t('common.delete'),
-    cancelText: t('common.cancel'),
-  })
-  if (!ok) {
-    return
-  }
+  const undo = dismissConversationFile(file.id)
   try {
-    const { deleteFile } = await import('@/services/filesService')
-    await deleteFile(file.id)
-    showSuccessToast(t('chat.conversationFiles.deleted'))
-    await refreshConversationFiles()
+    await conversationFilesApi.detachConversationFile(chatId, file.id)
+    showSuccessToast(t('chat.conversationFiles.deleted', { name: file.name }))
   } catch {
-    showErrorToast(t('chat.conversationFiles.deleteFailed'))
+    undo()
+    showErrorToast(t('chat.conversationFiles.deleteFailed', { name: file.name }))
   }
 }
 const quoting = useMessageQuoting(chatContainer)

@@ -11,9 +11,19 @@
             <Icon icon="mdi:loading" class="w-10 h-10 text-blue-500 animate-spin" />
           </div>
           <h1 class="text-3xl font-bold txt-primary mb-3">
-            {{ $t('subscription.success.activating') }}
+            {{
+              isTopup
+                ? $t('subscription.success.topupChecking')
+                : $t('subscription.success.activating')
+            }}
           </h1>
-          <p class="txt-secondary mb-8">{{ $t('subscription.success.activatingDesc') }}</p>
+          <p class="txt-secondary mb-8">
+            {{
+              isTopup
+                ? $t('subscription.success.topupCheckingDesc')
+                : $t('subscription.success.activatingDesc')
+            }}
+          </p>
         </template>
 
         <!-- Success State -->
@@ -25,18 +35,36 @@
             <Icon icon="mdi:check-circle" class="w-10 h-10 text-green-500" />
           </div>
           <h1 class="text-3xl font-bold txt-primary mb-3">
-            {{ $t('subscription.success.title') }}
+            {{
+              isTopup
+                ? $t('subscription.success.topupTitle', { amount: creditedAmount })
+                : $t('subscription.success.title')
+            }}
           </h1>
-          <p class="txt-secondary mb-4">{{ $t('subscription.success.description') }}</p>
+          <p class="txt-secondary mb-4">
+            {{
+              isTopup
+                ? $t('subscription.success.topupDescription', { amount: creditedAmount })
+                : $t('subscription.success.description')
+            }}
+          </p>
           <p
-            v-if="newLevel && newLevel !== 'NEW'"
+            v-if="!isTopup && newLevel && newLevel !== 'NEW'"
             data-testid="text-new-level"
             class="text-lg font-semibold text-green-500 mb-8"
           >
             {{ $t('subscription.success.newPlan') }}: {{ newLevel }}
           </p>
-          <button class="btn-primary px-8 py-3 rounded-lg font-semibold" @click="goHome">
-            {{ $t('subscription.success.startUsing') }}
+          <button
+            type="button"
+            class="btn-primary px-8 py-3 rounded-lg font-semibold"
+            @click="isTopup ? goUsage() : goHome()"
+          >
+            {{
+              isTopup
+                ? $t('subscription.success.topupButton')
+                : $t('subscription.success.startUsing')
+            }}
           </button>
         </template>
 
@@ -49,21 +77,42 @@
             <Icon icon="mdi:alert" class="w-10 h-10 text-amber-500" />
           </div>
           <h1 class="text-3xl font-bold txt-primary mb-3">
-            {{ $t('subscription.success.almostDone') }}
+            {{
+              isTopup
+                ? $t('subscription.success.topupPendingTitle')
+                : $t('subscription.success.almostDone')
+            }}
           </h1>
-          <p class="txt-secondary mb-4">{{ $t('subscription.success.processing') }}</p>
+          <p class="txt-secondary mb-4">
+            {{
+              isTopup
+                ? $t('subscription.success.topupPendingDescription', { amount: creditedAmount })
+                : $t('subscription.success.processing')
+            }}
+          </p>
           <p v-if="errorMessage" class="text-sm text-red-500 mb-4">{{ errorMessage }}</p>
           <div class="flex flex-col gap-3">
             <button
+              type="button"
               :disabled="syncing"
               class="btn-primary px-8 py-3 rounded-lg font-semibold"
               @click="retrySync"
             >
               <Icon v-if="syncing" icon="mdi:loading" class="w-5 h-5 animate-spin inline mr-2" />
-              {{ $t('subscription.success.retry') }}
+              {{
+                isTopup ? $t('subscription.success.topupRetry') : $t('subscription.success.retry')
+              }}
             </button>
-            <button class="btn-secondary px-8 py-3 rounded-lg font-semibold" @click="goHome">
-              {{ $t('subscription.success.continueAnyway') }}
+            <button
+              type="button"
+              class="btn-secondary px-8 py-3 rounded-lg font-semibold"
+              @click="isTopup ? goUsage() : goHome()"
+            >
+              {{
+                isTopup
+                  ? $t('subscription.success.topupButton')
+                  : $t('subscription.success.continueAnyway')
+              }}
             </button>
           </div>
         </template>
@@ -74,19 +123,24 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
 import { subscriptionApi } from '@/services/api/subscriptionApi'
 import { useAuthStore } from '@/stores/auth'
 
+const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const authStore = useAuthStore()
+const isTopup = computed(() => route.query.kind === 'topup')
 
 const syncing = ref(true)
 const syncSuccess = ref(false)
 const newLevel = ref<string | null>(null)
+const creditedAmount = ref(100)
 const errorMessage = ref<string | null>(null)
 
 async function syncSubscription() {
@@ -118,7 +172,34 @@ async function syncSubscription() {
   }
 }
 
+async function confirmTopup() {
+  syncing.value = true
+  errorMessage.value = null
+  const sessionId = route.query.session_id
+  if (typeof sessionId !== 'string' || sessionId === '') {
+    syncing.value = false
+    syncSuccess.value = false
+    errorMessage.value = t('subscription.success.topupMissing')
+    return
+  }
+
+  try {
+    const result = await subscriptionApi.confirmTopup(sessionId)
+    creditedAmount.value = result.amount_eur
+    syncSuccess.value = result.status === 'credited'
+  } catch (error: unknown) {
+    syncSuccess.value = false
+    errorMessage.value = getErrorMessage(error) || t('subscription.success.topupMissing')
+  } finally {
+    syncing.value = false
+  }
+}
+
 async function retrySync() {
+  if (isTopup.value) {
+    await confirmTopup()
+    return
+  }
   await syncSubscription()
 }
 
@@ -126,8 +207,15 @@ function goHome() {
   router.push('/')
 }
 
+function goUsage() {
+  router.push('/statistics')
+}
+
 onMounted(() => {
-  // Auto-sync on page load
-  syncSubscription()
+  if (isTopup.value) {
+    void confirmTopup()
+    return
+  }
+  void syncSubscription()
 })
 </script>

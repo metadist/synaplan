@@ -3,13 +3,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 
 import { useConversationFiles } from '@/composables/useConversationFiles'
-import { chatApi } from '@/services/api/chatApi'
+import { conversationFilesApi } from '@/services/api/conversationFilesApi'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { useHistoryStore, type Message } from '@/stores/history'
 
-vi.mock('@/services/api/chatApi', () => ({
-  chatApi: {
+vi.mock('@/services/api/conversationFilesApi', () => ({
+  conversationFilesApi: {
     getConversationFiles: vi.fn(),
   },
 }))
@@ -42,8 +42,11 @@ describe('useConversationFiles', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
-    vi.mocked(chatApi.getConversationFiles).mockReset()
-    vi.mocked(chatApi.getConversationFiles).mockResolvedValue({ success: true, files: [] })
+    vi.mocked(conversationFilesApi.getConversationFiles).mockReset()
+    vi.mocked(conversationFilesApi.getConversationFiles).mockResolvedValue({
+      success: true,
+      files: [],
+    })
 
     const auth = useAuthStore()
     auth.user = { id: 1, email: 'demo@synaplan.com', level: 'NEW' }
@@ -91,10 +94,10 @@ describe('useConversationFiles', () => {
     await nextTick()
     await Promise.resolve()
 
-    expect(chatApi.getConversationFiles).toHaveBeenCalledTimes(1)
+    expect(conversationFilesApi.getConversationFiles).toHaveBeenCalledTimes(1)
     expect(files.value).toEqual([])
 
-    vi.mocked(chatApi.getConversationFiles).mockResolvedValueOnce({
+    vi.mocked(conversationFilesApi.getConversationFiles).mockResolvedValueOnce({
       success: true,
       files: [apiFile],
     })
@@ -105,7 +108,37 @@ describe('useConversationFiles', () => {
     await nextTick()
     await Promise.resolve()
 
-    expect(chatApi.getConversationFiles).toHaveBeenCalledTimes(2)
+    expect(conversationFilesApi.getConversationFiles).toHaveBeenCalledTimes(2)
     expect(files.value.map((file) => file.name)).toContain('generated.docx')
+  })
+
+  it('drops a dismissed file from the list before the server answers', async () => {
+    const history = useHistoryStore()
+    history.messages.push({
+      id: 'm1',
+      role: 'user',
+      parts: [{ type: 'text', content: 'see this' }],
+      timestamp: new Date(),
+      backend_message_id: 100,
+      files: [
+        {
+          id: 77,
+          filename: 'contract.pdf',
+          fileType: 'pdf',
+          filePath: '4/contract.pdf',
+        },
+      ],
+    } as unknown as Message)
+
+    const { files, dismiss } = useConversationFiles()
+    await nextTick()
+    expect(files.value).toHaveLength(1)
+
+    const undo = dismiss(77)
+    expect(files.value).toEqual([])
+
+    undo()
+    await nextTick()
+    expect(files.value.map((file) => file.id)).toEqual([77])
   })
 })

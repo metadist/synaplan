@@ -25,9 +25,13 @@ interface CheckoutSessionGateway
      * The pay-first Checkout session as Stripe reports it now, or null when it
      * does not exist or was not started by the pay-first flow.
      *
+     * `$loaded` receives the Checkout session Stripe returned, including a
+     * usage top-up, so a caller can read it without a second request. It is
+     * null when Stripe has no such session.
+     *
      * @throws PayFirstException when Stripe cannot be reached
      */
-    public function retrieve(string $sessionId): ?PaidCheckout;
+    public function retrieve(string $sessionId, ?StripeObject &$loaded = null): ?PaidCheckout;
 
     /**
      * The subscription a paid session created, with its latest invoice, for

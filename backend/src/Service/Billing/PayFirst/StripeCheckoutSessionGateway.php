@@ -32,8 +32,9 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
         return ['id' => (string) $session->id, 'url' => (string) $session->url];
     }
 
-    public function retrieve(string $sessionId): ?PaidCheckout
+    public function retrieve(string $sessionId, ?StripeObject &$loaded = null): ?PaidCheckout
     {
+        $loaded = null;
         try {
             \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
             $session = \Stripe\Checkout\Session::retrieve($sessionId);
@@ -45,6 +46,7 @@ final readonly class StripeCheckoutSessionGateway implements CheckoutSessionGate
             throw PayFirstException::lookupFailed();
         }
 
+        $loaded = $session;
         $metadata = $session->metadata;
         if (!$metadata instanceof StripeObject || PayFirstCheckout::FLOW !== ($metadata['flow'] ?? null)) {
             return null;

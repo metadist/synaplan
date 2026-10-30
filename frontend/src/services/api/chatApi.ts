@@ -15,13 +15,11 @@ import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
-import {
+export {
   ConversationFileRowSchema,
   GetConversationFilesResponseSchema,
   type ConversationFileRow,
 } from './conversationFileSchema'
-
-export { ConversationFileRowSchema, GetConversationFilesResponseSchema, type ConversationFileRow }
 import type { StreamUpdatePayload } from '@/types/chatStream'
 import { fetchWithBusyRetry, isBusyRefusal } from './busyRetry'
 
@@ -864,17 +862,6 @@ export const chatApi = {
     return httpClient(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
       method: 'GET',
       schema: GetApiChatsMessagesResponseSchema,
-    })
-  },
-
-  /**
-   * Files this chat can still use on later turns (uploads and generated
-   * artefacts). The same list is on GET /api/v1/chats/{id} as `conversationFiles`.
-   */
-  async getConversationFiles(chatId: number) {
-    return httpClient(`/api/v1/chats/${chatId}/files`, {
-      method: 'GET',
-      schema: GetConversationFilesResponseSchema,
     })
   },
 
