@@ -24,12 +24,14 @@ services:
     networks:
       - synaplan-network
 
+  # The dev entrypoint runs Composer before PHP has published the allowlist.
+  # Those hosts bypass the gateway, or backend and worker never become healthy.
   backend:
     environment:
       EGRESS_GATEWAY: "1"
       HTTPS_PROXY: http://egress:3128
       HTTP_PROXY: http://egress:3128
-      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin,docling,searxng
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin,docling,searxng,repo.packagist.org,packagist.org,github.com,api.github.com,codeload.github.com,objects.githubusercontent.com
     depends_on:
       egress:
         condition: service_started
@@ -39,7 +41,7 @@ services:
       EGRESS_GATEWAY: "1"
       HTTPS_PROXY: http://egress:3128
       HTTP_PROXY: http://egress:3128
-      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin,docling,searxng
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin,docling,searxng,repo.packagist.org,packagist.org,github.com,api.github.com,codeload.github.com,objects.githubusercontent.com
     depends_on:
       egress:
         condition: service_started
@@ -49,7 +51,7 @@ services:
       EGRESS_GATEWAY: "1"
       HTTPS_PROXY: http://egress:3128
       HTTP_PROXY: http://egress:3128
-      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin,docling,searxng
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin,docling,searxng,repo.packagist.org,packagist.org,github.com,api.github.com,codeload.github.com,objects.githubusercontent.com
     depends_on:
       egress:
         condition: service_started

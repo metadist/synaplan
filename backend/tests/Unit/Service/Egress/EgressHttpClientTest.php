@@ -18,6 +18,10 @@ use App\Service\Egress\EgressRefusedException;
 use App\Service\Egress\EgressRule;
 use App\Service\Egress\EgressTypedUrlGuard;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Event\ConsoleCommandEvent;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -289,6 +293,21 @@ final class EgressHttpClientTest extends TestCase
 
         self::assertStringContainsString('api.openai.com', $cache->allowlist());
         self::assertSame(86400, $cache->puts[0][2]);
+    }
+
+    public function testCacheWarmupDoesNotPublishTheAllowlist(): void
+    {
+        $cache = new RecordingEgressCache();
+        $config = new EgressConfig();
+        putenv('EGRESS_GATEWAY=1');
+        try {
+            $refresher = new EgressDirectoryRefresher($config, new EgressPolicy($config, new AllowTypedGuard()), new EgressDirectory($cache));
+            $refresher->publishCommand(new ConsoleCommandEvent(new Command('cache:warmup'), new ArrayInput([]), new NullOutput()));
+        } finally {
+            putenv('EGRESS_GATEWAY');
+        }
+
+        self::assertSame('', $cache->allowlist());
     }
 
     public function testTheGatewayRefusesAPrivatePin(): void

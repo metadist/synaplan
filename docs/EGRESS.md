@@ -81,7 +81,9 @@ A compute run does not use that proxy environment. Its pin proxy dials
 the approved address itself. When `EGRESS_UPSTREAM` and
 `EGRESS_UPSTREAM_TOKEN` are set, that proxy sends `CONNECT <pinned ip>`
 to the gateway with the token. The gateway dials that public address and
-does not log the token. `docling` and `searxng` are in `NO_PROXY`.
+does not log the token. `docling` and `searxng` are in `NO_PROXY`. The dev overlay also bypasses
+Packagist and GitHub: Composer runs before PHP has published the allowlist,
+and without that bypass the backend and the worker never become healthy.
 
 `REDIS_KEY_PREFIX` must be the prefix `RedisService` writes
 (`synaplan:` plus `APP_ENV` plus `:`). The dev overlay uses `synaplan:dev:`
