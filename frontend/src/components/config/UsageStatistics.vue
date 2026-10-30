@@ -561,10 +561,7 @@ const exporting = ref(false)
 const error = ref<string | null>(null)
 const stats = ref<UsageStats | null>(null)
 const showTopup = computed(
-  () =>
-    !isNativeApp() &&
-    config.billing.enabled &&
-    (stats.value?.cost_budget?.budget ?? 0) > 0
+  () => !isNativeApp() && config.billing.enabled && (stats.value?.cost_budget?.budget ?? 0) > 0
 )
 
 const activityItems = ref<ActivityEntry[]>([])

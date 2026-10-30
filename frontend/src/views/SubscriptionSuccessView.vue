@@ -28,7 +28,11 @@
             {{ isTopup ? $t('subscription.success.topupTitle') : $t('subscription.success.title') }}
           </h1>
           <p class="txt-secondary mb-4">
-            {{ isTopup ? $t('subscription.success.topupDescription') : $t('subscription.success.description') }}
+            {{
+              isTopup
+                ? $t('subscription.success.topupDescription')
+                : $t('subscription.success.description')
+            }}
           </p>
           <p
             v-if="!isTopup && newLevel && newLevel !== 'NEW'"
@@ -42,7 +46,11 @@
             class="btn-primary px-8 py-3 rounded-lg font-semibold"
             @click="isTopup ? goUsage() : goHome()"
           >
-            {{ isTopup ? $t('subscription.success.topupButton') : $t('subscription.success.startUsing') }}
+            {{
+              isTopup
+                ? $t('subscription.success.topupButton')
+                : $t('subscription.success.startUsing')
+            }}
           </button>
         </template>
 
