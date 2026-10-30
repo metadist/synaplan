@@ -37,7 +37,7 @@ RUN go mod download
 COPY sidecars/synaplan-watchdog/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /synaplan-watchdog ./cmd/synaplan-watchdog
 
-FROM base AS dev
+FROM base AS runtime
 
 ARG APP_VERSION=dev
 
@@ -113,13 +113,30 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
     CMD ["/usr/local/bin/container-healthcheck"]
 
+# Development libraries live only on this stage. Production starts again from
+# `runtime` below, so these packages never become a layer of the shipped image.
+FROM runtime AS dev
+
 # ---------------------------------------------------------------------------
-# `dev` target ends here: base image (phpredis included) + ENV defaults + entrypoint.
+# PHP libraries for a fresh checkout. Compose bind-mounts the source tree,
+# which would hide this directory, and keeps it on the named volume
+# backend_vendor instead. The fingerprint matches
+# _devextras/backend/docker-entrypoint.d/10-composer-install.sh, so the first
+# boot does not download the same packages again. A composer.lock change
+# rebuilds this layer; application source stays on the bind mount.
+COPY backend/composer.json backend/composer.lock backend/symfony.lock ./
+RUN COMPOSER_PROCESS_TIMEOUT=0 composer install \
+        --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
+    && md5sum composer.lock | cut -d' ' -f1 > vendor/.composer_lock_hash \
+    && chown -R www-data:www-data vendor
+
+# `dev` target ends here: base image (phpredis included) + ENV defaults + entrypoint
+# + the PHP libraries from composer.lock.
 # Everything below builds the self-contained `prod` image and is skipped for
-# dev/worker containers (they bind-mount code/vendor via docker-compose).
-# `prod` inherits EXPOSE and ENTRYPOINT from `dev`.
+# dev/worker containers (they bind-mount code and keep vendor on backend_vendor).
+# `prod` inherits EXPOSE and ENTRYPOINT from `runtime`, not the dev libraries.
 # ---------------------------------------------------------------------------
-FROM dev AS prod
+FROM runtime AS prod
 
 # Download and unpack the production dependencies from the lock file ALONE,
 # above the source COPY, so this layer stays cached for as long as composer.lock

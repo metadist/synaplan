@@ -22,6 +22,7 @@ const START_ERRORS: Record<string, string> = {
   freeapi_own_endpoint: 'ownEndpoint',
   freeapi_already_active: 'alreadyActive',
   freeapi_throttled: 'throttled',
+  freeapi_limit_reached: 'limitReached',
   freeapi_full_today: 'fullToday',
   freeapi_paused: 'paused',
   freeapi_blocked: 'blocked',

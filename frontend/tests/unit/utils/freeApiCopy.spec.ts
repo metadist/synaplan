@@ -37,6 +37,7 @@ const CODES = [
   'freeapi_own_endpoint',
   'freeapi_already_active',
   'freeapi_throttled',
+  'freeapi_limit_reached',
   'freeapi_full_today',
   'freeapi_paused',
   'freeapi_blocked',
