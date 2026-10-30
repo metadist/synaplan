@@ -247,7 +247,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
             $this->client = \OpenAI::factory()
                 ->withApiKey($key)
                 ->withBaseUri(self::BASE_URI)
-                ->make();
+                ->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->httpClient))->make();
             $this->clientKey = $key;
         }
 

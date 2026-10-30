@@ -90,7 +90,7 @@ class StripeWebhookController extends AbstractController
 
         try {
             // Verify webhook signature
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
             $event = \Stripe\Webhook::constructEvent(
                 $payload,
                 $signature,
@@ -304,7 +304,7 @@ class StripeWebhookController extends AbstractController
     private function cancelOtherSubscriptions(string $customerId, string $newSubscriptionId): void
     {
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             // Get all subscriptions for this customer
             $subscriptions = \Stripe\Subscription::all([

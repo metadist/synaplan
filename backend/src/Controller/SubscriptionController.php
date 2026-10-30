@@ -347,7 +347,7 @@ class SubscriptionController extends AbstractController
         }
 
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             // Create or get Stripe customer
             $customerId = $this->getOrCreateStripeCustomer($user);
@@ -548,7 +548,7 @@ class SubscriptionController extends AbstractController
 
         try {
             $topups->assertSingleStep($steps);
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             return $this->json($topups->start($user, $this->getOrCreateStripeCustomer($user)));
         } catch (UsageTopupRejected $e) {
@@ -798,7 +798,7 @@ class SubscriptionController extends AbstractController
         }
 
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             // Get all active subscriptions for this customer
             $subscriptions = \Stripe\Subscription::all([
@@ -920,7 +920,7 @@ class SubscriptionController extends AbstractController
         }
 
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             // Get customer ID from paymentDetails JSON
             $customerId = $user->getStripeCustomerId();
@@ -995,7 +995,7 @@ class SubscriptionController extends AbstractController
         }
 
         try {
-            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
             // Cancel at period end (user keeps access until end of billing period)
             $subscription = \Stripe\Subscription::update($subscriptionId, [
@@ -1072,7 +1072,7 @@ class SubscriptionController extends AbstractController
      */
     private function getOrCreateStripeCustomer(User $user): string
     {
-        \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+        \App\Service\Billing\StripeApi::activate($this->stripeSecretKey);
 
         // Check if customer ID exists in paymentDetails JSON
         $customerId = $user->getStripeCustomerId();

@@ -14,6 +14,7 @@ use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Shared client, chat, stream and vision path for fixed-URL OpenAI-compatible
@@ -45,6 +46,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         private readonly ?ProviderKeyStore $keyStore = null,
         private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private readonly ?HttpClientInterface $httpClient = null,
     ) {
     }
 
@@ -94,9 +96,13 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         }
 
         if (null === $this->client || $this->clientKey !== $key) {
+            if (null === $this->httpClient) {
+                throw new \LogicException($this->getName().' requires the shared HTTP client.');
+            }
             $this->client = \OpenAI::factory()
                 ->withApiKey($key)
                 ->withBaseUri($this->baseUri())
+                ->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->httpClient))
                 ->make();
             $this->clientKey = $key;
         }
@@ -123,7 +129,9 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
 
     public function isAvailable(): bool
     {
-        return null !== $this->client();
+        $key = $this->resolveApiKey();
+
+        return null !== $key && '' !== $key;
     }
 
     public function getRequiredEnvVars(): array

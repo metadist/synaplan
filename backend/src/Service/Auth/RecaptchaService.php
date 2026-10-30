@@ -4,6 +4,7 @@ namespace App\Service\Auth;
 
 use Psr\Log\LoggerInterface;
 use ReCaptcha\ReCaptcha;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class RecaptchaService
 {
@@ -16,12 +17,13 @@ final readonly class RecaptchaService
         string $secretKey,
         string $enabled = 'false',
         string $minScore = '0.5',
+        private ?HttpClientInterface $httpClient = null,
     ) {
         $this->enabled = filter_var($enabled, FILTER_VALIDATE_BOOLEAN);
         $this->minScore = (float) $minScore;
 
         if ($this->enabled && !empty($secretKey) && 'your_secret_key_here' !== $secretKey) {
-            $this->recaptcha = new ReCaptcha($secretKey);
+            $this->recaptcha = new ReCaptcha($secretKey, new RecaptchaEgressRequest($this->httpClient));
             $this->logger->info('reCAPTCHA v3 enabled', [
                 'min_score' => $this->minScore,
             ]);

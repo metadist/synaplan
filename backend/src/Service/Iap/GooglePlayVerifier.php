@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Iap;
 
+use App\Service\Egress\EgressGuzzleClient;
 use App\Service\Iap\Exception\IapNotConfiguredException;
 use App\Service\Iap\Exception\IapVerificationException;
 use Google\Client as GoogleClient;
@@ -16,6 +17,7 @@ use Google\Service\AndroidPublisher\SubscriptionPurchaseV2;
 use Google\Service\AndroidPublisher\TestPurchase;
 use Google\Service\Exception as GoogleServiceException;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * MOBILE-APP SEAM (Epic 5.4): real Google Play verifier.
@@ -37,6 +39,7 @@ final class GooglePlayVerifier implements GooglePlayVerifierInterface
         private readonly string $packageName,
         private readonly string $serviceAccountJsonPath,
         private readonly LoggerInterface $logger,
+        private readonly ?HttpClientInterface $httpClient = null,
     ) {
     }
 
@@ -214,7 +217,11 @@ final class GooglePlayVerifier implements GooglePlayVerifierInterface
 
         if (null === $this->service) {
             try {
+                if (null === $this->httpClient) {
+                    throw new IapNotConfiguredException('Google IAP requires the shared HTTP client.');
+                }
                 $client = new GoogleClient();
+                $client->setHttpClient(EgressGuzzleClient::fromHttpClient($this->httpClient));
                 $client->setAuthConfig($this->serviceAccountJsonPath);
                 $client->addScope(AndroidPublisher::ANDROIDPUBLISHER);
                 $this->service = new AndroidPublisher($client);

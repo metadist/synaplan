@@ -9,7 +9,6 @@ use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
-use ArdaGnsrn\Ollama\Ollama;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\Service\ResetInterface;
@@ -26,8 +25,6 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     /** The longest a chat waits when the caller does not name a shorter deadline. */
     private const MAX_CHAT_SECONDS = 300;
 
-    private $client;
-
     /** @var list<array{name: string, size: int, family: string}>|null */
     private ?array $probedModels = null;
 
@@ -39,9 +36,6 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private HttpClientInterface $httpClient,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
-        // Set timeout to 5 minutes for slow CPU-based models
-        ini_set('default_socket_timeout', 300);
-        $this->client = Ollama::client($this->baseUrl);
     }
 
     public function getName(): string
@@ -174,28 +168,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             ]);
 
             $requestBody = $this->buildChatRequestBody($messages, $options, $model);
-            $deadline = self::requestedTimeout($options);
-            if (null !== $deadline) {
-                return $this->chatWithin($requestBody, $deadline);
-            }
 
-            $response = $this->client->chat()->create($requestBody);
-
-            $promptTokens = $response->promptEvalCount ?? 0;
-            $completionTokens = $response->evalCount ?? 0;
-
-            $usage = [
-                'prompt_tokens' => $promptTokens,
-                'completion_tokens' => $completionTokens,
-                'total_tokens' => $promptTokens + $completionTokens,
-                'cached_tokens' => 0,
-                'cache_creation_tokens' => 0,
-            ];
-
-            return [
-                'content' => $response->message->content ?? '',
-                'usage' => $usage,
-            ];
+            return $this->chatWithin($requestBody, self::requestedTimeout($options) ?? self::MAX_CHAT_SECONDS);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -663,15 +637,11 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $response = $this->client->embed()->create([
-                'model' => $options['model'],
-                'input' => [$text],
-            ]);
-
-            $promptTokens = $response->promptEvalCount ?? 0;
+            $embedded = $this->embedViaHttp($options['model'], [$text]);
+            $promptTokens = $embedded['prompt_tokens'];
 
             return [
-                'embedding' => $response->embeddings[0] ?? [],
+                'embedding' => $embedded['embeddings'][0] ?? [],
                 'usage' => [
                     'prompt_tokens' => $promptTokens,
                     'total_tokens' => $promptTokens,
@@ -693,23 +663,42 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $response = $this->client->embed()->create([
-                'model' => $options['model'],
-                'input' => $texts,
-            ]);
-
-            $promptTokens = $response->promptEvalCount ?? 0;
+            $embedded = $this->embedViaHttp($options['model'], $texts);
 
             return [
-                'embeddings' => $response->embeddings ?? [],
+                'embeddings' => $embedded['embeddings'],
                 'usage' => [
-                    'prompt_tokens' => $promptTokens,
-                    'total_tokens' => $promptTokens,
+                    'prompt_tokens' => $embedded['prompt_tokens'],
+                    'total_tokens' => $embedded['prompt_tokens'],
                 ],
             ];
         } catch (\Exception $e) {
             throw new ProviderException('Ollama batch embedding error: '.$e->getMessage(), 'ollama');
         }
+    }
+
+    /**
+     * @param list<string> $input
+     *
+     * @return array{embeddings: list<array<int, float>>, prompt_tokens: int}
+     */
+    private function embedViaHttp(string $model, array $input): array
+    {
+        $response = $this->httpClient->request('POST', rtrim($this->baseUrl, '/').'/api/embed', [
+            'json' => ['model' => $model, 'input' => $input],
+            'timeout' => self::MAX_CHAT_SECONDS,
+            'max_duration' => self::MAX_CHAT_SECONDS,
+        ]);
+        $payload = $response->toArray();
+        $embeddings = [];
+        foreach ($payload['embeddings'] ?? [] as $vector) {
+            if (is_array($vector)) {
+                $embeddings[] = $vector;
+            }
+        }
+        $promptTokens = is_numeric($payload['prompt_eval_count'] ?? null) ? (int) $payload['prompt_eval_count'] : 0;
+
+        return ['embeddings' => $embeddings, 'prompt_tokens' => $promptTokens];
     }
 
     public function getDimensions(string $model): int

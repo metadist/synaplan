@@ -7,6 +7,7 @@ namespace App\AI\Provider;
 use OpenAI\Contracts\ClientContract;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Builds and caches the OpenAI SDK clients of {@see OpenAICompatibleProvider},
@@ -24,6 +25,7 @@ final class OpenAiCompatibleClients
     public function __construct(
         private readonly LoggerInterface $logger = new NullLogger(),
         private readonly ?OpenAiCompatibleRequestHeaders $requestHeaders = null,
+        private readonly ?HttpClientInterface $httpClient = null,
     ) {
     }
 
@@ -56,12 +58,16 @@ final class OpenAiCompatibleClients
             return $this->clients[$cacheKey];
         }
 
+        if (null === $this->httpClient) {
+            throw new \LogicException('OpenAI-compatible clients require the shared HTTP client.');
+        }
         $factory = \OpenAI::factory()
             // Many gateways require SOME bearer token; send a harmless
             // placeholder when the endpoint is unauthenticated (e.g. a
             // localhost LocalAI) so the client still sets the header.
             ->withApiKey('' !== $endpoint['api_key'] ? $endpoint['api_key'] : 'sk-no-key')
-            ->withBaseUri($endpoint['base_url']);
+            ->withBaseUri($endpoint['base_url'])
+            ->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->httpClient));
 
         foreach ($endpoint['headers'] as $headerName => $headerValue) {
             $factory = $factory->withHttpHeader($headerName, $headerValue);

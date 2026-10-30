@@ -7,6 +7,7 @@ namespace App\Tests\Unit\AI\Provider;
 use App\AI\Provider\OpenAiCompatibleClients;
 use App\AI\Provider\OpenAiCompatibleRequestHeaders;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
 
 final class OpenAiCompatibleClientsTest extends TestCase
 {
@@ -38,7 +39,7 @@ final class OpenAiCompatibleClientsTest extends TestCase
 
     public function testClientsAreReusedPerEndpointAndRebuiltWhenAnythingChanges(): void
     {
-        $clients = new OpenAiCompatibleClients();
+        $clients = new OpenAiCompatibleClients(httpClient: new MockHttpClient());
         $first = $clients->clientFor(self::ENDPOINT, 'free-chat');
 
         $this->assertSame($first, $clients->clientFor(self::ENDPOINT, 'free-sort'));

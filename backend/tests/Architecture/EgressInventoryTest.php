@@ -243,7 +243,7 @@ PHP;
             if (str_contains($code, 'HttpClient::create(')) {
                 $record('http_client_create', $i);
             }
-            if (self::lineBuildsGuzzleClient($code, $guzzleAliases)) {
+            if (self::lineBuildsGuzzleClient($code, $guzzleAliases) && !str_contains($relativePath, 'src/Service/Egress/')) {
                 $record('guzzle_client', $i);
             }
             if (str_contains($code, 'Psr18ClientDiscovery')) {
@@ -258,13 +258,13 @@ PHP;
             if (str_contains($code, 'Ollama::client(')) {
                 $record('ollama_sdk', $i);
             }
-            if (str_contains($code, 'Stripe::setApiKey(')) {
+            if (str_contains($code, 'Stripe::setApiKey(') && !self::fileCalls($lines, 'setHttpClient(')) {
                 $record('stripe_default_http', $i);
             }
-            if (1 === preg_match('/new\s+(\\\\?Google\\\\Client|GoogleClient)\s*\(/', $code)) {
+            if (1 === preg_match('/new\s+(\\\\?Google\\\\Client|GoogleClient)\s*\(/', $code) && !self::functionCalls($lines, $i, 'setHttpClient(')) {
                 $record('google_api_client', $i);
             }
-            if (str_contains($code, 'new ReCaptcha(') || str_contains($code, 'new \\ReCaptcha\\ReCaptcha(')) {
+            if ((str_contains($code, 'new ReCaptcha(') || str_contains($code, 'new \\ReCaptcha\\ReCaptcha(')) && !self::recaptchaInjectsTransport($lines, $i)) {
                 $record('recaptcha', $i);
             }
             if (str_contains($code, 'SignedDataVerifier(')) {
@@ -273,6 +273,65 @@ PHP;
         }
 
         return self::disambiguate($sites);
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function fileCalls(array $lines, string $needle): bool
+    {
+        foreach ($lines as $line) {
+            if (str_contains(self::codePortion($line), $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function functionCalls(array $lines, int $index, string $needle): bool
+    {
+        $start = $index;
+        while ($start > 0 && !str_contains($lines[$start], 'function ')) {
+            --$start;
+        }
+        $end = $index + 1;
+        $limit = \count($lines);
+        while ($end < $limit && !preg_match('/^\s{0,4}(public |private |protected |final |function )/', $lines[$end])) {
+            ++$end;
+        }
+        for ($i = $start; $i < $end; ++$i) {
+            if (str_contains(self::codePortion($lines[$i]), $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function recaptchaInjectsTransport(array $lines, int $start): bool
+    {
+        $statement = '';
+        $end = min(\count($lines), $start + 6);
+        for ($i = $start; $i < $end; ++$i) {
+            $piece = self::codePortion($lines[$i]);
+            if ('' === $piece) {
+                continue;
+            }
+            $statement .= $piece;
+            if (str_contains($piece, ';')) {
+                break;
+            }
+        }
+        $open = strpos($statement, 'ReCaptcha(');
+
+        return false !== $open && str_contains(substr($statement, $open), ',');
     }
 
     /**

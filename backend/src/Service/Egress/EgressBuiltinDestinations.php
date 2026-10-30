@@ -63,6 +63,7 @@ final class EgressBuiltinDestinations
         'graph.facebook.com',
         'api.search.brave.com',
         'accounts.google.com',
+        'androidpublisher.googleapis.com',
         'oauth2.googleapis.com',
         'www.googleapis.com',
         'github.com',
