@@ -30,14 +30,14 @@
 #                    -> keep it off across restarts: give it a profile in a
 #                       docker-compose.override.yml, e.g.
 #                         services: { qdrant: { profiles: [optional] } }
-# On by default:     compute (file work), tts (spoken answers)
+# On by default:     compute (file work), tts (spoken answers),
+#                    collabora (office files, ~2 GB RAM)
 # Opt-in profiles:   local-ai (Ollama + local embedding model, ~1 GB)
-#                    office   (Collabora CODE, office files, ~2 GB RAM)
 #                    docling  (layout-aware extraction in front of Tika)
 #                    searxng  (self-hosted web search)
 #                    oidc     (Keycloak, SSO test realm)
 #                    transcriber (Meeting notes for Jitsi and Element)
-#                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
+#                    -> COMPOSE_PROFILES=local-ai docker compose up -d
 # The boot page is http://localhost:<SYNAPLAN_FRONTEND_PORT> (5173 when unset).
 # It shows which blocks are running.
 #
@@ -108,7 +108,7 @@ services:
              Centrifugo  live support        on   (REALTIME_ENABLED=false)
              Tika        text extraction     on   (docker compose stop tika)
              Ollama      local AI            off  (COMPOSE_PROFILES=local-ai)
-             Collabora   office files        off  (--profile office)
+             Collabora   office files        on   (docker compose stop collabora)
              Compute     file work           on   (COMPUTE_URL=disabled)
              TTS         spoken answers      on   (docker compose stop tts)
            Off = Synaplan keeps running, the feature simply stays hidden.
@@ -365,10 +365,9 @@ services:
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
-      # Collabora CODE convert-to. Local default is the compose service name.
-      # Override with OFFICE_CONVERT_URL for an external CODE, or set
-      # OFFICE_CONVERT_URL=disabled to turn the engine off. The sidecar still
-      # needs `--profile office` (it is not started by a plain `up -d`).
+      # Collabora CODE convert-to. The collabora service starts with this
+      # stack. Override OFFICE_CONVERT_URL for an external CODE, or set
+      # OFFICE_CONVERT_URL=disabled to turn the engine off.
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       # File work sidecar. Defaults match the compute service below so
@@ -1248,9 +1247,10 @@ services:
     networks:
       - synaplan-network
 
-  # Optional Collabora CODE — LibreOffice convert-to over HTTP.
-  # Not started by default (keeps ~2 GB RAM off the core stack). Enable with:
-  #   docker compose --profile office up -d
+  # Collabora CODE — LibreOffice convert-to over HTTP. Starts with the
+  # stack (wave 2, after the backend is healthy) so office thumbnails,
+  # “Download as PDF” and combine-as-PDF work on a plain `make up`.
+  # About 2 GB RAM. Stop it with: docker compose stop collabora
   # Docs: docs/DEVELOPMENT.md ("Office conversion")
   # No published port: the backend talks to collabora:9980 on the compose network.
   collabora:
@@ -1259,7 +1259,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    profiles: [office]
     restart: unless-stopped
     mem_limit: 2g
     environment:

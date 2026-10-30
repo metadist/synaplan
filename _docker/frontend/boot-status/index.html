@@ -235,7 +235,7 @@
     </p>
     <div id="blockList"></div>
     <p class="hint">
-      Opt-in blocks use Compose profiles (<span class="kbd">docker compose --profile office up -d</span>).
+      Opt-in blocks use Compose profiles (<span class="kbd">docker compose --profile docling up -d</span>).
       Blocks that are on by default can be stopped with <span class="kbd">docker compose stop &lt;name&gt;</span>;
       Synaplan keeps working and simply hides the matching feature.
       Details: <a href="https://github.com/metadist/synaplan#lean-by-design-core-vs-optional-building-blocks" target="_blank" rel="noopener">README → Lean by design</a>.
@@ -380,7 +380,7 @@
     { id: 'ollama', name: 'Ollama', role: 'Local AI on your own hardware — embeddings for document search, optional local chat (~1 GB of weights)',
       defaultOn: false, start: 'COMPOSE_PROFILES=local-ai docker compose up -d' },
     { id: 'collabora', name: 'Collabora CODE', role: 'Office files — thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM)',
-      defaultOn: false, start: 'docker compose --profile office up -d' },
+      defaultOn: true, secondWave: true, stop: 'docker compose stop collabora' },
     { id: 'tts', name: 'Text-to-speech', role: 'Spoken answers — four built-in voices (en, de, es, tr)',
       defaultOn: false, start: 'docker compose --profile tts up -d' },
   ]

@@ -391,7 +391,7 @@ Synaplan is provider-neutral: connect the providers you want in **Operate → AI
 | **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
 | **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false make up` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
 | **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
-| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](docs/INSTALLATION.md#optional-office-conversion-collabora) | **off** | `docker compose --profile office up -d` |
+| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](docs/INSTALLATION.md#office-conversion-collabora) | **on** | `docker compose stop collabora` |
 | **Docling** (`docling`) | Layout-aware extraction (tables, headings) in front of Tika — [module](https://docs.synaplan.com/modules/docling) | **off** | `docker compose --profile docling up -d` |
 | **SearXNG** (`searxng`) | Self-hosted web search so queries stay on your network — [module](https://docs.synaplan.com/modules/searxng) | **off** | `docker compose --profile searxng up -d` |
 | **File work** (`compute`) | Short Python / Node jobs on copies of files you pick — [details](docs/INSTALLATION.md#file-work-secure-compute) | **on** | `COMPUTE_URL=disabled make up` |
@@ -442,7 +442,7 @@ The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://tts:10200`).
 
 ## Office documents
 
-Thumbnails, PDF export, inline preview and “Combine as PDF” need an optional Collabora CODE sidecar. It is off by default, so `make up` does not pull it. Chat and DOCX / XLSX / PPTX generation work without it. Setup, including why `OFFICE_CONVERT_URL` does not belong in `backend/.env`: [Installation — Optional office conversion](docs/INSTALLATION.md#optional-office-conversion-collabora).
+Thumbnails, PDF export, inline preview and “Combine as PDF” use Collabora CODE. `make up` starts it. Chat and DOCX / XLSX / PPTX generation still work if you stop it. The URL is `http://collabora:9980` in `backend/.env.example`. Setup: [Installation — Office conversion](docs/INSTALLATION.md#office-conversion-collabora).
 
 ---
 

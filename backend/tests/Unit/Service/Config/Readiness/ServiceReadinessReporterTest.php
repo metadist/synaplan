@@ -83,16 +83,23 @@ final class ServiceReadinessReporterTest extends TestCase
         self::assertNull($row['recovery'], 'progress is not a problem to act on');
     }
 
-    public function testAnOffServiceNamesItsProfileAndTheDevStackGetsTheCommand(): void
+    public function testCollaboraStartsWithTheStandardStackAndStaysOptInOnMinimal(): void
     {
-        $prod = $this->row($this->reporter(['collabora' => ReadinessObservation::off()])->rows(), 'collabora');
-        self::assertSame('off', $prod['state']);
-        self::assertSame('office', $prod['profile']);
-        self::assertSame('Office files open read-only.', $prod['effect']);
-        self::assertNull($prod['recovery'], 'the office profile exists only in the dev compose files');
+        $down = ['collabora' => ReadinessObservation::down()];
 
-        $dev = $this->row($this->reporter(['collabora' => ReadinessObservation::off()], 'dev')->rows(), 'collabora');
-        self::assertSame('Turn it on with the "office" Compose profile: `COMPOSE_PROFILES=office make up`', $dev['recovery']);
+        $standard = $this->row($this->reporter($down, 'dev', containersExist: false)->rows(), 'collabora');
+        self::assertSame('starting', $standard['state']);
+        self::assertNull($standard['profile']);
+        self::assertNull($standard['recovery']);
+        self::assertSame('Office files open read-only.', $standard['effect']);
+
+        $minimal = $this->row($this->reporter($down, 'dev', platform: 'minimal', containersExist: false)->rows(), 'collabora');
+        self::assertSame('off', $minimal['state']);
+        self::assertSame('office', $minimal['profile']);
+        self::assertSame('Turn it on with the "office" Compose profile: `COMPOSE_PROFILES=office make up`', $minimal['recovery']);
+
+        $prod = $this->row($this->reporter($down)->rows(), 'collabora');
+        self::assertNull($prod['recovery'], 'a production install gets no dev compose command');
     }
 
     public function testAFailedServiceOnAComposeInstallNamesTheCommand(): void

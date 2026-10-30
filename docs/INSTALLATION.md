@@ -207,19 +207,21 @@ Enabling the profile installs the local AI services; a local chat model remains
 an additional opt-in. Leave `COMPOSE_PROFILES` empty to keep the Cloud-AI
 default.
 
-### Optional office conversion (Collabora)
+### Office conversion (Collabora)
 
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
 legacy / Apple format conversion, and “Combine as PDF” need a **Collabora CODE**
 sidecar (`collabora/code`). Chat, Tika RAG and officemaker DOCX / XLSX / PPTX
-work without it. The sidecar is **off by default** (`--profile office`) so
-`make up` does not pull the image or spend the extra ~2 GB RAM. The official
-8 GB Cloud-AI floor stays valid. Umbrel, AWS Marketplace and Elestio stay off
-unless you opt in.
+work without it. `make up` starts Collabora with the standard compose file
+(`OFFICE_CONVERT_URL=http://collabora:9980` in `backend/.env.example`). It
+uses about 2 GB of RAM. Stop it with `docker compose stop collabora`.
+
+The lean file, `deploy/compose.yaml`, Umbrel, AWS Marketplace and Elestio
+stay off unless you opt in, so the official 8 GB Cloud-AI floor stays valid.
 
 ```bash
-# Dev / minimal — compose already defaults OFFICE_CONVERT_URL to http://collabora:9980
-docker compose --profile office up -d
+# Lean file
+docker compose -f docker-compose-minimal.yml --profile office up -d
 
 # Production (deploy/) — env, not backend/.env
 # in deploy/.env:  COMPOSE_PROFILES=office
@@ -232,9 +234,10 @@ OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 make up
 The deploy entrypoint sets `OFFICE_CONVERT_URL=http://collabora:9980` when
 `office` is in `COMPOSE_PROFILES`.
 
-Do **not** put `OFFICE_CONVERT_URL` in `backend/.env`: Compose injects the
-variable, so the file cannot override it. Deployments set the env on the host
-or in compose. `OFFICE_CONVERT_URL=disabled` turns the engine off.
+`backend/.env.example` shows `OFFICE_CONVERT_URL=http://collabora:9980`.
+Compose injects that URL, so a copy in `backend/.env` does not replace it.
+Set `OFFICE_CONVERT_URL=disabled` in the project `.env` next to
+`docker-compose.yml` to turn the engine off.
 
 **Collabora never sees Synaplan users.** Convert-to is a server-to-server POST
 of a file; identity stays in Synaplan (login + file ownership). No Collabora
@@ -242,7 +245,7 @@ accounts, no WOPI token on this path. HTTP 403 is usually CODE’s
 `net.post_allow.host` rejecting the compose subnet.
 
 Full operator guide: [docs.synaplan.com/office-documents](https://docs.synaplan.com/index.php/office-documents).
-Development notes: [Development Guide](DEVELOPMENT.md#office-conversion-optional).
+Development notes: [Development Guide](DEVELOPMENT.md#office-conversion).
 Kubernetes / reuse in other projects:
 [synaplan-charts `docs/collabora-office-engine.md`](https://github.com/metadist/synaplan-charts/blob/docs/collabora-office-engine/docs/collabora-office-engine.md).
 

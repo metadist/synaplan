@@ -674,20 +674,19 @@ need this service.
 
 ---
 
-## Office conversion (optional Collabora CODE)
+## Office conversion (Collabora CODE)
 
 Office thumbnails, PDF export, inline preview, officemaker PDF output, and
 combine-as-PDF need Collabora CODE (`collabora/code`), reached over HTTP.
-Local compose defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`.
-Self-host / Umbrel / AWS leave it empty unless you opt in. Set the env on
-the host or in the deployment compose — not in `backend/.env` (Compose
-already injects the variable, so the file cannot override it).
+The standard compose file starts Collabora and defaults `OFFICE_CONVERT_URL`
+to `http://collabora:9980` (`backend/.env.example`). Self-host, the minimal
+file, Umbrel and AWS leave it empty unless you opt in with the `office`
+profile. Set the env on the host or in the deployment compose — not in
+`backend/.env` (Compose already injects the variable, so the file cannot
+override it).
 
 ```bash
-# Dev — sidecar still needs the office profile
-docker compose --profile office up -d
-
-# Self-host
+# Self-host and the lean file still need the profile
 COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
 
 # External CODE already running (reachable from backend + worker)
