@@ -10,9 +10,10 @@ use App\Service\Infrastructure\RedisService;
 /**
  * Reads what every server's watchdog wrote to Redis (architecture update,
  * contracts §6 and §6.1): the live snapshot `capacity:server:{id}` and the
- * seen-list `capacity:seen`, which keeps a server on the page for an hour
- * after its snapshot expired. No request reads another server; Redis is the only
- * source, and one short request builds the whole report.
+ * seen-list `capacity:seen`. A silent web server stays for an hour. A
+ * worker stays only when it reported in the last 24 hours. No request reads
+ * another server; Redis is the only source, and one short request builds the
+ * whole report.
  *
  * @phpstan-type Pool array{total: int, busy: int}
  * @phpstan-type Server array{
@@ -38,11 +39,17 @@ final readonly class CapacityService
     private const REPORTING_WINDOW_SECONDS = 20;
 
     /**
-     * A silent server stays on the page this long, then drops off. Matches
-     * the watchdog's SeenTTL. The page applies it itself so a report written
-     * under an older, longer TTL still disappears after an hour.
+     * A silent web server stays on the page this long, then drops off.
+     * Matches the watchdog's SeenTTL. The page applies it itself so a report
+     * written under an older, longer TTL still disappears after an hour.
      */
     private const LISTED_WINDOW_SECONDS = 3600;
+
+    /**
+     * A worker is listed only when its last report is inside this window.
+     * A replaced worker keeps its own id, so the window stays under a week.
+     */
+    private const WORKER_LISTED_WINDOW_SECONDS = 86400;
 
     public function __construct(
         private RedisService $redis,
@@ -82,9 +89,10 @@ final readonly class CapacityService
 
     /**
      * Null when neither the live snapshot nor the last report exists, or the
-     * last report is older than an hour. The seen-list hash is refreshed by
-     * every live server, so a dead server's field outlives its report and
-     * the id alone would be a card with nothing on it.
+     * last report is outside the role's window: an hour for a web server, 24
+     * hours for a worker. The seen-list hash is refreshed by every live
+     * server, so a dead server's field outlives its report and the id alone
+     * would be a card with nothing on it.
      *
      * @return Server|null
      */
@@ -99,7 +107,9 @@ final readonly class CapacityService
         }
         $snapshot = $this->decode($raw);
         $updatedAt = $this->str($snapshot['updated_at'] ?? null) ?? $lastSeenAt;
-        if (null === $live && !$this->reportedWithin($lastSeenAt, $now) && !$this->reportedWithin($updatedAt, $now)) {
+        $role = $this->str($snapshot['role'] ?? null) ?? 'web';
+        $window = 'worker' === $role ? self::WORKER_LISTED_WINDOW_SECONDS : self::LISTED_WINDOW_SECONDS;
+        if (!$this->reportedWithin($lastSeenAt, $now, $window) && !$this->reportedWithin($updatedAt, $now, $window)) {
             return null;
         }
         $reporting = null !== $live && $this->isFresh($updatedAt, $now);
@@ -107,7 +117,7 @@ final readonly class CapacityService
         return [
             'id' => $id,
             'hostname' => $this->str($snapshot['hostname'] ?? null) ?? '',
-            'role' => $this->str($snapshot['role'] ?? null) ?? 'web',
+            'role' => $role,
             'runtime' => $this->str($snapshot['runtime'] ?? null) ?? '',
             'version' => $this->str($snapshot['version'] ?? null) ?? '',
             'watchdog_version' => $this->str($snapshot['watchdog_version'] ?? null) ?? '',
@@ -194,11 +204,11 @@ final readonly class CapacityService
         return null !== $age && $age <= self::REPORTING_WINDOW_SECONDS;
     }
 
-    private function reportedWithin(string $at, \DateTimeImmutable $now): bool
+    private function reportedWithin(string $at, \DateTimeImmutable $now, int $windowSeconds): bool
     {
         $age = $this->ageSeconds($at, $now);
 
-        return null !== $age && $age <= self::LISTED_WINDOW_SECONDS;
+        return null !== $age && $age <= $windowSeconds;
     }
 
     private function ageSeconds(string $at, \DateTimeImmutable $now): ?int

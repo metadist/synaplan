@@ -1,17 +1,18 @@
 # Architecture update — status
 
-> **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
-> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
-> Do not set `AI.USAGE_HOOK` to `on` until RV2 is merged, and do not
-> treat a clean shadow soak as proof that the collision is gone. On a
-> second Messages turn in one session `TurnUsageLedger::close()`
-> returns null. `buildShadowMessagesExpectation()` then compares the
-> caller's own metadata, so no `ai.usage_mismatch` is logged. RV3
-> releases the database connection before every provider stream:
-> the tool loop, again after a `TOOLS` usage write reopens it, and
-> the direct `stream()` when the request has no server tools. AU24
-> keeps the wrap-up prompt and the `TOOLS` usage row when the two
-> tool loops become one.
+> **2026-10-30.** The production reading is one day, not a week. A worker is
+> listed only when it reported in the last 24 hours; a web server still
+> drops off after an hour. The vultr-cluster load test (M6) is not a gate
+> for S2. It waits until after AU15–AU18. S1 is on `main`. S2's next step
+> is AU15. AU14 merged as [#2854](https://github.com/metadist/synaplan/pull/2854).
+> AU8 merged as [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90).
+
+> **2026-10-30.** Row 31 is archived:
+> [`2026-archive/20261028-loop-and-cloud-review/`](../2026-archive/20261028-loop-and-cloud-review/00_master_plan.md).
+> RV2 ([#2867](https://github.com/metadist/synaplan/pull/2867)) and RV3
+> ([#2865](https://github.com/metadist/synaplan/pull/2865)) are on `main`.
+> `AI.USAGE_HOOK` stays seeded `legacy`. AU24 still keeps the wrap-up
+> prompt and the `TOOLS` usage row when the two tool loops become one.
 
 Step log for [`00_master_plan.md`](./00_master_plan.md). A walk, a
 measurement and a rollout are entries here, not chat messages.
@@ -30,13 +31,13 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-24 | AU6 | [#2724](https://github.com/metadist/synaplan/pull/2724) | merged (`5e7a4ebdd`) | watchdog on `:8098`; `capacity:server:{id}` every 5 s with place and log source. No relay. Not rolled out |
 | 2026-10-24 | AU6 (every role) | [#2727](https://github.com/metadist/synaplan/pull/2727) | merged (`3b0c6f627`) | worker and scheduler report too; ids per role on compose, with [synaplan-platform#33](https://github.com/metadist/synaplan-platform/pull/33); seen-list, day peak, the app's Redis prefix |
 | 2026-10-24 | AU7 | [#2729](https://github.com/metadist/synaplan/pull/2729), stacked on #2727 | merged (`33f498065`) | Admin › Capacity: one card per server with place, logs and "You are connected to"; `X-Synaplan-Server` on every response; `capacity` feature module. `place.address` is `SYNAPLAN_NODE_ADDRESS` when set; loopback is not reported |
-| 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | in review | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0): probes on `:8098`, startup probe on `/api/health/ready`, the pod's place for the capacity page, `frankenphp.*` pools, PodMonitor / ServiceMonitor, the capacity dashboard; chart 0.8.0. Probe behaviour observed on a local k3d cluster; M6 on `vultr-cluster` open |
+| 2026-10-25 | AU8 | [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90) | merged 2026-10-28 | `watchdog.enabled` (off until the chart's `appVersion` is 5.6.0). Probe behaviour observed on a local k3d cluster. M6 on `vultr-cluster` is deferred until after AU15–AU18 (owner, 2026-10-30) |
 | 2026-10-27 | AU9 | [#2839](https://github.com/metadist/synaplan/pull/2839) | merged (`a0bb87213`) | `AiPathCharacterizationTest` + `ai_paths.json` (19 paths, offline); `03` §1.7 method map and value shapes hardened |
 | 2026-10-27 | AU10 | [#2841](https://github.com/metadist/synaplan/pull/2841) | merged (`2b3148c40`) | `AiCallPipeline` + `RequestContextHook`, `CircuitBreakerHook`, `ModelHealthHook`; `AiFacade` 1,747 → 1,070 lines; pipeline overhead 0.008 ms p95 |
 | 2026-10-28 | AU11 | [#2844](https://github.com/metadist/synaplan/pull/2844) | merged (`f029b10fd`) | `RateLimitHook` (800), `UsageHook` (300), `LegacyUsageWriter`, `TurnUsageLedger`, `AI.USAGE_HOOK` (`legacy` \| `shadow` \| `on`, seeded `legacy`). Live installation set to `shadow` on 2026-10-28 |
 | 2026-10-28 | AU12 | [#2845](https://github.com/metadist/synaplan/pull/2845) | merged (`32ce18e76`) | `MessagesGateway` (`PipelineMessagesTranslator`), `VoiceLiveUsageService`, `PerplexityAdapter::maybeAnswer()`, and probes join `AiCallPipeline`; `AiPathOnlyThroughPipelineTest` |
 | 2026-10-28 | AU13 | [#2846](https://github.com/metadist/synaplan/pull/2846) | merged (`74800aed5`) | `AiCallMetricsHook` (200), request timeline, capacity `/requests` and `/ai-calls`. Post-merge cost stamp: [#2849](https://github.com/metadist/synaplan/pull/2849) (`010d689be`) |
-| 2026-10-28 | AU14 | [#2854](https://github.com/metadist/synaplan/pull/2854) | open | `EgressInventoryTest` freezes today's outbound HTTP stacks. No runtime change. Started from `main` at `010d689be` |
+| 2026-10-28 | AU14 | [#2854](https://github.com/metadist/synaplan/pull/2854) | merged (`2026-10-28`) | `EgressInventoryTest` freezes today's outbound HTTP stacks. No runtime change |
 
 ## 2026-10-28 — AU14 started
 
