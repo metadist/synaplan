@@ -55,22 +55,21 @@ test.describe('@noci Open issues walks', () => {
     const previousCount = await chat.sendMessage(prompt)
     const answerText = await chat.waitForAnswer(previousCount, true)
 
+    const fixtureFacts =
+      /nordwind|ostsee|1,240\.00|386\.50|2,015\.75|acme supplies|beta logistics|gamma tech/i
     const folderRead = page.getByTestId('folder-read-card')
     if (await folderRead.isVisible()) {
       await expect(page.getByTestId('folder-read-headline')).toContainText(/Invoices|Nextcloud/i)
-      expect(answerText.includes('Nordwind') || answerText.includes('386.50')).toBe(true)
+      expect(answerText).toMatch(/nordwind|ostsee|1,240\.00|386\.50|2,015\.75/i)
       return
     }
 
-    if (answerText.includes('Nordwind') && answerText.includes('386.50')) {
-      expect(answerText).not.toMatch(/Acme Supplies|Beta Logistics|Gamma Tech/)
-      return
-    }
-
+    // The answer text is lowercased. Invoice facts without the read card are
+    // invented, in either casing. The only other ending says the folder was not read.
+    expect(answerText).not.toMatch(fixtureFacts)
     const normalized = answerText.toLowerCase().replace(/\u2019/g, "'")
     expect(normalized).toMatch(
       /did not read|nothing was read|could not read|wasn't able to read|can't extract|can't create the requested table/
     )
-    expect(answerText).not.toMatch(/Acme Supplies|Beta Logistics|Gamma Tech/)
   })
 })
