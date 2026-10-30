@@ -46,7 +46,7 @@
         "src/Service/File/FileProcessor.php": 1786,
         "src/Service/File/FileUploadService.php": 1009,
         "src/Service/Iam/ShareService.php": 853,
-        "src/Service/Media/MediaGenerationService.php": 846,
+        "src/Service/Media/MediaGenerationService.php": 831,
         "src/Service/Memory/UserMemoryService.php": 1022,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,

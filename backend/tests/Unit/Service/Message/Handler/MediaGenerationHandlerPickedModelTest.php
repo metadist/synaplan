@@ -85,7 +85,7 @@ final class MediaGenerationHandlerPickedModelTest extends TestCase
             'models' => $this->modelConfig,
             'em' => $this->entityManager(),
             'extractor' => $prompts,
-            'downloader' => new MediaDownloader(),
+            'downloader' => new MediaDownloader(\Symfony\Component\HttpClient\HttpClient::create()),
             'thumbnails' => $this->createStub(ThumbnailService::class),
             'limits' => $rateLimits,
             'memory' => new PendingMemoryExtraction(

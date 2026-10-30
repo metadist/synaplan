@@ -156,7 +156,7 @@ final class OpenAIProviderToolsTest extends TestCase
 
     private function chat(): OpenAIChat
     {
-        $api = new OpenAIApiClient($this->createMock(HttpClientInterface::class), new OpenAICurlTransport(), 'test-key');
+        $api = new OpenAIApiClient($this->createMock(HttpClientInterface::class), new OpenAICurlTransport(new \Symfony\Component\HttpClient\MockHttpClient()), 'test-key');
 
         return new OpenAIChat($api, new OpenAIResponses($api, new NullLogger()), new NullLogger(), new StructuredOutputTranslator(new StructuredOutputCapability()), false);
     }

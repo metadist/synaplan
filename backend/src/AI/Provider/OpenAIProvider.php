@@ -58,7 +58,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         ?\Closure $sdkFactory = null,
         ?OpenAICurlTransport $curl = null,
     ) {
-        $this->api = new OpenAIApiClient($httpClient, $curl ?? new OpenAICurlTransport(), $apiKey, $keyStore, $sdkFactory);
+        $this->api = new OpenAIApiClient($httpClient, $curl ?? new OpenAICurlTransport($httpClient), $apiKey, $keyStore, $sdkFactory);
         $this->responses = new OpenAIResponses($this->api, $logger, $transcripts);
         $this->chat = new OpenAIChat($this->api, $this->responses, $logger, $structuredOutputTranslator, $storeResponses);
         $this->embedding = new OpenAIEmbedding($this->api);

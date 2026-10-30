@@ -9,6 +9,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Service\Egress\HttpBytes;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\FileHelper;
@@ -19,11 +20,11 @@ use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class MediaGenerationService implements MediaGenerationServiceInterface
 {
     private const CURL_TIMEOUT_SECONDS = 60;
-    private const CURL_CONNECT_TIMEOUT_SECONDS = 30;
     private const DEFAULT_IMAGE_SIZE = '1024x1024';
     private const DEFAULT_VIDEO_DURATION = 8;
     private const DEFAULT_VIDEO_ASPECT_RATIO = '16:9';
@@ -59,6 +60,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private CacheItemPoolInterface $cache,
+        private HttpClientInterface $http,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -727,30 +729,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
     private function downloadAndSave(string $url, int $userId, string $provider, string $type): ?string
     {
-        $ch = curl_init($url);
-        if (false === $ch) {
-            $this->logger->error('Failed to initialize cURL', [
-                'url' => FileHelper::redactUrlForLogging($url),
-            ]);
-
-            return null;
-        }
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, self::CURL_TIMEOUT_SECONDS);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, self::CURL_CONNECT_TIMEOUT_SECONDS);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; PHP; Synaplan)');
-        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-
-        $content = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if (false === $content || 200 !== $httpCode) {
+        try {
+            $content = (new HttpBytes($this->http))->download($url, self::CURL_TIMEOUT_SECONDS);
+        } catch (\Exception $e) {
             $this->logger->error('Media download failed', [
                 'url' => FileHelper::redactUrlForLogging($url),
-                'http_code' => $httpCode,
+                'http_code' => 0,
+                'error' => $e->getMessage(),
             ]);
 
             return null;

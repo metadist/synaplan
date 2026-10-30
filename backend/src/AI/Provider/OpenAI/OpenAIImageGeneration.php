@@ -415,10 +415,7 @@ final class OpenAIImageGeneration
 
         try {
             // Convert URL to file resource
-            $imageContent = file_get_contents($imageUrl);
-            if (false === $imageContent) {
-                throw new \Exception('Failed to download image from URL');
-            }
+            $imageContent = $this->api->getBytes($imageUrl);
 
             $tmpFile = tmpfile();
             fwrite($tmpFile, $imageContent);
@@ -454,12 +451,8 @@ final class OpenAIImageGeneration
 
         try {
             // Download images
-            $imageContent = file_get_contents($imageUrl);
-            $maskContent = file_get_contents($maskUrl);
-
-            if (false === $imageContent || false === $maskContent) {
-                throw new \Exception('Failed to download image or mask');
-            }
+            $imageContent = $this->api->getBytes($imageUrl);
+            $maskContent = $this->api->getBytes($maskUrl);
 
             // Create temp files
             $tmpImage = tmpfile();

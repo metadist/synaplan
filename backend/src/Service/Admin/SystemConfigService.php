@@ -10,8 +10,10 @@ use App\Service\Admin\SystemConfig\SystemConfigSchema;
 use App\Service\Admin\SystemConfig\SystemConfigValues;
 use App\Service\Admin\SystemConfig\SystemConfigWriter;
 use App\Service\Branding\BrandingService;
+use App\Service\Egress\HttpBytes;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Admin → System settings: the schema the UI renders (13 tabs, see
@@ -26,6 +28,7 @@ final readonly class SystemConfigService
         private SystemConfigValues $values,
         private SystemConfigWriter $writer,
         private EnvSettings $env,
+        private HttpClientInterface $http,
         private LoggerInterface $logger,
         #[Autowire('%synaplan_tts_url_default%')]
         private string $defaultTtsUrl,
@@ -148,15 +151,7 @@ final readonly class SystemConfigService
         }
 
         try {
-            $ch = curl_init($url.'/api/tags');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 5,
-                CURLOPT_CONNECTTIMEOUT => 3,
-            ]);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            [$httpCode, $response] = $this->bytes()->probe($url.'/api/tags');
 
             if (200 === $httpCode && $response) {
                 $data = json_decode($response, true);
@@ -185,22 +180,12 @@ final readonly class SystemConfigService
         }
 
         try {
-            $ch = curl_init($url.'/tika');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 5,
-                CURLOPT_CONNECTTIMEOUT => 3,
-            ]);
-
-            // Send HTTP Basic Auth when Tika is protected (same pattern as TikaClient)
             $httpUser = $this->env->value('TIKA_HTTP_USER');
-            if (!empty($httpUser)) {
-                curl_setopt($ch, CURLOPT_USERPWD, $httpUser.':'.($this->env->value('TIKA_HTTP_PASS') ?? ''));
-            }
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            [$httpCode] = $this->bytes()->probe(
+                $url.'/tika',
+                user: \is_string($httpUser) && '' !== $httpUser ? $httpUser : null,
+                password: $this->env->value('TIKA_HTTP_PASS'),
+            );
 
             if (200 === $httpCode) {
                 return ['success' => true, 'message' => 'Connected to Apache Tika'];
@@ -223,15 +208,7 @@ final readonly class SystemConfigService
         }
 
         try {
-            $ch = curl_init(rtrim($url, '/').'/health');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 5,
-                CURLOPT_CONNECTTIMEOUT => 3,
-            ]);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            [$httpCode] = $this->bytes()->probe(rtrim($url, '/').'/health');
 
             if (200 === $httpCode) {
                 return ['success' => true, 'message' => 'Connected to Docling'];
@@ -254,15 +231,7 @@ final readonly class SystemConfigService
         }
 
         try {
-            $ch = curl_init($url.'/healthz');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 5,
-                CURLOPT_CONNECTTIMEOUT => 3,
-            ]);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            [$httpCode] = $this->bytes()->probe($url.'/healthz');
 
             if (200 === $httpCode) {
                 return ['success' => true, 'message' => 'Connected to Qdrant'];
@@ -285,15 +254,7 @@ final readonly class SystemConfigService
         }
 
         try {
-            $ch = curl_init($url.'/health');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 5,
-                CURLOPT_CONNECTTIMEOUT => 3,
-            ]);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            [$httpCode, $response] = $this->bytes()->probe($url.'/health');
 
             if (200 === $httpCode && $response) {
                 $data = json_decode($response, true);
@@ -330,5 +291,10 @@ final readonly class SystemConfigService
         }
 
         return ['success' => true, 'message' => 'Mailer DSN configured'];
+    }
+
+    private function bytes(): HttpBytes
+    {
+        return new HttpBytes($this->http);
     }
 }

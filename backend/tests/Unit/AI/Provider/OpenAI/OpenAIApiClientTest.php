@@ -21,9 +21,9 @@ final class OpenAIApiClientTest extends TestCase
         $store = $this->createStub(ProviderKeyStore::class);
         $store->method('getKey')->willReturnMap([['openai', 'stored-key']]);
 
-        self::assertSame('explicit-key', (new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(), 'explicit-key', $store))->key());
-        self::assertSame('stored-key', (new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(), '', $store))->key());
-        self::assertNull((new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()))->sdk());
+        self::assertSame('explicit-key', (new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new \Symfony\Component\HttpClient\MockHttpClient()), 'explicit-key', $store))->key());
+        self::assertSame('stored-key', (new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new \Symfony\Component\HttpClient\MockHttpClient()), '', $store))->key());
+        self::assertNull((new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new \Symfony\Component\HttpClient\MockHttpClient())))->sdk());
     }
 
     public function testTheSdkClientIsBuiltOncePerKeyAndAgainWhenTheKeyChanges(): void
@@ -36,7 +36,7 @@ final class OpenAIApiClientTest extends TestCase
 
             return \OpenAI::client($key);
         };
-        $api = new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(), null, $store, $factory);
+        $api = new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new \Symfony\Component\HttpClient\MockHttpClient()), null, $store, $factory);
 
         $first = $api->sdk();
 
