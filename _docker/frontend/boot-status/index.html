@@ -370,6 +370,10 @@
   // compose); the human-readable copy lives here. `defaultOn` blocks ship in
   // the compose file and start with the stack; the others sit behind a
   // Compose profile and are off until asked for.
+  // Collabora's default below is the standard checkout. The minimal file
+  // mounts this same page and sends stack=minimal, which keeps Collabora
+  // behind the office profile.
+  const MINIMAL_OFFICE_START = 'docker compose -f docker-compose-minimal.yml --profile office up -d'
   const BLOCKS = [
     { id: 'qdrant', name: 'Qdrant', role: 'Vector database — AI memories, feedback analysis, large-scale RAG (document search itself runs on MariaDB VECTOR without it)',
       defaultOn: true, secondWave: true, stop: 'docker compose stop qdrant' },
@@ -385,6 +389,17 @@
       defaultOn: false, start: 'docker compose --profile tts up -d' },
   ]
 
+  const blockForStack = (block, stack) => {
+    if (block.id !== 'collabora' || stack !== 'minimal') return block
+    return {
+      id: block.id,
+      name: block.name,
+      role: block.role,
+      defaultOn: false,
+      start: MINIMAL_OFFICE_START,
+    }
+  }
+
   const kbd = (text) => {
     const el = document.createElement('span')
     el.className = 'kbd'
@@ -392,10 +407,13 @@
     return el
   }
 
-  let blocksBuilt = false
-  const buildBlocks = () => {
+  let blocksBuiltFor = null
+  const buildBlocks = (stack) => {
+    if (blocksBuiltFor === stack) return
     const list = $('blockList')
-    for (const b of BLOCKS) {
+    list.replaceChildren()
+    for (const raw of BLOCKS) {
+      const b = blockForStack(raw, stack)
       const row = document.createElement('div')
       row.className = 'block'
       row.id = 'block-' + b.id
@@ -420,15 +438,17 @@
       row.append(dot, body)
       list.append(row)
     }
-    blocksBuilt = true
+    blocksBuiltFor = stack
   }
 
   const renderBlocks = (s) => {
-    if (!blocksBuilt) buildBlocks()
+    const stack = s.stack === 'minimal' ? 'minimal' : 'standard'
+    buildBlocks(stack)
     const feed = s.companions || {}
     // Ollama is probed separately (it also drives the model-download step).
     if (s.localAi) feed.ollama = { reachable: Boolean(s.localAi.reachable) }
-    for (const b of BLOCKS) {
+    for (const raw of BLOCKS) {
+      const b = blockForStack(raw, stack)
       const row = $('block-' + b.id)
       const state = $('blockstate-' + b.id)
       const probe = feed[b.id]
