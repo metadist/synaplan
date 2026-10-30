@@ -53,9 +53,9 @@ the operator details.
 │ Step 2 of 3                                  │
 ├──────────────────────────────────────────────┤
 │ Choose where the AI runs                     │
-│ Your own model server keeps everything on    │
-│ your network. A cloud provider needs an API  │
-│ key. You can add more later.                 │
+│ Use a model server you run yourself, or a    │
+│ cloud provider with an API key. You can add  │
+│ more later.                                  │
 │                                              │
 │ ┌──────────────────────────────────────────┐ │
 │ │ ✓ Found a model server                   │ │
@@ -167,7 +167,8 @@ Use for Vision (Image → Text)       [ glm-ocr      ▾ ]
 
 ```text
 ✓ 3 models imported from Ollama · host.docker.internal:11434
-  llama3.2:3b answers chat now. bge-m3 searches your files and memories.
+  llama3.2:3b is now the default chat model. bge-m3 searches your files
+  and memories.
   Nothing else changed: glm-5.2:cloud was not imported, and no model
   that was already in the catalog was touched.
   They are in your model catalog. Change their names, costs or purposes
@@ -195,7 +196,7 @@ Your own model servers                                   [ Connect a server ]
 │ Ollama · host.docker.internal:11434    On the same machine as Synaplan │
 │ Added by mia@example.org in the setup wizard on 31 Oct 2026.          │
 │ 3 models in the catalog · 1 new on the server                         │
-│ Answers chat for everyone on this installation (llama3.2:3b).         │
+│ llama3.2:3b is the default chat model of this installation.           │
 │ [ Show models ]  [ Open in model catalog ]  [ Disconnect ]            │
 └───────────────────────────────────────────────────────────────────────┘
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -208,8 +209,10 @@ Your own model servers                                   [ Connect a server ]
 ```
 
 The five questions, on the row: **who owns it** (this installation,
-added by …), **who else** (everyone here, through chat, the API and
-Synaplan Desktop — HG6 verifies the last two before the sentence ships),
+added by …), **who else** (everyone who uses this installation's
+default, in chat, the API and Synaplan Desktop; people and groups with a
+choice of their own keep it — HG6 verifies the API and Desktop parts
+before the sentence ships),
 **what it touches** (where the server is — the location labels of §1 —
 and *Runs on ollama.com* per model), **how to stop it**
 (**Disconnect**), **where it came from** (wizard, AI infrastructure,
@@ -258,8 +261,9 @@ contract §6. A walk is a dated STATUS entry.
    (Embedding / Vectorization), both selected, cost 0 / 0. **Use for
    chat** is `llama3.2:3b`, **Use for Embedding / Vectorization** is
    `bge-m3`.
-4. **Import 2 models.** The result card says which model answers chat,
-   what did not change, where to edit, and the BMODELS line.
+4. **Import 2 models.** The result card says which model is now the
+   default chat model, what did not change, where to edit, and the
+   BMODELS line.
 5. **Send a test message**: an answer, or the slow-start sentence before
    the deadline.
 6. **Continue** → step 3 → **Enter Synaplan** → chat. "Hello" is answered
@@ -378,7 +382,7 @@ form after a numeral, as the parity gate allows.
 | Key | English |
 | --- | ------- |
 | `setup.provider.title` | Choose where the AI runs |
-| `setup.provider.description` | Your own model server keeps everything on your network. A cloud provider needs an API key. You can add more later. |
+| `setup.provider.description` | Use a model server you run yourself, or a cloud provider with an API key. You can add more later. |
 | `setup.provider.choiceOwn` | Own model server |
 | `setup.provider.choiceCloud` | Cloud provider |
 | `setup.provider.found` | Found a model server |
@@ -417,7 +421,7 @@ old page ("Admin → AI Provider Setup").
 | `aiInfra.modelServer.addedCli` | Added from the command line on {date}. |
 | `aiInfra.modelServer.pinnedEnv` | Set by the server environment (OLLAMA_BASE_URL). Change it there and restart. |
 | `aiInfra.modelServer.counts` | {inCatalog} models in the catalog · {new} new on the server |
-| `aiInfra.modelServer.answersChat` | Answers chat for everyone on this installation ({model}). |
+| `aiInfra.modelServer.answersChat` | {model} is the default chat model of this installation. |
 | `aiInfra.modelServer.showModels` | Show models |
 | `aiInfra.modelServer.openCatalog` | Open in model catalog |
 | `aiInfra.modelServer.disconnect` | Disconnect |
@@ -437,7 +441,7 @@ One sentence, the recovery in it, no HTTP code (U8).
 | `refused` | Nothing answered at {address}. Check that the server is running and that the port is right, then check again. |
 | `timeout` | {address} did not answer within {seconds} seconds. A firewall may be in the way, or the address is wrong. |
 | `unknownName` | The Synaplan server does not know the name {host}. Use the server's IP address, or a name the Synaplan server can resolve. |
-| `certificate` | The server's certificate is not trusted. Use http:// on a private network, or give the server a valid certificate. |
+| `certificate` | The Synaplan server does not trust this server's certificate. Give the server a valid certificate, or add the authority that issued it to the Synaplan server, then check again. |
 | `needsKey` | The server wants an API key. Enter it above and check again. |
 | `wrongKey` | The server did not accept this API key. Check the key and try again. |
 | `notModelServer` | Something answered at {address}, but it is not a model server. Check the port: Ollama uses 11434, vLLM usually 8000. |
@@ -448,6 +452,11 @@ One sentence, the recovery in it, no HTTP code (U8).
 
 `noModels` is the empty state (U5): one sentence, one primary button,
 **Check again**.
+
+No sentence advises switching from `https://` to `http://`: that would
+send the API key and every prompt in plain text, and a private network
+does not encrypt them. An address the administrator types with
+`http://` stays allowed.
 
 ### Import list and result (`admin.json`, `aiInfra.modelImport.*`)
 
@@ -473,7 +482,7 @@ One sentence, the recovery in it, no HTTP code (U8).
 | `aiInfra.modelImport.searchIndexed` | Your files are already indexed with {model}. Switching re-indexes them — do it under AI infrastructure › Search. |
 | `aiInfra.modelImport.editPurposes` | Edit purposes |
 | `aiInfra.modelImport.resultTitle` | {count} models imported from {server} |
-| `aiInfra.modelImport.resultChat` | {model} answers chat now. |
+| `aiInfra.modelImport.resultChat` | {model} is now the default chat model. |
 | `aiInfra.modelImport.resultSearch` | {model} searches your files and memories. |
 | `aiInfra.modelImport.resultUnchanged` | Nothing else changed: the models you did not select were not imported, and no model that was already in the catalog was touched. |
 | `aiInfra.modelImport.resultWhere` | They are in your model catalog. Change their names, costs or purposes any time under AI infrastructure › Model catalog. |

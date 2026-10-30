@@ -8,7 +8,7 @@ here, not a chat message ([`../AGENTS.md`](../AGENTS.md)).
 | Plan | — | written 2026-10-30; §0 unticked |
 | HG0 | Measure the `/v1` route; the model stub | not started |
 | HG1 | Fresh install for developers | not started |
-| HG2 | One row per model (`:latest`) | not started |
+| HG2 | A model's identity (its server, `:latest`) | not started |
 | HG3 | The server's own capability list | not started |
 | HG4 | Connect by address | not started |
 | HG5 | Import with a cost, choose for chat, console | not started |

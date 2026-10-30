@@ -101,36 +101,49 @@ change.
 
 ---
 
-## HG2 — One row per model
+## HG2 — A model's identity: its server, and `x` = `x:latest`
 
-**Commit:** `fix(models): treat an Ollama model and its :latest tag as one model`
-**Branch:** `fix/20261031-ollama-latest` · **Class:** backend-only · **Closes:** F7
+**Commit:** `fix(models): tell imported models apart by server and treat x:latest as x`
+**Branch:** `fix/20261031-model-identity` · **Class:** backend-only · **Closes:** F7, F14
 
-File the bug first (title format of the repository's issues, the
-measured preview from F7), then `Fixes #…` in the pull request.
+File the two bugs first (title format of the repository's issues; F7's
+measured preview, F14's code path), then `Fixes #…` for both in the pull
+request. One topic: what makes two catalog rows the same model.
 
 ### Change
 
-- One small canonical-name helper (`x` and `x:latest` are the same Ollama
-  model, compared case-insensitively), used where an Ollama id is
-  matched against the catalog:
-  `ModelDiscoveryService::existingProviderIds()`,
-  `ModelImportApplier::apply()` (the existence lookup), and the
-  withdrawn comparison in `ImportedModelListingCheck`.
-- A match that differs only by `:latest` is reported as existing. A
-  catalog row without import provenance is left untouched — no
-  `meta.import` is written onto it, so the listing check never starts
-  treating a seeded row as imported.
+- **Per server.** An OpenAI-compatible row is identified by `service`,
+  `BJSON.endpoint`, `tag` and `providerId`:
+  `ModelDiscoveryService::existingProviderIds()` looks at the listed
+  endpoint's rows only, and the existence lookup in
+  `ModelImportApplier::apply()` includes the endpoint.
+- **Routing per row.** The call options carry the selected row's
+  `BJSON.endpoint`, so `OpenAICompatibleProvider::endpointForCall()`
+  never falls back to the first row with that id; the Messages gateway
+  (`OpenAiMessagesTranslator`) resolves the same way.
+  `resolveForModel()` by id alone stays only for a row without an
+  endpoint (a single-endpoint install).
+- **`x` = `x:latest`.** One small canonical-name helper (case-insensitive)
+  for Ollama ids, used by the two lookups above and by the withdrawn
+  comparison in `ImportedModelListingCheck`. A match that differs only
+  by `:latest` is reported as existing. A catalog row without import
+  provenance is left untouched — no `meta.import` is written onto it, so
+  the listing check never starts treating a seeded row as imported.
 
 ### Tests (red first)
 
 - `ModelDiscoveryServiceTest`: catalog `bge-m3`, listing `bge-m3:latest`
-  → `exists: true`.
+  → `exists: true`; endpoint `a` has `llama3.2:3b`, endpoint `b` lists
+  it → `exists: false` for `b`.
 - `ModelImportApplierTest`: applying `bge-m3:latest` / `vectorize` next to
   `bge-m3` / `vectorize` creates no row and writes no meta on the
-  catalog row.
+  catalog row; importing `llama3.2:3b` from `b` next to `a`'s row
+  creates a second row with `endpoint: b`.
+- Routing: a chat with `b`'s row goes to `b`'s base URL, a chat with
+  `a`'s row to `a`'s (`MockHttpClient`, both directions).
 - `ImportedModelListingCheckTest`: an imported `foo:latest` is not
-  withdrawn when the server lists `foo`, and the other way round.
+  withdrawn when the server lists `foo`, and the other way round; `a`
+  dropping a model does not mark `b`'s row.
 
 **Gate:** `make ci-local`. No Playwright: no screen and no OpenAPI change.
 
@@ -258,8 +271,13 @@ measured preview from F7), then `Fixes #…` in the pull request.
   request. A sent price is stored with `meta.import.priceKnown: true` and
   `priceSource: admin`; `BSHOWWHENFREE=1` stays; an existing row is never
   repriced.
-- **Defaults** (a new service), per D7, through
-  `ModelConfigService::setDefaultModel(0, …)`:
+- **Defaults**, per D7, through the write path
+  `ProviderDefaultsService::applyGlobalDefaults()` already uses —
+  `DEFAULTMODEL/<PURPOSE>` rows at `ownerId = 0`, then its cache clear —
+  extended to take explicit model ids. Not
+  `ModelConfigService::setDefaultModel()`: it writes the legacy
+  `ai/default_<capability>_model` row, which `getDefaultModel()` does not
+  read.
   - chat → CHAT, TOOLS, ANALYZE, SORT, PLAN, SUMMARIZE, MEM, the seven
     purposes `ProviderDefaultsService` writes — the MEM row (tag `mem`,
     not selectable) is created once; TOOLS is the helper-task model
@@ -309,8 +327,13 @@ measured preview from F7), then `Fixes #…` in the pull request.
   created once; VECTORIZE untouched while vectors exist; PIC2TEXT only
   where images are read; `ai.default_chat_provider` set; the Demo left
   before the first write (order asserted); a personal override reported.
-- Integration: a fresh install whose seeded CHAT is Anthropic without a
-  key is chat-ready after one apply with `useFor.chat`; a following
+- Integration on a fresh install whose stored CHAT is Anthropic without
+  a key: before the apply, `getConfiguredDefaultModel('CHAT')` names the
+  Anthropic row; after one apply with `useFor.chat`,
+  `getConfiguredDefaultModel()` — the stored binding, without the
+  quality fallback — names the chosen row for each of the seven purposes,
+  and `chatReady` is true. `chatReady` alone is not the assertion: it can
+  turn true through the fallback (F4). A following
   `app:provider:apply-defaults --auto` changes nothing.
 - Disconnect and reconnect: marked rows only; an administrator's own
   switch-off survives.
@@ -512,15 +535,24 @@ walked.
   cost 0, use for chat, the test message answered by the stub, access
   step, done, a chat answered by the stub; then on `/admin/setup` the
   presets `empty`, `unauthorized` and `four-models` (the cloud row).
-- `playwright.config.ts`: project `fresh-install` (`@fresh`, one worker,
-  base URL `http://localhost:8001`), not part of the `@ci` projects.
+- `frontend/tests/e2e/playwright.fresh.config.ts`, a config of its own
+  (`@fresh`, one worker). It has **no** `globalSetup` / `globalTeardown`:
+  the shared ones in `playwright.config.ts` sign in as the seeded
+  administrator and rewrite the instance defaults (`ownerId = 0`) to the
+  TestProvider on whatever `BASE_URL` points at, and `config/config.ts`
+  derives the API address from the same variable, the dev stack by
+  default. `npm run test:e2e:fresh` sets `BASE_URL=http://localhost:8001`
+  explicitly and refuses to start when `BASE_URL` points at `:5173` or
+  `:8000`. The `@ci` projects do not pick up `@fresh`.
 - `.github/workflows/ci.yml`: job *E2E Tests (fresh install)* on
   `docker-compose.test.yml` + `docker-compose.test.ci.yml` +
   `docker-compose.test.fresh.yml`, the same trace and backend-log
   artifacts as the other E2E jobs, required by **All Checks Passed**.
 - `docs/E2E_TESTING.md`: the project and how to run it locally.
 
-**Gate:** the new project green twice in a row on `make fresh`;
+**Gate:** the fresh config green twice in a row on `make fresh`; the dev
+stack's instance defaults unchanged afterwards (read before and after
+with the call `helpers/model-defaults.ts` uses for its snapshot);
 `make test-e2e-full` unchanged.
 
 ---

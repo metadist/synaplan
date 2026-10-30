@@ -70,28 +70,35 @@ The public docs give the same advice that cannot work: docs.synaplan.com
 "`OLLAMA_BASE_URL=http://host.docker.internal:11434` … restart backend +
 worker".
 
-## F4 — Importing does not make chat work
+## F4 — An import stores no choice
 
-- An import creates rows with `BISDEFAULT=0` and no default binding
-  (`ModelImportApplier::newModel()`; docs/ai-infrastructure.md: "nothing
-  routes to them until you pick them").
-- Chat readiness follows the provider of the **default chat model**
-  (`ChatReadinessService::isChatReady()`). A fresh install seeds CHAT,
-  TOOLS and ANALYZE to Anthropic, SORT, PLAN, SUMMARIZE and MEM to Groq,
-  VECTORIZE to the bundled Ollama `bge-m3` (`DefaultModelConfigSeeder`).
+- An import creates rows with `BISDEFAULT=0` and no `DEFAULTMODEL`
+  binding (`ModelImportApplier::newModel()`; docs/ai-infrastructure.md:
+  "nothing routes to them until you pick them").
+- A fresh install stores CHAT, TOOLS and ANALYZE on Anthropic, SORT,
+  PLAN, SUMMARIZE and MEM on Groq, VECTORIZE on the bundled Ollama
+  `bge-m3` (`DefaultModelConfigSeeder`).
+- `ModelConfigService::getDefaultModel()` skips a stored binding whose
+  provider has no credentials and, when nothing stored resolves, takes
+  `firstUsableModelForCapability()`: the best usable row of that tag by
+  quality. Chat readiness reads that resolved model
+  (`ChatReadinessService::isChatReady()` → `defaultChatService()`).
 - The start-time repair (`app:provider:apply-defaults --auto`, run by
-  `_docker/backend/docker-entrypoint.sh` on every start) moves chat to
-  Ollama only when Ollama counts as available, and for a non-Ollama
-  default that means the **recommended** `gpt-oss:20b` is pulled
-  (`ChatReadinessService::recommendedOllamaChatModelPulled()`,
+  `_docker/backend/docker-entrypoint.sh` on every start) acts only when
+  chat is not ready, and moves to Ollama only when the **recommended**
+  `gpt-oss:20b` is pulled (`ChatReadinessService::recommendedOllamaChatModelPulled()`,
   `ProviderDefaultsService::PROVIDER_DEFAULTS['ollama']`).
 
-So the beginner with `llama3.2:3b` and `bge-m3` imports both and still
-sees **No AI provider configured** until they find the AI models page and
-choose the chat model there — and sorting, memory extraction and text
-analysis still point at providers without a key. TOOLS and PLAN, which
-`ProviderDefaultsService` writes for a cloud provider, are not on that
-page's purpose list at all.
+So after an import, chat may answer — on a model the resolver picked by
+quality, not one the administrator chose. Nothing is stored:
+`getConfiguredDefaultModel()` still names the cloud model, and the answer
+moves as soon as another provider becomes usable (the Synaplan Demo, a
+key added later). Sorting, memory extraction and text analysis fall back
+the same way, and nothing on screen says which model will answer. When
+the imported rows are not the best usable ones, the beginner still sees
+**No AI provider configured** or another provider's model. TOOLS and
+PLAN, which `ProviderDefaultsService` writes for a cloud provider, are
+not on the AI models page's purpose list at all.
 
 ## F5 — Tags are guessed from names although the server reports them
 
@@ -224,6 +231,28 @@ System status reads the native address only
 (`FeatureStatusReporter`: `$_ENV['OLLAMA_BASE_URL']`), so an Ollama added
 as an endpoint today is reported as not configured next to a working
 local chat.
+
+## F14 — Two servers with the same model id collide
+
+Read from the code, not measured. An OpenAI-compatible model is
+identified by its id alone:
+
+- discovery marks a listed id as existing when **any** endpoint has it
+  (`ModelDiscoveryService::existingProviderIds()` over the whole
+  `OpenAICompatible` service);
+- the applier looks up `service`, `tag` and `providerId`, not the
+  endpoint (`ModelImportApplier::apply()`), so the second server's row is
+  skipped as "exists";
+- the chat path does not pass the row's endpoint, so
+  `OpenAICompatibleProvider::endpointForCall()` falls back to
+  `OpenAiCompatibleEndpointRegistry::resolveForModel($providerId)`, which
+  takes the first row with that id (`findByServiceAndProviderId()`,
+  `setMaxResults(1)`); the Messages gateway resolves the same way
+  (`OpenAiMessagesTranslator`).
+
+A second Ollama with `llama3.2:3b` — on a GPU box next to the laptop, or
+the bundled one next to the host's — can therefore not be imported, and
+would route to the first server if it were.
 
 ---
 
