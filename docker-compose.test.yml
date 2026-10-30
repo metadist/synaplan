@@ -24,8 +24,12 @@ services:
     env_file:
       - backend/.env.test
     volumes:
-      # Volume mounts for local development (overridden in CI via docker-compose.test.ci.yml)
+      # Volume mounts for local development (overridden in CI via docker-compose.test.ci.yml).
+      # The anonymous vendor volume keeps the image's libraries. A fresh
+      # checkout has no host vendor/, and sharing the dev stack's volume
+      # would mix dev packages into this test app.
       - ./backend:/var/www/backend
+      - /var/www/backend/vendor
       - /var/www/backend/var/cache
       - ./plugins:/plugins
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
