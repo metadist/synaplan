@@ -61,7 +61,9 @@ final class OpenAIApiClient
         }
 
         if (null === $this->client || $this->clientKey !== $key) {
-            $this->client = null !== $this->sdkFactory ? ($this->sdkFactory)($key) : \OpenAI::client($key);
+            $this->client = null !== $this->sdkFactory
+                ? ($this->sdkFactory)($key)
+                : \OpenAI::factory()->withApiKey($key)->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->httpClient))->make();
             $this->clientKey = $key;
         }
 

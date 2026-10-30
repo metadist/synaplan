@@ -18,6 +18,7 @@ use App\AI\Tool\ToolCallAccumulator;
 use App\AI\ToolCalling\ToolCallingCapability;
 use OpenAI;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Groq Provider - Fast LLM inference with OpenAI-compatible API
@@ -54,6 +55,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
         private ToolCallingCapability $toolCallingCapability = new ToolCallingCapability(),
+        private ?HttpClientInterface $httpClient = null,
     ) {
     }
 
@@ -81,10 +83,13 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         }
 
         if (null === $this->client || $this->clientKey !== $key) {
-            // Groq uses OpenAI-compatible client with custom base URL
+            if (null === $this->httpClient) {
+                throw new \LogicException('Groq requires the shared HTTP client.');
+            }
             $this->client = \OpenAI::factory()
                 ->withApiKey($key)
                 ->withBaseUri('https://api.groq.com/openai/v1')
+                ->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->httpClient))
                 ->make();
             $this->clientKey = $key;
         }
@@ -119,7 +124,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
     public function getStatus(): array
     {
-        if (null === $this->client()) {
+        if (!$this->hasKey()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -136,7 +141,14 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
     public function isAvailable(): bool
     {
-        return null !== $this->client();
+        return $this->hasKey();
+    }
+
+    private function hasKey(): bool
+    {
+        $key = $this->resolveApiKey();
+
+        return null !== $key && '' !== $key;
     }
 
     public function getRequiredEnvVars(): array
@@ -541,7 +553,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      */
     public function transcribe(string $audioPath, array $options = []): array
     {
-        if (null === $this->client()) {
+        if (!$this->hasKey()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -644,7 +656,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      */
     public function translateAudio(string $audioPath, string $targetLang): string
     {
-        if (null === $this->client()) {
+        if (!$this->hasKey()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 

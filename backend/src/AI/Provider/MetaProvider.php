@@ -11,7 +11,6 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Component\Process\Process;
@@ -102,8 +101,12 @@ class MetaProvider extends AbstractChatCompletionsCloudProvider implements Image
             $uploadDir,
             $keyStore,
             $structuredOutputTranslator ?? new StructuredOutputTranslator(new StructuredOutputCapability()),
+            $httpClient,
         );
-        $this->httpClient = $httpClient ?? HttpClient::create();
+        if (null === $httpClient) {
+            throw new \LogicException('MetaProvider requires the shared HTTP client.');
+        }
+        $this->httpClient = $httpClient;
     }
 
     /** @var list<string> */

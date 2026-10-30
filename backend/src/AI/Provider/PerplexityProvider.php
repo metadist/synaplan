@@ -10,6 +10,7 @@ use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use OpenAI;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Perplexity chat — OpenAI-compatible `/chat/completions` at api.perplexity.ai.
@@ -35,6 +36,7 @@ final class PerplexityProvider implements ChatProviderInterface
         private readonly ?string $apiKey = null,
         private readonly ?ProviderKeyStore $keyStore = null,
         private readonly ?\Closure $sdkFactory = null,
+        private readonly ?HttpClientInterface $httpClient = null,
     ) {
     }
 
@@ -65,7 +67,7 @@ final class PerplexityProvider implements ChatProviderInterface
 
     public function getStatus(): array
     {
-        if (null === $this->client()) {
+        if (!$this->hasKey()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -80,7 +82,14 @@ final class PerplexityProvider implements ChatProviderInterface
 
     public function isAvailable(): bool
     {
-        return null !== $this->client();
+        return $this->hasKey();
+    }
+
+    private function hasKey(): bool
+    {
+        $key = $this->resolveApiKey();
+
+        return null !== $key && '' !== $key;
     }
 
     public function getRequiredEnvVars(): array
@@ -161,6 +170,15 @@ final class PerplexityProvider implements ChatProviderInterface
         return $this->keyStore?->getKey($this->getName());
     }
 
+    private function requireHttp(): HttpClientInterface
+    {
+        if (null === $this->httpClient) {
+            throw new \LogicException('Perplexity requires the shared HTTP client.');
+        }
+
+        return $this->httpClient;
+    }
+
     private function client(): ?OpenAI\Client
     {
         $key = $this->resolveApiKey();
@@ -177,6 +195,7 @@ final class PerplexityProvider implements ChatProviderInterface
                 : \OpenAI::factory()
                     ->withApiKey($key)
                     ->withBaseUri(self::BASE_URI)
+                    ->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->requireHttp()))
                     ->make();
             $this->clientKey = $key;
         }
