@@ -11,6 +11,7 @@ use App\Entity\Model;
 use App\Entity\ModelHealth;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -38,6 +39,7 @@ final readonly class ImportedModelListingCheck
         private ModelAutoDisabler $autoDisabler,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private ModelConfigService $modelConfig,
     ) {
     }
 
@@ -67,8 +69,9 @@ final readonly class ImportedModelListingCheck
             $restored += $applied['reEnabled'];
         }
 
-        if (!$dryRun) {
+        if (!$dryRun && $checked > 0) {
             $this->em->flush();
+            $this->modelConfig->invalidateModelHealth();
         }
 
         return [
@@ -91,6 +94,7 @@ final readonly class ImportedModelListingCheck
         $rows = $this->importedModelsBySource()[$source] ?? [];
         $this->applyOffered($rows, $this->offeredIds($result), false, time());
         $this->em->flush();
+        $this->modelConfig->invalidateModelHealth();
     }
 
     /**

@@ -224,7 +224,7 @@ import { adminModelsApi, type ModelImportPreviewRow } from '@/services/api/admin
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps<{ source: string; label: string }>()
-const emit = defineEmits<{ close: []; applied: [] }>()
+const emit = defineEmits<{ close: []; applied: []; reconciled: [] }>()
 
 const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
@@ -285,6 +285,9 @@ async function loadPreview(): Promise<void> {
       selected: !r.exists,
       tagsText: r.guessedTags.join(', '),
     }))
+    if (result.endpointOk) {
+      emit('reconciled')
+    }
   } catch (err) {
     endpointOk.value = false
     error.value = err instanceof Error ? err.message : t('aiInfra.modelImport.unreachable')

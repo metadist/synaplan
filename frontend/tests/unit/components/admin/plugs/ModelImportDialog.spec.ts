@@ -121,6 +121,27 @@ describe('ModelImportDialog', () => {
     expect(wrapper.emitted('close')).toBeTruthy()
   })
 
+  it('tells the catalog a successful preview already reconciled withdrawals', async () => {
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    expect(wrapper.emitted('reconciled')).toHaveLength(1)
+  })
+
+  it('does not reconcile when the endpoint did not answer', async () => {
+    importEndpointPreview.mockResolvedValue({
+      source: 'openai_compatible:vllm',
+      endpointOk: false,
+      error: 'connection refused',
+      probeCostNote: null,
+      rows: [],
+    })
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    expect(wrapper.emitted('reconciled')).toBeFalsy()
+  })
+
   it('keeps Import outside the scrolling list', async () => {
     const base = previewResponse()
     importEndpointPreview.mockResolvedValue({
