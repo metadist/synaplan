@@ -219,6 +219,7 @@ final class EgressHttpClient implements HttpClientInterface
         $options['max_redirects'] = 0;
         if ($this->config->gateway()) {
             $this->directory?->publish($this->policy->publishedRules());
+            $options = $this->forceProxyTunnel($options);
         }
         if ($typed) {
             $options = $this->pinThroughProxy($url, $options);
@@ -274,13 +275,40 @@ final class EgressHttpClient implements HttpClientInterface
         if (false === filter_var($pin, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
             throw new EgressRefusedException($destination);
         }
+        if (!\defined('CURLOPT_PROXYHEADER')) {
+            throw new EgressRefusedException($destination);
+        }
         $id = $this->directory?->issue($destination->host, $destination->port, $pin);
         if (!\is_string($id) || '' === $id) {
             throw new EgressRefusedException($destination);
         }
-        $headers = \is_array($options['headers'] ?? null) ? $options['headers'] : [];
-        $headers['Proxy-Authorization'] = 'Bearer '.$id;
-        $options['headers'] = $headers;
+        $extra = \is_array($options['extra'] ?? null) ? $options['extra'] : [];
+        $curl = \is_array($extra['curl'] ?? null) ? $extra['curl'] : [];
+        $curl[\CURLOPT_PROXYHEADER] = ['Proxy-Authorization: Bearer '.$id];
+        $extra['curl'] = $curl;
+        $options['extra'] = $extra;
+
+        return $options;
+    }
+
+    /**
+     * Plain HTTP would arrive at the gateway as an absolute-form request.
+     * The gateway accepts CONNECT only, so every hop is a tunnel.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function forceProxyTunnel(array $options): array
+    {
+        if (!$this->proxyInUse($options) || !\defined('CURLOPT_HTTPPROXYTUNNEL')) {
+            return $options;
+        }
+        $extra = \is_array($options['extra'] ?? null) ? $options['extra'] : [];
+        $curl = \is_array($extra['curl'] ?? null) ? $extra['curl'] : [];
+        $curl[\CURLOPT_HTTPPROXYTUNNEL] = true;
+        $extra['curl'] = $curl;
+        $options['extra'] = $extra;
 
         return $options;
     }

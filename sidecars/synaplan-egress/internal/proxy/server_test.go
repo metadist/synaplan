@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 type memoryStore struct {
@@ -143,6 +144,79 @@ func TestUpstreamConnectUsesThePinnedAddress(t *testing.T) {
 	}
 	if line := <-got; line != "CONNECT [2001:db8::10]:443 HTTP/1.1" {
 		t.Fatalf("upstream line %q", line)
+	}
+}
+
+func TestComputePinDialsOnlyAPublicAddress(t *testing.T) {
+	var dialed []string
+	var lines bytes.Buffer
+	server := testServer(t, &memoryStore{}, func(_ context.Context, _, address string) (net.Conn, error) {
+		dialed = append(dialed, address)
+		a, b := net.Pipe()
+		go func() { _, _ = io.Copy(io.Discard, b) }()
+		return a, nil
+	}, nil)
+	server.ComputeToken = "compute-token"
+	server.Log = log.New(&lines, "", 0)
+	if status := connect(t, server, "203.0.113.30:443", "Bearer compute-token"); status != http.StatusOK {
+		t.Fatalf("status %d", status)
+	}
+	if status := connect(t, server, "203.0.113.30:443", ""); status != http.StatusForbidden {
+		t.Fatalf("missing token status %d", status)
+	}
+	if status := connect(t, server, "10.1.1.1:443", "Bearer compute-token"); status != http.StatusForbidden {
+		t.Fatalf("private status %d", status)
+	}
+	if len(dialed) != 1 || dialed[0] != "203.0.113.30:443" {
+		t.Fatalf("dialed %v", dialed)
+	}
+	if strings.Contains(lines.String(), "compute-token") {
+		t.Fatalf("log leaked the token: %s", lines.String())
+	}
+}
+
+func TestActiveTunnelRefreshesTheIdleDeadline(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = io.Copy(io.Discard, conn)
+	}()
+	store := &memoryStore{grant: map[string]Grant{
+		"grant-1": {Host: "customer.example", Port: 443, IPs: []string{"203.0.113.10"}},
+	}}
+	server := testServer(t, store, func(context.Context, string, string) (net.Conn, error) {
+		return net.Dial("tcp", ln.Addr().String())
+	}, nil)
+	server.Idle = 80 * time.Millisecond
+	proxy := httptest.NewServer(server)
+	t.Cleanup(proxy.Close)
+	conn, err := net.Dial("tcp", proxy.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	fmt.Fprint(conn, "CONNECT customer.example:443 HTTP/1.1\r\nHost: customer.example:443\r\nProxy-Authorization: Bearer grant-1\r\n\r\n")
+	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	deadline := time.Now().Add(200 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if _, err := conn.Write([]byte("x")); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
 }
 

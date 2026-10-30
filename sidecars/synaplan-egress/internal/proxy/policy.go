@@ -6,6 +6,29 @@ import (
 	"strings"
 )
 
+// specialRanges are IPv4 blocks net.IP does not treat as private: shared
+// address space, "this" network, IETF protocol assignments, benchmarking,
+// and the limited broadcast. Same set as the compute proxy.
+var specialRanges = mustCIDRs(
+	"100.64.0.0/10",
+	"0.0.0.0/8",
+	"192.0.0.0/24",
+	"198.18.0.0/15",
+	"255.255.255.255/32",
+)
+
+func mustCIDRs(cidrs ...string) []*net.IPNet {
+	out := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, network)
+	}
+	return out
+}
+
 // Match reports whether host:port is on a rule list. A rule is a host, a
 // host:port, a one-label wildcard (*.example.org), or a suffix (.example.org).
 func Match(rules []string, host string, port int) bool {
@@ -48,6 +71,15 @@ func Match(rules []string, host string, port int) bool {
 }
 
 func Private(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
-		ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
+		ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() {
+		return true
+	}
+	for _, network := range specialRanges {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

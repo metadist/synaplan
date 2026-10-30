@@ -9,6 +9,7 @@ use App\Service\Egress\EgressCall;
 use App\Service\Egress\EgressConfig;
 use App\Service\Egress\EgressDestination;
 use App\Service\Egress\EgressDirectory;
+use App\Service\Egress\EgressDirectoryRefresher;
 use App\Service\Egress\EgressHttpClient;
 use App\Service\Egress\EgressMetrics;
 use App\Service\Egress\EgressMode;
@@ -240,13 +241,54 @@ final class EgressHttpClientTest extends TestCase
         self::assertNotNull($grant);
         self::assertNotNull($seen);
         self::assertArrayNotHasKey(\CURLOPT_CONNECT_TO, $seen['extra']['curl'] ?? []);
-        self::assertContains('Proxy-Authorization: Bearer '.$grant['id'], $seen['headers']);
+        self::assertContains('Proxy-Authorization: Bearer '.$grant['id'], $seen['extra']['curl'][\CURLOPT_PROXYHEADER] ?? []);
+        self::assertStringNotContainsString($grant['id'], (string) json_encode($seen['headers'] ?? []));
         self::assertSame('customer.example', $grant['body']['host']);
         self::assertSame(443, $grant['body']['port']);
         self::assertSame(['203.0.113.10'], $grant['body']['ips']);
         self::assertSame(60, $grant['ttl']);
         self::assertStringContainsString('api.openai.com', $cache->allowlist());
         self::assertStringNotContainsString($grant['id'], $cache->allowlist());
+    }
+
+    public function testHttpThroughTheGatewayUsesAConnectTunnel(): void
+    {
+        $seen = null;
+        $inner = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen = $options;
+
+            return new MockResponse('ok');
+        });
+        $config = new EgressConfig();
+        EgressConfig::setModeOverride(EgressMode::Enforce);
+        putenv('EGRESS_PROXY=http://egress:3128');
+        putenv('EGRESS_GATEWAY=1');
+        try {
+            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard()), $config, new AllowTypedGuard(), new EgressMetrics());
+            $client->request('GET', 'http://api.openai.com/v1')->getStatusCode();
+        } finally {
+            putenv('EGRESS_PROXY');
+            putenv('EGRESS_GATEWAY');
+            EgressConfig::setModeOverride(null);
+        }
+
+        self::assertNotNull($seen);
+        self::assertTrue($seen['extra']['curl'][\CURLOPT_HTTPPROXYTUNNEL] ?? false);
+    }
+
+    public function testTheAllowlistIsPublishedBeforeAnOutboundCall(): void
+    {
+        $cache = new RecordingEgressCache();
+        $config = new EgressConfig();
+        putenv('EGRESS_GATEWAY=1');
+        try {
+            (new EgressDirectoryRefresher($config, new EgressPolicy($config, new AllowTypedGuard()), new EgressDirectory($cache)))->publish();
+        } finally {
+            putenv('EGRESS_GATEWAY');
+        }
+
+        self::assertStringContainsString('api.openai.com', $cache->allowlist());
+        self::assertSame(86400, $cache->puts[0][2]);
     }
 
     public function testTheGatewayRefusesAPrivatePin(): void

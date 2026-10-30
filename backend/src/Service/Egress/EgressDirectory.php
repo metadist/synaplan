@@ -11,7 +11,7 @@ namespace App\Service\Egress;
 final class EgressDirectory
 {
     public const GRANT_TTL_SECONDS = 60;
-    public const ALLOW_TTL_SECONDS = 120;
+    public const ALLOW_TTL_SECONDS = 86400;
 
     public function __construct(
         private readonly EgressCache $cache,

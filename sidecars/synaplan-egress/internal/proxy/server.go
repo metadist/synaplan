@@ -6,6 +6,7 @@ package proxy
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,13 +46,15 @@ type ResolveFunc func(ctx context.Context, host string) ([]net.IP, error)
 
 // Server is the proxy plus /healthz and /metrics.
 type Server struct {
-	Store    Store
-	Dial     DialFunc
-	Resolve  ResolveFunc
-	Upstream string // host:port of an enterprise proxy, empty to dial directly
-	Log      *log.Logger
-	allowed  atomic.Int64
-	refused  atomic.Int64
+	Store        Store
+	Dial         DialFunc
+	Resolve      ResolveFunc
+	Upstream     string // host:port of an enterprise proxy, empty to dial directly
+	ComputeToken string // lets the compute pin proxy CONNECT to a public IP
+	Idle         time.Duration
+	Log          *log.Logger
+	allowed      atomic.Int64
+	refused      atomic.Int64
 }
 
 // ServeHTTP accepts CONNECT, a health check, and metrics.
@@ -112,11 +115,14 @@ func (s *Server) connect(w http.ResponseWriter, r *http.Request) {
 	}
 	s.allowed.Add(1)
 	s.logf("egress allowed host=%s port=%d", host, port)
-	go relay(client, upstream)
+	go s.relay(client, upstream)
 }
 
 func (s *Server) decide(ctx context.Context, host string, port int, grantID string) ([]net.IP, string) {
-	if net.ParseIP(host) != nil {
+	if ip := net.ParseIP(host); ip != nil {
+		if s.computePin(grantID) {
+			return publicIPs([]string{ip.String()})
+		}
 		return nil, "ip_literal"
 	}
 	if grantID != "" {
@@ -231,6 +237,21 @@ func (c *prefixConn) Read(buf []byte) (int, error) {
 	return c.Conn.Read(buf)
 }
 
+func (s *Server) computePin(token string) bool {
+	want := s.ComputeToken
+	if want == "" || len(token) != len(want) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(want)) == 1
+}
+
+func (s *Server) idle() time.Duration {
+	if s.Idle > 0 {
+		return s.Idle
+	}
+	return tunnelIdle
+}
+
 func (s *Server) logf(format string, args ...any) {
 	if s.Log != nil {
 		s.Log.Printf(format, args...)
@@ -257,16 +278,33 @@ func bearer(header string) string {
 	return strings.TrimSpace(header[len(prefix):])
 }
 
-func relay(client, upstream net.Conn) {
+func (s *Server) relay(client, upstream net.Conn) {
 	defer func() {
 		_ = client.Close()
 		_ = upstream.Close()
 	}()
-	_ = client.SetDeadline(time.Now().Add(tunnelIdle))
+	idle := s.idle()
+	client = &idleConn{Conn: client, idle: idle}
+	upstream = &idleConn{Conn: upstream, idle: idle}
 	done := make(chan struct{}, 2)
 	go func() { _, _ = io.Copy(upstream, client); done <- struct{}{} }()
 	go func() { _, _ = io.Copy(client, upstream); done <- struct{}{} }()
 	<-done
+}
+
+type idleConn struct {
+	net.Conn
+	idle time.Duration
+}
+
+func (c *idleConn) Read(buf []byte) (int, error) {
+	_ = c.Conn.SetDeadline(time.Now().Add(c.idle))
+	return c.Conn.Read(buf)
+}
+
+func (c *idleConn) Write(buf []byte) (int, error) {
+	_ = c.Conn.SetDeadline(time.Now().Add(c.idle))
+	return c.Conn.Write(buf)
 }
 
 // DecodeGrant parses a grant body. An empty body is not a grant.

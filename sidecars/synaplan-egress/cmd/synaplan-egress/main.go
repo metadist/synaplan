@@ -24,10 +24,11 @@ func main() {
 		log.Fatalf("egress: redis: %v", err)
 	}
 	server := &proxy.Server{
-		Store:    client,
-		Upstream: os.Getenv("UPSTREAM_PROXY"),
-		Log:      log.Default(),
-		Resolve:  proxy.DefaultResolve,
+		Store:        client,
+		Upstream:     os.Getenv("UPSTREAM_PROXY"),
+		ComputeToken: os.Getenv("EGRESS_COMPUTE_TOKEN"),
+		Log:          log.Default(),
+		Resolve:      proxy.DefaultResolve,
 	}
 	httpServer := &http.Server{Addr: addr, Handler: server, ReadHeaderTimeout: 10 * time.Second}
 	go func() {

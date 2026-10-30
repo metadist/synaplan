@@ -31,6 +31,8 @@ func runProxy() {
 	}
 	runID := os.Getenv("EGRESS_RUN_ID")
 	srv := egress.NewServer(allow, egress.Option{
+		Upstream:      os.Getenv("EGRESS_UPSTREAM"),
+		UpstreamToken: os.Getenv("EGRESS_UPSTREAM_TOKEN"),
 		OnRefused: func(host string, p int, reason string) {
 			log.Printf("proxy: run=%s refused %s:%d (%s)", runID, host, p, reason)
 		},

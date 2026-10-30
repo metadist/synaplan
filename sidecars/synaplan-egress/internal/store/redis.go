@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -61,7 +62,10 @@ func (r *Redis) command(ctx context.Context, args ...string) (string, bool, erro
 	if _, err := fmt.Fprint(dial, encode(args)); err != nil {
 		return "", false, err
 	}
-	reader := bufio.NewReader(dial)
+	return readReply(bufio.NewReader(dial))
+}
+
+func readReply(reader *bufio.Reader) (string, bool, error) {
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", false, err
@@ -73,12 +77,15 @@ func (r *Redis) command(ctx context.Context, args ...string) (string, bool, erro
 		return "", false, fmt.Errorf("redis: %s", strings.TrimSpace(line))
 	}
 	var size int
-	if _, err := fmt.Sscanf(line, "$%d", &size); err != nil {
-		return "", false, err
+	if _, err := fmt.Sscanf(line, "$%d", &size); err != nil || size < 0 {
+		return "", false, fmt.Errorf("redis: bad bulk length")
 	}
 	buf := make([]byte, size+2)
-	if _, err := reader.Read(buf); err != nil {
+	if _, err := io.ReadFull(reader, buf); err != nil {
 		return "", false, err
+	}
+	if string(buf[size:]) != "\r\n" {
+		return "", false, fmt.Errorf("redis: bulk trailer")
 	}
 	return string(buf[:size]), true, nil
 }

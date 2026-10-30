@@ -65,17 +65,29 @@ not, and only when online checks are on.
 docker compose -f docker-compose.yml -f docker-compose.egress.yml --profile egress up -d
 ```
 
-That file points PHP, the worker, the scheduler, voice, the transcriber,
-and compute at `http://egress:3128`, and sets `NODE_USE_ENV_PROXY=1` on the
-two Node sidecars so they actually use the proxy. `EGRESS_GATEWAY=1` tells
-PHP to send a one-request grant for a URL a person typed. The gateway
-dials the pinned address and deletes the grant. An allowlisted name is
-resolved by the gateway. Without this file, nothing in the default stack
-changes.
+That file points PHP, the worker, the scheduler, voice, and the
+transcriber at `http://egress:3128`, and sets `NODE_USE_ENV_PROXY=1` on the
+two Node sidecars so they actually use the proxy. Plain HTTP is sent as a
+CONNECT tunnel (`CURLOPT_HTTPPROXYTUNNEL`), because the gateway accepts
+CONNECT only. `EGRESS_GATEWAY=1` tells PHP to send a one-request grant on
+`CURLOPT_PROXYHEADER`, which is the header curl puts on CONNECT. The
+gateway dials the pinned address and deletes the grant. An allowlisted
+name is resolved by the gateway. The allowlist is written when the
+process starts (the entrypoint runs a console command) and again on each
+command and request; the key lasts a day. Without this file, nothing in
+the default stack changes.
+
+A compute run does not use that proxy environment. Its pin proxy dials
+the approved address itself. When `EGRESS_UPSTREAM` and
+`EGRESS_UPSTREAM_TOKEN` are set, that proxy sends `CONNECT <pinned ip>`
+to the gateway with the token. The gateway dials that public address and
+does not log the token. `docling` and `searxng` are in `NO_PROXY`.
 
 `REDIS_KEY_PREFIX` must be the prefix `RedisService` writes
 (`synaplan:` plus `APP_ENV` plus `:`). The dev overlay uses `synaplan:dev:`
-because this compose file pins `APP_ENV=dev`.
+because this compose file pins `APP_ENV=dev`. Production sets
+`EGRESS_COMPUTE_TOKEN` to the same value on the gateway and the compute
+service. The dev overlay has a local default.
 
 An enterprise proxy still uses `EGRESS_PROXY` and `CURLOPT_CONNECT_TO`.
 The gateway, when it is chained with `UPSTREAM_PROXY`, sends
