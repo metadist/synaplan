@@ -21,6 +21,7 @@ use App\Service\Admin\SystemConfig\Tab\FeaturesTab;
 use App\Service\Admin\SystemConfig\Tab\GuestLandingTab;
 use App\Service\Admin\SystemConfig\Tab\InterfaceTab;
 use App\Service\Admin\SystemConfig\Tab\MobileTab;
+use App\Service\Admin\SystemConfig\Tab\OutboundTab;
 use App\Service\Admin\SystemConfig\Tab\ProcessingTab;
 use App\Service\Admin\SystemConfig\Tab\RoutingTab;
 use App\Service\Admin\SystemConfig\Tab\SharingTab;
@@ -95,7 +96,7 @@ final class SystemConfigServiceFactory
     }
 
     /**
-     * The thirteen tabs in the order the container collects them.
+     * The tabs in the order the container collects them.
      */
     public static function schema(ConfigRepository $repository, ?ModuleRegistry $modules = null): SystemConfigSchema
     {
@@ -108,6 +109,7 @@ final class SystemConfigServiceFactory
             new ChannelsTab(),
             new ProcessingTab(),
             new FeaturesTab($modules),
+            new OutboundTab(),
             new SharingTab(new RegistrationConfig($repository)),
             new RoutingTab(),
             new InterfaceTab(),

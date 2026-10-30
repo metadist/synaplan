@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
+use App\Service\Egress\EgressCall;
 use App\Service\Mcp\Notion\NotionActivityLog;
 use App\Service\Mcp\Notion\NotionWriteGuard;
 use App\Service\Security\EncryptionService;
@@ -198,10 +199,10 @@ final readonly class McpClient
             // 4. Best-effort session teardown.
             if (isset($headers['Mcp-Session-Id'])) {
                 try {
-                    $this->httpClient->request('DELETE', $url, [
+                    $this->httpClient->request('DELETE', $url, EgressCall::typed([
                         'headers' => $headers,
                         'timeout' => 5,
-                    ])->getStatusCode();
+                    ]))->getStatusCode();
                 } catch (\Throwable) {
                     // Session cleanup is cosmetic — the server expires it anyway.
                 }
@@ -266,12 +267,12 @@ final readonly class McpClient
     private function post(string $url, array $headers, array $payload): ResponseInterface
     {
         try {
-            return $this->httpClient->request('POST', $url, [
+            return $this->httpClient->request('POST', $url, EgressCall::typed([
                 'headers' => $headers,
                 'json' => $payload,
                 'timeout' => $this->config->nodeTimeoutSeconds(),
                 'max_redirects' => 0,
-            ]);
+            ]));
         } catch (\Throwable $e) {
             throw new McpClientException('MCP request failed: '.$e->getMessage(), 0, $e);
         }

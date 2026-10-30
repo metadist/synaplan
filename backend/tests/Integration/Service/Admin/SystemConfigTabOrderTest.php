@@ -19,7 +19,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 final class SystemConfigTabOrderTest extends KernelTestCase
 {
-    private const ORDER = ['ai', 'email', 'branding', 'mobile', 'auth', 'channels', 'processing', 'features', 'sharing', 'routing', 'interface', 'guest_landing', 'vectordb'];
+    private const ORDER = ['ai', 'email', 'branding', 'mobile', 'auth', 'channels', 'processing', 'features', 'outbound', 'sharing', 'routing', 'interface', 'guest_landing', 'vectordb'];
 
     public function testTheTabsComeInTheEstablishedOrder(): void
     {

@@ -1,5 +1,13 @@
 # Architecture update — status
 
+> **2026-10-30 — AU15.** `EgressHttpClient` decorates `http_client`. `EGRESS.MODE`
+> is seeded `off`. `report` records `egress.would_block` and still sends.
+> `enforce` refuses before a socket opens. A typed URL behind `EGRESS_PROXY`
+> tunnels to the pinned address. Raw cURL and the SDKs are still outside
+> this client (AU16, AU17).
+
+
+
 > **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
 > [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
 > Do not set `AI.USAGE_HOOK` to `on` until RV2 is merged, and do not

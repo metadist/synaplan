@@ -6,6 +6,7 @@ namespace App\Service\Tool\Custom;
 
 use App\Entity\CustomTool;
 use App\Service\Credential\CredentialVaultInterface;
+use App\Service\Egress\EgressCall;
 use App\Service\Security\SsrfGuard;
 use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
@@ -61,7 +62,7 @@ final readonly class HttpToolExecutor
         }
 
         try {
-            $response = $this->httpClient->request($request['method'], $request['url'], $options);
+            $response = $this->httpClient->request($request['method'], $request['url'], EgressCall::typed($options));
             $status = $response->getStatusCode();
             if ($status >= 300 && $status < 400) {
                 $response->cancel();

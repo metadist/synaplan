@@ -205,11 +205,18 @@ final class RequestTimelineContext implements ResetInterface
     public function recordEgress(string $urlOrHost, int $statusCode, int $durationMs): void
     {
         $host = parse_url($urlOrHost, \PHP_URL_HOST);
-        $dest = \is_string($host) && '' !== $host ? strtolower($host) : self::boundedLabel($urlOrHost, 'unknown');
+        $port = parse_url($urlOrHost, \PHP_URL_PORT);
+        if (\is_string($host) && '' !== $host) {
+            $scheme = parse_url($urlOrHost, \PHP_URL_SCHEME);
+            $resolvedPort = \is_int($port) ? $port : ('http' === $scheme ? 80 : 443);
+            $dest = strtolower($host).':'.$resolvedPort;
+        } else {
+            $dest = self::boundedLabel($urlOrHost, 'unknown');
+        }
 
         $this->egressCalls[] = [
-            'destination' => (string) preg_replace('/[^a-z0-9._-]/', '', $dest),
-            'status_class' => self::classifyStatus($statusCode),
+            'destination' => (string) preg_replace('/[^a-z0-9._:-]/', '', $dest),
+            'status_class' => 0 === $statusCode ? 'blocked' : self::classifyStatus($statusCode),
             'duration_ms' => max(0, $durationMs),
         ];
     }
