@@ -138,7 +138,7 @@ final class RequestTimelineRecorderTest extends \PHPUnit\Framework\TestCase
         self::assertSame('0.001250', $chatRec['ai'][0]['cost']);
         self::assertSame('ok', $chatRec['ai'][0]['outcome']);
         self::assertSame([['source' => 'mcp', 'kind' => 'web_search', 'outcome' => 'ok', 'duration_ms' => 210]], $chatRec['tools']);
-        self::assertSame([['destination' => 'api.openai.com', 'status_class' => '2xx', 'duration_ms' => 640]], $chatRec['egress']);
+        self::assertSame([['destination' => 'api.openai.com:443', 'status_class' => '2xx', 'duration_ms' => 640]], $chatRec['egress']);
 
         $gwRec = $byId['req-gw-2'];
         self::assertSame('messages_api', $gwRec['route_class']);

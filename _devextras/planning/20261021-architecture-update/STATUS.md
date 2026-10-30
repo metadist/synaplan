@@ -1,14 +1,20 @@
 # Architecture update — status
 
+> **2026-10-30 — AU15.** `EgressHttpClient` decorates `http_client`. `EGRESS.MODE`
+> is seeded `off`. `report` records `egress.would_block` and still sends.
+> `enforce` refuses before a socket opens. A typed URL behind `EGRESS_PROXY`
+> tunnels to the pinned address. Raw cURL and the SDKs are still outside
+> this client (AU16, AU17). This is [#2883](https://github.com/metadist/synaplan/pull/2883).
+
 > **2026-10-30.** The production reading is one day, not a week. A worker is
 > listed only when it reported in the last 24 hours; a web server still
 > drops off after an hour. The vultr-cluster load test (M6) is not a gate
-> for S2. It waits until after AU15–AU18. S1 is on `main`. S2's next step
-> is AU15. AU14 merged as [#2854](https://github.com/metadist/synaplan/pull/2854).
+> for S2. It waits until after AU15–AU18. S1 is on `main`. AU14 merged as
+> [#2854](https://github.com/metadist/synaplan/pull/2854).
 > AU8 merged as [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90).
 
-> **2026-10-30.** Row 31 is archived:
-> [`2026-archive/20261028-loop-and-cloud-review/`](../2026-archive/20261028-loop-and-cloud-review/00_master_plan.md).
+> **2026-10-30.** Row 31 stays
+> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
 > RV2 ([#2867](https://github.com/metadist/synaplan/pull/2867)) and RV3
 > ([#2865](https://github.com/metadist/synaplan/pull/2865)) are on `main`.
 > `AI.USAGE_HOOK` stays seeded `legacy`. AU24 still keeps the wrap-up

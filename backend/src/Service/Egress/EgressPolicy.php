@@ -1,0 +1,92 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\Egress;
+
+/**
+ * Decides one destination. Built-in services and provider hosts, the
+ * administrator's list, and the no-proxy hosts are allowed. A URL a person
+ * typed is allowed only when the guard accepts it, and is not stored.
+ */
+final readonly class EgressPolicy
+{
+    public function __construct(
+        private EgressConfig $config,
+        private EgressTypedUrlGuard $typedUrls,
+    ) {
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function decide(string $url, array $options = []): EgressDecision
+    {
+        $destination = EgressDestination::fromUrl($url);
+        if (null === $destination) {
+            return EgressDecision::refuse('unparseable');
+        }
+        if (!\in_array($destination->scheme, ['http', 'https'], true)) {
+            return EgressDecision::refuse('scheme');
+        }
+
+        // A URL a person typed is checked before the allowlist. Otherwise a
+        // typed redirect to localhost would pass because localhost is a
+        // built-in name, and the guard would never see it.
+        if (EgressCall::isTyped($options) && !$this->typedUrls->allows($url)) {
+            return EgressDecision::refuse('typed_refused');
+        }
+
+        foreach ($this->rules() as $rule) {
+            if ($rule->matches($destination)) {
+                return EgressDecision::allow($rule->label(), 'allowlist');
+            }
+        }
+
+        if (EgressCall::isTyped($options)) {
+            return EgressDecision::allow('typed', 'typed');
+        }
+
+        return EgressDecision::refuse('not_allowed');
+    }
+
+    /**
+     * The metric label is the matched rule (`api.openai.com`, `*.example.org`,
+     * `api.example.com:443`). A typed or refused call is `other`, so a new
+     * host cannot grow the label set.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function metricDestination(string $url, array $options = []): string
+    {
+        $decision = $this->decide($url, $options);
+        if ($decision->allowed && null !== $decision->rule && 'typed' !== $decision->rule) {
+            // The rule id is bounded: `api.openai.com`, `api.example.com:443`
+            // or `*.example.org`. The concrete host of a wildcard is not a label.
+            return $decision->rule;
+        }
+
+        return 'other';
+    }
+
+    /**
+     * @return list<EgressRule>
+     */
+    private function rules(): array
+    {
+        $raw = [
+            ...EgressBuiltinDestinations::rules(),
+            ...$this->config->allowRules(),
+            ...$this->config->noProxyHosts(),
+        ];
+        $rules = [];
+        foreach ($raw as $item) {
+            $rule = EgressRule::parse($item);
+            if (null !== $rule) {
+                $rules[] = $rule;
+            }
+        }
+
+        return $rules;
+    }
+}

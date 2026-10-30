@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Research;
 
+use App\Service\Egress\EgressCall;
 use App\Service\File\FileHelper;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
@@ -218,9 +219,7 @@ final readonly class UrlContentService
         return $url;
     }
 
-    /**
-     * Fetch content from a single URL.
-     */
+    /** Fetch content from a single URL. */
     public function fetch(string $url): UrlContentResult
     {
         $hostname = $this->getHostname($url);
@@ -237,14 +236,14 @@ final readonly class UrlContentService
         }
 
         try {
-            $response = $this->httpClient->request('GET', $url, [
+            $response = $this->httpClient->request('GET', $url, EgressCall::typed([
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 3,
                 'headers' => [
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'text/html,application/xhtml+xml,text/plain',
                 ],
-            ]);
+            ]));
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
@@ -491,7 +490,7 @@ final readonly class UrlContentService
 
     private function startReadingRequest(string $url): ResponseInterface
     {
-        return $this->httpClient->request('GET', $url, $this->ssrfGuard->pinnedResolveOption($url) + [
+        return $this->httpClient->request('GET', $url, EgressCall::typed($this->ssrfGuard->pinnedResolveOption($url) + [
             'timeout' => self::READ_TIMEOUT_SECONDS,
             'max_redirects' => 0,
             'headers' => [
@@ -499,7 +498,7 @@ final readonly class UrlContentService
                 'Accept' => 'text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5',
                 'Accept-Language' => 'en,de;q=0.8,*;q=0.5',
             ],
-        ]);
+        ]));
     }
 
     /**
@@ -709,14 +708,14 @@ final readonly class UrlContentService
         }
 
         try {
-            $response = $this->httpClient->request('GET', $url, [
+            $response = $this->httpClient->request('GET', $url, EgressCall::typed([
                 'timeout' => self::CRAWL_TIMEOUT_SECONDS,
                 'max_redirects' => 5,
                 'headers' => [
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'text/html,application/xhtml+xml,application/json,text/plain',
                 ],
-            ]);
+            ]));
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
@@ -857,14 +856,14 @@ final readonly class UrlContentService
         }
 
         try {
-            $response = $this->httpClient->request($method, $url, [
+            $response = $this->httpClient->request($method, $url, EgressCall::typed([
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 3,
                 'headers' => array_merge([
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'application/json,text/plain',
                 ], $headers),
-            ]);
+            ]));
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
@@ -1164,11 +1163,11 @@ final readonly class UrlContentService
         $robotsUrl = "{$scheme}://{$host}/robots.txt";
 
         try {
-            $response = $this->httpClient->request('GET', $robotsUrl, [
+            $response = $this->httpClient->request('GET', $robotsUrl, EgressCall::typed([
                 'timeout' => self::ROBOTS_TXT_TIMEOUT,
                 'max_redirects' => 2,
                 'headers' => ['User-Agent' => self::USER_AGENT],
-            ]);
+            ]));
 
             if ($response->getStatusCode() >= 400) {
                 return true;

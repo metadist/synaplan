@@ -22,7 +22,7 @@ final class SeedAllCommandOrderTest extends KernelTestCase
         'messages-gateway', 'saved-tasks', 'research', 'file-context', 'desktop-agent', 'iam',
         'agents', 'bundle', 'platform-links', 'self-aware', 'structured-output',
         'embedding-router', 'native-tool-routing', 'document-tools', 'smart-search',
-        'ai-pipeline', 'plugs', 'tools', 'workflows', 'compute', 'module-gates', 'demo-widget',
+        'ai-pipeline', 'egress', 'plugs', 'tools', 'workflows', 'compute', 'module-gates', 'demo-widget',
     ];
 
     public function testSeedersRunInDependencyOrder(): void

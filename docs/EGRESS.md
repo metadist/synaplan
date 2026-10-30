@@ -4,8 +4,14 @@ Every byte Synaplan sends to another host, as of the inventory frozen in
 `backend/tests/Architecture/egressInventoryBaseline.json` (S2 AU14). The
 policy that will stand in front of these calls is
 [`03_contracts.md`](../_devextras/planning/20261021-architecture-update/03_contracts.md)
-§3. It is not switched on yet: `EGRESS.MODE` does not exist until AU15, and
-its default will be `off`.
+§3. `EGRESS.MODE` is seeded `off`. `report` lets a call out and records
+`egress.would_block` with the host and port only. `enforce` refuses before
+a socket opens. The extra allowlist is `EGRESS.ALLOW`. `EGRESS_PROXY`
+overrides `HTTPS_PROXY` when it is set; an empty value leaves the
+environment proxy alone. A URL a person typed is not added to the list:
+`SsrfGuard` decides, and behind a proxy the tunnel goes to the pinned
+address (`CURLOPT_CONNECT_TO`). Raw cURL and the SDKs are still outside
+this client until AU16 and AU17.
 
 The 2026-10-21 map in `STATUS.md` counted 9 `curl_init` calls, one
 `file_get_contents` fallback, and one `HttpClient::create()`. The scan of
