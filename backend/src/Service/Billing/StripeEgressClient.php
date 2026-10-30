@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Billing;
 
 use Stripe\Exception\ApiConnectionException;
+use Stripe\Exception\UnexpectedValueException;
 use Stripe\HttpClient\CurlClient;
 use Stripe\Util\CaseInsensitiveArray;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -12,9 +13,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Stripe's own cURL client, with the socket handed to the shared HTTP client.
- * Stripe still builds the URL, the body and the signature headers. A file
- * upload stays on cURL: Symfony's body option is a string, and a multipart
- * file is an array.
+ * Stripe still builds the URL, the body and the signature headers, including
+ * the idempotency key, and this class keeps Stripe's retry loop around that
+ * request. A multipart file body is refused: it is not sent on a second client.
  */
 final class StripeEgressClient extends CurlClient
 {
@@ -33,9 +34,42 @@ final class StripeEgressClient extends CurlClient
     {
         $body = $opts[\CURLOPT_POSTFIELDS] ?? null;
         if (null !== $body && !\is_string($body)) {
-            return parent::executeRequestWithRetries($opts, $absUrl, $maxNetworkRetries);
+            throw new UnexpectedValueException('Stripe file uploads are not sent through the shared HTTP client.');
         }
 
+        $numRetries = 0;
+        $lastError = null;
+        while (true) {
+            $errno = 0;
+            $rcode = 0;
+            $rbody = false;
+            $rheaders = new CaseInsensitiveArray();
+            try {
+                [$rbody, $rcode, $rheaders] = $this->sendOnce($opts, $absUrl);
+            } catch (TransportExceptionInterface $e) {
+                $errno = \CURLE_COULDNT_CONNECT;
+                $lastError = $e;
+            }
+            if ($this->sdk('shouldRetry', $errno, $rcode, $rheaders, $numRetries, $maxNetworkRetries)) {
+                ++$numRetries;
+                usleep((int) ($this->sdk('sleepTime', $numRetries) * 1_000_000));
+                continue;
+            }
+            if (false === $rbody) {
+                throw new ApiConnectionException('Could not connect to Stripe ('.$absUrl.').', 0, $lastError);
+            }
+
+            return [$rbody, $rcode, $rheaders];
+        }
+    }
+
+    /**
+     * @param array<int, mixed> $opts
+     *
+     * @return array{0: string, 1: int, 2: CaseInsensitiveArray}
+     */
+    private function sendOnce(array $opts, string $absUrl): array
+    {
         $method = 'GET';
         if (!empty($opts[\CURLOPT_POST])) {
             $method = 'POST';
@@ -53,21 +87,14 @@ final class StripeEgressClient extends CurlClient
             }
             $headers[trim($name)] = trim($value);
         }
+        $body = $opts[\CURLOPT_POSTFIELDS] ?? null;
         $timeout = isset($opts[\CURLOPT_TIMEOUT]) ? (float) $opts[\CURLOPT_TIMEOUT] : 80.0;
-
-        try {
-            $response = $this->http->request($method, $absUrl, [
-                'headers' => $headers,
-                'body' => \is_string($body) ? $body : '',
-                'timeout' => $timeout,
-                'max_duration' => $timeout,
-            ]);
-            $status = $response->getStatusCode();
-            $content = $response->getContent(false);
-        } catch (TransportExceptionInterface $e) {
-            throw new ApiConnectionException('Could not connect to Stripe ('.$absUrl.').', 0, $e);
-        }
-
+        $response = $this->http->request($method, $absUrl, [
+            'headers' => $headers,
+            'body' => \is_string($body) ? $body : '',
+            'timeout' => $timeout,
+            'max_duration' => $timeout,
+        ]);
         $parsed = new CaseInsensitiveArray();
         $raw = $response->getInfo('response_headers');
         if (\is_array($raw)) {
@@ -80,6 +107,13 @@ final class StripeEgressClient extends CurlClient
             }
         }
 
-        return [$content, $status, $parsed];
+        return [$response->getContent(false), $response->getStatusCode(), $parsed];
+    }
+
+    private function sdk(string $method, mixed ...$args): mixed
+    {
+        $reflected = new \ReflectionMethod(CurlClient::class, $method);
+
+        return $reflected->invoke($this, ...$args);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Service\Egress;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
+use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
@@ -43,6 +44,6 @@ final class EgressGuzzleClient
             ));
         };
 
-        return new Client(['handler' => $handler]);
+        return new Client(['handler' => HandlerStack::create($handler)]);
     }
 }

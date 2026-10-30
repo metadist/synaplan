@@ -26,6 +26,14 @@ final class EgressHttpClientTest extends TestCase
         EgressConfig::setAllowOverride(null);
     }
 
+    public function testPlayPurchasesAreOnTheBuiltInList(): void
+    {
+        $inner = new MockHttpClient(static fn (): MockResponse => new MockResponse('ok'));
+        $client = $this->client($inner, EgressMode::Enforce);
+
+        self::assertSame(200, $client->request('GET', 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/app/purchases/subscriptionsv2/tokens/t')->getStatusCode());
+    }
+
     public function testOffModeDoesNotChangeTheRequest(): void
     {
         $seen = [];
