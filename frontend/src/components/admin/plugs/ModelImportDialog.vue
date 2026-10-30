@@ -1,7 +1,9 @@
 <template>
   <Teleport to="body">
+    <!-- Below the notification layer (z-9999). A failed import stays open and
+         reports through a toast, which has to stay visible over this panel. -->
     <div
-      class="modal-overlay fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60"
+      class="modal-overlay fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-black/60"
       data-testid="model-import-dialog"
       @click.self="close"
     >

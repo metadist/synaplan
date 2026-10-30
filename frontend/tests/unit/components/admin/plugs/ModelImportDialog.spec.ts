@@ -144,6 +144,8 @@ describe('ModelImportDialog', () => {
     const apply = wrapper.get('[data-testid="model-import-apply"]')
 
     expect(overlay.classes()).toContain('modal-overlay')
+    expect(overlay.classes()).toContain('z-[9000]')
+    expect(overlay.classes()).not.toContain('z-[10000]')
     expect(panel.classes()).toEqual(
       expect.arrayContaining(['modal-panel', 'min-h-0', 'max-h-full', 'overflow-hidden'])
     )
