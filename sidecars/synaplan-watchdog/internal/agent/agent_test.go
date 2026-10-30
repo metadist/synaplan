@@ -150,6 +150,23 @@ func (failingAdmin) Threads(context.Context) ([]byte, error) {
 	return nil, context.DeadlineExceeded
 }
 
+func TestWorkerLastReportLivesForADay(t *testing.T) {
+	memory := store.NewMemory()
+	agent := &Agent{
+		ID:     "web1-worker",
+		Prefix: "synaplan:test:",
+		Read:   func() host.Facts { return host.Facts{Runtime: "compose", Role: "worker"} },
+		Store:  memory,
+	}
+	agent.Tick(context.Background(), time.Date(2026, 10, 24, 18, 0, 0, 0, time.UTC))
+	if memory.TTL(capacity.LastKey("synaplan:test:", "web1-worker")) != capacity.WorkerListedTTL {
+		t.Fatalf("worker last report ttl = %s", memory.TTL(capacity.LastKey("synaplan:test:", "web1-worker")))
+	}
+	if memory.HashTTL(capacity.SeenHashKey("synaplan:test:")) != capacity.WorkerListedTTL {
+		t.Fatalf("worker seen ttl = %s", memory.HashTTL(capacity.SeenHashKey("synaplan:test:")))
+	}
+}
+
 func TestFailedAdminScrapeDropsTheStaleBody(t *testing.T) {
 	good := fakeAdmin{metrics: "frankenphp_total_workers{worker=\"streams\"} 4\n", threads: []byte(`[]`)}
 	agent := &Agent{

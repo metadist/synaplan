@@ -1,10 +1,11 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** S0 is in progress. AU0–AU7 are merged, AU6's every-role
-follow-up included; AU8 (the chart) is in review in `synaplan-charts`. The
-contract hardening tasks in
-`03_contracts.md` (§1.7, §2.3, §7.1) must merge before AU10, AU19 and AU28
-respectively.
+**Status:** S1 (AU9–AU13) is on `main`. S2 has started: AU14 is merged, and
+AU15 is next. S0's code (AU1–AU8, including the chart) is merged. The
+production reading is one day, not a week: a worker is listed only when it
+reported in the last 24 hours. The vultr-cluster load test (M6) waits until
+after AU15–AU18. The contract hardening in `03_contracts.md` §2.3 and §7.1
+must merge before AU19 and AU28 respectively. §1.7 landed with AU10.
 **Priority:** Row 22 of [`../ROADMAP.md`](../ROADMAP.md). S0 is production
 relief and continues before the owner orders the rest.
 **Origin:** Four directions from an external system architect (quoted in
@@ -397,17 +398,21 @@ pull request):
   answers chat, search and the gateways.
 - `ToolLoopCharacterizationTest` shows the gate, an audit row for every write
   and a usage row for every billable tool call, on every loop.
-- One production web node held its daily peak through the watchdog for a
-  week with `queue_depth` at 0 (measured, entered in STATUS).
+- One production web node is read on the capacity page over one day, not a
+  week. A worker is listed only when it reported in the last 24 hours.
+  `queue_depth` for that day is entered in STATUS. The vultr-cluster load
+  test is not part of this reading.
 - `docs/CAPACITY.md` carries the production numbers; plan archived.
 
 **Final acceptance, local and remote** (decided 2026-10-21; testing happens
 at every step — this is the last gate, not the only one): locally the full
 gate of `01` §6 and the named journey walks; remotely (1) GitHub
-**All Checks Passed** on the merged head, (2) the load cases of AU8 and
-AU34 on the `vultr-cluster` load-test namespace, and (3) a read-only
-one-node production soak by ops with the capacity page read before and
-after. There is no load test against production (§8).
+**All Checks Passed** on the merged head, (2) the load cases of AU34 on the
+`vultr-cluster` load-test namespace, and (3) a read-only one-node production
+reading of one day by ops, with the capacity page read before and after.
+M6 and that cluster load are not a gate for S2; they wait until after
+AU15–AU18. There is no load test against production (§8). A worker on the
+capacity page counts only when it reported in the last 24 hours.
 
 ---
 

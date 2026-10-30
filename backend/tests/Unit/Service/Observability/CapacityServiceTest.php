@@ -99,15 +99,45 @@ final class CapacityServiceTest extends TestCase
 
     public function testAStaleSnapshotIsNotReporting(): void
     {
+        $twoHoursAgo = $this->minutesAgo(120);
         $redis = $this->createStub(RedisService::class);
-        $redis->method('hGetAll')->willReturn(['web1' => '2026-10-24T18:00:00Z']);
-        $redis->method('get')->willReturn(json_encode(['updated_at' => '2026-10-24T18:00:00Z', 'role' => 'worker'], JSON_THROW_ON_ERROR));
+        $redis->method('hGetAll')->willReturn(['web1' => $twoHoursAgo]);
+        $redis->method('get')->willReturn(json_encode(['updated_at' => $twoHoursAgo, 'role' => 'worker'], JSON_THROW_ON_ERROR));
 
         $report = (new CapacityService($redis, new ServerIdentity(null)))->report();
 
         self::assertFalse($report['servers'][0]['reporting']);
         self::assertSame('worker', $report['servers'][0]['role']);
         self::assertNull($report['servers'][0]['cpu']['usage_ratio']);
+    }
+
+    public function testAWorkerSilentForMoreThanADayIsNotListed(): void
+    {
+        $recent = $this->minutesAgo(10);
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('hGetAll')->willReturn([
+            'web1-worker' => $this->minutesAgo(25 * 60),
+            'web1' => $recent,
+        ]);
+        $redis->method('get')->willReturnCallback(function (string $key) use ($recent): ?string {
+            return match ($key) {
+                'capacity:last:web1-worker' => json_encode([
+                    'server_id' => 'web1-worker',
+                    'role' => 'worker',
+                    'updated_at' => $this->minutesAgo(25 * 60),
+                ], JSON_THROW_ON_ERROR),
+                'capacity:last:web1' => json_encode([
+                    'server_id' => 'web1',
+                    'role' => 'web',
+                    'updated_at' => $recent,
+                ], JSON_THROW_ON_ERROR),
+                default => null,
+            };
+        });
+
+        $report = (new CapacityService($redis, new ServerIdentity('web1')))->report();
+
+        self::assertSame(['web1'], array_column($report['servers'], 'id'));
     }
 
     public function testASilentServerKeepsItsIdentityFromTheLastReport(): void
