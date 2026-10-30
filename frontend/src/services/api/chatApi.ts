@@ -17,6 +17,7 @@ import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
 import {
   ConversationFileRowSchema,
+  DetachConversationFileResponseSchema,
   GetConversationFilesResponseSchema,
   type ConversationFileRow,
 } from './conversationFileSchema'
@@ -875,6 +876,16 @@ export const chatApi = {
     return httpClient(`/api/v1/chats/${chatId}/files`, {
       method: 'GET',
       schema: GetConversationFilesResponseSchema,
+    })
+  },
+
+  /**
+   * Take a file out of this chat. The file stays in the user's files.
+   */
+  async detachConversationFile(chatId: number, fileId: number) {
+    return httpClient(`/api/v1/chats/${chatId}/files/${fileId}/detach`, {
+      method: 'POST',
+      schema: DetachConversationFileResponseSchema,
     })
   },
 

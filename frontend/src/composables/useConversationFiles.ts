@@ -145,7 +145,13 @@ export function useConversationFiles() {
     return rows
   })
 
-  const files = computed(() => mergeConversationFileRows([fromApi.value, fromMessages.value]))
+  const hiddenIds = ref<number[]>([])
+
+  const files = computed(() =>
+    mergeConversationFileRows([fromApi.value, fromMessages.value]).filter(
+      (row) => row.id === null || !hiddenIds.value.includes(row.id)
+    )
+  )
 
   const refresh = async () => {
     const chatId = chatsStore.activeChatId
@@ -166,9 +172,33 @@ export function useConversationFiles() {
     }
   }
 
+  const dismiss = (fileId: number): (() => void) => {
+    if (!hiddenIds.value.includes(fileId)) {
+      hiddenIds.value = [...hiddenIds.value, fileId]
+    }
+
+    const snapshots: { message: HistoryMessageLike; files: HistoryAttachment[] }[] = []
+    for (const message of historyStore.messages as HistoryMessageLike[]) {
+      const list = message.files ?? []
+      if (!list.some((file) => attachmentId(file) === fileId)) {
+        continue
+      }
+      snapshots.push({ message, files: list })
+      message.files = list.filter((file) => attachmentId(file) !== fileId)
+    }
+
+    return () => {
+      hiddenIds.value = hiddenIds.value.filter((id) => id !== fileId)
+      for (const snapshot of snapshots) {
+        snapshot.message.files = snapshot.files
+      }
+    }
+  }
+
   watch(
     () => chatsStore.activeChatId,
     () => {
+      hiddenIds.value = []
       void refresh()
     },
     { immediate: true }
@@ -198,5 +228,5 @@ export function useConversationFiles() {
     }
   )
 
-  return { files, refresh }
+  return { files, refresh, dismiss }
 }

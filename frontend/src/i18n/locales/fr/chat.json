@@ -174,11 +174,11 @@
       "attach": "Utiliser {name} dans le prochain message",
       "attached": "{name} sera envoyé avec le prochain message",
       "count": "{count} fichier | {count} fichiers",
-      "delete": "Retirer {name}",
-      "deleteConfirmTitle": "Retirer le fichier ?",
-      "deleteConfirmMessage": "« {name} » sera définitivement supprimé, y compris son contenu indexé dans votre base de connaissances. Cette action est irréversible.",
-      "deleted": "Fichier retiré.",
-      "deleteFailed": "Le fichier n’a pas pu être retiré. Rien n’a été supprimé."
+      "delete": "Retirer {name} de cette conversation",
+      "deleteConfirmTitle": "Retirer le fichier de la conversation ?",
+      "deleteConfirmMessage": "« {name} » quitte cette conversation. Le fichier reste dans vos fichiers.",
+      "deleted": "{name} n’est plus dans cette conversation. Le fichier reste dans vos fichiers.",
+      "deleteFailed": "{name} est encore dans cette conversation. Rien n’a été retiré. Réessayez."
     },
     "fileOnlyDefaultMessage": "Veuillez examiner le fichier joint.",
     "voiceMessageDefaultMessage": "Veuillez répondre à mon message vocal.",

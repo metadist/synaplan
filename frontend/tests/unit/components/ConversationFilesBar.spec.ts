@@ -17,6 +17,7 @@ const i18n = createI18n({
           attach: 'Use {name} in the next message',
           attached: '{name} will be sent with your next message',
           count: '{count} file | {count} files',
+          delete: 'Remove {name} from this chat',
         },
       },
     },
@@ -34,9 +35,20 @@ const contract: ConversationFileRow = {
   hasText: true,
 }
 
-const mountBar = (files: ConversationFileRow[] = [contract], canAttach = true) =>
+const annex: ConversationFileRow = {
+  ...contract,
+  id: 78,
+  reference: 'file:78',
+  name: 'annex.pdf',
+}
+
+const mountBar = (
+  files: ConversationFileRow[] = [contract],
+  canAttach = true,
+  canDelete = false
+) =>
   mount(ConversationFilesBar, {
-    props: { files, canAttach },
+    props: { files, canAttach, canDelete },
     global: {
       plugins: [i18n],
       stubs: { Icon: true },
@@ -95,5 +107,25 @@ describe('ConversationFilesBar', () => {
     await wrapper.get('[data-testid="conversation-file-chip"]').trigger('click')
 
     expect(wrapper.emitted('attach')).toBeUndefined()
+  })
+
+  it('removes a file from the open list without closing it', async () => {
+    const wrapper = mountBar([contract, annex], true, true)
+
+    const toggle = wrapper.get('[data-testid="conversation-files-toggle"]')
+    await toggle.trigger('click')
+    expect(toggle.text()).toContain('2')
+
+    const remove = wrapper.get('[data-testid="conversation-file-remove"]')
+    await remove.trigger('click')
+
+    expect(wrapper.emitted('remove')?.[0]).toEqual([contract])
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+
+    await wrapper.setProps({ files: [annex] })
+
+    expect(toggle.text()).toContain('1')
+    expect(wrapper.text()).not.toContain('contract.pdf')
+    expect(wrapper.text()).toContain('annex.pdf')
   })
 })

@@ -79,13 +79,13 @@
             <button
               v-if="canDelete && file.id !== null"
               type="button"
-              class="p-1.5 rounded-xl hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors shrink-0"
+              class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 txt-secondary hover:txt-primary transition-colors shrink-0"
               :title="$t('chat.conversationFiles.delete', { name: file.name })"
               :aria-label="$t('chat.conversationFiles.delete', { name: file.name })"
-              data-testid="conversation-file-delete"
-              @click="onDelete(file)"
+              data-testid="conversation-file-remove"
+              @click="onRemove(file)"
             >
-              <TrashIcon class="w-4 h-4" />
+              <XMarkIcon class="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -97,7 +97,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { TrashIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 import type { ConversationFileRow } from '@/composables/useConversationFiles'
@@ -111,7 +111,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   attach: [file: ConversationFileRow]
   preview: [file: ConversationFileRow]
-  delete: [file: ConversationFileRow]
+  remove: [file: ConversationFileRow]
 }>()
 
 const { t } = useI18n()
@@ -162,14 +162,13 @@ const onAttach = (file: ConversationFileRow) => {
   closePopover()
 }
 
-// Deletion is destructive and permanent, so the parent owns the confirm dialog
-// and the actual delete call; the bar only forwards the intent and closes.
-const onDelete = (file: ConversationFileRow) => {
+// Removing only takes the file out of this chat. The parent drops it from the
+// list immediately; the file itself stays in the user's files.
+const onRemove = (file: ConversationFileRow) => {
   if (!canDelete.value || file.id === null) {
     return
   }
-  emit('delete', file)
-  closePopover()
+  emit('remove', file)
 }
 
 const onDocumentClick = (event: MouseEvent) => {

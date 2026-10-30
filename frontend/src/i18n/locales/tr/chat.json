@@ -168,11 +168,11 @@
       "attach": "Sonraki iletide {name} kullan",
       "attached": "{name} sonraki iletide gönderilecek",
       "count": "{count} dosya",
-      "delete": "{name} dosyasını kaldır",
-      "deleteConfirmTitle": "Dosya kaldırılsın mı?",
-      "deleteConfirmMessage": "“{name}” bilgi tabanınızdaki dizinlenmiş içeriğiyle birlikte kalıcı olarak silinecek. Bu işlem geri alınamaz.",
-      "deleted": "Dosya kaldırıldı.",
-      "deleteFailed": "Dosya kaldırılamadı. Hiçbir şey silinmedi."
+      "delete": "{name} dosyasını bu sohbetten çıkar",
+      "deleteConfirmTitle": "Dosya sohbetten çıkarılsın mı?",
+      "deleteConfirmMessage": "“{name}” bu sohbetten çıkar. Dosya dosyalarınızda kalır.",
+      "deleted": "{name} artık bu sohbette değil. Dosya dosyalarınızda duruyor.",
+      "deleteFailed": "{name} hâlâ bu sohbette. Hiçbir şey çıkarılmadı. Yeniden deneyin."
     },
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",

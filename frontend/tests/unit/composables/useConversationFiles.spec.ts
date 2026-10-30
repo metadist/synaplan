@@ -108,4 +108,34 @@ describe('useConversationFiles', () => {
     expect(chatApi.getConversationFiles).toHaveBeenCalledTimes(2)
     expect(files.value.map((file) => file.name)).toContain('generated.docx')
   })
+
+  it('drops a dismissed file from the list before the server answers', async () => {
+    const history = useHistoryStore()
+    history.messages.push({
+      id: 'm1',
+      role: 'user',
+      parts: [{ type: 'text', content: 'see this' }],
+      timestamp: new Date(),
+      backend_message_id: 100,
+      files: [
+        {
+          id: 77,
+          filename: 'contract.pdf',
+          fileType: 'pdf',
+          filePath: '4/contract.pdf',
+        },
+      ],
+    } as unknown as Message)
+
+    const { files, dismiss } = useConversationFiles()
+    await nextTick()
+    expect(files.value).toHaveLength(1)
+
+    const undo = dismiss(77)
+    expect(files.value).toEqual([])
+
+    undo()
+    await nextTick()
+    expect(files.value.map((file) => file.id)).toEqual([77])
+  })
 })
