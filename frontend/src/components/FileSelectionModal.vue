@@ -4,6 +4,8 @@
       <div
         v-if="visible"
         class="modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50"
+        role="dialog"
+        aria-modal="true"
         data-testid="modal-file-selection-root"
         @click.self="emit('close')"
       >
@@ -510,7 +512,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
 
     if (successCount > 0) {
       success(t('fileSelection.uploadSuccess', { count: successCount }))
-      await reloadPicker()
+      await (pickerRef.value?.resetToMine() ?? Promise.resolve())
 
       for (const fileId of newFileIds) {
         selectUploaded(fileId)

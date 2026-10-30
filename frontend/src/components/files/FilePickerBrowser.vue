@@ -78,7 +78,7 @@
         <Icon icon="mdi:loading" class="w-8 h-8 animate-spin txt-secondary" />
       </div>
 
-      <div v-else-if="visibleFiles.length === 0" class="text-center py-12">
+      <div v-else-if="visibleFiles.length === 0 && !hasMore" class="text-center py-12">
         <p class="text-sm txt-secondary mb-4">{{ emptyMessage }}</p>
         <button
           v-if="scope === 'mine' && !hasActiveFilter"
@@ -246,8 +246,15 @@ const {
   hasMore,
   reload,
   loadMore,
-  resetToMine,
+  resetToMine: resetListToMine,
 } = useFilePickerList()
+
+/** Back to "My files" with no search, type or status filter, newest first. */
+const resetToMine = (): Promise<void> => {
+  filterType.value = 'all'
+  filterStatus.value = 'all'
+  return resetListToMine()
+}
 
 const visibleFiles = computed(() => {
   if (filterStatus.value === 'all') return files.value
