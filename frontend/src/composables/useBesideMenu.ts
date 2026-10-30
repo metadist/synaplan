@@ -205,6 +205,9 @@ function createHoverGate(
   panel: Ref<HTMLElement | null>
 ) {
   let closeTimer: number | null = null
+  // A click inside the list keeps it open. Repositioning after that click would
+  // otherwise look like the pointer left, and the list would unmount mid-click.
+  let stick = false
 
   function open(): void {
     setOwner(id)
@@ -212,6 +215,7 @@ function createHoverGate(
   }
 
   function close(): void {
+    stick = false
     isOpen.value = false
     if (ownerId.current === id) setOwner(null)
   }
@@ -222,8 +226,13 @@ function createHoverGate(
     closeTimer = null
   }
 
+  function holdOpen(): void {
+    stick = true
+    cancelClose()
+  }
+
   function scheduleClose(): void {
-    if (!hoverFine()) return
+    if (stick || !hoverFine()) return
     cancelClose()
     closeTimer = window.setTimeout(() => {
       closeTimer = null
@@ -253,6 +262,7 @@ function createHoverGate(
     },
     onRowLeave: scheduleClose,
     onRowClick,
+    holdOpen,
   }
 }
 
@@ -285,7 +295,7 @@ export function useBesideMenu(
     const el = panel.value
     if (!el || typeof MutationObserver === 'undefined') return
     observer = new MutationObserver(() => placePanel(root, panel, opensLeft))
-    observer.observe(el, { childList: true, subtree: true, characterData: true })
+    observer.observe(el, { childList: true, subtree: true })
   })
 
   onMounted(() => {
@@ -307,6 +317,7 @@ export function useBesideMenu(
     onRowEnter: hover.onRowEnter,
     onRowLeave: hover.onRowLeave,
     onPanelEnter: hover.cancelClose,
+    onPanelPointerDown: hover.holdOpen,
     onPanelLeave: hover.onRowLeave,
     onRowClick: hover.onRowClick,
     openFromKeyboard: hover.open,

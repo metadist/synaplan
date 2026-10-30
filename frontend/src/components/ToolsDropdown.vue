@@ -39,6 +39,7 @@
       role="menu"
       @mouseenter="onPanelEnter"
       @mouseleave="onPanelLeave"
+      @pointerdown="onPanelPointerDown"
       @keydown.escape="closeDropdown"
       @keydown.left.prevent="onArrowLeft"
     >
@@ -366,6 +367,7 @@ const {
   onRowEnter,
   onRowLeave,
   onPanelEnter,
+  onPanelPointerDown,
   onPanelLeave,
   onRowClick,
   openFromKeyboard,
