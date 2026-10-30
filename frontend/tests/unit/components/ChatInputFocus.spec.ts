@@ -92,4 +92,43 @@ describe('ChatInput focus handling', () => {
     expect(wrapper.emitted('send')).toBeTruthy()
     expect(document.activeElement).toBe(textarea.element)
   })
+
+  it('focuses the composer when the chat opens', async () => {
+    const wrapper = mountInput()
+    const textarea = wrapper.get('[data-testid="input-chat-message"]')
+    expect(document.activeElement).toBe(textarea.element)
+    wrapper.unmount()
+  })
+
+  it('types into the composer when a letter is pressed outside it', async () => {
+    const wrapper = mountInput()
+    const textarea = wrapper.get('[data-testid="input-chat-message"]')
+    const button = document.createElement('button')
+    document.body.appendChild(button)
+    button.focus()
+
+    button.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'h', bubbles: true, cancelable: true })
+    )
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('h')
+    expect(document.activeElement).toBe(textarea.element)
+    button.remove()
+    wrapper.unmount()
+  })
+
+  it('leaves a letter typed in another field where it is', async () => {
+    const wrapper = mountInput()
+    const other = document.createElement('input')
+    document.body.appendChild(other)
+    other.focus()
+
+    other.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true, cancelable: true }))
+
+    const textarea = wrapper.get('[data-testid="input-chat-message"]')
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
+    expect(document.activeElement).toBe(other)
+    other.remove()
+    wrapper.unmount()
+  })
 })

@@ -30,8 +30,8 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array<int>                                                                                                                                                                        $vectorFileIds
-     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     * @param array<int>                                                                                                                                                                                                  $vectorFileIds
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, exclude_source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
      *
      * @return array{files: File[], total: int}
      */
@@ -510,7 +510,7 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, exclude_source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
      *
      * @return array<string, int> group name => file count
      */
@@ -541,14 +541,12 @@ class FileRepository extends ServiceEntityRepository
      * Same predicates as the file list, so a folder count only includes files
      * the current search or filters would actually show.
      *
-     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, exclude_source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
      */
     private function applyListingFilters(QueryBuilder $qb, string $alias, array $filters): void
     {
         $search = $filters['search'] ?? null;
         if (null !== $search && '' !== $search) {
-            // Match the original (source) name too, so an Outlook attachment
-            // is findable by the name the user recognises.
             $qb->andWhere(sprintf('(%1$s.fileName LIKE :search OR %1$s.originalName LIKE :search OR %1$s.fileText LIKE :search)', $alias))
                 ->setParameter('search', '%'.$search.'%');
         }
@@ -572,6 +570,12 @@ class FileRepository extends ServiceEntityRepository
                 $qb->andWhere(sprintf('%s.source IN (:sources)', $alias))
                     ->setParameter('sources', $sources);
             }
+        }
+
+        $excluded = array_values(array_filter(array_map('trim', explode(',', (string) ($filters['exclude_source'] ?? '')))));
+        if ([] !== $excluded) {
+            $qb->andWhere(sprintf('%s.source NOT IN (:excludedSources)', $alias))
+                ->setParameter('excludedSources', $excluded);
         }
 
         $vectorState = $filters['vector_state'] ?? null;

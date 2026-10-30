@@ -8,6 +8,9 @@ import {
   Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
+import { useChatsStore } from '@/stores/chats'
+import { requestComposerFocus } from './useComposerTyping'
+import { goToFreshChat } from './usePinnedAssistant'
 import {
   groupNavChildren,
   isNavChildActive,
@@ -18,8 +21,38 @@ import {
 } from './useNavItems'
 export type NavSectionKey = 'chats' | 'library' | 'assistants' | 'channels' | 'operate'
 
-/** Incremented when the chats rail icon is clicked while chats is already open. */
+/** Incremented when the chats rail icon is clicked while the chats panel stays mounted. */
 export const chatsPanelRefresh = ref(0)
+
+/** One in-flight "open a new chat" so a double click cannot create two. */
+let chatsHomeOpen: Promise<void> | null = null
+
+function queueFreshChat(
+  router: ReturnType<typeof useRouter>,
+  route: ReturnType<typeof useRoute>,
+  isGuest: boolean,
+  sectionKey: NavSectionKey | null
+): Promise<void> {
+  chatsHomeOpen ??= openFreshChat(router, route, isGuest, sectionKey).finally(() => {
+    chatsHomeOpen = null
+  })
+  return chatsHomeOpen
+}
+
+async function openFreshChat(
+  router: ReturnType<typeof useRouter>,
+  route: ReturnType<typeof useRoute>,
+  isGuest: boolean,
+  sectionKey: NavSectionKey | null
+): Promise<void> {
+  // Pick the empty chat before navigating so the composer restores that draft
+  // instead of flashing the last thread.
+  if (!isGuest) await useChatsStore().findOrCreateEmptyChat()
+  if (sectionKey === 'chats') chatsPanelRefresh.value += 1
+  if (route.path === '/') await goToFreshChat(router, route)
+  else await router.push({ path: '/' })
+  requestComposerFocus()
+}
 
 export interface NavSection {
   key: NavSectionKey
@@ -276,14 +309,11 @@ export function useNavSections() {
     return children[0]?.path ?? (key === 'assistants' ? '/prompts' : '/apps')
   }
 
-  function selectSection(key: NavSectionKey) {
-    // The chats panel stays mounted, so a second click on the active rail
-    // icon never remounts it. Bump the refresh so a chat renamed elsewhere
-    // (or created after the first load) shows up in the list.
-    if (sectionKeyForPath(route.path) === key) {
-      if (key === 'chats') chatsPanelRefresh.value += 1
-      return
+  function selectSection(key: NavSectionKey): Promise<void> | void {
+    if (key === 'chats') {
+      return queueFreshChat(router, route, isGuestMode.value, sectionKeyForPath(route.path))
     }
+    if (sectionKeyForPath(route.path) === key) return
     const target = homePath(key)
     if (route.path !== target) router.push(target)
   }

@@ -11,7 +11,11 @@ import { TIMEOUTS } from '../config/config'
  */
 export async function openChatManager(page: Page): Promise<Locator> {
   const panel = page.locator(selectors.nav.sidebarChats)
-  await page.locator(selectors.nav.sidebarV2ChatNav).click()
+  // The Chats rail icon starts a new chat. Click it only when the list is
+  // not already on screen, so opening the list does not leave the thread.
+  if (!(await panel.isVisible())) {
+    await page.locator(selectors.nav.sidebarV2ChatNav).click()
+  }
   await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
   await expect(panel).toHaveAttribute('data-chats-loading', 'false', {
     timeout: TIMEOUTS.STANDARD,

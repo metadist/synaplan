@@ -81,7 +81,7 @@
     "preview": "Vorschau",
     "openWorkspace": "Arbeitsbereich öffnen",
     "elapsed": "{seconds}s",
-    "findInFiles": "In Dateien → Erzeugt finden"
+    "findInFiles": "In Dateien → KI-erstellt finden"
   },
   "plugins": {
     "title": "Plugins",

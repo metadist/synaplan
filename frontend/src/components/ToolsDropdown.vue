@@ -1,29 +1,46 @@
 <template>
-  <div ref="dropdownRef" class="relative" data-testid="comp-tools-dropdown">
+  <div ref="dropdownRef" class="relative w-full" data-testid="comp-tools-dropdown">
     <button
       type="button"
-      :class="['pill touch-manipulation', isOpen && 'pill--active']"
+      class="plus-menu-row touch-manipulation w-full"
+      data-beside-row
       :aria-label="$t('chatInput.tools.label')"
+      :aria-expanded="isOpen"
+      aria-haspopup="menu"
       data-testid="btn-tools-toggle"
-      @click="toggleOpen"
+      @click="onToggleClick"
+      @mouseenter="onRowEnter"
+      @mouseleave="onRowLeave"
       @keydown.escape="closeDropdown"
+      @keydown.right.prevent="onArrowRight"
+      @keydown.down.prevent="onArrowRight"
     >
-      <WrenchScrewdriverIcon class="w-4 h-4 md:w-5 md:h-5" />
-      <span class="text-xs md:text-sm font-medium">{{ $t('chatInput.tools.label') }}</span>
-      <!-- Q8: active toggles (Thinking / Voice reply) surface on the pill as a dot -->
+      <WrenchScrewdriverIcon class="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+      <span class="text-xs md:text-sm font-medium truncate min-w-0">{{
+        $t('chatInput.tools.label')
+      }}</span>
+      <!-- Q8: active toggles (Thinking / Voice reply) surface on the row as a dot -->
       <span
         v-if="activeToggleCount > 0"
-        class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] flex-shrink-0"
+        class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] shrink-0"
         data-testid="badge-tools-active"
         aria-hidden="true"
       />
-      <ChevronUpIcon class="w-4 h-4" />
+      <span class="flex-1" aria-hidden="true" />
+      <ChevronLeftIcon v-if="opensLeft" class="w-4 h-4 shrink-0" />
+      <ChevronRightIcon v-else class="w-4 h-4 shrink-0" />
     </button>
     <div
       v-if="isOpen"
-      class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin"
+      ref="panelRef"
+      class="dropdown-up side-flyout"
       data-testid="dropdown-tools-panel"
+      data-dropdown-placement="manual"
+      role="menu"
+      @mouseenter="onPanelEnter"
+      @mouseleave="onPanelLeave"
       @keydown.escape="closeDropdown"
+      @keydown.left.prevent="onArrowLeft"
     >
       <!-- Command tools: toggle a removable tool badge inside the chat input -->
       <button
@@ -199,10 +216,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, nextTick, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
   WrenchScrewdriverIcon,
-  ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CheckIcon,
   LightBulbIcon,
 } from '@heroicons/vue/24/outline'
@@ -217,6 +235,7 @@ import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 import { useDesktopDevices } from '@/composables/useDesktopDevices'
 import { DESKTOP_CHECK_IN_MINUTES, desktopPresence } from '@/utils/desktopPresence'
 import { useConfigStore } from '@/stores/config'
+import { useBesideMenu } from '@/composables/useBesideMenu'
 
 interface Props {
   activeCommand?: string | null
@@ -339,14 +358,26 @@ const chooseRunOnDevice = (device: { id: number; name: string; enabledSkills?: s
   })
 }
 const isOpen = ref(false)
+const itemRefs = ref<HTMLElement[]>([])
+const dropdownRef = ref<HTMLElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
+const {
+  opensLeft,
+  onRowEnter,
+  onRowLeave,
+  onPanelEnter,
+  onPanelLeave,
+  onRowClick,
+  openFromKeyboard,
+  close: closeDropdown,
+} = useBesideMenu('tools', isOpen, dropdownRef, panelRef)
 watch(isOpen, (open) => {
   if (open) {
     startPresenceClock()
     void reload()
+    if (Object.keys(featuresStatus.value).length === 0) void loadFeaturesStatus()
   } else stopPresenceClock()
 })
-const itemRefs = ref<HTMLElement[]>([])
-const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
 
@@ -396,16 +427,22 @@ const loadFeaturesStatus = async () => {
   }
 }
 
-const toggleOpen = () => {
-  triggerHapticImpact('light')
-  isOpen.value = !isOpen.value
-  if (isOpen.value && Object.keys(featuresStatus.value).length === 0) {
-    loadFeaturesStatus()
+const onToggleClick = () => {
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    triggerHapticImpact('light')
   }
+  onRowClick()
 }
 
-const closeDropdown = () => {
-  isOpen.value = false
+const onArrowRight = async () => {
+  openFromKeyboard()
+  await nextTick()
+  itemRefs.value[0]?.focus()
+}
+
+const onArrowLeft = () => {
+  closeDropdown()
+  dropdownRef.value?.querySelector('button')?.focus()
 }
 
 const selectToolCommand = (toolId: string, commandName: string) => {

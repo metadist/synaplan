@@ -6,7 +6,8 @@
  * typed. The text must NOT be wiped; it is carried forward into the new slot.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { ref, nextTick } from 'vue'
+import { defineComponent, ref, nextTick } from 'vue'
+import { mount } from '@vue/test-utils'
 import {
   useAttachmentPersist,
   useAutoPersist,
@@ -126,6 +127,24 @@ describe('useAutoPersist — chatId watcher', () => {
     expect(stored).not.toBeNull()
     const parsed = JSON.parse(stored!)
     expect(parsed.message).toBe('unsaved text in chat 7')
+  })
+
+  it('saves a new-chat draft when the composer is left before the save delay', () => {
+    const chatId = ref<number | null>(5)
+    const input = ref('hello from a new chat')
+    const Harness = defineComponent({
+      setup() {
+        useAutoPersist(input, 'chat', chatId)
+      },
+      template: '<div />',
+    })
+
+    const wrapper = mount(Harness)
+    wrapper.unmount()
+
+    const stored = localStorage.getItem(slotKey(5))
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).message).toBe('hello from a new chat')
   })
 })
 

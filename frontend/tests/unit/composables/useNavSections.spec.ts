@@ -1,10 +1,11 @@
 import { defineComponent } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { useNavSections } from '@/composables/useNavSections'
 import { useAuthStore, type User } from '@/stores/auth'
+import { useChatsStore } from '@/stores/chats'
 
 function mountSections(user: { email: string; level: string } | null) {
   setActivePinia(createPinia())
@@ -100,5 +101,46 @@ describe('useNavSections', () => {
     await router.push('/not-a-section')
     await router.isReady()
     expect(wrapper.vm.activeKey).toBe('library')
+  })
+
+  it('opens a new chat instead of the last thread when Chats is chosen from another page', async () => {
+    const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
+    const findOrCreate = vi.spyOn(useChatsStore(), 'findOrCreateEmptyChat').mockResolvedValue(null)
+    const router = wrapper.vm.$router
+
+    await router.push('/files')
+    await router.isReady()
+    await wrapper.vm.selectSection('chats')
+    await router.isReady()
+
+    expect(findOrCreate).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('opens a new chat when Chats is clicked while a conversation is already open', async () => {
+    const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
+    const findOrCreate = vi.spyOn(useChatsStore(), 'findOrCreateEmptyChat').mockResolvedValue(null)
+    const router = wrapper.vm.$router
+
+    await router.push('/')
+    await router.isReady()
+    await wrapper.vm.selectSection('chats')
+
+    expect(findOrCreate).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('sends a guest to the chat page without creating a chat', async () => {
+    const wrapper = mountSections(null)
+    const findOrCreate = vi.spyOn(useChatsStore(), 'findOrCreateEmptyChat').mockResolvedValue(null)
+    const router = wrapper.vm.$router
+
+    await router.push('/files')
+    await router.isReady()
+    await wrapper.vm.selectSection('chats')
+    await router.isReady()
+
+    expect(findOrCreate).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.path).toBe('/')
   })
 })

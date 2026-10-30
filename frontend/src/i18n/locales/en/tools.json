@@ -346,7 +346,7 @@
     "preview": "Preview",
     "openWorkspace": "Open workspace",
     "elapsed": "{seconds}s",
-    "findInFiles": "Find in Files → Generated"
+    "findInFiles": "Find in Files → AI-created"
   },
   "aiProvider": {
     "error": {

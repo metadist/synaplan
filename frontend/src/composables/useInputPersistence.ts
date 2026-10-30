@@ -248,12 +248,17 @@ export function useAutoPersist(
     { immediate: false }
   )
 
-  // Clear on unmount if input is empty
+  // Flush on leave. The debounced save has not run yet when someone types
+  // in a new chat and opens Library immediately; cancelling the timer
+  // without writing would drop that draft.
   onBeforeUnmount(() => {
     if (saveTimeout) clearTimeout(saveTimeout)
-    if (!inputRef.value.trim() && !isDisabled()) {
-      clearInput()
+    if (isDisabled()) return
+    if (inputRef.value.trim()) {
+      saveInput(inputRef.value)
+      return
     }
+    clearInput()
   })
 
   return {

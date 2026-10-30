@@ -346,7 +346,7 @@
     "preview": "Aperçu",
     "openWorkspace": "Ouvrir l’espace de travail",
     "elapsed": "{seconds}s",
-    "findInFiles": "Trouver dans Fichiers → Générés"
+    "findInFiles": "Trouver dans Fichiers → Créés par l'IA"
   },
   "aiProvider": {
     "error": {

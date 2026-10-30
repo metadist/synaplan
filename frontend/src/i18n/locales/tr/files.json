@@ -1,6 +1,8 @@
 {
   "fileSelection": {
     "title": "Dosya Seç veya Yükle",
+    "tabMine": "Dosyalarım",
+    "tabAiCreated": "AI oluşturdu",
     "searchPlaceholder": "Dosya ara...",
     "allStatuses": "Tüm durumlar",
     "selectedCount": "{count} dosya seçili",
@@ -232,11 +234,11 @@
     },
     "tabBrowse": "Gözat",
     "tabIncoming": "Gelen",
-    "tabGenerated": "Üretilen",
+    "tabGenerated": "AI oluşturdu",
     "tabWorkspace": "Çalışma alanı",
     "workspace": {
-      "subtitle": "Yapay zekânın dosya çalışması için çalışma klasörü — dosyaları burada okur, yazar ve çalıştırmalar arasında yeniden kullanır. Tamamlanan sonuçlar Üretilen bölümüne kaydedilir.",
-      "empty": "Yapay zekâdan dosyalar üzerinde çalıştırmalar arasında çalışmaya devam etmesini istediğinizde burada görünür. Tek seferlik sonuçlar Üretilen bölümüne kaydedilir.",
+      "subtitle": "Yapay zekânın dosya çalışması için çalışma klasörü — dosyaları burada okur, yazar ve çalıştırmalar arasında yeniden kullanır. Tamamlanan sonuçlar AI oluşturdu bölümüne kaydedilir.",
+      "empty": "Yapay zekâdan dosyalar üzerinde çalıştırmalar arasında çalışmaya devam etmesini istediğinizde burada görünür. Tek seferlik sonuçlar AI oluşturdu bölümüne kaydedilir.",
       "emptyAction": "Sohbete dön",
       "usage": "{quota} MB’nin {used} MB’si kullanıldı",
       "delete": "Çalışma alanını sil",
@@ -342,7 +344,7 @@
     },
     "empty": {
       "browseTitle": "Dosya kitaplığınız",
-      "browseBody": "Her yükleme, sohbet eki ve yapay zekâ üretimi dosya burada; aramaya ve yeniden kullanmaya hazır.",
+      "browseBody": "Yüklemelerin ve sohbet eklerin burada; aramaya ve yeniden kullanmaya hazır.",
       "browseAction": "İlk dosyanızı yükleyin",
       "filteredBody": "Bu filtrelere uyan dosya yok.",
       "filteredAction": "Filtreleri temizle",
@@ -411,7 +413,19 @@
       "deleteConfirmTitle": "Üretilen dosya silinsin mi?",
       "deleteConfirmMessage": "\"{name}\" kalıcı olarak silinecek; bilgi tabanınızdaki dizinlenmiş içeriği de kaldırılacak. Bu işlem geri alınamaz.",
       "deleted": "Dosya silindi, dizinlenmiş içeriği de kaldırıldı.",
-      "deleteFailed": "Dosya silinemedi. Lütfen tekrar deneyin."
+      "deleteFailed": "Dosya silinemedi. Lütfen tekrar deneyin.",
+      "searchPlaceholder": "AI ile oluşturulan dosyalarda ara"
+    },
+    "aiCreated": {
+      "title": "AI oluşturdu",
+      "count": "{count} dosya",
+      "searchHint": "AI oluşturdu içinde {count} sonuç daha",
+      "searchHintAction": "Göster",
+      "mineEmpty": "Kendi dosyaların burada görünür. Başlamak için bir dosya yükle.",
+      "mineEmptyAction": "Dosya yükle",
+      "empty": "Yapay zekânın senin için oluşturduğu resimler, videolar ve belgeler burada görünür.",
+      "emptyAction": "Dosyalarıma dön",
+      "loadMore": "Daha fazla yükle"
     },
     "explainer": {
       "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. Asistan, yapay zekâ ile aranabilir işaretli dosyaları kullanabilir. Fotoğraflar, kayıtlar ve yapay zekânın ürettiği dosyalar için önce aranabilir yapmanız gerekir.",
