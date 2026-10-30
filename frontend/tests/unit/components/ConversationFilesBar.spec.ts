@@ -42,11 +42,7 @@ const annex: ConversationFileRow = {
   name: 'annex.pdf',
 }
 
-const mountBar = (
-  files: ConversationFileRow[] = [contract],
-  canAttach = true,
-  canDelete = false
-) =>
+const mountBar = (files: ConversationFileRow[] = [contract], canAttach = true, canDelete = false) =>
   mount(ConversationFilesBar, {
     props: { files, canAttach, canDelete },
     global: {

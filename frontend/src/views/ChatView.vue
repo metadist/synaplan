@@ -850,10 +850,7 @@ const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
-const {
-  files: conversationFiles,
-  dismiss: dismissConversationFile,
-} = useConversationFiles()
+const { files: conversationFiles, dismiss: dismissConversationFile } = useConversationFiles()
 const {
   conversationPreview,
   previewConversationFile,

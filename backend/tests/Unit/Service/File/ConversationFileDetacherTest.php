@@ -22,10 +22,13 @@ final class ConversationFileDetacherTest extends TestCase
         $message->addFile($file);
 
         $files = $this->createMock(FileRepository::class);
-        $files->method('find')->with(15)->willReturn($file);
+        $files->expects(self::once())->method('find')->with(15)->willReturn($file);
 
         $links = $this->createMock(ConversationFileLinkRepository::class);
-        $links->method('messagesInChatTouchingFile')->with(4, 3, $file)->willReturn([$message]);
+        $links->expects(self::once())
+            ->method('messagesInChatTouchingFile')
+            ->with(4, 3, $file)
+            ->willReturn([$message]);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::once())->method('flush');
