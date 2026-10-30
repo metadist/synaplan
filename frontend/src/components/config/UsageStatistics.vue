@@ -50,79 +50,7 @@
 
     <!-- Stats Content -->
     <div v-if="!loading && stats" class="space-y-6" data-testid="section-stats">
-      <!-- Cost Budget -->
-      <div v-if="stats.cost_budget" class="surface-card p-6" data-testid="section-cost-budget">
-        <h3 class="text-lg font-semibold txt-primary mb-4">
-          {{ $t('config.usage.costBudget.title') }}
-        </h3>
-
-        <!-- With budget limit -->
-        <div v-if="stats.cost_budget.budget > 0" class="space-y-3">
-          <div class="flex items-center justify-between text-sm">
-            <span class="txt-primary font-medium">
-              {{ $t('config.usage.costBudget.consumption') }}:
-              {{ stats.cost_budget.percent.toFixed(1) }}%
-            </span>
-          </div>
-
-          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
-            <div
-              class="h-4 rounded-full transition-all flex items-center justify-center text-xs text-white font-medium"
-              :class="getBudgetBarClass(stats.cost_budget.percent)"
-              :style="{ width: Math.min(Math.max(stats.cost_budget.percent, 2), 100) + '%' }"
-            >
-              <span v-if="stats.cost_budget.percent > 15">
-                {{ stats.cost_budget.percent.toFixed(0) }}%
-              </span>
-            </div>
-          </div>
-
-          <div class="text-xs txt-secondary text-left">
-            {{ formatDate(stats.cost_budget.period_start) }} -
-            {{ formatDate(stats.cost_budget.period_end) }}
-          </div>
-
-          <div v-if="showTopup" class="pt-2 space-y-3">
-            <p class="text-sm txt-secondary">
-              {{ $t('limitReached.topup.sentence', { amount: 100 }) }}
-            </p>
-            <button
-              type="button"
-              class="btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="topupLoading"
-              data-testid="btn-usage-topup"
-              @click="startTopup"
-            >
-              {{ $t('limitReached.topup.button', { amount: 100 }) }}
-            </button>
-            <p v-if="topupError" class="text-sm text-red-600 dark:text-red-400">{{ topupError }}</p>
-          </div>
-        </div>
-
-        <!-- No budget limit (open source / unlimited) -->
-        <div v-else class="space-y-3">
-          <div class="flex items-center justify-between text-sm">
-            <span class="txt-primary font-medium">
-              {{ $t('config.usage.costBudget.thisMonth') }}
-            </span>
-            <span class="txt-secondary"> ${{ stats.cost_budget.used.toFixed(4) }} </span>
-          </div>
-
-          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
-            <div
-              class="h-4 rounded-full transition-all bg-green-500 flex items-center justify-center text-xs text-white font-medium"
-              style="width: 100%"
-            >
-              {{ $t('config.usage.costBudget.unlimited') }}
-            </div>
-          </div>
-
-          <div class="text-xs txt-secondary">
-            {{ formatDate(stats.cost_budget.period_start) }} -
-            {{ formatDate(stats.cost_budget.period_end) }}
-          </div>
-        </div>
-      </div>
+      <UsageBudgetCard v-if="stats.cost_budget" :budget="stats.cost_budget" />
 
       <!-- Cost Summary Cards -->
       <div
@@ -545,24 +473,16 @@ import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { authService } from '@/services/authService'
-import { useConfigStore } from '@/stores/config'
-import { isNativeApp } from '@/services/api/nativeRuntime'
-import { subscriptionApi } from '@/services/api/subscriptionApi'
+import UsageBudgetCard from '@/components/config/UsageBudgetCard.vue'
 
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
-const config = useConfigStore()
-const topupLoading = ref(false)
-const topupError = ref<string | null>(null)
-const { formatDate: formatDateStr, formatRelativeTime } = useDateFormat()
+const { formatRelativeTime } = useDateFormat()
 
 const loading = ref(false)
 const exporting = ref(false)
 const error = ref<string | null>(null)
 const stats = ref<UsageStats | null>(null)
-const showTopup = computed(
-  () => !isNativeApp() && config.billing.enabled && (stats.value?.cost_budget?.budget ?? 0) > 0
-)
 
 const activityItems = ref<ActivityEntry[]>([])
 const activityLoading = ref(false)
@@ -575,24 +495,6 @@ const activityAction = ref('')
 const activityFrom = ref('')
 const activityTo = ref('')
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
-
-async function startTopup(): Promise<void> {
-  if (topupLoading.value) return
-  topupLoading.value = true
-  topupError.value = null
-  try {
-    const session = await subscriptionApi.createTopupSession(1)
-    if (session.url) {
-      window.location.href = session.url
-      return
-    }
-    topupError.value = t('limitReached.topup.error')
-  } catch {
-    topupError.value = t('limitReached.topup.error')
-  } finally {
-    topupLoading.value = false
-  }
-}
 
 const hasActiveFilters = computed(
   () =>
@@ -847,17 +749,6 @@ const getSourceIconColor = (source: string) => {
 
 const getTimePeriodLabel = (period: string) => {
   return t(`config.usage.periods.${period.toLowerCase()}`)
-}
-
-const getBudgetBarClass = (percent: number) => {
-  if (percent >= 90) return 'bg-red-500'
-  if (percent >= 75) return 'bg-orange-500'
-  if (percent >= 50) return 'bg-yellow-500'
-  return 'bg-green-500'
-}
-
-const formatDate = (timestamp: number) => {
-  return formatDateStr(new Date(timestamp * 1000))
 }
 
 const getTimeAgo = (timestamp: number) => {

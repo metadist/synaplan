@@ -20,7 +20,6 @@
     "src/components/MobileNav.vue": 1148,
     "src/components/config/AIModelsConfiguration.vue": 1932,
     "src/components/config/TaskPromptsConfiguration.vue": 2422,
-    "src/components/config/UsageStatistics.vue": 832,
     "src/components/feedback/FalsePositiveModal.vue": 1188,
     "src/components/mail/MailHandlerConfiguration.vue": 1029,
     "src/components/widgets/AdvancedWidgetConfig.vue": 3007,
