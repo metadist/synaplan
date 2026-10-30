@@ -1,6 +1,7 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 
-import { chatApi, type ConversationFileRow } from '@/services/api/chatApi'
+import { type ConversationFileRow } from '@/services/api/chatApi'
+import { conversationFilesApi } from '@/services/api/conversationFilesApi'
 import { chatGoneStatus } from '@/utils/chatAccessError'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
@@ -104,6 +105,34 @@ const historyFileSignature = (messages: HistoryMessageLike[]): string =>
     )
     .join('|')
 
+/** Drop a file from the open chat immediately. The returned function puts it back. */
+function dismissConversationFile(
+  messages: HistoryMessageLike[],
+  hiddenIds: Ref<number[]>,
+  fileId: number
+): () => void {
+  if (!hiddenIds.value.includes(fileId)) {
+    hiddenIds.value = [...hiddenIds.value, fileId]
+  }
+
+  const snapshots: { message: HistoryMessageLike; files: HistoryAttachment[] }[] = []
+  for (const message of messages) {
+    const list = message.files ?? []
+    if (!list.some((file) => attachmentId(file) === fileId)) {
+      continue
+    }
+    snapshots.push({ message, files: list })
+    message.files = list.filter((file) => attachmentId(file) !== fileId)
+  }
+
+  return () => {
+    hiddenIds.value = hiddenIds.value.filter((id) => id !== fileId)
+    for (const snapshot of snapshots) {
+      snapshot.message.files = snapshot.files
+    }
+  }
+}
+
 /**
  * Files this chat can still use: the server catalog plus anything already
  * sitting on loaded messages (a just-uploaded PDF is visible before the
@@ -145,7 +174,12 @@ export function useConversationFiles() {
     return rows
   })
 
-  const files = computed(() => mergeConversationFileRows([fromApi.value, fromMessages.value]))
+  const hiddenIds = ref<number[]>([])
+  const files = computed(() =>
+    mergeConversationFileRows([fromApi.value, fromMessages.value]).filter(
+      (row) => row.id === null || !hiddenIds.value.includes(row.id)
+    )
+  )
 
   const refresh = async () => {
     const chatId = chatsStore.activeChatId
@@ -155,7 +189,7 @@ export function useConversationFiles() {
     }
 
     try {
-      const response = await chatApi.getConversationFiles(chatId)
+      const response = await conversationFilesApi.getConversationFiles(chatId)
       fromApi.value = response.files
     } catch (error) {
       fromApi.value = []
@@ -166,9 +200,13 @@ export function useConversationFiles() {
     }
   }
 
+  const dismiss = (fileId: number): (() => void) =>
+    dismissConversationFile(historyStore.messages as HistoryMessageLike[], hiddenIds, fileId)
+
   watch(
     () => chatsStore.activeChatId,
     () => {
+      hiddenIds.value = []
       void refresh()
     },
     { immediate: true }
@@ -198,5 +236,5 @@ export function useConversationFiles() {
     }
   )
 
-  return { files, refresh }
+  return { files, refresh, dismiss }
 }

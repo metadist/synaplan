@@ -18,3 +18,8 @@ export const GetConversationFilesResponseSchema = z.object({
   success: z.boolean(),
   files: z.array(ConversationFileRowSchema),
 })
+
+export const DetachConversationFileResponseSchema = z.object({
+  success: z.boolean(),
+  detached: z.boolean(),
+})

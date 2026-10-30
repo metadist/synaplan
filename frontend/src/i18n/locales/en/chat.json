@@ -174,11 +174,11 @@
       "attach": "Use {name} in the next message",
       "attached": "{name} will be sent with your next message",
       "count": "{count} file | {count} files",
-      "delete": "Remove {name}",
+      "delete": "Remove {name} from this chat",
       "deleteConfirmTitle": "Remove file?",
-      "deleteConfirmMessage": "\"{name}\" will be permanently deleted, including its indexed content in your knowledge base. This cannot be undone.",
-      "deleted": "File removed.",
-      "deleteFailed": "The file could not be removed. Nothing was deleted."
+      "deleteConfirmMessage": "\"{name}\" leaves this chat. The file stays in your files.",
+      "deleted": "{name} is no longer in this chat. The file is still in your files.",
+      "deleteFailed": "{name} is still in this chat. Nothing was removed. Try again."
     },
     "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message.",
