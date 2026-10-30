@@ -894,6 +894,34 @@
                 "tab": "channels",
                 "type": "text"
             },
+            "EGRESS_ALLOW": {
+                "dbGroup": "EGRESS",
+                "dbKey": "ALLOW",
+                "default": "[]",
+                "description": "Extra hosts this installation may call, one per line or a JSON list. A host matches any port. \"api.example.com:443\" matches that port only. \"*.example.org\" matches one name in front of example.org, not a name further down. Leave this empty until report mode shows a host you want to allow.",
+                "placeholder": "*.example.org\napi.example.com:443",
+                "section": "policy",
+                "sensitive": false,
+                "source": "database",
+                "tab": "outbound",
+                "type": "text"
+            },
+            "EGRESS_MODE": {
+                "dbGroup": "EGRESS",
+                "dbKey": "MODE",
+                "default": "off",
+                "description": "What happens when a program calls a host that is not on the list. \"off\": nothing changes. \"report\": the call still goes out, and the host is recorded so you can allow it. \"enforce\": the call is refused before it connects, and the person sees that the service could not be reached. Starts as off.",
+                "options": [
+                    "off",
+                    "report",
+                    "enforce"
+                ],
+                "section": "policy",
+                "sensitive": false,
+                "source": "database",
+                "tab": "outbound",
+                "type": "select"
+            },
             "ELEVENLABS_API_KEY": {
                 "default": "",
                 "description": "ElevenLabs TTS API key",
@@ -2549,6 +2577,20 @@
                 ]
             },
             {
+                "id": "outbound",
+                "label": "Outbound traffic",
+                "sections": [
+                    {
+                        "fields": [
+                            "EGRESS_MODE",
+                            "EGRESS_ALLOW"
+                        ],
+                        "id": "policy",
+                        "label": "Outbound traffic"
+                    }
+                ]
+            },
+            {
                 "id": "sharing",
                 "label": "Sharing",
                 "sections": [
@@ -3191,6 +3233,18 @@
                 "isSet": false,
                 "locked": false,
                 "value": ""
+            },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
             },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
@@ -4357,6 +4411,18 @@
                 "isSet": false,
                 "locked": false,
                 "value": ""
+            },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
             },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
@@ -6066,6 +6132,34 @@
                 "source": "database",
                 "tab": "channels",
                 "type": "text"
+            },
+            "EGRESS_ALLOW": {
+                "dbGroup": "EGRESS",
+                "dbKey": "ALLOW",
+                "default": "[]",
+                "description": "Extra hosts this installation may call, one per line or a JSON list. A host matches any port. \"api.example.com:443\" matches that port only. \"*.example.org\" matches one name in front of example.org, not a name further down. Leave this empty until report mode shows a host you want to allow.",
+                "placeholder": "*.example.org\napi.example.com:443",
+                "section": "policy",
+                "sensitive": false,
+                "source": "database",
+                "tab": "outbound",
+                "type": "text"
+            },
+            "EGRESS_MODE": {
+                "dbGroup": "EGRESS",
+                "dbKey": "MODE",
+                "default": "off",
+                "description": "What happens when a program calls a host that is not on the list. \"off\": nothing changes. \"report\": the call still goes out, and the host is recorded so you can allow it. \"enforce\": the call is refused before it connects, and the person sees that the service could not be reached. Starts as off.",
+                "options": [
+                    "off",
+                    "report",
+                    "enforce"
+                ],
+                "section": "policy",
+                "sensitive": false,
+                "source": "database",
+                "tab": "outbound",
+                "type": "select"
             },
             "ELEVENLABS_API_KEY": {
                 "default": "",
@@ -7992,6 +8086,20 @@
                 ]
             },
             {
+                "id": "outbound",
+                "label": "Outbound traffic",
+                "sections": [
+                    {
+                        "fields": [
+                            "EGRESS_MODE",
+                            "EGRESS_ALLOW"
+                        ],
+                        "id": "policy",
+                        "label": "Outbound traffic"
+                    }
+                ]
+            },
+            {
                 "id": "sharing",
                 "label": "Sharing",
                 "sections": [
@@ -8634,6 +8742,18 @@
                 "isSet": false,
                 "locked": false,
                 "value": ""
+            },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
             },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
@@ -9931,6 +10051,18 @@
                 "locked": false,
                 "value": ""
             },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
+            },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
                 "isSet": false,
@@ -11113,6 +11245,18 @@
                 "locked": false,
                 "value": ""
             },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
+            },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
                 "isSet": false,
@@ -12276,6 +12420,18 @@
                 "isSet": false,
                 "locked": false,
                 "value": ""
+            },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
             },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
@@ -13572,6 +13728,18 @@
                 "isSet": false,
                 "locked": false,
                 "value": ""
+            },
+            "EGRESS_ALLOW": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "[]"
+            },
+            "EGRESS_MODE": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "off"
             },
             "ELEVENLABS_API_KEY": {
                 "isMasked": false,
