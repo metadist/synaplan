@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Egress;
 
+use App\Service\Egress\EgressCache;
 use App\Service\Egress\EgressCall;
 use App\Service\Egress\EgressConfig;
 use App\Service\Egress\EgressDestination;
+use App\Service\Egress\EgressDirectory;
 use App\Service\Egress\EgressHttpClient;
 use App\Service\Egress\EgressMetrics;
 use App\Service\Egress\EgressMode;
@@ -201,6 +203,81 @@ final class EgressHttpClientTest extends TestCase
         }
 
         self::assertSame(['customer.example:443:203.0.113.10:443'], $connectTo);
+    }
+
+    public function testATypedUrlBehindTheGatewaySendsAOneRequestGrant(): void
+    {
+        $seen = null;
+        $inner = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen = $options;
+
+            return new MockResponse('ok');
+        });
+        $cache = new RecordingEgressCache();
+        $config = new EgressConfig();
+        EgressConfig::setModeOverride(EgressMode::Enforce);
+        putenv('EGRESS_PROXY=http://egress:3128');
+        putenv('EGRESS_GATEWAY=1');
+        try {
+            $client = new EgressHttpClient(
+                $inner,
+                new EgressPolicy($config, new AllowTypedGuard(['203.0.113.10'])),
+                $config,
+                new AllowTypedGuard(['203.0.113.10']),
+                new EgressMetrics(),
+                null,
+                null,
+                new EgressDirectory($cache),
+            );
+            $client->request('GET', 'https://customer.example/file', EgressCall::typed([]))->getStatusCode();
+        } finally {
+            putenv('EGRESS_PROXY');
+            putenv('EGRESS_GATEWAY');
+            EgressConfig::setModeOverride(null);
+        }
+
+        $grant = $cache->grant();
+        self::assertNotNull($grant);
+        self::assertNotNull($seen);
+        self::assertArrayNotHasKey(\CURLOPT_CONNECT_TO, $seen['extra']['curl'] ?? []);
+        self::assertContains('Proxy-Authorization: Bearer '.$grant['id'], $seen['headers']);
+        self::assertSame('customer.example', $grant['body']['host']);
+        self::assertSame(443, $grant['body']['port']);
+        self::assertSame(['203.0.113.10'], $grant['body']['ips']);
+        self::assertSame(60, $grant['ttl']);
+        self::assertStringContainsString('api.openai.com', $cache->allowlist());
+        self::assertStringNotContainsString($grant['id'], $cache->allowlist());
+    }
+
+    public function testTheGatewayRefusesAPrivatePin(): void
+    {
+        $inner = new MockHttpClient(fn (): MockResponse => new MockResponse('ok'));
+        $cache = new RecordingEgressCache();
+        $config = new EgressConfig();
+        EgressConfig::setModeOverride(EgressMode::Off);
+        putenv('EGRESS_PROXY=http://egress:3128');
+        putenv('EGRESS_GATEWAY=1');
+        try {
+            $client = new EgressHttpClient(
+                $inner,
+                new EgressPolicy($config, new AllowTypedGuard(['10.1.1.1'])),
+                $config,
+                new AllowTypedGuard(['10.1.1.1']),
+                new EgressMetrics(),
+                null,
+                null,
+                new EgressDirectory($cache),
+            );
+            $client->request('GET', 'https://customer.example/file', EgressCall::typed([]));
+            self::fail('A private pin must be refused.');
+        } catch (EgressRefusedException $e) {
+            self::assertStringNotContainsString('10.1.1.1', $e->getMessage());
+            self::assertNull($cache->grant());
+        } finally {
+            putenv('EGRESS_PROXY');
+            putenv('EGRESS_GATEWAY');
+            EgressConfig::setModeOverride(null);
+        }
     }
 
     public function testOneWildcardLevelAndAPortRule(): void
@@ -459,5 +536,53 @@ final class AllowTypedGuard implements EgressTypedUrlGuard
     public function pins(string $host): array
     {
         return $this->pins;
+    }
+}
+
+/**
+ * @internal
+ */
+final class RecordingEgressCache implements EgressCache
+{
+    /** @var list<array{0: string, 1: string, 2: int}> */
+    public array $puts = [];
+
+    public function put(string $key, string $value, int $ttlSeconds): bool
+    {
+        $this->puts[] = [$key, $value, $ttlSeconds];
+
+        return true;
+    }
+
+    /**
+     * @return array{id: string, ttl: int, body: array<string, mixed>}|null
+     */
+    public function grant(): ?array
+    {
+        foreach (array_reverse($this->puts) as [$key, $value, $ttl]) {
+            if (!str_starts_with($key, 'egress:grant:')) {
+                continue;
+            }
+            $body = json_decode($value, true);
+
+            return [
+                'id' => substr($key, strlen('egress:grant:')),
+                'ttl' => $ttl,
+                'body' => \is_array($body) ? $body : [],
+            ];
+        }
+
+        return null;
+    }
+
+    public function allowlist(): string
+    {
+        foreach ($this->puts as [$key, $value]) {
+            if ('egress:allow' === $key) {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }

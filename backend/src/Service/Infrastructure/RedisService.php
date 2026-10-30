@@ -743,7 +743,7 @@ LUA;
     {
         $this->logger->warning('Redis command failed', [
             'command' => $command,
-            'key' => $key,
+            'key' => str_contains($key, 'egress:grant:') ? 'egress:grant:*' : $key,
             'error' => $e->getMessage(),
         ]);
     }

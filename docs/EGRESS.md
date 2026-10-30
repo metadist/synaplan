@@ -52,10 +52,38 @@ Nothing else in this table moves onto the HTTP client.
 | gRPC | Triton, from `LocalProviderAvailabilityProbe` and the model catalog | The Triton endpoint on the AI settings tab |
 | WebSocket | The voice sidecar's provider socket | The voice service URL. PHP does not open it. |
 
-No compose file sets `HTTP_PROXY`, `HTTPS_PROXY`, or `NO_PROXY`. Symfony
-HttpClient honours those environment variables on its own. The SDKs that
-accept a client now use that client. Apple OCSP does not, and only when
-online checks are on.
+The default compose file sets none of `HTTP_PROXY`, `HTTPS_PROXY`, or
+`NO_PROXY`. Symfony HttpClient honours those environment variables on its
+own. The SDKs that accept a client now use that client. Apple OCSP does
+not, and only when online checks are on.
+
+## The optional gateway
+
+`docker-compose.egress.yml` is off unless you load it:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.egress.yml --profile egress up -d
+```
+
+That file points PHP, the worker, the scheduler, voice, the transcriber,
+and compute at `http://egress:3128`, and sets `NODE_USE_ENV_PROXY=1` on the
+two Node sidecars so they actually use the proxy. `EGRESS_GATEWAY=1` tells
+PHP to send a one-request grant for a URL a person typed. The gateway
+dials the pinned address and deletes the grant. An allowlisted name is
+resolved by the gateway. Without this file, nothing in the default stack
+changes.
+
+`REDIS_KEY_PREFIX` must be the prefix `RedisService` writes
+(`synaplan:` plus `APP_ENV` plus `:`). The dev overlay uses `synaplan:dev:`
+because this compose file pins `APP_ENV=dev`.
+
+An enterprise proxy still uses `EGRESS_PROXY` and `CURLOPT_CONNECT_TO`.
+The gateway, when it is chained with `UPSTREAM_PROXY`, sends
+`CONNECT <pinned ip>:<port>` to that proxy. If the enterprise proxy
+refuses a CONNECT to an IP address, typed-URL features stop: allow IP
+literals for those tunnels, or turn the typed-URL features off. The
+gateway log line is `reason=upstream_refused` and it names the host and
+port only. A grant id is not written to a log.
 
 ## What is deliberately not a shared allowlist entry
 

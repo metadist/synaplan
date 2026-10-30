@@ -1,5 +1,12 @@
 # Architecture update — status
 
+> **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
+> It is off unless `docker-compose.egress.yml` is loaded with the `egress`
+> profile. Typed URLs then use a one-request Redis grant. The live walk
+> (two providers, web search, voice, compute) is not claimed here: the
+> tests cover the grant, a reused grant, a private pin, and an upstream
+> proxy that refuses an IP literal.
+
 > **2026-10-30 — AU17.** The OpenAI-compatible SDKs, Ollama chat and
 > embeddings, Stripe, Google Play and reCAPTCHA send through the shared
 > HTTP client. Apple's verifier has no HTTP hook. Online checks stay off

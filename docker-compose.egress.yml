@@ -1,0 +1,74 @@
+# Opt-in CONNECT gateway. The default stack does not load this file.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.egress.yml --profile egress up -d
+#
+# REDIS_KEY_PREFIX matches RedisService for the dev stack, which pins
+# APP_ENV=dev. A production install sets the same prefix as that process
+# (synaplan:<APP_ENV>:). Leave this file out and nothing here applies.
+services:
+  egress:
+    profiles: [egress]
+    pull_policy: build
+    build:
+      context: ./sidecars/synaplan-egress
+    container_name: synaplan-egress
+    restart: unless-stopped
+    environment:
+      EGRESS_LISTEN: :3128
+      REDIS_ADDR: redis:6379
+      REDIS_KEY_PREFIX: "synaplan:dev:"
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - synaplan-network
+
+  backend:
+    environment:
+      EGRESS_GATEWAY: "1"
+      HTTPS_PROXY: http://egress:3128
+      HTTP_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin
+    depends_on:
+      egress:
+        condition: service_started
+
+  worker:
+    environment:
+      EGRESS_GATEWAY: "1"
+      HTTPS_PROXY: http://egress:3128
+      HTTP_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin
+    depends_on:
+      egress:
+        condition: service_started
+
+  scheduler:
+    environment:
+      EGRESS_GATEWAY: "1"
+      HTTPS_PROXY: http://egress:3128
+      HTTP_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress,phpmyadmin
+    depends_on:
+      egress:
+        condition: service_started
+
+  voice:
+    environment:
+      HTTPS_PROXY: http://egress:3128
+      HTTP_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress
+      NODE_USE_ENV_PROXY: "1"
+
+  transcriber:
+    environment:
+      HTTPS_PROXY: http://egress:3128
+      HTTP_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress
+      NODE_USE_ENV_PROXY: "1"
+
+  compute:
+    environment:
+      HTTPS_PROXY: http://egress:3128
+      HTTP_PROXY: http://egress:3128
+      NO_PROXY: localhost,127.0.0.1,db,redis,qdrant,tika,centrifugo,ollama,mailhog,backend,worker,scheduler,compute,voice,transcriber,keycloak,egress

@@ -80,6 +80,13 @@ final class EgressConfig implements ResetInterface
         return self::parseAllow(\is_string($raw) ? $raw : '');
     }
 
+    public function gateway(): bool
+    {
+        $value = getenv('EGRESS_GATEWAY');
+
+        return \is_string($value) && \in_array(strtolower(trim($value)), ['1', 'true', 'yes'], true);
+    }
+
     public function proxy(): ?string
     {
         $value = getenv('EGRESS_PROXY');
