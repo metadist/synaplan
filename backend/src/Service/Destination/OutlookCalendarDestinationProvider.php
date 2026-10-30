@@ -19,9 +19,11 @@ use Psr\Log\LoggerInterface;
  * {@see CalDavDestinationProvider} (Phase M steps M4–M6).
  *
  * Idempotency by construction (same S13 contract as CalDAV): every event is
- * created with a deterministic Graph `transactionId` derived from the file and
- * source message; Graph answers 409 for a repeated transaction, which counts
- * as "already delivered", never a duplicate.
+ * created with a deterministic Graph `transactionId` derived from the message
+ * and the meeting itself. File id is always 0 for a generated invite, so it
+ * cannot tell two steps in one reply apart. Graph answers 409, or 400 with
+ * `ErrorDuplicateTransactionId`, for a repeated transaction, which counts as
+ * "already delivered", never a duplicate.
  *
  * Requires the `Calendars.ReadWrite` delegated scope. Connections consented
  * before the scope expansion carry only the old grant — those fail with
@@ -83,30 +85,9 @@ final readonly class OutlookCalendarDestinationProvider implements DestinationPr
         }
 
         $messageId = is_numeric($params['message_id'] ?? null) ? (int) $params['message_id'] : 0;
-        $created = 0;
-        $skipped = 0;
-        $lastWebLink = '';
 
         try {
-            foreach ($events as $index => $event) {
-                $result = $this->graph->createEvent(
-                    $connection,
-                    transactionId: sprintf('synaplan-f%d-m%d-e%d', $file->fileId, $messageId, $index),
-                    subject: $event['summary'],
-                    start: $event['start'],
-                    end: $event['end'],
-                    timezone: 'UTC',
-                    body: $event['description'],
-                    location: $event['location'],
-                    attendees: $event['attendees'],
-                );
-                if ($result['created']) {
-                    ++$created;
-                    $lastWebLink = $result['webLink'];
-                } else {
-                    ++$skipped;
-                }
-            }
+            [$created, $skipped, $lastWebLink] = $this->createEvents($connection, $messageId, $events);
         } catch (OAuthReauthRequiredException|OAuthException $e) {
             $this->logger->warning('Outlook calendar delivery failed: token exchange rejected', [
                 'connection_id' => $connection->getId(),
@@ -143,6 +124,46 @@ final readonly class OutlookCalendarDestinationProvider implements DestinationPr
         }
 
         return DestinationResult::success((string) $created, $context);
+    }
+
+    /**
+     * @param list<array{summary: string, description: ?string, location: ?string, start: \DateTimeImmutable, end: \DateTimeImmutable, attendees: list<string>}> $events
+     *
+     * @return array{0: int, 1: int, 2: string}
+     */
+    private function createEvents(Connection $connection, int $messageId, array $events): array
+    {
+        $created = 0;
+        $skipped = 0;
+        $lastWebLink = '';
+
+        foreach ($events as $index => $event) {
+            $result = $this->graph->createEvent(
+                $connection,
+                transactionId: CalendarDeliveryId::token(
+                    $messageId,
+                    $index,
+                    $event['summary'],
+                    $event['start']->format('Y-m-d\TH:i:s'),
+                    $event['end']->format('Y-m-d\TH:i:s'),
+                ),
+                subject: $event['summary'],
+                start: $event['start'],
+                end: $event['end'],
+                timezone: 'UTC',
+                body: $event['description'],
+                location: $event['location'],
+                attendees: $event['attendees'],
+            );
+            if ($result['created']) {
+                ++$created;
+                $lastWebLink = $result['webLink'];
+            } else {
+                ++$skipped;
+            }
+        }
+
+        return [$created, $skipped, $lastWebLink];
     }
 
     /**

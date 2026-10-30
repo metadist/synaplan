@@ -299,6 +299,52 @@ final class GraphClientTest extends TestCase
         self::assertSame('', $result['id']);
     }
 
+    public function testCreateEventTreatsDuplicateTransactionId400AsAlreadyDelivered(): void
+    {
+        $client = $this->client([
+            new MockResponse(json_encode(['error' => [
+                'code' => 'ErrorDuplicateTransactionId',
+                'message' => 'The TransactionId specified in the request has already been used.',
+            ]]), ['http_code' => 400]),
+        ]);
+
+        $start = new \DateTimeImmutable('2026-08-22T10:00:00', new \DateTimeZone('UTC'));
+        $result = $client->createEvent(
+            $this->connection(),
+            'synaplan-m42-same',
+            'Meeting',
+            $start,
+            $start->add(new \DateInterval('PT1H')),
+            'UTC',
+        );
+
+        self::assertFalse($result['created']);
+        self::assertSame('', $result['id']);
+    }
+
+    public function testCreateEventStillFailsOnAnUnrelated400(): void
+    {
+        $client = $this->client([
+            new MockResponse(json_encode(['error' => [
+                'code' => 'ErrorInvalidRequest',
+                'message' => 'Start time is missing.',
+            ]]), ['http_code' => 400]),
+        ]);
+
+        $this->expectException(GraphException::class);
+        $this->expectExceptionMessageMatches('/ErrorInvalidRequest/');
+
+        $start = new \DateTimeImmutable('2026-08-22T10:00:00', new \DateTimeZone('UTC'));
+        $client->createEvent(
+            $this->connection(),
+            'synaplan-m42-bad',
+            'Meeting',
+            $start,
+            $start->add(new \DateInterval('PT1H')),
+            'UTC',
+        );
+    }
+
     public function testSendMailPostsTheMessageWithBase64Attachments(): void
     {
         $captured = [];

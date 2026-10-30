@@ -17,9 +17,11 @@ use App\Service\Dav\DavException;
  * calendar" upgrade.
  *
  * Idempotency by construction (sign-off S13): every event gets a
- * deterministic UID derived from the file and source message, the calendar is
- * queried for that UID before writing, and the PUT itself is create-only —
- * an event that already exists is counted as delivered, never duplicated.
+ * deterministic UID derived from the source message and the meeting itself.
+ * File id is always 0 for a generated invite, so it cannot tell two steps in
+ * one reply apart. The calendar is queried for that UID before writing, and
+ * the PUT itself is create-only — an event that already exists is counted as
+ * delivered, never duplicated.
  */
 final readonly class CalDavDestinationProvider implements DestinationProvider
 {
@@ -79,7 +81,7 @@ final readonly class CalDavDestinationProvider implements DestinationProvider
 
         try {
             foreach ($events as $index => $event) {
-                $uid = $this->deterministicUid($file->fileId, $messageId, $index);
+                $uid = $this->deterministicUid($messageId, $index, $event);
                 if ($this->calDav->eventExists($target, $uid)) {
                     ++$skipped;
                     continue;
@@ -106,13 +108,29 @@ final readonly class CalDavDestinationProvider implements DestinationProvider
     }
 
     /**
-     * Deterministic per-event UID from the delivery identity, so the same file
-     * re-sent (manually or by a re-run schedule) addresses the same calendar
-     * resources.
+     * Deterministic per-event UID from the meeting itself, so a repeat of the
+     * same invite addresses the same calendar resource and a second meeting
+     * in the same reply does not.
      */
-    private function deterministicUid(int $fileId, int $messageId, int $eventIndex): string
+    private function deterministicUid(int $messageId, int $eventIndex, string $event): string
     {
-        return sprintf('synaplan-f%d-m%d-e%d@synaplan', $fileId, $messageId, $eventIndex);
+        return CalendarDeliveryId::token(
+            $messageId,
+            $eventIndex,
+            $this->propertyValue($event, 'SUMMARY') ?? '',
+            $this->propertyValue($event, 'DTSTART') ?? '',
+            $this->propertyValue($event, 'DTEND') ?? '',
+        ).'@synaplan';
+    }
+
+    /** Property value with parameters stripped (DTSTART;TZID=…:value). */
+    private function propertyValue(string $block, string $name): ?string
+    {
+        if (1 !== preg_match('/^'.preg_quote($name, '/').'(?:;[^:]*)?:([^\r\n]*)/m', $block, $matches)) {
+            return null;
+        }
+
+        return trim($matches[1]);
     }
 
     /**
