@@ -163,14 +163,15 @@ final readonly class GraphClient
      * Create a calendar event (delegated `Calendars.ReadWrite`).
      *
      * Idempotent by construction: the caller passes a deterministic
-     * `transactionId` (max 255 chars) and Graph answers 409 for a repeat of
-     * the same transaction — re-running a delivery never duplicates the
-     * event, mirroring the CalDAV UID contract (plan 07 S13).
+     * `transactionId` (max 255 chars). Graph answers 409, or 400 with
+     * `ErrorDuplicateTransactionId`, for a repeat of the same transaction —
+     * re-running a delivery never duplicates the event, mirroring the CalDAV
+     * UID contract (plan 07 S13).
      *
      * @param list<string> $attendees email addresses
      *
      * @return array{id: string, webLink: string, created: bool} `created` is
-     *                                                           false when the event already existed (409 on the transactionId)
+     *                                                           false when the event already existed (duplicate transactionId)
      */
     public function createEvent(
         Connection $connection,
@@ -373,8 +374,9 @@ final readonly class GraphClient
      * processing, so retrying it is always safe.
      *
      * @param array<string, mixed> $payload
-     * @param bool                 $conflictIsDuplicate when true a 409 answer means
-     *                                                  "this transaction already ran" and returns null instead of throwing
+     * @param bool                 $conflictIsDuplicate when true a 409, or a 400
+     *                                                  `ErrorDuplicateTransactionId`, means "this transaction already ran"
+     *                                                  and returns null instead of throwing
      *
      * @return array<string, mixed>|null the decoded response body (empty for 202-style answers), null on a duplicate 409
      */
@@ -416,7 +418,7 @@ final readonly class GraphClient
                 continue;
             }
 
-            if (409 === $status && $conflictIsDuplicate) {
+            if ($conflictIsDuplicate && $this->isDuplicateTransaction($status, $raw)) {
                 return null;
             }
 
@@ -427,6 +429,26 @@ final readonly class GraphClient
 
             throw new GraphException($this->describeFailure($status, $raw));
         }
+    }
+
+    /**
+     * A repeated transactionId is 409, or 400 with ErrorDuplicateTransactionId.
+     * Any other 400 is a real rejection and must still surface.
+     */
+    private function isDuplicateTransaction(int $status, string $raw): bool
+    {
+        if (409 === $status) {
+            return true;
+        }
+        if (400 !== $status) {
+            return false;
+        }
+
+        $decoded = json_decode($raw, true);
+        $error = is_array($decoded) ? ($decoded['error'] ?? null) : null;
+        $code = is_array($error) ? ($error['code'] ?? null) : null;
+
+        return 'ErrorDuplicateTransactionId' === $code;
     }
 
     private function sleepBeforeRetry(?string $retryAfter, int $attempt, int $status, Connection $connection): void

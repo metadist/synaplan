@@ -19,9 +19,11 @@ use Psr\Log\LoggerInterface;
  * {@see CalDavDestinationProvider} (Phase M steps M4–M6).
  *
  * Idempotency by construction (same S13 contract as CalDAV): every event is
- * created with a deterministic Graph `transactionId` derived from the file and
- * source message; Graph answers 409 for a repeated transaction, which counts
- * as "already delivered", never a duplicate.
+ * created with a deterministic Graph `transactionId` derived from the message
+ * and the meeting itself. File id is always 0 for a generated invite, so it
+ * cannot tell two steps in one reply apart. Graph answers 409, or 400 with
+ * `ErrorDuplicateTransactionId`, for a repeated transaction, which counts as
+ * "already delivered", never a duplicate.
  *
  * Requires the `Calendars.ReadWrite` delegated scope. Connections consented
  * before the scope expansion carry only the old grant — those fail with
@@ -91,7 +93,13 @@ final readonly class OutlookCalendarDestinationProvider implements DestinationPr
             foreach ($events as $index => $event) {
                 $result = $this->graph->createEvent(
                     $connection,
-                    transactionId: sprintf('synaplan-f%d-m%d-e%d', $file->fileId, $messageId, $index),
+                    transactionId: CalendarDeliveryId::token(
+                        $messageId,
+                        $index,
+                        $event['summary'],
+                        $event['start']->format('Y-m-d\TH:i:s'),
+                        $event['end']->format('Y-m-d\TH:i:s'),
+                    ),
                     subject: $event['summary'],
                     start: $event['start'],
                     end: $event['end'],

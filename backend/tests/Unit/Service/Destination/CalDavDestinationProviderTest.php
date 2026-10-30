@@ -10,6 +10,7 @@ use App\Service\Credential\CredentialVaultInterface;
 use App\Service\Dav\CalDavClient;
 use App\Service\Dav\WebDavClient;
 use App\Service\Destination\CalDavDestinationProvider;
+use App\Service\Destination\CalendarDeliveryId;
 use App\Service\Destination\DestinationFailureCode;
 use App\Service\Destination\ShareableFile;
 use App\Service\Security\SsrfGuard;
@@ -52,10 +53,16 @@ final class CalDavDestinationProviderTest extends TestCase
         self::assertTrue($result->ok);
         self::assertSame('2', $result->context['created']);
         self::assertSame('0', $result->context['skipped']);
-        self::assertStringContainsString('UID:synaplan-f5-m33-e0@synaplan', $captured[1]['body']);
+        self::assertStringContainsString(
+            'UID:'.CalendarDeliveryId::token(33, 0, 'Standup', '20260817T070000Z', '20260817T080000Z').'@synaplan',
+            $captured[1]['body'],
+        );
         self::assertStringContainsString('BEGIN:VCALENDAR', $captured[1]['body']);
         self::assertStringContainsString('SUMMARY:Standup', $captured[1]['body']);
-        self::assertStringContainsString('UID:synaplan-f5-m33-e1@synaplan', $captured[3]['body']);
+        self::assertStringContainsString(
+            'UID:'.CalendarDeliveryId::token(33, 1, 'Planning', '20260818T090000Z', '20260818T100000Z').'@synaplan',
+            $captured[3]['body'],
+        );
     }
 
     public function testRedeliveryDoesNotDuplicateEvents(): void

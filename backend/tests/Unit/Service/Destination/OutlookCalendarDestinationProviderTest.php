@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Destination;
 
 use App\Entity\Connection;
 use App\Repository\ConnectionRepository;
+use App\Service\Destination\CalendarDeliveryId;
 use App\Service\Destination\DestinationFailureCode;
 use App\Service\Destination\OutlookCalendarDestinationProvider;
 use App\Service\Destination\ShareableFile;
@@ -55,12 +56,49 @@ final class OutlookCalendarDestinationProviderTest extends TestCase
         self::assertSame('https://outlook.office.com/evt-1', $result->context['webLink']);
 
         $first = json_decode($captured[0]['body'], true);
-        self::assertSame('synaplan-f5-m33-e0', $first['transactionId']);
+        self::assertSame(
+            CalendarDeliveryId::token(33, 0, 'Standup', '2026-08-17T07:00:00', '2026-08-17T08:00:00'),
+            $first['transactionId'],
+        );
         self::assertSame('Standup', $first['subject']);
         self::assertSame('2026-08-17T07:00:00', $first['start']['dateTime']);
         self::assertSame('UTC', $first['start']['timeZone']);
         $second = json_decode($captured[1]['body'], true);
-        self::assertSame('synaplan-f5-m33-e1', $second['transactionId']);
+        self::assertSame(
+            CalendarDeliveryId::token(33, 1, 'Planning', '2026-08-18T09:00:00', '2026-08-18T10:00:00'),
+            $second['transactionId'],
+        );
+        self::assertNotSame($first['transactionId'], $second['transactionId']);
+    }
+
+    public function testTwoInvitesInOneMessageDoNotShareATransactionId(): void
+    {
+        $prague = tempnam(sys_get_temp_dir(), 'ics').'.ics';
+        $malta = tempnam(sys_get_temp_dir(), 'ics').'.ics';
+        file_put_contents($prague, $this->singleEvent('Flug Prag', '20261121T194000Z', '20261121T214000Z'));
+        file_put_contents($malta, $this->singleEvent('Flug Malta', '20261125T140000Z', '20261125T160000Z'));
+
+        try {
+            $captured = [];
+            $provider = $this->provider([
+                new MockResponse(json_encode(['id' => 'evt-prague', 'webLink' => 'https://outlook.office.com/prague']), ['http_code' => 201]),
+                new MockResponse(json_encode(['id' => 'evt-malta', 'webLink' => 'https://outlook.office.com/malta']), ['http_code' => 201]),
+            ], $captured);
+
+            $pragueResult = $provider->send(new ShareableFile(0, 1, $prague, 'prague.ics', 128), ['connection_id' => 7, 'message_id' => 99]);
+            $maltaResult = $provider->send(new ShareableFile(0, 1, $malta, 'malta.ics', 128), ['connection_id' => 7, 'message_id' => 99]);
+
+            self::assertTrue($pragueResult->ok);
+            self::assertTrue($maltaResult->ok);
+            $first = json_decode($captured[0]['body'], true);
+            $second = json_decode($captured[1]['body'], true);
+            self::assertNotSame($first['transactionId'], $second['transactionId']);
+            self::assertSame('Flug Prag', $first['subject']);
+            self::assertSame('Flug Malta', $second['subject']);
+        } finally {
+            @unlink($prague);
+            @unlink($malta);
+        }
     }
 
     public function testRedeliveryCountsConflictsAsSkippedNotFailed(): void
@@ -165,6 +203,20 @@ final class OutlookCalendarDestinationProviderTest extends TestCase
 
         self::assertFalse($result->ok);
         self::assertSame(DestinationFailureCode::Unauthorized, $result->code);
+    }
+
+    private function singleEvent(string $summary, string $start, string $end): string
+    {
+        return implode("\r\n", [
+            'BEGIN:VCALENDAR',
+            'BEGIN:VEVENT',
+            'UID:one@synaplan',
+            'DTSTART:'.$start,
+            'DTEND:'.$end,
+            'SUMMARY:'.$summary,
+            'END:VEVENT',
+            'END:VCALENDAR',
+        ])."\r\n";
     }
 
     private function icsWithTwoEvents(): string
