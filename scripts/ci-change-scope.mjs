@@ -102,6 +102,7 @@ export const isPinPath = (path) => {
 export const SIDECAR_PATHS = {
   compute: ['sidecars/synaplan-compute/'],
   watchdog: ['sidecars/synaplan-watchdog/'],
+  egress: ['sidecars/synaplan-egress/'],
   transcriber: ['sidecars/synaplan-transcriber/'],
   voice: ['sidecars/synaplan-voice/'],
 }
@@ -120,11 +121,11 @@ const matchesSidecar = (path, prefixes) =>
  * diff, a release tag that must rebuild, or a change to the CI rule tests
  * every sidecar. Thin and promote skip them.
  *
- * @returns {{ compute: boolean, watchdog: boolean, transcriber: boolean, voice: boolean }}
+ * @returns {{ compute: boolean, watchdog: boolean, egress: boolean, transcriber: boolean, voice: boolean }}
  */
 export const sidecarsForChange = ({ eventName, ref, files = [], mode }) => {
-  const none = { compute: false, watchdog: false, transcriber: false, voice: false }
-  const all = { compute: true, watchdog: true, transcriber: true, voice: true }
+  const none = { compute: false, watchdog: false, egress: false, transcriber: false, voice: false }
+  const all = { compute: true, watchdog: true, egress: true, transcriber: true, voice: true }
   if (mode === 'thin' || mode === 'promote') {
     return none
   }
@@ -143,6 +144,7 @@ export const sidecarsForChange = ({ eventName, ref, files = [], mode }) => {
   return {
     compute: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.compute)),
     watchdog: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.watchdog)),
+    egress: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.egress)),
     transcriber: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.transcriber)),
     voice: paths.some((path) => matchesSidecar(path, SIDECAR_PATHS.voice)),
   }
@@ -234,6 +236,7 @@ export const runCli = (arguments_ = []) => {
     `reason=${result.reason}`,
     `compute=${sidecars.compute}`,
     `watchdog=${sidecars.watchdog}`,
+    `egress=${sidecars.egress}`,
     `transcriber=${sidecars.transcriber}`,
     `voice=${sidecars.voice}`,
     '',

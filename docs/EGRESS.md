@@ -52,10 +52,50 @@ Nothing else in this table moves onto the HTTP client.
 | gRPC | Triton, from `LocalProviderAvailabilityProbe` and the model catalog | The Triton endpoint on the AI settings tab |
 | WebSocket | The voice sidecar's provider socket | The voice service URL. PHP does not open it. |
 
-No compose file sets `HTTP_PROXY`, `HTTPS_PROXY`, or `NO_PROXY`. Symfony
-HttpClient honours those environment variables on its own. The SDKs that
-accept a client now use that client. Apple OCSP does not, and only when
-online checks are on.
+The default compose file sets none of `HTTP_PROXY`, `HTTPS_PROXY`, or
+`NO_PROXY`. Symfony HttpClient honours those environment variables on its
+own. The SDKs that accept a client now use that client. Apple OCSP does
+not, and only when online checks are on.
+
+## The optional gateway
+
+`docker-compose.egress.yml` is off unless you load it:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.egress.yml --profile egress up -d
+```
+
+That file points PHP, the worker, the scheduler, voice, and the
+transcriber at `http://egress:3128`, and sets `NODE_USE_ENV_PROXY=1` on the
+two Node sidecars so they actually use the proxy. Plain HTTP is sent as a
+CONNECT tunnel (`CURLOPT_HTTPPROXYTUNNEL`), because the gateway accepts
+CONNECT only. `EGRESS_GATEWAY=1` tells PHP to send a one-request grant on
+`CURLOPT_PROXYHEADER`, which is the header curl puts on CONNECT. The
+gateway dials the pinned address and deletes the grant. An allowlisted
+name is resolved by the gateway. The allowlist is written when the
+process starts (the entrypoint runs a console command) and again on each
+command and request; the key lasts a day. Without this file, nothing in
+the default stack changes.
+
+A compute run does not use that proxy environment. Its pin proxy dials
+the approved address itself. When `EGRESS_UPSTREAM` and
+`EGRESS_UPSTREAM_TOKEN` are set, that proxy sends `CONNECT <pinned ip>`
+to the gateway with the token. The gateway dials that public address and
+does not log the token. `docling` and `searxng` are in `NO_PROXY`.
+
+`REDIS_KEY_PREFIX` must be the prefix `RedisService` writes
+(`synaplan:` plus `APP_ENV` plus `:`). The dev overlay uses `synaplan:dev:`
+because this compose file pins `APP_ENV=dev`. Production sets
+`EGRESS_COMPUTE_TOKEN` to the same value on the gateway and the compute
+service. The dev overlay has a local default.
+
+An enterprise proxy still uses `EGRESS_PROXY` and `CURLOPT_CONNECT_TO`.
+The gateway, when it is chained with `UPSTREAM_PROXY`, sends
+`CONNECT <pinned ip>:<port>` to that proxy. If the enterprise proxy
+refuses a CONNECT to an IP address, typed-URL features stop: allow IP
+literals for those tunnels, or turn the typed-URL features off. The
+gateway log line is `reason=upstream_refused` and it names the host and
+port only. A grant id is not written to a log.
 
 ## What is deliberately not a shared allowlist entry
 

@@ -70,17 +70,34 @@ final readonly class EgressPolicy
     }
 
     /**
+     * Rule strings the CONNECT gateway stores. Same set {@see rules()} uses.
+     *
+     * @return list<string>
+     */
+    public function publishedRules(): array
+    {
+        $rules = [];
+        foreach ([
+            ...EgressBuiltinDestinations::rules(),
+            ...$this->config->allowRules(),
+            ...$this->config->noProxyHosts(),
+        ] as $item) {
+            $item = trim($item);
+            if ('' !== $item && null !== EgressRule::parse($item)) {
+                $rules[] = $item;
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
      * @return list<EgressRule>
      */
     private function rules(): array
     {
-        $raw = [
-            ...EgressBuiltinDestinations::rules(),
-            ...$this->config->allowRules(),
-            ...$this->config->noProxyHosts(),
-        ];
         $rules = [];
-        foreach ($raw as $item) {
+        foreach ($this->publishedRules() as $item) {
             $rule = EgressRule::parse($item);
             if (null !== $rule) {
                 $rules[] = $rule;

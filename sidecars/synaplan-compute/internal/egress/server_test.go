@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,46 @@ func TestConnectUnknownHostRefused(t *testing.T) {
 	}
 	if len(refused) != 1 || refused[0] != "unknown_host" {
 		t.Fatalf("refused = %v, want [unknown_host]", refused)
+	}
+}
+
+func TestUpstreamConnectKeepsThePin(t *testing.T) {
+	t.Parallel()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	got := make(chan string, 1)
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		reader := bufio.NewReader(conn)
+		line, _ := reader.ReadString('\n')
+		var auth string
+		for {
+			header, err := reader.ReadString('\n')
+			if err != nil || header == "\r\n" {
+				break
+			}
+			if strings.HasPrefix(strings.ToLower(header), "proxy-authorization:") {
+				auth = strings.TrimSpace(header)
+			}
+		}
+		got <- strings.TrimSpace(line) + " | " + auth
+		_, _ = io.WriteString(conn, "HTTP/1.1 200 Connection established\r\n\r\n")
+	}()
+	srv := NewServer(allowList(), Option{Upstream: ln.Addr().String(), UpstreamToken: "compute-token"})
+	conn, err := srv.dialPinned(t.Context(), []net.IP{net.ParseIP("93.184.216.34")}, 443)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.Close()
+	if line := <-got; line != "CONNECT 93.184.216.34:443 HTTP/1.1 | Proxy-Authorization: Bearer compute-token" {
+		t.Fatalf("upstream %q", line)
 	}
 }
 

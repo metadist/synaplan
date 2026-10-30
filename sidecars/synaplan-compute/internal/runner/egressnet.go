@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -63,6 +64,36 @@ type EgressConfig struct {
 // lowercase keeps the name within Docker's charset.
 func EgressNetworkName(runID string) string {
 	return egressNetworkPrefix + strings.ToLower(runID)
+}
+
+// upstreamProxyEnv is the installation gateway for this run's pin proxy.
+// The address is an IP literal so the proxy container does not need DNS.
+// Both variables are required together. Neither is logged.
+func upstreamProxyEnv() ([]string, error) {
+	raw := strings.TrimSpace(os.Getenv("EGRESS_UPSTREAM"))
+	token := os.Getenv("EGRESS_UPSTREAM_TOKEN")
+	if raw == "" && token == "" {
+		return nil, nil
+	}
+	if raw == "" || token == "" {
+		return nil, fmt.Errorf("egress upstream requires EGRESS_UPSTREAM and EGRESS_UPSTREAM_TOKEN")
+	}
+	host, port, err := net.SplitHostPort(raw)
+	if err != nil {
+		return nil, fmt.Errorf("EGRESS_UPSTREAM: %w", err)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		ips, err := net.LookupIP(host)
+		if err != nil || len(ips) == 0 {
+			return nil, fmt.Errorf("resolve egress upstream %s: %w", host, err)
+		}
+		ip = ips[0]
+	}
+	return []string{
+		"EGRESS_UPSTREAM=" + net.JoinHostPort(ip.String(), port),
+		"EGRESS_UPSTREAM_TOKEN=" + token,
+	}, nil
 }
 
 // ProxyEnv renders the only three variables an egress run container gets.
@@ -199,15 +230,19 @@ func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, 
 	mem := int64(64 * 1024 * 1024)
 	pids := int64(32)
 	initTrue := true
+	upstream, err := upstreamProxyEnv()
+	if err != nil {
+		return "", "", err
+	}
 	resp, err := d.cli.ContainerCreate(ctx,
 		&container.Config{
 			Image: image,
 			Cmd:   []string{proxyCmd},
-			Env: []string{
+			Env: append([]string{
 				"EGRESS_ALLOW_JSON=" + allowJSON,
 				"EGRESS_RUN_ID=" + runID,
 				fmt.Sprintf("EGRESS_PORT=%d", egressProxyPort),
-			},
+			}, upstream...),
 			Labels: map[string]string{runLabelKey: runLabelValue, proxyLabelKey: proxyLabelValue},
 		},
 		&container.HostConfig{

@@ -49,7 +49,9 @@ type Server struct {
 	// onRefused is called for every refused or cut connection (nil-safe).
 	// Reason is a short machine string (unknown_host, ip_literal,
 	// private_ip, bad_method, body_cap, ...).
-	onRefused func(host string, port int, reason string)
+	onRefused     func(host string, port int, reason string)
+	upstream      string
+	upstreamToken string
 }
 
 // Option tunes a Server. Zero values select defaults.
@@ -60,6 +62,10 @@ type Option struct {
 	MaxConns int
 	// OnRefused receives every refusal for audit; may be nil.
 	OnRefused func(host string, port int, reason string)
+	// Upstream is host:port of the installation gateway. Empty dials the pin.
+	Upstream string
+	// UpstreamToken is sent on that CONNECT and is not logged.
+	UpstreamToken string
 }
 
 // NewServer builds a proxy for exactly allow (already validated by
@@ -74,11 +80,13 @@ func NewServer(allow []contract.EgressHost, opt Option) *Server {
 		maxConns = DefaultMaxConns
 	}
 	return &Server{
-		proxy:     NewProxy(allow),
-		maxBody:   maxBody,
-		sem:       make(chan struct{}, maxConns),
-		dialer:    &net.Dialer{Timeout: dialTimeout},
-		onRefused: opt.OnRefused,
+		proxy:         NewProxy(allow),
+		maxBody:       maxBody,
+		sem:           make(chan struct{}, maxConns),
+		dialer:        &net.Dialer{Timeout: dialTimeout},
+		onRefused:     opt.OnRefused,
+		upstream:      opt.Upstream,
+		upstreamToken: opt.UpstreamToken,
 	}
 }
 
@@ -255,7 +263,7 @@ func (s *Server) roundTrip(req *http.Request, pins []net.IP, port int) (*http.Re
 	req = req.WithContext(ctx)
 	var lastErr error
 	for _, ip := range pins {
-		conn, err := s.dialer.DialContext(req.Context(), "tcp", net.JoinHostPort(ip.String(), strconv.Itoa(port)))
+		conn, err := s.dialOne(req.Context(), ip, port)
 		if err != nil {
 			lastErr = err
 			continue
@@ -281,7 +289,7 @@ func (s *Server) roundTrip(req *http.Request, pins []net.IP, port int) (*http.Re
 func (s *Server) dialPinned(ctx context.Context, pins []net.IP, port int) (net.Conn, error) {
 	var lastErr error
 	for _, ip := range pins {
-		conn, err := s.dialer.DialContext(ctx, "tcp", net.JoinHostPort(ip.String(), strconv.Itoa(port)))
+		conn, err := s.dialOne(ctx, ip, port)
 		if err != nil {
 			lastErr = err
 			continue
@@ -292,6 +300,47 @@ func (s *Server) dialPinned(ctx context.Context, pins []net.IP, port int) (net.C
 		lastErr = fmt.Errorf("no pinned ip dialed")
 	}
 	return nil, lastErr
+}
+
+func (s *Server) dialOne(ctx context.Context, ip net.IP, port int) (net.Conn, error) {
+	target := net.JoinHostPort(ip.String(), strconv.Itoa(port))
+	if s.upstream == "" {
+		return s.dialer.DialContext(ctx, "tcp", target)
+	}
+	conn, err := s.dialer.DialContext(ctx, "tcp", s.upstream)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeUpstreamConnect(conn, target, s.upstreamToken); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+func writeUpstreamConnect(conn net.Conn, target, token string) error {
+	_ = conn.SetDeadline(time.Now().Add(dialTimeout))
+	if _, err := fmt.Fprintf(conn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", target, target); err != nil {
+		return err
+	}
+	if token != "" {
+		if _, err := fmt.Fprintf(conn, "Proxy-Authorization: Bearer %s\r\n", token); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprint(conn, "\r\n"); err != nil {
+		return err
+	}
+	resp, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: http.MethodConnect})
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("upstream proxy status %d", resp.StatusCode)
+	}
+	_ = conn.SetDeadline(time.Time{})
+	return nil
 }
 
 // relay copies both directions until EOF, error, idle timeout, or the body
