@@ -84,6 +84,16 @@ final class OpenAIApiClient
         ] + $options + ['timeout' => $timeout]);
     }
 
+    public function getBytes(string $url): string
+    {
+        $response = $this->httpClient->request('GET', $url, ['timeout' => 60, 'max_duration' => 60]);
+        if (200 !== $response->getStatusCode()) {
+            throw new \Exception('Failed to download image from URL');
+        }
+
+        return $response->getContent();
+    }
+
     public function stream(ResponseInterface $response): ResponseStreamInterface
     {
         return $this->httpClient->stream($response);

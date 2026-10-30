@@ -90,6 +90,7 @@ final class SystemConfigServiceFactory
                 $doubles['layeredConfigResolver'] ?? null,
             ),
             env: $env,
+            http: new \Symfony\Component\HttpClient\MockHttpClient(),
             logger: $logger,
             defaultTtsUrl: self::TTS_URL,
         );

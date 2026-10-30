@@ -945,7 +945,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     private function api(): OpenAIApiClient
     {
-        return new OpenAIApiClient($this->httpClient, new OpenAICurlTransport(), 'test-key');
+        return new OpenAIApiClient($this->httpClient, new OpenAICurlTransport(new \Symfony\Component\HttpClient\MockHttpClient()), 'test-key');
     }
 
     private function createChat(bool $storeResponses = true): OpenAIChat

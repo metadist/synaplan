@@ -414,8 +414,9 @@ final class OpenAIImageGeneration
         }
 
         try {
-            // Convert URL to file resource
-            $imageContent = file_get_contents($imageUrl);
+            // A remote URL goes through the shared HTTP client. A local path
+            // is the file the caller already has, which file_get_contents reads.
+            $imageContent = $this->imageBytes($imageUrl);
             if (false === $imageContent) {
                 throw new \Exception('Failed to download image from URL');
             }
@@ -446,6 +447,23 @@ final class OpenAIImageGeneration
         }
     }
 
+    /**
+     * Bytes of an image the caller named. An http(s) URL is fetched through
+     * the shared client. Anything else is a path on disk.
+     */
+    private function imageBytes(string $location): string|false
+    {
+        if (1 === preg_match('#\Ahttps?://#i', $location)) {
+            try {
+                return $this->api->getBytes($location);
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+
+        return file_get_contents($location);
+    }
+
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
     {
         if (null === $this->api->sdk()) {
@@ -453,9 +471,10 @@ final class OpenAIImageGeneration
         }
 
         try {
-            // Download images
-            $imageContent = file_get_contents($imageUrl);
-            $maskContent = file_get_contents($maskUrl);
+            // Download images. A remote URL uses the shared HTTP client; a
+            // local path is read from disk, as the edit and variation tests do.
+            $imageContent = $this->imageBytes($imageUrl);
+            $maskContent = $this->imageBytes($maskUrl);
 
             if (false === $imageContent || false === $maskContent) {
                 throw new \Exception('Failed to download image or mask');

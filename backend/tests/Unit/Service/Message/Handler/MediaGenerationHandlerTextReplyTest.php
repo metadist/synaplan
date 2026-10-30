@@ -77,7 +77,7 @@ final class MediaGenerationHandlerTextReplyTest extends TestCase
             'models' => $this->modelConfigService,
             'em' => $this->em,
             'extractor' => $this->promptExtractor,
-            'downloader' => new MediaDownloader(),
+            'downloader' => new MediaDownloader(\Symfony\Component\HttpClient\HttpClient::create()),
             'thumbnails' => $this->createMock(ThumbnailService::class),
             'limits' => $this->rateLimitService,
             'memory' => new PendingMemoryExtraction(

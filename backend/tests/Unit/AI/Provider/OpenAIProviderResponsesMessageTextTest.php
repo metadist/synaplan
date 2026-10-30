@@ -88,7 +88,7 @@ final class OpenAIProviderResponsesMessageTextTest extends TestCase
      */
     private function messageText(array $output): ?string
     {
-        $generation = new OpenAIImageGeneration(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()), new NullLogger());
+        $generation = new OpenAIImageGeneration(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new MockHttpClient())), new NullLogger());
         $method = new \ReflectionMethod(OpenAIImageGeneration::class, 'responsesMessageText');
 
         $text = $method->invoke($generation, $output);

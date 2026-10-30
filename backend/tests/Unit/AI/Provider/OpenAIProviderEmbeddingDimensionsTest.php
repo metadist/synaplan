@@ -101,7 +101,7 @@ final class OpenAIProviderEmbeddingDimensionsTest extends TestCase
      */
     private function invokeBuildEmbeddingParams(string $model, string $text, array $options): array
     {
-        $embedding = new OpenAIEmbedding(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()));
+        $embedding = new OpenAIEmbedding(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new MockHttpClient())));
 
         return (new \ReflectionMethod($embedding, 'buildEmbeddingParams'))->invoke($embedding, $model, $text, $options);
     }

@@ -74,26 +74,26 @@ final class MediaDownloaderTest extends TestCase
 
     public function testItReturnsTheBytesOfTheFile(): void
     {
-        self::assertSame(base64_decode(self::PIXEL), (new MediaDownloader())->fetch(self::url('/pixel.png')));
+        self::assertSame(base64_decode(self::PIXEL), (new MediaDownloader(\Symfony\Component\HttpClient\HttpClient::create()))->fetch(self::url('/pixel.png')));
     }
 
     public function testItFollowsARedirect(): void
     {
-        self::assertSame(base64_decode(self::PIXEL), (new MediaDownloader())->fetch(self::url('/moved')));
+        self::assertSame(base64_decode(self::PIXEL), (new MediaDownloader(\Symfony\Component\HttpClient\HttpClient::create()))->fetch(self::url('/moved')));
     }
 
     public function testAMissingFileFailsWithItsStatus(): void
     {
         $this->expectExceptionMessage('cURL download failed (HTTP 404): ');
 
-        (new MediaDownloader())->fetch(self::url('/missing.png'));
+        (new MediaDownloader(\Symfony\Component\HttpClient\HttpClient::create()))->fetch(self::url('/missing.png'));
     }
 
     public function testAHostThatRefusesTheConnectionFailsWithTheCurlError(): void
     {
         $this->expectExceptionMessageMatches('/^cURL download failed \(HTTP 0\): .+/');
 
-        (new MediaDownloader())->fetch('http://127.0.0.1:1/pixel.png');
+        (new MediaDownloader(\Symfony\Component\HttpClient\HttpClient::create()))->fetch('http://127.0.0.1:1/pixel.png');
     }
 
     private static function url(string $path): string

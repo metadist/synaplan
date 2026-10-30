@@ -101,7 +101,7 @@ final class OpenAIProviderImageEditRequestTest extends TestCase
      */
     private function build(string $prompt, string $model, array $images, array $options): array
     {
-        $generation = new OpenAIImageGeneration(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()), new NullLogger());
+        $generation = new OpenAIImageGeneration(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport(new MockHttpClient())), new NullLogger());
         $method = new \ReflectionMethod(OpenAIImageGeneration::class, 'buildImageEditRequest');
 
         /** @var array{model: string, input: list<array<string, mixed>>, tools: list<array<string, mixed>>} $body */

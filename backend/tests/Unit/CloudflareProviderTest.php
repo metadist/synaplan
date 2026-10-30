@@ -108,6 +108,7 @@ class CloudflareProviderTest extends TestCase
     ): CloudflareProvider {
         return new CloudflareProvider(
             logger: $this->logger,
+            http: new \Symfony\Component\HttpClient\MockHttpClient(),
             accountId: $accountId,
             apiToken: $apiToken,
         );

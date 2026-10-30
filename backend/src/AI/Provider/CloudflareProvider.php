@@ -7,6 +7,8 @@ namespace App\AI\Provider;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Cloudflare Workers AI — Embedding provider for bge-m3 and Qwen3-Embedding.
@@ -33,20 +35,12 @@ class CloudflareProvider implements EmbeddingProviderInterface
     private const MAX_BATCH_SIZE = 100;
     private const TIMEOUT_SECONDS = 30;
 
-    private ?\CurlHandle $curlHandle = null;
-
     public function __construct(
         private readonly LoggerInterface $logger,
+        private readonly HttpClientInterface $http,
         private readonly ?string $accountId = null,
         private readonly ?string $apiToken = null,
     ) {
-    }
-
-    public function __destruct()
-    {
-        if (null !== $this->curlHandle) {
-            curl_close($this->curlHandle);
-        }
     }
 
     public function getName(): string
@@ -209,17 +203,21 @@ class CloudflareProvider implements EmbeddingProviderInterface
             $payload['instruction'] = $instruction;
         }
 
-        $ch = $this->getCurlHandle();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, \JSON_THROW_ON_ERROR));
-
-        $body = curl_exec($ch);
-
-        if (false === $body) {
-            throw new ProviderException('Cloudflare cURL error: '.curl_error($ch), 'cloudflare');
+        try {
+            $response = $this->http->request('POST', $url, [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$this->apiToken,
+                    'Content-Type' => 'application/json',
+                ],
+                'body' => json_encode($payload, \JSON_THROW_ON_ERROR),
+                'timeout' => self::TIMEOUT_SECONDS,
+                'max_duration' => self::TIMEOUT_SECONDS,
+            ]);
+            $httpCode = $response->getStatusCode();
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new ProviderException('Cloudflare cURL error: '.$e->getMessage(), 'cloudflare', null, 0, $e);
         }
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         if ($httpCode < 200 || $httpCode >= 300) {
             throw new ProviderException("Cloudflare API returned HTTP {$httpCode}: {$body}", 'cloudflare');
         }
@@ -237,30 +235,6 @@ class CloudflareProvider implements EmbeddingProviderInterface
         }
 
         return $json['result'] ?? throw new ProviderException('Cloudflare API returned no result', 'cloudflare');
-    }
-
-    /**
-     * Persistent cURL handle — keeps TCP+TLS connection alive across calls.
-     */
-    private function getCurlHandle(): \CurlHandle
-    {
-        if (null === $this->curlHandle) {
-            $this->curlHandle = curl_init();
-            curl_setopt_array($this->curlHandle, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Authorization: Bearer '.$this->apiToken,
-                    'Content-Type: application/json',
-                ],
-                CURLOPT_TIMEOUT => self::TIMEOUT_SECONDS,
-                CURLOPT_TCP_KEEPALIVE => 1,
-                CURLOPT_TCP_KEEPIDLE => 60,
-                CURLOPT_TCP_KEEPINTVL => 30,
-            ]);
-        }
-
-        return $this->curlHandle;
     }
 
     private function supportsInstruction(string $model): bool

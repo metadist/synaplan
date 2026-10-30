@@ -51,6 +51,7 @@ class MediaGenerationServiceTest extends TestCase
             $this->em,
             new NullLogger(),
             $this->cache,
+            new \Symfony\Component\HttpClient\MockHttpClient(),
             $this->uploadDir,
         );
     }
