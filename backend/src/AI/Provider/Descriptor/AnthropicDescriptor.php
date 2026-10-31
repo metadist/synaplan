@@ -29,7 +29,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * (`03_contracts.md` §2.3.3); the request-shape constants it quotes stay on
  * the adapter.
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: AnthropicProvider::class)]
 final class AnthropicDescriptor implements DescribesProviderInterface
 {
     /**

@@ -14,11 +14,16 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
+ * Wires the container from the provider descriptors.
+ *
  * Hands {@see ProviderCatalog} the class of every service tagged
- * {@see AsAiProvider::TAG}, and refuses a container in which a provider is
- * registered for a capability (`app.ai.<capability>` tag, however it got
- * there) without a descriptor of the same name. The marker tag comes from
- * the `#[AsAiProvider]` attribute through {@see self::configure()}, which
+ * {@see AsAiProvider::TAG}; tags each provider's adapter service with one
+ * `app.ai.<capability>` tag per declared capability, keyed by the provider
+ * name, so `services.yaml` names no capability; builds the platform key
+ * store's environment map from the descriptors' env vars; and refuses a
+ * container in which a provider is registered for a capability without a
+ * descriptor of the same name. The marker tag comes from the
+ * `#[AsAiProvider]` attribute through {@see self::configure()}, which
  * `App\Kernel::build()` registers for autoconfiguration; a class that
  * carries the attribute without describing itself fails the build too.
  */
@@ -42,10 +47,119 @@ final class ProviderCatalogPass implements CompilerPassInterface
         }
 
         $classes = $this->describedClasses($container);
+        $this->tagAdapters($container, $classes);
         $this->assertEveryRegisteredProviderIsDescribed($container, $classes);
 
         $container->getDefinition(ProviderCatalog::class)->setArgument('$providerClasses', $classes);
         $this->wireKeyStoreEnvironment($container, $classes);
+    }
+
+    /**
+     * @return list<class-string<DescribesProviderInterface>>
+     */
+    private function describedClasses(ContainerBuilder $container): array
+    {
+        $classes = [];
+        foreach (array_keys($container->findTaggedServiceIds(AsAiProvider::TAG)) as $id) {
+            $definition = $container->getDefinition($id);
+            if ($definition->isAbstract()) {
+                continue;
+            }
+            $class = $definition->getClass() ?? $id;
+            if (!is_a($class, DescribesProviderInterface::class, true)) {
+                throw new \LogicException(sprintf('Service "%s" is tagged %s but %s does not implement %s.', $id, AsAiProvider::TAG, $class, DescribesProviderInterface::class));
+            }
+            $classes[$class] = true;
+        }
+
+        return array_keys($classes);
+    }
+
+    /**
+     * One `app.ai.<capability>` tag per capability on the adapter service —
+     * the described class, or the one its attribute names. A tag the
+     * container already carries is not added twice. An adapter without a
+     * service definition (a key-only row, a provider the environment
+     * removed) is skipped.
+     *
+     * @param list<class-string<DescribesProviderInterface>> $classes
+     */
+    private function tagAdapters(ContainerBuilder $container, array $classes): void
+    {
+        foreach ($classes as $class) {
+            $adapter = self::adapterOf($class);
+            if (!$container->hasDefinition($adapter)) {
+                continue;
+            }
+            $definition = $container->getDefinition($adapter);
+            if ($definition->isAbstract()) {
+                continue;
+            }
+            $descriptor = $class::descriptor();
+            foreach ($descriptor->capabilities as $capability) {
+                if (!self::hasTagWithKey($definition->getTag($capability->tag()), $descriptor->name)) {
+                    $definition->addTag($capability->tag(), ['key' => $descriptor->name]);
+                }
+            }
+        }
+    }
+
+    /**
+     * @param class-string $class
+     *
+     * @return class-string
+     */
+    private static function adapterOf(string $class): string
+    {
+        $attributes = (new \ReflectionClass($class))->getAttributes(AsAiProvider::class);
+        $adapter = [] === $attributes ? null : $attributes[0]->newInstance()->adapter;
+
+        return $adapter ?? $class;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $tags
+     */
+    private static function hasTagWithKey(array $tags, string $key): bool
+    {
+        foreach ($tags as $attributes) {
+            if (($attributes['key'] ?? null) === $key) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A provider tagged in `services.yaml` without the attribute would
+     * otherwise escape the catalog silently.
+     *
+     * @param list<class-string<DescribesProviderInterface>> $classes
+     */
+    private function assertEveryRegisteredProviderIsDescribed(ContainerBuilder $container, array $classes): void
+    {
+        $described = [];
+        foreach ($classes as $class) {
+            $described[$class::descriptor()->name] = $class;
+        }
+
+        foreach (ProviderCapability::cases() as $capability) {
+            foreach ($container->findTaggedServiceIds($capability->tag()) as $id => $tags) {
+                foreach ($tags as $attributes) {
+                    $key = (string) ($attributes['key'] ?? '');
+                    // Without a key the registry's indexed locator falls back to
+                    // the service id, which no descriptor is named after: a
+                    // key-less tag would reach the registry undescribed.
+                    if ('' === $key) {
+                        throw new \LogicException(sprintf('Service "%s" is tagged %s without a key. A provider is registered by #[AsAiProvider] and descriptor(), whose name is the key.', $id, $capability->tag()));
+                    }
+                    if (!isset($described[$key])) {
+                        throw new \LogicException(sprintf('Service "%s" is tagged %s with key "%s" but no class describes a provider of that name. Add #[AsAiProvider] and descriptor() to it.', $id, $capability->tag(), $key));
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -80,57 +194,5 @@ final class ProviderCatalogPass implements CompilerPassInterface
         $store = $container->getDefinition(ProviderKeyStore::class);
         $store->setArgument('$envKeys', $envKeys);
         $store->setArgument('$envSecrets', $envSecrets);
-    }
-
-    /**
-     * @return list<class-string<DescribesProviderInterface>>
-     */
-    private function describedClasses(ContainerBuilder $container): array
-    {
-        $classes = [];
-        foreach (array_keys($container->findTaggedServiceIds(AsAiProvider::TAG)) as $id) {
-            $definition = $container->getDefinition($id);
-            if ($definition->isAbstract()) {
-                continue;
-            }
-            $class = $definition->getClass() ?? $id;
-            if (!is_a($class, DescribesProviderInterface::class, true)) {
-                throw new \LogicException(sprintf('Service "%s" is tagged %s but %s does not implement %s.', $id, AsAiProvider::TAG, $class, DescribesProviderInterface::class));
-            }
-            $classes[$class] = true;
-        }
-
-        return array_keys($classes);
-    }
-
-    /**
-     * A provider tagged in `services.yaml` without the attribute would
-     * otherwise escape the catalog silently.
-     *
-     * @param list<class-string<DescribesProviderInterface>> $classes
-     */
-    private function assertEveryRegisteredProviderIsDescribed(ContainerBuilder $container, array $classes): void
-    {
-        $described = [];
-        foreach ($classes as $class) {
-            $described[$class::descriptor()->name] = $class;
-        }
-
-        foreach (ProviderCapability::cases() as $capability) {
-            foreach ($container->findTaggedServiceIds($capability->tag()) as $id => $tags) {
-                foreach ($tags as $attributes) {
-                    $key = (string) ($attributes['key'] ?? '');
-                    // Without a key the registry's indexed locator falls back to
-                    // the service id, which no descriptor is named after: a
-                    // key-less tag would reach the registry undescribed.
-                    if ('' === $key) {
-                        throw new \LogicException(sprintf('Service "%s" is tagged %s without a key. A provider is registered by #[AsAiProvider] and descriptor(), whose name is the key.', $id, $capability->tag()));
-                    }
-                    if (!isset($described[$key])) {
-                        throw new \LogicException(sprintf('Service "%s" is tagged %s with key "%s" but no class describes a provider of that name. Add #[AsAiProvider] and descriptor() to it.', $id, $capability->tag(), $key));
-                    }
-                }
-            }
-        }
     }
 }

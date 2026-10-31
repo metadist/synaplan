@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Architecture;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\TestCase;
 
@@ -285,11 +286,11 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testClassifiedKeysStillExistInServicesYaml(): void
     {
-        $existing = $this->envKeysInServicesYaml();
+        $existing = array_values(array_unique([...$this->envKeysInServicesYaml(), ...$this->envKeysInProviderDescriptors()]));
         $stale = array_values(array_diff(array_merge($this->moduleKeys(), $this->coreKeys()), $existing));
 
         $this->assertSame([], $stale, sprintf(
-            "Classified env keys no longer referenced by config/services.yaml (renamed or removed?):\n  %s",
+            "Classified env keys no longer referenced by config/services.yaml or a provider descriptor (renamed or removed?):\n  %s",
             implode("\n  ", $stale),
         ));
     }
@@ -330,6 +331,25 @@ final class ModuleOwnershipTest extends TestCase
     private function coreKeys(): array
     {
         return array_merge(...array_values(self::CORE_ENV_KEYS));
+    }
+
+    /**
+     * The provider key variables ProviderCatalogPass wires into the key store
+     * from the descriptors (key, aliases, secret); services.yaml no longer
+     * names them.
+     *
+     * @return list<string>
+     */
+    private function envKeysInProviderDescriptors(): array
+    {
+        $names = [];
+        foreach (ProviderCatalog::builtIn()->all() as $descriptor) {
+            foreach ($descriptor->key?->envVars() ?? [] as $name) {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
     }
 
     /**

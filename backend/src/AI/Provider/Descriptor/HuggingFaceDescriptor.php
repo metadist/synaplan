@@ -27,7 +27,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * The descriptor of {@see HuggingFaceProvider}, kept beside the adapter
  * because the adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: HuggingFaceProvider::class)]
 final class HuggingFaceDescriptor implements DescribesProviderInterface
 {
     /** Proves the token; says nothing about served models. */

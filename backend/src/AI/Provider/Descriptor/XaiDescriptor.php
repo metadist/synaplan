@@ -25,7 +25,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * The descriptor of {@see XaiProvider}, kept beside the adapter because the
  * adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: XaiProvider::class)]
 final class XaiDescriptor implements DescribesProviderInterface
 {
     public static function descriptor(): ProviderDescriptor

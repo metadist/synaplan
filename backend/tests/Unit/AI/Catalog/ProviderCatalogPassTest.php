@@ -8,7 +8,12 @@ use App\AI\Catalog\Attribute\AsAiProvider;
 use App\AI\Catalog\DependencyInjection\ProviderCatalogPass;
 use App\AI\Catalog\ProviderCatalog;
 use App\AI\Provider\CerebrasProvider;
+use App\AI\Provider\Descriptor\TestProviderDescriptor;
+use App\AI\Provider\Descriptor\XaiDescriptor;
+use App\AI\Provider\ElevenLabsProvider;
 use App\AI\Provider\OllamaProvider;
+use App\AI\Provider\TestProvider;
+use App\AI\Provider\XaiProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -30,6 +35,51 @@ final class ProviderCatalogPassTest extends TestCase
             [CerebrasProvider::class, OllamaProvider::class],
             $container->getDefinition(ProviderCatalog::class)->getArgument('$providerClasses'),
         );
+    }
+
+    public function testADescribedAdapterGetsOneTagPerCapabilityKeyedByItsName(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        $container->setDefinition(CerebrasProvider::class, (new Definition(CerebrasProvider::class))->addTag(AsAiProvider::TAG));
+
+        (new ProviderCatalogPass())->process($container);
+
+        $definition = $container->getDefinition(CerebrasProvider::class);
+        self::assertSame([['key' => 'cerebras']], $definition->getTag('app.ai.chat'));
+        self::assertSame([['key' => 'cerebras']], $definition->getTag('app.ai.vision'));
+        self::assertSame([], $definition->getTag('app.ai.embedding'));
+    }
+
+    public function testASiblingDescriptorTagsTheAdapterItNamesAndATagIsNeverDoubled(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        $container->setDefinition(XaiDescriptor::class, (new Definition(XaiDescriptor::class))->addTag(AsAiProvider::TAG));
+        $container->setDefinition(XaiProvider::class, (new Definition(XaiProvider::class))->addTag('app.ai.chat', ['key' => 'xai']));
+
+        (new ProviderCatalogPass())->process($container);
+
+        $adapter = $container->getDefinition(XaiProvider::class);
+        self::assertSame([['key' => 'xai']], $adapter->getTag('app.ai.chat'), 'the YAML tag is kept, not doubled');
+        self::assertSame([['key' => 'xai']], $adapter->getTag('app.ai.video_generation'));
+        self::assertSame([], $container->getDefinition(XaiDescriptor::class)->getTag('app.ai.chat'), 'the descriptor class carries no capability');
+        self::assertSame([XaiDescriptor::class], $container->getDefinition(ProviderCatalog::class)->getArgument('$providerClasses'));
+    }
+
+    public function testAKeyOnlyProviderAndAMissingAdapterGetNoTags(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        $container->setDefinition(ElevenLabsProvider::class, (new Definition(ElevenLabsProvider::class))->addTag(AsAiProvider::TAG));
+        // The test provider's adapter was removed by PerfTestProviderPass in production.
+        $container->setDefinition(TestProviderDescriptor::class, (new Definition(TestProviderDescriptor::class))->addTag(AsAiProvider::TAG));
+
+        (new ProviderCatalogPass())->process($container);
+
+        self::assertSame([AsAiProvider::TAG], array_keys($container->getDefinition(ElevenLabsProvider::class)->getTags()), 'no capability, no capability tag');
+        self::assertFalse($container->hasDefinition(TestProvider::class));
+        self::assertSame([ElevenLabsProvider::class, TestProviderDescriptor::class], $container->getDefinition(ProviderCatalog::class)->getArgument('$providerClasses'));
     }
 
     public function testACapabilityTaggedProviderWithoutADescriptorFailsTheBuild(): void
