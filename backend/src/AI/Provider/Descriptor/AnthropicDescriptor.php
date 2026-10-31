@@ -13,6 +13,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -75,6 +76,8 @@ final class AnthropicDescriptor implements DescribesProviderInterface
                 listOrder: 3,
                 modelListing: ModelListing::Lists,
                 fieldDescription: 'Anthropic (Claude) API key',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 2,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::ANTHROPIC_TOOL_FORCING,

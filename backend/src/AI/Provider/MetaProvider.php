@@ -12,6 +12,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -140,6 +141,8 @@ class MetaProvider extends AbstractChatCompletionsCloudProvider implements Image
                 listOrder: 9,
                 modelListing: ModelListing::Lists,
                 fieldDescription: 'Meta Model API key — Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Create it at https://dev.meta.ai/ (API keys)',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 7,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,

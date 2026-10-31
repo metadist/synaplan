@@ -12,6 +12,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -50,6 +51,8 @@ class A2AgentProvider extends AbstractChatCompletionsCloudProvider
                 listOrder: 7,
                 modelListing: ModelListing::Lists,
                 fieldDescription: 'A2Agent API key — Qwen, DeepSeek and MiniMax via the A2Agent gateway (Chinese model vendors)',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 10,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,

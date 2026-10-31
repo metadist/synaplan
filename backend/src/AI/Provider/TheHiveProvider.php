@@ -11,6 +11,7 @@ use App\AI\Catalog\ProviderCapability;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderPricing;
 use App\AI\Credential\ProviderKeyStore;
@@ -85,6 +86,8 @@ final class TheHiveProvider implements ImageGenerationProviderInterface, Describ
                 listOrder: 13,
                 servesChat: false,
                 fieldDescription: 'TheHive API key — Flux Schnell and SDXL image generation',
+                configSection: ProviderKeyPresentation::SECTION_MEDIA,
+                configOrder: 1,
             ),
             dialects: new ProviderDialects(),
             defaults: null,
