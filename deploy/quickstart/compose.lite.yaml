@@ -8,7 +8,7 @@
 # are omitted to save ~2 GB of images and RAM. Same volume names as compose.yaml,
 # so switching between compose.lite.yaml and compose.yaml keeps every chat and file.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.6.3}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.6.4}
 
 x-app-command: &app-command
   - |
@@ -27,7 +27,7 @@ x-app-environment: &app-environment
   FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-}
   FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
   SYNAPLAN_PLATFORM: lite
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.6.3}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.6.4}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000} http://localhost:${SYNAPLAN_HTTP_PORT:-8000}}
