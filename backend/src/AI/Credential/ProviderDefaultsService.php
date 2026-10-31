@@ -57,12 +57,14 @@ final readonly class ProviderDefaultsService
         foreach ($this->catalog->all() as $descriptor) {
             $rank = $descriptor->defaults?->preferenceRank;
             if (null !== $rank) {
-                $ranked[$rank] = $descriptor->name;
+                $ranked[] = [$rank, $descriptor->name];
             }
         }
-        ksort($ranked);
+        // Two providers may share a rank (a plugin next to a built-in one);
+        // both stay in the order, the name breaks the tie.
+        usort($ranked, static fn (array $a, array $b): int => $a[0] <=> $b[0] ?: strcmp($a[1], $b[1]));
 
-        return array_values($ranked);
+        return array_map(static fn (array $entry): string => $entry[1], $ranked);
     }
 
     /**
