@@ -318,7 +318,7 @@ final class RateLimitService implements ResetInterface
      */
     public function recordUsage(User $user, string $action, array $metadata = []): RecordedUsage
     {
-        $metadata = \App\Service\Usage\DemoCallContext::apply($metadata);
+        $metadata = Usage\DemoCallContext::apply($metadata);
         $usage = $metadata['usage'] ?? [];
         $promptTokens = $usage['prompt_tokens'] ?? 0;
         $completionTokens = $usage['completion_tokens'] ?? 0;
