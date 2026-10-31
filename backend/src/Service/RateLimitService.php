@@ -318,13 +318,13 @@ final class RateLimitService implements ResetInterface
      */
     public function recordUsage(User $user, string $action, array $metadata = []): RecordedUsage
     {
+        $metadata = Usage\DemoCallContext::apply($metadata);
         $usage = $metadata['usage'] ?? [];
         $promptTokens = $usage['prompt_tokens'] ?? 0;
         $completionTokens = $usage['completion_tokens'] ?? 0;
         $cachedTokens = $usage['cached_tokens'] ?? 0;
         $cacheCreationTokens = $usage['cache_creation_tokens'] ?? 0;
-        // Anthropic-only: subset of $cacheCreationTokens written with a 1-hour TTL (billed at
-        // 2x base input instead of the 1.25x default) — see MessagesUsage::extractCacheCreation1hTokens().
+        // 1-hour Anthropic cache writes are billed at 2x. See MessagesUsage::extractCacheCreation1hTokens().
         // Cast/clamp defensively: $usage is an untyped array, so a stray numeric
         // string or negative value must not reach calculateCost()'s int param.
         $cacheCreation1hTokens = max(0, (int) ($usage['cache_creation_1h_tokens'] ?? 0));

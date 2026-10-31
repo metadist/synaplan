@@ -208,6 +208,9 @@ describe('UsageStatistics', () => {
     expect(select.get('option[value="TRANSCRIPTION"]').text()).toBe(
       i18n.global.t('config.usage.actions.transcription')
     )
+    expect(select.get('option[value="DEMO"]').text()).toBe(
+      i18n.global.t('config.usage.actions.demo')
+    )
   })
 
   it('shows talk time under the chip and links a live conversation to its chat', async () => {
@@ -252,6 +255,8 @@ describe('UsageStatistics', () => {
     expect(row.text()).toContain(
       i18n.global.t('config.usage.durationMinutes', { minutes: 4, seconds: 12 })
     )
+    expect(row.text()).toContain(i18n.global.t('config.usage.inProgress'))
+    expect(row.text()).not.toContain(i18n.global.t('config.usage.succeeded'))
     const link = row.get('a')
     expect(link.attributes('href')).toContain('chat=7')
     expect(link.attributes('title')).toBe(i18n.global.t('config.usage.openChat'))

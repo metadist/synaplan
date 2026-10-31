@@ -199,6 +199,16 @@ export interface ActivityEntry {
   cost: number
   latency: number
   status: string
+  /** Refusal code, when this row is a failed Synaplan Demo call. */
+  error?: string
+  /** Demo install this call belonged to. */
+  install_id?: string | null
+  /** Demo model alias, such as free-chat. */
+  alias?: string | null
+  /** Route that was refused, when this row is an outcome rather than a model call. */
+  path?: string | null
+  /** HTTP status of a refused call. */
+  http?: number | null
 }
 
 export interface ActivityLogResponse {

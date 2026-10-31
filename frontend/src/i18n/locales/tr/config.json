@@ -894,6 +894,11 @@
       "noData": "Veri yok",
       "time": "Zaman",
       "action": "Eylem",
+      "result": "Sonuç",
+      "succeeded": "Başarılı",
+      "inProgress": "Sürüyor",
+      "refused": "Reddedildi",
+      "install": "Kurulum {id}",
       "source": "Kaynak",
       "channel": "Kanal",
       "tokens": "Token",
@@ -903,6 +908,9 @@
       "durationMinutes": "{minutes} dk {seconds} sn",
       "durationSeconds": "{seconds} sn",
       "openChat": "Bu sohbeti aç",
+      "activity": {
+        "searchPlaceholder": "Modele, sağlayıcıya veya hataya göre ara…"
+      },
       "actions": {
         "messages": "Mesajlar",
         "images": "Görseller",
@@ -915,7 +923,8 @@
         "rerank": "Yeniden sıralama",
         "message_digest": "Uzun süreli bellek",
         "voice_live": "Canlı sohbet",
-        "transcription": "Transkripsiyon"
+        "transcription": "Transkripsiyon",
+        "demo": "Demo"
       },
       "sources": {
         "whatsapp": "WhatsApp",
