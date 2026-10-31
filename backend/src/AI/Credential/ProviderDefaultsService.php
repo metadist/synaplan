@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use Psr\Cache\CacheItemPoolInterface;
@@ -22,209 +23,51 @@ use Psr\Log\LoggerInterface;
  *
  * Only capabilities the provider actually covers are written; everything else
  * (e.g. VECTORIZE → local bge-m3, media models) keeps its current value.
+ *
+ * The bindings themselves live on each provider's descriptor
+ * ({@see \App\AI\Catalog\ProviderDefaults}), read through the catalog.
  */
 final readonly class ProviderDefaultsService
 {
-    /**
-     * Per-provider recommended bindings, capability => catalog key.
-     *
-     * MAIN = flagship chat tier (CHAT, TOOLS, ANALYZE), FAST = cheap/fast tier
-     * (SORT, PLAN, SUMMARIZE). MEM/PIC2TEXT/SOUND2TEXT only where the catalog
-     * has a matching entry for the provider.
-     *
-     * @var array<string, array<string, string>>
-     */
-    private const PROVIDER_DEFAULTS = [
-        // gpt-oss-120b for every text tier, main and fast alike. Groq classes it
-        // as a **Production** model, while `qwen/qwen3.6-27b` — the previous
-        // MAIN pick — is **Preview**, which Groq documents as "should not be
-        // used in production environments as they may be discontinued at short
-        // notice". A recommended default is precisely the binding an operator
-        // does not watch, so it should not sit on a model that can vanish. It is
-        // also the cheaper and (per the catalog's own quality score) stronger
-        // row: $0.15/$0.60 vs $0.60/$3.00 per 1M tokens, quality 10 vs 9.
-        'groq' => [
-            'CHAT' => 'groq:openai/gpt-oss-120b:chat',
-            'TOOLS' => 'groq:openai/gpt-oss-120b:chat',
-            'ANALYZE' => 'groq:openai/gpt-oss-120b:chat',
-            'SORT' => 'groq:openai/gpt-oss-120b:chat',
-            'PLAN' => 'groq:openai/gpt-oss-120b:chat',
-            'SUMMARIZE' => 'groq:openai/gpt-oss-120b:chat',
-            'MEM' => 'groq:openai/gpt-oss-120b:mem',
-            // The one unavoidable Preview binding: qwen3.6-27b is the only
-            // Groq model that accepts images at all (the gpt-oss rows are
-            // text-only). Leaving PIC2TEXT unbound would be worse — it would
-            // fall through to whatever the install had, which on a Groq-only
-            // setup is nothing.
-            'PIC2TEXT' => 'groq:qwen/qwen3.6-27b:pic2text',
-            // whisper-large-v3, not the cheaper -turbo ($0.111 vs $0.04 per
-            // hour): Synaplan ships four UI locales and large-v3 is the more
-            // accurate multilingual transcriber. Turbo stays selectable for
-            // operators who would rather have the cheaper run.
-            'SOUND2TEXT' => 'groq:whisper-large-v3:sound2text',
-        ],
-        'openai' => [
-            'CHAT' => 'openai:gpt-5.5:chat',
-            'TOOLS' => 'openai:gpt-5.5:chat',
-            'ANALYZE' => 'openai:gpt-5.5:chat',
-            'SORT' => 'openai:gpt-5.4-mini:chat',
-            'PLAN' => 'openai:gpt-5.4-mini:chat',
-            'SUMMARIZE' => 'openai:gpt-5.4-mini:chat',
-            'PIC2TEXT' => 'openai:gpt-5.5:pic2text',
-            'SOUND2TEXT' => 'openai:whisper-1:sound2text',
-        ],
-        'anthropic' => [
-            'CHAT' => 'anthropic:claude-sonnet-5:chat',
-            'TOOLS' => 'anthropic:claude-sonnet-5:chat',
-            'ANALYZE' => 'anthropic:claude-sonnet-5:chat',
-            'SORT' => 'anthropic:claude-haiku-4-5-20251001:chat',
-            'PLAN' => 'anthropic:claude-haiku-4-5-20251001:chat',
-            'SUMMARIZE' => 'anthropic:claude-haiku-4-5-20251001:chat',
-            'MEM' => 'anthropic:claude-sonnet-5:mem',
-            'PIC2TEXT' => 'anthropic:claude-sonnet-5:pic2text',
-        ],
-        'google' => [
-            'CHAT' => 'google:gemini-3.8-flash:chat',
-            'TOOLS' => 'google:gemini-3.8-flash:chat',
-            'ANALYZE' => 'google:gemini-3.8-flash:chat',
-            'SORT' => 'google:gemini-3.1-flash-lite:chat',
-            'PLAN' => 'google:gemini-3.1-flash-lite:chat',
-            'SUMMARIZE' => 'google:gemini-3.1-flash-lite:chat',
-            'PIC2TEXT' => 'google:gemini-3.8-flash:pic2text',
-            'SOUND2TEXT' => 'google:gemini-3.5-transcribe:sound2text',
-        ],
-        'mistral' => [
-            'CHAT' => 'mistral:mistral-medium-latest:chat',
-            'TOOLS' => 'mistral:mistral-medium-latest:chat',
-            'ANALYZE' => 'mistral:mistral-medium-latest:chat',
-            'SORT' => 'mistral:mistral-medium-latest:chat',
-            'PLAN' => 'mistral:mistral-medium-latest:chat',
-            'SUMMARIZE' => 'mistral:mistral-medium-latest:chat',
-            'PIC2TEXT' => 'mistral:mistral-medium-latest:pic2text',
-            'SOUND2TEXT' => 'mistral:voxtral-mini-latest:sound2text',
-        ],
-        'trustedtokens' => [
-            'CHAT' => 'trustedtokens:zai-org/GLM-5.2:chat',
-            'TOOLS' => 'trustedtokens:zai-org/GLM-5.2:chat',
-            'ANALYZE' => 'trustedtokens:zai-org/GLM-5.2:chat',
-            'SORT' => 'trustedtokens:openai/gpt-oss-120b:chat',
-            'PLAN' => 'trustedtokens:openai/gpt-oss-120b:chat',
-            'SUMMARIZE' => 'trustedtokens:openai/gpt-oss-120b:chat',
-            'PIC2TEXT' => 'trustedtokens:Qwen/Qwen3.6-35B-A3B-FP8:pic2text',
-        ],
-        'a2agent' => [
-            'CHAT' => 'a2agent:deepseek-v4-pro:chat',
-            'TOOLS' => 'a2agent:deepseek-v4-pro:chat',
-            'ANALYZE' => 'a2agent:deepseek-v4-pro:chat',
-            'SORT' => 'a2agent:qwen3.8-flash:chat',
-            'PLAN' => 'a2agent:qwen3.8-flash:chat',
-            'SUMMARIZE' => 'a2agent:qwen3.8-flash:chat',
-            'PIC2TEXT' => 'a2agent:qwen3.8-flash:pic2text',
-        ],
-        'meta' => [
-            'CHAT' => 'meta:muse-spark-1.3:chat',
-            'TOOLS' => 'meta:muse-spark-1.3:chat',
-            'ANALYZE' => 'meta:muse-spark-1.3:chat',
-            'SORT' => 'meta:muse-spark-1.3:chat',
-            'PLAN' => 'meta:muse-spark-1.3:chat',
-            'SUMMARIZE' => 'meta:muse-spark-1.3:chat',
-            'PIC2TEXT' => 'meta:muse-spark-1.3:pic2text',
-        ],
-        // Qwen 3.8 27B for the main tier (tools, vision, reasoning that the
-        // Thinking toggle can switch off). gpt-oss-120b for the fast tier: a
-        // third of the price, ~3000 t/s, and the same strict-schema family the
-        // Groq SORT/PLAN default already runs.
-        'cerebras' => [
-            'CHAT' => 'cerebras:qwen-3.8-27b:chat',
-            'TOOLS' => 'cerebras:qwen-3.8-27b:chat',
-            'ANALYZE' => 'cerebras:qwen-3.8-27b:chat',
-            'SORT' => 'cerebras:gpt-oss-120b:chat',
-            'PLAN' => 'cerebras:gpt-oss-120b:chat',
-            'SUMMARIZE' => 'cerebras:gpt-oss-120b:chat',
-            'MEM' => 'cerebras:gpt-oss-120b:mem',
-            'PIC2TEXT' => 'cerebras:qwen-3.8-27b:pic2text',
-        ],
-        // NB: colons inside a catalog providerId are normalized to dashes by
-        // ModelCatalog::modelKey() — hence "Kimi-K2.6-deepinfra", not ":deepinfra".
-        'huggingface' => [
-            'CHAT' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:chat',
-            'TOOLS' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:chat',
-            'ANALYZE' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:chat',
-            'SORT' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:chat',
-            'PLAN' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:chat',
-            'SUMMARIZE' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:chat',
-            'PIC2TEXT' => 'huggingface:moonshotai/Kimi-K2.6-deepinfra:pic2text',
-        ],
-        'xai' => [
-            'CHAT' => 'xai:grok-4.5:chat',
-            'TOOLS' => 'xai:grok-4.5:chat',
-            'ANALYZE' => 'xai:grok-4.5:chat',
-            'SORT' => 'xai:grok-4.5:chat',
-            'PLAN' => 'xai:grok-4.5:chat',
-            'SUMMARIZE' => 'xai:grok-4.5:chat',
-            'PIC2TEXT' => 'xai:grok-4.5:pic2text',
-            // No SOUND2TEXT recommendation: xAI retired grok-stt and offers no
-            // replacement, and there is no cross-provider substitute to
-            // recommend here — a key the operator may not hold cannot be a
-            // default. Without the entry the capability keeps whatever it was
-            // bound to instead of being rebound to a dead model on every
-            // container start by `app:provider:apply-defaults --auto` (#1514).
-        ],
-        'perplexity' => [
-            'CHAT' => 'perplexity:sonar:chat',
-        ],
-        // Local Ollama — last resort when a chat-capable model is already present.
-        // providerId "gpt-oss:120b" normalises to "gpt-oss-120b" in ModelCatalog keys.
-        // gpt-oss:20b, not the 120b sibling: 20b is what
-        // _docker/backend/docker-entrypoint.sh downloads, so these bindings
-        // reference a model that can actually exist on a self-hosted install.
-        'ollama' => [
-            'CHAT' => 'ollama:gpt-oss-20b:chat',
-            'TOOLS' => 'ollama:gpt-oss-20b:chat',
-            'ANALYZE' => 'ollama:gpt-oss-20b:chat',
-            'SORT' => 'ollama:gpt-oss-20b:chat',
-            'PLAN' => 'ollama:gpt-oss-20b:chat',
-            'SUMMARIZE' => 'ollama:gpt-oss-20b:chat',
-            'MEM' => 'ollama:gpt-oss-20b:mem',
-        ],
-    ];
-
-    /**
-     * Preference order for automatic first-run default selection.
-     * Cloud free-tier / fast providers first; local Ollama last.
-     *
-     * @var list<string>
-     */
-    public const PREFERENCE_ORDER = [
-        'groq',
-        'openai',
-        'google',
-        'mistral',
-        'anthropic',
-        'trustedtokens',
-        'huggingface',
-        'xai',
-        'a2agent',
-        'meta',
-        'cerebras',
-        'ollama',
-    ];
-
     public function __construct(
         private ConfigRepository $configRepository,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
+        private ProviderKeyCatalog $keyCatalog,
+        private ProviderCatalog $catalog,
     ) {
     }
 
-    public static function supports(string $provider): bool
+    /** Does the provider declare recommended bindings? Media and speech keys do not. */
+    public function supports(string $provider): bool
     {
-        return isset(self::PROVIDER_DEFAULTS[strtolower($provider)]);
+        return null !== $this->catalog->find($provider)?->defaults;
+    }
+
+    /**
+     * Preference order for automatic first-run default selection: cloud
+     * free-tier / fast providers first, local Ollama last — the descriptors'
+     * `preferenceRank`, ascending. A provider without a rank is never picked.
+     *
+     * @return list<string>
+     */
+    public function preferenceOrder(): array
+    {
+        $ranked = [];
+        foreach ($this->catalog->all() as $descriptor) {
+            $rank = $descriptor->defaults?->preferenceRank;
+            if (null !== $rank) {
+                $ranked[$rank] = $descriptor->name;
+            }
+        }
+        ksort($ranked);
+
+        return array_values($ranked);
     }
 
     /**
      * Repair a default that points at a cloud provider the operator never gave a
-     * key for: pick the first available provider in {@see self::PREFERENCE_ORDER}
+     * key for: pick the first available provider in {@see self::preferenceOrder()}
      * and apply its recommended defaults, so chat works without an explicit
      * "Use as default" click on a fresh install.
      *
@@ -250,7 +93,7 @@ final readonly class ProviderDefaultsService
             }
             $incumbent = strtolower($incumbent);
             // Keyless provider (ollama, test, self-hosted) => operator's choice.
-            if (!ProviderKeyCatalog::has($incumbent)) {
+            if (!$this->keyCatalog->has($incumbent)) {
                 return null;
             }
             // Has a usable key => nothing to repair.
@@ -259,11 +102,8 @@ final readonly class ProviderDefaultsService
             }
         }
 
-        foreach (self::PREFERENCE_ORDER as $provider) {
+        foreach ($this->preferenceOrder() as $provider) {
             if (!($availabilityByName[$provider] ?? false)) {
-                continue;
-            }
-            if (!self::supports($provider)) {
                 continue;
             }
 
@@ -289,9 +129,9 @@ final readonly class ProviderDefaultsService
     public function getRecommendedDefaults(string $provider): array
     {
         $provider = strtolower($provider);
-        $mapping = self::PROVIDER_DEFAULTS[$provider] ?? null;
+        $mapping = $this->catalog->find($provider)?->defaults?->bindings;
         if (null === $mapping) {
-            throw new \InvalidArgumentException(sprintf('No recommended defaults for provider "%s". Supported: %s.', $provider, implode(', ', array_keys(self::PROVIDER_DEFAULTS))));
+            throw new \InvalidArgumentException(sprintf('No recommended defaults for provider "%s". Supported: %s.', $provider, implode(', ', $this->providersWithDefaults())));
         }
 
         $resolved = [];
@@ -304,6 +144,21 @@ final readonly class ProviderDefaultsService
         }
 
         return $resolved;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function providersWithDefaults(): array
+    {
+        $names = [];
+        foreach ($this->catalog->all() as $descriptor) {
+            if (null !== $descriptor->defaults) {
+                $names[] = $descriptor->name;
+            }
+        }
+
+        return $names;
     }
 
     /**

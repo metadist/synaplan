@@ -14,6 +14,10 @@ namespace App\AI\Catalog;
  */
 final class ProviderCatalog
 {
+    private const BUILT_IN_NAMESPACE = 'App\\AI\\Provider\\';
+
+    private static ?self $builtIn = null;
+
     /** @var array<string, ProviderDescriptor>|null name => descriptor, in display order */
     private ?array $byName = null;
 
@@ -26,11 +30,62 @@ final class ProviderCatalog
     }
 
     /**
+     * The providers shipped in this source tree: every class under
+     * `src/AI/Provider` that carries `#[AsAiProvider]`, found by scanning the
+     * directory once per process. For code that runs without a container —
+     * a provider built with `new` in a test, a static helper an adapter
+     * calls about itself. The container's catalog is the canonical one: it
+     * also holds providers a plugin registers.
+     */
+    public static function builtIn(): self
+    {
+        return self::$builtIn ??= new self(self::discoverBuiltIn());
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private static function discoverBuiltIn(): array
+    {
+        $base = \dirname(__DIR__).'/Provider';
+        $classes = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($base, \FilesystemIterator::SKIP_DOTS));
+        foreach ($files as $file) {
+            if (!$file instanceof \SplFileInfo || 'php' !== $file->getExtension()) {
+                continue;
+            }
+            $relative = substr($file->getPathname(), \strlen($base) + 1, -4);
+            $class = self::BUILT_IN_NAMESPACE.str_replace('/', '\\', $relative);
+            if (!class_exists($class)) {
+                continue;
+            }
+            $reflection = new \ReflectionClass($class);
+            if ($reflection->isAbstract() || [] === $reflection->getAttributes(Attribute\AsAiProvider::class)) {
+                continue;
+            }
+            $classes[] = $class;
+        }
+        sort($classes);
+
+        return $classes;
+    }
+
+    /**
      * @return list<ProviderDescriptor>
      */
     public function all(): array
     {
         return array_values($this->load());
+    }
+
+    /**
+     * The classes this catalog reads, as given.
+     *
+     * @return list<class-string>
+     */
+    public function providerClasses(): array
+    {
+        return $this->providerClasses;
     }
 
     /**

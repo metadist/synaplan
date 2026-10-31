@@ -44,6 +44,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
         private ProviderKeyStore $keyStore,
         private ProviderModelInventoryInterface $inventory,
         private LoggerInterface $logger,
+        private ProviderKeyCatalog $keyCatalog,
     ) {
     }
 
@@ -60,8 +61,8 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
         // HuggingFace's whoami-v2 is not a model list (listsModels=false) but
         // still tells a bad key from an outage. Media/speech providers have
         // no cheap authenticated check that helps health.
-        return ProviderKeyCatalog::has($provider)
-            && (ProviderKeyCatalog::listsModels($provider) || in_array($provider, self::NO_LISTING, true));
+        return $this->keyCatalog->has($provider)
+            && ($this->keyCatalog->listsModels($provider) || in_array($provider, self::NO_LISTING, true));
     }
 
     public function probe(string $service): ProbeResult
@@ -71,7 +72,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
             return ProbeResult::skipped(sprintf('No catalog endpoint known for "%s".', $service));
         }
 
-        $check = ProviderKeyCatalog::get($provider)['validation'];
+        $check = $this->keyCatalog->get($provider)['validation'];
         if (null === $check) {
             return ProbeResult::skipped(sprintf('No catalog endpoint known for "%s".', $service));
         }

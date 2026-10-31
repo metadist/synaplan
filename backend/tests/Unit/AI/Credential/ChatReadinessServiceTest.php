@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Credential;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
@@ -66,7 +68,7 @@ class ChatReadinessServiceTest extends TestCase
 
         return new ChatReadinessService(
             $this->providerRegistry,
-            new ProviderDefaultsService($this->configRepository, new ArrayAdapter(), new NullLogger()),
+            new ProviderDefaultsService($this->configRepository, new ArrayAdapter(), new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()), ProviderCatalog::builtIn()),
             $modelConfigService,
             $this->modelRepository,
             $ollamaModelInventory,

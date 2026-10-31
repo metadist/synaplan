@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\AI\Credential;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyCatalog;
-use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
 use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
@@ -38,12 +38,12 @@ final class ProviderDefaultsServiceTest extends TestCase
         );
 
         $this->cache = new ArrayAdapter();
-        $this->service = new ProviderDefaultsService($this->configRepository, $this->cache, new NullLogger());
+        $this->service = new ProviderDefaultsService($this->configRepository, $this->cache, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()), ProviderCatalog::builtIn());
     }
 
     /**
      * Locks the mapping promised in the class docblock: every catalog key in
-     * PROVIDER_DEFAULTS must resolve to exactly one ModelCatalog entry. Fails
+     * each provider's descriptor defaults must resolve to exactly one ModelCatalog entry. Fails
      * on catalog drift (renamed/removed models) at test time instead of at
      * apply time in an operator's install.
      */
@@ -59,7 +59,8 @@ final class ProviderDefaultsServiceTest extends TestCase
      */
     private static function chatProviders(): array
     {
-        $chat = array_values(array_filter(ProviderKeyStore::SUPPORTED_PROVIDERS, ProviderKeyCatalog::servesChat(...)));
+        $catalog = new ProviderKeyCatalog(ProviderCatalog::builtIn());
+        $chat = array_values(array_filter($catalog->providerNames(), $catalog->servesChat(...)));
         $chat[] = 'ollama';
 
         return $chat;
@@ -71,14 +72,15 @@ final class ProviderDefaultsServiceTest extends TestCase
      */
     public function testMediaAndSpeechProvidersHaveNoDefaultsAndSayWhy(): void
     {
+        $catalog = new ProviderKeyCatalog(ProviderCatalog::builtIn());
         foreach (self::NO_CHAT_PROVIDERS as $provider) {
-            self::assertFalse(ProviderKeyCatalog::servesChat($provider), $provider.' is a media/speech provider');
-            self::assertFalse(ProviderDefaultsService::supports($provider), $provider.' serves no chat model and must not offer "apply defaults"');
+            self::assertFalse($catalog->servesChat($provider), $provider.' is a media/speech provider');
+            self::assertFalse($this->service->supports($provider), $provider.' serves no chat model and must not offer "apply defaults"');
         }
-        foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
+        foreach ($catalog->providerNames() as $provider) {
             self::assertSame(
-                ProviderKeyCatalog::servesChat($provider),
-                ProviderDefaultsService::supports($provider),
+                $catalog->servesChat($provider),
+                $this->service->supports($provider),
                 $provider.': catalog chat flag and recommended defaults disagree'
             );
         }
@@ -87,7 +89,7 @@ final class ProviderDefaultsServiceTest extends TestCase
     public function testEveryRecommendedDefaultResolvesInTheModelCatalog(): void
     {
         foreach (self::chatProviders() as $provider) {
-            self::assertTrue(ProviderDefaultsService::supports($provider), sprintf('No recommended defaults defined for supported provider "%s"', $provider));
+            self::assertTrue($this->service->supports($provider), sprintf('No recommended defaults defined for supported provider "%s"', $provider));
 
             $defaults = $this->service->getRecommendedDefaults($provider);
 
@@ -134,7 +136,7 @@ final class ProviderDefaultsServiceTest extends TestCase
 
         self::assertSame([], $problems, sprintf(
             "Recommended default(s) point at a model that can no longer serve a request:\n  %s\n"
-            ."Repoint them at a live model, or drop the capability from PROVIDER_DEFAULTS so it keeps\n"
+            ."Repoint them at a live model, or drop the capability from the provider's descriptor defaults so it keeps\n"
             .'whatever the install had instead of being rebound to a dead model.',
             implode("\n  ", $problems),
         ));
@@ -259,7 +261,7 @@ final class ProviderDefaultsServiceTest extends TestCase
 
     public function testUnknownProviderIsRejected(): void
     {
-        self::assertFalse(ProviderDefaultsService::supports('not-a-provider'));
+        self::assertFalse($this->service->supports('not-a-provider'));
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->getRecommendedDefaults('not-a-provider');
