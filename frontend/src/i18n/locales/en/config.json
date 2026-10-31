@@ -1144,6 +1144,7 @@
       "action": "Action",
       "result": "Result",
       "succeeded": "Succeeded",
+      "inProgress": "In progress",
       "refused": "Refused",
       "install": "Install {id}",
       "source": "Source",

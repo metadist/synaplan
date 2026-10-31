@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Usage;
 
+use App\DTO\CostResult;
 use App\Entity\User;
+use App\Repository\ConfigRepository;
+use App\Repository\SubscriptionRepository;
+use App\Repository\TopupRepository;
+use App\Service\Billing\BillingService;
 use App\Service\RateLimitService;
+use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\DemoCallContext;
 use App\Service\Usage\LegacyUsageWriter;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\UsageActivityRow;
 use App\Service\Usage\UsageOutcome;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class DemoCallStatisticsTest extends TestCase
 {
@@ -82,6 +91,45 @@ final class DemoCallStatisticsTest extends TestCase
         self::assertSame(self::INSTALL, $seen[1]['install_id']);
         self::assertSame('free-chat', $seen[1]['alias']);
         self::assertSame('gpt-oss-120b', $seen[1]['model']);
+        self::assertTrue(DemoCallContext::wasWritten());
+    }
+
+    public function testSharedUsageInsertKeepsTheInstallWhenTheHookWritesTheRow(): void
+    {
+        DemoCallContext::attach(self::INSTALL, 'free-embed');
+        $stored = null;
+        $connection = $this->createStub(Connection::class);
+        $connection->method('executeStatement')->willReturnCallback(function (string $sql, array $params = []) use (&$stored): int {
+            if (str_contains($sql, 'INSERT INTO BUSELOG')) {
+                $stored = json_decode((string) ($params['metadata'] ?? '{}'), true);
+            }
+
+            return 1;
+        });
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('getConnection')->willReturn($connection);
+        $config = $this->createStub(ConfigRepository::class);
+        $config->method('getValue')->willReturn('10');
+        $costs = $this->createStub(CostCalculationService::class);
+        $costs->method('getPricingMode')->willReturn('per_token');
+        $costs->method('calculateCost')->willReturn(new CostResult('0.000000', '0.000000', '0.000000', '0.000000', [], 0));
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $limits = new RateLimitService(
+            $config,
+            $em,
+            new NullLogger(),
+            $this->createStub(BillingService::class),
+            $costs,
+            $this->createStub(SubscriptionRepository::class),
+            $this->createStub(TopupRepository::class),
+        );
+
+        $limits->recordUsage($user, 'EMBEDDINGS', ['provider' => 'ollama', 'model' => 'bge-m3', 'source' => 'OPENAI_API']);
+
+        self::assertIsArray($stored);
+        self::assertSame(self::INSTALL, $stored['install_id']);
+        self::assertSame('free-embed', $stored['alias']);
     }
 
     public function testActivityRowExposesTheRefusal(): void
@@ -111,5 +159,21 @@ final class DemoCallStatisticsTest extends TestCase
         self::assertSame('free-chat', $item['alias']);
         self::assertSame(403, $item['http']);
         self::assertSame('/v1/chat/completions', $item['path']);
+    }
+
+    public function testActivityRowHidesProviderDiagnostics(): void
+    {
+        $item = UsageActivityRow::from([
+            'timestamp' => 1,
+            'action' => 'IMAGES',
+            'source' => 'openai',
+            'model' => 'gpt-image',
+            'status' => 'error',
+            'error' => 'upstream body sk-secret',
+            'metadata' => '{}',
+        ], 'OPENAI_API', null, null);
+
+        self::assertSame('', $item['error']);
+        self::assertSame('error', $item['status']);
     }
 }

@@ -1116,6 +1116,7 @@
       "action": "Aktion",
       "result": "Ergebnis",
       "succeeded": "Erledigt",
+      "inProgress": "Läuft",
       "refused": "Abgelehnt",
       "install": "Installation {id}",
       "source": "Quelle",

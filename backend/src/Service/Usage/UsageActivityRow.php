@@ -39,7 +39,7 @@ final class UsageActivityRow
             'cost' => (float) ($row['cost'] ?? 0),
             'latency' => (float) ($row['latency'] ?? 0),
             'status' => is_string($row['status'] ?? null) && '' !== $row['status'] ? $row['status'] : 'success',
-            'error' => is_string($row['error'] ?? null) ? $row['error'] : '',
+            'error' => self::demoCode($row['error'] ?? null),
             'install_id' => self::text($metadata['install_id'] ?? null),
             'alias' => self::text($metadata['alias'] ?? null),
             'path' => self::text($metadata['path'] ?? null),
@@ -60,6 +60,16 @@ final class UsageActivityRow
         $decoded = json_decode($metadata, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private static function demoCode(mixed $error): string
+    {
+        if (!is_string($error)) {
+            return '';
+        }
+        $error = strtolower(trim($error));
+
+        return 1 === preg_match('/^freeapi_[a-z0-9_]{1,40}$/', $error) ? $error : '';
     }
 
     private static function text(mixed $value): ?string

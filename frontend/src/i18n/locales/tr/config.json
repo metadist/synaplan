@@ -896,6 +896,7 @@
       "action": "Eylem",
       "result": "Sonuç",
       "succeeded": "Başarılı",
+      "inProgress": "Sürüyor",
       "refused": "Reddedildi",
       "install": "Kurulum {id}",
       "source": "Kaynak",

@@ -1142,6 +1142,7 @@
       "action": "Action",
       "result": "Résultat",
       "succeeded": "Réussie",
+      "inProgress": "En cours",
       "refused": "Refusée",
       "install": "Installation {id}",
       "source": "Source",

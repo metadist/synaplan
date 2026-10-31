@@ -896,6 +896,7 @@
       "action": "Acción",
       "result": "Resultado",
       "succeeded": "Correcta",
+      "inProgress": "En curso",
       "refused": "Rechazada",
       "install": "Instalación {id}",
       "source": "Fuente",

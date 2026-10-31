@@ -17,6 +17,8 @@ final class DemoCallContext
 
     private static ?string $alias = null;
 
+    private static bool $written = false;
+
     public static function attach(string $installId, string $alias): void
     {
         $installId = UsageOutcome::installId($installId);
@@ -29,6 +31,17 @@ final class DemoCallContext
     {
         self::$installId = null;
         self::$alias = null;
+        self::$written = false;
+    }
+
+    public static function markWritten(): void
+    {
+        self::$written = true;
+    }
+
+    public static function wasWritten(): bool
+    {
+        return self::$written;
     }
 
     /**

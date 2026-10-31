@@ -805,7 +805,7 @@ final readonly class UsageStatsService
         $params = ['user_id' => $userId];
 
         if ($search) {
-            $where[] = '(BMODEL LIKE :search OR BPROVIDER LIKE :search OR BERROR LIKE :search OR BMETADATA LIKE :search)';
+            $where[] = '(BMODEL LIKE :search OR BPROVIDER LIKE :search OR BMETADATA LIKE :search OR (BERROR LIKE \'freeapi_%\' AND BERROR LIKE :search))';
             $params['search'] = '%'.$search.'%';
         }
 

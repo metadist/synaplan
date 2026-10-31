@@ -347,24 +347,28 @@
                   <p v-if="entry.alias && entry.alias !== entry.model" class="mt-1 txt-secondary">
                     {{ entry.alias }}
                   </p>
-                  <p
-                    v-if="entry.install_id"
-                    class="mt-1 txt-secondary"
-                    :title="entry.install_id"
-                  >
+                  <p v-if="entry.install_id" class="mt-1 txt-secondary" :title="entry.install_id">
                     {{ $t('config.usage.install', { id: entry.install_id.slice(0, 8) }) }}
                   </p>
                 </td>
                 <td class="px-3 py-3 text-xs whitespace-nowrap">
                   <span
-                    v-if="entry.status === 'error'"
+                    v-if="entry.status === 'error' && entry.error"
                     class="text-red-600 dark:text-red-400"
                     :title="entry.path || undefined"
                   >
-                    {{ entry.error || $t('config.usage.refused') }}
+                    {{ entry.error }}
                     <span v-if="entry.http"> · {{ entry.http }}</span>
                   </span>
-                  <span v-else class="txt-secondary">{{ $t('config.usage.succeeded') }}</span>
+                  <span v-else-if="entry.status === 'error'" class="txt-secondary">{{
+                    $t('config.usage.refused')
+                  }}</span>
+                  <span v-else-if="entry.status === 'running'" class="txt-secondary">{{
+                    $t('config.usage.inProgress')
+                  }}</span>
+                  <span v-else-if="entry.status === 'success'" class="txt-secondary">{{
+                    $t('config.usage.succeeded')
+                  }}</span>
                 </td>
                 <td class="px-3 py-3 text-right txt-secondary">
                   <span class="flex items-center justify-end gap-1">
