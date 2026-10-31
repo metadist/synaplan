@@ -4,63 +4,139 @@ declare(strict_types=1);
 
 namespace App\AI\Messages\Translator;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Chat Completions hosts the Messages gateway can translate to.
  *
  * Desktop (and Claude Code aliases) send Anthropic-shaped `/v1/messages`.
- * Every catalog chat model that already speaks OpenAI Chat Completions is
- * routed through {@see OpenAiMessagesTranslator} — not only `openai`.
- * Anthropic and Gemini are intentionally absent: Claude Code stays on
+ * Every catalog chat model whose provider descriptor declares a Chat
+ * Completions endpoint is routed through {@see OpenAiMessagesTranslator} —
+ * fixed cloud URLs from the descriptor, Ollama from `OLLAMA_BASE_URL`, and
+ * admin-registered OpenAI-compatible endpoints from the registry. Anthropic
+ * and Gemini are intentionally absent: Claude Code stays on
  * {@see AnthropicPassthroughTranslator} / {@see GeminiMessagesTranslator}.
  */
-final class ChatCompletionsUpstreams
+final readonly class ChatCompletionsUpstreams
 {
+    private const DEFAULT_UPSTREAM = 'https://api.openai.com';
+
+    public function __construct(
+        private ProviderCatalog $catalog,
+        #[Autowire('%env(string:default::OLLAMA_BASE_URL)%')]
+        private string $ollamaBaseUrl = '',
+        private ?OpenAiCompatibleEndpointRegistry $openAiCompatibleEndpoints = null,
+    ) {
+    }
+
+    public function supports(string $provider): bool
+    {
+        return null !== $this->descriptor($provider)?->chatCompletionsEndpoint();
+    }
+
+    /** The provider's descriptor, for the request rules the translator applies. */
+    public function descriptor(string $provider): ?ProviderDescriptor
+    {
+        return $this->catalog->find($provider);
+    }
+
+    /** An install-configured host: Ollama or an admin-registered endpoint; no platform key. */
+    public function isLocal(string $provider): bool
+    {
+        return true === $this->catalog->find($provider)?->isLocal();
+    }
+
+    public function needsProviderKey(string $provider): bool
+    {
+        return !$this->isLocal($provider);
+    }
+
+    /** The fixed `…/chat/completions` URL of a cloud provider, null for a local host. */
+    public function fixedUrl(string $provider): ?string
+    {
+        return $this->catalog->find($provider)?->chatCompletionsUrl();
+    }
+
     /**
-     * Fixed cloud hosts. Value is the full `…/chat/completions` URL.
-     *
-     * @var array<string, string>
+     * @param array<string, mixed> $context
      */
-    public const URLS = [
-        'openai' => 'https://api.openai.com/v1/chat/completions',
-        'groq' => 'https://api.groq.com/openai/v1/chat/completions',
-        'mistral' => 'https://api.mistral.ai/v1/chat/completions',
-        'xai' => 'https://api.x.ai/v1/chat/completions',
-        'huggingface' => 'https://router.huggingface.co/v1/chat/completions',
-        'trustedtokens' => 'https://api.trustedtokens.eu/v1/chat/completions',
-        'a2agent' => 'https://a2agent.me/v1/chat/completions',
-        'meta' => 'https://api.meta.ai/v1/chat/completions',
-        'cerebras' => 'https://api.cerebras.ai/v1/chat/completions',
-        'perplexity' => 'https://api.perplexity.ai/chat/completions',
-    ];
+    public function completionsUrl(array $context): ?string
+    {
+        if (isset($context['openai_completions_url']) && \is_string($context['openai_completions_url']) && '' !== $context['openai_completions_url']) {
+            return rtrim($context['openai_completions_url'], '/');
+        }
+
+        if (isset($context['openai_upstream_url']) && \is_string($context['openai_upstream_url']) && '' !== $context['openai_upstream_url']) {
+            return rtrim($context['openai_upstream_url'], '/').'/v1/chat/completions';
+        }
+
+        $provider = strtolower((string) ($context['provider'] ?? 'openai'));
+        $fixed = $this->fixedUrl($provider);
+        if (null !== $fixed) {
+            return $fixed;
+        }
+
+        if ('ollama' === $provider) {
+            $base = trim($this->ollamaBaseUrl);
+            if ('' === $base) {
+                return null;
+            }
+
+            return rtrim($base, '/').'/v1/chat/completions';
+        }
+
+        if (OpenAiCompatibleEndpointRegistry::PROVIDER_NAME === $provider) {
+            $endpoint = $this->compatibleEndpoint($context);
+            if (null === $endpoint || '' === $endpoint['base_url']) {
+                return null;
+            }
+
+            return rtrim($endpoint['base_url'], '/').'/chat/completions';
+        }
+
+        return self::DEFAULT_UPSTREAM.'/v1/chat/completions';
+    }
 
     /**
-     * Local / install-configured hosts: no ProviderKeyStore entry required.
-     *
-     * @var list<string>
+     * @param array<string, mixed> $context
      */
-    public const LOCAL_PROVIDERS = ['ollama', OpenAiCompatibleEndpointRegistry::PROVIDER_NAME];
-
-    public static function supports(string $provider): bool
+    public function responsesUrl(array $context): string
     {
-        $provider = strtolower($provider);
+        if (isset($context['openai_responses_url']) && \is_string($context['openai_responses_url']) && '' !== $context['openai_responses_url']) {
+            return rtrim($context['openai_responses_url'], '/');
+        }
+        if (isset($context['openai_upstream_url']) && \is_string($context['openai_upstream_url']) && '' !== $context['openai_upstream_url']) {
+            return rtrim($context['openai_upstream_url'], '/').'/v1/responses';
+        }
 
-        return isset(self::URLS[$provider]) || self::isLocal($provider);
+        return self::DEFAULT_UPSTREAM.'/v1/responses';
     }
 
-    public static function isLocal(string $provider): bool
+    /**
+     * The admin-registered endpoint an OpenAI-compatible model runs on.
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array{name: string, label: string, base_url: string, api_key: string, headers: array<string, string>, capabilities: string[]}|null
+     */
+    public function compatibleEndpoint(array $context): ?array
     {
-        return \in_array(strtolower($provider), self::LOCAL_PROVIDERS, true);
-    }
+        if (null === $this->openAiCompatibleEndpoints) {
+            return null;
+        }
 
-    public static function needsProviderKey(string $provider): bool
-    {
-        return !self::isLocal($provider);
-    }
+        $provider = strtolower((string) ($context['provider'] ?? ''));
+        if (OpenAiCompatibleEndpointRegistry::PROVIDER_NAME !== $provider) {
+            return null;
+        }
 
-    public static function fixedUrl(string $provider): ?string
-    {
-        return self::URLS[strtolower($provider)] ?? null;
+        $providerModelId = isset($context['provider_model_id']) && \is_string($context['provider_model_id'])
+            ? $context['provider_model_id']
+            : null;
+
+        return $this->openAiCompatibleEndpoints->resolveForModel($providerModelId);
     }
 }

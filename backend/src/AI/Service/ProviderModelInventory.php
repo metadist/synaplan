@@ -46,6 +46,7 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
         private HttpClientInterface $httpClient,
         private ProviderKeyStore $keyStore,
         private LoggerInterface $logger,
+        private ProviderKeyCatalog $keyCatalog,
         ?AiCallPipeline $pipeline = null,
     ) {
         $this->pipeline = $pipeline ?? new AiCallPipeline();
@@ -55,14 +56,14 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
     {
         $provider = ModelCatalog::normalizeProvider($provider);
 
-        if (!ProviderKeyCatalog::has($provider)) {
+        if (!$this->keyCatalog->has($provider)) {
             return ProviderModelListing::noListingEndpoint('Provider is not key-managed (self-hosted or per-install endpoint).');
         }
 
         // A key-validation endpoint that is not a model listing (whoami,
         // account page) can never contribute an availability verdict.
-        $listing = ProviderKeyCatalog::get($provider)['validation'];
-        if (null === $listing || !ProviderKeyCatalog::listsModels($provider)) {
+        $listing = $this->keyCatalog->get($provider)['validation'];
+        if (null === $listing || !$this->keyCatalog->listsModels($provider)) {
             return ProviderModelListing::noListingEndpoint('Provider exposes no model-listing endpoint.');
         }
 
@@ -139,12 +140,12 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
     public function probe(string $provider, string $providerModelId): ModelProbeResult
     {
         $provider = ModelCatalog::normalizeProvider($provider);
-        if (!ProviderKeyCatalog::has($provider)) {
+        if (!$this->keyCatalog->has($provider)) {
             return ModelProbeResult::Inconclusive;
         }
 
-        $listing = ProviderKeyCatalog::get($provider)['validation'];
-        if (null === $listing || !ProviderKeyCatalog::listsModels($provider)) {
+        $listing = $this->keyCatalog->get($provider)['validation'];
+        if (null === $listing || !$this->keyCatalog->listsModels($provider)) {
             return ModelProbeResult::Inconclusive;
         }
 

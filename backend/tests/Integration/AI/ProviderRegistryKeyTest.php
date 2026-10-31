@@ -9,10 +9,11 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
  * The lazy registry indexes providers by the `key` attribute of their
- * `app.ai.*` tags in services.yaml instead of calling getName() on every
- * instance at boot. This is the one place that instantiates every registered
- * provider and proves each key equals the provider's own name — a typo in a
- * tag would otherwise make a provider unreachable by name.
+ * `app.ai.*` tags — added from the descriptors by ProviderCatalogPass —
+ * instead of calling getName() on every instance at boot. This is the one
+ * place that instantiates every registered provider and proves each key
+ * equals the provider's own name — a descriptor naming a provider differently
+ * from getName() would otherwise make it unreachable by name.
  */
 final class ProviderRegistryKeyTest extends KernelTestCase
 {

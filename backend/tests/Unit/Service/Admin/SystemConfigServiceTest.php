@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
@@ -695,7 +696,7 @@ final class SystemConfigServiceTest extends TestCase
     {
         $fields = $this->service->getSchema()['fields'];
 
-        foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
+        foreach ((new ProviderKeyCatalog(ProviderCatalog::builtIn()))->managedEnvVars() as $envVar) {
             if (!isset($fields[$envVar])) {
                 continue; // aliases like GEMINI_API_KEY have no config field
             }
@@ -732,6 +733,7 @@ final class SystemConfigServiceTest extends TestCase
             $this->configRepository,
             $encryption,
             new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
             ['higgsfield' => 'hf-key-from-env'],
             ['higgsfield' => 'hf-secret-from-env'],
         );

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization\Support;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Health\FailureClassifier;
@@ -1113,7 +1115,7 @@ final class AiPathHarness
         $keyStore = $this->createStub(ProviderKeyStore::class);
         $keyStore->method('getKey')->willReturnCallback(static fn (string $provider): ?string => 'openai' === $provider ? self::SECRET : null);
 
-        $inventory = new ProviderModelInventory($http->client(), $keyStore, new NullLogger(), $facade->pipeline());
+        $inventory = new ProviderModelInventory($http->client(), $keyStore, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()), $facade->pipeline());
         $availability = $inventory->fetch('openai');
         $singleProbe = $inventory->probe('openai', 'gpt-4o-retired-probe');
 

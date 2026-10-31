@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\Admin\SystemConfig\Tab;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\Service\Admin\SystemConfig\ConfigSection;
 use App\Service\Admin\SystemConfig\FieldDefinition;
 use App\Service\Admin\SystemConfig\SystemConfigTab;
@@ -15,9 +18,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * self-hosted Triton, image and video providers, Cloudflare embeddings and
  * text-to-speech.
  *
- * Every key whose env var ProviderKeyCatalog knows is stored encrypted in
- * BCONFIG by ProviderKeyStore and applies without a restart; the schema marks
- * it `managedBy`, so its status comes from the store and a write here is
+ * Every provider key field comes from the provider's descriptor
+ * ({@see ProviderKeyPresentation::$configSection} places it, the descriptions
+ * are its texts). Such a key is stored encrypted in BCONFIG by
+ * ProviderKeyStore and applies without a restart; the schema marks it
+ * `managedBy`, so its status comes from the store and a write here is
  * refused with a pointer to Providers & keys.
  */
 #[AsTaggedItem(priority: 130)]
@@ -26,6 +31,7 @@ final readonly class AiTab implements SystemConfigTab
     public function __construct(
         #[Autowire('%synaplan_tts_url_default%')]
         private string $defaultTtsUrl,
+        private ProviderCatalog $catalog,
     ) {
     }
 
@@ -65,61 +71,7 @@ final readonly class AiTab implements SystemConfigTab
     private function cloud(): ConfigSection
     {
         return new ConfigSection('Cloud AI Providers', [
-            'OPENAI_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'OpenAI API key',
-                sensitive: true,
-            ),
-            'ANTHROPIC_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Anthropic (Claude) API key',
-                sensitive: true,
-            ),
-            'GROQ_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Groq API key (free tier available)',
-                sensitive: true,
-            ),
-            'GOOGLE_GEMINI_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Google Gemini API key — also unlocks Imagen, Nano Banana, Veo and Gemini TTS',
-                sensitive: true,
-            ),
-            'MISTRAL_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Mistral API key — chat, vision and the Voxtral audio pair',
-                sensitive: true,
-            ),
-            'XAI_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
-                sensitive: true,
-            ),
-            'META_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Meta Model API key — Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Create it at https://dev.meta.ai/ (API keys)',
-                sensitive: true,
-            ),
-            'CEREBRAS_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Cerebras Inference API key — GPT OSS 120B and Qwen 3.8 27B. Create it at https://cloud.cerebras.ai/ (API Keys)',
-                sensitive: true,
-            ),
-            'TRUSTEDTOKENS_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'TrustedTokens API key — sovereign inference on German GPUs (GLM, DeepSeek, Qwen, GPT OSS)',
-                sensitive: true,
-            ),
-            'A2AGENT_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'A2Agent API key — Qwen, DeepSeek and MiniMax via the A2Agent gateway (Chinese model vendors)',
-                sensitive: true,
-            ),
-            'HUGGINGFACE_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'HuggingFace API token — routes the Kimi models through HF Inference',
-                sensitive: true,
-            ),
+            ...$this->keyFields(ProviderKeyPresentation::SECTION_CLOUD),
             'GOOGLE_VERTEX_ACCESS_TOKEN' => new FieldDefinition(
                 type: 'password',
                 description: 'Optional OAuth bearer for Vertex AI Imagen; leave empty to use Gemini API (Imagen 4) with the key above',
@@ -140,23 +92,7 @@ final readonly class AiTab implements SystemConfigTab
 
     private function media(): ConfigSection
     {
-        return new ConfigSection('Image & Video Generation', [
-            'THEHIVE_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'TheHive API key — Flux Schnell and SDXL image generation',
-                sensitive: true,
-            ),
-            'HIGGSFIELD_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'Higgsfield API key — Soul/Reve images, DoP and Kling video. Both halves are required',
-                sensitive: true,
-            ),
-            'HIGGSFIELD_API_SECRET' => new FieldDefinition(
-                type: 'password',
-                description: 'Higgsfield API secret — the key alone will not authenticate',
-                sensitive: true,
-            ),
-        ]);
+        return new ConfigSection('Image & Video Generation', $this->keyFields(ProviderKeyPresentation::SECTION_MEDIA));
     }
 
     private function embeddings(): ConfigSection
@@ -186,11 +122,44 @@ final readonly class AiTab implements SystemConfigTab
                 description: 'Synaplan TTS service URL (self-hosted, Piper-based)',
                 default: $this->defaultTtsUrl,
             ),
-            'ELEVENLABS_API_KEY' => new FieldDefinition(
-                type: 'password',
-                description: 'ElevenLabs TTS API key',
-                sensitive: true,
-            ),
+            ...$this->keyFields(ProviderKeyPresentation::SECTION_TTS),
         ]);
+    }
+
+    /**
+     * The password fields of every platform key the descriptors place in a
+     * section, in the descriptors' order; a key + secret pair yields two.
+     *
+     * @return array<string, FieldDefinition>
+     */
+    private function keyFields(string $section): array
+    {
+        $placed = array_filter(
+            $this->catalog->withKey(),
+            static fn (ProviderDescriptor $d): bool => $section === $d->key?->presentation->configSection,
+        );
+        usort($placed, static fn (ProviderDescriptor $a, ProviderDescriptor $b): int => ($a->key?->presentation->configOrder ?? 0) <=> ($b->key?->presentation->configOrder ?? 0));
+
+        $fields = [];
+        foreach ($placed as $descriptor) {
+            $key = $descriptor->key;
+            if (null === $key || null === $key->envVar) {
+                continue;
+            }
+            $fields[$key->envVar] = new FieldDefinition(
+                type: 'password',
+                description: $key->presentation->fieldDescription ?? sprintf('%s API key', $descriptor->displayName),
+                sensitive: true,
+            );
+            if (null !== $key->secretEnvVar) {
+                $fields[$key->secretEnvVar] = new FieldDefinition(
+                    type: 'password',
+                    description: $key->presentation->secretFieldDescription ?? sprintf('%s API secret', $descriptor->displayName),
+                    sensitive: true,
+                );
+            }
+        }
+
+        return $fields;
     }
 }

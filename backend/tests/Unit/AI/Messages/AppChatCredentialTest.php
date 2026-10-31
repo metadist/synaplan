@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Messages;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\AppChatCredential;
 use App\AI\Messages\DesktopOmittedModel;
@@ -71,11 +72,13 @@ final class AppChatCredentialTest extends TestCase
         $config = $this->createStub(MessagesGatewayConfig::class);
         $config->method('allowOperatorKey')->willReturn($allowOperator);
 
-        return new AppChatCredential(
-            $desktop,
-            $keys ?? $this->createStub(UserProviderKeyResolver::class),
-            $config,
-        );
+        if (null === $keys) {
+            // A local host (Ollama, a custom endpoint) is answered by the catalog, as the real resolver does.
+            $keys = $this->createStub(UserProviderKeyResolver::class);
+            $keys->method('isLocalHost')->willReturnCallback(static fn (string $provider): bool => true === ProviderCatalog::builtIn()->find($provider)?->isLocal());
+        }
+
+        return new AppChatCredential($desktop, $keys, $config);
     }
 
     private function model(string $service): Model

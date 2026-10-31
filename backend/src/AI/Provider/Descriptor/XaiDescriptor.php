@@ -13,6 +13,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -24,7 +25,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * The descriptor of {@see XaiProvider}, kept beside the adapter because the
  * adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: XaiProvider::class)]
 final class XaiDescriptor implements DescribesProviderInterface
 {
     public static function descriptor(): ProviderDescriptor
@@ -48,6 +49,8 @@ final class XaiDescriptor implements DescribesProviderInterface
                 listOrder: 11,
                 modelListing: ModelListing::Lists,
                 fieldDescription: 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 6,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,

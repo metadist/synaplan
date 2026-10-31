@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Command;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Service\ModelAvailabilityChecker;
 use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderModelInventoryInterface;
@@ -163,7 +165,7 @@ final class CheckModelAvailabilityCommandTest extends TestCase
         $checker = new ModelAvailabilityChecker(
             $inventory,
             $modelRepository,
-            new ProviderDefaultsService($this->createStub(ConfigRepository::class), new ArrayAdapter(), new NullLogger()),
+            new ProviderDefaultsService($this->createStub(ConfigRepository::class), new ArrayAdapter(), new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()), ProviderCatalog::builtIn()),
         );
 
         $webhookClient = new MockHttpClient(function (string $method, string $url): MockResponse {

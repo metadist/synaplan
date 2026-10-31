@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Messages;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
@@ -598,19 +599,19 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $t = new OpenAiMessagesTranslator(new MockHttpClient());
 
         $this->assertSame(
-            ChatCompletionsUpstreams::URLS['groq'],
+            'https://api.groq.com/openai/v1/chat/completions',
             $t->resolveCompletionsUrl(['provider' => 'groq']),
         );
         $this->assertSame(
-            ChatCompletionsUpstreams::URLS['mistral'],
+            'https://api.mistral.ai/v1/chat/completions',
             $t->resolveCompletionsUrl(['provider' => 'mistral']),
         );
         $this->assertSame(
-            ChatCompletionsUpstreams::URLS['openai'],
+            'https://api.openai.com/v1/chat/completions',
             $t->resolveCompletionsUrl(['provider' => 'openai']),
         );
         $this->assertSame(
-            ChatCompletionsUpstreams::URLS['a2agent'],
+            'https://a2agent.me/v1/chat/completions',
             $t->resolveCompletionsUrl(['provider' => 'a2agent']),
         );
         $this->assertSame(
@@ -629,7 +630,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
 
     public function testResolvesOllamaFromConfiguredBaseUrl(): void
     {
-        $t = new OpenAiMessagesTranslator(new MockHttpClient(), 'http://ollama:11434');
+        $t = new OpenAiMessagesTranslator(new MockHttpClient(), new ChatCompletionsUpstreams(ProviderCatalog::builtIn(), 'http://ollama:11434'));
 
         $this->assertSame(
             'http://ollama:11434/v1/chat/completions',
@@ -675,7 +676,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
             ],
         );
 
-        $this->assertSame(ChatCompletionsUpstreams::URLS['groq'], $seenUrl);
+        $this->assertSame('https://api.groq.com/openai/v1/chat/completions', $seenUrl);
         $this->assertSame(200, $result['status']);
         $this->assertIsArray($result['body']);
         $this->assertSame('hi', $result['body']['content'][0]['text']);

@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace App\AI\Messages;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
-use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\AI\Pipeline\AiCallPipeline;
 use App\AI\Stream\StreamTextCapture;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
+use App\Model\ModelCatalog;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentRuntimeResolver;
@@ -108,15 +109,6 @@ final class MessagesGateway
      * everyone bring their own key.
      */
     public const BYO_ALLOWED_LEVELS = PremiumFeatureGate::PAID_LEVELS;
-
-    /**
-     * PIC2TEXT rewrite hosts. Claude Code image turns must stay on Anthropic
-     * (or the original OpenAI / Gemini alias) — never be stolen onto Groq /
-     * Ollama / other Chat Completions hosts that Desktop may use for chat.
-     *
-     * @var list<string>
-     */
-    private const VISION_REWRITE_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
 
     /**
      * @param iterable<MessagesTranslatorInterface> $translators
@@ -702,8 +694,13 @@ final class MessagesGateway
             ];
         }
 
-        $provider = strtolower($visionModel->getService());
-        if (!\in_array($provider, self::VISION_REWRITE_PROVIDERS, true)) {
+        // PIC2TEXT rewrite hosts come from the descriptors (`gatewayVisionRewrite`):
+        // Claude Code image turns stay on Anthropic, OpenAI or Gemini — never
+        // stolen onto Groq / Ollama / other Chat Completions hosts Desktop may
+        // use for chat. Read from the shipped catalog: this constructor is
+        // frozen in the size ledger and has no room for another injection.
+        $provider = ModelCatalog::normalizeProvider($visionModel->getService());
+        if (true !== ProviderCatalog::builtIn()->find($provider)?->dialects->gatewayVisionRewrite) {
             $this->logger->info('MessagesGateway: vision model provider not supported by gateway, funneling images upstream', [
                 'user_id' => $user->getId(),
                 'provider' => $provider,
@@ -808,7 +805,7 @@ final class MessagesGateway
      */
     private function resolveCredential(string $provider, ?int $userId, bool $allowOperator): ?array
     {
-        if (ChatCompletionsUpstreams::isLocal($provider)) {
+        if ($this->keyResolver->isLocalHost($provider)) {
             // Ollama and admin-registered OpenAI-compatible endpoints do not
             // use ProviderKeyStore. The translator attaches a real endpoint
             // key when one exists; a placeholder is enough to pass this gate.

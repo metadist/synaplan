@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\ModelDiscovery;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Service\ProviderModelInventoryInterface;
 use App\AI\Service\ProviderModelListing;
@@ -49,8 +50,8 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testNotConfiguredAndNoListingAreSilent(): void
     {
         $listings = [];
-        foreach (ProviderKeyCatalog::providerNames() as $provider) {
-            $listings[$provider] = ProviderKeyCatalog::listsModels($provider)
+        foreach ((new ProviderKeyCatalog(ProviderCatalog::builtIn()))->providerNames() as $provider) {
+            $listings[$provider] = (new ProviderKeyCatalog(ProviderCatalog::builtIn()))->listsModels($provider)
                 ? ProviderModelListing::notConfigured()
                 : ProviderModelListing::noListingEndpoint('n/a');
         }
@@ -741,6 +742,7 @@ final class ModelDiscoveryServiceTest extends TestCase
             $modelsRepo,
             $store,
             new MockClock('2026-09-24 12:00:00'),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
             true,
         );
         $service->markBaselinesAnnounced(['openai']);
@@ -795,6 +797,7 @@ final class ModelDiscoveryServiceTest extends TestCase
             $modelsRepo,
             $store,
             $clock ?? new MockClock('2026-09-24 12:00:00'),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
             $enabled,
             $ignoreEntries,
         );
@@ -841,7 +844,7 @@ final class ModelDiscoveryServiceTest extends TestCase
     private function allNotConfigured(): array
     {
         $listings = [];
-        foreach (ProviderKeyCatalog::providerNames() as $provider) {
+        foreach ((new ProviderKeyCatalog(ProviderCatalog::builtIn()))->providerNames() as $provider) {
             $listings[$provider] = ProviderModelListing::notConfigured();
         }
 

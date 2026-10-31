@@ -204,11 +204,7 @@ final readonly class ModelAvailabilityChecker
     private function recommendedBids(): array
     {
         $bids = [];
-        foreach (ProviderDefaultsService::PREFERENCE_ORDER as $provider) {
-            if (!ProviderDefaultsService::supports($provider)) {
-                continue;
-            }
-
+        foreach ($this->providerDefaults->preferenceOrder() as $provider) {
             try {
                 foreach ($this->providerDefaults->getRecommendedDefaults($provider) as $bid) {
                     $bids[$bid] = true;

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\AI;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DependencyInjection\ProviderCatalogPass;
 use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\InlineImageRule;
 use App\AI\Catalog\ModelListing;
 use App\AI\Catalog\ProviderCapability;
 use App\AI\Catalog\ProviderCatalog;
@@ -13,26 +16,29 @@ use App\AI\Catalog\ReasoningMatch;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
+use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Health\Probe\PlatformKeyModelListProbe;
-use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use App\AI\Provider\ReasoningLevelCatalog;
+use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderRegistry;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\Tool\CatalogToolUse;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Command\SyncModelPricesCommand;
 use App\Controller\AdminProviderKeysController;
-use App\Controller\MessagesGatewayController;
+use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Service\Admin\SystemConfig\Tab\AiTab;
 use App\Service\Egress\EgressBuiltinDestinations;
 use App\Service\Voice\VoiceLiveConcurrency;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 
 /**
  * Every name-keyed provider table of `03_contracts.md` §2.3.1 (T1–T23),
@@ -77,19 +83,27 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertCount(22, $this->catalog->all(), 'twenty-one adapters and the key-only ElevenLabs row');
     }
 
-    /** T1 */
-    public function testKeyStoreSupportedProvidersEqualTheKeyedDescriptors(): void
+    /** T1 — the store answers from the catalog */
+    public function testKeyStoreSupportsExactlyTheKeyedDescriptors(): void
     {
-        self::assertSameSet(ProviderKeyStore::SUPPORTED_PROVIDERS, self::names($this->catalog->withKey()));
+        $store = self::getContainer()->get(ProviderKeyStore::class);
+        \assert($store instanceof ProviderKeyStore);
+        foreach ($this->catalog->all() as $descriptor) {
+            self::assertSame($descriptor->hasPlatformKey(), $store->supports($descriptor->name), $descriptor->name);
+        }
+        self::assertFalse($store->supports('not-a-provider'));
+        self::assertCount(15, $this->catalog->withKey());
     }
 
-    /** T2 */
+    /** T2 — the key catalog is a projection of the key specs */
     public function testKeyCatalogEntriesEqualTheKeySpecsInOrder(): void
     {
-        self::assertSame(ProviderKeyCatalog::providerNames(), self::names($this->catalog->withKey()), 'Admin → AI keys order');
+        $keyCatalog = new ProviderKeyCatalog($this->catalog);
+        self::assertSame($keyCatalog->providerNames(), self::names($this->catalog->withKey()), 'Admin → AI keys order');
+        self::assertSame(['groq', 'openai', 'anthropic', 'google', 'mistral', 'trustedtokens', 'a2agent', 'huggingface', 'meta', 'cerebras', 'xai', 'perplexity', 'thehive', 'higgsfield', 'elevenlabs'], $keyCatalog->providerNames());
 
         foreach ($this->catalog->withKey() as $descriptor) {
-            $meta = ProviderKeyCatalog::get($descriptor->name);
+            $meta = $keyCatalog->get($descriptor->name);
             $key = $descriptor->key;
             self::assertNotNull($key);
             self::assertSame($meta['displayName'], $key->presentation->displayName ?? $descriptor->displayName, $descriptor->name.' displayName');
@@ -99,73 +113,84 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertSame($meta['freeTier'], $key->presentation->freeTier, $descriptor->name.' freeTier');
             self::assertSame($meta['recommended'], $key->presentation->recommended, $descriptor->name.' recommended');
             self::assertSame($meta['validation'], $key->validation?->toArray(), $descriptor->name.' validation');
-            self::assertSame(ProviderKeyCatalog::servesChat($descriptor->name), $key->servesChat, $descriptor->name.' servesChat');
-            self::assertSame(ProviderKeyCatalog::isTestable($descriptor->name), $key->isTestable(), $descriptor->name.' testable');
-            self::assertSame(ProviderKeyCatalog::requiresSecret($descriptor->name), $key->requiresSecret(), $descriptor->name.' requiresSecret');
-            self::assertSame(ProviderKeyCatalog::listsModels($descriptor->name), ModelListing::Lists === $descriptor->modelListing(), $descriptor->name.' listsModels');
+            self::assertSame($meta['chat'] ?? true, $key->servesChat, $descriptor->name.' chat');
+            self::assertSame($meta['modelListing'] ?? true, ModelListing::Lists === $key->modelListing || null === $key->validation, $descriptor->name.' modelListing');
+            self::assertSame($keyCatalog->listsModels($descriptor->name), ModelListing::Lists === $descriptor->modelListing(), $descriptor->name.' listsModels');
+            self::assertSame($keyCatalog->requiresSecret($descriptor->name), null !== $key->secretEnvVar, $descriptor->name.' requiresSecret');
         }
+        self::assertFalse($keyCatalog->has('ollama'), 'no platform key');
+        self::assertFalse($keyCatalog->has('cloudflare'), 'env-only token, not in the store');
+        self::assertSame('higgsfield', $keyCatalog->providerForEnvVar('HIGGSFIELD_API_SECRET'));
+        self::assertNull($keyCatalog->providerForEnvVar('GEMINI_API_KEY'), 'aliases are not managed fields');
     }
 
-    /** T3 */
-    public function testKeyStoreEnvArgumentsEqualTheKeySpecEnvVars(): void
+    /** T3 — the compiler pass wires the store's environment from the descriptors */
+    public function testKeyStoreEnvArgumentsComeFromTheKeySpecs(): void
     {
-        $services = Yaml::parseFile(\dirname(__DIR__, 3).'/config/services.yaml', Yaml::PARSE_CUSTOM_TAGS);
-        $arguments = $services['services'][ProviderKeyStore::class]['arguments'];
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        $container->setDefinition(ProviderKeyStore::class, new Definition(ProviderKeyStore::class));
+        // The source-tree discovery and the container's tags name the same classes.
+        self::assertSame(ProviderCatalog::builtIn()->names(), $this->catalog->names());
+        foreach (ProviderCatalog::builtIn()->providerClasses() as $class) {
+            $container->setDefinition($class, (new Definition($class))->addTag(AsAiProvider::TAG));
+        }
 
-        $envKeys = [];
-        foreach ($arguments['$envKeys'] as $provider => $expression) {
-            $envKeys[$provider] = self::envNames(\is_array($expression) ? $expression : [$expression]);
-        }
-        $envSecrets = [];
-        foreach ($arguments['$envSecrets'] as $provider => $expression) {
-            $envSecrets[$provider] = self::envNames([$expression])[0];
-        }
+        (new ProviderCatalogPass())->process($container);
 
         $expectedKeys = [];
         $expectedSecrets = [];
         foreach ($this->catalog->withKey() as $descriptor) {
             $key = $descriptor->key;
             self::assertNotNull($key);
-            $expectedKeys[$descriptor->name] = [$key->envVar, ...$key->envAliases];
+            $expressions = array_map(static fn (string $name): string => sprintf('%%env(default::%s)%%', $name), [(string) $key->envVar, ...$key->envAliases]);
+            $expectedKeys[$descriptor->name] = 1 === \count($expressions) ? $expressions[0] : $expressions;
             if (null !== $key->secretEnvVar) {
-                $expectedSecrets[$descriptor->name] = $key->secretEnvVar;
+                $expectedSecrets[$descriptor->name] = sprintf('%%env(default::%s)%%', $key->secretEnvVar);
             }
         }
-
+        $store = $container->getDefinition(ProviderKeyStore::class);
+        $envKeys = $store->getArgument('$envKeys');
         ksort($envKeys);
         ksort($expectedKeys);
         self::assertSame($expectedKeys, $envKeys);
-        self::assertSame($expectedSecrets, $envSecrets);
+        self::assertSame($expectedSecrets, $store->getArgument('$envSecrets'));
+        self::assertSame(['%env(default::GOOGLE_GEMINI_API_KEY)%', '%env(default::GEMINI_API_KEY)%', '%env(default::GOOGLE_API_KEY)%'], $envKeys['google']);
     }
 
-    /** T4 */
+    /** T4 — the gateway's BYOK list is the resolver's view of the descriptors */
     public function testGatewayByokProvidersEqualTheDescriptorsWithAUserKey(): void
     {
-        self::assertSameSet(self::constant(MessagesGatewayController::class, 'SUPPORTED_PROVIDERS'), self::names($this->catalog->withUserKey()));
+        $resolver = self::getContainer()->get(UserProviderKeyResolver::class);
+        \assert($resolver instanceof UserProviderKeyResolver);
+        self::assertSame(self::names($this->catalog->withUserKey()), $resolver->supportedProviders());
+        self::assertSame(['openai', 'anthropic', 'google'], $resolver->supportedProviders());
+        self::assertTrue($resolver->supports('Anthropic'));
+        self::assertFalse($resolver->supports('higgsfield'), 'a personal pair is not a gateway key');
     }
 
-    /** T5 */
-    public function testRecommendedDefaultsEqualTheDescriptorBindings(): void
+    /** T5 — the defaults service resolves the descriptor bindings */
+    public function testRecommendedDefaultsComeFromTheDescriptorBindings(): void
     {
-        $expected = [];
+        $defaults = self::getContainer()->get(ProviderDefaultsService::class);
+        \assert($defaults instanceof ProviderDefaultsService);
+        $seen = 0;
         foreach ($this->catalog->all() as $descriptor) {
-            if (null !== $descriptor->defaults) {
-                $expected[$descriptor->name] = $descriptor->defaults->bindings;
+            self::assertSame(null !== $descriptor->defaults, $defaults->supports($descriptor->name), $descriptor->name.' supports');
+            if (null === $descriptor->defaults) {
+                continue;
             }
-        }
-        $actual = self::constant(ProviderDefaultsService::class, 'PROVIDER_DEFAULTS');
-        ksort($expected);
-        ksort($actual);
-        self::assertSame($actual, $expected);
-
-        foreach ($expected as $name => $bindings) {
-            foreach ($bindings as $capability => $modelKey) {
-                self::assertNotNull(ModelCatalog::findBidByKey($modelKey), "{$name} {$capability}: {$modelKey} must resolve to one catalog row");
+            $resolved = $defaults->getRecommendedDefaults($descriptor->name);
+            self::assertSame(array_keys($descriptor->defaults->bindings), array_keys($resolved), $descriptor->name.' capabilities');
+            foreach ($descriptor->defaults->bindings as $capability => $modelKey) {
+                self::assertSame(ModelCatalog::findBidByKey($modelKey), $resolved[$capability], "{$descriptor->name} {$capability}: {$modelKey}");
             }
+            ++$seen;
         }
+        self::assertSame(13, $seen, 'twelve keyed chat providers and Ollama declare defaults');
     }
 
-    /** T6 */
+    /** T6 — the preference order is the descriptor ranks */
     public function testPreferenceOrderEqualsTheDescriptorRanks(): void
     {
         $ranked = [];
@@ -177,67 +202,86 @@ final class ProviderCatalogParityTest extends KernelTestCase
             }
         }
         ksort($ranked);
-        self::assertSame(ProviderDefaultsService::PREFERENCE_ORDER, array_values($ranked));
+        $defaults = self::getContainer()->get(ProviderDefaultsService::class);
+        \assert($defaults instanceof ProviderDefaultsService);
+        self::assertSame(array_values($ranked), $defaults->preferenceOrder());
+        self::assertSame(['groq', 'openai', 'google', 'mistral', 'anthropic', 'trustedtokens', 'huggingface', 'xai', 'a2agent', 'meta', 'cerebras', 'ollama'], $defaults->preferenceOrder());
         self::assertSame(range(1, \count($ranked)), array_keys($ranked), 'ranks are 1..n without gaps');
     }
 
-    /** T7 */
+    /** T7 — the Messages gateway's fixed upstreams are the Chat Completions endpoints */
     public function testChatCompletionsUrlsEqualTheChatCompletionsEndpoints(): void
     {
-        $expected = [];
+        $upstreams = self::getContainer()->get(ChatCompletionsUpstreams::class);
+        \assert($upstreams instanceof ChatCompletionsUpstreams);
+        $fixed = [];
         foreach ($this->catalog->all() as $descriptor) {
             $url = $descriptor->chatCompletionsUrl();
+            self::assertSame($url, $upstreams->fixedUrl($descriptor->name), $descriptor->name);
+            self::assertSame($url, $upstreams->completionsUrl(['provider' => $descriptor->name]) === $url ? $url : null, $descriptor->name.' completionsUrl');
             if (null !== $url) {
-                $expected[$descriptor->name] = $url;
+                $fixed[$descriptor->name] = $url;
             }
         }
-        $actual = ChatCompletionsUpstreams::URLS;
-        ksort($expected);
-        ksort($actual);
-        self::assertSame($actual, $expected);
-        foreach ($expected as $name => $url) {
-            self::assertSame($url, ChatCompletionsUpstreams::fixedUrl($name));
-        }
+        ksort($fixed);
+        self::assertSame([
+            'a2agent' => 'https://a2agent.me/v1/chat/completions',
+            'cerebras' => 'https://api.cerebras.ai/v1/chat/completions',
+            'groq' => 'https://api.groq.com/openai/v1/chat/completions',
+            'huggingface' => 'https://router.huggingface.co/v1/chat/completions',
+            'meta' => 'https://api.meta.ai/v1/chat/completions',
+            'mistral' => 'https://api.mistral.ai/v1/chat/completions',
+            'openai' => 'https://api.openai.com/v1/chat/completions',
+            'perplexity' => 'https://api.perplexity.ai/chat/completions',
+            'trustedtokens' => 'https://api.trustedtokens.eu/v1/chat/completions',
+            'xai' => 'https://api.x.ai/v1/chat/completions',
+        ], $fixed);
     }
 
-    /** T8 */
+    /** T8 — the local hosts are the install-configured Chat Completions endpoints */
     public function testLocalChatCompletionsHostsEqualTheLocalDescriptors(): void
     {
+        $upstreams = self::getContainer()->get(ChatCompletionsUpstreams::class);
+        \assert($upstreams instanceof ChatCompletionsUpstreams);
+        $resolver = self::getContainer()->get(UserProviderKeyResolver::class);
+        \assert($resolver instanceof UserProviderKeyResolver);
         $local = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->isLocal()));
-        self::assertSameSet(ChatCompletionsUpstreams::LOCAL_PROVIDERS, $local);
+        self::assertSameSet(['ollama', 'openaicompatible'], $local);
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame($descriptor->isLocal(), ChatCompletionsUpstreams::isLocal($descriptor->name), $descriptor->name);
-            self::assertSame(null !== $descriptor->chatCompletionsEndpoint(), ChatCompletionsUpstreams::supports($descriptor->name), $descriptor->name.' supports');
+            self::assertSame($descriptor->isLocal(), $upstreams->isLocal($descriptor->name), $descriptor->name);
+            self::assertSame(!$descriptor->isLocal(), $upstreams->needsProviderKey($descriptor->name), $descriptor->name.' needs a key');
+            self::assertSame($descriptor->isLocal(), $resolver->isLocalHost($descriptor->name), $descriptor->name.' resolver');
+            self::assertSame(null !== $descriptor->chatCompletionsEndpoint(), $upstreams->supports($descriptor->name), $descriptor->name.' supports');
         }
+        self::assertFalse($upstreams->supports('anthropic'), 'Claude Code stays on the passthrough');
+        self::assertFalse($upstreams->supports('google'), 'Gemini keeps its own translator');
     }
 
-    /** T9 */
+    /** T9 — the structured-output capability answers from the descriptor dialects */
     public function testStructuredOutputDialectsEqualTheDescriptorDialects(): void
     {
-        $capability = new StructuredOutputCapability();
+        $capability = new StructuredOutputCapability($this->catalog);
         foreach ($this->catalog->all() as $descriptor) {
             $dialects = $descriptor->dialects;
-            self::assertSame($capability->dialect($descriptor->name), $dialects->structuredOutput, $descriptor->name.' dialect');
-            self::assertSame(
-                $capability->supports($descriptor->name, null, false),
-                null !== $dialects->structuredOutput,
-                $descriptor->name.' buffered schema support',
-            );
-            self::assertSame(
-                $capability->supports($descriptor->name, null, true),
-                null !== $dialects->structuredOutput && $dialects->schemaWithStreaming,
-                $descriptor->name.' streaming schema support',
-            );
+            self::assertSame($dialects->structuredOutput, $capability->dialect($descriptor->name), $descriptor->name.' dialect');
+            self::assertSame(null !== $dialects->structuredOutput, $capability->supports($descriptor->name, null, false), $descriptor->name.' buffered schema support');
+            self::assertSame(null !== $dialects->structuredOutput && $dialects->schemaWithStreaming, $capability->supports($descriptor->name, null, true), $descriptor->name.' streaming schema support');
         }
-        $streamingRefusers = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => !$d->dialects->schemaWithStreaming));
-        self::assertSameSet(self::constant(StructuredOutputCapability::class, 'NO_SCHEMA_WITH_STREAMING'), $streamingRefusers);
+        self::assertSame(StructuredOutputDialect::OPENAI_JSON_SCHEMA, $capability->dialect('groq'));
+        self::assertSame(StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT, $capability->dialect('openai'));
+        self::assertSame(StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA, $capability->dialect('google'));
+        self::assertSame(StructuredOutputDialect::OLLAMA_FORMAT, $capability->dialect('ollama'));
+        self::assertSame(StructuredOutputDialect::ANTHROPIC_TOOL_FORCING, $capability->dialect('anthropic'));
+        self::assertNull($capability->dialect('triton'));
+        self::assertNull($capability->dialect('unknown-provider'));
+        self::assertFalse($capability->supports('groq', null, true), 'Groq 400s on a schema while streaming');
+        self::assertTrue($capability->supports('mistral', null, true));
     }
 
-    /** T10 */
+    /** T10 — the model-level rules are the descriptor lists */
     public function testModelLevelStructuredOutputRulesEqualTheDescriptorLists(): void
     {
-        $capability = new StructuredOutputCapability();
-
+        $capability = new StructuredOutputCapability($this->catalog);
         $unavailable = [];
         $strict = [];
         foreach ($this->catalog->all() as $descriptor) {
@@ -245,67 +289,82 @@ final class ProviderCatalogParityTest extends KernelTestCase
                 $unavailable[] = $prefix;
                 self::assertFalse($capability->supports($descriptor->name, $prefix.'-20260101', false), "{$descriptor->name} {$prefix}");
             }
-            if ([] !== $descriptor->dialects->strictSchemaModels) {
-                $strict[$descriptor->name] = $descriptor->dialects->strictSchemaModels;
-                foreach ($descriptor->dialects->strictSchemaModels as $model) {
-                    self::assertTrue($capability->supportsStrict($descriptor->name, $model), "{$descriptor->name} {$model} strict");
-                }
+            foreach ($descriptor->dialects->strictSchemaModels as $model) {
+                $strict[] = $descriptor->name.':'.$model;
+                self::assertTrue($capability->supportsStrict($descriptor->name, strtoupper($model)), "{$descriptor->name} {$model} strict, any case");
             }
         }
-        self::assertSameSet(self::constant(StructuredOutputCapability::class, 'ANTHROPIC_NO_FORCED_TOOL_CHOICE_PREFIXES'), $unavailable);
-        self::assertSame(self::constant(StructuredOutputCapability::class, 'STRICT_CAPABLE_MODELS'), $strict);
+        self::assertSameSet(['claude-fable-5-1', 'claude-mythos-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5'], $unavailable);
+        self::assertSameSet(['groq:openai/gpt-oss-120b', 'groq:openai/gpt-oss-20b'], $strict);
+        self::assertTrue($capability->supports('anthropic', 'claude-sonnet-5', false), 'other Claude generations keep the forced tool call');
+        self::assertFalse($capability->supportsStrict('groq', 'qwen/qwen3.6-27b'));
+        self::assertFalse($capability->supportsStrict('openai', 'gpt-5.5'));
     }
 
-    /** T11 */
+    /** T11 — the tool-calling capability answers from the descriptor dialects */
     public function testToolCallingRulesEqualTheDescriptorDialects(): void
     {
-        $capability = new ToolCallingCapability();
+        $capability = new ToolCallingCapability($this->catalog);
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame($capability->supports($descriptor->name, null, true), $descriptor->dialects->nativeToolRouting, $descriptor->name.' native routing');
-            self::assertSame($capability->conflictsWithStructuredOutput($descriptor->name), !$descriptor->dialects->toolsWithStructuredOutput, $descriptor->name.' tools with schema');
+            self::assertSame($descriptor->dialects->nativeToolRouting, $capability->supports($descriptor->name, null, true), $descriptor->name.' native routing');
+            self::assertSame(!$descriptor->dialects->toolsWithStructuredOutput, $capability->conflictsWithStructuredOutput($descriptor->name), $descriptor->name.' tools with schema');
         }
+        self::assertSameSet(['groq', 'anthropic'], self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->nativeToolRouting)));
+        self::assertSameSet(['groq', 'cerebras', 'anthropic'], self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => !$d->dialects->toolsWithStructuredOutput)));
+        self::assertFalse($capability->supports('unknown-provider', null, true));
+        self::assertFalse($capability->conflictsWithStructuredOutput('unknown-provider'));
     }
 
-    /** T12 */
+    /** T12 — the catalog tool-use rule is the descriptor flag */
     public function testCatalogToolUseServicesEqualTheDescriptorFlag(): void
     {
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame(CatalogToolUse::isCapableChatService($descriptor->name), $descriptor->dialects->catalogToolUse, $descriptor->name);
+            self::assertSame($descriptor->dialects->catalogToolUse, CatalogToolUse::isCapableChatService($descriptor->name), $descriptor->name);
         }
         $flagged = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->catalogToolUse));
-        self::assertSameSet(CatalogToolUse::CAPABLE_CHAT_SERVICES, $flagged);
+        self::assertSameSet(['openai', 'groq', 'anthropic', 'google', 'xai', 'mistral', 'huggingface', 'trustedtokens', 'a2agent', 'meta', 'cerebras'], $flagged);
+        self::assertTrue(CatalogToolUse::isCapableChatService('Hugging Face'), 'service aliases normalise');
+        self::assertFalse(CatalogToolUse::isCapableChatService('ollama'), 'opt-in per pulled model');
     }
 
-    /** T13 */
+    /** T13 — the OpenAI translator transcodes images for providers with the PNG/JPEG rule */
     public function testInlinePngJpegOnlyUpstreamEqualsTheDescriptorImageRule(): void
     {
-        $pngJpegOnly = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => 'png_jpeg_only' === $d->dialects->inlineImages->value));
-        self::assertSame([self::constant(OpenAiMessagesTranslator::class, 'INLINE_PNG_JPEG_ONLY')], $pngJpegOnly);
+        $pngJpegOnly = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => InlineImageRule::PngJpegOnly === $d->dialects->inlineImages));
+        self::assertSame(['cerebras'], $pngJpegOnly);
+
+        $translator = self::getContainer()->get(OpenAiMessagesTranslator::class);
+        \assert($translator instanceof OpenAiMessagesTranslator);
+        $link = ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/picture.webp']];
+        $body = ['model' => 'x', 'max_tokens' => 8, 'messages' => [['role' => 'user', 'content' => [$link, ['type' => 'text', 'text' => 'describe']]]]];
+        $method = new \ReflectionMethod($translator, 'resolveUpstream');
+
+        $cerebras = $method->invoke($translator, $body, ['provider' => 'cerebras'], false);
+        self::assertIsArray($cerebras);
+        self::assertStringContainsString('Cerebras', (string) $cerebras['input_error'], 'a link is refused for the PNG/JPEG-only upstream');
+
+        $groq = $method->invoke($translator, $body, ['provider' => 'groq'], false);
+        self::assertIsArray($groq);
+        self::assertNull($groq['input_error'], 'other upstreams take the link as is');
     }
 
-    /** T14 — `gemini` names no provider; it is `google`'s alias (§2.3.4 #1) */
+    /** T14 — the gateway's rewrite hosts are the descriptors with the flag (the `gemini` alias matched no row and is gone) */
     public function testVisionRewriteProvidersEqualTheDescriptorFlag(): void
     {
-        $today = self::constant(MessagesGateway::class, 'VISION_REWRITE_PROVIDERS');
-        $known = array_values(array_filter($today, fn (string $name): bool => $this->catalog->has($name)));
-        self::assertSame(['gemini'], array_values(array_diff($today, $known)), 'the only alias on the list');
-
         $flagged = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->gatewayVisionRewrite));
-        self::assertSameSet($known, $flagged);
+        self::assertSameSet(['anthropic', 'openai', 'google'], $flagged);
+        // The behaviour itself is MessagesGatewayVisionTest::testAutoFunnelsImagesUpstreamWhenTheVisionModelIsNotARewriteHost.
     }
 
-    /** T15 */
+    /** T15 — the level catalog applies the descriptor ladders */
     public function testReasoningLaddersEqualTheReasoningLevelCatalog(): void
     {
         foreach ($this->catalog->all() as $descriptor) {
             $ladder = $descriptor->dialects->reasoning;
             foreach (['zzz-no-such-model', 'gpt-4o', 'claude-3-haiku'] as $unmatched) {
-                self::assertSame(
-                    $ladder?->levelsFor($unmatched),
-                    ReasoningLevelCatalog::levels($descriptor->name, $unmatched, ['reasoning']),
-                    "{$descriptor->name} {$unmatched}",
-                );
+                self::assertSame($ladder?->levelsFor($unmatched), ReasoningLevelCatalog::levels($descriptor->name, $unmatched, ['reasoning']), "{$descriptor->name} {$unmatched}");
             }
+            self::assertNull(ReasoningLevelCatalog::levels($descriptor->name, 'any-model', []), $descriptor->name.' without the reasoning feature');
             if (null === $ladder) {
                 continue;
             }
@@ -316,14 +375,9 @@ final class ProviderCatalogParityTest extends KernelTestCase
                     ReasoningMatch::Contains => array_map(static fn (string $p): string => 'vendor/'.$p.'-thinking', $rule->patterns),
                 };
                 foreach ($ids as $id) {
-                    self::assertSame(
-                        ReasoningLevelCatalog::levels($descriptor->name, $id, ['reasoning']),
-                        $ladder->levelsFor($id),
-                        "{$descriptor->name} {$id}",
-                    );
+                    self::assertSame($ladder->levelsFor($id), ReasoningLevelCatalog::levels($descriptor->name, $id, ['reasoning']), "{$descriptor->name} {$id}");
                 }
             }
-            self::assertNull(ReasoningLevelCatalog::levels($descriptor->name, 'any-model', []), $descriptor->name.' without the reasoning feature');
         }
 
         // An inventory of today's model families, independent of the descriptors:
@@ -332,6 +386,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertSame($levels, ReasoningLevelCatalog::levels($service, $id, ['reasoning']), "today: {$service} {$id}");
             self::assertSame($levels, $this->catalog->get($service)->dialects->reasoning?->levelsFor($id), "descriptor: {$service} {$id}");
         }
+        self::assertSame(['low', 'high', 'max'], ReasoningLevelCatalog::levels('Hugging Face', 'moonshotai/Kimi-K3', ['reasoning']), 'service aliases normalise');
     }
 
     /**
@@ -378,32 +433,33 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['mistral', 'mistral-large-4', null],
     ];
 
-    /** T16 */
+    /** T16 — the model-list probe covers every keyed provider whose endpoint says something */
     public function testModelListProbeSupportEqualsTheDescriptorModelListing(): void
     {
         $probe = self::getContainer()->get(PlatformKeyModelListProbe::class);
         \assert($probe instanceof PlatformKeyModelListProbe);
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame(
-                $probe->supports($descriptor->name),
-                $descriptor->hasPlatformKey() && ModelListing::None !== $descriptor->modelListing(),
-                $descriptor->name,
-            );
+            self::assertSame($descriptor->hasPlatformKey() && ModelListing::None !== $descriptor->modelListing(), $probe->supports($descriptor->name), $descriptor->name);
         }
         $credentialsOnly = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => ModelListing::CredentialsOnly === $d->modelListing()));
-        self::assertSameSet(self::constant(PlatformKeyModelListProbe::class, 'NO_LISTING'), $credentialsOnly);
+        self::assertSame(['huggingface'], $credentialsOnly);
+        self::assertSame(ModelProbeResult::Inconclusive, $probe->confirm('huggingface', 'moonshotai/Kimi-K3'), 'whoami names no model');
+        self::assertFalse($probe->supports('higgsfield'));
+        self::assertFalse($probe->supports('thehive'));
+        self::assertFalse($probe->supports('ollama'));
     }
 
-    /** T17 — prefixes and vendors are sequences per provider (the first existing key wins) */
+    /** T17 — the price sync reads each descriptor's pricing (prefix order matters: the first existing key wins) */
     public function testPricePrefixesVendorsAndSkipListEqualTheDescriptorPricing(): void
     {
+        $skipped = [];
         $prefixes = [];
         $vendors = [];
-        $skipped = [];
         foreach ($this->catalog->all() as $descriptor) {
             if (!$descriptor->pricing->synced) {
                 $skipped[] = $descriptor->name;
-            } elseif ([] !== $descriptor->pricing->litellmPrefixes) {
+            }
+            if ([] !== $descriptor->pricing->litellmPrefixes) {
                 $prefixes[$descriptor->name] = $descriptor->pricing->litellmPrefixes;
             }
             if ([] !== $descriptor->pricing->bareMatchVendors) {
@@ -411,40 +467,39 @@ final class ProviderCatalogParityTest extends KernelTestCase
             }
             self::assertSame([$descriptor->name], \App\AI\Catalog\ProviderPricing::byServiceName()->prefixesFor($descriptor->name));
         }
-        $actualPrefixes = self::constant(SyncModelPricesCommand::class, 'PREFIX_MAP');
-        ksort($prefixes);
-        ksort($actualPrefixes);
-        self::assertSame($actualPrefixes, $prefixes);
-        self::assertSameSet(self::constant(SyncModelPricesCommand::class, 'LOCAL_PROVIDERS'), $skipped);
+        self::assertSameSet(['ollama', 'triton', 'test', 'piper', 'thehive'], $skipped);
+        self::assertSame(['anthropic' => ['anthropic'], 'google' => ['gemini', 'google'], 'groq' => ['groq'], 'huggingface' => ['huggingface'], 'openai' => ['openai']], self::sorted($prefixes));
+        self::assertSame(['anthropic' => ['anthropic'], 'google' => ['gemini', 'google', 'vertex_ai'], 'openai' => ['openai']], self::sorted($vendors));
 
-        // `cohere` and `jina` are rerank / embedding plugs, not providers; they
-        // stay with the command (03 §2.3.1 T17).
-        $actualVendors = self::constant(SyncModelPricesCommand::class, 'BARE_MATCH_PROVIDERS');
-        $plugs = array_filter(array_keys($actualVendors), fn (string $name): bool => !$this->catalog->has($name));
-        self::assertSame(['cohere', 'jina'], array_values($plugs));
-        $actualVendors = array_diff_key($actualVendors, array_flip($plugs));
-        ksort($vendors);
-        ksort($actualVendors);
-        self::assertSame($actualVendors, $vendors);
+        $command = self::getContainer()->get(SyncModelPricesCommand::class);
+        \assert($command instanceof SyncModelPricesCommand);
+        $find = new \ReflectionMethod($command, 'findLiteLLMKey');
+        $litellm = ['gemini/gemini-3.8-flash' => [], 'google/gemini-3.8-flash' => [], 'deepseek-v4-pro' => ['litellm_provider' => 'deepseek'], 'gpt-5.5' => ['litellm_provider' => 'openai'], 'xai/grok-4.5' => []];
+        self::assertSame('gemini/gemini-3.8-flash', $find->invoke($command, self::model('google', 'gemini-3.8-flash'), $litellm), 'gemini before google');
+        self::assertSame('gpt-5.5', $find->invoke($command, self::model('openai', 'gpt-5.5'), $litellm), 'a bare id of our own vendor');
+        self::assertNull($find->invoke($command, self::model('a2agent', 'deepseek-v4-pro'), $litellm), 'a gateway never matches a bare id');
+        self::assertSame('xai/grok-4.5', $find->invoke($command, self::model('xAI', 'grok-4.5'), $litellm), 'the service name is the default prefix');
     }
 
-    /** T18 — `compatible` is the live-voice name of `openaicompatible` (§2.3.4 #2) */
+    /** T18 — live-voice caps are the descriptors' sessions; `compatible` is the endpoint registry's socket */
     public function testLiveVoiceCapsEqualTheDescriptorSessions(): void
     {
-        $today = self::constant(VoiceLiveConcurrency::class, 'DEFAULTS');
-        if (isset($today['compatible'])) {
-            $today['openaicompatible'] = $today['compatible'];
-            unset($today['compatible']);
-        }
         $expected = [];
         foreach ($this->catalog->all() as $descriptor) {
             if (null !== $descriptor->liveVoiceSessions) {
                 $expected[$descriptor->name] = $descriptor->liveVoiceSessions;
             }
         }
-        ksort($today);
-        ksort($expected);
-        self::assertSame($today, $expected);
+        self::assertSame(['google' => 100, 'openai' => 50, 'openaicompatible' => 4, 'xai' => 10], self::sorted($expected));
+
+        $concurrency = self::getContainer()->get(VoiceLiveConcurrency::class);
+        \assert($concurrency instanceof VoiceLiveConcurrency);
+        $cap = new \ReflectionMethod($concurrency, 'cap');
+        self::assertSame(50, $cap->invoke($concurrency, 'OpenAI'));
+        self::assertSame(100, $cap->invoke($concurrency, 'google'));
+        self::assertSame(10, $cap->invoke($concurrency, 'xai'));
+        self::assertSame(4, $cap->invoke($concurrency, 'compatible'));
+        self::assertSame(10, $cap->invoke($concurrency, 'unknown'), 'the fallback');
     }
 
     /** T19 */
@@ -461,59 +516,51 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSameSet($enum, self::names($this->catalog->withKey()));
     }
 
-    /** T20 */
+    /** T20 — the AI Services tab's key fields are the descriptors' placements and texts */
     public function testSystemConfigPasswordFieldsEqualTheKeySpecs(): void
     {
         $tab = self::getContainer()->get(AiTab::class);
         \assert($tab instanceof AiTab);
 
         $fields = [];
-        foreach ($tab->sections() as $section) {
+        foreach ($tab->sections() as $sectionId => $section) {
             foreach ($section->fields as $envVar => $field) {
                 if ('password' === $field->type) {
-                    $fields[$envVar] = $field->description;
+                    $fields[$envVar] = [$sectionId, $field->description];
                 }
             }
         }
 
-        $described = [];
-        foreach ($this->catalog->all() as $descriptor) {
+        $expected = [];
+        foreach ($this->catalog->withKey() as $descriptor) {
             $key = $descriptor->key;
-            if (null === $key) {
-                continue;
-            }
-            foreach ($key->envVars() as $envVar) {
-                $described[$envVar] = $descriptor->name;
-            }
-            $fieldDescription = $key->presentation->fieldDescription;
-            if (null !== $fieldDescription) {
-                self::assertArrayHasKey((string) $key->envVar, $fields, "{$descriptor->name} field");
-                self::assertSame($fields[$key->envVar], $fieldDescription, "{$descriptor->name} field description");
-            }
-            $secretDescription = $key->presentation->secretFieldDescription;
-            if (null !== $secretDescription) {
-                self::assertArrayHasKey((string) $key->secretEnvVar, $fields, "{$descriptor->name} secret field");
-                self::assertSame($fields[$key->secretEnvVar], $secretDescription, "{$descriptor->name} secret field description");
-            }
-        }
-
-        foreach ($fields as $envVar => $description) {
-            $owner = ProviderKeyCatalog::providerForEnvVar($envVar);
-            if (null === $owner) {
-                continue;
-            }
-            self::assertSame($owner, $described[$envVar] ?? null, "{$envVar} belongs to {$owner}");
-            $key = $this->catalog->get($owner)->key;
             self::assertNotNull($key);
-            // The legacy field's text must be on the descriptor, so a dropped
-            // description is caught before AiTab reads the catalog.
-            $expected = $envVar === $key->secretEnvVar ? $key->presentation->secretFieldDescription : $key->presentation->fieldDescription;
-            self::assertSame($description, $expected, "{$envVar} description");
+            $section = $key->presentation->configSection;
+            if (null === $section) {
+                self::assertArrayNotHasKey((string) $key->envVar, $fields, "{$descriptor->name} has no system-config field");
+                continue;
+            }
+            $expected[(string) $key->envVar] = [$section, $key->presentation->fieldDescription];
+            if (null !== $key->secretEnvVar) {
+                $expected[$key->secretEnvVar] = [$section, $key->presentation->secretFieldDescription];
+            }
         }
-        self::assertCount(15, array_filter(array_keys($fields), static fn (string $envVar): bool => null !== ProviderKeyCatalog::providerForEnvVar($envVar)), 'fourteen key fields and one secret field are managed');
+        foreach ($expected as $envVar => $placement) {
+            self::assertSame($placement, $fields[$envVar] ?? null, $envVar);
+        }
+        self::assertCount(15, $expected, 'fourteen key fields and one secret field are managed');
+        self::assertSame(
+            ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'CEREBRAS_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN'],
+            array_keys($tab->sections()['cloud']->fields),
+            'the shipped order of the cloud section',
+        );
+        self::assertSame(['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET'], array_keys($tab->sections()['media']->fields));
+        self::assertSame(['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY'], array_keys($tab->sections()['tts']->fields));
+        self::assertNull($this->catalog->get('perplexity')->key?->presentation->configSection, 'Perplexity has no system-config field today');
+        self::assertSame('Cloudflare API token with Workers AI access', $fields['CLOUDFLARE_API_TOKEN'][1], 'env-only token stays a hand-written field');
     }
 
-    /** T21 */
+    /** T21 — the registry's tags are the descriptors' capabilities, added by the pass; services.yaml names none */
     public function testContainerTagsEqualTheDescriptorCapabilities(): void
     {
         foreach (ProviderCapability::cases() as $capability) {
@@ -524,6 +571,11 @@ final class ProviderCatalogParityTest extends KernelTestCase
             );
         }
         self::assertSame(ProviderRegistry::CAPABILITIES, array_map(static fn (ProviderCapability $c): string => $c->value, ProviderCapability::cases()));
+        self::assertSame(['a2agent', 'anthropic', 'cerebras', 'google', 'groq', 'huggingface', 'meta', 'mistral', 'ollama', 'openaicompatible', 'openai', 'perplexity', 'test', 'triton', 'trustedtokens', 'xai'], $this->registry->getRegisteredProviderNames('chat'), 'the order the registry lists');
+
+        $services = file_get_contents(\dirname(__DIR__, 3).'/config/services.yaml');
+        self::assertIsString($services);
+        self::assertDoesNotMatchRegularExpression('/name: \'app\.ai\.(chat|embedding|vision|image_generation|video_generation|speech_to_text|text_to_speech|file_analysis)\'/', $services, 'no capability tag is hand-kept');
     }
 
     /** T22 */
@@ -579,20 +631,25 @@ final class ProviderCatalogParityTest extends KernelTestCase
     }
 
     /**
-     * `%env(X)%` and `%env(default::X)%` → `X`.
+     * @template T
      *
-     * @param list<string> $expressions
+     * @param array<string, T> $map
      *
-     * @return list<string>
+     * @return array<string, T>
      */
-    private static function envNames(array $expressions): array
+    private static function sorted(array $map): array
     {
-        $names = [];
-        foreach ($expressions as $expression) {
-            self::assertSame(1, preg_match('/env\((?:[a-z]+::)*([A-Z0-9_]+)\)/', $expression, $m), $expression);
-            $names[] = $m[1];
-        }
+        ksort($map);
 
-        return $names;
+        return $map;
+    }
+
+    private static function model(string $service, string $providerId): Model
+    {
+        $model = new Model();
+        $model->setService($service);
+        $model->setProviderId($providerId);
+
+        return $model;
     }
 }

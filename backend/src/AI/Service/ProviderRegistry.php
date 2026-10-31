@@ -23,9 +23,9 @@ use Symfony\Contracts\Service\ServiceProviderInterface;
 /**
  * Provider Registry with DB-driven Capabilities.
  *
- * Providers register with all their interfaces (one `app.ai.<capability>` tag
- * per interface, each carrying `key: <getName()>`), but DB (BMODELS.BTAG)
- * controls which capabilities are actually available.
+ * Providers register with one `app.ai.<capability>` tag per capability of
+ * their descriptor, each carrying `key: <name>` (added by ProviderCatalogPass),
+ * but DB (BMODELS.BTAG) controls which capabilities are actually available.
  *
  * Providers are resolved lazily: a by-name lookup instantiates exactly the
  * provider asked for, so a chat request never constructs the Ollama client,

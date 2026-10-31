@@ -11,6 +11,7 @@ use App\AI\Catalog\ProviderCapability;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -21,7 +22,7 @@ use App\AI\Provider\HiggsfieldProvider;
  * The descriptor of {@see HiggsfieldProvider}, kept beside the adapter
  * because the adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: HiggsfieldProvider::class)]
 final class HiggsfieldDescriptor implements DescribesProviderInterface
 {
     public static function descriptor(): ProviderDescriptor
@@ -45,6 +46,8 @@ final class HiggsfieldDescriptor implements DescribesProviderInterface
                 secretEnvVar: 'HIGGSFIELD_API_SECRET',
                 fieldDescription: 'Higgsfield API key — Soul/Reve images, DoP and Kling video. Both halves are required',
                 secretFieldDescription: 'Higgsfield API secret — the key alone will not authenticate',
+                configSection: ProviderKeyPresentation::SECTION_MEDIA,
+                configOrder: 2,
             ),
             dialects: new ProviderDialects(),
             defaults: null,

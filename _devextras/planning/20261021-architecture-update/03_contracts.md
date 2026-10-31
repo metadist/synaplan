@@ -476,6 +476,26 @@ defined in §2.3.2.)
 | `services.yaml` `app.ai.<capability>` tags and `$envKeys` | `#[AsAiProvider]` + `registerAttributeForAutoconfiguration`, tags from the implemented interfaces, keys from the descriptor |
 | frontend `providerIcons.ts`, `providerHelp.ts`, `ServiceIcon.vue` | `GET /api/v1/ai/providers` (AU21); help text stays in the five locale files under `admin.providerHelp.<helpKey>` |
 
+**As delivered (AU20).** Every row above reads the catalog; the differences
+from the table: the BYOK list (T4) is `UserProviderKeyResolver::supportedProviders()`,
+and the gateway asks the same resolver `isLocalHost()` where the table said
+`ChatCompletionsUpstreams::isLocal()`, because `MessagesGateway`'s
+constructor is frozen at 21 parameters. `ChatCompletionsUpstreams` is a
+service that also took over the translator's upstream URL resolution
+(fixed URL, Ollama, the endpoint registry), which is how the frozen
+translator shrank instead of growing. `MessagesGateway`'s vision rewrite,
+`CatalogToolUse::isCapableChatService()` and `ReasoningLevelCatalog::levels()`
+read `ProviderCatalog::builtIn()` — the shipped descriptors, discovered by
+scanning `src/AI/Provider` — because they are static or their class is
+frozen; a plugin provider therefore cannot opt into the vision rewrite or
+a reasoning ladder until those three get an injection. `StructuredOutputCapability`
+and `ToolCallingCapability` take an optional `ProviderCatalog` and fall back
+to `builtIn()` for the providers' `new` constructor defaults. The `gemini`
+alias on T14 named no service anywhere (catalog, BMODELS, tests) and is
+gone. `AiTab` keeps its non-key fields; the key fields come from
+`ProviderKeyPresentation::$configSection` / `$configOrder`, which the
+hardening did not foresee and the descriptors now carry.
+
 ### 2.2 Parity test
 
 `ProviderCatalogParityTest` (AU19) builds every table of §2.1 from the

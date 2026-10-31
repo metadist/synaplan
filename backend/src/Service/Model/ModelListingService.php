@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Model;
 
 use App\AI\Credential\ChatReadinessService;
-use App\AI\Credential\ProviderKeyStore;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
@@ -32,6 +32,7 @@ final readonly class ModelListingService
         private ChatReadinessService $chatReadiness,
         private ProviderRegistry $providerRegistry,
         private ModelConfigService $modelConfigService,
+        private ProviderKeyCatalog $keyCatalog,
         private ?CostCalculationService $costCalculationService = null,
         private ?GroupPolicyService $groupPolicyService = null,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
@@ -163,7 +164,7 @@ final readonly class ModelListingService
                 'name' => $key,
                 'displayName' => $provider->getDisplayName(),
                 'available' => $availability[$key] ?? false,
-                'requiresKey' => ProviderKeyStore::isSupported($key),
+                'requiresKey' => $this->keyCatalog->has($key),
             ];
         }
         usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));

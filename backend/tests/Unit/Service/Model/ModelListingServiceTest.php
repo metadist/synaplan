@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Model;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ChatReadinessService;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
 use App\Entity\User;
@@ -108,6 +110,7 @@ final class ModelListingServiceTest extends TestCase
             $readiness,
             $registry,
             $modelConfig ?? $this->createStub(ModelConfigService::class),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
             null,
             $policy,
             $resolver,

@@ -11,6 +11,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -107,6 +108,8 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 listOrder: 2,
                 modelListing: ModelListing::Lists,
                 fieldDescription: 'OpenAI API key',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 1,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT,

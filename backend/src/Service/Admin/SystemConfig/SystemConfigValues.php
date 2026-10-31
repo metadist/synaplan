@@ -34,6 +34,7 @@ final readonly class SystemConfigValues
         private EnvSettings $env,
         private RegistrationConfig $registrationConfig,
         private GuestChatConfig $guestChatConfig,
+        private ProviderKeyCatalog $keyCatalog,
         private FeatureFlagEnv $featureFlagEnv = new FeatureFlagEnv(),
         private ?ChatArtifactsConfig $chatArtifactsConfig = null,
         private ?SignupPauseSwitch $signupPauseSwitch = null,
@@ -67,7 +68,7 @@ final readonly class SystemConfigValues
         // (BCONFIG), not in .env — report their status from there so this
         // legacy surface and Providers & keys agree. The secret half of a
         // key + secret pair reports its own presence.
-        $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+        $storeProvider = $this->keyCatalog->providerForEnvVar($key);
         if (null !== $storeProvider) {
             return $this->providerKeyValue($key, $storeProvider, $field);
         }
@@ -86,7 +87,7 @@ final readonly class SystemConfigValues
         // Each half of a pair reports its own presence so a missing
         // secret is visible. An env-imported DB row is still "from
         // the environment / Helm", not a UI override.
-        $isSet = ProviderKeyCatalog::isSecretEnvVar($key)
+        $isSet = $this->keyCatalog->isSecretEnvVar($key)
             ? $status['hasSecret']
             : '' !== $status['maskedKey'];
         $keySource = 'db' === $status['source'] && ProviderKeyStore::ORIGIN_ENV === $status['origin']
