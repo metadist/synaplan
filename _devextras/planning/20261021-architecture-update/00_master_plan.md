@@ -1,11 +1,12 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** S1 (AU9–AU13) is on `main`. S2 has started: AU14 is merged, and
-AU15 is next. S0's code (AU1–AU8, including the chart) is merged. The
+**Status:** S0, S1 and S2 (AU1–AU18) are on `main`. S3 has started: the
+contract hardening of `03_contracts.md` §2.3 (frozen inventory, sub-type
+shapes, discovery) is the first pull request, AU19 follows it. The
 production reading is one day, not a week: a worker is listed only when it
 reported in the last 24 hours. The vultr-cluster load test (M6) waits until
-after AU15–AU18. The contract hardening in `03_contracts.md` §2.3 and §7.1
-must merge before AU19 and AU28 respectively. §1.7 landed with AU10.
+after S2 has been read in production. `03_contracts.md` §7.1 must merge
+before AU28. §1.7 landed with AU10.
 **Priority:** Row 22 of [`../ROADMAP.md`](../ROADMAP.md). S0 is production
 relief and continues before the owner orders the rest.
 **Origin:** Four directions from an external system architect (quoted in
