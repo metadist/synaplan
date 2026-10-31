@@ -67,6 +67,21 @@ final class ProviderCatalogPassTest extends TestCase
         self::assertSame([XaiDescriptor::class], $container->getDefinition(ProviderCatalog::class)->getArgument('$providerClasses'));
     }
 
+    public function testAnAdapterRegisteredUnderAnotherServiceIdIsTaggedToo(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        $container->setDefinition('ai.cerebras', (new Definition(CerebrasProvider::class))->addTag(AsAiProvider::TAG));
+        $container->setDefinition('ai.xai', new Definition(XaiProvider::class));
+        $container->setDefinition(XaiDescriptor::class, (new Definition(XaiDescriptor::class))->addTag(AsAiProvider::TAG));
+
+        (new ProviderCatalogPass())->process($container);
+
+        self::assertSame([['key' => 'cerebras']], $container->getDefinition('ai.cerebras')->getTag('app.ai.chat'), 'an inline descriptor under its own id');
+        self::assertSame([['key' => 'xai']], $container->getDefinition('ai.xai')->getTag('app.ai.chat'), 'a sibling resolves its adapter by class');
+        self::assertFalse($container->hasDefinition(CerebrasProvider::class));
+    }
+
     public function testAKeyOnlyProviderAndAMissingAdapterGetNoTags(): void
     {
         $container = new ContainerBuilder();
