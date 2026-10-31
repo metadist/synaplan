@@ -3,7 +3,7 @@
 > **2026-10-31 — S3 started.** The `03` §2.3 hardening is written: 26
 > name-keyed provider tables frozen with file and line (T1–T26), the
 > descriptor sub-types defined, discovery by `#[AsAiProvider]` plus a
-> compiler pass, and eleven places where today's tables disagree (§2.3.4).
+> compiler pass, and twelve places where today's tables disagree (§2.3.4).
 > No production code changed. AU19 starts from this.
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
@@ -67,7 +67,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-30 | AU16 | [#2884](https://github.com/metadist/synaplan/pull/2884) | merged (`cbe0d35cf`) | raw cURL calls use the egress client |
 | 2026-10-30 | AU17 | [#2888](https://github.com/metadist/synaplan/pull/2888) | merged (`99a2318cc`) | OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA send through the shared client |
 | 2026-10-30 | AU18 | [#2889](https://github.com/metadist/synaplan/pull/2889) | merged (`feeb3630e`) | `sidecars/synaplan-egress` CONNECT gateway, off unless the `egress` profile is loaded |
-| 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, eleven disagreements; docs only |
+| 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
 
 ## 2026-10-31 — S3 hardening: the provider descriptor contract
 
@@ -85,7 +85,7 @@ constant. New since AU0: `MessagesGatewayController::SUPPORTED_PROVIDERS`
 `StructuredOutputCapability` (T10) and the `OpenAiReasoningEffort` tiers
 that `ReasoningLevelCatalog` delegates to (T15). ElevenLabs has a key row
 on four tables and no adapter class; `gemini` and `compatible` are names
-that reach a table without naming a provider. All eleven disagreements are in
+that reach a table without naming a provider. All twelve disagreements are in
 `03` §2.3.4 and stay as they are through S3.
 
 **Shape decisions.** `capabilities` is a new `ProviderCapability` enum of

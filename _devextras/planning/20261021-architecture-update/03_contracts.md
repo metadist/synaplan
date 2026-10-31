@@ -469,7 +469,7 @@ defined in §2.3.2.)
 | `PlatformKeyModelListProbe::NO_LISTING` | `modelListing` |
 | `SyncModelPricesCommand` `PREFIX_MAP` and `LOCAL_PROVIDERS` | `pricing` |
 | `VoiceLiveConcurrency` caps | `liveVoiceSessions` |
-| `ProviderException::DISPLAY_NAMES` | `displayName` |
+| `ProviderException::DISPLAY_NAMES` | **kept** — the exception is static and its `ucfirst()` fallback is error copy; the parity test pins its two entries to the descriptors (§2.3.1 T22, §2.3.4 #12) |
 | `EgressBuiltinDestinations::PROVIDERS` (the provider hosts; AU22) | `ProviderCatalog::endpoints()` |
 | `AdminProviderKeysController` OpenAPI enum | **dropped** (AU21): the field becomes a string validated against the catalog (unknown name ⇒ 400 with the existing error shape). A hand-kept enum would be one more list to edit, and a generated one would make every new provider a change of the frontend's generated schemas; the UI already gets the names from `GET /api/v1/ai/providers`. Test: the exported spec (`/api/doc.json`) contains no provider-name list, and the AU22 fixture provider is accepted |
 | `AiTab` password fields | generated from `key` |
@@ -514,16 +514,16 @@ the set.
 | T14 | `MessagesGateway::VISION_REWRITE_PROVIDERS` | `backend/src/AI/Messages/MessagesGateway.php:119` | the constant | `dialects->gatewayVisionRewrite` (`gemini` is `google`'s alias, see §2.3.4) | set |
 | T15 | `ReasoningLevelCatalog::levels()` match arms and `ANTHROPIC_EXTENDED_EFFORT_MODELS`, `ANTHROPIC_EFFORT_MODELS`; `OpenAiReasoningEffort::TIERS`, `TIERS_FALLBACK` | `backend/src/AI/Provider/ReasoningLevelCatalog.php:65–74, 29, 40`; `backend/src/AI/Provider/OpenAiReasoningEffort.php:27, 45` | `levels($service, $providerId, ['reasoning'])` for every model id named in a rule plus one unmatched id per service | `dialects->reasoning` (`ReasoningLadder`) | sequence per rule |
 | T16 | `PlatformKeyModelListProbe::NO_LISTING` | `backend/src/AI/Health/Probe/PlatformKeyModelListProbe.php:40` | `supports($name)` with `ProviderKeyCatalog::listsModels()` | `modelListing() === ModelListing::CredentialsOnly` | set |
-| T17 | `SyncModelPricesCommand::PREFIX_MAP`, `LOCAL_PROVIDERS` | `backend/src/Command/SyncModelPricesCommand.php:76, 69` | the constants through reflection | `pricing` (`ProviderPricing`) | set |
+| T17 | `SyncModelPricesCommand::PREFIX_MAP`, `LOCAL_PROVIDERS`, `BARE_MATCH_PROVIDERS` | `backend/src/Command/SyncModelPricesCommand.php:76, 69, 102` | the constants through reflection | `pricing` (`ProviderPricing`: `litellmPrefixes`, `synced`, `bareMatchVendors`). `cohere` and `jina` in `BARE_MATCH_PROVIDERS` are rerank / embedding plugs, not providers: they stay with the command | providers: set; prefixes and vendors: sequence per provider (the first existing key wins) |
 | T18 | `VoiceLiveConcurrency::DEFAULTS` | `backend/src/Service/Voice/VoiceLiveConcurrency.php:18` | the constant through reflection | `liveVoiceSessions` (`compatible` is `openaicompatible`'s live-voice name, see §2.3.4) | set |
 | T19 | `AdminProviderKeysController` `provider` path enum | `backend/src/Controller/AdminProviderKeysController.php:111` | the `#[OA\Parameter]` attribute through reflection | `ProviderCatalog::withKey()`; dropped in AU21 | set |
-| T20 | `AiTab::cloud()`, `media()`, `tts()` password fields | `backend/src/Service/Admin/SystemConfig/Tab/AiTab.php:65–129, 141–160, 181–195` | `sections()` — every `password` field whose key `ProviderKeyCatalog::providerForEnvVar()` resolves | `key->envVar`, `key->secretEnvVar`; the key field's `description` is `key->presentation->fieldDescription` (the secret field's text stays in `AiTab` until AU20) | set |
+| T20 | `AiTab::cloud()`, `media()`, `tts()` password fields | `backend/src/Service/Admin/SystemConfig/Tab/AiTab.php:65–129, 141–160, 181–195` | `sections()` — every `password` field whose key `ProviderKeyCatalog::providerForEnvVar()` resolves | `key->envVar`, `key->secretEnvVar`; the texts are `key->presentation->fieldDescription` and `->secretFieldDescription` | set |
 | T21 | `services.yaml` `app.ai.<capability>` tags | `backend/config/services.yaml:460–664, 1713–1723` | `ProviderRegistry::getRegisteredProviderNames($capability)` | `capabilities` | set per capability |
-| T22 | `ProviderException::DISPLAY_NAMES` | `backend/src/AI/Exception/ProviderException.php:17` | `displayName($name)` | `displayName` | set |
+| T22 | `ProviderException::DISPLAY_NAMES` | `backend/src/AI/Exception/ProviderException.php:17` | `displayName($name)` | parity only: the two entries equal the descriptors' `displayName`. The constant **stays** — the exception is static and its `ucfirst()` fallback is error copy (`Google`, `Mistral`) that a catalog lookup (`Google AI`, `Mistral AI`) would change (§2.3.4 #12) | set |
 | T23 | `EgressBuiltinDestinations::PROVIDERS` — the twelve provider hosts (`api.openai.com` … `api.perplexity.ai`) | `backend/src/Service/Egress/EgressBuiltinDestinations.php:48–60` | the constant | `ProviderCatalog::endpoints()` hosts ⊇ those twelve (AU22) | set |
-| T24 | frontend `getProviderIcon`, `getProviderFlag`, `isLocalSelfHostedProvider` | `frontend/src/utils/providerIcons.ts` (whole file) | the functions | `branding->icon`, `branding->flag`, `branding->local` (AU21; the substring fallback for unregistered names stays) | per name |
-| T25 | frontend `providerHelp.ts` `BY_PROVIDER`, `BY_ENV_VAR` | `frontend/src/utils/providerHelp.ts:29, 46` | the maps | `branding->helpKey`, `branding->helpUrl`, `key->envVar` (AU21) | per name |
-| T26 | frontend `ServiceIcon.vue` component switch | `frontend/src/components/icons/ServiceIcon.vue:45–53` | the three `is*` computeds | `branding->icon` (`component:` prefix, §2.3.2) (AU21) | per name |
+| T24 | frontend `getProviderIcon`, `getProviderFlag`, `isLocalSelfHostedProvider` | `frontend/src/utils/providerIcons.ts` (whole file) | the functions | `branding->icon` (the Iconify fallback: `simple-icons:groq`), `branding->flag`, `branding->local` (AU21; the substring fallback for unregistered names stays) | per name |
+| T25 | frontend `providerHelp.ts` `BY_PROVIDER`, `BY_ENV_VAR` | `frontend/src/utils/providerHelp.ts:29, 46` | the maps | `branding->helpKey`, `branding->helpUrl`, `branding->helpIsDownload`; `ProviderDescriptor::helpFields()` — the key's env var, or `branding->helpFields` for a keyless hint (`OLLAMA_BASE_URL` → Ollama) (AU21) | per name |
+| T26 | frontend `ServiceIcon.vue` component switch | `frontend/src/components/icons/ServiceIcon.vue:45–53` | the three `is*` computeds | `branding->iconComponent` (`GroqIcon`, `MistralIcon`, `OpenAiCompatibleIcon`; null = draw `branding->icon`) (AU21) | per name |
 
 Already registry-driven and untouched: `ProviderDisplayNames`,
 `AiProviderDisclosure`, `ProviderRegistry::getProvidersMetadata()`.
@@ -568,12 +568,20 @@ final readonly class ProviderEndpoint
     public function host(): ?string;                       // `parse_url(PHP_URL_HOST)`, null when url is null
 }
 
+/** Where the platform credential lives. */
 enum ProviderKeyStoreKind: string
 {
     case Platform = 'platform';                  // ProviderKeyStore row (BCONFIG `provider_keys`)
-    case PlatformAndUser = 'platform_and_user';  // the same row, and UserProviderKeyResolver for a user's own key (BYOK)
     case EndpointRegistry = 'endpoint_registry'; // OpenAiCompatibleEndpointRegistry: one credential per endpoint
     case None = 'none';                          // a credential read from the environment only (Cloudflare's token)
+}
+
+/** Whether a person may bring their own credential, and through which path — separate from the store. */
+enum UserCredential: string
+{
+    case None = 'none';
+    case Gateway = 'gateway';    // the Messages gateway's BYOK list (T4): UserProviderKeyResolver, metered at zero cost
+    case Personal = 'personal';  // a per-user key pair the adapter's own resolver reads at call time (HiggsfieldCredentialResolver)
 }
 
 final readonly class ProviderKeyValidation
@@ -600,7 +608,8 @@ final readonly class ProviderKeyPresentation
         public ?string $displayName = null,        // the key row's label where it differs from the adapter's (§2.3.4 #4)
         public bool $freeTier = false,
         public bool $recommended = false,
-        public ?string $fieldDescription = null,   // the AiTab password-field text
+        public ?string $fieldDescription = null,        // the AiTab password-field text of the key
+        public ?string $secretFieldDescription = null,  // the same for the secret half (Higgsfield has two texts)
     ) {}
 }
 
@@ -624,11 +633,13 @@ final readonly class ProviderKeySpec
         public ?ProviderKeyValidation $validation = null,
         public ModelListing $modelListing = ModelListing::None,
         public bool $servesChat = true,
+        public UserCredential $userCredential = UserCredential::None,
         public ProviderKeyPresentation $presentation = new ProviderKeyPresentation(),
     ) {}
 
-    public static function platform(string $envVar, string $consoleUrl, ?ProviderKeyValidation $validation, int $listOrder, ModelListing $modelListing = ModelListing::None, bool $freeTier = false, bool $recommended = false, bool $servesChat = true, array $envAliases = [], ?string $secretEnvVar = null, ?string $displayName = null, ?string $fieldDescription = null): self;
-    public static function platformAndUser(/* same, without servesChat and secretEnvVar */): self;
+    public static function platform(string $envVar, string $consoleUrl, ?ProviderKeyValidation $validation, int $listOrder, ModelListing $modelListing = ModelListing::None, bool $freeTier = false, bool $recommended = false, bool $servesChat = true, UserCredential $userCredential = UserCredential::None, array $envAliases = [], ?string $secretEnvVar = null, ?string $displayName = null, ?string $fieldDescription = null, ?string $secretFieldDescription = null): self;
+    /** platform() with UserCredential::Gateway */
+    public static function platformAndUser(/* same, without servesChat, userCredential and the secret */): self;
     public static function endpointRegistry(): self;
     public static function envOnly(string $envVar, ?string $fieldDescription = null): self;
     public function requiresSecret(): bool;
@@ -639,12 +650,16 @@ final readonly class ProviderKeySpec
 
 final readonly class ProviderPricing
 {
-    /** @param list<string> $litellmPrefixes empty with `$synced === false` = skipped by app:models:sync-prices */
-    public function __construct(public bool $synced, public array $litellmPrefixes) {}
+    /**
+     * @param list<string> $litellmPrefixes  tried in order, the first existing key wins; empty = `[$service]`
+     * @param list<string> $bareMatchVendors `litellm_provider` values (prefix match) that are this vendor, so a bare
+     *                                       model id counts (BARE_MATCH_PROVIDERS); empty = never, the row is `unmatched`
+     */
+    public function __construct(public bool $synced, public array $litellmPrefixes, public array $bareMatchVendors = []) {}
 
-    public static function litellm(string ...$prefixes): self;   // explicit PREFIX_MAP entry
-    public static function byServiceName(): self;                // the default: `[$service]`
-    public static function none(): self;                         // LOCAL_PROVIDERS: ollama, triton, test, piper, thehive
+    public static function litellm(array $prefixes, array $bareMatchVendors = []): self;   // explicit PREFIX_MAP entry
+    public static function byServiceName(): self;                                         // the default: `[$service]`
+    public static function none(): self;                                                  // LOCAL_PROVIDERS: ollama, triton, test, piper, thehive
 }
 
 enum InlineImageRule: string
@@ -712,28 +727,33 @@ final readonly class ProviderDefaults
 final readonly class ProviderBranding
 {
     /**
-     * @param string  $icon    an Iconify id, or `component:<Name>` for a bundled Vue glyph (`component:GroqIcon`)
-     * @param string  $flag    a `circle-flags:<cc>` id, `mdi:map-marker` for a self-hosted engine, `circle-flags:un` when unknown
-     * @param bool    $local   runs on the operator's machine (pin badge, no jurisdiction)
-     * @param ?string $helpKey `admin.providerHelp.<helpKey>` in the five locale files; null = no help hint
-     * @param ?string $helpUrl the page the hint links to; null = `key->consoleUrl`
+     * @param string       $icon          an Iconify id — the fallback every consumer can draw (T24: `simple-icons:groq`)
+     * @param ?string      $iconComponent a bundled Vue glyph that replaces it where the app has one (T26: `GroqIcon`)
+     * @param string       $flag          a `circle-flags:<cc>` id, `mdi:map-marker` for a self-hosted engine, `circle-flags:un` when unknown
+     * @param bool         $local         runs on the operator's machine (pin badge, no jurisdiction)
+     * @param ?string      $helpKey       `admin.providerHelp.<helpKey>` in the five locale files; null = no help hint
+     * @param ?string      $helpUrl       the page the hint links to; null = `key->consoleUrl`
+     * @param list<string> $helpFields    system-config field keys that show the hint; empty = the key's env var (T25: Ollama names `OLLAMA_BASE_URL`)
      */
     public function __construct(
         public string $icon,
+        public ?string $iconComponent = null,
         public string $flag = 'circle-flags:un',
         public bool $local = false,
         public ?string $helpKey = null,
         public ?string $helpUrl = null,
         public bool $helpIsDownload = false,
+        public array $helpFields = [],
     ) {}
 }
 ```
 
-`ProviderDescriptor` additionally answers `hasCapability()`, `hasPlatformKey()`,
-`hasUserKey()`, `modelListing()` (`key->modelListing`, `None` without a
-key), `chatCompletionsEndpoint()` / `chatCompletionsUrl()` / `isLocal()`,
-`hosts()` and `rank()`. The constructor stays at ten parameters, the size
-ratchet's limit.
+`ProviderDescriptor` additionally answers `hasCapability()`, `hasPlatformKey()`
+(`key->store === Platform`), `hasUserKey()` (`key->userCredential ===
+Gateway`, T4), `modelListing()` (`key->modelListing`, `None` without a
+key), `helpFields()` (T25), `chatCompletionsEndpoint()` /
+`chatCompletionsUrl()` / `isLocal()`, `hosts()` and `rank()`. The
+constructor stays at ten parameters, the size ratchet's limit.
 
 `ProviderCatalog` (AU19):
 
@@ -791,7 +811,11 @@ final class ProviderCatalog
 - `ProviderCatalogPass` (a compiler pass) collects the class names of
   every definition tagged `app.ai.provider` and sets them as the
   `$providerClasses` argument of `ProviderCatalog`. The catalog never
-  instantiates a provider; `descriptor()` is static.
+  instantiates a provider; `descriptor()` is static. The same pass then
+  walks every `app.ai.<capability>` tag in the container — however it got
+  there, attribute or YAML — and fails the build when a tag's `key` names
+  no described provider. A provider registered in `services.yaml` without
+  the attribute therefore cannot escape the catalog silently.
 - **Order.** `all()` sorts by `ProviderDescriptor::rank()`: providers with
   a key in the Admin → AI keys order of T2 (`key->listOrder`, an integer
   set in each descriptor so T2's sequence survives), then the rest by
@@ -802,16 +826,19 @@ final class ProviderCatalog
   no tag beyond the marker — with a docblock saying the key is stored for
   a voice integration no PHP adapter reads yet. Nothing else changes.
 - **A provider class without a descriptor.** The configurator throws
-  `LogicException` at container build when a class tagged `app.ai.*` in
-  `services.yaml` (or carrying the attribute) does not implement
-  `DescribesProviderInterface`. The parity test additionally asserts that
-  `ProviderCatalog::all()` names every provider
+  `LogicException` at container build when a class carrying the attribute
+  does not implement `DescribesProviderInterface`; the pass throws when a
+  capability tag's key has no descriptor (above). The parity test
+  additionally asserts that `ProviderCatalog::all()` names every provider
   `ProviderRegistry::getRegisteredProviderNames()` knows, for every
   capability, so a provider that the registry has and the catalog lacks
   fails the test rather than being skipped.
-- `TestProvider` describes itself like every other provider; it stays
-  tagged under `when@dev` / `when@test` only, as today, and
-  `PerfTestProviderPass` keeps removing it elsewhere.
+- `TestProvider` describes itself like every other provider (through a
+  sibling, it is frozen in the ledger). Its definition stays
+  unconditional in `services.yaml`, as today: `PerfTestProviderPass`
+  removes it outside dev and test unless `SYNAPLAN_PERF_TEST_PROVIDER` is
+  set for a benchmark, and removes `TestProviderDescriptor` with it, so a
+  production catalog never names a provider the registry does not have.
 
 #### 2.3.4 Where today's tables disagree
 
@@ -860,6 +887,12 @@ after S3.
     test provider, Piper and TheHive, not Whisper**, although Whisper is as
     local as Piper. Whisper's `pricing` is therefore `byServiceName()`;
     the sync finds no row for it and moves on, as today.
+12. **`ProviderException::DISPLAY_NAMES` spells two providers and
+    `ucfirst()`s the rest**, so an error says `Google` where the adapter
+    says `Google AI`. The exception is static and cannot ask the catalog
+    without a static accessor; the constant stays through S3 and the
+    parity test pins its two entries. Routing error copy through the
+    catalog is a copy change for a later, separate decision.
 
 ---
 
