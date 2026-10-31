@@ -14,6 +14,21 @@
     "processingOnServer": "{count} dosya arka planda işleniyor…",
     "orDragDrop": "veya dosyaları buraya sürükleyip bırakın",
     "dropHere": "Yüklemek için dosyaları buraya bırakın",
+    "viewContent": "İçeriği görüntüle",
+    "download": "İndir",
+    "downloadFailed": "İndirme başarısız oldu",
+    "deleteFile": "Dosyayı sil",
+    "deleteSelected": "Seçilenleri sil",
+    "deleteConfirmTitle": "Dosyayı sil",
+    "deleteConfirmMessage": "Bu dosyayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "deleteConfirmButton": "Sil",
+    "fileDeleted": "Dosya başarıyla silindi",
+    "deleteFailed": "Dosya silinemedi",
+    "bulkDeleteSuccess": "{count} dosya başarıyla silindi",
+    "bulkDeletePartial": "{success} silindi, {failed} başarısız",
+    "reVectorize": "Yeniden işle",
+    "reVectorizeSuccess": "Dosya başarıyla yeniden işlendi ({chunks} bölüm indekslendi)",
+    "reVectorizeFailed": "Yeniden işleme başarısız oldu",
     "uploadSuccess": "{count} dosya başarıyla yüklendi",
     "uploadCancelled": "Yükleme iptal edildi",
     "uploadInterrupted": "Aktarım kesildi. Liste yenilendi — sunucuya ulaşmış dosyalar görünmeye devam edebilir.",
@@ -29,6 +44,14 @@
       "invalid_response": "{filename}: Sunucu beklenmeyen bir yanıt döndürdü. Lütfen tekrar deneyin.",
       "http_error": "{filename}: Yükleme başarısız oldu (hata {status}). Lütfen tekrar deneyin."
     },
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: Yeterli depolama alanı yok. {message}",
+      "file_too_large": "{filename}: Dosya çok büyük. {message}",
+      "file_empty": "{filename}: Dosya boş. {message}",
+      "extension_not_allowed": "{filename}: Dosya türü desteklenmiyor. {message}",
+      "rate_limit_exceeded": "{filename}: Yükleme sınırına ulaşıldı. {message}",
+      "generic": "{filename}: Bu dosyanın yüklenmesine izin verilmiyor. {message}"
+    },
     "helper": "Eklenen dosyalar bu mesaj için yapay zekâya gönderilir. ✅ ile işaretli dosyalar ayrıca tüm sohbetlerinizde aranabilir.",
     "searchYourFiles": "Dosyalarınızda ara",
     "typeAll": "Tümü",
@@ -43,6 +66,9 @@
     "noResults": "Dosya yok. Başka bir arama deneyin veya yeni dosya yükleyin."
   },
   "fileMention": {
+    "hint": "Dosya aramak için yazın, eklemek için Enter'a basın",
+    "noResults": "Dosya bulunamadı",
+    "fileAttached": "{name} eklendi",
     "header": "Yapay zekâya verecek bir dosya bulmak için yazın"
   },
   "storage": {
