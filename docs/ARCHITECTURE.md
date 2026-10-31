@@ -393,15 +393,28 @@ themselves through a sibling `App\AI\Provider\Descriptor\<Name>Descriptor`
 instead; a key-only row without an adapter (ElevenLabs) is a descriptor
 class with no capability.
 
-`ProviderCatalogParityTest` rebuilds every name-keyed provider table of the
-code base from the descriptors — the key store and key catalog, the BYOK
-list, the recommended defaults and preference order, the Chat Completions
-upstreams, the structured-output and tool-calling rules, the reasoning
-ladders, the model-list probe, the price prefixes, the live-voice caps, the
-admin enum, the system-config fields, the container tags, the exception
-spellings, the egress hosts — and compares each with today's constant. Until
-those consumers read the catalog (AU20) the descriptors are a proven second
-copy; after it, the catalog is the only copy.
+The catalog is the only copy. `ProviderCatalogPass` tags each adapter
+service with one `app.ai.<capability>` tag per descriptor capability (a
+sibling descriptor names its adapter with `#[AsAiProvider(adapter:)]`) and
+builds `ProviderKeyStore`'s environment map from the descriptors' env vars,
+so `services.yaml` names no provider capability or variable. The consumers
+read the descriptors: `ProviderKeyCatalog` (a service over
+`ProviderCatalog::withKey()`), `ProviderDefaultsService` (bindings and
+`preferenceOrder()`), `UserProviderKeyResolver` (`supportedProviders()` for
+the Messages gateway's BYOK list, `isLocalHost()`), `ChatCompletionsUpstreams`
+(a service: fixed URLs, Ollama, the endpoint registry), the
+`OpenAiMessagesTranslator` (inline-image rule), `MessagesGateway` (vision
+rewrite), `StructuredOutputCapability`, `ToolCallingCapability`,
+`CatalogToolUse`, `ReasoningLevelCatalog`, `PlatformKeyModelListProbe`
+(`ModelListing`), `SyncModelPricesCommand` (`ProviderPricing`),
+`VoiceLiveConcurrency` and `AiTab`. `ProviderCatalog::builtIn()` discovers
+the shipped descriptor classes for code without a container — a provider
+built with `new` in a test, and the static helpers (`ReasoningLevelCatalog`,
+`CatalogToolUse`) and ledger-frozen classes (`MessagesGateway`) that have no
+room for an injection; a plugin provider is only in the container's catalog.
+`ProviderCatalogParityTest` pins every consumer to the descriptors (T1–T23 of
+`03_contracts.md` §2.3.1); `ProviderException::DISPLAY_NAMES` is the one
+table that stays, pinned to the descriptors' display names.
 
 A vendor's adapter in `App\AI\Provider\` is what the registry knows: its
 name, its capability interfaces and its `app.ai.<capability>` tags in
