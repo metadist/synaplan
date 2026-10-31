@@ -96,7 +96,7 @@ final class ApplyProviderDefaultsCommand extends Command
             return Command::INVALID;
         }
 
-        if (!ProviderDefaultsService::supports($provider)) {
+        if (!$this->defaults->supports($provider)) {
             $io->error(sprintf('No recommended defaults for provider "%s".', $provider));
 
             return Command::INVALID;

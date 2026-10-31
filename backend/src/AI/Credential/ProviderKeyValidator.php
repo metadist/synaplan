@@ -22,6 +22,7 @@ final readonly class ProviderKeyValidator
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private ProviderKeyCatalog $keyCatalog,
     ) {
     }
 
@@ -39,14 +40,14 @@ final readonly class ProviderKeyValidator
         if ('' === $key) {
             return ['ok' => false, 'tested' => false, 'error' => 'API key must not be empty.'];
         }
-        if (!ProviderKeyCatalog::has($provider)) {
+        if (!$this->keyCatalog->has($provider)) {
             return ['ok' => false, 'tested' => false, 'error' => sprintf('Unknown provider "%s".', $provider)];
         }
-        if (ProviderKeyCatalog::requiresSecret($provider) && '' === trim((string) $secret)) {
-            return ['ok' => false, 'tested' => false, 'error' => sprintf('%s needs the API key and the API secret together.', ProviderKeyCatalog::get($provider)['displayName'])];
+        if ($this->keyCatalog->requiresSecret($provider) && '' === trim((string) $secret)) {
+            return ['ok' => false, 'tested' => false, 'error' => sprintf('%s needs the API key and the API secret together.', $this->keyCatalog->get($provider)['displayName'])];
         }
 
-        $check = ProviderKeyCatalog::get($provider)['validation'];
+        $check = $this->keyCatalog->get($provider)['validation'];
         if (null === $check) {
             return ['ok' => true, 'tested' => false];
         }

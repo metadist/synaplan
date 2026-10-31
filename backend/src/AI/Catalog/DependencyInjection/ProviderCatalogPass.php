@@ -8,6 +8,7 @@ use App\AI\Catalog\Attribute\AsAiProvider;
 use App\AI\Catalog\DescribesProviderInterface;
 use App\AI\Catalog\ProviderCapability;
 use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\ProviderKeyStore;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -44,6 +45,41 @@ final class ProviderCatalogPass implements CompilerPassInterface
         $this->assertEveryRegisteredProviderIsDescribed($container, $classes);
 
         $container->getDefinition(ProviderCatalog::class)->setArgument('$providerClasses', $classes);
+        $this->wireKeyStoreEnvironment($container, $classes);
+    }
+
+    /**
+     * The platform key store reads each provider's key from the environment
+     * variables its descriptor names: `%env(default::X)%` per variable, so
+     * an unset variable resolves to null instead of failing the container,
+     * and the first usable alias wins inside the store.
+     *
+     * @param list<class-string<DescribesProviderInterface>> $classes
+     */
+    private function wireKeyStoreEnvironment(ContainerBuilder $container, array $classes): void
+    {
+        if (!$container->hasDefinition(ProviderKeyStore::class)) {
+            return;
+        }
+
+        $envKeys = [];
+        $envSecrets = [];
+        foreach ($classes as $class) {
+            $descriptor = $class::descriptor();
+            $key = $descriptor->key;
+            if (null === $key || !$descriptor->hasPlatformKey() || null === $key->envVar) {
+                continue;
+            }
+            $expressions = array_map(static fn (string $name): string => sprintf('%%env(default::%s)%%', $name), [$key->envVar, ...$key->envAliases]);
+            $envKeys[$descriptor->name] = 1 === \count($expressions) ? $expressions[0] : $expressions;
+            if (null !== $key->secretEnvVar) {
+                $envSecrets[$descriptor->name] = sprintf('%%env(default::%s)%%', $key->secretEnvVar);
+            }
+        }
+
+        $store = $container->getDefinition(ProviderKeyStore::class);
+        $store->setArgument('$envKeys', $envKeys);
+        $store->setArgument('$envSecrets', $envSecrets);
     }
 
     /**

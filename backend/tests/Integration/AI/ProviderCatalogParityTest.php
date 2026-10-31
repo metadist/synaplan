@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\AI;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DependencyInjection\ProviderCatalogPass;
 use App\AI\Catalog\DescribesProviderInterface;
 use App\AI\Catalog\ModelListing;
 use App\AI\Catalog\ProviderCapability;
@@ -32,7 +34,8 @@ use App\Service\Egress\EgressBuiltinDestinations;
 use App\Service\Voice\VoiceLiveConcurrency;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 
 /**
  * Every name-keyed provider table of `03_contracts.md` §2.3.1 (T1–T23),
@@ -77,19 +80,27 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertCount(22, $this->catalog->all(), 'twenty-one adapters and the key-only ElevenLabs row');
     }
 
-    /** T1 */
-    public function testKeyStoreSupportedProvidersEqualTheKeyedDescriptors(): void
+    /** T1 — the store answers from the catalog */
+    public function testKeyStoreSupportsExactlyTheKeyedDescriptors(): void
     {
-        self::assertSameSet(ProviderKeyStore::SUPPORTED_PROVIDERS, self::names($this->catalog->withKey()));
+        $store = self::getContainer()->get(ProviderKeyStore::class);
+        \assert($store instanceof ProviderKeyStore);
+        foreach ($this->catalog->all() as $descriptor) {
+            self::assertSame($descriptor->hasPlatformKey(), $store->supports($descriptor->name), $descriptor->name);
+        }
+        self::assertFalse($store->supports('not-a-provider'));
+        self::assertCount(15, $this->catalog->withKey());
     }
 
-    /** T2 */
+    /** T2 — the key catalog is a projection of the key specs */
     public function testKeyCatalogEntriesEqualTheKeySpecsInOrder(): void
     {
-        self::assertSame(ProviderKeyCatalog::providerNames(), self::names($this->catalog->withKey()), 'Admin → AI keys order');
+        $keyCatalog = new ProviderKeyCatalog($this->catalog);
+        self::assertSame($keyCatalog->providerNames(), self::names($this->catalog->withKey()), 'Admin → AI keys order');
+        self::assertSame(['groq', 'openai', 'anthropic', 'google', 'mistral', 'trustedtokens', 'a2agent', 'huggingface', 'meta', 'cerebras', 'xai', 'perplexity', 'thehive', 'higgsfield', 'elevenlabs'], $keyCatalog->providerNames());
 
         foreach ($this->catalog->withKey() as $descriptor) {
-            $meta = ProviderKeyCatalog::get($descriptor->name);
+            $meta = $keyCatalog->get($descriptor->name);
             $key = $descriptor->key;
             self::assertNotNull($key);
             self::assertSame($meta['displayName'], $key->presentation->displayName ?? $descriptor->displayName, $descriptor->name.' displayName');
@@ -99,43 +110,49 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertSame($meta['freeTier'], $key->presentation->freeTier, $descriptor->name.' freeTier');
             self::assertSame($meta['recommended'], $key->presentation->recommended, $descriptor->name.' recommended');
             self::assertSame($meta['validation'], $key->validation?->toArray(), $descriptor->name.' validation');
-            self::assertSame(ProviderKeyCatalog::servesChat($descriptor->name), $key->servesChat, $descriptor->name.' servesChat');
-            self::assertSame(ProviderKeyCatalog::isTestable($descriptor->name), $key->isTestable(), $descriptor->name.' testable');
-            self::assertSame(ProviderKeyCatalog::requiresSecret($descriptor->name), $key->requiresSecret(), $descriptor->name.' requiresSecret');
-            self::assertSame(ProviderKeyCatalog::listsModels($descriptor->name), ModelListing::Lists === $descriptor->modelListing(), $descriptor->name.' listsModels');
+            self::assertSame($meta['chat'] ?? true, $key->servesChat, $descriptor->name.' chat');
+            self::assertSame($meta['modelListing'] ?? true, ModelListing::Lists === $key->modelListing || null === $key->validation, $descriptor->name.' modelListing');
+            self::assertSame($keyCatalog->listsModels($descriptor->name), ModelListing::Lists === $descriptor->modelListing(), $descriptor->name.' listsModels');
+            self::assertSame($keyCatalog->requiresSecret($descriptor->name), null !== $key->secretEnvVar, $descriptor->name.' requiresSecret');
         }
+        self::assertFalse($keyCatalog->has('ollama'), 'no platform key');
+        self::assertFalse($keyCatalog->has('cloudflare'), 'env-only token, not in the store');
+        self::assertSame('higgsfield', $keyCatalog->providerForEnvVar('HIGGSFIELD_API_SECRET'));
+        self::assertNull($keyCatalog->providerForEnvVar('GEMINI_API_KEY'), 'aliases are not managed fields');
     }
 
-    /** T3 */
-    public function testKeyStoreEnvArgumentsEqualTheKeySpecEnvVars(): void
+    /** T3 — the compiler pass wires the store's environment from the descriptors */
+    public function testKeyStoreEnvArgumentsComeFromTheKeySpecs(): void
     {
-        $services = Yaml::parseFile(\dirname(__DIR__, 3).'/config/services.yaml', Yaml::PARSE_CUSTOM_TAGS);
-        $arguments = $services['services'][ProviderKeyStore::class]['arguments'];
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        $container->setDefinition(ProviderKeyStore::class, new Definition(ProviderKeyStore::class));
+        // The source-tree discovery and the container's tags name the same classes.
+        self::assertSame(ProviderCatalog::builtIn()->names(), $this->catalog->names());
+        foreach (ProviderCatalog::builtIn()->providerClasses() as $class) {
+            $container->setDefinition($class, (new Definition($class))->addTag(AsAiProvider::TAG));
+        }
 
-        $envKeys = [];
-        foreach ($arguments['$envKeys'] as $provider => $expression) {
-            $envKeys[$provider] = self::envNames(\is_array($expression) ? $expression : [$expression]);
-        }
-        $envSecrets = [];
-        foreach ($arguments['$envSecrets'] as $provider => $expression) {
-            $envSecrets[$provider] = self::envNames([$expression])[0];
-        }
+        (new ProviderCatalogPass())->process($container);
 
         $expectedKeys = [];
         $expectedSecrets = [];
         foreach ($this->catalog->withKey() as $descriptor) {
             $key = $descriptor->key;
             self::assertNotNull($key);
-            $expectedKeys[$descriptor->name] = [$key->envVar, ...$key->envAliases];
+            $expressions = array_map(static fn (string $name): string => sprintf('%%env(default::%s)%%', $name), [(string) $key->envVar, ...$key->envAliases]);
+            $expectedKeys[$descriptor->name] = 1 === \count($expressions) ? $expressions[0] : $expressions;
             if (null !== $key->secretEnvVar) {
-                $expectedSecrets[$descriptor->name] = $key->secretEnvVar;
+                $expectedSecrets[$descriptor->name] = sprintf('%%env(default::%s)%%', $key->secretEnvVar);
             }
         }
-
+        $store = $container->getDefinition(ProviderKeyStore::class);
+        $envKeys = $store->getArgument('$envKeys');
         ksort($envKeys);
         ksort($expectedKeys);
         self::assertSame($expectedKeys, $envKeys);
-        self::assertSame($expectedSecrets, $envSecrets);
+        self::assertSame($expectedSecrets, $store->getArgument('$envSecrets'));
+        self::assertSame(['%env(default::GOOGLE_GEMINI_API_KEY)%', '%env(default::GEMINI_API_KEY)%', '%env(default::GOOGLE_API_KEY)%'], $envKeys['google']);
     }
 
     /** T4 */
@@ -144,28 +161,28 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSameSet(self::constant(MessagesGatewayController::class, 'SUPPORTED_PROVIDERS'), self::names($this->catalog->withUserKey()));
     }
 
-    /** T5 */
-    public function testRecommendedDefaultsEqualTheDescriptorBindings(): void
+    /** T5 — the defaults service resolves the descriptor bindings */
+    public function testRecommendedDefaultsComeFromTheDescriptorBindings(): void
     {
-        $expected = [];
+        $defaults = self::getContainer()->get(ProviderDefaultsService::class);
+        \assert($defaults instanceof ProviderDefaultsService);
+        $seen = 0;
         foreach ($this->catalog->all() as $descriptor) {
-            if (null !== $descriptor->defaults) {
-                $expected[$descriptor->name] = $descriptor->defaults->bindings;
+            self::assertSame(null !== $descriptor->defaults, $defaults->supports($descriptor->name), $descriptor->name.' supports');
+            if (null === $descriptor->defaults) {
+                continue;
             }
-        }
-        $actual = self::constant(ProviderDefaultsService::class, 'PROVIDER_DEFAULTS');
-        ksort($expected);
-        ksort($actual);
-        self::assertSame($actual, $expected);
-
-        foreach ($expected as $name => $bindings) {
-            foreach ($bindings as $capability => $modelKey) {
-                self::assertNotNull(ModelCatalog::findBidByKey($modelKey), "{$name} {$capability}: {$modelKey} must resolve to one catalog row");
+            $resolved = $defaults->getRecommendedDefaults($descriptor->name);
+            self::assertSame(array_keys($descriptor->defaults->bindings), array_keys($resolved), $descriptor->name.' capabilities');
+            foreach ($descriptor->defaults->bindings as $capability => $modelKey) {
+                self::assertSame(ModelCatalog::findBidByKey($modelKey), $resolved[$capability], "{$descriptor->name} {$capability}: {$modelKey}");
             }
+            ++$seen;
         }
+        self::assertSame(13, $seen, 'twelve keyed chat providers and Ollama declare defaults');
     }
 
-    /** T6 */
+    /** T6 — the preference order is the descriptor ranks */
     public function testPreferenceOrderEqualsTheDescriptorRanks(): void
     {
         $ranked = [];
@@ -177,7 +194,10 @@ final class ProviderCatalogParityTest extends KernelTestCase
             }
         }
         ksort($ranked);
-        self::assertSame(ProviderDefaultsService::PREFERENCE_ORDER, array_values($ranked));
+        $defaults = self::getContainer()->get(ProviderDefaultsService::class);
+        \assert($defaults instanceof ProviderDefaultsService);
+        self::assertSame(array_values($ranked), $defaults->preferenceOrder());
+        self::assertSame(['groq', 'openai', 'google', 'mistral', 'anthropic', 'trustedtokens', 'huggingface', 'xai', 'a2agent', 'meta', 'cerebras', 'ollama'], $defaults->preferenceOrder());
         self::assertSame(range(1, \count($ranked)), array_keys($ranked), 'ranks are 1..n without gaps');
     }
 
@@ -498,7 +518,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
         }
 
         foreach ($fields as $envVar => $description) {
-            $owner = ProviderKeyCatalog::providerForEnvVar($envVar);
+            $owner = (new ProviderKeyCatalog($this->catalog))->providerForEnvVar($envVar);
             if (null === $owner) {
                 continue;
             }
@@ -576,23 +596,5 @@ final class ProviderCatalogParityTest extends KernelTestCase
     private static function constant(string $class, string $name): mixed
     {
         return (new \ReflectionClassConstant($class, $name))->getValue();
-    }
-
-    /**
-     * `%env(X)%` and `%env(default::X)%` → `X`.
-     *
-     * @param list<string> $expressions
-     *
-     * @return list<string>
-     */
-    private static function envNames(array $expressions): array
-    {
-        $names = [];
-        foreach ($expressions as $expression) {
-            self::assertSame(1, preg_match('/env\((?:[a-z]+::)*([A-Z0-9_]+)\)/', $expression, $m), $expression);
-            $names[] = $m[1];
-        }
-
-        return $names;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin\SystemConfig;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\ModuleRegistry;
@@ -33,7 +34,7 @@ final class SystemConfigSchemaTest extends TestCase
                 'qdrant' => new ConfigSection('Qdrant', ['QDRANT_URL' => new FieldDefinition('url', 'Qdrant URL')]),
                 'qdrant_search' => new ConfigSection('Search Thresholds', ['MAX_CHAT_MEMORIES' => new FieldDefinition('number', 'Max memories', '5', row: new DatabaseRow())]),
             ]),
-        ]);
+        ], new ProviderKeyCatalog(ProviderCatalog::builtIn()));
 
         self::assertSame([
             'email' => ['label' => 'Email', 'sections' => ['mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_NAME']]]],
@@ -49,10 +50,10 @@ final class SystemConfigSchemaTest extends TestCase
 
     public function testAProviderKeyHasOneEditorAndLivesInTheDatabase(): void
     {
-        $envVar = ProviderKeyCatalog::managedEnvVars()[0];
+        $envVar = (new ProviderKeyCatalog(ProviderCatalog::builtIn()))->managedEnvVars()[0];
         $schema = new SystemConfigSchema([
             $this->tab('ai', 'AI Services', ['cloud' => new ConfigSection('Cloud AI Providers', [$envVar => new FieldDefinition('password', 'API key', sensitive: true)])]),
-        ]);
+        ], new ProviderKeyCatalog(ProviderCatalog::builtIn()));
 
         $field = $schema->field($envVar);
         self::assertNotNull($field);
@@ -68,7 +69,7 @@ final class SystemConfigSchemaTest extends TestCase
         new SystemConfigSchema([
             $this->tab('vectordb', 'Vector DB', ['qdrant' => new ConfigSection('Qdrant', ['QDRANT_URL' => new FieldDefinition('url', 'Qdrant URL')])]),
             $this->tab('processing', 'Processing', ['tika' => new ConfigSection('Apache Tika', ['QDRANT_URL' => new FieldDefinition('url', 'Again')])]),
-        ]);
+        ], new ProviderKeyCatalog(ProviderCatalog::builtIn()));
     }
 
     public function testTheShippedFieldsAreListedInTheOrderTheScreenShowsThem(): void

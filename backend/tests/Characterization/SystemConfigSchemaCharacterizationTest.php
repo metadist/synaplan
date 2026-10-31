@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
@@ -168,7 +169,7 @@ final class SystemConfigSchemaCharacterizationTest extends TestCase
         $repository = $this->repository($rows, $locked);
 
         $encryption = new EncryptionService('test-secret', new NullLogger());
-        $store = new ProviderKeyStore($repository, $encryption, new NullLogger(), $case['envKeys'] ?? [], $case['envSecrets'] ?? []);
+        $store = new ProviderKeyStore($repository, $encryption, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()), $case['envKeys'] ?? [], $case['envSecrets'] ?? []);
         foreach ($case['savedKeys'] ?? [] as $provider => $key) {
             $store->saveKey($provider, $key);
         }
@@ -298,7 +299,7 @@ final class SystemConfigSchemaCharacterizationTest extends TestCase
      */
     private function isolateEnvironment(array $keys, array $values): void
     {
-        foreach (array_unique([...$keys, ...ProviderKeyCatalog::managedEnvVars()]) as $key) {
+        foreach (array_unique([...$keys, ...(new ProviderKeyCatalog(ProviderCatalog::builtIn()))->managedEnvVars()]) as $key) {
             if (!\array_key_exists($key, $this->savedEnvironment)) {
                 $this->savedEnvironment[$key] = ['env' => $_ENV[$key] ?? null, 'server' => $_SERVER[$key] ?? null, 'getenv' => getenv($key)];
             }

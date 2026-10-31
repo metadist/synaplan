@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\AI\Credential;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyValidator;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -14,7 +16,7 @@ final class ProviderKeyValidatorTest extends TestCase
 {
     private function makeValidator(MockHttpClient $client): ProviderKeyValidator
     {
-        return new ProviderKeyValidator($client, new NullLogger());
+        return new ProviderKeyValidator($client, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()));
     }
 
     public function testSuccessfulValidation(): void

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Health\Probe;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Health\Probe\PlatformKeyModelListProbe;
 use App\AI\Service\ProviderModelInventoryInterface;
@@ -28,6 +30,7 @@ final class PlatformKeyModelListProbeTest extends TestCase
             $this->createStub(ProviderKeyStore::class),
             $this->createStub(ProviderModelInventoryInterface::class),
             new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
         );
 
         self::assertTrue($probe->supports('groq'));
@@ -61,6 +64,7 @@ final class PlatformKeyModelListProbeTest extends TestCase
             $this->createStub(ConfigRepository::class),
             new EncryptionService('unit-test-secret', new NullLogger()),
             new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
             ['anthropic' => 'unit-test-provider-key-0123456789'],
         );
 
@@ -69,6 +73,7 @@ final class PlatformKeyModelListProbeTest extends TestCase
             $keyStore,
             $this->createStub(ProviderModelInventoryInterface::class),
             new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
         ))->probe('anthropic');
 
         self::assertTrue($result->isOk());

@@ -63,6 +63,7 @@ final readonly class ModelDiscoveryService
         private ModelRepository $modelRepository,
         private ModelDiscoveryStateStore $stateStore,
         private ClockInterface $clock,
+        private ProviderKeyCatalog $keyCatalog,
         private bool $enabled,
         private ?array $ignoreEntries = null,
         private ?array $classRules = null,
@@ -96,7 +97,7 @@ final readonly class ModelDiscoveryService
         /** @var array<string, list<string>> */
         $okListedByProvider = [];
 
-        foreach (ProviderKeyCatalog::providerNames() as $provider) {
+        foreach ($this->keyCatalog->providerNames() as $provider) {
             $listing = $this->inventory->fetch($provider);
 
             $providers[] = [

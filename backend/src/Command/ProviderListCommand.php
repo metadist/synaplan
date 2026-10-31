@@ -121,7 +121,7 @@ final class ProviderListCommand extends Command
 
     private function credentialLabel(string $provider): string
     {
-        if (!ProviderKeyStore::isSupported($provider)) {
+        if (!$this->providerKeyStore->supports($provider)) {
             return 'n/a';
         }
 
