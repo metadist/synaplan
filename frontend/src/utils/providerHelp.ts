@@ -1,22 +1,12 @@
 /**
- * Help metadata for AI provider credentials and local Ollama.
- * URLs mirror ProviderKeyCatalog consoleUrl values on the backend.
+ * Bundled help metadata for AI provider credentials and local Ollama — the
+ * fallback for the first paint and for a name the server does not know. The
+ * source of truth is the provider catalog (`GET /api/v1/ai/providers`,
+ * `stores/providerCatalog.ts`), whose `helpKey` / `helpUrl` these mirror.
  */
 
-export type ProviderHelpId =
-  | 'groq'
-  | 'openai'
-  | 'anthropic'
-  | 'google'
-  | 'mistral'
-  | 'trustedtokens'
-  | 'a2agent'
-  | 'meta'
-  | 'cerebras'
-  | 'huggingface'
-  | 'xai'
-  | 'perplexity'
-  | 'ollama'
+/** A key under `admin.providerHelp.<id>` in the locale files. */
+export type ProviderHelpId = string
 
 export interface ProviderHelpMeta {
   id: ProviderHelpId

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import SetupProviderKeyForm from '@/components/setup/SetupProviderKeyForm.vue'
 import type { ProviderKeyStatus } from '@/services/api/providerKeysApi'
 
@@ -41,7 +42,7 @@ const provider = (overrides: Partial<ProviderKeyStatus> = {}): ProviderKeyStatus
 const mountForm = (overrides: Partial<ProviderKeyStatus> = {}, isDefaultChat = false) =>
   mount(SetupProviderKeyForm, {
     props: { provider: provider(overrides), isDefaultChat },
-    global: { stubs: { ServiceIcon: true, Icon: true } },
+    global: { plugins: [createPinia()], stubs: { ServiceIcon: true, Icon: true } },
   })
 
 describe('SetupProviderKeyForm', () => {

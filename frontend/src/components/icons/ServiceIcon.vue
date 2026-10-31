@@ -1,8 +1,6 @@
 <template>
   <span class="service-icon" :style="rootStyle">
-    <OpenAiCompatibleIcon v-if="isOpenAiCompatible" :size="size" />
-    <GroqIcon v-else-if="isGroq" :size="size" />
-    <MistralIcon v-else-if="isMistral" :size="size" />
+    <component :is="glyph" v-if="glyph" :size="size" />
     <Icon v-else :icon="providerIcon" :style="rootStyle" />
     <Icon
       v-if="hasService && showFlag"
@@ -16,12 +14,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { Icon } from '@iconify/vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import MistralIcon from '@/components/icons/MistralIcon.vue'
 import OpenAiCompatibleIcon from '@/components/icons/OpenAiCompatibleIcon.vue'
-import { getProviderIcon, getProviderFlag, isLocalSelfHostedProvider } from '@/utils/providerIcons'
+import { useProviderCatalogStore } from '@/stores/providerCatalog'
+
+/** The bundled glyphs a descriptor may name in `iconComponent`. */
+const GLYPHS: Record<string, Component> = {
+  GroqIcon,
+  MistralIcon,
+  OpenAiCompatibleIcon,
+}
 
 interface Props {
   service: string
@@ -40,20 +45,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const hasService = computed(() => props.service.trim().length > 0)
-// Check the OpenAI-compatible provider FIRST: its service string
-// ("openaicompatible") contains "openai", so it must win before any
-// substring check that would otherwise show the OpenAI logo + US flag.
-const isOpenAiCompatible = computed(() =>
-  props.service
-    .toLowerCase()
-    .replace(/[\s_-]/g, '')
-    .includes('openaicompatible')
-)
-const isGroq = computed(() => props.service.toLowerCase().includes('groq'))
-const isMistral = computed(() => props.service.toLowerCase().includes('mistral'))
-const providerIcon = computed(() => getProviderIcon(props.service))
-const flagIcon = computed(() => getProviderFlag(props.service))
-const isLocal = computed(() => isLocalSelfHostedProvider(props.service))
+// Branding comes from the provider catalog; until it has loaded (or for a
+// name the server does not know) the bundled fallback answers.
+const catalog = useProviderCatalogStore()
+catalog.ensureLoaded()
+const glyph = computed<Component | null>(() => {
+  const name = catalog.iconComponentFor(props.service)
+  return name ? (GLYPHS[name] ?? null) : null
+})
+const providerIcon = computed(() => catalog.iconFor(props.service))
+const flagIcon = computed(() => catalog.flagFor(props.service))
+const isLocal = computed(() => catalog.isLocal(props.service))
 
 const flagPx = computed(() => Math.max(9, Math.round(props.size * 0.55)))
 const rootStyle = computed(() => ({ width: `${props.size}px`, height: `${props.size}px` }))

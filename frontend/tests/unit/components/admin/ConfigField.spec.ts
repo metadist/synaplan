@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 
 const { mockRoute } = vi.hoisted(() => ({
   mockRoute: { query: {} as Record<string, string> },
@@ -29,6 +30,8 @@ const mountField = (value: Partial<ConfigValue> = {}) =>
       schema: booleanSchema,
       value: { value: 'true', isSet: false, isMasked: false, ...value } as ConfigValue,
     },
+    // The field asks the provider catalog store for a help hint.
+    global: { plugins: [createPinia()] },
   })
 
 const toggle = (wrapper: ReturnType<typeof mountField>) => wrapper.get('button[role="switch"]')
