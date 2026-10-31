@@ -27,6 +27,12 @@ final class GoogleApiClient
     private const API_BASE = self::GEMINI_BASE;
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
 
+    /** The Vertex AI base for a region; the descriptor lists the configured one. */
+    public static function vertexBase(string $region): string
+    {
+        return str_replace('{region}', $region, self::VERTEX_BASE);
+    }
+
     private readonly ?string $projectId;
     private readonly ?string $vertexAccessToken;
 

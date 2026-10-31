@@ -100,8 +100,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             ],
             endpoints: [
                 ProviderEndpoint::api(GoogleApiClient::GEMINI_BASE),
-                // Vertex Imagen: the region is part of the host name.
-                ProviderEndpoint::api('https://*.aiplatform.googleapis.com/v1'),
+                // Vertex Imagen: the region is a prefix of the host name
+                // (`<region>-aiplatform.googleapis.com`), and services.yaml
+                // configures us-central1.
+                ProviderEndpoint::api(GoogleApiClient::vertexBase('us-central1')),
             ],
             key: ProviderKeySpec::platformAndUser(
                 envVar: 'GOOGLE_GEMINI_API_KEY',

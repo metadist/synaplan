@@ -326,10 +326,57 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertNull(ReasoningLevelCatalog::levels($descriptor->name, 'any-model', []), $descriptor->name.' without the reasoning feature');
         }
 
-        foreach (['gpt-5.5-pro', 'gpt-5.5', 'gpt-5.4-mini', 'gpt-6.1-sol', 'gpt-6-luna', 'gpt-5', 'o3-mini', 'o1'] as $id) {
-            self::assertSame(ReasoningLevelCatalog::levels('openai', $id, ['reasoning']), $this->catalog->get('openai')->dialects->reasoning?->levelsFor($id), "openai {$id}");
+        // An inventory of today's model families, independent of the descriptors:
+        // a ladder or a pattern dropped from a descriptor fails here.
+        foreach (self::REASONING_FAMILIES as [$service, $id, $levels]) {
+            self::assertSame($levels, ReasoningLevelCatalog::levels($service, $id, ['reasoning']), "today: {$service} {$id}");
+            self::assertSame($levels, $this->catalog->get($service)->dialects->reasoning?->levelsFor($id), "descriptor: {$service} {$id}");
         }
     }
+
+    /**
+     * Every arm of `ReasoningLevelCatalog::levels()` and `OpenAiReasoningEffort::TIERS`
+     * on `main` @ `619ad883f`, as (service, model id, levels or null).
+     *
+     * @var list<array{string, string, list<string>|null}>
+     */
+    private const REASONING_FAMILIES = [
+        ['openai', 'gpt-6-sol', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-6-luna', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-6.1-sol', ['low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-6-astra', ['low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-5.6', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-5.5-pro', ['medium', 'high', 'xhigh']],
+        ['openai', 'gpt-5.5', ['none', 'low', 'medium', 'high', 'xhigh']],
+        ['openai', 'gpt-5.4-mini', ['none', 'low', 'medium', 'high', 'xhigh']],
+        ['openai', 'gpt-5', ['minimal', 'low', 'medium', 'high']],
+        ['openai', 'o1', ['low', 'medium', 'high']],
+        ['openai', 'o3-mini', ['low', 'medium', 'high']],
+        ['openai', 'o4-mini', ['low', 'medium', 'high']],
+        ['openai', 'gpt-4o', null],
+        ['xai', 'grok-4.7', ['low', 'medium', 'high', 'xhigh']],
+        ['xai', 'grok-4.3', ['none', 'low', 'medium', 'high']],
+        ['xai', 'grok-4.5', null],
+        ['google', 'gemini-3.8-flash', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-sonnet-5-5-20260601', ['low', 'medium', 'high', 'xhigh', 'max']],
+        ['anthropic', 'claude-opus-4-6', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-opus-4-7', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-opus-4-8', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-sonnet-4-6', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-opus-5-5', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-opus-5', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-sonnet-5', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-fable-5-1', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-fable-5', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-haiku-4-5-20251001', null],
+        ['meta', 'muse-spark-1.3', ['minimal', 'low', 'medium', 'high', 'xhigh', 'max']],
+        ['huggingface', 'moonshotai/Kimi-K3', ['low', 'high', 'max']],
+        ['huggingface', 'moonshotai/Kimi-K2.6-deepinfra', ['low', 'high', 'max']],
+        ['cerebras', 'qwen-3.8-27b', ['none', 'low', 'medium', 'high']],
+        ['cerebras', 'gpt-oss-120b', ['low', 'medium', 'high']],
+        ['groq', 'openai/gpt-oss-120b', null],
+        ['mistral', 'mistral-large-4', null],
+    ];
 
     /** T16 */
     public function testModelListProbeSupportEqualsTheDescriptorModelListing(): void
@@ -456,7 +503,14 @@ final class ProviderCatalogParityTest extends KernelTestCase
                 continue;
             }
             self::assertSame($owner, $described[$envVar] ?? null, "{$envVar} belongs to {$owner}");
+            $key = $this->catalog->get($owner)->key;
+            self::assertNotNull($key);
+            // The legacy field's text must be on the descriptor, so a dropped
+            // description is caught before AiTab reads the catalog.
+            $expected = $envVar === $key->secretEnvVar ? $key->presentation->secretFieldDescription : $key->presentation->fieldDescription;
+            self::assertSame($description, $expected, "{$envVar} description");
         }
+        self::assertCount(15, array_filter(array_keys($fields), static fn (string $envVar): bool => null !== ProviderKeyCatalog::providerForEnvVar($envVar)), 'fourteen key fields and one secret field are managed');
     }
 
     /** T21 */
