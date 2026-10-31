@@ -514,6 +514,19 @@ string that the controllers validate against the key catalog, and an
 unknown name stays **404** (the table said 400; 404 was the behaviour
 before and after AU20, and the frontend never relies on either).
 
+**As delivered (AU22).** T23: `EgressPolicy` takes `ProviderCatalog` and
+`EgressBuiltinDestinations::rules($catalog)` is `INTERNAL` + the
+catalog's `endpoints()` + `INTEGRATIONS` (the fourteen non-provider hosts,
+hand-kept as the table said). The six hosts the static list lacked
+(§2.3.4 #10) are allowed now. `app:provider:scaffold <name>
+--openai-compatible` writes the class and its unit test and prints the
+model row and the five locale keys; `AddProviderJourneyTest` boots the
+kernel with a fixture plugin that is one provider class and finds it in
+every table of §2.1, in `GET /api/v1/ai/providers`, and in the allowlist,
+and asserts the exported spec did not change. The scaffold refuses a
+provider that is not chat completions; that provider starts from
+`docs/PROVIDERS.md`.
+
 `ProviderCatalogParityTest` (AU19) builds every table of §2.1 from the
 descriptors and compares it with today's constant, entry by entry. It is the
 regression proof for AU20: each table switch keeps it green, then the

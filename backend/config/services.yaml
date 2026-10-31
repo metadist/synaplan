@@ -416,6 +416,11 @@ services:
     # The public subset of the catalog for GET /api/v1/ai/providers.
     App\AI\Catalog\ProviderCatalogPresenter: ~
 
+    # `app:provider:scaffold` writes the one class a provider is.
+    App\AI\Catalog\Scaffold\ProviderScaffolder:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     # DB-backed platform API keys for the cloud AI providers, encrypted at
     # rest in BCONFIG (group `provider_keys`) via EncryptionService. The env
     # bootstrap/fallback map ($envKeys, $envSecrets) is built by

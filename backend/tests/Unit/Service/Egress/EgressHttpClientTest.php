@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Egress;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\Service\Egress\EgressCache;
 use App\Service\Egress\EgressCall;
 use App\Service\Egress\EgressConfig;
@@ -27,6 +28,8 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class EgressHttpClientTest extends TestCase
 {
+    private static ?ProviderCatalog $catalog = null;
+
     protected function tearDown(): void
     {
         EgressConfig::setModeOverride(null);
@@ -201,7 +204,7 @@ final class EgressHttpClientTest extends TestCase
         EgressConfig::setModeOverride(EgressMode::Enforce);
         putenv('EGRESS_PROXY=http://127.0.0.1:9');
         try {
-            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard(['203.0.113.10'])), $config, new AllowTypedGuard(['203.0.113.10']), new EgressMetrics());
+            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard(['203.0.113.10']), self::catalog()), $config, new AllowTypedGuard(['203.0.113.10']), new EgressMetrics());
             $client->request('GET', 'https://customer.example/file', EgressCall::typed([]));
         } finally {
             putenv('EGRESS_PROXY');
@@ -226,7 +229,7 @@ final class EgressHttpClientTest extends TestCase
         try {
             $client = new EgressHttpClient(
                 $inner,
-                new EgressPolicy($config, new AllowTypedGuard(['203.0.113.10'])),
+                new EgressPolicy($config, new AllowTypedGuard(['203.0.113.10']), self::catalog()),
                 $config,
                 new AllowTypedGuard(['203.0.113.10']),
                 new EgressMetrics(),
@@ -268,7 +271,7 @@ final class EgressHttpClientTest extends TestCase
         putenv('EGRESS_PROXY=http://egress:3128');
         putenv('EGRESS_GATEWAY=1');
         try {
-            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard()), $config, new AllowTypedGuard(), new EgressMetrics());
+            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard(), self::catalog()), $config, new AllowTypedGuard(), new EgressMetrics());
             $client->request('GET', 'http://api.openai.com/v1')->getStatusCode();
         } finally {
             putenv('EGRESS_PROXY');
@@ -286,7 +289,7 @@ final class EgressHttpClientTest extends TestCase
         $config = new EgressConfig();
         putenv('EGRESS_GATEWAY=1');
         try {
-            (new EgressDirectoryRefresher($config, new EgressPolicy($config, new AllowTypedGuard()), new EgressDirectory($cache)))->publish();
+            (new EgressDirectoryRefresher($config, new EgressPolicy($config, new AllowTypedGuard(), self::catalog()), new EgressDirectory($cache)))->publish();
         } finally {
             putenv('EGRESS_GATEWAY');
         }
@@ -301,7 +304,7 @@ final class EgressHttpClientTest extends TestCase
         $config = new EgressConfig();
         putenv('EGRESS_GATEWAY=1');
         try {
-            $refresher = new EgressDirectoryRefresher($config, new EgressPolicy($config, new AllowTypedGuard()), new EgressDirectory($cache));
+            $refresher = new EgressDirectoryRefresher($config, new EgressPolicy($config, new AllowTypedGuard(), self::catalog()), new EgressDirectory($cache));
             $refresher->publishCommand(new ConsoleCommandEvent(new Command('cache:warmup'), new ArrayInput([]), new NullOutput()));
         } finally {
             putenv('EGRESS_GATEWAY');
@@ -321,7 +324,7 @@ final class EgressHttpClientTest extends TestCase
         try {
             $client = new EgressHttpClient(
                 $inner,
-                new EgressPolicy($config, new AllowTypedGuard(['10.1.1.1'])),
+                new EgressPolicy($config, new AllowTypedGuard(['10.1.1.1']), self::catalog()),
                 $config,
                 new AllowTypedGuard(['10.1.1.1']),
                 new EgressMetrics(),
@@ -454,7 +457,7 @@ final class EgressHttpClientTest extends TestCase
                 return [];
             }
         };
-        $client = new EgressHttpClient($inner, new EgressPolicy($config, $guard), $config, $guard, new EgressMetrics());
+        $client = new EgressHttpClient($inner, new EgressPolicy($config, $guard, self::catalog()), $config, $guard, new EgressMetrics());
         $response = $client->request('GET', 'https://api.openai.com/start', EgressCall::typed([]));
 
         self::assertSame(1, $called);
@@ -529,7 +532,7 @@ final class EgressHttpClientTest extends TestCase
         };
         putenv('EGRESS_PROXY=http://127.0.0.1:9');
         try {
-            $client = new EgressHttpClient($inner, new EgressPolicy($config, $guard), $config, $guard, new EgressMetrics());
+            $client = new EgressHttpClient($inner, new EgressPolicy($config, $guard, self::catalog()), $config, $guard, new EgressMetrics());
             $client->request('GET', 'https://customer.example/file', EgressCall::typed([
                 'resolve' => ['customer.example' => '203.0.113.10'],
             ]));
@@ -556,7 +559,7 @@ final class EgressHttpClientTest extends TestCase
         EgressConfig::setModeOverride(EgressMode::Enforce);
         putenv('EGRESS_PROXY=http://127.0.0.1:9');
         try {
-            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard()), $config, new AllowTypedGuard(), new EgressMetrics());
+            $client = new EgressHttpClient($inner, new EgressPolicy($config, new AllowTypedGuard(), self::catalog()), $config, new AllowTypedGuard(), new EgressMetrics());
             $client->request('GET', 'https://customer.example/file', EgressCall::typed([]));
             self::fail('A typed URL behind a proxy needs a pin.');
         } catch (EgressRefusedException $e) {
@@ -567,13 +570,19 @@ final class EgressHttpClientTest extends TestCase
         self::assertFalse($called);
     }
 
+    /** The shipped descriptors, discovered once: the policy allows their hosts. */
+    private static function catalog(): ProviderCatalog
+    {
+        return self::$catalog ??= ProviderCatalog::builtIn();
+    }
+
     private function client(MockHttpClient $inner, EgressMode $mode, ?EgressMetrics $metrics = null): EgressHttpClient
     {
         EgressConfig::setModeOverride($mode);
         $config = new EgressConfig();
         $guard = new AllowTypedGuard();
 
-        return new EgressHttpClient($inner, new EgressPolicy($config, $guard), $config, $guard, $metrics ?? new EgressMetrics());
+        return new EgressHttpClient($inner, new EgressPolicy($config, $guard, self::catalog()), $config, $guard, $metrics ?? new EgressMetrics());
     }
 }
 
