@@ -461,7 +461,7 @@ defined in §2.3.2.)
 | ----------- | ------- |
 | `ProviderKeyStore::SUPPORTED_PROVIDERS` | `ProviderCatalog::withKey()` |
 | `ProviderKeyCatalog` entries | `descriptor()->key` |
-| `MessagesGatewayController::SUPPORTED_PROVIDERS` (BYOK) | `ProviderCatalog::withUserKey()` (`key->store === PlatformAndUser`) |
+| `MessagesGatewayController::SUPPORTED_PROVIDERS` (BYOK) | `ProviderCatalog::withUserKey()` (`key->userCredential === UserCredential::Gateway`) |
 | `ProviderDefaultsService` bindings and `PREFERENCE_ORDER` | `descriptor()->defaults` |
 | `ChatCompletionsUpstreams` URLs and local hosts | `endpoints` with purpose `chat_completions`; `ProviderDescriptor::chatCompletionsUrl()`, `isLocal()` |
 | `StructuredOutputCapability`, `ToolCallingCapability`, `CatalogToolUse`, `OpenAiMessagesTranslator::INLINE_PNG_JPEG_ONLY`, `MessagesGateway::VISION_REWRITE_PROVIDERS` | `dialects` |
@@ -498,10 +498,10 @@ the set.
 
 | # | Table | File and line (`main` @ `619ad883f`) | Read through | Descriptor field | Order |
 | - | ----- | ------------------------------------ | ------------ | ---------------- | ----- |
-| T1 | `ProviderKeyStore::SUPPORTED_PROVIDERS` | `backend/src/AI/Credential/ProviderKeyStore.php:56` | the constant | `ProviderCatalog::withKey()` — descriptors whose `key->store` is `Platform` or `PlatformAndUser` | set |
+| T1 | `ProviderKeyStore::SUPPORTED_PROVIDERS` | `backend/src/AI/Credential/ProviderKeyStore.php:56` | the constant | `ProviderCatalog::withKey()` — descriptors whose `key->store` is `ProviderKeyStoreKind::Platform` | set |
 | T2 | `ProviderKeyCatalog::PROVIDERS` | `backend/src/AI/Credential/ProviderKeyCatalog.php:47` | `providerNames()`, `get($name)` | `key` (`envVar`, `secretEnvVar`, `consoleUrl`, `validation`, `servesChat`, `modelListing`) and `key->presentation` (`displayName`, `freeTier`, `recommended`) | sequence (it is the Admin → AI keys order) |
-| T3 | `ProviderKeyStore` `$envKeys` / `$envSecrets` | `backend/config/services.yaml:417–442` | the container argument | `key->envVar`, `key->envAliases`, `key->secretEnvVar` | set |
-| T4 | `MessagesGatewayController::SUPPORTED_PROVIDERS` (BYOK) | `backend/src/Controller/MessagesGatewayController.php:40` | the constant | `ProviderCatalog::withUserKey()` — `key->store === PlatformAndUser` | set (the response is a JSON object keyed by name) |
+| T3 | `ProviderKeyStore` `$envKeys` / `$envSecrets` | `backend/config/services.yaml:417–442` | the container argument | `key->envVar`, `key->envAliases`, `key->secretEnvVar` | providers: set; a provider's candidates: sequence (`envKey()` takes the first usable value) |
+| T4 | `MessagesGatewayController::SUPPORTED_PROVIDERS` (BYOK) | `backend/src/Controller/MessagesGatewayController.php:40` | the constant | `ProviderCatalog::withUserKey()` — `key->userCredential === UserCredential::Gateway`; Higgsfield's `Personal` pair stays off the list | set (the response is a JSON object keyed by name) |
 | T5 | `ProviderDefaultsService::PROVIDER_DEFAULTS` | `backend/src/AI/Credential/ProviderDefaultsService.php:37` | `getRecommendedDefaults()` after `ModelCatalog` resolution is stubbed, or the constant through reflection | `defaults->bindings` | set per provider |
 | T6 | `ProviderDefaultsService::PREFERENCE_ORDER` | `backend/src/AI/Credential/ProviderDefaultsService.php:198` | the constant | `defaults->preferenceRank` (ascending; `null` = not in the order) | sequence |
 | T7 | `ChatCompletionsUpstreams::URLS` | `backend/src/AI/Messages/Translator/ChatCompletionsUpstreams.php:25` | `fixedUrl($name)` | the `ChatCompletions` endpoint's `url` | set |
@@ -520,7 +520,7 @@ the set.
 | T20 | `AiTab::cloud()`, `media()`, `tts()` password fields | `backend/src/Service/Admin/SystemConfig/Tab/AiTab.php:65–129, 141–160, 181–195` | `sections()` — every `password` field whose key `ProviderKeyCatalog::providerForEnvVar()` resolves | `key->envVar`, `key->secretEnvVar`; the texts are `key->presentation->fieldDescription` and `->secretFieldDescription` | set |
 | T21 | `services.yaml` `app.ai.<capability>` tags | `backend/config/services.yaml:460–664, 1713–1723` | `ProviderRegistry::getRegisteredProviderNames($capability)` | `capabilities` | set per capability |
 | T22 | `ProviderException::DISPLAY_NAMES` | `backend/src/AI/Exception/ProviderException.php:17` | `displayName($name)` | parity only: the two entries equal the descriptors' `displayName`. The constant **stays** — the exception is static and its `ucfirst()` fallback is error copy (`Google`, `Mistral`) that a catalog lookup (`Google AI`, `Mistral AI`) would change (§2.3.4 #12) | set |
-| T23 | `EgressBuiltinDestinations::PROVIDERS` — the twelve provider hosts (`api.openai.com` … `api.perplexity.ai`) | `backend/src/Service/Egress/EgressBuiltinDestinations.php:48–60` | the constant | `ProviderCatalog::endpoints()` hosts ⊇ those twelve (AU22) | set |
+| T23 | `EgressBuiltinDestinations::PROVIDERS` — the twelve provider hosts (`api.openai.com` … `api.perplexity.ai`) and the integration hosts after them (Stripe, Telegram, Meta Graph, Brave, Google OAuth and Play, GitHub, Apple, reCAPTCHA, Cloudflare challenges) | `backend/src/Service/Egress/EgressBuiltinDestinations.php:48–75` | the constant | AU22: the provider half becomes `ProviderCatalog::endpoints()`; the integration hosts stay as a hand-kept `INTEGRATIONS` list; the test asserts the combined allowlist still contains every entry of today's constant | set |
 | T24 | frontend `getProviderIcon`, `getProviderFlag`, `isLocalSelfHostedProvider` | `frontend/src/utils/providerIcons.ts` (whole file) | the functions | `branding->icon` (the Iconify fallback: `simple-icons:groq`), `branding->flag`, `branding->local` (AU21; the substring fallback for unregistered names stays) | per name |
 | T25 | frontend `providerHelp.ts` `BY_PROVIDER`, `BY_ENV_VAR` | `frontend/src/utils/providerHelp.ts:29, 46` | the maps | `branding->helpKey`, `branding->helpUrl`, `branding->helpIsDownload`; `ProviderDescriptor::helpFields()` — the key's env var, or `branding->helpFields` for a keyless hint (`OLLAMA_BASE_URL` → Ollama) (AU21) | per name |
 | T26 | frontend `ServiceIcon.vue` component switch | `frontend/src/components/icons/ServiceIcon.vue:45–53` | the three `is*` computeds | `branding->iconComponent` (`GroqIcon`, `MistralIcon`, `OpenAiCompatibleIcon`; null = draw `branding->icon`) (AU21) | per name |
@@ -772,9 +772,9 @@ final class ProviderCatalog
     public function has(string $name): bool;
     /** @return list<ProviderDescriptor> */
     public function withCapability(ProviderCapability $capability): array;
-    /** @return list<ProviderDescriptor> Platform or PlatformAndUser keys, Admin → AI keys order */
+    /** @return list<ProviderDescriptor> `ProviderKeyStoreKind::Platform` keys, Admin → AI keys order */
     public function withKey(): array;
-    /** @return list<ProviderDescriptor> PlatformAndUser only */
+    /** @return list<ProviderDescriptor> `UserCredential::Gateway` only */
     public function withUserKey(): array;
     /** @return list<string> every distinct host of every endpoint and validation URL */
     public function endpoints(): array;
@@ -786,28 +786,35 @@ final class ProviderCatalog
 - A provider class carries `#[App\AI\Catalog\Attribute\AsAiProvider]` and
   implements `App\AI\Catalog\DescribesProviderInterface`
   (`public static function descriptor(): ProviderDescriptor`). The
-  attribute has no arguments: everything is in the descriptor.
+  attribute's one argument is `adapter`: the class of the service that
+  implements the capabilities, defaulting to the described class itself.
+  Everything else is in the descriptor.
 - **Adapters frozen in the size ledger** (`tests/Architecture/sizeRatchetBaseline.json`:
   Anthropic, Higgsfield, HuggingFace, Mistral, Test, Triton, xAI) and
   adapters at the limit (OpenAI-compatible, 792 lines) may not grow by a
   line, so their descriptor is a sibling class
   `App\AI\Provider\Descriptor\<Name>Descriptor` that carries the attribute
-  and implements the interface; the adapter itself is untouched except
-  that the constants the descriptor quotes (base URL, API version, the
-  reasoning tiers) become `public const`, which adds no line. The parity
-  test then matches adapter and descriptor by name through the catalog;
+  — `#[AsAiProvider(adapter: XaiProvider::class)]` — and implements the
+  interface; the adapter itself is untouched except that the constants
+  the descriptor quotes (base URL, API version, the reasoning tiers)
+  become `public const`, which adds no line. The capability tags go on the
+  adapter the attribute names, never on the sibling, so the registry only
+  ever resolves adapters. The parity test matches adapter and descriptor
+  by name through the catalog;
   an adapter that also implements the interface must agree with the
   catalog. Every other provider — and every provider AU22 scaffolds —
   describes itself inline.
 - `App\Kernel::build()` calls
   `registerAttributeForAutoconfiguration(AsAiProvider::class, …)`. The
-  configurator reads `$class::descriptor()` and adds one
-  `app.ai.<capability>` tag with `key: <name>` per entry of
-  `capabilities`, plus the marker tag `app.ai.provider`. Until AU20 the
-  tags in `services.yaml` stay and the configurator adds none — AU19
-  only registers the marker; AU20 switches the source and deletes the
-  YAML tags in the same commit, with `debug:container --tag=app.ai.chat`
-  compared before and after.
+  configurator adds the marker tag `app.ai.provider` and refuses a class
+  that does not describe itself. The capability tags are added by
+  `ProviderCatalogPass` (below), which has the whole container and can
+  tag the adapter a sibling descriptor names: one `app.ai.<capability>`
+  tag with `key: <name>` per entry of `capabilities`, never doubling a
+  tag the container already carries. Until AU20 the tags in
+  `services.yaml` stay — AU19 only registers the marker; AU20 switches
+  the source and deletes the YAML tags in the same commit, with
+  `debug:container --tag=app.ai.chat` compared before and after.
 - `ProviderCatalogPass` (a compiler pass) collects the class names of
   every definition tagged `app.ai.provider` and sets them as the
   `$providerClasses` argument of `ProviderCatalog`. The catalog never
@@ -881,8 +888,12 @@ after S3.
 10. **`EgressBuiltinDestinations::PROVIDERS` lacks hosts the adapters
     call:** `huggingface.co` (whoami), `platform.higgsfield.ai`,
     `api.thehive.ai`, `api.elevenlabs.io`, `api.cloudflare.com`, Google's
-    Vertex host. AU22 replaces the list with the catalog's hosts; until
-    then `report` mode shows them as `would_block`.
+    Vertex host (`us-central1-aiplatform.googleapis.com`: the region is a
+    prefix of the host, not a subdomain). AU22 replaces the provider half
+    of the list with the catalog's hosts and keeps the integration hosts
+    (Stripe, Telegram, Meta Graph, Brave, Google OAuth and Play, GitHub,
+    Apple, reCAPTCHA, Cloudflare challenges) as their own list; until then
+    `report` mode shows the missing hosts as `would_block`.
 11. **`SyncModelPricesCommand::LOCAL_PROVIDERS` skips Ollama, Triton, the
     test provider, Piper and TheHive, not Whisper**, although Whisper is as
     local as Piper. Whisper's `pricing` is therefore `byServiceName()`;
