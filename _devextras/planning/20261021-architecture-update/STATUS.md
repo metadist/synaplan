@@ -4,7 +4,11 @@
 > name-keyed provider tables frozen with file and line (T1–T26), the
 > descriptor sub-types defined, discovery by `#[AsAiProvider]` plus a
 > compiler pass, and twelve places where today's tables disagree (§2.3.4).
-> No production code changed. AU19 starts from this.
+> No production code changed. AU19 stacks on it: every provider describes
+> itself, `ProviderCatalog` collects the descriptors, and
+> `ProviderCatalogParityTest` proves them equal to today's tables (T1–T23).
+> Nothing reads the catalog yet; AU20 switches the consumers one table at
+> a time.
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
 > It is off unless `docker-compose.egress.yml` is loaded with the `egress`
@@ -68,6 +72,78 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-30 | AU17 | [#2888](https://github.com/metadist/synaplan/pull/2888) | merged (`99a2318cc`) | OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA send through the shared client |
 | 2026-10-30 | AU18 | [#2889](https://github.com/metadist/synaplan/pull/2889) | merged (`feeb3630e`) | `sidecars/synaplan-egress` CONNECT gateway, off unless the `egress` profile is loaded |
 | 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
+| 2026-10-31 | AU19 | stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
+
+## 2026-10-31 — AU19: every provider declares its capabilities, endpoints and keys
+
+Started from `docs/au19-provider-descriptor-hardening` (`03f74e348`,
+[#2911](https://github.com/metadist/synaplan/pull/2911)). `make -C backend
+metrics` before: 2,507 files under `src/`, 47 over 800 lines, 64
+constructors over 10 parameters, 118 methods over 100 lines. After: 2,539
+files, the same 47 / 64 / 118 — the catalog added 32 files and no offender.
+
+**The dev stack was pointed at another checkout.** The running containers
+mounted `/Users/puzzler/temp-delme/synaplan` (a clean `main` at the same
+SHA with an empty `backend/.env`), so no gate and no walk could have
+reached this checkout. `docker compose up -d` from
+`/Users/puzzler/wwwroot/synaplan` re-pointed the stack (same project name,
+same volumes); the first full PHPUnit run then showed the drifted local
+`synaplan_test` database AU0 recorded (summary service, enhancement prompt,
+memory parse: five controller tests). Reset the way CI prepares it
+(`doctrine:migrations:migrate`, `doctrine:fixtures:load`, `app:seed`,
+`--env=test`), and the suite is green.
+
+**What changed.**
+- `App\AI\Catalog\`: `ProviderDescriptor`, `ProviderCapability`,
+  `ProviderEndpoint` / `EndpointPurpose`, `ProviderKeySpec` /
+  `ProviderKeyStoreKind` / `ProviderKeyValidation` / `ProviderKeyPresentation`
+  / `ModelListing`, `ProviderDialects` / `InlineImageRule` /
+  `ReasoningLadder` / `ReasoningLevelRule` / `ReasoningMatch`,
+  `ProviderDefaults`, `ProviderPricing`, `ProviderBranding`,
+  `DescribesProviderInterface`, `Attribute\AsAiProvider`,
+  `DependencyInjection\ProviderCatalogPass`, `ProviderCatalog`,
+  `UnknownProviderException`. `Kernel::build()` registers the attribute and
+  the pass; `services.yaml` excludes the value objects from the resource
+  and wires `ProviderCatalog` (public in `when@test` so the parity test can
+  read it before AU20 gives it a consumer).
+- A `descriptor()` on 13 adapters inline (A2Agent, Cerebras, Cloudflare,
+  Google, Groq, Meta, Ollama, OpenAI, Perplexity, Piper, TheHive,
+  TrustedTokens, Whisper); eight through `App\AI\Provider\Descriptor\`
+  siblings because the size ratchet forbids a single added line in a
+  frozen file (Anthropic, Higgsfield, HuggingFace, Mistral, Test, Triton,
+  xAI) or the file sits at the limit (OpenAI-compatible, 792 lines). Those
+  adapters changed only `private const` → `public const` for the values
+  the sibling quotes. `ElevenLabsProvider` is a descriptor-only class.
+  `OpenAiReasoningEffort::ladder()` turns the OpenAI tier table into the
+  catalog's ladder, so the table has one source.
+- `PerfTestProviderPass` removes `TestProviderDescriptor` with
+  `TestProvider`, so a production catalog never lists `test`.
+
+**Proof.** `ProviderCatalogParityTest`, 24 tests, 1,166 assertions, one per
+table T1–T23 plus "every registered provider has a descriptor with its own
+name and display name". Written against the catalog first: with empty
+descriptors it failed on every table. Mutation: Vision dropped from
+`CerebrasProvider::descriptor()` ⇒ `testContainerTagsEqualTheDescriptorCapabilities`
+fails on `app.ai.vision` with `cerebras` missing; restored. Unit tests:
+`ProviderCatalogTest` (order, lookups, a class without a descriptor, two
+classes for one name, a mixed-case name), `ReasoningLadderTest`,
+`ProviderDescriptorPartsTest`, `ProviderCatalogPassTest` (16 tests).
+
+**Disagreements the test had to encode** (all in `03` §2.3.4): `gemini` on
+T14 is skipped as the one alias; `compatible` on T18 is read as
+`openaicompatible`; Whisper is `byServiceName()` because T17's skip list
+does not name it (#11, found by the test, not the inventory).
+
+**Gate.** `make -C backend lint`, `phpstan` (`src/` and `tests/`),
+`deptrac` (0 violations), `lint:container`, full PHPUnit: 11,245 tests,
+0 failures (the first run's five failures were the drifted test database,
+above). Frontend lint, `vue-tsc` and Vitest unchanged and green. Release
+class `backend-only` (`scripts/mobile-impact.mjs`). No `perf-runtime`:
+S3 steps change no runtime path.
+
+**Carried.** Groq's adapter is at 795 lines after its inline descriptor;
+the next line added there moves the descriptor to a sibling. The frontend
+tables T24–T26 are AU21.
 
 ## 2026-10-31 — S3 hardening: the provider descriptor contract
 
