@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Voice;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\DTO\CostResult;
 use App\Entity\Message;
@@ -152,7 +153,7 @@ final class VoiceLiveGatewayTest extends TestCase
         $config->method('getValue')->willReturn(null);
 
         $this->expectException(VoiceLiveRejectedException::class);
-        (new VoiceLiveConcurrency($redis, $config))->acquire('compatible');
+        (new VoiceLiveConcurrency($redis, $config, ProviderCatalog::builtIn()))->acquire('compatible');
     }
 
     public function testConcurrencyRefusesTheFiftyFirstOpenAiSocket(): void
@@ -163,7 +164,7 @@ final class VoiceLiveGatewayTest extends TestCase
         $config->method('getValue')->willReturn(null);
 
         $this->expectException(VoiceLiveRejectedException::class);
-        (new VoiceLiveConcurrency($redis, $config))->acquire('OpenAI');
+        (new VoiceLiveConcurrency($redis, $config, ProviderCatalog::builtIn()))->acquire('OpenAI');
     }
 
     public function testDelegationChargesTheVoiceRowAndSkipsAMessagesRowPath(): void

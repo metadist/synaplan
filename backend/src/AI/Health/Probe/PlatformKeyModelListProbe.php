@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Health\Probe;
 
+use App\AI\Catalog\ModelListing;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Health\FailureKind;
@@ -31,14 +32,6 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
     /** Safety stop for paginated catalogs, so a broken cursor cannot loop forever. */
     private const MAX_PAGES = 10;
 
-    /**
-     * Providers whose validation endpoint confirms the credentials but does not
-     * enumerate models. HuggingFace's whoami-v2 answers "this token is valid"
-     * and nothing else — good enough to tell a key problem from an outage, not
-     * good enough to declare a model retired.
-     */
-    private const NO_LISTING = ['huggingface'];
-
     public function __construct(
         private HttpClientInterface $httpClient,
         private ProviderKeyStore $keyStore,
@@ -49,20 +42,25 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
     }
 
     /**
-     * Only providers whose catalog endpoint really lists models. Media and
-     * speech providers (Higgsfield, TheHive, ElevenLabs) sit in the same key
-     * catalog but have no free listing — they stay covered by the passive
-     * traffic counters, as {@see ModelListProbeRegistry} documents.
+     * Only providers whose catalog endpoint really lists models, plus the ones
+     * whose endpoint proves the credentials (HuggingFace's whoami-v2 tells a
+     * bad key from an outage without naming a model). Media and speech
+     * providers (Higgsfield, TheHive, ElevenLabs) sit in the same key catalog
+     * but their descriptor says `ModelListing::None` — they stay covered by
+     * the passive traffic counters, as {@see ModelListProbeRegistry} documents.
      */
     public function supports(string $service): bool
     {
         $provider = mb_strtolower($service);
 
-        // HuggingFace's whoami-v2 is not a model list (listsModels=false) but
-        // still tells a bad key from an outage. Media/speech providers have
-        // no cheap authenticated check that helps health.
         return $this->keyCatalog->has($provider)
-            && ($this->keyCatalog->listsModels($provider) || in_array($provider, self::NO_LISTING, true));
+            && ModelListing::None !== $this->keyCatalog->spec($provider)->modelListing;
+    }
+
+    private function credentialsOnly(string $provider): bool
+    {
+        return $this->keyCatalog->has($provider)
+            && ModelListing::CredentialsOnly === $this->keyCatalog->spec($provider)->modelListing;
     }
 
     public function probe(string $service): ProbeResult
@@ -115,7 +113,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
                 return ProbeResult::failed(self::kindForStatus($status), sprintf('Provider catalog returned HTTP %d.', $status));
             }
 
-            if (in_array($provider, self::NO_LISTING, true)) {
+            if ($this->credentialsOnly($provider)) {
                 return ProbeResult::reachable('Credentials accepted; this provider does not publish a model list.');
             }
 
@@ -153,7 +151,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
     public function confirm(string $service, string $providerModelId): ModelProbeResult
     {
         $provider = mb_strtolower($service);
-        if ('' === trim($providerModelId) || in_array($provider, self::NO_LISTING, true)) {
+        if ('' === trim($providerModelId) || $this->credentialsOnly($provider)) {
             return ModelProbeResult::Inconclusive;
         }
 
