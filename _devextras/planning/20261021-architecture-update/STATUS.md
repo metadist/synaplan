@@ -7,8 +7,9 @@
 > No production code changed. AU19 stacks on it: every provider describes
 > itself, `ProviderCatalog` collects the descriptors, and
 > `ProviderCatalogParityTest` proves them equal to today's tables (T1–T23).
-> Nothing reads the catalog yet; AU20 switches the consumers one table at
-> a time.
+> AU20 stacks on AU19: every consumer reads the catalog, `services.yaml`
+> names no provider capability or key variable, and the registry's tags
+> are identical before and after.
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
 > It is off unless `docker-compose.egress.yml` is loaded with the `egress`
@@ -72,7 +73,97 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-30 | AU17 | [#2888](https://github.com/metadist/synaplan/pull/2888) | merged (`99a2318cc`) | OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA send through the shared client |
 | 2026-10-30 | AU18 | [#2889](https://github.com/metadist/synaplan/pull/2889) | merged (`feeb3630e`) | `sidecars/synaplan-egress` CONNECT gateway, off unless the `egress` profile is loaded |
 | 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
-| 2026-10-31 | AU19 | stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
+| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
+| 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913), stacked on #2912 | open | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
+
+## 2026-10-31 — AU20: provider tables ask the provider catalog
+
+Started from `refactor/au19-provider-descriptors` (`3e2f6d49f`,
+[#2912](https://github.com/metadist/synaplan/pull/2912)). `make -C backend
+metrics`: 2,539 → 2,540 files under `src/`; 47 / 64 / 118 offenders before
+and after. Six commits, one table group each, every one green on the
+backend gate.
+
+**What changed, by table.**
+- T1–T3, T5, T6: `ProviderKeyCatalog` is a service over
+  `ProviderCatalog::withKey()` (same method names, `PROVIDERS` gone);
+  `ProviderKeyStore::SUPPORTED_PROVIDERS` and `isSupported()` gone,
+  `supports()` asks the key catalog; `ProviderCatalogPass` builds the
+  store's `$envKeys` / `$envSecrets` (`%env(default::X)%` per declared
+  variable) and `services.yaml` no longer names a provider variable;
+  `ProviderDefaultsService` reads the descriptors' bindings and ranks
+  (`supports()`, `preferenceOrder()` are instance methods). Nine services
+  take the key catalog by injection.
+- T4, T7, T8, T13, T14: `UserProviderKeyResolver::supportedProviders()` /
+  `isLocalHost()` from the descriptors; `ChatCompletionsUpstreams` is a
+  service over the catalog that also owns the translator's upstream URL
+  resolution (the frozen translator went 1,499 → 1,450 lines); the
+  inline-image rule and the vision-rewrite hosts come from `dialects`. The
+  gateway's `gemini` alias named no service anywhere and is gone.
+- T9–T12, T15: `StructuredOutputCapability`, `ToolCallingCapability`,
+  `CatalogToolUse` and `ReasoningLevelCatalog` lose their lists and apply
+  the descriptors' dialects and ladders.
+- T16–T18: the model-list probe reads `ModelListing`; the price sync reads
+  `ProviderPricing` (the Cohere / Jina vendors stay as the plug table they
+  are); `VoiceLiveConcurrency` reads `liveVoiceSessions`, `compatible`
+  mapped onto the endpoint-registry descriptor.
+- T20: `AiTab` builds the key fields from `ProviderKeyPresentation`
+  (`configSection`, `configOrder`, both texts); the system-config schema
+  snapshot is byte-identical.
+- T21: the pass tags each adapter from its descriptor; the 21 tag blocks
+  and three empty definitions left `services.yaml`.
+- T19 (the admin enum) is AU21; T22 stays by decision (`03` §2.3.4 #12).
+
+**Before / after.** `debug:container --tag=app.ai.<capability>` for all
+eight capabilities and `ProviderRegistry::getRegisteredProviderNames()`
+per capability: identical (`diff` of both recordings empty). Dev-stack
+`app:provider:list`: every keyed provider still `key (env)` / available
+through the pass-built environment map.
+
+**Proof.** `ProviderCatalogParityTest` is now a consumer test per table
+(T1–T23, 24 tests, 1,223 assertions through the container's services —
+`ProviderKeyStore::supports()`, `ProviderKeyCatalog`, the pass's arguments,
+`ProviderDefaultsService`, `UserProviderKeyResolver`,
+`ChatCompletionsUpstreams`, the translator's `resolveUpstream()`, the
+capabilities, `ReasoningLevelCatalog`, the probe, the price sync's
+`findLiteLLMKey()`, `VoiceLiveConcurrency::cap()`, `AiTab::sections()`, the
+registry). `MessagesGatewayVisionTest` gains the "not a rewrite host"
+case. `ProviderCatalogPassTest` covers tagging (own adapter, named adapter,
+no doubling, key-only, missing adapter) and the env map.
+`ModuleOwnershipTest` reads the descriptors' env vars next to
+`services.yaml`, which is where the Google aliases now live.
+
+**Real-provider walk (admin@synaplan.com on the dev stack).**
+`POST /api/v1/admin/provider-keys/<p>/test` for the eleven chat keys through
+the catalog-backed key catalog: Groq, OpenAI, Google, Cerebras, Mistral,
+xAI, Meta, A2Agent, HuggingFace `ok, tested, 200`; Anthropic `401` and
+TrustedTokens `403` — the providers reject those two keys in `backend/.env`,
+which is their answer, not a code path. The seeded default chat provider
+was Anthropic, so `POST /api/v1/admin/provider-keys/groq/apply-defaults`
+(the catalog bindings) made Groq the default — the dev database keeps that.
+Two turns on `POST /api/v1/messages/send`: "Answer with exactly one word:
+which planet is known as the red planet?" → "Mars"; a one-sentence question
+→ a one-sentence answer; the AU13 timeline shows `groq` /
+`openai/gpt-oss-120b`, 178 in / 204 out tokens.
+
+**Gate.** php-cs-fixer, PHPStan (`src/` and `tests/`), deptrac 0,
+`lint:container`, PHPUnit 11,251 tests / 0 failures. Frontend untouched
+(AU19's green run stands). `make test-e2e`: 160 passed, 25 failed — 18 on
+the known local-only list (mail ×4, guest ×2, WhatsApp, Telegram,
+subscription ×5, workspace-tab flag), 5 fail identically on `main`
+(`chat` standard model, `long-term-memory`, `pay-first-pages` ×2,
+`live-voice-activity-filter`: the dev database is in Synaplan Demo mode and
+answers canned replies; its flags differ from the test stack), 6 pass on a
+re-run of their specs alone on this branch and on `main` (`task-prompts`
+×2, `notion-app` ×3, `file-picker-scope`: run interference). CI is the
+proof. Release class `backend-only`.
+
+**Carried.** Three static reads of `ProviderCatalog::builtIn()`
+(`MessagesGateway` vision rewrite, `CatalogToolUse`,
+`ReasoningLevelCatalog`) mean a plugin provider cannot opt into those
+until the classes get an injection — the gateway's constructor is frozen
+at 21 parameters. `ProviderException::DISPLAY_NAMES` stays (`03` §2.3.4
+#12).
 
 ## 2026-10-31 — AU19: every provider declares its capabilities, endpoints and keys
 
