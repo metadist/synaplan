@@ -417,7 +417,6 @@ final readonly class ProviderDescriptor
         public ?ProviderKeySpec $key,                // null = no credential at all (Ollama, Piper, Whisper, Triton, test)
         public ProviderDialects $dialects,           // structured output, tool calling, reasoning ladder, image rules
         public ?ProviderDefaults $defaults,          // recommended bindings and first-run preference rank
-        public ModelListing $modelListing,           // what the key-validation endpoint says about served models
         public ProviderPricing $pricing,             // how app:models:sync-prices looks the provider up
         public ?int $liveVoiceSessions,              // concurrency cap, when the provider offers live voice
         public ProviderBranding $branding,           // iconify id, flag badge, help key, help URL
@@ -437,13 +436,13 @@ final class CerebrasProvider extends AbstractChatCompletionsCloudProvider
             capabilities: [ProviderCapability::Chat, ProviderCapability::Vision],
             endpoints: [ProviderEndpoint::chatCompletions('https://api.cerebras.ai/v1/chat/completions')],
             key: ProviderKeySpec::platform(envVar: 'CEREBRAS_API_KEY', consoleUrl: 'https://cloud.cerebras.ai/',
-                validation: ProviderKeyValidation::bearer('https://api.cerebras.ai/v1/models'), listOrder: 10, freeTier: true),
+                validation: ProviderKeyValidation::bearer('https://api.cerebras.ai/v1/models'), listOrder: 10,
+                modelListing: ModelListing::Lists, freeTier: true),
             dialects: new ProviderDialects(structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
                 toolsWithStructuredOutput: false, catalogToolUse: true,
                 inlineImages: InlineImageRule::PngJpegOnly, reasoning: ReasoningLadder::prefixes([
                     'qwen-3.8' => ['none', 'low', 'medium', 'high'], 'gpt-oss' => ['low', 'medium', 'high']])),
             defaults: new ProviderDefaults(bindings: [/* the PROVIDER_DEFAULTS['cerebras'] rows */], preferenceRank: 11),
-            modelListing: ModelListing::Lists,
             pricing: ProviderPricing::byServiceName(),
             liveVoiceSessions: null,
             branding: new ProviderBranding(icon: 'logos:cerebras-icon', flag: 'circle-flags:us', helpKey: 'cerebras'),
@@ -500,9 +499,9 @@ the set.
 | # | Table | File and line (`main` @ `619ad883f`) | Read through | Descriptor field | Order |
 | - | ----- | ------------------------------------ | ------------ | ---------------- | ----- |
 | T1 | `ProviderKeyStore::SUPPORTED_PROVIDERS` | `backend/src/AI/Credential/ProviderKeyStore.php:56` | the constant | `ProviderCatalog::withKey()` — descriptors whose `key->store` is `Platform` or `PlatformAndUser` | set |
-| T2 | `ProviderKeyCatalog::PROVIDERS` | `backend/src/AI/Credential/ProviderKeyCatalog.php:47` | `providerNames()`, `get($name)` | `key` (`displayName`, `envVar`, `secretEnvVar`, `consoleUrl`, `freeTier`, `recommended`, `validation`), `key->servesChat`, `modelListing` | sequence (it is the Admin → AI keys order) |
+| T2 | `ProviderKeyCatalog::PROVIDERS` | `backend/src/AI/Credential/ProviderKeyCatalog.php:47` | `providerNames()`, `get($name)` | `key` (`envVar`, `secretEnvVar`, `consoleUrl`, `validation`, `servesChat`, `modelListing`) and `key->presentation` (`displayName`, `freeTier`, `recommended`) | sequence (it is the Admin → AI keys order) |
 | T3 | `ProviderKeyStore` `$envKeys` / `$envSecrets` | `backend/config/services.yaml:417–442` | the container argument | `key->envVar`, `key->envAliases`, `key->secretEnvVar` | set |
-| T4 | `MessagesGatewayController::SUPPORTED_PROVIDERS` (BYOK) | `backend/src/Controller/MessagesGatewayController.php:40` | the constant | `ProviderCatalog::withUserKey()` — `key->store === PlatformAndUser` | sequence |
+| T4 | `MessagesGatewayController::SUPPORTED_PROVIDERS` (BYOK) | `backend/src/Controller/MessagesGatewayController.php:40` | the constant | `ProviderCatalog::withUserKey()` — `key->store === PlatformAndUser` | set (the response is a JSON object keyed by name) |
 | T5 | `ProviderDefaultsService::PROVIDER_DEFAULTS` | `backend/src/AI/Credential/ProviderDefaultsService.php:37` | `getRecommendedDefaults()` after `ModelCatalog` resolution is stubbed, or the constant through reflection | `defaults->bindings` | set per provider |
 | T6 | `ProviderDefaultsService::PREFERENCE_ORDER` | `backend/src/AI/Credential/ProviderDefaultsService.php:198` | the constant | `defaults->preferenceRank` (ascending; `null` = not in the order) | sequence |
 | T7 | `ChatCompletionsUpstreams::URLS` | `backend/src/AI/Messages/Translator/ChatCompletionsUpstreams.php:25` | `fixedUrl($name)` | the `ChatCompletions` endpoint's `url` | set |
@@ -514,11 +513,11 @@ the set.
 | T13 | `OpenAiMessagesTranslator::INLINE_PNG_JPEG_ONLY` | `backend/src/AI/Messages/Translator/OpenAiMessagesTranslator.php:62` | the constant | `dialects->inlineImages === InlineImageRule::PngJpegOnly` | one name |
 | T14 | `MessagesGateway::VISION_REWRITE_PROVIDERS` | `backend/src/AI/Messages/MessagesGateway.php:119` | the constant | `dialects->gatewayVisionRewrite` (`gemini` is `google`'s alias, see §2.3.4) | set |
 | T15 | `ReasoningLevelCatalog::levels()` match arms and `ANTHROPIC_EXTENDED_EFFORT_MODELS`, `ANTHROPIC_EFFORT_MODELS`; `OpenAiReasoningEffort::TIERS`, `TIERS_FALLBACK` | `backend/src/AI/Provider/ReasoningLevelCatalog.php:65–74, 29, 40`; `backend/src/AI/Provider/OpenAiReasoningEffort.php:27, 45` | `levels($service, $providerId, ['reasoning'])` for every model id named in a rule plus one unmatched id per service | `dialects->reasoning` (`ReasoningLadder`) | sequence per rule |
-| T16 | `PlatformKeyModelListProbe::NO_LISTING` | `backend/src/AI/Health/Probe/PlatformKeyModelListProbe.php:40` | `supports($name)` with `ProviderKeyCatalog::listsModels()` | `modelListing === ModelListing::CredentialsOnly` | set |
+| T16 | `PlatformKeyModelListProbe::NO_LISTING` | `backend/src/AI/Health/Probe/PlatformKeyModelListProbe.php:40` | `supports($name)` with `ProviderKeyCatalog::listsModels()` | `modelListing() === ModelListing::CredentialsOnly` | set |
 | T17 | `SyncModelPricesCommand::PREFIX_MAP`, `LOCAL_PROVIDERS` | `backend/src/Command/SyncModelPricesCommand.php:76, 69` | the constants through reflection | `pricing` (`ProviderPricing`) | set |
 | T18 | `VoiceLiveConcurrency::DEFAULTS` | `backend/src/Service/Voice/VoiceLiveConcurrency.php:18` | the constant through reflection | `liveVoiceSessions` (`compatible` is `openaicompatible`'s live-voice name, see §2.3.4) | set |
 | T19 | `AdminProviderKeysController` `provider` path enum | `backend/src/Controller/AdminProviderKeysController.php:111` | the `#[OA\Parameter]` attribute through reflection | `ProviderCatalog::withKey()`; dropped in AU21 | set |
-| T20 | `AiTab::cloud()`, `media()`, `tts()` password fields | `backend/src/Service/Admin/SystemConfig/Tab/AiTab.php:65–129, 141–160, 181–195` | `sections()` — every `password` field whose key `ProviderKeyCatalog::providerForEnvVar()` resolves | `key->envVar`, `key->secretEnvVar`; the `description` text stays in `AiTab` until AU20 moves it to `key->fieldDescription` | set |
+| T20 | `AiTab::cloud()`, `media()`, `tts()` password fields | `backend/src/Service/Admin/SystemConfig/Tab/AiTab.php:65–129, 141–160, 181–195` | `sections()` — every `password` field whose key `ProviderKeyCatalog::providerForEnvVar()` resolves | `key->envVar`, `key->secretEnvVar`; the key field's `description` is `key->presentation->fieldDescription` (the secret field's text stays in `AiTab` until AU20) | set |
 | T21 | `services.yaml` `app.ai.<capability>` tags | `backend/config/services.yaml:460–664, 1713–1723` | `ProviderRegistry::getRegisteredProviderNames($capability)` | `capabilities` | set per capability |
 | T22 | `ProviderException::DISPLAY_NAMES` | `backend/src/AI/Exception/ProviderException.php:17` | `displayName($name)` | `displayName` | set |
 | T23 | `EgressBuiltinDestinations::PROVIDERS` — the twelve provider hosts (`api.openai.com` … `api.perplexity.ai`) | `backend/src/Service/Egress/EgressBuiltinDestinations.php:48–60` | the constant | `ProviderCatalog::endpoints()` hosts ⊇ those twelve (AU22) | set |
@@ -586,6 +585,25 @@ final readonly class ProviderKeyValidation
     public static function header(string $url, string $name, string $value = '{key}'): self;
 }
 
+enum ModelListing: string
+{
+    case Lists = 'lists';                        // the validation endpoint enumerates models (health may read it)
+    case CredentialsOnly = 'credentials_only';   // it proves the key and nothing else (HuggingFace whoami)
+    case None = 'none';                          // no validation endpoint, or one the probe must not use
+}
+
+/** Presentation of the key row on Admin → AI keys and the system-config tab; nothing here changes a request. */
+final readonly class ProviderKeyPresentation
+{
+    public function __construct(
+        public int $listOrder = 0,                 // position on Admin → AI keys (T2's sequence); 0 = not listed there
+        public ?string $displayName = null,        // the key row's label where it differs from the adapter's (§2.3.4 #4)
+        public bool $freeTier = false,
+        public bool $recommended = false,
+        public ?string $fieldDescription = null,   // the AiTab password-field text
+    ) {}
+}
+
 final readonly class ProviderKeySpec
 {
     /**
@@ -594,9 +612,8 @@ final readonly class ProviderKeySpec
      * @param ?string      $secretEnvVar the secret half of a key + secret pair (Higgsfield)
      * @param ?string      $consoleUrl   where a person creates the key; also `branding->helpUrl` unless that is set
      * @param ?ProviderKeyValidation $validation null = stored untested
+     * @param ModelListing $modelListing what the validation endpoint says about served models (a key property: T2 and T16)
      * @param bool         $servesChat   false for media and speech keys (wizard, "use as default")
-     * @param ?string      $displayName  the label of the key row where it differs from the adapter's (§2.3.4 #4)
-     * @param int          $listOrder    position on Admin → AI keys (T2's sequence); 0 for keys that are not listed there
      */
     public function __construct(
         public ProviderKeyStoreKind $store,
@@ -605,27 +622,19 @@ final readonly class ProviderKeySpec
         public ?string $secretEnvVar = null,
         public ?string $consoleUrl = null,
         public ?ProviderKeyValidation $validation = null,
-        public bool $freeTier = false,
-        public bool $recommended = false,
+        public ModelListing $modelListing = ModelListing::None,
         public bool $servesChat = true,
-        public ?string $displayName = null,
-        public int $listOrder = 0,
-        public ?string $fieldDescription = null,   // the AiTab password-field text (AU20)
+        public ProviderKeyPresentation $presentation = new ProviderKeyPresentation(),
     ) {}
 
-    public static function platform(string $envVar, string $consoleUrl, ?ProviderKeyValidation $validation, int $listOrder, bool $freeTier = false, bool $recommended = false, bool $servesChat = true, array $envAliases = [], ?string $secretEnvVar = null, ?string $displayName = null): self;
-    public static function platformAndUser(/* same */): self;
+    public static function platform(string $envVar, string $consoleUrl, ?ProviderKeyValidation $validation, int $listOrder, ModelListing $modelListing = ModelListing::None, bool $freeTier = false, bool $recommended = false, bool $servesChat = true, array $envAliases = [], ?string $secretEnvVar = null, ?string $displayName = null, ?string $fieldDescription = null): self;
+    public static function platformAndUser(/* same, without servesChat and secretEnvVar */): self;
     public static function endpointRegistry(): self;
-    public static function envOnly(string $envVar): self;
+    public static function envOnly(string $envVar, ?string $fieldDescription = null): self;
     public function requiresSecret(): bool;
     public function isTestable(): bool;
-}
-
-enum ModelListing: string
-{
-    case Lists = 'lists';                        // the validation endpoint enumerates models (health may read it)
-    case CredentialsOnly = 'credentials_only';   // it proves the key and nothing else (HuggingFace whoami)
-    case None = 'none';                          // no validation endpoint, or one the probe must not use
+    /** @return list<string> key, aliases, secret */
+    public function envVars(): array;
 }
 
 final readonly class ProviderPricing
@@ -720,17 +729,26 @@ final readonly class ProviderBranding
 }
 ```
 
+`ProviderDescriptor` additionally answers `hasCapability()`, `hasPlatformKey()`,
+`hasUserKey()`, `modelListing()` (`key->modelListing`, `None` without a
+key), `chatCompletionsEndpoint()` / `chatCompletionsUrl()` / `isLocal()`,
+`hosts()` and `rank()`. The constructor stays at ten parameters, the size
+ratchet's limit.
+
 `ProviderCatalog` (AU19):
 
 ```php
 final class ProviderCatalog
 {
-    /** @param list<class-string> $providerClasses discovered as in §2.3.3 */
+    /** @param list<class-string> $providerClasses discovered as in §2.3.3; checked against the interface on first read */
     public function __construct(array $providerClasses) {}
 
     /** @return list<ProviderDescriptor> in the order of §2.3.3 */
     public function all(): array;
+    /** @return list<string> */
+    public function names(): array;
     public function get(string $name): ProviderDescriptor;           // throws UnknownProviderException
+    public function find(string $name): ?ProviderDescriptor;
     public function has(string $name): bool;
     /** @return list<ProviderDescriptor> */
     public function withCapability(ProviderCapability $capability): array;
@@ -749,6 +767,18 @@ final class ProviderCatalog
   implements `App\AI\Catalog\DescribesProviderInterface`
   (`public static function descriptor(): ProviderDescriptor`). The
   attribute has no arguments: everything is in the descriptor.
+- **Adapters frozen in the size ledger** (`tests/Architecture/sizeRatchetBaseline.json`:
+  Anthropic, Higgsfield, HuggingFace, Mistral, Test, Triton, xAI) and
+  adapters at the limit (OpenAI-compatible, 792 lines) may not grow by a
+  line, so their descriptor is a sibling class
+  `App\AI\Provider\Descriptor\<Name>Descriptor` that carries the attribute
+  and implements the interface; the adapter itself is untouched except
+  that the constants the descriptor quotes (base URL, API version, the
+  reasoning tiers) become `public const`, which adds no line. The parity
+  test then matches adapter and descriptor by name through the catalog;
+  an adapter that also implements the interface must agree with the
+  catalog. Every other provider — and every provider AU22 scaffolds —
+  describes itself inline.
 - `App\Kernel::build()` calls
   `registerAttributeForAutoconfiguration(AsAiProvider::class, …)`. The
   configurator reads `$class::descriptor()` and adds one
@@ -826,6 +856,10 @@ after S3.
     `api.thehive.ai`, `api.elevenlabs.io`, `api.cloudflare.com`, Google's
     Vertex host. AU22 replaces the list with the catalog's hosts; until
     then `report` mode shows them as `would_block`.
+11. **`SyncModelPricesCommand::LOCAL_PROVIDERS` skips Ollama, Triton, the
+    test provider, Piper and TheHive, not Whisper**, although Whisper is as
+    local as Piper. Whisper's `pricing` is therefore `byServiceName()`;
+    the sync finds no row for it and moves on, as today.
 
 ---
 
