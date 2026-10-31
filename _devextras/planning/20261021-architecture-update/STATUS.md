@@ -173,8 +173,9 @@ stub removed.
    through `Symfony\Component\HttpClient\Psr18Client`, whose PSR-7 body is
    built from the response's stream, and the `EgressPendingResponse`
    wrapper of AU15 does not offer a seekable one. Pre-existing since AU15
-   / AU17, reproduced on `main`'s code paths; filed as an issue (below),
-   not fixed here.
+   / AU17, reproduced on `main`'s code paths; filed as
+   [#2919](https://github.com/metadist/synaplan/issues/2919), not fixed
+   here.
 3. The Higgsfield key test answers `405` for the same `GET
    https://platform.higgsfield.ai/` that `main` sends (T2 pins the request);
    Anthropic `401`, TrustedTokens `403`, ElevenLabs `401` are the
