@@ -440,111 +440,66 @@ services:
         arguments:
             $statusFilePath: '%kernel.project_dir%/var/ollama-download.json'
 
+    # AI provider adapters. Their `app.ai.<capability>` tags come from the
+    # descriptors (#[AsAiProvider] + ProviderCatalogPass); only the arguments
+    # that are not autowirable are listed here.
     App\AI\Provider\AnthropicProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'anthropic' }
-            - { name: 'app.ai.vision', key: 'anthropic' }
 
     App\AI\Provider\OpenAIProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $storeResponses: '%env(bool:OPENAI_STORE_RESPONSES)%'
-        tags:
-            - { name: 'app.ai.chat', key: 'openai' }
-            - { name: 'app.ai.embedding', key: 'openai' }
-            - { name: 'app.ai.vision', key: 'openai' }
-            - { name: 'app.ai.image_generation', key: 'openai' }
-            - { name: 'app.ai.speech_to_text', key: 'openai' }
-            - { name: 'app.ai.text_to_speech', key: 'openai' }
 
     App\AI\Provider\OllamaProvider:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
-        tags:
-            - { name: 'app.ai.chat', key: 'ollama' }
-            - { name: 'app.ai.embedding', key: 'ollama' }
 
     App\AI\Provider\TritonProvider:
         arguments:
             $serverUrl: '%env(TRITON_SERVER_URL)%'
-        tags:
-            - { name: 'app.ai.chat', key: 'triton' }
-            - { name: 'app.ai.embedding', key: 'triton' }
 
     App\AI\Provider\GroqProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'groq' }
-            - { name: 'app.ai.vision', key: 'groq' }
-            - { name: 'app.ai.speech_to_text', key: 'groq' }
 
     App\AI\Provider\MistralProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'mistral' }
-            - { name: 'app.ai.vision', key: 'mistral' }
-            - { name: 'app.ai.speech_to_text', key: 'mistral' }
-            - { name: 'app.ai.text_to_speech', key: 'mistral' }
 
     App\AI\Provider\TrustedTokensProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'trustedtokens' }
-            - { name: 'app.ai.vision', key: 'trustedtokens' }
 
     App\AI\Provider\A2AgentProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'a2agent' }
-            - { name: 'app.ai.vision', key: 'a2agent' }
 
     App\AI\Provider\MetaProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'meta' }
-            - { name: 'app.ai.vision', key: 'meta' }
-            - { name: 'app.ai.image_generation', key: 'meta' }
-            - { name: 'app.ai.speech_to_text', key: 'meta' }
 
     App\AI\Provider\CerebrasProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'cerebras' }
-            - { name: 'app.ai.vision', key: 'cerebras' }
 
     App\AI\Provider\XaiProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'xai' }
-            - { name: 'app.ai.vision', key: 'xai' }
-            - { name: 'app.ai.image_generation', key: 'xai' }
-            - { name: 'app.ai.video_generation', key: 'xai' }
-            - { name: 'app.ai.text_to_speech', key: 'xai' }
-            - { name: 'app.ai.speech_to_text', key: 'xai' }
 
     App\AI\Provider\PerplexityProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
-        tags:
-            - { name: 'app.ai.chat', key: 'perplexity' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -553,17 +508,6 @@ services:
             $region: 'us-central1'
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $vertexAccessToken: '%env(GOOGLE_VERTEX_ACCESS_TOKEN)%'
-        tags:
-            - { name: 'app.ai.chat', key: 'google' }
-            - { name: 'app.ai.vision', key: 'google' }
-            - { name: 'app.ai.image_generation', key: 'google' }
-            - { name: 'app.ai.video_generation', key: 'google' }
-            - { name: 'app.ai.speech_to_text', key: 'google' }
-            - { name: 'app.ai.text_to_speech', key: 'google' }
-
-    App\AI\Provider\TheHiveProvider:
-        tags:
-            - { name: 'app.ai.image_generation', key: 'thehive' }
 
     # Anthropic Messages gateway: admin-set UPSTREAM_URL in BCONFIG wins;
     # MESSAGES_GATEWAY_UPSTREAM_URL is the env fallback for the local smoke harness.
@@ -575,41 +519,20 @@ services:
         tags:
             - { name: 'app.messages.translator' }
 
-    # Higgsfield: instance pair from ProviderKeyStore (Models & keys, env
-    # bootstrap) + per-user override resolved by HiggsfieldCredentialResolver.
-    App\AI\Provider\HiggsfieldProvider:
-        tags:
-            - { name: 'app.ai.image_generation', key: 'higgsfield' }
-            - { name: 'app.ai.video_generation', key: 'higgsfield' }
-
     App\AI\Provider\PiperProvider:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
-        tags:
-            - { name: 'app.ai.text_to_speech', key: 'piper' }
-
-    App\AI\Provider\WhisperProvider:
-        tags:
-            - { name: 'app.ai.speech_to_text', key: 'whisper' }
 
     App\AI\Provider\HuggingFaceProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'huggingface' }
-            - { name: 'app.ai.vision', key: 'huggingface' }
-            - { name: 'app.ai.embedding', key: 'huggingface' }
-            - { name: 'app.ai.image_generation', key: 'huggingface' }
-            - { name: 'app.ai.video_generation', key: 'huggingface' }
 
     App\AI\Provider\CloudflareProvider:
         arguments:
             $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
             $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
-        tags:
-            - { name: 'app.ai.embedding', key: 'cloudflare' }
 
     # Model health: the account-scoped Cloudflare catalog needs the same
     # credentials as the provider itself.
@@ -639,11 +562,6 @@ services:
     App\AI\Provider\OpenAICompatibleProvider:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'openaicompatible' }
-            - { name: 'app.ai.embedding', key: 'openaicompatible' }
-            - { name: 'app.ai.vision', key: 'openaicompatible' }
-            - { name: 'app.ai.image_generation', key: 'openaicompatible' }
 
     # AI Facade
     App\AI\Service\AiFacade:
@@ -1695,14 +1613,6 @@ services:
     App\AI\Provider\TestProvider:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-        tags:
-            - { name: 'app.ai.chat', key: 'test' }
-            - { name: 'app.ai.embedding', key: 'test' }
-            - { name: 'app.ai.vision', key: 'test' }
-            - { name: 'app.ai.image_generation', key: 'test' }
-            - { name: 'app.ai.speech_to_text', key: 'test' }
-            - { name: 'app.ai.text_to_speech', key: 'test' }
-            - { name: 'app.ai.file_analysis', key: 'test' }
 
 when@test:
     services:
@@ -1720,12 +1630,4 @@ when@test:
         App\Service\Research\Run\Source\FixtureSourceReader:
             arguments:
                 $pagesDir: '%kernel.project_dir%/tests/Fixtures/research/pages'
-
-        # ProviderCatalogParityTest reads the catalog from the container. Until
-        # AU20 wires the first consumer the service has no other user, and the
-        # compiler would drop it.
-        App\AI\Catalog\ProviderCatalog:
-            public: true
-            arguments:
-                $providerClasses: []
 

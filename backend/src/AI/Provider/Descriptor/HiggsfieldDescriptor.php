@@ -22,7 +22,7 @@ use App\AI\Provider\HiggsfieldProvider;
  * The descriptor of {@see HiggsfieldProvider}, kept beside the adapter
  * because the adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: HiggsfieldProvider::class)]
 final class HiggsfieldDescriptor implements DescribesProviderInterface
 {
     public static function descriptor(): ProviderDescriptor

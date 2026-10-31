@@ -24,7 +24,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * The descriptor of {@see MistralProvider}, kept beside the adapter because
  * the adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: MistralProvider::class)]
 final class MistralDescriptor implements DescribesProviderInterface
 {
     private const BASE_URL = 'https://api.mistral.ai/v1';

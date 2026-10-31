@@ -560,7 +560,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSame('Cloudflare API token with Workers AI access', $fields['CLOUDFLARE_API_TOKEN'][1], 'env-only token stays a hand-written field');
     }
 
-    /** T21 */
+    /** T21 — the registry's tags are the descriptors' capabilities, added by the pass; services.yaml names none */
     public function testContainerTagsEqualTheDescriptorCapabilities(): void
     {
         foreach (ProviderCapability::cases() as $capability) {
@@ -571,6 +571,11 @@ final class ProviderCatalogParityTest extends KernelTestCase
             );
         }
         self::assertSame(ProviderRegistry::CAPABILITIES, array_map(static fn (ProviderCapability $c): string => $c->value, ProviderCapability::cases()));
+        self::assertSame(['a2agent', 'anthropic', 'cerebras', 'google', 'groq', 'huggingface', 'meta', 'mistral', 'ollama', 'openaicompatible', 'openai', 'perplexity', 'test', 'triton', 'trustedtokens', 'xai'], $this->registry->getRegisteredProviderNames('chat'), 'the order the registry lists');
+
+        $services = file_get_contents(\dirname(__DIR__, 3).'/config/services.yaml');
+        self::assertIsString($services);
+        self::assertDoesNotMatchRegularExpression('/name: \'app\.ai\.(chat|embedding|vision|image_generation|video_generation|speech_to_text|text_to_speech|file_analysis)\'/', $services, 'no capability tag is hand-kept');
     }
 
     /** T22 */
