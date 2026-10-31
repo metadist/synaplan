@@ -160,7 +160,7 @@ final class VoiceLiveUsageServiceIntegrationTest extends KernelTestCase
         $reaper = new \App\Service\Voice\VoiceLiveReaper(
             $em->getRepository(VoiceSession::class),
             $usage,
-            new \App\Service\Voice\VoiceLiveConcurrency($redis, $config),
+            new \App\Service\Voice\VoiceLiveConcurrency($redis, $config, \App\AI\Catalog\ProviderCatalog::builtIn()),
             new \Psr\Log\NullLogger(),
         );
 

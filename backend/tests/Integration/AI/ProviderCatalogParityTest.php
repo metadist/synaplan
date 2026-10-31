@@ -22,6 +22,7 @@ use App\AI\Health\Probe\PlatformKeyModelListProbe;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use App\AI\Provider\ReasoningLevelCatalog;
+use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderRegistry;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputDialect;
@@ -29,6 +30,7 @@ use App\AI\Tool\CatalogToolUse;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Command\SyncModelPricesCommand;
 use App\Controller\AdminProviderKeysController;
+use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Service\Admin\SystemConfig\Tab\AiTab;
 use App\Service\Egress\EgressBuiltinDestinations;
@@ -431,32 +433,33 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['mistral', 'mistral-large-4', null],
     ];
 
-    /** T16 */
+    /** T16 — the model-list probe covers every keyed provider whose endpoint says something */
     public function testModelListProbeSupportEqualsTheDescriptorModelListing(): void
     {
         $probe = self::getContainer()->get(PlatformKeyModelListProbe::class);
         \assert($probe instanceof PlatformKeyModelListProbe);
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame(
-                $probe->supports($descriptor->name),
-                $descriptor->hasPlatformKey() && ModelListing::None !== $descriptor->modelListing(),
-                $descriptor->name,
-            );
+            self::assertSame($descriptor->hasPlatformKey() && ModelListing::None !== $descriptor->modelListing(), $probe->supports($descriptor->name), $descriptor->name);
         }
         $credentialsOnly = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => ModelListing::CredentialsOnly === $d->modelListing()));
-        self::assertSameSet(self::constant(PlatformKeyModelListProbe::class, 'NO_LISTING'), $credentialsOnly);
+        self::assertSame(['huggingface'], $credentialsOnly);
+        self::assertSame(ModelProbeResult::Inconclusive, $probe->confirm('huggingface', 'moonshotai/Kimi-K3'), 'whoami names no model');
+        self::assertFalse($probe->supports('higgsfield'));
+        self::assertFalse($probe->supports('thehive'));
+        self::assertFalse($probe->supports('ollama'));
     }
 
-    /** T17 — prefixes and vendors are sequences per provider (the first existing key wins) */
+    /** T17 — the price sync reads each descriptor's pricing (prefix order matters: the first existing key wins) */
     public function testPricePrefixesVendorsAndSkipListEqualTheDescriptorPricing(): void
     {
+        $skipped = [];
         $prefixes = [];
         $vendors = [];
-        $skipped = [];
         foreach ($this->catalog->all() as $descriptor) {
             if (!$descriptor->pricing->synced) {
                 $skipped[] = $descriptor->name;
-            } elseif ([] !== $descriptor->pricing->litellmPrefixes) {
+            }
+            if ([] !== $descriptor->pricing->litellmPrefixes) {
                 $prefixes[$descriptor->name] = $descriptor->pricing->litellmPrefixes;
             }
             if ([] !== $descriptor->pricing->bareMatchVendors) {
@@ -464,40 +467,39 @@ final class ProviderCatalogParityTest extends KernelTestCase
             }
             self::assertSame([$descriptor->name], \App\AI\Catalog\ProviderPricing::byServiceName()->prefixesFor($descriptor->name));
         }
-        $actualPrefixes = self::constant(SyncModelPricesCommand::class, 'PREFIX_MAP');
-        ksort($prefixes);
-        ksort($actualPrefixes);
-        self::assertSame($actualPrefixes, $prefixes);
-        self::assertSameSet(self::constant(SyncModelPricesCommand::class, 'LOCAL_PROVIDERS'), $skipped);
+        self::assertSameSet(['ollama', 'triton', 'test', 'piper', 'thehive'], $skipped);
+        self::assertSame(['anthropic' => ['anthropic'], 'google' => ['gemini', 'google'], 'groq' => ['groq'], 'huggingface' => ['huggingface'], 'openai' => ['openai']], self::sorted($prefixes));
+        self::assertSame(['anthropic' => ['anthropic'], 'google' => ['gemini', 'google', 'vertex_ai'], 'openai' => ['openai']], self::sorted($vendors));
 
-        // `cohere` and `jina` are rerank / embedding plugs, not providers; they
-        // stay with the command (03 §2.3.1 T17).
-        $actualVendors = self::constant(SyncModelPricesCommand::class, 'BARE_MATCH_PROVIDERS');
-        $plugs = array_filter(array_keys($actualVendors), fn (string $name): bool => !$this->catalog->has($name));
-        self::assertSame(['cohere', 'jina'], array_values($plugs));
-        $actualVendors = array_diff_key($actualVendors, array_flip($plugs));
-        ksort($vendors);
-        ksort($actualVendors);
-        self::assertSame($actualVendors, $vendors);
+        $command = self::getContainer()->get(SyncModelPricesCommand::class);
+        \assert($command instanceof SyncModelPricesCommand);
+        $find = new \ReflectionMethod($command, 'findLiteLLMKey');
+        $litellm = ['gemini/gemini-3.8-flash' => [], 'google/gemini-3.8-flash' => [], 'deepseek-v4-pro' => ['litellm_provider' => 'deepseek'], 'gpt-5.5' => ['litellm_provider' => 'openai'], 'xai/grok-4.5' => []];
+        self::assertSame('gemini/gemini-3.8-flash', $find->invoke($command, self::model('google', 'gemini-3.8-flash'), $litellm), 'gemini before google');
+        self::assertSame('gpt-5.5', $find->invoke($command, self::model('openai', 'gpt-5.5'), $litellm), 'a bare id of our own vendor');
+        self::assertNull($find->invoke($command, self::model('a2agent', 'deepseek-v4-pro'), $litellm), 'a gateway never matches a bare id');
+        self::assertSame('xai/grok-4.5', $find->invoke($command, self::model('xAI', 'grok-4.5'), $litellm), 'the service name is the default prefix');
     }
 
-    /** T18 — `compatible` is the live-voice name of `openaicompatible` (§2.3.4 #2) */
+    /** T18 — live-voice caps are the descriptors' sessions; `compatible` is the endpoint registry's socket */
     public function testLiveVoiceCapsEqualTheDescriptorSessions(): void
     {
-        $today = self::constant(VoiceLiveConcurrency::class, 'DEFAULTS');
-        if (isset($today['compatible'])) {
-            $today['openaicompatible'] = $today['compatible'];
-            unset($today['compatible']);
-        }
         $expected = [];
         foreach ($this->catalog->all() as $descriptor) {
             if (null !== $descriptor->liveVoiceSessions) {
                 $expected[$descriptor->name] = $descriptor->liveVoiceSessions;
             }
         }
-        ksort($today);
-        ksort($expected);
-        self::assertSame($today, $expected);
+        self::assertSame(['google' => 100, 'openai' => 50, 'openaicompatible' => 4, 'xai' => 10], self::sorted($expected));
+
+        $concurrency = self::getContainer()->get(VoiceLiveConcurrency::class);
+        \assert($concurrency instanceof VoiceLiveConcurrency);
+        $cap = new \ReflectionMethod($concurrency, 'cap');
+        self::assertSame(50, $cap->invoke($concurrency, 'OpenAI'));
+        self::assertSame(100, $cap->invoke($concurrency, 'google'));
+        self::assertSame(10, $cap->invoke($concurrency, 'xai'));
+        self::assertSame(4, $cap->invoke($concurrency, 'compatible'));
+        self::assertSame(10, $cap->invoke($concurrency, 'unknown'), 'the fallback');
     }
 
     /** T19 */
@@ -629,5 +631,28 @@ final class ProviderCatalogParityTest extends KernelTestCase
     private static function constant(string $class, string $name): mixed
     {
         return (new \ReflectionClassConstant($class, $name))->getValue();
+    }
+
+    /**
+     * @template T
+     *
+     * @param array<string, T> $map
+     *
+     * @return array<string, T>
+     */
+    private static function sorted(array $map): array
+    {
+        ksort($map);
+
+        return $map;
+    }
+
+    private static function model(string $service, string $providerId): Model
+    {
+        $model = new Model();
+        $model->setService($service);
+        $model->setProviderId($providerId);
+
+        return $model;
     }
 }

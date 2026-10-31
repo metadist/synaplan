@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Voice;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\Exception\VoiceLiveRejectedException;
 use App\Repository\ConfigRepository;
 use App\Service\Infrastructure\RedisService;
@@ -11,20 +13,21 @@ use App\Service\Infrastructure\RedisService;
 /**
  * How many provider sockets this install may hold open at once.
  * Redis down refuses a new conversation rather than ignoring the cap.
+ *
+ * The default per provider is the descriptor's `liveVoiceSessions`; an
+ * operator overrides it with `LIVE_VOICE.CONCURRENCY_<PROVIDER>`. The
+ * OpenAI-compatible realtime socket is addressed as
+ * {@see VoiceLiveCompatibleEndpoint::PROVIDER} by the sidecar and the
+ * settings, so that name maps onto the `openaicompatible` descriptor.
  */
 final readonly class VoiceLiveConcurrency
 {
-    /** @var array<string, int> */
-    private const DEFAULTS = [
-        'openai' => 50,
-        'google' => 100,
-        'xai' => 10,
-        'compatible' => 4,
-    ];
+    private const FALLBACK_SESSIONS = 10;
 
     public function __construct(
         private RedisService $redis,
         private ConfigRepository $config,
+        private ProviderCatalog $catalog,
     ) {
     }
 
@@ -63,7 +66,11 @@ final readonly class VoiceLiveConcurrency
             return (int) $raw;
         }
 
-        return self::DEFAULTS[$this->name($provider)] ?? 10;
+        $descriptor = VoiceLiveCompatibleEndpoint::PROVIDER === $this->name($provider)
+            ? OpenAiCompatibleEndpointRegistry::PROVIDER_NAME
+            : $this->name($provider);
+
+        return $this->catalog->find($descriptor)->liveVoiceSessions ?? self::FALLBACK_SESSIONS;
     }
 
     private function name(string $provider): string
