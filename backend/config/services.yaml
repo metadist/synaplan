@@ -337,6 +337,8 @@ services:
             - '../src/Module/Contract/'
             - '../src/Module/DependencyInjection/'
             - '../src/Module/Exception/'
+            # Provider descriptors are value objects; ProviderCatalog is wired below.
+            - '../src/AI/Catalog/'
             # Factory product of PluginResourceKindCatalog — never a singleton.
             - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
             # One pulse per Telegram turn. Its callbacks are not services.
@@ -403,6 +405,13 @@ services:
     App\Seed\DemoWidgetConfigSeeder:
         arguments:
             $environment: '%kernel.environment%'
+
+    # Every provider class with #[AsAiProvider] describes itself; the
+    # ProviderCatalogPass fills $providerClasses with their class names at
+    # compile time, so the catalog never instantiates a provider.
+    App\AI\Catalog\ProviderCatalog:
+        arguments:
+            $providerClasses: []
 
     # DB-backed platform API keys for the cloud AI providers, encrypted at
     # rest in BCONFIG (group `provider_keys`) via EncryptionService. The env
@@ -1738,4 +1747,12 @@ when@test:
         App\Service\Research\Run\Source\FixtureSourceReader:
             arguments:
                 $pagesDir: '%kernel.project_dir%/tests/Fixtures/research/pages'
+
+        # ProviderCatalogParityTest reads the catalog from the container. Until
+        # AU20 wires the first consumer the service has no other user, and the
+        # compiler would drop it.
+        App\AI\Catalog\ProviderCatalog:
+            public: true
+            arguments:
+                $providerClasses: []
 

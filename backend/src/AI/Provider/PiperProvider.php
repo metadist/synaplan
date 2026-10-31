@@ -2,6 +2,13 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use Psr\Log\LoggerInterface;
@@ -11,7 +18,8 @@ use Symfony\Component\Process\Process;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
-class PiperProvider implements TextToSpeechProviderInterface
+#[AsAiProvider]
+class PiperProvider implements TextToSpeechProviderInterface, DescribesProviderInterface
 {
     /**
      * Frontend language selects the voice.
@@ -74,6 +82,23 @@ class PiperProvider implements TextToSpeechProviderInterface
         if (!$this->filesystem->exists($this->uploadDir)) {
             $this->filesystem->mkdir($this->uploadDir);
         }
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'piper',
+            displayName: 'Piper TTS',
+            capabilities: [ProviderCapability::TextToSpeech],
+            // The host is SYNAPLAN_TTS_URL, the bundled sidecar.
+            endpoints: [],
+            key: null,
+            dialects: new ProviderDialects(),
+            defaults: null,
+            pricing: ProviderPricing::none(),
+            liveVoiceSessions: null,
+            branding: ProviderBranding::local('mdi:robot'),
+        );
     }
 
     public function getName(): string

@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\Service\Stt\WhisperService;
@@ -12,11 +19,30 @@ use App\Service\Stt\WhisperService;
  * Local whisper.cpp speech-to-text. No API key — availability is the
  * WHISPER_ENABLED flag plus the binary shipped in the image.
  */
-final readonly class WhisperProvider implements SpeechToTextProviderInterface
+#[AsAiProvider]
+final readonly class WhisperProvider implements SpeechToTextProviderInterface, DescribesProviderInterface
 {
     public function __construct(
         private WhisperService $whisperService,
     ) {
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'whisper',
+            displayName: 'Whisper',
+            capabilities: [ProviderCapability::SpeechToText],
+            endpoints: [],
+            key: null,
+            dialects: new ProviderDialects(),
+            defaults: null,
+            // Not on the price sync's skip list today (03 §2.3.4 #11); the
+            // descriptor follows that until the list reads the catalog.
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            branding: ProviderBranding::local('mdi:microphone'),
+        );
     }
 
     public function getName(): string

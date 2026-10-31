@@ -45,9 +45,9 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
     private const DISPLAY_NAME = 'HuggingFace';
 
     private const ROUTER_BASE = 'https://router.huggingface.co';
-    private const CHAT_ENDPOINT = self::ROUTER_BASE.'/v1/chat/completions';
+    public const CHAT_ENDPOINT = self::ROUTER_BASE.'/v1/chat/completions';
     private const BILLING_URL = 'https://huggingface.co/settings/billing';
-    private const TOKENS_URL = 'https://huggingface.co/settings/tokens';
+    public const TOKENS_URL = 'https://huggingface.co/settings/tokens';
 
     private const DEFAULT_SUB_PROVIDER = 'hf-inference';
     private const FAL_PROVIDER = 'fal-ai';

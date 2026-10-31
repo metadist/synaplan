@@ -4,6 +4,19 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
+use App\AI\StructuredOutput\StructuredOutputDialect;
+
 /**
  * TrustedTokens — sovereign OpenAI-compatible inference hosted in Germany
  * by TNG Technology Consulting (EU data residency).
@@ -15,12 +28,48 @@ namespace App\AI\Provider;
  * @see https://trustedtokens.eu/docs/
  * @see https://api.trustedtokens.eu/v1
  */
+#[AsAiProvider]
 class TrustedTokensProvider extends AbstractChatCompletionsCloudProvider
 {
     private const PROVIDER_NAME = 'trustedtokens';
     private const BASE_URI = 'https://api.trustedtokens.eu/v1';
     private const DEFAULT_CHAT_MODEL = 'zai-org/GLM-5.2';
     private const DEFAULT_VISION_MODEL = 'Qwen/Qwen3.6-35B-A3B-FP8';
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: self::PROVIDER_NAME,
+            displayName: 'TrustedTokens',
+            capabilities: [ProviderCapability::Chat, ProviderCapability::Vision],
+            endpoints: [ProviderEndpoint::chatCompletions(self::BASE_URI.'/chat/completions')],
+            key: ProviderKeySpec::platform(
+                envVar: 'TRUSTEDTOKENS_API_KEY',
+                consoleUrl: 'https://trustedtokens.eu/',
+                validation: ProviderKeyValidation::bearer(self::BASE_URI.'/models'),
+                listOrder: 6,
+                modelListing: ModelListing::Lists,
+                fieldDescription: 'TrustedTokens API key — sovereign inference on German GPUs (GLM, DeepSeek, Qwen, GPT OSS)',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
+                catalogToolUse: true,
+            ),
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'trustedtokens:zai-org/GLM-5.2:chat',
+                'TOOLS' => 'trustedtokens:zai-org/GLM-5.2:chat',
+                'ANALYZE' => 'trustedtokens:zai-org/GLM-5.2:chat',
+                'SORT' => 'trustedtokens:openai/gpt-oss-120b:chat',
+                'PLAN' => 'trustedtokens:openai/gpt-oss-120b:chat',
+                'SUMMARIZE' => 'trustedtokens:openai/gpt-oss-120b:chat',
+                'PIC2TEXT' => 'trustedtokens:Qwen/Qwen3.6-35B-A3B-FP8:pic2text',
+            ], preferenceRank: 6),
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            // No brand glyph in Iconify; a shield reads as "sovereign / secured".
+            branding: new ProviderBranding(icon: 'mdi:shield-check', flag: 'circle-flags:de', helpKey: 'trustedtokens'),
+        );
+    }
 
     public function getName(): string
     {

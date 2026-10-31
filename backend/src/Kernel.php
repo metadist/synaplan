@@ -2,6 +2,8 @@
 
 namespace App;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DependencyInjection\ProviderCatalogPass;
 use App\AI\Pipeline\AsAiCallHook;
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
 use App\DependencyInjection\Compiler\PerfTestProviderPass;
@@ -119,6 +121,11 @@ class Kernel extends BaseKernel
         // refuses duplicate ids at compile time.
         $container->registerForAutoconfiguration(FeatureModuleInterface::class)->addTag(FeatureModuleTagPass::TAG);
         $container->addCompilerPass(new FeatureModuleTagPass());
+
+        // AI providers: every class with #[AsAiProvider] describes itself and
+        // reaches ProviderCatalog by class name, without being instantiated.
+        $container->registerAttributeForAutoconfiguration(AsAiProvider::class, ProviderCatalogPass::configure(...));
+        $container->addCompilerPass(new ProviderCatalogPass());
         $container->addCompilerPass(new PerfTestProviderPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 100);
 
         // Nested-transaction savepoints are required by dama/doctrine-test-bundle

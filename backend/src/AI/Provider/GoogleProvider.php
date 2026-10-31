@@ -2,6 +2,19 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
+use App\AI\Catalog\ReasoningLadder;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
@@ -19,6 +32,7 @@ use App\AI\Provider\Google\GoogleSpeech;
 use App\AI\Provider\Google\GoogleVideoGeneration;
 use App\AI\Provider\Google\GoogleVision;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
 use Psr\Log\LoggerInterface;
@@ -33,7 +47,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - Veo 3.1 (predictLongRunning) and Gemini Omni Flash (Interactions API)
  * - Gemini TTS and Gemini 3.5 Transcribe
  */
-class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
+#[AsAiProvider]
+class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo, DescribesProviderInterface
 {
     private readonly GoogleApiClient $api;
     private readonly GoogleChat $chat;
@@ -66,6 +81,61 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $this->vision = new GoogleVision($this->api, $logger, $uploadDir);
         $this->video = new GoogleVideoGeneration($this->api, $logger, new GoogleOmniVideo($this->api, $logger));
         $this->speech = new GoogleSpeech($this->api, $logger, $uploadDir);
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'google',
+            displayName: 'Google AI',
+            // The container registers no embedding tag for Google although
+            // getCapabilities() lists it; the descriptor follows the tags.
+            capabilities: [
+                ProviderCapability::Chat,
+                ProviderCapability::Vision,
+                ProviderCapability::ImageGeneration,
+                ProviderCapability::VideoGeneration,
+                ProviderCapability::SpeechToText,
+                ProviderCapability::TextToSpeech,
+            ],
+            endpoints: [
+                ProviderEndpoint::api(GoogleApiClient::GEMINI_BASE),
+                // Vertex Imagen: the region is a prefix of the host name
+                // (`<region>-aiplatform.googleapis.com`), and services.yaml
+                // configures us-central1.
+                ProviderEndpoint::api(GoogleApiClient::vertexBase('us-central1')),
+            ],
+            key: ProviderKeySpec::platformAndUser(
+                envVar: 'GOOGLE_GEMINI_API_KEY',
+                consoleUrl: 'https://aistudio.google.com/apikey',
+                validation: ProviderKeyValidation::header(GoogleApiClient::GEMINI_BASE.'/models', 'x-goog-api-key'),
+                listOrder: 4,
+                modelListing: ModelListing::Lists,
+                freeTier: true,
+                envAliases: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+                displayName: 'Google Gemini',
+                fieldDescription: 'Google Gemini API key — also unlocks Imagen, Nano Banana, Veo and Gemini TTS',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA,
+                catalogToolUse: true,
+                gatewayVisionRewrite: true,
+                reasoning: ReasoningLadder::always(['low', 'medium', 'high']),
+            ),
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'google:gemini-3.8-flash:chat',
+                'TOOLS' => 'google:gemini-3.8-flash:chat',
+                'ANALYZE' => 'google:gemini-3.8-flash:chat',
+                'SORT' => 'google:gemini-3.1-flash-lite:chat',
+                'PLAN' => 'google:gemini-3.1-flash-lite:chat',
+                'SUMMARIZE' => 'google:gemini-3.1-flash-lite:chat',
+                'PIC2TEXT' => 'google:gemini-3.8-flash:pic2text',
+                'SOUND2TEXT' => 'google:gemini-3.5-transcribe:sound2text',
+            ], preferenceRank: 3),
+            pricing: ProviderPricing::litellm(['gemini', 'google'], ['gemini', 'google', 'vertex_ai']),
+            liveVoiceSessions: 100,
+            branding: new ProviderBranding(icon: 'logos:google-icon', flag: 'circle-flags:us', helpKey: 'google'),
+        );
     }
 
     public function getName(): string
