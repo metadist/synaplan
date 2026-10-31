@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
@@ -17,7 +26,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * @see https://docs.thehive.ai/reference/image-generation-models-reference
  */
-final class TheHiveProvider implements ImageGenerationProviderInterface
+#[AsAiProvider]
+final class TheHiveProvider implements ImageGenerationProviderInterface, DescribesProviderInterface
 {
     private const BASE_URL = 'https://api.thehive.ai/api/v3';
 
@@ -57,6 +67,32 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
     private function apiKey(): ?string
     {
         return $this->keyStore->getKey('thehive');
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'thehive',
+            displayName: 'TheHive',
+            capabilities: [ProviderCapability::ImageGeneration],
+            endpoints: [ProviderEndpoint::api(self::BASE_URL)],
+            key: ProviderKeySpec::platform(
+                envVar: 'THEHIVE_API_KEY',
+                consoleUrl: 'https://thehive.ai/',
+                // No authenticated read-only endpoint that does not bill a
+                // generation: the key is stored untested.
+                validation: null,
+                listOrder: 13,
+                servesChat: false,
+                fieldDescription: 'TheHive API key — Flux Schnell and SDXL image generation',
+            ),
+            dialects: new ProviderDialects(),
+            defaults: null,
+            // No LiteLLM price rows; the sync command skips the service.
+            pricing: ProviderPricing::none(),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding(icon: 'mdi:robot', flag: 'circle-flags:us'),
+        );
     }
 
     public function getName(): string

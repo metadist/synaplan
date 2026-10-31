@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DependencyInjection\Compiler;
 
+use App\AI\Provider\Descriptor\TestProviderDescriptor;
 use App\AI\Provider\TestProvider;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -14,7 +15,9 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  * Dev and test always keep it. Any other environment drops it, unless
  * SYNAPLAN_PERF_TEST_PROVIDER is truthy at container compile time. The runtime
  * benchmark sets that while it warms var/cache/prod and deletes that cache
- * afterwards, so a normal prod container never contains the mock.
+ * afterwards, so a normal prod container never contains the mock. Its
+ * descriptor leaves with it, so the provider catalog never lists `test` where
+ * the registry has no such provider.
  */
 final class PerfTestProviderPass implements CompilerPassInterface
 {
@@ -28,6 +31,9 @@ final class PerfTestProviderPass implements CompilerPassInterface
             return;
         }
         $container->removeDefinition(TestProvider::class);
+        if ($container->hasDefinition(TestProviderDescriptor::class)) {
+            $container->removeDefinition(TestProviderDescriptor::class);
+        }
     }
 
     public static function benchmarkEnabled(): bool

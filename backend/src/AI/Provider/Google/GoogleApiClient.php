@@ -21,7 +21,10 @@ final class GoogleApiClient
     public const PROVIDER = 'google';
     public const KEY_ENV = 'GOOGLE_GEMINI_API_KEY';
 
-    private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+    /** The Gemini API base; the provider descriptor lists it as an endpoint. */
+    public const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+    private const API_BASE = self::GEMINI_BASE;
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
 
     private readonly ?string $projectId;

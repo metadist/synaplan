@@ -2,6 +2,18 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
@@ -11,6 +23,7 @@ use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\StructuredOutput\StructuredOutputViolationDetector;
@@ -27,9 +40,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://console.groq.com/docs/
  * @see https://console.groq.com/docs/speech-to-text
  */
-class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
+#[AsAiProvider]
+class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, DescribesProviderInterface
 {
     use ChatCompletionsToolSupport;
+
+    private const BASE_URL = 'https://api.groq.com/openai/v1';
 
     /**
      * Fallback vision model when the caller passed none. Qwen 3.6 27B replaced
@@ -37,6 +53,15 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      * model from the catalog and never hit this constant.
      */
     private const DEFAULT_VISION_MODEL = 'qwen/qwen3.6-27b';
+
+    /**
+     * Models allowed to request `strict: true` schemas: the shipped SORT/PLAN
+     * default family, the only one verified against strict mode's
+     * `additionalProperties: false` + full-required constraint.
+     *
+     * @var list<string>
+     */
+    private const STRICT_SCHEMA_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
 
     private ?OpenAI\Client $client = null;
 
@@ -88,13 +113,66 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             }
             $this->client = \OpenAI::factory()
                 ->withApiKey($key)
-                ->withBaseUri('https://api.groq.com/openai/v1')
+                ->withBaseUri(self::BASE_URL)
                 ->withHttpClient(new \Symfony\Component\HttpClient\Psr18Client($this->httpClient))
                 ->make();
             $this->clientKey = $key;
         }
 
         return $this->client;
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'groq',
+            displayName: 'Groq',
+            capabilities: [ProviderCapability::Chat, ProviderCapability::Vision, ProviderCapability::SpeechToText],
+            endpoints: [ProviderEndpoint::chatCompletions(self::BASE_URL.'/chat/completions')],
+            key: ProviderKeySpec::platform(
+                envVar: 'GROQ_API_KEY',
+                consoleUrl: 'https://console.groq.com/keys',
+                validation: ProviderKeyValidation::bearer(self::BASE_URL.'/models'),
+                listOrder: 1,
+                modelListing: ModelListing::Lists,
+                freeTier: true,
+                recommended: true,
+                fieldDescription: 'Groq API key (free tier available)',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
+                // Groq 400s on a schema combined with streaming or with tools.
+                schemaWithStreaming: false,
+                strictSchemaModels: self::STRICT_SCHEMA_MODELS,
+                nativeToolRouting: true,
+                toolsWithStructuredOutput: false,
+                catalogToolUse: true,
+            ),
+            // gpt-oss-120b for every text tier, main and fast alike. Groq classes it
+            // as a Production model, while `qwen/qwen3.6-27b` — the previous MAIN
+            // pick — is Preview, which Groq documents as "should not be used in
+            // production environments as they may be discontinued at short notice".
+            // It is also the cheaper and (per the catalog's quality score) stronger
+            // row: $0.15/$0.60 vs $0.60/$3.00 per 1M tokens, quality 10 vs 9.
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'groq:openai/gpt-oss-120b:chat',
+                'TOOLS' => 'groq:openai/gpt-oss-120b:chat',
+                'ANALYZE' => 'groq:openai/gpt-oss-120b:chat',
+                'SORT' => 'groq:openai/gpt-oss-120b:chat',
+                'PLAN' => 'groq:openai/gpt-oss-120b:chat',
+                'SUMMARIZE' => 'groq:openai/gpt-oss-120b:chat',
+                'MEM' => 'groq:openai/gpt-oss-120b:mem',
+                // The one unavoidable Preview binding: qwen3.6-27b is the only Groq
+                // model that accepts images at all (the gpt-oss rows are text-only).
+                'PIC2TEXT' => 'groq:qwen/qwen3.6-27b:pic2text',
+                // whisper-large-v3, not the cheaper -turbo: Synaplan ships five UI
+                // locales and large-v3 is the more accurate multilingual transcriber.
+                'SOUND2TEXT' => 'groq:whisper-large-v3:sound2text',
+            ], preferenceRank: 1),
+            pricing: ProviderPricing::litellm(['groq']),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding(icon: 'simple-icons:groq', iconComponent: 'GroqIcon', flag: 'circle-flags:us', helpKey: 'groq'),
+        );
     }
 
     public function getName(): string

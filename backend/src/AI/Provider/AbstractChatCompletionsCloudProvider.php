@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\DescribesProviderInterface;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
@@ -23,8 +24,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * TrustedTokens, A2Agent, Meta and Cerebras are the current subclasses. Mistral, Groq and xAI
  * are candidates later — they carry provider-specific extras (audio, media,
  * per-endpoint clients) that this base does not model.
+ *
+ * Every subclass describes itself ({@see DescribesProviderInterface}) and
+ * carries `#[AsAiProvider]`, so the catalog finds it by class alone.
  */
-abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
+abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, DescribesProviderInterface
 {
     use ChatCompletionsToolSupport;
 

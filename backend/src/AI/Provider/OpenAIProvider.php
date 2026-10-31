@@ -2,6 +2,18 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
@@ -19,6 +31,7 @@ use App\AI\Provider\OpenAI\OpenAIResponses;
 use App\AI\Provider\OpenAI\OpenAISpeech;
 use App\AI\Provider\OpenAI\OpenAIVision;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
 use App\Service\Chat\ProviderTranscriptCapture;
@@ -26,8 +39,11 @@ use OpenAI;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
+#[AsAiProvider]
+class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, DescribesProviderInterface
 {
+    private const BASE_URL = 'https://api.openai.com/v1';
+
     private readonly OpenAIApiClient $api;
     private readonly OpenAIResponses $responses;
     private readonly OpenAIChat $chat;
@@ -65,6 +81,53 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $this->images = new OpenAIImageGeneration($this->api, $logger);
         $this->vision = new OpenAIVision($this->api, $this->responses, $logger, $uploadDir, $storeResponses);
         $this->speech = new OpenAISpeech($this->api, $logger, $uploadDir);
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'openai',
+            displayName: 'OpenAI',
+            capabilities: [
+                ProviderCapability::Chat,
+                ProviderCapability::Embedding,
+                ProviderCapability::Vision,
+                ProviderCapability::ImageGeneration,
+                ProviderCapability::SpeechToText,
+                ProviderCapability::TextToSpeech,
+            ],
+            endpoints: [
+                ProviderEndpoint::chatCompletions(self::BASE_URL.'/chat/completions'),
+                ProviderEndpoint::api(self::BASE_URL),
+            ],
+            key: ProviderKeySpec::platformAndUser(
+                envVar: 'OPENAI_API_KEY',
+                consoleUrl: 'https://platform.openai.com/api-keys',
+                validation: ProviderKeyValidation::bearer(self::BASE_URL.'/models'),
+                listOrder: 2,
+                modelListing: ModelListing::Lists,
+                fieldDescription: 'OpenAI API key',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT,
+                catalogToolUse: true,
+                gatewayVisionRewrite: true,
+                reasoning: OpenAiReasoningEffort::ladder(),
+            ),
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'openai:gpt-5.5:chat',
+                'TOOLS' => 'openai:gpt-5.5:chat',
+                'ANALYZE' => 'openai:gpt-5.5:chat',
+                'SORT' => 'openai:gpt-5.4-mini:chat',
+                'PLAN' => 'openai:gpt-5.4-mini:chat',
+                'SUMMARIZE' => 'openai:gpt-5.4-mini:chat',
+                'PIC2TEXT' => 'openai:gpt-5.5:pic2text',
+                'SOUND2TEXT' => 'openai:whisper-1:sound2text',
+            ], preferenceRank: 2),
+            pricing: ProviderPricing::litellm(['openai'], ['openai']),
+            liveVoiceSessions: 50,
+            branding: new ProviderBranding(icon: 'simple-icons:openai', flag: 'circle-flags:us', helpKey: 'openai'),
+        );
     }
 
     public function getName(): string

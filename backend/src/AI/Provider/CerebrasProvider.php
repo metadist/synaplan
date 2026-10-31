@@ -4,9 +4,23 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\InlineImageRule;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
+use App\AI\Catalog\ReasoningLadder;
 use App\AI\Exception\ProviderException;
 use App\AI\Image\PngJpegInlineImages;
 use App\AI\Image\UnsupportedImageInputException;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 
 /**
  * Cerebras Inference — wafer-scale hosting for open models (GPT OSS 120B,
@@ -27,6 +41,7 @@ use App\AI\Image\UnsupportedImageInputException;
  * @see https://inference-docs.cerebras.ai/resources/openai
  * @see https://inference-docs.cerebras.ai/capabilities/reasoning
  */
+#[AsAiProvider]
 class CerebrasProvider extends AbstractChatCompletionsCloudProvider
 {
     private const PROVIDER_NAME = 'cerebras';
@@ -44,6 +59,51 @@ class CerebrasProvider extends AbstractChatCompletionsCloudProvider
         'qwen-3.8' => ['none', 'low', 'medium', 'high'],
         'gpt-oss' => ['low', 'medium', 'high'],
     ];
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: self::PROVIDER_NAME,
+            displayName: 'Cerebras',
+            capabilities: [ProviderCapability::Chat, ProviderCapability::Vision],
+            endpoints: [ProviderEndpoint::chatCompletions(self::BASE_URI.'/chat/completions')],
+            key: ProviderKeySpec::platform(
+                envVar: 'CEREBRAS_API_KEY',
+                consoleUrl: 'https://cloud.cerebras.ai/',
+                validation: ProviderKeyValidation::bearer(self::BASE_URI.'/models'),
+                listOrder: 10,
+                modelListing: ModelListing::Lists,
+                freeTier: true,
+                fieldDescription: 'Cerebras Inference API key — GPT OSS 120B and Qwen 3.8 27B. Create it at https://cloud.cerebras.ai/ (API Keys)',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
+                // gpt-oss-120b rejects tools next to response_format; Cerebras
+                // documents the combination as model-dependent.
+                toolsWithStructuredOutput: false,
+                catalogToolUse: true,
+                inlineImages: InlineImageRule::PngJpegOnly,
+                reasoning: ReasoningLadder::prefixes(self::REASONING_EFFORTS),
+            ),
+            // Qwen 3.8 27B for the main tier (tools, vision, reasoning that the
+            // Thinking toggle can switch off). gpt-oss-120b for the fast tier: a
+            // third of the price, ~3000 t/s, and the same strict-schema family the
+            // Groq SORT/PLAN default already runs.
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'cerebras:qwen-3.8-27b:chat',
+                'TOOLS' => 'cerebras:qwen-3.8-27b:chat',
+                'ANALYZE' => 'cerebras:qwen-3.8-27b:chat',
+                'SORT' => 'cerebras:gpt-oss-120b:chat',
+                'PLAN' => 'cerebras:gpt-oss-120b:chat',
+                'SUMMARIZE' => 'cerebras:gpt-oss-120b:chat',
+                'MEM' => 'cerebras:gpt-oss-120b:mem',
+                'PIC2TEXT' => 'cerebras:qwen-3.8-27b:pic2text',
+            ], preferenceRank: 11),
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding(icon: 'logos:cerebras-icon', flag: 'circle-flags:us', helpKey: 'cerebras'),
+        );
+    }
 
     public function getName(): string
     {
