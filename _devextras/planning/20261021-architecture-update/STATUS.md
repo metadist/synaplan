@@ -78,11 +78,11 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-30 | AU16 | [#2884](https://github.com/metadist/synaplan/pull/2884) | merged (`cbe0d35cf`) | raw cURL calls use the egress client |
 | 2026-10-30 | AU17 | [#2888](https://github.com/metadist/synaplan/pull/2888) | merged (`99a2318cc`) | OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA send through the shared client |
 | 2026-10-30 | AU18 | [#2889](https://github.com/metadist/synaplan/pull/2889) | merged (`feeb3630e`) | `sidecars/synaplan-egress` CONNECT gateway, off unless the `egress` profile is loaded |
-| 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
-| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
+| 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | merged (`24697a98d`) | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
+| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), rebased onto `main` | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913), stacked on #2912 | open | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
 | 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914), stacked on #2913 | open | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
-| 2026-10-31 | AU22 | AU22_PR_PLACEHOLDER, stacked on #2914 | open | `app:provider:scaffold`, `AddProviderJourneyTest` (red on the parent at the egress table), `EgressPolicy` reads the catalog (T23), `docs/PROVIDERS.md`; J-AU-4 walked with a stub: one class + one test + one model row + five locale keys |
+| 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | open | `app:provider:scaffold`, `AddProviderJourneyTest` (red on the parent at the egress table), `EgressPolicy` reads the catalog (T23), `docs/PROVIDERS.md`; J-AU-4 walked with a stub: one class + one test + one model row + five locale keys |
 
 ## 2026-10-31 — AU22: add an OpenAI-compatible provider in one file
 
@@ -187,7 +187,7 @@ template method hit the 100-line ratchet once; the templates are files
 under `Scaffold/templates/` now). Frontend untouched (no
 `.vue`, `.ts` or locale change). No HTTP or UI contract changed, so no
 Playwright run for this step (AU21's stands). Release class
-MOBILE_PLACEHOLDER.
+`backend-only` (`scripts/mobile-impact.mjs`).
 
 **Carried.** The scaffold has one template (chat completions); a provider
 with its own wire format starts from the closest adapter per
