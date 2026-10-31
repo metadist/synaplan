@@ -11,7 +11,8 @@
 > names no provider capability or key variable, and the registry's tags
 > are identical before and after. AU21 stacks on AU20: the frontend reads
 > `GET /api/v1/ai/providers` for names, icons and help, with the bundled
-> maps as the fallback; the provider enum left the OpenAPI spec.
+> maps as the fallback; the provider enum left the OpenAPI spec
+> ([#2914](https://github.com/metadist/synaplan/pull/2914)).
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
 > It is off unless `docker-compose.egress.yml` is loaded with the `egress`
@@ -77,7 +78,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
 | 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913), stacked on #2912 | open | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
-| 2026-10-31 | AU21 | AU21_PR_PLACEHOLDER, stacked on #2913 | open | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
+| 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914), stacked on #2913 | open | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
 
 ## 2026-10-31 — AU21: provider names, icons and help come from the provider catalog
 
@@ -152,7 +153,7 @@ backend had restarted (a FrankenPHP restart from the stash swap, not a
 code path). Layout suite (`make -C frontend test-e2e-layout`): 16
 passed, 1 failed — the documented local-only login "clipped bottom"
 (the fresh-demo card above the form; `docs/E2E_TESTING.md`). CI is the
-proof. Release class MOBILE_IMPACT_PLACEHOLDER.
+proof. Release class `ota-candidate` (`scripts/mobile-impact.mjs`).
 
 **Carried.** The 320 px badge overlap on the first key card (pre-existing,
 `ProviderKeyCard.vue`). The help *text* stays in the five locale files
