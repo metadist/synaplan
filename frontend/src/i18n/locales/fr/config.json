@@ -1140,6 +1140,10 @@
       "noData": "Aucune donnée disponible",
       "time": "Heure",
       "action": "Action",
+      "result": "Résultat",
+      "succeeded": "Réussie",
+      "refused": "Refusée",
+      "install": "Installation {id}",
       "source": "Source",
       "channel": "Canal",
       "tokens": "Jetons",
@@ -1156,7 +1160,7 @@
       "durationSeconds": "{seconds} s",
       "openChat": "Ouvrir ce chat",
       "activity": {
-        "searchPlaceholder": "Rechercher par modèle ou fournisseur…",
+        "searchPlaceholder": "Rechercher par modèle, fournisseur ou erreur…",
         "allActions": "Toutes les actions",
         "dateFrom": "Date de début",
         "dateTo": "Date de fin",
@@ -1188,7 +1192,8 @@
         "rerank": "Rerank",
         "message_digest": "Mémoire à long terme",
         "voice_live": "Conversation en direct",
-        "transcription": "Transcription"
+        "transcription": "Transcription",
+        "demo": "Démo"
       },
       "sources": {
         "whatsapp": "WhatsApp",

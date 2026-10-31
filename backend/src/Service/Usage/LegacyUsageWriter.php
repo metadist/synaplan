@@ -49,6 +49,7 @@ final class LegacyUsageWriter
         array $metadata = [],
         ?AiCallSource $source = null,
     ): RecordedUsage {
+        $metadata = DemoCallContext::apply($metadata);
         if (null !== self::$meter) {
             return self::$meter->recordFromLegacyWriter($rateLimitService, $user, $action, $metadata, $source);
         }

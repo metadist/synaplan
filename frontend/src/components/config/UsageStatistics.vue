@@ -235,6 +235,7 @@
             <option value="MESSAGE_DIGEST">{{ $t('config.usage.actions.message_digest') }}</option>
             <option value="VOICE_LIVE">{{ $t('config.usage.actions.voice_live') }}</option>
             <option value="TRANSCRIPTION">{{ $t('config.usage.actions.transcription') }}</option>
+            <option value="DEMO">{{ $t('config.usage.actions.demo') }}</option>
           </select>
 
           <input
@@ -287,6 +288,7 @@
                 <th class="px-3 py-3 text-left">{{ $t('config.usage.action') }}</th>
                 <th class="px-3 py-3 text-left">{{ $t('config.usage.channel') }}</th>
                 <th class="px-3 py-3 text-left">{{ $t('config.usage.model') }}</th>
+                <th class="px-3 py-3 text-left">{{ $t('config.usage.result') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.promptTokens') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.completionTokens') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.cachedTokens') }}</th>
@@ -338,10 +340,31 @@
                   </span>
                 </td>
                 <td
-                  class="px-3 py-3 txt-primary text-xs truncate max-w-[120px]"
+                  class="px-3 py-3 txt-primary text-xs truncate max-w-[140px]"
                   :title="entry.model"
                 >
                   {{ entry.model || '-' }}
+                  <p v-if="entry.alias && entry.alias !== entry.model" class="mt-1 txt-secondary">
+                    {{ entry.alias }}
+                  </p>
+                  <p
+                    v-if="entry.install_id"
+                    class="mt-1 txt-secondary"
+                    :title="entry.install_id"
+                  >
+                    {{ $t('config.usage.install', { id: entry.install_id.slice(0, 8) }) }}
+                  </p>
+                </td>
+                <td class="px-3 py-3 text-xs whitespace-nowrap">
+                  <span
+                    v-if="entry.status === 'error'"
+                    class="text-red-600 dark:text-red-400"
+                    :title="entry.path || undefined"
+                  >
+                    {{ entry.error || $t('config.usage.refused') }}
+                    <span v-if="entry.http"> · {{ entry.http }}</span>
+                  </span>
+                  <span v-else class="txt-secondary">{{ $t('config.usage.succeeded') }}</span>
                 </td>
                 <td class="px-3 py-3 text-right txt-secondary">
                   <span class="flex items-center justify-end gap-1">
@@ -372,7 +395,7 @@
               </tr>
 
               <tr v-if="activityItems.length === 0" data-testid="row-empty">
-                <td colspan="9" class="px-4 py-8 text-center txt-secondary text-sm">
+                <td colspan="10" class="px-4 py-8 text-center txt-secondary text-sm">
                   {{ $t('config.usage.noRecentActivity') }}
                 </td>
               </tr>

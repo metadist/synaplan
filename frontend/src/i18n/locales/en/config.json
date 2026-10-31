@@ -1142,6 +1142,10 @@
       "noData": "No data available",
       "time": "Time",
       "action": "Action",
+      "result": "Result",
+      "succeeded": "Succeeded",
+      "refused": "Refused",
+      "install": "Install {id}",
       "source": "Source",
       "channel": "Channel",
       "tokens": "Tokens",
@@ -1158,7 +1162,7 @@
       "durationSeconds": "{seconds} s",
       "openChat": "Open this chat",
       "activity": {
-        "searchPlaceholder": "Search by model or provider...",
+        "searchPlaceholder": "Search by model, provider or error...",
         "allActions": "All actions",
         "dateFrom": "From date",
         "dateTo": "To date",
@@ -1190,7 +1194,8 @@
         "rerank": "Rerank",
         "message_digest": "Long-term memory",
         "voice_live": "Live conversation",
-        "transcription": "Transcription"
+        "transcription": "Transcription",
+        "demo": "Demo"
       },
       "sources": {
         "whatsapp": "WhatsApp",

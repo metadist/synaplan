@@ -294,6 +294,23 @@ final readonly class UsageStatsService
     }
 
     /**
+     * @param array<string, mixed> $row
+     *
+     * @return array<string, mixed>
+     */
+    private function activityItem(array $row): array
+    {
+        $metadata = is_string($row['metadata'] ?? null) ? $row['metadata'] : null;
+
+        return UsageActivityRow::from(
+            $row,
+            $this->channelFromMetadata($metadata),
+            $this->durationSeconds($metadata),
+            $this->chatIdFromMetadata($metadata),
+        );
+    }
+
+    /**
      * Get usage breakdown by time period (today, this week, this month).
      */
     private function getUsageByTimePeriod(int $userId): array
@@ -367,6 +384,7 @@ final readonly class UsageStatsService
                 BCOST as cost,
                 BLATENCY as latency,
                 BSTATUS as status,
+                BERROR as error,
                 BMETADATA as metadata
             FROM BUSELOG
             WHERE BUSERID = :user_id
@@ -378,29 +396,7 @@ final readonly class UsageStatsService
             'user_id' => $userId,
         ]);
 
-        return array_map(function ($row) {
-            $metadata = is_string($row['metadata'] ?? null) ? $row['metadata'] : null;
-
-            return [
-                'timestamp' => (int) $row['timestamp'],
-                'datetime' => date('Y-m-d H:i:s', $row['timestamp']),
-                'action' => $row['action'],
-                'source' => $row['source'] ?: 'WEB',
-                'channel' => $this->channelFromMetadata($metadata),
-                'model' => $row['model'],
-                'tokens' => (int) $row['tokens'],
-                'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
-                'completion_tokens' => (int) ($row['completion_tokens'] ?? 0),
-                'cached_tokens' => (int) ($row['cached_tokens'] ?? 0),
-                'cache_creation_tokens' => (int) ($row['cache_creation_tokens'] ?? 0),
-                'estimated' => (bool) ($row['estimated'] ?? false),
-                'cost' => (float) $row['cost'],
-                'latency' => (float) $row['latency'],
-                'status' => $row['status'],
-                'duration_seconds' => $this->durationSeconds($metadata),
-                'chat_id' => $this->chatIdFromMetadata($metadata),
-            ];
-        }, $results);
+        return array_map(fn (array $row) => $this->activityItem($row), $results);
     }
 
     /**
@@ -809,7 +805,7 @@ final readonly class UsageStatsService
         $params = ['user_id' => $userId];
 
         if ($search) {
-            $where[] = '(BMODEL LIKE :search OR BPROVIDER LIKE :search)';
+            $where[] = '(BMODEL LIKE :search OR BPROVIDER LIKE :search OR BERROR LIKE :search OR BMETADATA LIKE :search)';
             $params['search'] = '%'.$search.'%';
         }
 
@@ -853,6 +849,7 @@ final readonly class UsageStatsService
                 BCOST as cost,
                 BLATENCY as latency,
                 BSTATUS as status,
+                BERROR as error,
                 BMETADATA as metadata
              FROM BUSELOG
              WHERE {$whereClause}
@@ -861,25 +858,7 @@ final readonly class UsageStatsService
             $params,
         );
 
-        $items = array_map(fn (array $row) => [
-            'timestamp' => (int) $row['timestamp'],
-            'datetime' => date('Y-m-d H:i:s', (int) $row['timestamp']),
-            'action' => $row['action'],
-            'source' => $row['source'] ?: 'WEB',
-            'channel' => $this->channelFromMetadata(is_string($row['metadata'] ?? null) ? $row['metadata'] : null),
-            'model' => $row['model'],
-            'tokens' => (int) $row['tokens'],
-            'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
-            'completion_tokens' => (int) ($row['completion_tokens'] ?? 0),
-            'cached_tokens' => (int) ($row['cached_tokens'] ?? 0),
-            'cache_creation_tokens' => (int) ($row['cache_creation_tokens'] ?? 0),
-            'estimated' => (bool) ($row['estimated'] ?? false),
-            'cost' => (float) $row['cost'],
-            'latency' => (float) $row['latency'],
-            'status' => $row['status'],
-            'duration_seconds' => $this->durationSeconds(is_string($row['metadata'] ?? null) ? $row['metadata'] : null),
-            'chat_id' => $this->chatIdFromMetadata(is_string($row['metadata'] ?? null) ? $row['metadata'] : null),
-        ], $rows);
+        $items = array_map(fn (array $row) => $this->activityItem($row), $rows);
 
         return [
             'items' => $items,
@@ -913,6 +892,7 @@ final readonly class UsageStatsService
                 BCOST as cost,
                 BLATENCY as latency,
                 BSTATUS as status,
+                BERROR as error,
                 BMETADATA as metadata
             FROM BUSELOG
             WHERE BUSERID = :user_id
@@ -929,28 +909,33 @@ final readonly class UsageStatsService
 
         $results = $conn->fetchAllAssociative($sql, $params);
 
-        $csv = "Timestamp,Date,Action,Channel,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status,Duration (s)\n";
+        $csv = "Timestamp,Date,Action,Channel,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status,Error,Install,Alias,Path,HTTP,Duration (s)\n";
 
         foreach ($results as $row) {
-            $metadata = is_string($row['metadata'] ?? null) ? $row['metadata'] : null;
-            $duration = $this->durationSeconds($metadata);
+            $item = $this->activityItem($row);
+            $duration = $item['duration_seconds'];
             $csv .= sprintf(
-                "%d,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s,%s\n",
-                $row['timestamp'],
-                date('Y-m-d H:i:s', $row['timestamp']),
-                $row['action'],
-                $this->channelFromMetadata($metadata),
-                $row['source'] ?: 'WEB',
-                $row['model'],
-                $row['tokens'],
-                $row['prompt_tokens'] ?? 0,
-                $row['completion_tokens'] ?? 0,
-                $row['cached_tokens'] ?? 0,
-                $row['cache_creation_tokens'] ?? 0,
-                $row['estimated'] ? 'Yes' : 'No',
-                $row['cost'],
-                $row['latency'],
-                $row['status'],
+                "%d,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s,%s,%s,%s,%s,%s,%s\n",
+                $item['timestamp'],
+                $item['datetime'],
+                $item['action'],
+                $item['channel'],
+                $item['source'],
+                $item['model'],
+                $item['tokens'],
+                $item['prompt_tokens'],
+                $item['completion_tokens'],
+                $item['cached_tokens'],
+                $item['cache_creation_tokens'],
+                $item['estimated'] ? 'Yes' : 'No',
+                $item['cost'],
+                $item['latency'],
+                $item['status'],
+                $item['error'],
+                $item['install_id'] ?? '',
+                $item['alias'] ?? '',
+                $item['path'] ?? '',
+                null === $item['http'] ? '' : (string) $item['http'],
                 null === $duration ? '' : sprintf('%.3f', $duration)
             );
         }

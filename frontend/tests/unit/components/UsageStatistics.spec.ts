@@ -208,6 +208,7 @@ describe('UsageStatistics', () => {
     expect(select.get('option[value="TRANSCRIPTION"]').text()).toBe(
       i18n.global.t('config.usage.actions.transcription')
     )
+    expect(select.get('option[value="DEMO"]').text()).toBe(i18n.global.t('config.usage.actions.demo'))
   })
 
   it('shows talk time under the chip and links a live conversation to its chat', async () => {

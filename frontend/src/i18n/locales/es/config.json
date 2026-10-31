@@ -894,6 +894,10 @@
       "noData": "Sin datos disponibles",
       "time": "Tiempo",
       "action": "Acción",
+      "result": "Resultado",
+      "succeeded": "Correcta",
+      "refused": "Rechazada",
+      "install": "Instalación {id}",
       "source": "Fuente",
       "channel": "Canal",
       "tokens": "Tokens",
@@ -903,6 +907,9 @@
       "durationMinutes": "{minutes} min {seconds} s",
       "durationSeconds": "{seconds} s",
       "openChat": "Abrir este chat",
+      "activity": {
+        "searchPlaceholder": "Buscar por modelo, proveedor o error…"
+      },
       "actions": {
         "messages": "Mensajes",
         "images": "Imágenes",
@@ -915,7 +922,8 @@
         "rerank": "Rerank",
         "message_digest": "Memoria a largo plazo",
         "voice_live": "Conversación en vivo",
-        "transcription": "Transcripción"
+        "transcription": "Transcripción",
+        "demo": "Demo"
       },
       "sources": {
         "whatsapp": "WhatsApp",
