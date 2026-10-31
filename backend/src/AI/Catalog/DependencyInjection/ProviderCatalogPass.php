@@ -12,6 +12,7 @@ use App\AI\Credential\ProviderKeyStore;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 
 /**
  * Wires the container from the provider descriptors.
@@ -77,31 +78,48 @@ final class ProviderCatalogPass implements CompilerPassInterface
 
     /**
      * One `app.ai.<capability>` tag per capability on the adapter service —
-     * the described class, or the one its attribute names. A tag the
-     * container already carries is not added twice. An adapter without a
-     * service definition (a key-only row, a provider the environment
-     * removed) is skipped.
+     * every definition whose class is the described class, or the class its
+     * attribute names, whatever the service id. A tag the container already
+     * carries is not added twice. An adapter without a definition (a key-only
+     * row, a provider the environment removed) is skipped.
      *
      * @param list<class-string<DescribesProviderInterface>> $classes
      */
     private function tagAdapters(ContainerBuilder $container, array $classes): void
     {
         foreach ($classes as $class) {
-            $adapter = self::adapterOf($class);
-            if (!$container->hasDefinition($adapter)) {
-                continue;
-            }
-            $definition = $container->getDefinition($adapter);
-            if ($definition->isAbstract()) {
-                continue;
-            }
             $descriptor = $class::descriptor();
-            foreach ($descriptor->capabilities as $capability) {
-                if (!self::hasTagWithKey($definition->getTag($capability->tag()), $descriptor->name)) {
-                    $definition->addTag($capability->tag(), ['key' => $descriptor->name]);
+            foreach (self::definitionsOfClass($container, self::adapterOf($class)) as $definition) {
+                foreach ($descriptor->capabilities as $capability) {
+                    if (!self::hasTagWithKey($definition->getTag($capability->tag()), $descriptor->name)) {
+                        $definition->addTag($capability->tag(), ['key' => $descriptor->name]);
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Every concrete definition of a class: the one registered under the
+     * class name and any registered under another id (`ai.acme`).
+     *
+     * @param class-string $class
+     *
+     * @return list<Definition>
+     */
+    private static function definitionsOfClass(ContainerBuilder $container, string $class): array
+    {
+        $found = [];
+        foreach ($container->getDefinitions() as $id => $definition) {
+            if ($definition->isAbstract()) {
+                continue;
+            }
+            if ($id === $class || $definition->getClass() === $class) {
+                $found[] = $definition;
+            }
+        }
+
+        return $found;
     }
 
     /**
