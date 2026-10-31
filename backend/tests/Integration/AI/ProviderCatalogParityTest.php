@@ -24,6 +24,7 @@ use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\ProviderRegistry;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\Tool\CatalogToolUse;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Command\SyncModelPricesCommand;
@@ -254,33 +255,31 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertFalse($upstreams->supports('google'), 'Gemini keeps its own translator');
     }
 
-    /** T9 */
+    /** T9 — the structured-output capability answers from the descriptor dialects */
     public function testStructuredOutputDialectsEqualTheDescriptorDialects(): void
     {
-        $capability = new StructuredOutputCapability();
+        $capability = new StructuredOutputCapability($this->catalog);
         foreach ($this->catalog->all() as $descriptor) {
             $dialects = $descriptor->dialects;
-            self::assertSame($capability->dialect($descriptor->name), $dialects->structuredOutput, $descriptor->name.' dialect');
-            self::assertSame(
-                $capability->supports($descriptor->name, null, false),
-                null !== $dialects->structuredOutput,
-                $descriptor->name.' buffered schema support',
-            );
-            self::assertSame(
-                $capability->supports($descriptor->name, null, true),
-                null !== $dialects->structuredOutput && $dialects->schemaWithStreaming,
-                $descriptor->name.' streaming schema support',
-            );
+            self::assertSame($dialects->structuredOutput, $capability->dialect($descriptor->name), $descriptor->name.' dialect');
+            self::assertSame(null !== $dialects->structuredOutput, $capability->supports($descriptor->name, null, false), $descriptor->name.' buffered schema support');
+            self::assertSame(null !== $dialects->structuredOutput && $dialects->schemaWithStreaming, $capability->supports($descriptor->name, null, true), $descriptor->name.' streaming schema support');
         }
-        $streamingRefusers = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => !$d->dialects->schemaWithStreaming));
-        self::assertSameSet(self::constant(StructuredOutputCapability::class, 'NO_SCHEMA_WITH_STREAMING'), $streamingRefusers);
+        self::assertSame(StructuredOutputDialect::OPENAI_JSON_SCHEMA, $capability->dialect('groq'));
+        self::assertSame(StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT, $capability->dialect('openai'));
+        self::assertSame(StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA, $capability->dialect('google'));
+        self::assertSame(StructuredOutputDialect::OLLAMA_FORMAT, $capability->dialect('ollama'));
+        self::assertSame(StructuredOutputDialect::ANTHROPIC_TOOL_FORCING, $capability->dialect('anthropic'));
+        self::assertNull($capability->dialect('triton'));
+        self::assertNull($capability->dialect('unknown-provider'));
+        self::assertFalse($capability->supports('groq', null, true), 'Groq 400s on a schema while streaming');
+        self::assertTrue($capability->supports('mistral', null, true));
     }
 
-    /** T10 */
+    /** T10 — the model-level rules are the descriptor lists */
     public function testModelLevelStructuredOutputRulesEqualTheDescriptorLists(): void
     {
-        $capability = new StructuredOutputCapability();
-
+        $capability = new StructuredOutputCapability($this->catalog);
         $unavailable = [];
         $strict = [];
         foreach ($this->catalog->all() as $descriptor) {
@@ -288,35 +287,42 @@ final class ProviderCatalogParityTest extends KernelTestCase
                 $unavailable[] = $prefix;
                 self::assertFalse($capability->supports($descriptor->name, $prefix.'-20260101', false), "{$descriptor->name} {$prefix}");
             }
-            if ([] !== $descriptor->dialects->strictSchemaModels) {
-                $strict[$descriptor->name] = $descriptor->dialects->strictSchemaModels;
-                foreach ($descriptor->dialects->strictSchemaModels as $model) {
-                    self::assertTrue($capability->supportsStrict($descriptor->name, $model), "{$descriptor->name} {$model} strict");
-                }
+            foreach ($descriptor->dialects->strictSchemaModels as $model) {
+                $strict[] = $descriptor->name.':'.$model;
+                self::assertTrue($capability->supportsStrict($descriptor->name, strtoupper($model)), "{$descriptor->name} {$model} strict, any case");
             }
         }
-        self::assertSameSet(self::constant(StructuredOutputCapability::class, 'ANTHROPIC_NO_FORCED_TOOL_CHOICE_PREFIXES'), $unavailable);
-        self::assertSame(self::constant(StructuredOutputCapability::class, 'STRICT_CAPABLE_MODELS'), $strict);
+        self::assertSameSet(['claude-fable-5-1', 'claude-mythos-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5'], $unavailable);
+        self::assertSameSet(['groq:openai/gpt-oss-120b', 'groq:openai/gpt-oss-20b'], $strict);
+        self::assertTrue($capability->supports('anthropic', 'claude-sonnet-5', false), 'other Claude generations keep the forced tool call');
+        self::assertFalse($capability->supportsStrict('groq', 'qwen/qwen3.6-27b'));
+        self::assertFalse($capability->supportsStrict('openai', 'gpt-5.5'));
     }
 
-    /** T11 */
+    /** T11 — the tool-calling capability answers from the descriptor dialects */
     public function testToolCallingRulesEqualTheDescriptorDialects(): void
     {
-        $capability = new ToolCallingCapability();
+        $capability = new ToolCallingCapability($this->catalog);
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame($capability->supports($descriptor->name, null, true), $descriptor->dialects->nativeToolRouting, $descriptor->name.' native routing');
-            self::assertSame($capability->conflictsWithStructuredOutput($descriptor->name), !$descriptor->dialects->toolsWithStructuredOutput, $descriptor->name.' tools with schema');
+            self::assertSame($descriptor->dialects->nativeToolRouting, $capability->supports($descriptor->name, null, true), $descriptor->name.' native routing');
+            self::assertSame(!$descriptor->dialects->toolsWithStructuredOutput, $capability->conflictsWithStructuredOutput($descriptor->name), $descriptor->name.' tools with schema');
         }
+        self::assertSameSet(['groq', 'anthropic'], self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->nativeToolRouting)));
+        self::assertSameSet(['groq', 'cerebras', 'anthropic'], self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => !$d->dialects->toolsWithStructuredOutput)));
+        self::assertFalse($capability->supports('unknown-provider', null, true));
+        self::assertFalse($capability->conflictsWithStructuredOutput('unknown-provider'));
     }
 
-    /** T12 */
+    /** T12 — the catalog tool-use rule is the descriptor flag */
     public function testCatalogToolUseServicesEqualTheDescriptorFlag(): void
     {
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame(CatalogToolUse::isCapableChatService($descriptor->name), $descriptor->dialects->catalogToolUse, $descriptor->name);
+            self::assertSame($descriptor->dialects->catalogToolUse, CatalogToolUse::isCapableChatService($descriptor->name), $descriptor->name);
         }
         $flagged = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->catalogToolUse));
-        self::assertSameSet(CatalogToolUse::CAPABLE_CHAT_SERVICES, $flagged);
+        self::assertSameSet(['openai', 'groq', 'anthropic', 'google', 'xai', 'mistral', 'huggingface', 'trustedtokens', 'a2agent', 'meta', 'cerebras'], $flagged);
+        self::assertTrue(CatalogToolUse::isCapableChatService('Hugging Face'), 'service aliases normalise');
+        self::assertFalse(CatalogToolUse::isCapableChatService('ollama'), 'opt-in per pulled model');
     }
 
     /** T13 — the OpenAI translator transcodes images for providers with the PNG/JPEG rule */
@@ -348,18 +354,15 @@ final class ProviderCatalogParityTest extends KernelTestCase
         // The behaviour itself is MessagesGatewayVisionTest::testAutoFunnelsImagesUpstreamWhenTheVisionModelIsNotARewriteHost.
     }
 
-    /** T15 */
+    /** T15 — the level catalog applies the descriptor ladders */
     public function testReasoningLaddersEqualTheReasoningLevelCatalog(): void
     {
         foreach ($this->catalog->all() as $descriptor) {
             $ladder = $descriptor->dialects->reasoning;
             foreach (['zzz-no-such-model', 'gpt-4o', 'claude-3-haiku'] as $unmatched) {
-                self::assertSame(
-                    $ladder?->levelsFor($unmatched),
-                    ReasoningLevelCatalog::levels($descriptor->name, $unmatched, ['reasoning']),
-                    "{$descriptor->name} {$unmatched}",
-                );
+                self::assertSame($ladder?->levelsFor($unmatched), ReasoningLevelCatalog::levels($descriptor->name, $unmatched, ['reasoning']), "{$descriptor->name} {$unmatched}");
             }
+            self::assertNull(ReasoningLevelCatalog::levels($descriptor->name, 'any-model', []), $descriptor->name.' without the reasoning feature');
             if (null === $ladder) {
                 continue;
             }
@@ -370,14 +373,9 @@ final class ProviderCatalogParityTest extends KernelTestCase
                     ReasoningMatch::Contains => array_map(static fn (string $p): string => 'vendor/'.$p.'-thinking', $rule->patterns),
                 };
                 foreach ($ids as $id) {
-                    self::assertSame(
-                        ReasoningLevelCatalog::levels($descriptor->name, $id, ['reasoning']),
-                        $ladder->levelsFor($id),
-                        "{$descriptor->name} {$id}",
-                    );
+                    self::assertSame($ladder->levelsFor($id), ReasoningLevelCatalog::levels($descriptor->name, $id, ['reasoning']), "{$descriptor->name} {$id}");
                 }
             }
-            self::assertNull(ReasoningLevelCatalog::levels($descriptor->name, 'any-model', []), $descriptor->name.' without the reasoning feature');
         }
 
         // An inventory of today's model families, independent of the descriptors:
@@ -386,6 +384,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertSame($levels, ReasoningLevelCatalog::levels($service, $id, ['reasoning']), "today: {$service} {$id}");
             self::assertSame($levels, $this->catalog->get($service)->dialects->reasoning?->levelsFor($id), "descriptor: {$service} {$id}");
         }
+        self::assertSame(['low', 'high', 'max'], ReasoningLevelCatalog::levels('Hugging Face', 'moonshotai/Kimi-K3', ['reasoning']), 'service aliases normalise');
     }
 
     /**

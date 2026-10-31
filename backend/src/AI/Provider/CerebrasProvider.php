@@ -51,7 +51,7 @@ class CerebrasProvider extends AbstractChatCompletionsCloudProvider
 
     /**
      * Model family prefix => accepted `reasoning_effort` values, cheapest first.
-     * Keep aligned with {@see ReasoningLevelCatalog::cerebrasLevels()}.
+     * The descriptor ladder below reads it; ReasoningLevelCatalog applies it.
      *
      * @var array<string, list<string>>
      */
