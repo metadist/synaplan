@@ -75,6 +75,30 @@ final class MessagesGatewayVisionTest extends TestCase
         self::assertSame(42, $result['resolved']['model_id']);
     }
 
+    /**
+     * The rewrite hosts are the descriptors with `gatewayVisionRewrite`
+     * (Anthropic, OpenAI, Google); a vision model on any other provider
+     * leaves the images on the wire.
+     */
+    public function testAutoFunnelsImagesUpstreamWhenTheVisionModelIsNotARewriteHost(): void
+    {
+        $current = $this->model(42, 'anthropic', 'text-only', vision: false);
+        $vision = $this->model(99, 'groq', 'qwen/qwen3.6-27b', vision: true);
+
+        $gateway = $this->gateway(
+            MessagesGatewayConfig::VISION_AUTO,
+            $current,
+            $vision,
+            expectedProvider: 'anthropic',
+        );
+
+        $result = $gateway->prepare($this->imageRequest('text-only'), $this->user());
+
+        self::assertTrue($result['ok']);
+        self::assertSame(GatewayToolCatalog::VISION_PASSTHROUGH, $result['vision']['handling']);
+        self::assertSame(42, $result['resolved']['model_id']);
+    }
+
     public function testPassthroughModeNeverRewrites(): void
     {
         $current = $this->model(42, 'anthropic', 'text-only', vision: false);

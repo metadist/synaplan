@@ -7,6 +7,7 @@ namespace App\Tests\Integration\AI;
 use App\AI\Catalog\Attribute\AsAiProvider;
 use App\AI\Catalog\DependencyInjection\ProviderCatalogPass;
 use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\InlineImageRule;
 use App\AI\Catalog\ModelListing;
 use App\AI\Catalog\ProviderCapability;
 use App\AI\Catalog\ProviderCatalog;
@@ -15,9 +16,9 @@ use App\AI\Catalog\ReasoningMatch;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
+use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Health\Probe\PlatformKeyModelListProbe;
-use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use App\AI\Provider\ReasoningLevelCatalog;
@@ -27,7 +28,6 @@ use App\AI\Tool\CatalogToolUse;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Command\SyncModelPricesCommand;
 use App\Controller\AdminProviderKeysController;
-use App\Controller\MessagesGatewayController;
 use App\Model\ModelCatalog;
 use App\Service\Admin\SystemConfig\Tab\AiTab;
 use App\Service\Egress\EgressBuiltinDestinations;
@@ -155,10 +155,15 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSame(['%env(default::GOOGLE_GEMINI_API_KEY)%', '%env(default::GEMINI_API_KEY)%', '%env(default::GOOGLE_API_KEY)%'], $envKeys['google']);
     }
 
-    /** T4 */
+    /** T4 — the gateway's BYOK list is the resolver's view of the descriptors */
     public function testGatewayByokProvidersEqualTheDescriptorsWithAUserKey(): void
     {
-        self::assertSameSet(self::constant(MessagesGatewayController::class, 'SUPPORTED_PROVIDERS'), self::names($this->catalog->withUserKey()));
+        $resolver = self::getContainer()->get(UserProviderKeyResolver::class);
+        \assert($resolver instanceof UserProviderKeyResolver);
+        self::assertSame(self::names($this->catalog->withUserKey()), $resolver->supportedProviders());
+        self::assertSame(['openai', 'anthropic', 'google'], $resolver->supportedProviders());
+        self::assertTrue($resolver->supports('Anthropic'));
+        self::assertFalse($resolver->supports('higgsfield'), 'a personal pair is not a gateway key');
     }
 
     /** T5 — the defaults service resolves the descriptor bindings */
@@ -201,34 +206,52 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSame(range(1, \count($ranked)), array_keys($ranked), 'ranks are 1..n without gaps');
     }
 
-    /** T7 */
+    /** T7 — the Messages gateway's fixed upstreams are the Chat Completions endpoints */
     public function testChatCompletionsUrlsEqualTheChatCompletionsEndpoints(): void
     {
-        $expected = [];
+        $upstreams = self::getContainer()->get(ChatCompletionsUpstreams::class);
+        \assert($upstreams instanceof ChatCompletionsUpstreams);
+        $fixed = [];
         foreach ($this->catalog->all() as $descriptor) {
             $url = $descriptor->chatCompletionsUrl();
+            self::assertSame($url, $upstreams->fixedUrl($descriptor->name), $descriptor->name);
+            self::assertSame($url, $upstreams->completionsUrl(['provider' => $descriptor->name]) === $url ? $url : null, $descriptor->name.' completionsUrl');
             if (null !== $url) {
-                $expected[$descriptor->name] = $url;
+                $fixed[$descriptor->name] = $url;
             }
         }
-        $actual = ChatCompletionsUpstreams::URLS;
-        ksort($expected);
-        ksort($actual);
-        self::assertSame($actual, $expected);
-        foreach ($expected as $name => $url) {
-            self::assertSame($url, ChatCompletionsUpstreams::fixedUrl($name));
-        }
+        ksort($fixed);
+        self::assertSame([
+            'a2agent' => 'https://a2agent.me/v1/chat/completions',
+            'cerebras' => 'https://api.cerebras.ai/v1/chat/completions',
+            'groq' => 'https://api.groq.com/openai/v1/chat/completions',
+            'huggingface' => 'https://router.huggingface.co/v1/chat/completions',
+            'meta' => 'https://api.meta.ai/v1/chat/completions',
+            'mistral' => 'https://api.mistral.ai/v1/chat/completions',
+            'openai' => 'https://api.openai.com/v1/chat/completions',
+            'perplexity' => 'https://api.perplexity.ai/chat/completions',
+            'trustedtokens' => 'https://api.trustedtokens.eu/v1/chat/completions',
+            'xai' => 'https://api.x.ai/v1/chat/completions',
+        ], $fixed);
     }
 
-    /** T8 */
+    /** T8 — the local hosts are the install-configured Chat Completions endpoints */
     public function testLocalChatCompletionsHostsEqualTheLocalDescriptors(): void
     {
+        $upstreams = self::getContainer()->get(ChatCompletionsUpstreams::class);
+        \assert($upstreams instanceof ChatCompletionsUpstreams);
+        $resolver = self::getContainer()->get(UserProviderKeyResolver::class);
+        \assert($resolver instanceof UserProviderKeyResolver);
         $local = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->isLocal()));
-        self::assertSameSet(ChatCompletionsUpstreams::LOCAL_PROVIDERS, $local);
+        self::assertSameSet(['ollama', 'openaicompatible'], $local);
         foreach ($this->catalog->all() as $descriptor) {
-            self::assertSame($descriptor->isLocal(), ChatCompletionsUpstreams::isLocal($descriptor->name), $descriptor->name);
-            self::assertSame(null !== $descriptor->chatCompletionsEndpoint(), ChatCompletionsUpstreams::supports($descriptor->name), $descriptor->name.' supports');
+            self::assertSame($descriptor->isLocal(), $upstreams->isLocal($descriptor->name), $descriptor->name);
+            self::assertSame(!$descriptor->isLocal(), $upstreams->needsProviderKey($descriptor->name), $descriptor->name.' needs a key');
+            self::assertSame($descriptor->isLocal(), $resolver->isLocalHost($descriptor->name), $descriptor->name.' resolver');
+            self::assertSame(null !== $descriptor->chatCompletionsEndpoint(), $upstreams->supports($descriptor->name), $descriptor->name.' supports');
         }
+        self::assertFalse($upstreams->supports('anthropic'), 'Claude Code stays on the passthrough');
+        self::assertFalse($upstreams->supports('google'), 'Gemini keeps its own translator');
     }
 
     /** T9 */
@@ -296,22 +319,33 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSameSet(CatalogToolUse::CAPABLE_CHAT_SERVICES, $flagged);
     }
 
-    /** T13 */
+    /** T13 — the OpenAI translator transcodes images for providers with the PNG/JPEG rule */
     public function testInlinePngJpegOnlyUpstreamEqualsTheDescriptorImageRule(): void
     {
-        $pngJpegOnly = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => 'png_jpeg_only' === $d->dialects->inlineImages->value));
-        self::assertSame([self::constant(OpenAiMessagesTranslator::class, 'INLINE_PNG_JPEG_ONLY')], $pngJpegOnly);
+        $pngJpegOnly = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => InlineImageRule::PngJpegOnly === $d->dialects->inlineImages));
+        self::assertSame(['cerebras'], $pngJpegOnly);
+
+        $translator = self::getContainer()->get(OpenAiMessagesTranslator::class);
+        \assert($translator instanceof OpenAiMessagesTranslator);
+        $link = ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/picture.webp']];
+        $body = ['model' => 'x', 'max_tokens' => 8, 'messages' => [['role' => 'user', 'content' => [$link, ['type' => 'text', 'text' => 'describe']]]]];
+        $method = new \ReflectionMethod($translator, 'resolveUpstream');
+
+        $cerebras = $method->invoke($translator, $body, ['provider' => 'cerebras'], false);
+        self::assertIsArray($cerebras);
+        self::assertStringContainsString('Cerebras', (string) $cerebras['input_error'], 'a link is refused for the PNG/JPEG-only upstream');
+
+        $groq = $method->invoke($translator, $body, ['provider' => 'groq'], false);
+        self::assertIsArray($groq);
+        self::assertNull($groq['input_error'], 'other upstreams take the link as is');
     }
 
-    /** T14 — `gemini` names no provider; it is `google`'s alias (§2.3.4 #1) */
+    /** T14 — the gateway's rewrite hosts are the descriptors with the flag (the `gemini` alias matched no row and is gone) */
     public function testVisionRewriteProvidersEqualTheDescriptorFlag(): void
     {
-        $today = self::constant(MessagesGateway::class, 'VISION_REWRITE_PROVIDERS');
-        $known = array_values(array_filter($today, fn (string $name): bool => $this->catalog->has($name)));
-        self::assertSame(['gemini'], array_values(array_diff($today, $known)), 'the only alias on the list');
-
         $flagged = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->gatewayVisionRewrite));
-        self::assertSameSet($known, $flagged);
+        self::assertSameSet(['anthropic', 'openai', 'google'], $flagged);
+        // The behaviour itself is MessagesGatewayVisionTest::testAutoFunnelsImagesUpstreamWhenTheVisionModelIsNotARewriteHost.
     }
 
     /** T15 */
