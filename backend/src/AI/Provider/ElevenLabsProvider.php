@@ -10,6 +10,7 @@ use App\AI\Catalog\ProviderBranding;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -45,6 +46,8 @@ final class ElevenLabsProvider implements DescribesProviderInterface
                 freeTier: true,
                 servesChat: false,
                 fieldDescription: 'ElevenLabs TTS API key',
+                configSection: ProviderKeyPresentation::SECTION_TTS,
+                configOrder: 1,
             ),
             dialects: new ProviderDialects(),
             defaults: null,

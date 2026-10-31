@@ -13,6 +13,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -75,6 +76,8 @@ class CerebrasProvider extends AbstractChatCompletionsCloudProvider
                 modelListing: ModelListing::Lists,
                 freeTier: true,
                 fieldDescription: 'Cerebras Inference API key — GPT OSS 120B and Qwen 3.8 27B. Create it at https://cloud.cerebras.ai/ (API Keys)',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 8,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,

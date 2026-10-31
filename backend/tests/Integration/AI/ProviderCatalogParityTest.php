@@ -516,56 +516,48 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSameSet($enum, self::names($this->catalog->withKey()));
     }
 
-    /** T20 */
+    /** T20 — the AI Services tab's key fields are the descriptors' placements and texts */
     public function testSystemConfigPasswordFieldsEqualTheKeySpecs(): void
     {
         $tab = self::getContainer()->get(AiTab::class);
         \assert($tab instanceof AiTab);
 
         $fields = [];
-        foreach ($tab->sections() as $section) {
+        foreach ($tab->sections() as $sectionId => $section) {
             foreach ($section->fields as $envVar => $field) {
                 if ('password' === $field->type) {
-                    $fields[$envVar] = $field->description;
+                    $fields[$envVar] = [$sectionId, $field->description];
                 }
             }
         }
 
-        $described = [];
-        foreach ($this->catalog->all() as $descriptor) {
+        $expected = [];
+        foreach ($this->catalog->withKey() as $descriptor) {
             $key = $descriptor->key;
-            if (null === $key) {
-                continue;
-            }
-            foreach ($key->envVars() as $envVar) {
-                $described[$envVar] = $descriptor->name;
-            }
-            $fieldDescription = $key->presentation->fieldDescription;
-            if (null !== $fieldDescription) {
-                self::assertArrayHasKey((string) $key->envVar, $fields, "{$descriptor->name} field");
-                self::assertSame($fields[$key->envVar], $fieldDescription, "{$descriptor->name} field description");
-            }
-            $secretDescription = $key->presentation->secretFieldDescription;
-            if (null !== $secretDescription) {
-                self::assertArrayHasKey((string) $key->secretEnvVar, $fields, "{$descriptor->name} secret field");
-                self::assertSame($fields[$key->secretEnvVar], $secretDescription, "{$descriptor->name} secret field description");
-            }
-        }
-
-        foreach ($fields as $envVar => $description) {
-            $owner = (new ProviderKeyCatalog($this->catalog))->providerForEnvVar($envVar);
-            if (null === $owner) {
-                continue;
-            }
-            self::assertSame($owner, $described[$envVar] ?? null, "{$envVar} belongs to {$owner}");
-            $key = $this->catalog->get($owner)->key;
             self::assertNotNull($key);
-            // The legacy field's text must be on the descriptor, so a dropped
-            // description is caught before AiTab reads the catalog.
-            $expected = $envVar === $key->secretEnvVar ? $key->presentation->secretFieldDescription : $key->presentation->fieldDescription;
-            self::assertSame($description, $expected, "{$envVar} description");
+            $section = $key->presentation->configSection;
+            if (null === $section) {
+                self::assertArrayNotHasKey((string) $key->envVar, $fields, "{$descriptor->name} has no system-config field");
+                continue;
+            }
+            $expected[(string) $key->envVar] = [$section, $key->presentation->fieldDescription];
+            if (null !== $key->secretEnvVar) {
+                $expected[$key->secretEnvVar] = [$section, $key->presentation->secretFieldDescription];
+            }
         }
-        self::assertCount(15, array_filter(array_keys($fields), static fn (string $envVar): bool => null !== ProviderKeyCatalog::providerForEnvVar($envVar)), 'fourteen key fields and one secret field are managed');
+        foreach ($expected as $envVar => $placement) {
+            self::assertSame($placement, $fields[$envVar] ?? null, $envVar);
+        }
+        self::assertCount(15, $expected, 'fourteen key fields and one secret field are managed');
+        self::assertSame(
+            ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'CEREBRAS_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN'],
+            array_keys($tab->sections()['cloud']->fields),
+            'the shipped order of the cloud section',
+        );
+        self::assertSame(['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET'], array_keys($tab->sections()['media']->fields));
+        self::assertSame(['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY'], array_keys($tab->sections()['tts']->fields));
+        self::assertNull($this->catalog->get('perplexity')->key?->presentation->configSection, 'Perplexity has no system-config field today');
+        self::assertSame('Cloudflare API token with Workers AI access', $fields['CLOUDFLARE_API_TOKEN'][1], 'env-only token stays a hand-written field');
     }
 
     /** T21 */

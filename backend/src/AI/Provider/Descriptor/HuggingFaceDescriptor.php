@@ -13,6 +13,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -53,6 +54,8 @@ final class HuggingFaceDescriptor implements DescribesProviderInterface
                 modelListing: ModelListing::CredentialsOnly,
                 freeTier: true,
                 fieldDescription: 'HuggingFace API token — routes the Kimi models through HF Inference',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 11,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,

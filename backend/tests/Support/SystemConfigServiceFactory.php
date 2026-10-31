@@ -105,7 +105,7 @@ final class SystemConfigServiceFactory
     public static function schema(ConfigRepository $repository, ?ModuleRegistry $modules = null): SystemConfigSchema
     {
         return new SystemConfigSchema([
-            new AiTab(self::TTS_URL),
+            new AiTab(self::TTS_URL, ProviderCatalog::builtIn()),
             new EmailTab(),
             new BrandingTab(),
             new MobileTab(),
