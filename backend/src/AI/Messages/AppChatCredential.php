@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\AI\Credential\UserProviderKeyResolver;
-use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -40,7 +39,7 @@ final readonly class AppChatCredential
         }
 
         $provider = strtolower(trim($model->getService()));
-        if (ChatCompletionsUpstreams::isLocal($provider)) {
+        if ($this->keyResolver->isLocalHost($provider)) {
             return self::READY;
         }
 
