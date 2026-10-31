@@ -235,6 +235,11 @@
 		@split_pools expression `{env.APP_ENV} == "prod" || {env.FRANKENPHP_BUSY_PROFILE} == "1"`
 		handle @split_pools {
 			reverse_proxy 127.0.0.1:9080 {
+				# Production PHP is behind this hop. The default proxy header
+				# would replace X-Forwarded-For with 127.0.0.1, so the Demo
+				# never sees Cloudflare and answers 403 freeapi_edge_required.
+				# Keep the chain from the edge proxy and append this listener.
+				header_up X-Forwarded-For "{http.request.header.X-Forwarded-For},{http.request.remote.host}"
 				@busy {
 					status 503
 					header Content-Type text/plain*
