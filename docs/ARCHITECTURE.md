@@ -415,6 +415,11 @@ room for an injection; a plugin provider is only in the container's catalog.
 `ProviderCatalogParityTest` pins every consumer to the descriptors (T1–T23 of
 `03_contracts.md` §2.3.1); `ProviderException::DISPLAY_NAMES` is the one
 table that stays, pinned to the descriptors' display names.
+`EgressPolicy` reads `ProviderCatalog::endpoints()` for the outbound
+allowlist. A new provider is one class: `app:provider:scaffold` writes it
+([`PROVIDERS.md`](PROVIDERS.md)), and `AddProviderJourneyTest` boots a
+fixture plugin that contains only a provider class and finds it in every
+table.
 
 A vendor's adapter in `App\AI\Provider\` is what the registry knows: its
 name, its capability interfaces and its `app.ai.<capability>` tags in

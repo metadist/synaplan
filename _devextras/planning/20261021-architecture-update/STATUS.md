@@ -12,7 +12,10 @@
 > are identical before and after. AU21 stacks on AU20: the frontend reads
 > `GET /api/v1/ai/providers` for names, icons and help, with the bundled
 > maps as the fallback; the provider enum left the OpenAPI spec
-> ([#2914](https://github.com/metadist/synaplan/pull/2914)).
+> ([#2914](https://github.com/metadist/synaplan/pull/2914)). AU22 stacks on
+> AU21 and closes S3: a provider is one class (`app:provider:scaffold`),
+> `AddProviderJourneyTest` proves every table reads it, and the egress
+> allowlist follows the catalog.
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
 > It is off unless `docker-compose.egress.yml` is loaded with the `egress`
@@ -75,10 +78,124 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-30 | AU16 | [#2884](https://github.com/metadist/synaplan/pull/2884) | merged (`cbe0d35cf`) | raw cURL calls use the egress client |
 | 2026-10-30 | AU17 | [#2888](https://github.com/metadist/synaplan/pull/2888) | merged (`99a2318cc`) | OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA send through the shared client |
 | 2026-10-30 | AU18 | [#2889](https://github.com/metadist/synaplan/pull/2889) | merged (`feeb3630e`) | `sidecars/synaplan-egress` CONNECT gateway, off unless the `egress` profile is loaded |
-| 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
-| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
+| 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | merged (`24697a98d`) | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
+| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), rebased onto `main` | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913), stacked on #2912 | open | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
 | 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914), stacked on #2913 | open | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
+| 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | open | `app:provider:scaffold`, `AddProviderJourneyTest` (red on the parent at the egress table), `EgressPolicy` reads the catalog (T23), `docs/PROVIDERS.md`; J-AU-4 walked with a stub: one class + one test + one model row + five locale keys |
+
+## 2026-10-31 — AU22: add an OpenAI-compatible provider in one file
+
+Started from `refactor/au21-provider-catalog-frontend` (`8f37557eb`,
+[#2914](https://github.com/metadist/synaplan/pull/2914)).
+
+**What changed.**
+- `AddProviderJourneyTest` first: a fixture plugin
+  (`tests/Fixtures/plugins/provider/acme_ai/`, one class `AcmeAiProvider`
+  with a descriptor, nothing in `src/` or `config/` names it) booted with
+  `FixturePluginsKernel`. Nine tests, one table each: the catalog, the key
+  store and its environment map (`ACME_API_KEY` from the pass), the
+  defaults and `preferenceOrder()`, `ChatCompletionsUpstreams`, the
+  registry's `chat` tag (serving a turn still needs the model rows, which
+  the test pins as the sentence the registry says), `AiTab`'s key field,
+  `GET /api/v1/ai/providers`, the egress allowlist, and `/api/doc.json`
+  without `acme` and without a provider enum. On the parent it is red at
+  exactly one table: `testTheEgressAllowlistFollowsTheCatalog`. Each test
+  runs in its own process: a second container does not fit into what the
+  long-lived PHPUnit process has left after a thousand tests.
+- `EgressPolicy` takes `ProviderCatalog`; `EgressBuiltinDestinations` is
+  `INTERNAL` + `ProviderCatalog::endpoints()` + `INTEGRATIONS`. T23 of the
+  parity test asserts every entry of AU15's constant is still published
+  and the six hosts the constant lacked (`03` §2.3.4 #10) are allowed.
+- `app:provider:scaffold <name> --openai-compatible` (`ProviderScaffolder`,
+  `ProviderScaffoldRequest`, `ProviderScaffoldPlan` under
+  `App\AI\Catalog\Scaffold`): writes `src/AI/Provider/<Name>Provider.php`
+  on `AbstractChatCompletionsCloudProvider` and
+  `tests/Unit/AI/Provider/<Name>ProviderTest.php`, prints the
+  `ModelCatalog` row with the next free id and the five
+  `admin.providerHelp.<name>` keys. Refuses an existing name, a bad name or
+  URL, a missing `--openai-compatible` (points to `docs/PROVIDERS.md`), an
+  existing file without `--force`; `--dry-run` writes nothing.
+  `ProviderScaffoldCommandTest` includes the generated class and reads its
+  descriptor.
+- `docs/PROVIDERS.md` (the journey, what the descriptor decides, a custom
+  wire format, a plugin provider, the allowlist); `docs/EGRESS.md` "Where
+  the allowlist comes from"; `docs/ARCHITECTURE.md` and `AGENTS.md` point
+  at it.
+- `tests/Support/NoExecutionTimeLimitExtension`: production code re-arms
+  `set_time_limit(120)` per work window (`VectorizationService`, the
+  media pollers); in the one PHPUnit process that limit outlives the test
+  that armed it (`AiPathCharacterizationTest`, `FileControllerTest` leave
+  it behind, found with `PHPUNIT_REPORT_TIME_LIMIT=1`) and counts the CPU
+  time of every later test. The journey test's second container tipped the
+  suite over it ("Maximum execution time of 120 seconds exceeded" in
+  `MessageRepositoryTest`); the extension resets the limit before every
+  test.
+
+**J-AU-4 walked (dev stack, `admin@synaplan.com`, the provider keys from
+`.env`; a stub `php -S` container `acme-stub:9009` on the Synaplan network
+answering `GET /v1/models` and streamed `POST /v1/chat/completions` with a
+Bearer check).** `app:provider:scaffold acme --openai-compatible
+--display-name "Acme AI" --base-url http://acme-stub:9009/v1 …` → two
+files; the printed model row pasted into `ModelCatalog::MODELS` (id 408)
+and the five locale keys into `admin.json`; `app:model:seed` inserted one
+row. Then, with no other edit: `GET /api/v1/ai/providers` listed 23
+providers with `acme` (icon `mdi:robot-outline`, help key, env var);
+Admin → AI infrastructure → Providers & keys showed an "Acme AI" card
+between Groq and Anthropic with Get API key / Test / Use as default /
+Remove; a pasted key was tested live against the stub (`GET /v1/models`,
+200) and stored; "Use as default" bound CHAT, SORT and SUMMARIZE;
+`POST /api/v1/messages/send` answered "Hello from Acme AI: your words
+reached the stub." (two `POST /v1/chat/completions` at the stub: sort and
+chat); the chat composer's picker listed "Acme acme-1" with the robot
+glyph and flag. Under `EGRESS.MODE=enforce` the stub host was allowed
+(`openai-endpoints/test` against `http://acme-stub:9009/v1` → 200) while
+`https://example.org/v1` was refused ("Outbound traffic to
+example.org:443 is not allowed."); after deleting `AcmeProvider.php` the
+same stub request was refused ("Outbound traffic to acme-stub:9009 is not
+allowed.") — the allowlist entry was the class. **File count: one provider
+class + its test + one model row + five locale keys.** Everything was
+reverted: files removed, `ModelCatalog` and the locales checked out, the
+BMODELS row, its usage rows and the stored key deleted, Groq's defaults
+re-applied (`Mars` on the next turn), `EGRESS.MODE` back to `off`, the
+stub removed.
+
+**Found on the walk, not AU22.**
+1. A model row priced `0.0 / 0.0` is hidden from every picker
+   (`Model::isHiddenBecauseFree()`): the first pasted row did not show in
+   the composer. The scaffold's snippet now says so and sets
+   `showWhenFree => 1`; the command test pins it.
+2. **`EGRESS.MODE=report` and `enforce` break chat for every provider
+   behind the OpenAI PHP SDK** (Groq, OpenAI, Acme, every
+   `AbstractChatCompletionsCloudProvider`): `Groq chat error: Unable to
+   seek to stream position 0 with whence 0`. The key tests (Symfony
+   HttpClient directly) and the refusal work; `off` works. The SDK reads
+   through `Symfony\Component\HttpClient\Psr18Client`, whose PSR-7 body is
+   built from the response's stream, and the `EgressPendingResponse`
+   wrapper of AU15 does not offer a seekable one. Pre-existing since AU15
+   / AU17, reproduced on `main`'s code paths; filed as
+   [#2919](https://github.com/metadist/synaplan/issues/2919), not fixed
+   here.
+3. The Higgsfield key test answers `405` for the same `GET
+   https://platform.higgsfield.ai/` that `main` sends (T2 pins the request);
+   Anthropic `401`, TrustedTokens `403`, ElevenLabs `401` are the
+   providers' answers to the keys in `backend/.env`. Ten of fourteen keys
+   validate live after the restart.
+
+**Gate.** php-cs-fixer, PHPStan (`src/` and `tests/`), deptrac 0,
+`lint:container`, PHPUnit 11,270 tests / 0 failures (the scaffold's
+template method hit the 100-line ratchet once; the templates are files
+under `Scaffold/templates/` now). Frontend untouched (no
+`.vue`, `.ts` or locale change). No HTTP or UI contract changed, so no
+Playwright run for this step (AU21's stands). Release class
+`backend-only` (`scripts/mobile-impact.mjs`).
+
+**Carried.** The scaffold has one template (chat completions); a provider
+with its own wire format starts from the closest adapter per
+`docs/PROVIDERS.md`. A plugin provider's help sentence still needs the five
+locale keys in the application. The time-limit finding also means a CLI
+worker that runs a vectorization window gets a 120 s CPU budget it never
+had — worth its own look.
 
 ## 2026-10-31 — AU21: provider names, icons and help come from the provider catalog
 
