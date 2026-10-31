@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\AI\Credential;
 
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
 use App\AI\Catalog\ProviderCatalog;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\Entity\Config;
@@ -287,5 +295,60 @@ final class ProviderDefaultsServiceTest extends TestCase
         $this->service->applyGlobalDefaults('groq');
 
         self::assertArrayNotHasKey('0|DEFAULTMODEL|VECTORIZE', $this->written, 'VECTORIZE (local embeddings) must keep its current value');
+    }
+
+    public function testTwoProvidersWithTheSameRankBothStayInThePreferenceOrder(): void
+    {
+        $catalog = new ProviderCatalog([TiedBravoProvider::class, TiedAlphaProvider::class, RankedFirstProvider::class]);
+        $service = new ProviderDefaultsService($this->configRepository, $this->cache, new NullLogger(), new ProviderKeyCatalog($catalog), $catalog);
+
+        self::assertSame(['first', 'alpha', 'bravo'], $service->preferenceOrder(), 'rank first, then the name breaks the tie; nobody is dropped');
+    }
+}
+
+/** @internal */
+abstract class RankedFixtureProvider implements DescribesProviderInterface
+{
+    protected static function ranked(string $name, int $rank): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: $name,
+            displayName: ucfirst($name),
+            capabilities: [ProviderCapability::Chat],
+            endpoints: [ProviderEndpoint::localChatCompletions()],
+            key: null,
+            dialects: new ProviderDialects(),
+            defaults: new ProviderDefaults(bindings: ['CHAT' => $name.':model:chat'], preferenceRank: $rank),
+            pricing: ProviderPricing::none(),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding('mdi:robot'),
+        );
+    }
+}
+
+/** @internal */
+final class RankedFirstProvider extends RankedFixtureProvider
+{
+    public static function descriptor(): ProviderDescriptor
+    {
+        return self::ranked('first', 1);
+    }
+}
+
+/** @internal */
+final class TiedAlphaProvider extends RankedFixtureProvider
+{
+    public static function descriptor(): ProviderDescriptor
+    {
+        return self::ranked('alpha', 7);
+    }
+}
+
+/** @internal */
+final class TiedBravoProvider extends RankedFixtureProvider
+{
+    public static function descriptor(): ProviderDescriptor
+    {
+        return self::ranked('bravo', 7);
     }
 }
