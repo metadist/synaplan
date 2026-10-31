@@ -84,7 +84,13 @@ final class ProviderCatalogPass implements CompilerPassInterface
             foreach ($container->findTaggedServiceIds($capability->tag()) as $id => $tags) {
                 foreach ($tags as $attributes) {
                     $key = (string) ($attributes['key'] ?? '');
-                    if ('' !== $key && !isset($described[$key])) {
+                    // Without a key the registry's indexed locator falls back to
+                    // the service id, which no descriptor is named after: a
+                    // key-less tag would reach the registry undescribed.
+                    if ('' === $key) {
+                        throw new \LogicException(sprintf('Service "%s" is tagged %s without a key. A provider is registered by #[AsAiProvider] and descriptor(), whose name is the key.', $id, $capability->tag()));
+                    }
+                    if (!isset($described[$key])) {
                         throw new \LogicException(sprintf('Service "%s" is tagged %s with key "%s" but no class describes a provider of that name. Add #[AsAiProvider] and descriptor() to it.', $id, $capability->tag(), $key));
                     }
                 }

@@ -45,6 +45,18 @@ final class ProviderCatalogPassTest extends TestCase
         (new ProviderCatalogPass())->process($container);
     }
 
+    public function testACapabilityTagWithoutAKeyFailsTheBuild(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setDefinition(ProviderCatalog::class, new Definition(ProviderCatalog::class, ['$providerClasses' => []]));
+        // The locator would index it by service id, bypassing the described-name check.
+        $container->setDefinition('acme.provider', (new Definition(\stdClass::class))->addTag('app.ai.chat'));
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Service "acme.provider" is tagged app.ai.chat without a key');
+        (new ProviderCatalogPass())->process($container);
+    }
+
     public function testACapabilityTagWhoseKeyIsDescribedPasses(): void
     {
         $container = new ContainerBuilder();
