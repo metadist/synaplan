@@ -84,7 +84,7 @@ import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import { useFreeApiAutoLeave } from '@/composables/useFreeApiAutoLeave'
 import { useNotification } from '@/composables/useNotification'
 import { saveProviderKey, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
-import { providerHelpByName } from '@/utils/providerHelp'
+import { useProviderCatalogStore } from '@/stores/providerCatalog'
 
 const props = defineProps<{
   provider: ProviderKeyStatus
@@ -98,13 +98,15 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { success, error: showError } = useNotification()
 const { announce: announceAutoLeave } = useFreeApiAutoLeave()
+const providerCatalog = useProviderCatalogStore()
+providerCatalog.ensureLoaded()
 
 const keyInput = ref('')
 const saving = ref(false)
 const keyField = ref<HTMLInputElement | null>(null)
 
 const keyUrl = computed(
-  () => props.provider.consoleUrl || providerHelpByName(props.provider.name)?.url
+  () => props.provider.consoleUrl || providerCatalog.helpFor(props.provider.name)?.url
 )
 
 /**

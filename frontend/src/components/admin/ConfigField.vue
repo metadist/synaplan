@@ -6,7 +6,7 @@ import { TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
-import { providerHelpByEnvVar } from '@/utils/providerHelp'
+import { useProviderCatalogStore } from '@/stores/providerCatalog'
 
 const { t, te } = useI18n()
 const route = useRoute()
@@ -186,7 +186,9 @@ const effectiveValueLabel = computed(() => {
   return props.value.effectiveValue === 'true' ? t('common.enabled') : t('common.disabled')
 })
 
-const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
+const providerCatalog = useProviderCatalogStore()
+providerCatalog.ensureLoaded()
+const helpMeta = computed(() => providerCatalog.helpForField(props.fieldKey))
 
 /** `?highlight=KEY` from a search result rings the field it points at. */
 const isHighlighted = computed(() => route.query.highlight === props.fieldKey)

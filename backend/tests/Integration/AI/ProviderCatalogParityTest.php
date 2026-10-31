@@ -502,18 +502,18 @@ final class ProviderCatalogParityTest extends KernelTestCase
         self::assertSame(10, $cap->invoke($concurrency, 'unknown'), 'the fallback');
     }
 
-    /** T19 */
-    public function testAdminProviderKeysPathEnumEqualsTheKeyedDescriptors(): void
+    /** T19 — the admin route validates against the catalog; the spec names no provider list (ProviderCatalogControllerTest) */
+    public function testAdminProviderKeysPathHasNoEnumAndValidatesAgainstTheCatalog(): void
     {
-        $enum = null;
         foreach ((new \ReflectionMethod(AdminProviderKeysController::class, 'save'))->getAttributes(OA\Parameter::class) as $attribute) {
             $parameter = $attribute->newInstance();
             if ('provider' === $parameter->name && $parameter->schema instanceof OA\Schema) {
-                $enum = $parameter->schema->enum;
+                self::assertSame(\OpenApi\Generator::UNDEFINED, $parameter->schema->enum, 'no hand-kept provider list on the save route');
             }
         }
-        self::assertIsArray($enum, 'the save route still declares the provider enum (dropped in AU21)');
-        self::assertSameSet($enum, self::names($this->catalog->withKey()));
+        $keyCatalog = new ProviderKeyCatalog($this->catalog);
+        self::assertTrue($keyCatalog->has('groq'));
+        self::assertFalse($keyCatalog->has('acme'), 'an unknown name is refused by the controller through the key catalog');
     }
 
     /** T20 — the AI Services tab's key fields are the descriptors' placements and texts */

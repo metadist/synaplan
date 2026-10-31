@@ -247,7 +247,7 @@ final class MessagesGatewayController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Messages Gateway'],
     )]
-    #[OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['anthropic', 'openai', 'google']))]
+    #[OA\Parameter(name: 'provider', in: 'path', required: true, description: 'A provider whose key a person may bring on the Messages gateway (GET /api/v1/ai/providers: key.userCredential = gateway); another name is 400', schema: new OA\Schema(type: 'string', example: 'anthropic'))]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -330,7 +330,7 @@ final class MessagesGatewayController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Messages Gateway'],
     )]
-    #[OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['anthropic', 'openai', 'google']))]
+    #[OA\Parameter(name: 'provider', in: 'path', required: true, description: 'A provider whose key a person may bring on the Messages gateway (GET /api/v1/ai/providers: key.userCredential = gateway); another name is 400', schema: new OA\Schema(type: 'string', example: 'anthropic'))]
     #[OA\Response(
         response: 200,
         description: 'Key cleared',

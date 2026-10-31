@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 
 // `<script setup>` resolves the imported component directly, so a name-based
@@ -9,7 +10,7 @@ vi.mock('@iconify/vue', () => ({
 }))
 
 const iconsOf = (service: string, props: Record<string, unknown> = {}) =>
-  mount(ServiceIcon, { props: { service, ...props } })
+  mount(ServiceIcon, { props: { service, ...props }, global: { plugins: [createPinia()] } })
     .findAll('i')
     .map((i) => i.attributes('data-icon'))
 
