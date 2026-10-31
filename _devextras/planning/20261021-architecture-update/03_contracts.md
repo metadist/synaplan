@@ -496,7 +496,23 @@ gone. `AiTab` keeps its non-key fields; the key fields come from
 `ProviderKeyPresentation::$configSection` / `$configOrder`, which the
 hardening did not foresee and the descriptors now carry.
 
-### 2.2 Parity test
+**As delivered (AU21).** `GET /api/v1/ai/providers` (`ProviderCatalogController`,
+`ProviderCatalogPresenter`) serves the public subset to any signed-in user:
+name, display name, capabilities, `icon`, `iconComponent`, `flag`, `local`,
+`helpKey`, `helpUrl`, `helpIsDownload`, `helpFields`, and `key` (store, env
+var, secret env var, console URL, user-credential kind, serves chat) or
+null — no endpoint, no validation shape, no header. `stores/providerCatalog.ts`
+loads it once per signed-in session and answers T24–T26 (`iconFor`,
+`flagFor`, `isLocal`, `iconComponentFor`, `helpFor`, `helpForField`,
+`displayName`); the bundled maps in `providerIcons.ts` / `providerHelp.ts`
+and the three-glyph switch stay as the fallback before the first answer,
+when the request fails, and for a name the server does not know.
+`ServiceIcon.vue`, `ProviderKeyCard.vue`, `SetupProviderKeyForm.vue` and
+`ConfigField.vue` ask the store. T19: the provider enum left the admin
+save route and the gateway's two BYOK routes; the path parameter is a
+string that the controllers validate against the key catalog, and an
+unknown name stays **404** (the table said 400; 404 was the behaviour
+before and after AU20, and the frontend never relies on either).
 
 `ProviderCatalogParityTest` (AU19) builds every table of §2.1 from the
 descriptors and compares it with today's constant, entry by entry. It is the

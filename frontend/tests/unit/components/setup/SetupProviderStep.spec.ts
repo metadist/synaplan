@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import SetupProviderStep from '@/components/setup/SetupProviderStep.vue'
 
 const listProviderKeys = vi.fn()
@@ -33,6 +34,7 @@ const provider = (name: string, overrides: Record<string, unknown> = {}) => ({
 const mountStep = () =>
   mount(SetupProviderStep, {
     global: {
+      plugins: [createPinia()],
       stubs: {
         SetupProviderKeyForm: {
           name: 'SetupProviderKeyForm',

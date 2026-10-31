@@ -413,6 +413,9 @@ services:
         arguments:
             $providerClasses: []
 
+    # The public subset of the catalog for GET /api/v1/ai/providers.
+    App\AI\Catalog\ProviderCatalogPresenter: ~
+
     # DB-backed platform API keys for the cloud AI providers, encrypted at
     # rest in BCONFIG (group `provider_keys`) via EncryptionService. The env
     # bootstrap/fallback map ($envKeys, $envSecrets) is built by

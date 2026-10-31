@@ -9,7 +9,10 @@
 > `ProviderCatalogParityTest` proves them equal to today's tables (T1–T23).
 > AU20 stacks on AU19: every consumer reads the catalog, `services.yaml`
 > names no provider capability or key variable, and the registry's tags
-> are identical before and after.
+> are identical before and after. AU21 stacks on AU20: the frontend reads
+> `GET /api/v1/ai/providers` for names, icons and help, with the bundled
+> maps as the fallback; the provider enum left the OpenAPI spec
+> ([#2914](https://github.com/metadist/synaplan/pull/2914)).
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
 > It is off unless `docker-compose.egress.yml` is loaded with the `egress`
@@ -75,6 +78,87 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | open | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
 | 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), stacked on #2911 | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913), stacked on #2912 | open | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
+| 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914), stacked on #2913 | open | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
+
+## 2026-10-31 — AU21: provider names, icons and help come from the provider catalog
+
+Started from `refactor/au20-provider-tables-ask-catalog` (`313493da1`,
+[#2913](https://github.com/metadist/synaplan/pull/2913)).
+
+**What changed.**
+- Backend: `ProviderCatalogController` (`GET /api/v1/ai/providers`, 401
+  when signed out) and `ProviderCatalogPresenter` (the public subset of a
+  descriptor — see `03` §2.1 "As delivered (AU21)"; no endpoint, header or
+  validation shape travels). The provider enum left the admin save route
+  and the gateway's two BYOK routes; the path parameter is a string the
+  controllers validate against the key catalog, unknown ⇒ 404 as before.
+- Frontend: `services/api/providerCatalogApi.ts` (generated Zod schema
+  `GetAiProvidersListResponseSchema`), `stores/providerCatalog.ts`
+  (`load` once per signed-in session, `ensureLoaded` is a no-op when
+  signed out, `find` matches compact names — `Hugging Face` and
+  `huggingface` are one name). `ServiceIcon.vue` draws
+  `iconComponent` when the server names one and `icon` otherwise;
+  `ProviderKeyCard.vue`, `SetupProviderKeyForm.vue` and `ConfigField.vue`
+  take the help hint from the store. `providerIcons.ts` / `providerHelp.ts`
+  stay as the fallback (`ProviderHelpId` is a string now, since the server
+  may name a key the bundle does not).
+
+**The three places, before / after (admin@synaplan.com, dev stack with
+the provider keys).** The "before" is the same tree with `frontend/src`
+stashed, the "after" is this branch; both read the same backend.
+- Admin → AI infrastructure → Providers & keys: fourteen keyed cards in
+  the same order (Groq first, Perplexity last), the same names, the same
+  "Get API key" targets (Groq → `console.groq.com/keys`); the store
+  reports `loaded: true, 22 providers` after the first paint.
+- Model picker (chat composer): for Groq, Mistral, OpenAI, Google, xAI
+  and TrustedTokens the rendered glyph set per option is identical —
+  `GroqIcon` / `MistralIcon` inline SVGs, `simple-icons`, `logos`, `bxl`,
+  `mdi` Iconify ids — each followed by its `circle-flags` flag.
+- Help hint: "How to set this up" on Groq opens the same dialog, same
+  text (locale key `admin.providerHelp.groq`), same "Create API key" URL.
+- Dark and 320 px checked on the key cards and the picker. At 320 px the
+  "Recommended" badge overlaps the "Connected" badge on the first card —
+  identical before and after, not this step (carried below).
+
+**Proof.** `ProviderCatalogControllerTest`: a signed-out visitor is 401;
+a signed-in user reads the catalog in display order with Groq's full
+public row, Ollama keyless, Higgsfield's secret variable, the endpoint
+registry's store, and nothing of `validation`, `endpoints`, `Bearer` or a
+provider host in the body; `/api/doc.json` carries no `enum` on either
+`{provider}` path parameter. `ProviderCatalogParityTest` T19 asserts the
+enum is gone and the key catalog refuses an unknown name. Frontend:
+`tests/unit/stores/providerCatalog.spec.ts` (fallback before load,
+server values after load, a failed request keeps the fallback,
+`ensureLoaded` gated on authentication); `ServiceIcon.spec.ts`,
+`SetupProviderStep.spec.ts`, `ConfigField.spec.ts` and
+`SetupProviderKeyForm.spec.ts` mount with Pinia now.
+
+**Gate.** Backend: php-cs-fixer, PHPStan (`src/` and `tests/`), deptrac 0,
+PHPUnit 11,255 tests / 0 failures. Frontend: ESLint, `vue-tsc`, Vitest
+495 files / 3,434 tests / 0 failures (the store function went to 101
+lines once and `sizeRatchet.spec.ts` caught it; `helpOf` is a module
+function now). `make test-e2e`: 149 passed, 36 failed on the loaded dev
+stack — 18 on the known local-only list (mail ×4, guest ×3, WhatsApp,
+Telegram, subscription ×5, workspace-tab flag, …), 7 are the dev
+database's Synaplan Demo mode answering canned replies (`chat` standard
+model, `long-term-memory`, `memories`, `multitask`, `pay-first-pages`
+×2, `live-voice-activity-filter`), 11 pass when their specs run alone on
+this branch (`redirects` ×3, `ux-journeys` ×2, `capacity`,
+`assistant-name-autosave`, `i18n-namespaces`, `research` ×2 — the trace
+of the i18n one shows `GET /api/v1/config/runtime` taking 2.4 s under the
+parallel run and a 5 s title expectation; `notion-app` ×3 and
+`task-prompts` are AU20's interference set). The two that still failed
+when re-run alone passed on the parent tree **and** on this tree once the
+backend had restarted (a FrankenPHP restart from the stash swap, not a
+code path). Layout suite (`make -C frontend test-e2e-layout`): 16
+passed, 1 failed — the documented local-only login "clipped bottom"
+(the fresh-demo card above the form; `docs/E2E_TESTING.md`). CI is the
+proof. Release class `ota-candidate` (`scripts/mobile-impact.mjs`).
+
+**Carried.** The 320 px badge overlap on the first key card (pre-existing,
+`ProviderKeyCard.vue`). The help *text* stays in the five locale files
+under `admin.providerHelp.<helpKey>`, so a plugin provider's hint needs a
+locale key until a later step lets the descriptor carry the sentence.
 
 ## 2026-10-31 — AU20: provider tables ask the provider catalog
 
@@ -112,7 +196,7 @@ backend gate.
   snapshot is byte-identical.
 - T21: the pass tags each adapter from its descriptor; the 21 tag blocks
   and three empty definitions left `services.yaml`.
-- T19 (the admin enum) is AU21; T22 stays by decision (`03` §2.3.4 #12).
+- T19 (the admin enum) landed in AU21; T22 stays by decision (`03` §2.3.4 #12).
 
 **Before / after.** `debug:container --tag=app.ai.<capability>` for all
 eight capabilities and `ProviderRegistry::getRegisteredProviderNames()`
@@ -234,7 +318,7 @@ S3 steps change no runtime path.
 
 **Carried.** Groq's adapter is at 795 lines after its inline descriptor;
 the next line added there moves the descriptor to a sibling. The frontend
-tables T24–T26 are AU21.
+tables T24–T26 landed in AU21.
 
 ## 2026-10-31 — S3 hardening: the provider descriptor contract
 
