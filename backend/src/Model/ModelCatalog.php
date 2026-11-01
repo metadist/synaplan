@@ -561,11 +561,17 @@ class ModelCatalog
      * }>
      */
     private const LITELLM_DEVIATIONS = [
-        // Empty: LiteLLM currently agrees with every catalog price. The Jina
-        // reranker entry (LiteLLM 0.018 against our verified 0.05) retired on
-        // 2026-09-14 — the upstream fix landed and LiteLLM now lists 0.05.
-        // Per-dimension cache and long-context pins follow the same rule: only
-        // after the official page proved LiteLLM wrong (PRICING_MAINTENANCE.md).
+        // #2859: LiteLLM lists Mistral's pre-discount list rate for Mistral Large 4
+        // (in 1.36 / cached 0.14 / out 4.18); the official page still bills the
+        // launch rate the catalog holds (0.68 / 0.068 / 2.09), read 2026-11-01.
+        'mistral:mistral-large-4' => [
+            'litellm_in' => 1.36,
+            'litellm_out' => 4.18,
+            'litellm_cache_read' => 0.14,
+            'source' => 'https://docs.mistral.ai/inference/pricing',
+            'verifiedOn' => '2026-11-01',
+            'reason' => "LiteLLM lists Mistral's pre-discount list rate (\$1.36 / \$4.18, cached \$0.14) while the official page still bills the launch rate the catalog holds; correction to BerriAI/litellm not filed yet.",
+        ],
     ];
 
     /**
