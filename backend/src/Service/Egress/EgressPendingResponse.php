@@ -82,7 +82,10 @@ final class EgressPendingResponse implements ResponseInterface, StreamableInterf
         if (false === $stream) {
             throw new \RuntimeException('Unable to buffer the response body.');
         }
-        fwrite($stream, $response->getContent($throw));
+        $body = $response->getContent($throw);
+        if (fwrite($stream, $body) !== \strlen($body)) {
+            throw new \RuntimeException('Unable to buffer the response body.');
+        }
         rewind($stream);
 
         return $stream;
