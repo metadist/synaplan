@@ -14,6 +14,21 @@
     "processingOnServer": "Procesando {count} archivo(s) en segundo plano…",
     "orDragDrop": "o arrastra y suelta archivos aquí",
     "dropHere": "Suelta archivos aquí para subir",
+    "viewContent": "Ver contenido",
+    "download": "Descargar",
+    "downloadFailed": "No se pudo descargar",
+    "deleteFile": "Eliminar archivo",
+    "deleteSelected": "Eliminar seleccionados",
+    "deleteConfirmTitle": "Eliminar archivo",
+    "deleteConfirmMessage": "¿Seguro que quieres eliminar este archivo? Esta acción no se puede deshacer.",
+    "deleteConfirmButton": "Eliminar",
+    "fileDeleted": "Archivo eliminado correctamente",
+    "deleteFailed": "No se pudo eliminar el archivo",
+    "bulkDeleteSuccess": "{count} archivo(s) eliminado(s) correctamente",
+    "bulkDeletePartial": "{success} eliminado(s), {failed} fallido(s)",
+    "reVectorize": "Reprocesar",
+    "reVectorizeSuccess": "Archivo reprocesado correctamente ({chunks} partes indexadas)",
+    "reVectorizeFailed": "No se pudo reprocesar",
     "uploadSuccess": "{count} archivo(s) subido(s) correctamente",
     "uploadCancelled": "Subida cancelada",
     "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo.",
@@ -29,6 +44,14 @@
       "invalid_response": "{filename}: El servidor devolvió una respuesta inesperada. Inténtalo de nuevo.",
       "http_error": "{filename}: La subida falló (error {status}). Inténtalo de nuevo."
     },
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: No hay espacio suficiente. {message}",
+      "file_too_large": "{filename}: El archivo es demasiado grande. {message}",
+      "file_empty": "{filename}: El archivo está vacío. {message}",
+      "extension_not_allowed": "{filename}: El tipo de archivo no es compatible. {message}",
+      "rate_limit_exceeded": "{filename}: Se alcanzó el límite de subidas. {message}",
+      "generic": "{filename}: No se permite subir este archivo. {message}"
+    },
     "helper": "Los archivos adjuntos se envían a la IA para este mensaje. Los archivos marcados con ✅ también son consultables en todos tus chats.",
     "searchYourFiles": "Buscar en tus archivos",
     "typeAll": "Todos",
@@ -43,6 +66,9 @@
     "noResults": "No hay archivos. Prueba otra búsqueda o sube uno nuevo."
   },
   "fileMention": {
+    "hint": "Escribe para buscar archivos: pulsa Intro para adjuntar",
+    "noResults": "No se encontraron archivos",
+    "fileAttached": "{name} adjuntado",
     "header": "Escribe para encontrar un archivo que dar a la IA"
   },
   "storage": {

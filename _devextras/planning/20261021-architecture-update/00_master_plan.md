@@ -1,13 +1,13 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** S0, S1 and S2 (AU1–AU18) are on `main`. S3 is in review as a
-stack of pull requests: the contract hardening of `03_contracts.md` §2.3
-(frozen inventory, sub-type shapes, discovery), AU19 (descriptors and the
-catalog), AU20 (every consumer reads it), AU21 (the frontend reads
-`GET /api/v1/ai/providers`) and AU22 (one provider = one class, the egress
-allowlist from the catalog). S3 is complete when the stack is merged. The
-production reading is one day, not a week: a worker is listed only when it
-reported in the last 24 hours. The vultr-cluster load test (M6) waits until
+**Status:** S0, S1 and S2 (AU1–AU18) are on `main`. S3's contract
+hardening of `03_contracts.md` §2.3 (frozen inventory, sub-type shapes,
+discovery), AU19 (descriptors and the catalog), AU20 (every consumer reads
+it) and AU21 (the frontend reads `GET /api/v1/ai/providers`) are on
+`main`. AU22 (one provider = one class, the egress allowlist from the
+catalog) is in review. S3 is complete when AU22 is merged. `EGRESS.MODE`
+stays `off`. The production reading is one day, not a week: a worker is
+listed only when it reported in the last 24 hours. The vultr-cluster load test (M6) waits until
 after S2 has been read in production. `03_contracts.md` §7.1 must merge
 before AU28. §1.7 landed with AU10.
 **Priority:** Row 22 of [`../ROADMAP.md`](../ROADMAP.md). S0 is production

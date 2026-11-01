@@ -15,7 +15,7 @@
 > ([#2914](https://github.com/metadist/synaplan/pull/2914)). AU22 stacks on
 > AU21 and closes S3: a provider is one class (`app:provider:scaffold`),
 > `AddProviderJourneyTest` proves every table reads it, and the egress
-> allowlist follows the catalog.
+> allowlist follows the catalog. `EGRESS.MODE` stays `off`.
 
 > **2026-10-30 — AU18.** The CONNECT gateway is `sidecars/synaplan-egress`.
 > It is off unless `docker-compose.egress.yml` is loaded with the `egress`
@@ -79,10 +79,10 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-30 | AU17 | [#2888](https://github.com/metadist/synaplan/pull/2888) | merged (`99a2318cc`) | OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA send through the shared client |
 | 2026-10-30 | AU18 | [#2889](https://github.com/metadist/synaplan/pull/2889) | merged (`feeb3630e`) | `sidecars/synaplan-egress` CONNECT gateway, off unless the `egress` profile is loaded |
 | 2026-10-31 | S3 hardening (`03` §2.3) | [#2911](https://github.com/metadist/synaplan/pull/2911) | merged (`24697a98d`) | T1–T26 frozen inventory, sub-type shapes, discovery, twelve disagreements; docs only |
-| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912), rebased onto `main` | open | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
-| 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913), stacked on #2912 | open | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
-| 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914), stacked on #2913 | open | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
-| 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | open | `app:provider:scaffold`, `AddProviderJourneyTest` (red on the parent at the egress table), `EgressPolicy` reads the catalog (T23), `docs/PROVIDERS.md`; J-AU-4 walked with a stub: one class + one test + one model row + five locale keys |
+| 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912) | merged (`e7191414a`) | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
+| 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913) | merged (`2c5539719`) | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
+| 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914) | merged (`0fa6754e6`) | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
+| 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | open | `app:provider:scaffold`, `AddProviderJourneyTest` (red on the parent at the egress table), `EgressPolicy` reads the catalog (T23), `docs/PROVIDERS.md`; J-AU-4 walked with a stub: one class + one test + one model row + five locale keys. `EGRESS.MODE` stays `off` |
 
 ## 2026-10-31 — AU22: add an OpenAI-compatible provider in one file
 
@@ -165,17 +165,18 @@ stub removed.
    (`Model::isHiddenBecauseFree()`): the first pasted row did not show in
    the composer. The scaffold's snippet now says so and sets
    `showWhenFree => 1`; the command test pins it.
-2. **`EGRESS.MODE=report` and `enforce` break chat for every provider
+2. **`EGRESS.MODE=report` and `enforce` broke chat for every provider
    behind the OpenAI PHP SDK** (Groq, OpenAI, Acme, every
    `AbstractChatCompletionsCloudProvider`): `Groq chat error: Unable to
    seek to stream position 0 with whence 0`. The key tests (Symfony
    HttpClient directly) and the refusal work; `off` works. The SDK reads
    through `Symfony\Component\HttpClient\Psr18Client`, whose PSR-7 body is
    built from the response's stream, and the `EgressPendingResponse`
-   wrapper of AU15 does not offer a seekable one. Pre-existing since AU15
-   / AU17, reproduced on `main`'s code paths; filed as
-   [#2919](https://github.com/metadist/synaplan/issues/2919), not fixed
-   here.
+   wrapper of AU15 did not offer a seekable one. Filed as
+   [#2919](https://github.com/metadist/synaplan/issues/2919). `main`
+   hands PSR-18 a seekable body in
+   [#2925](https://github.com/metadist/synaplan/pull/2925). `EGRESS.MODE`
+   stays `off`; this step does not turn `report` or `enforce` on.
 3. The Higgsfield key test answers `405` for the same `GET
    https://platform.higgsfield.ai/` that `main` sends (T2 pins the request);
    Anthropic `401`, TrustedTokens `403`, ElevenLabs `401` are the

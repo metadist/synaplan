@@ -419,7 +419,7 @@ table that stays, pinned to the descriptors' display names.
 allowlist. A new provider is one class: `app:provider:scaffold` writes it
 ([`PROVIDERS.md`](PROVIDERS.md)), and `AddProviderJourneyTest` boots a
 fixture plugin that contains only a provider class and finds it in every
-table.
+table. `EGRESS.MODE` stays `off`.
 
 A vendor's adapter in `App\AI\Provider\` is what the registry knows: its
 name, its capability interfaces and its `app.ai.<capability>` tags in

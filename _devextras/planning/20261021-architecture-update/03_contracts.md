@@ -525,7 +525,8 @@ kernel with a fixture plugin that is one provider class and finds it in
 every table of §2.1, in `GET /api/v1/ai/providers`, and in the allowlist,
 and asserts the exported spec did not change. The scaffold refuses a
 provider that is not chat completions; that provider starts from
-`docs/PROVIDERS.md`.
+`docs/PROVIDERS.md`. `EGRESS.MODE` stays `off`: the allowlist is what
+`report` and `enforce` would use, and this step does not turn either on.
 
 `ProviderCatalogParityTest` (AU19) builds every table of §2.1 from the
 descriptors and compares it with today's constant, entry by entry. It is the
