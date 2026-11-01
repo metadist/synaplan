@@ -99,6 +99,18 @@ final class EgressHttpClientTest extends TestCase
         self::assertSame('final', $body->getContents());
     }
 
+    public function testAClientErrorBodyStaysReadableThroughPsr18(): void
+    {
+        $payload = '{"error":{"message":"invalid api key"}}';
+        $inner = new MockHttpClient(static fn (): MockResponse => new MockResponse($payload, ['http_code' => 401]));
+        $psr18 = new Psr18Client($this->client($inner, EgressMode::Enforce));
+
+        $response = $psr18->sendRequest($psr18->createRequest('GET', 'https://api.groq.com/openai/v1/chat/completions'));
+
+        self::assertSame(401, $response->getStatusCode());
+        self::assertSame($payload, $response->getBody()->getContents());
+    }
+
     public function testANonStreamableInnerResponseIsBufferedIntoASeekableStream(): void
     {
         $pending = new EgressPendingResponse(static fn (ResponseInterface $inner): ResponseInterface => $inner, new NonStreamableResponse(), 0);
