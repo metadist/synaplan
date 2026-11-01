@@ -1,3 +1,9 @@
+/**
+ * Bundled provider branding — the fallback for the first paint and for a
+ * name the server does not know. The source of truth is the provider
+ * catalog (`GET /api/v1/ai/providers`, `stores/providerCatalog.ts`), whose
+ * `icon`, `flag` and `local` these mirror by substring heuristics.
+ */
 export const getProviderIcon = (provider: string): string => {
   const providerLower = provider.toLowerCase()
   const providerCompact = providerLower.replace(/[\s_-]/g, '')

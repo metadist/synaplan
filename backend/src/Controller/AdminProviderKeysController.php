@@ -109,7 +109,7 @@ final class AdminProviderKeysController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Admin Provider Keys']
     )]
-    #[OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['anthropic', 'openai', 'groq', 'google', 'mistral', 'trustedtokens', 'a2agent', 'meta', 'cerebras', 'huggingface', 'xai', 'perplexity', 'thehive', 'higgsfield', 'elevenlabs']))]
+    #[OA\Parameter(name: 'provider', in: 'path', required: true, description: 'A provider name from GET /api/v1/ai/providers whose key lives in the platform store; an unknown name is 404', schema: new OA\Schema(type: 'string', example: 'groq'))]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(

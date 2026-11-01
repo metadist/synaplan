@@ -214,7 +214,7 @@ import {
   testProviderKey,
   type ProviderKeyStatus,
 } from '@/services/api/providerKeysApi'
-import { providerHelpByName } from '@/utils/providerHelp'
+import { useProviderCatalogStore } from '@/stores/providerCatalog'
 
 const props = defineProps<{
   provider: ProviderKeyStatus
@@ -236,7 +236,9 @@ const saving = ref(false)
 const testing = ref(false)
 const applying = ref(false)
 const removing = ref(false)
-const helpMeta = computed(() => providerHelpByName(props.provider.name))
+const providerCatalog = useProviderCatalogStore()
+providerCatalog.ensureLoaded()
+const helpMeta = computed(() => providerCatalog.helpFor(props.provider.name))
 
 /** Key + secret providers (Higgsfield): both halves or nothing. */
 const needsSecret = computed(() => Boolean(props.provider.secretEnvVar))
