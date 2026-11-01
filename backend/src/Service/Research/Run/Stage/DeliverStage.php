@@ -18,9 +18,9 @@ final readonly class DeliverStage implements ResearchStage
     public function run(StageContext $ctx): StageResult
     {
         $ledger = $ctx->state->ledger;
-        $grouped = $ledger->evidenceForWriter();
+        $grouped = EvidenceWindow::cards($ledger, $ctx->roles->checkerSameFamily);
         $report = $ledger->report();
-        if ([] === $grouped || null === $report) {
+        if ([] === $ledger->evidenceForWriter() || null === $report || '' === trim($report)) {
             return StageEnds::nothingFound($ctx);
         }
 

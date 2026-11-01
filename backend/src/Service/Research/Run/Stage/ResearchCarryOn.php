@@ -86,7 +86,7 @@ final class ResearchCarryOn
             $lines[] = $brief->goal;
             $lines[] = '';
         }
-        $grouped = $ctx->state->ledger->evidenceForWriter();
+        $grouped = EvidenceWindow::cards($ctx->state->ledger, $ctx->roles->checkerSameFamily);
         foreach ($ctx->state->ledger->points() as $point) {
             foreach ($grouped[$point->id] ?? [] as $card) {
                 $fact = trim((string) ($card['fact'] ?? ''));

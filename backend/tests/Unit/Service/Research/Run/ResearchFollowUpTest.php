@@ -174,7 +174,7 @@ final class ResearchFollowUpTest extends ResearchUnitCase
         $parent->ledger->setReport(
             "The price is 12. [e1]\n\n## Not confirmed\n\n- The delivery date is June. [e2]\n- The delivery date is June.\n1. The maker is in Lyon.\n\nThe warranty was not found.\n\n"
             ."1 of 4 statements are backed by a source. 3 were removed because the check could not confirm them in a source.\n\n"
-            .'A model of the same provider did the fact-check. This project has no second provider.',
+            .'This project has one model family. Research keeps only sentences a source quote supports. Add a second provider for a checked overview.',
         );
         $this->store->save($parent);
 

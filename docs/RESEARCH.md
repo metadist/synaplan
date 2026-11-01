@@ -146,16 +146,21 @@ nothing.
 After the report is written, the run checks it. The free check runs first
 and costs nothing: a cited statement must name evidence that exists, and
 its numbers, dates and proper names must appear in that evidence. A
-sentence that states a fact and cites nothing is removed. A second model
-then reads each remaining cited statement with its passages and returns
-supported, partial, unsupported or contradicted. Only a supported
-statement stays in the report. The rest joins the writer's "Not
-confirmed" section (what the writer already lists there is not checked
-again), and the report ends with how many statements a source backs. A
+sentence that states a fact and cites nothing is removed. A citation of a
+plan point (`p1`) is not a source, and a web source dated outside the
+brief's time frame cannot support a statement. A second model then reads
+each remaining cited statement with its passages and returns supported,
+partial, unsupported or contradicted. Only a supported statement stays in
+the report. A rejected statement is deleted. It is not copied into the
+writer's "Not confirmed" section; that section keeps the gaps the writer
+already named, and a cited sentence the writer hid there is checked with
+the rest. The report ends with how many statements a source backs. A
 batch holds at most 30 statements; when the budget runs out after the
-first batch, the statements not yet checked count as not confirmed and
-the report is still delivered. When the
-checker and the writer are the same provider, the report says so. Standard
+first batch, the statements not yet checked are removed the same way and
+the report is still delivered. When the checker and the writer are the
+same model family, the checker is not asked. A sentence stays only when a
+verified quote from inside the time frame supports it, and the report says
+the project has one model family. Standard
 and quick remove every statement that is not supported. When the checker
 marks a statement partial, a thorough run tries one revision first: the
 partial statement keeps the part a source backs, and the closing count
@@ -214,14 +219,15 @@ same stamp, which is how the chat shows the run and later its steps:
 
 The person reads the **reader's report**, not the checked report the run
 keeps (`report.markdown` in the run's state). The reader's report answers
-the question only: the "Not confirmed" section, the closing count and the
-same-provider sentence stay out of the message, a heading the check emptied
-goes with them, and every evidence id becomes the number of its source in
-the order the sources first appear (`[e12][e31]` reads as `[1][2]`). The
-sources are stored under the question like web-search results, so the chat
-shows them beneath the reply and the numbers link to them; the attached
-file lists them at the end. What the check removed, and whether a model of
-the same provider checked, is told in the research fold under the reply
+the question only: the closing count stays out of the message, a heading
+the check emptied goes with it, and every evidence id becomes the number
+of its source in the order the sources first appear (`[e12][e31]` reads as
+`[1][2]`). When that leaves no sentence, the message shows the gaps under
+"Not confirmed" and not the checked report. The sources are stored under
+the question like web-search results, so the chat shows them beneath the
+reply and the numbers link to them; the attached file lists them at the
+end. What the check removed, and that the project has one model family, is
+told in the research fold under the reply
 (`check` event: `statements`, `supported`, `softened`, `removed`,
 `same_provider`), and **Look deeper** still seeds its plan from the checked
 report's "Not confirmed" list. The reply's info panel shows what the run

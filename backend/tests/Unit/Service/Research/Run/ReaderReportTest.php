@@ -18,7 +18,7 @@ final class ReaderReportTest extends TestCase
         $checked = "# Visa\n\nThe fee is 90 EUR. [e2] Income must be 3,480 EUR. [e1][e2]\n\n"
             ."## Recommendation\n\n## Not confirmed\n\n- The tax rate.\n\n"
             ."2 of 3 statements are backed by a source. 1 were removed because the check could not confirm them in a source.\n\n"
-            .'A model of the same provider did the fact-check. This project has no second provider.';
+            .'This project has one model family. Research keeps only sentences a source quote supports. Add a second provider for a checked overview.';
 
         $reader = ReaderReport::from($checked, $ledger);
 
@@ -27,6 +27,20 @@ final class ReaderReportTest extends TestCase
         self::assertSame('https://pt.example/visa', $reader['sources'][0]['url']);
         self::assertSame('pt.example', $reader['sources'][0]['host']);
         self::assertSame('Fee 90 EUR.', $reader['sources'][0]['description']);
+    }
+
+    public function testAnEmptyAnswerShowsTheGapsAndNotARejectedClaim(): void
+    {
+        $report = "## Summary\n\n## Not confirmed\n\nThe election names are not in a source.\n\n- The fee is 50 EUR. [e1]\n\n"
+            ."0 of 1 statements are backed by a source.\n\n"
+            .'This project has one model family. Research keeps only sentences a source quote supports. Add a second provider for a checked overview.';
+
+        $reader = ReaderReport::from($report, $this->ledger());
+
+        self::assertStringContainsString('The election names are not in a source.', $reader['markdown']);
+        self::assertStringNotContainsString('50 EUR', $reader['markdown']);
+        self::assertStringNotContainsString('backed by a source', $reader['markdown']);
+        self::assertSame([], $reader['sources']);
     }
 
     public function testACitationToEvidenceThatDoesNotExistIsDropped(): void

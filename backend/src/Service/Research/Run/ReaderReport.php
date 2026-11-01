@@ -7,6 +7,7 @@ namespace App\Service\Research\Run;
 use App\Service\Research\Run\Ledger\EvidenceLedger;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\Stage\CheckReport;
+use App\Service\Research\Run\Stage\CitationMarks;
 
 /**
  * The report as the person reads it in the chat. The checked report keeps
@@ -33,6 +34,9 @@ final class ReaderReport
             static fn (string $line): bool => !CheckReport::isClosing($line),
         );
         $body = self::withoutEmptyHeadings(array_values($lines));
+        if ('' === trim($body)) {
+            return ['markdown' => self::gaps(CheckReport::notConfirmedBody($report)), 'sources' => []];
+        }
 
         return self::numbered($body, $ledger);
     }
@@ -55,6 +59,30 @@ final class ReaderReport
         }
 
         return trim($markdown)."\n\n".implode("\n", $lines);
+    }
+
+    /**
+     * The gaps, when the check left no sentence a source supports. A line
+     * that still cites a source is a rejected claim and stays out.
+     */
+    private static function gaps(string $section): string
+    {
+        if ('' === trim($section)) {
+            return '';
+        }
+        $kept = [];
+        foreach (preg_split("/\r\n|\r|\n/u", $section) ?: [] as $line) {
+            if (CitationMarks::cites($line) || CheckReport::isClosing($line)) {
+                continue;
+            }
+            $kept[] = rtrim($line);
+        }
+        $text = trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
+        if (1 === preg_match('/^#{1,6}\s+\S[\s\S]*$/u', $text) && 1 !== preg_match('/\n\s*\S/u', $text)) {
+            return '';
+        }
+
+        return $text;
     }
 
     /**

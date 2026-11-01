@@ -1183,7 +1183,7 @@
       },
       "check": "Doğrulama: {ratio} ifade desteklendi",
       "checkRemoved": "{count} tanesi hiçbir kaynak doğrulamadığı için yanıtın dışında bırakıldı.",
-      "checkSameProvider": "Aynı sağlayıcının bir modeli kontrol etti.",
+      "checkSameProvider": "Bu projede tek bir model ailesi var. Araştırma yalnızca bir kaynak alıntısının desteklediği cümleleri tutar. Kontrol edilmiş bir özet için ikinci bir sağlayıcı ekleyin.",
       "complete": "Bitti",
       "stopped": "Durduruldu",
       "failed": "Tamamlanamadı"

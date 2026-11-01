@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run\Stage;
 
+use App\Service\Research\Run\Ledger\PassageText;
+
 /**
  * Applies a standard fact-check to a report. Only a supported statement
- * stays. The rest is listed under Not confirmed, and the report ends with
- * the count. The writer already keeps a Not confirmed section for gaps; the
- * removed statements join it instead of opening a second one. A thorough
- * run may replace this with one writer revision; every other depth uses
- * this removal.
+ * stays. A statement the check rejects is deleted, including when the
+ * writer placed it under Not confirmed. That section keeps the gaps the
+ * writer already named. The report ends with the count. A thorough run
+ * may replace this with one writer revision; every other depth uses this
+ * removal.
  */
 final class CheckReport
 {
@@ -52,15 +54,15 @@ final class CheckReport
 
     /** @var array<string, string> */
     private const SAME_PROVIDER = [
-        'de' => 'Geprüft hat ein Modell desselben Anbieters. In diesem Projekt gibt es keinen zweiten Anbieter.',
-        'en' => 'A model of the same provider did the fact-check. This project has no second provider.',
-        'es' => 'La revisión la hizo un modelo del mismo proveedor. Este proyecto no tiene un segundo proveedor.',
-        'fr' => 'La vérification a été faite par un modèle du même fournisseur. Ce projet n\'a pas de second fournisseur.',
-        'tr' => 'Kontrolü aynı sağlayıcının bir modeli yaptı. Bu projede ikinci bir sağlayıcı yok.',
+        'de' => 'In diesem Projekt gibt es nur eine Modellfamilie. Die Recherche behält nur Sätze, die ein Quellenauszug stützt. Für eine geprüfte Übersicht einen zweiten Anbieter hinzufügen.',
+        'en' => 'This project has one model family. Research keeps only sentences a source quote supports. Add a second provider for a checked overview.',
+        'es' => 'Este proyecto tiene una sola familia de modelos. La investigación conserva solo las frases que respalda una cita de la fuente. Añada un segundo proveedor para un resumen verificado.',
+        'fr' => 'Ce projet n\'a qu\'une famille de modèles. La recherche ne garde que les phrases qu\'une citation de source confirme. Ajoutez un second fournisseur pour une synthèse vérifiée.',
+        'tr' => 'Bu projede tek bir model ailesi var. Araştırma yalnızca bir kaynak alıntısının desteklediği cümleleri tutar. Kontrol edilmiş bir özet için ikinci bir sağlayıcı ekleyin.',
     ];
 
     private const EMPTY_LIST_ITEM = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s*$/u';
-    private const LIST_ITEM = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s+\S/u';
+    private const LIST_MARKER = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s+/u';
 
     public static function notConfirmedTitle(string $language): string
     {
@@ -106,7 +108,69 @@ final class CheckReport
 
         $language = isset(self::HEADING[$language]) ? $language : 'en';
 
-        return self::close(self::list(self::tidy($report), $listed, $language), $language, $counts, $sameProvider);
+        return self::close(self::excise(self::tidy($report), $listed), $language, $counts, $sameProvider);
+    }
+
+    /**
+     * Cited lines do not belong under Not confirmed. They move into the
+     * body so the check can keep or delete them. A gap with no citation
+     * stays where the writer put it.
+     */
+    public static function promoteCited(string $report): string
+    {
+        $lines = self::lines($report);
+        $section = self::section($lines);
+        if (null === $section) {
+            return $report;
+        }
+        $claims = [];
+        $kept = [];
+        for ($i = $section['start']; $i < $section['end']; ++$i) {
+            $line = $lines[$i];
+            if ($i !== $section['start'] && !self::isTableRow($line) && CitationMarks::cites($line)) {
+                $claims[] = $line;
+                continue;
+            }
+            $kept[] = $line;
+        }
+        if ([] === $claims) {
+            return $report;
+        }
+        $before = array_slice($lines, 0, $section['start']);
+        $after = array_slice($lines, $section['end']);
+
+        return implode("\n", [...$before, ...$claims, '', ...$kept, ...$after]);
+    }
+
+    /**
+     * Deletes a rejected statement wherever it still stands, including a
+     * bullet under Not confirmed. A gap line that is not that statement
+     * stays.
+     *
+     * @param list<string> $bares
+     */
+    public static function excise(string $report, array $bares): string
+    {
+        $banned = [];
+        foreach ($bares as $bare) {
+            $key = PassageText::normalise($bare);
+            if ('' !== $key) {
+                $banned[$key] = true;
+            }
+        }
+        if ([] === $banned) {
+            return $report;
+        }
+        $kept = [];
+        foreach (self::lines($report) as $line) {
+            $text = trim((string) preg_replace(self::LIST_MARKER, '', $line));
+            if (isset($banned[PassageText::normalise(DraftSentences::bare($text))])) {
+                continue;
+            }
+            $kept[] = $line;
+        }
+
+        return self::tidy(implode("\n", $kept));
     }
 
     /**
@@ -223,34 +287,6 @@ final class CheckReport
         $line = trim($line);
 
         return str_starts_with($line, '|') && str_ends_with($line, '|') && strlen($line) > 1;
-    }
-
-    /**
-     * @param list<string> $listed
-     */
-    private static function list(string $report, array $listed, string $language): string
-    {
-        if ([] === $listed) {
-            return $report;
-        }
-        $items = array_map(static fn (string $text): string => '- '.$text, $listed);
-        $lines = self::lines($report);
-        $section = self::section($lines);
-        if (null === $section) {
-            return $report."\n\n".implode("\n", ['## '.self::HEADING[$language], '', ...$items]);
-        }
-
-        $at = $section['end'];
-        while ($at > $section['start'] + 1 && '' === trim($lines[$at - 1])) {
-            --$at;
-        }
-        $insert = 1 === preg_match(self::LIST_ITEM, $lines[$at - 1]) ? $items : ['', ...$items];
-        if ($at < count($lines)) {
-            $insert[] = '';
-        }
-        array_splice($lines, $at, 0, $insert);
-
-        return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $lines)));
     }
 
     /**
