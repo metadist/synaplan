@@ -111,7 +111,7 @@ REPORT);
         ], $verdicts);
     }
 
-    public function testAnAnswerWithoutTheVerdictEnvelopeStopsTheRun(): void
+    public function testAnAnswerWithoutTheVerdictEnvelopeStillDeliversTheDraft(): void
     {
         [$ctx, $caller] = $this->open(false);
         $this->card($ctx, 'The unit price is 12.40 EUR.');
@@ -120,10 +120,10 @@ REPORT);
 
         $result = $this->stage($caller)->run($ctx);
 
-        self::assertSame('done', $result->next);
-        self::assertSame(ResearchStatus::Failed, $ctx->state->status);
-        self::assertNotNull($ctx->state->outcome);
-        self::assertSame(ResearchOutcome::FAILED_MODEL_ERROR, $ctx->state->outcome->code);
+        self::assertSame('deliver', $result->next);
+        self::assertSame(ResearchStatus::Checking, $ctx->state->status);
+        self::assertNull($ctx->state->outcome);
+        self::assertSame('The price is 12.40 EUR. [e1]', $ctx->state->ledger->report());
     }
 
     public function testStatementsAreCheckedInBatches(): void

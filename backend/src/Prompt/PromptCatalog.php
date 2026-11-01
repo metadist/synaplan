@@ -2592,6 +2592,9 @@ round found nothing new — and leave "actions" empty in that case. Otherwise se
 - search {point, query, language, scope}: never repeat a query already run;
   change the words, the language or the source kind instead. scope is "web"
   or "both".
+Every action includes type, point, query, language, scope, source, question
+and options. A field that does not apply is null, and options is [] when
+you are not asking a question.
 The sources in <unread> are read in the next round anyway; do not spend an
 action on them.
 

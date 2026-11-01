@@ -71,6 +71,28 @@ final class GatherChoice
     }
 
     /**
+     * The sorting model did not answer. Open the first results anyway,
+     * one host at a time, so a failed selection does not end the research.
+     *
+     * @param list<array{id: string, url: string, host: string, title: string}> $hits
+     *
+     * @return list<array{url: string, title: string, kind: string, reason: string}>
+     */
+    public function opening(array $hits, int $room): array
+    {
+        $wanted = [];
+        foreach ($hits as $hit) {
+            $wanted[] = $hit + [
+                'kind' => 'other',
+                'reason' => 'Opened because the selection step did not answer.',
+                'preferred' => 0,
+            ];
+        }
+
+        return $this->diverse($wanted, $room);
+    }
+
+    /**
      * @param array{url: string, host: string, title: string} $hit
      * @param list<string>                                    $avoid
      */

@@ -37,7 +37,7 @@ final class ResearchDecisionSchema
                 'source' => ResearchJsonSchema::nullableString(),
                 'question' => ResearchJsonSchema::nullableString(),
                 'options' => ResearchJsonSchema::listOf(ResearchJsonSchema::string(), 4),
-            ], ['type'])),
+            ], ['type', 'point', 'query', 'language', 'scope', 'source', 'question', 'options'])),
             'finish' => ['type' => ['string', 'null'], 'enum' => ['covered', 'budget', 'no_progress', null]],
         ], ['points', 'actions', 'finish']);
     }

@@ -52,7 +52,14 @@ final readonly class WriteStage implements ResearchStage
             return $called->stop;
         }
 
-        $ctx->state->ledger->setReport($called->reply->text ?? '');
+        $text = trim($called->reply->text);
+        if ('' === $text) {
+            $text = (new ResearchCarryOn())->report($ctx);
+        }
+        if ('' === $text) {
+            return new StageResult('check');
+        }
+        $ctx->state->ledger->setReport($text);
         $total = count($sections);
         foreach ($sections as $index => $section) {
             $ctx->events->append($ctx->state->ref->id, 'section', [

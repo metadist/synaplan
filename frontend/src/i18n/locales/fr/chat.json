@@ -1222,7 +1222,8 @@
         "cost": "La limite de coût est atteinte.",
         "rounds": "La limite de tours est atteinte.",
         "gather": "Plus aucune recherche ni lecture disponible.",
-        "nothing_queued": "Il ne restait rien à consulter."
+        "nothing_queued": "Il ne restait rien à consulter.",
+        "decision_failed": "L’étape suivante n’a pas pu être choisie, la réponse est donc rédigée à partir de ce qui a déjà été trouvé."
       },
       "writing": "Rédaction",
       "section": "Rédigé",

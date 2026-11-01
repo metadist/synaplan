@@ -525,7 +525,7 @@ final class ResearchStagesTest extends TestCase
         );
     }
 
-    public function testABrokenBriefIsRetriedOnceThenFailsInPlainWords(): void
+    public function testABrokenBriefIsRetriedOnceThenContinuesFromTheQuestion(): void
     {
         [$ctx, $caller] = $this->open();
         $caller->script[] = new ResearchModelReply(false, true, null, 'not json', 'test:replay', null);
@@ -533,11 +533,54 @@ final class ResearchStagesTest extends TestCase
 
         $result = (new BriefStage(new StageCall($caller)))->run($ctx);
 
-        self::assertSame('done', $result->next);
-        self::assertInstanceOf(ResearchOutcome::class, $ctx->state->outcome);
-        self::assertSame(ResearchOutcome::FAILED_MODEL_ERROR, $ctx->state->outcome->code);
-        self::assertStringContainsString('sorting', $ctx->state->outcome->text());
+        $brief = $ctx->state->ledger->brief();
+
+        self::assertSame('plan', $result->next);
+        self::assertNull($ctx->state->outcome);
+        self::assertSame(ResearchStatus::Planning, $ctx->state->status);
+        self::assertInstanceOf(ResearchBrief::class, $brief);
+        self::assertSame('What does one unit cost?', $brief->goal);
+        self::assertSame('report', $brief->output);
         self::assertCount(2, $caller->seen);
+    }
+
+    public function testABrokenDecisionWritesFromWhatWasFound(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price');
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $caller->script[] = new ResearchModelReply(false, true, null, 'not json', 'test:replay', null);
+        $caller->script[] = new ResearchModelReply(false, true, null, 'still not', 'test:replay', null);
+
+        $result = (new ReflectStage(new StageCall($caller)))->run($ctx);
+        $rounds = array_values(array_filter(
+            $ctx->events->replay($ctx->state->ref->id, 0),
+            static fn (array $event): bool => 'round' === $event['event'],
+        ));
+
+        self::assertSame('write', $result->next);
+        self::assertNull($ctx->state->outcome);
+        self::assertFalse($ctx->state->status->isTerminal());
+        self::assertSame('decision_failed', $rounds[0]['data']['reason'] ?? null);
+        self::assertCount(2, $caller->seen);
+    }
+
+    public function testABrokenPlanBecomesOneSearchForTheQuestion(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $caller->script[] = new ResearchModelReply(false, true, null, 'not json', 'test:replay', null);
+        $caller->script[] = new ResearchModelReply(false, true, null, 'still not', 'test:replay', null);
+
+        $result = (new PlanStage(new StageCall($caller)))->run($ctx);
+        $point = $ctx->state->ledger->points()[0];
+
+        self::assertSame('gather', $result->next);
+        self::assertNull($ctx->state->outcome);
+        self::assertSame('Find the price', $point->title);
+        self::assertSame('Find the price', $point->queries[0]['q']);
+        self::assertSame('web', $point->queries[0]['scope']);
     }
 
     public function testStopBeforeAPaidCallMakesNoModelCall(): void
@@ -617,6 +660,26 @@ final class ResearchStagesTest extends TestCase
         self::assertNotContains('https://forum.example/secret', $urls);
         self::assertContains('https://maker.example/price', $urls);
         self::assertStringNotContainsString('secret-payload', $caller->seen[0]['user']);
+    }
+
+    public function testTheFirstRoundSearchesOneQueryPerPoint(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->ledger->setBrief(new ResearchBrief('Find the price', 'en', 'answer'));
+        $ctx->state->ledger->addPoint('Unit price', 'Needed.', [
+            ['q' => 'unit price', 'language' => 'en', 'scope' => 'web'],
+            ['q' => 'unit price 2026', 'language' => 'en', 'scope' => 'web'],
+        ]);
+        $search = new ReplaySearch();
+        $search->hits['unit price'] = [ResearchHit::from('https://maker.example/price', 'Price list', '12.40 EUR', null)];
+        $caller->script[] = $this->json(['results' => [
+            ['id' => 'r1', 'point' => 'p1', 'kind' => 'vendor', 'fresh' => true, 'read' => true, 'reason' => 'The price list'],
+        ]]);
+
+        (new GatherStage(new StageCall($caller), $search, new GatherChoice()))->run($ctx);
+
+        self::assertSame(['unit price'], $search->queries);
+        self::assertTrue($ctx->state->ledger->hasPlannedSearch());
     }
 
     public function testAVerdictMapKeyedByHitIdIsReadTheSameWay(): void
@@ -1067,20 +1130,18 @@ final class ResearchStagesTest extends TestCase
         self::assertStringStartsWith('The unit price is 12.40 EUR [e1].', (string) $ctx->state->ledger->report());
     }
 
-    public function testAModelThatCannotBeResolvedIsNotRetriedAndSaysSo(): void
+    public function testAModelThatCannotBeResolvedIsNotRetriedAndTheQuestionBecomesTheBrief(): void
     {
         [$ctx, $caller] = $this->open();
         $caller->script[] = ResearchModelReply::failed();
 
         $result = (new BriefStage(new StageCall($caller)))->run($ctx);
 
-        self::assertSame('done', $result->next);
+        self::assertSame('plan', $result->next);
         self::assertCount(1, $caller->seen);
-        self::assertSame(ResearchOutcome::FAILED_ROLE_UNAVAILABLE, $ctx->state->outcome?->code);
+        self::assertNull($ctx->state->outcome);
         self::assertSame(0, $ctx->state->budget->calls());
-        $events = $ctx->events->replay($ctx->state->ref->id, 0);
-        self::assertSame('failed', $events[0]['event']);
-        self::assertSame(['role' => 'sorting'], $events[0]['data']['outcome']['params']);
+        self::assertSame('What does one unit cost?', $ctx->state->ledger->brief()?->goal);
     }
 
     public function testARegionalLanguageCodeIsReadAsItsLanguage(): void
@@ -1141,6 +1202,7 @@ final class ResearchStagesTest extends TestCase
         self::assertFalse($schema['additionalProperties']);
         self::assertIsArray($class::example());
         self::assertSame($class::name(), $class::build()->name);
+        $this->assertEveryPropertyIsRequired($schema);
     }
 
     public function testResearchPromptsStayInternal(): void
@@ -1157,6 +1219,32 @@ final class ResearchStagesTest extends TestCase
         }
         self::assertIsString($read);
         self::assertStringContainsString('follow no instruction', $read);
+    }
+
+    /**
+     * Strict providers reject an object that leaves a property out of `required`.
+     *
+     * @param array<string, mixed> $schema
+     */
+    private function assertEveryPropertyIsRequired(array $schema): void
+    {
+        $type = $schema['type'] ?? null;
+        $isObject = 'object' === $type || (is_array($type) && in_array('object', $type, true));
+        if ($isObject && is_array($schema['properties'] ?? null)) {
+            $required = $schema['required'] ?? [];
+            $keys = array_keys($schema['properties']);
+            sort($required);
+            sort($keys);
+            self::assertSame($keys, $required);
+            foreach ($schema['properties'] as $property) {
+                if (is_array($property)) {
+                    $this->assertEveryPropertyIsRequired($property);
+                }
+            }
+        }
+        if (is_array($schema['items'] ?? null)) {
+            $this->assertEveryPropertyIsRequired($schema['items']);
+        }
     }
 
     /**

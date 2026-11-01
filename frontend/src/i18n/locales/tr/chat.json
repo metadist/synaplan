@@ -1163,7 +1163,8 @@
         "cost": "Maliyet sınırına ulaşıldı.",
         "rounds": "Tur sınırına ulaşıldı.",
         "gather": "Arama veya okuma hakkı kalmadı.",
-        "nothing_queued": "Bakılacak bir şey kalmamıştı."
+        "nothing_queued": "Bakılacak bir şey kalmamıştı.",
+        "decision_failed": "Sonraki adım seçilemedi, bu yüzden yanıt daha önce bulunanlarla yazılıyor."
       },
       "writing": "Yazılıyor",
       "section": "Yazıldı",

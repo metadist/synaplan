@@ -54,6 +54,9 @@ final readonly class GatherStage implements ResearchStage
         }
 
         $hits = [];
+        // One web search per point this round. The rest of the plan stays
+        // queued, so the lead can still steer the next round.
+        $searchedPoint = [];
         foreach ($ctx->state->ledger->points() as $point) {
             foreach ($point->queries as $query) {
                 if ('web' !== $query['scope']) {
@@ -63,7 +66,7 @@ final readonly class GatherStage implements ResearchStage
                         $ran[$fileKey] = true;
                     }
                 }
-                if ('files' === $query['scope'] || !$ctx->webOn() || !$ctx->state->budget->canSearch()) {
+                if ('files' === $query['scope'] || !$ctx->webOn() || !$ctx->state->budget->canSearch() || isset($searchedPoint[$point->id])) {
                     continue;
                 }
                 $key = $point->id.'|'.$query['q'];
@@ -73,6 +76,7 @@ final readonly class GatherStage implements ResearchStage
                 $found = $this->search->search($query['q'], $query['language'], $view['perSearch'], $ctx->state->ref->userId);
                 $ctx->state->budget->spend('searches');
                 $ran[$key] = true;
+                $searchedPoint[$point->id] = true;
                 $ctx->state->ledger->addQuery($point->id, $query['q'], $query['scope'], count($found));
                 $ctx->events->append($ctx->state->ref->id, 'search', [
                     'point' => $point->id,
@@ -131,13 +135,18 @@ final readonly class GatherStage implements ResearchStage
         if ($called->stop instanceof StageResult) {
             return $called->stop;
         }
+        $room = $ctx->state->budget->sourcesLeft() * self::SPARE_FACTOR;
+        $reply = $called->reply;
+        if (!$reply instanceof ResearchModelReply || !$reply->ok) {
+            return $this->choice->opening($hits, $room);
+        }
 
         return $this->choice->choose(
             $hits,
-            GatherChoice::verdicts(is_array($called->reply->data) ? $called->reply->data : []),
+            GatherChoice::verdicts(is_array($reply->data) ? $reply->data : []),
             null !== $brief ? $brief->mustUse : [],
             null !== $brief ? $brief->mustAvoid : [],
-            $ctx->state->budget->sourcesLeft() * self::SPARE_FACTOR,
+            $room,
         );
     }
 

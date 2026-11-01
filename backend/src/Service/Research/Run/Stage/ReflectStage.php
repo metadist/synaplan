@@ -63,8 +63,16 @@ final readonly class ReflectStage implements ResearchStage
         if ($called->stop instanceof StageResult) {
             return $called->stop;
         }
+        // A decision that did not arrive must not start another round, or a
+        // model that keeps failing would loop until the budget and then die.
+        $reply = $called->reply;
+        if (!$reply instanceof ResearchModelReply || !$reply->ok || !is_array($reply->data)) {
+            $this->roundEvent($ctx, 'write', 'decision_failed');
 
-        $data = is_array($called->reply->data) ? $called->reply->data : [];
+            return new StageResult('write');
+        }
+
+        $data = $reply->data;
         $this->applyPoints($ctx, $data);
         $ctx->state->budget->spend('rounds');
         $finish = $this->actions->finish($data);

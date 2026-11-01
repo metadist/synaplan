@@ -67,11 +67,10 @@ final readonly class LeadStage
         if ($turn->called) {
             $this->charge($ctx, $turn);
         }
-        if (!$turn->called) {
-            return StageEnds::roleUnavailable($ctx, 'planning');
-        }
-        if (!$turn->ok) {
-            return StageEnds::model($ctx, 'planning');
+        if (!$turn->called || !$turn->ok) {
+            $this->roundEvent($ctx, 'write', 'decision_failed');
+
+            return $this->toReport($ctx);
         }
 
         $ctx->state->budget->spend('rounds');

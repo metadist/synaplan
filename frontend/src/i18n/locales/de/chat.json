@@ -1220,7 +1220,8 @@
         "cost": "Das Kostenlimit ist erreicht.",
         "rounds": "Das Limit an Runden ist erreicht.",
         "gather": "Keine Suchen oder Lesevorgänge mehr übrig.",
-        "nothing_queued": "Es gab nichts mehr nachzuschlagen."
+        "nothing_queued": "Es gab nichts mehr nachzuschlagen.",
+        "decision_failed": "Der nächste Schritt ließ sich nicht wählen, deshalb wird die Antwort aus dem, was schon gefunden wurde, geschrieben."
       },
       "writing": "Schreibe",
       "section": "Geschrieben",

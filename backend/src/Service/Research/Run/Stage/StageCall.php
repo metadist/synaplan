@@ -9,8 +9,9 @@ use App\Service\Research\Run\ResearchLease;
 
 /**
  * One paid call, and a single retry when the answer is not the JSON shape.
- * Stop and an exhausted budget are checked before each attempt. A model that
- * cannot be resolved is not retried: nothing was called, so nothing is charged.
+ * Stop and an exhausted budget end the run. A model that does not answer
+ * does not: the reply comes back unusable and the stage continues with
+ * what the run already has. A model that cannot be resolved is not retried.
  */
 final readonly class StageCall
 {
@@ -46,19 +47,13 @@ final readonly class StageCall
         if (self::usable($reply, $schema)) {
             return StageCallResult::reply($reply);
         }
-        if (!$reply->called) {
-            return StageCallResult::stop(StageEnds::roleUnavailable($ctx, $role));
-        }
-        if (null === $schema) {
-            return StageCallResult::stop(StageEnds::model($ctx, $role));
+        if (!$reply->called || null === $schema) {
+            return StageCallResult::reply($reply);
         }
 
         $retry = $this->attempt($ctx, $role, $modelId, $system."\n\nReturn JSON only, in the required shape.", $user, $schema);
         if ($retry instanceof StageResult) {
             return StageCallResult::stop($retry);
-        }
-        if (!self::usable($retry, $schema)) {
-            return StageCallResult::stop(StageEnds::model($ctx, $role));
         }
 
         return StageCallResult::reply($retry);

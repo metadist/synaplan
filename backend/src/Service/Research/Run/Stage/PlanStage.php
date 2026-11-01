@@ -6,6 +6,7 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\Schema\ResearchPlanSchema;
 use App\Service\Research\Run\Ledger\PlanPoint;
+use App\Service\Research\Run\Ledger\ResearchBrief;
 use App\Service\Research\Run\ResearchDepth;
 use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
@@ -24,9 +25,13 @@ final readonly class PlanStage implements ResearchStage
 
     public function run(StageContext $ctx): StageResult
     {
+        $carried = (new ResearchCarryOn())->ensureBrief($ctx);
+        if ($carried instanceof StageResult) {
+            return $carried;
+        }
         $brief = $ctx->state->ledger->brief();
         if (null === $brief) {
-            return StageEnds::model($ctx, 'planning');
+            return StageEnds::nothingFound($ctx);
         }
         $view = StageBudget::view($ctx->state->budget);
         [$view['pointsMin'], $view['pointsMax']] = $this->ceiling->pointsRange($ctx->state, $view['pointsMin'], $view['pointsMax']);
@@ -54,14 +59,56 @@ final readonly class PlanStage implements ResearchStage
             return $called->stop;
         }
 
-        $data = $called->reply->data ?? [];
+        $data = is_array($called->reply?->data) ? $called->reply->data : [];
         $rows = $data['points'] ?? null;
         if (!is_array($rows)) {
-            return StageEnds::model($ctx, 'planning');
+            $rows = [];
         }
+        $kept = $this->keepPoints($ctx, $rows, $brief, $view['pointsMax']);
+        if (0 === $kept) {
+            $carried = (new ResearchCarryOn())->plan($ctx);
+            if ($carried instanceof StageResult) {
+                return $carried;
+            }
+            $kept = count($ctx->state->ledger->points());
+        }
+        if (0 === $kept) {
+            return StageEnds::nothingFound($ctx);
+        }
+
+        $outline = array_values(array_filter(
+            is_array($data['outline'] ?? null) ? $data['outline'] : [],
+            static fn (mixed $section): bool => is_string($section),
+        ));
+        if ([] !== $outline) {
+            $ctx->state->ledger->setOutline($outline);
+        } elseif ([] === $ctx->state->ledger->outline()) {
+            $ctx->state->ledger->setOutline(['Summary']);
+        }
+        $this->announcePlan($ctx, $kept, $view['minutes']);
+        $writing = StageEnds::writeNow($ctx);
+        if ($writing instanceof StageResult) {
+            return $writing;
+        }
+        if (ResearchDepth::Thorough === $ctx->state->ref->depth) {
+            $ctx->state->advance(ResearchStatus::WaitingPlan);
+            $ctx->events->append($ctx->state->ref->id, 'plan_waiting', []);
+
+            return new StageResult('wait_plan');
+        }
+        $ctx->state->advance(ResearchStatus::Gathering);
+
+        return new StageResult('gather');
+    }
+
+    /**
+     * @param list<mixed> $rows
+     */
+    private function keepPoints(StageContext $ctx, array $rows, ResearchBrief $brief, int $max): int
+    {
         $kept = 0;
         foreach ($rows as $row) {
-            if ($kept >= $view['pointsMax'] || !is_array($row)) {
+            if ($kept >= $max || !is_array($row)) {
                 continue;
             }
             $title = trim((string) ($row['title'] ?? ''));
@@ -86,28 +133,8 @@ final readonly class PlanStage implements ResearchStage
             $ctx->state->ledger->addPoint($title, (string) ($row['why'] ?? ''), $queries);
             ++$kept;
         }
-        if (0 === $kept) {
-            return StageEnds::model($ctx, 'planning');
-        }
 
-        $ctx->state->ledger->setOutline(array_values(array_filter(
-            is_array($data['outline'] ?? null) ? $data['outline'] : [],
-            static fn (mixed $section): bool => is_string($section),
-        )));
-        $this->announcePlan($ctx, $kept, $view['minutes']);
-        $writing = StageEnds::writeNow($ctx);
-        if ($writing instanceof StageResult) {
-            return $writing;
-        }
-        if (ResearchDepth::Thorough === $ctx->state->ref->depth) {
-            $ctx->state->advance(ResearchStatus::WaitingPlan);
-            $ctx->events->append($ctx->state->ref->id, 'plan_waiting', []);
-
-            return new StageResult('wait_plan');
-        }
-        $ctx->state->advance(ResearchStatus::Gathering);
-
-        return new StageResult('gather');
+        return $kept;
     }
 
     /**

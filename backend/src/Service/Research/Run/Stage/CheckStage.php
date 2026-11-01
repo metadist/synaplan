@@ -22,7 +22,8 @@ use App\Service\Research\Run\ResearchStatus;
  * report ends with
  * the count. When the budget runs out after the first batch, the
  * statements not yet checked count as not confirmed, so the paid report
- * is still delivered.
+ * is still delivered. When the checker does not answer at all, the draft
+ * is delivered as it was written.
  */
 final readonly class CheckStage implements ResearchStage
 {
@@ -73,7 +74,12 @@ final readonly class CheckStage implements ResearchStage
             }
             $parsed = $this->verdicts($called->reply?->data, $group);
             if (null === $parsed) {
-                return StageEnds::model($ctx, 'checker');
+                // No verdict list at all: the draft stands. A later batch that
+                // fails keeps the verdicts already in hand and stops asking.
+                if ([] === $verdicts) {
+                    return new StageResult('deliver');
+                }
+                break;
             }
             $verdicts += $parsed;
         }
