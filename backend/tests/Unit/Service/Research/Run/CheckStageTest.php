@@ -120,10 +120,15 @@ REPORT);
 
         $result = $this->stage($caller)->run($ctx);
 
+        $report = $ctx->state->ledger->report();
+
         self::assertSame('deliver', $result->next);
         self::assertSame(ResearchStatus::Checking, $ctx->state->status);
         self::assertNull($ctx->state->outcome);
-        self::assertSame('The price is 12.40 EUR. [e1]', $ctx->state->ledger->report());
+        self::assertIsString($report);
+        self::assertStringContainsString('The price is 12.40 EUR. [e1]', $report);
+        self::assertStringContainsString('0 of 1 statements are backed by a source.', $report);
+        self::assertSame(['statements' => 1, 'supported' => 0, 'removed' => 0], $ctx->state->ledger->check());
     }
 
     public function testStatementsAreCheckedInBatches(): void

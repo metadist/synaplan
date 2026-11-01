@@ -72,24 +72,27 @@ final class GatherChoice
 
     /**
      * The sorting model did not answer. Open the first results anyway,
-     * one host at a time, so a failed selection does not end the research.
+     * still honouring hosts the person excluded and sources they named.
      *
      * @param list<array{id: string, url: string, host: string, title: string}> $hits
+     * @param list<string>                                                      $mustUse
+     * @param list<string>                                                      $mustAvoid
      *
      * @return list<array{url: string, title: string, kind: string, reason: string}>
      */
-    public function opening(array $hits, int $room): array
+    public function opening(array $hits, int $room, array $mustUse = [], array $mustAvoid = []): array
     {
-        $wanted = [];
+        $verdicts = [];
         foreach ($hits as $hit) {
-            $wanted[] = $hit + [
+            $verdicts[$hit['id']] = [
+                'id' => $hit['id'],
+                'read' => true,
                 'kind' => 'other',
                 'reason' => 'Opened because the selection step did not answer.',
-                'preferred' => 0,
             ];
         }
 
-        return $this->diverse($wanted, $room);
+        return $this->choose($hits, $verdicts, $mustUse, $mustAvoid, $room);
     }
 
     /**

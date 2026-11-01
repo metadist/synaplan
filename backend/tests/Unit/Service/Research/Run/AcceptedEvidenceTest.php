@@ -27,6 +27,23 @@ final class AcceptedEvidenceTest extends TestCase
         self::assertCount(1, $cards);
         self::assertSame('p1', $cards[0]->pointId);
         self::assertSame(['§1'], $cards[0]->passages);
+        self::assertSame([], $cards[0]->quotes);
+    }
+
+    public function testAQuoteCitedAsABareNumberStaysWithItsPassage(): void
+    {
+        $cards = $this->accept([
+            'point' => 'p1',
+            'fact' => 'The unit price is 12.40 EUR.',
+            'passages' => ['p1'],
+            'quote' => ['text' => '12.40 EUR', 'passage' => '1'],
+            'confidence' => 'high',
+        ]);
+
+        self::assertCount(1, $cards);
+        self::assertSame(['§1'], $cards[0]->passages);
+        self::assertCount(1, $cards[0]->quotes);
+        self::assertTrue($cards[0]->quotes[0]->verified);
     }
 
     public function testAnInventedPassageIdIsNotMatchedByHuntingThePage(): void

@@ -81,11 +81,12 @@ final readonly class AcceptedEvidence
         if (!is_array($quote) || !is_string($quote['text'] ?? null) || !is_string($quote['passage'] ?? null)) {
             return [];
         }
+        $passage = $this->passageId($quote['passage'], $map);
         $words = preg_split('/\s+/u', trim($quote['text'])) ?: [];
-        if (count($words) > 25 || !in_array($quote['passage'], $passages, true)) {
+        if (count($words) > 25 || null === $passage || !in_array($passage, $passages, true)) {
             return [];
         }
-        $match = $this->verifier->quoteInPassage($quote['text'], $quote['passage'], $map);
+        $match = $this->verifier->quoteInPassage($quote['text'], $passage, $map);
 
         return $match instanceof QuoteMatch ? [$match] : [];
     }
@@ -170,7 +171,7 @@ final readonly class AcceptedEvidence
         if ('' !== $id && null !== $map->text($id)) {
             return $id;
         }
-        $bare = preg_replace('/^(?:§|section|passage)\s*/iu', '', $id) ?? $id;
+        $bare = preg_replace('/^(?:§|section|passage|p)\s*/iu', '', $id) ?? $id;
         if (1 === preg_match('/^(\d+)$/u', trim($bare), $match) && null !== $map->text('§'.$match[1])) {
             return '§'.$match[1];
         }

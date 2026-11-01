@@ -138,7 +138,12 @@ final readonly class GatherStage implements ResearchStage
         $room = $ctx->state->budget->sourcesLeft() * self::SPARE_FACTOR;
         $reply = $called->reply;
         if (!$reply instanceof ResearchModelReply || !$reply->ok) {
-            return $this->choice->opening($hits, $room);
+            return $this->choice->opening(
+                $hits,
+                $room,
+                null !== $brief ? $brief->mustUse : [],
+                null !== $brief ? $brief->mustAvoid : [],
+            );
         }
 
         return $this->choice->choose(

@@ -77,7 +77,17 @@ final readonly class ResearchPipeline implements ResearchUnitRunner
             return $writing;
         }
         if ($this->lead->active($ctx)) {
-            return $this->lead->run($ctx);
+            $led = $this->lead->run($ctx);
+            if ('read' !== $led->next) {
+                return $led;
+            }
+            $read = $this->read->run($ctx);
+            if ('write' !== $read->next || $ctx->state->status->isTerminal()) {
+                return $read;
+            }
+            $ctx->state->advance(ResearchStatus::Writing);
+
+            return new StageResult('write');
         }
         $ctx->state->evidenceBeforeRound = $ctx->state->ledger->evidenceCount();
         $gathered = $this->gather->run($ctx);
