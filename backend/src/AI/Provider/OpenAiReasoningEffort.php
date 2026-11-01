@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\ReasoningLadder;
+use App\AI\Catalog\ReasoningLevelRule;
+use App\AI\Catalog\ReasoningMatch;
+
 /**
  * Accepted `reasoning.effort` tiers per OpenAI model family, cheapest first.
  *
@@ -46,6 +50,30 @@ final class OpenAiReasoningEffort
 
     /** Every tier name OpenAI uses, cheapest first. */
     private const LADDER = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+    /**
+     * Model families that expose a level knob at all. Everything else (gpt-4o,
+     * the audio and image models) keeps the on/off Thinking toggle.
+     *
+     * @var list<string>
+     */
+    private const REASONING_FAMILIES = ['gpt-5', 'gpt-6', 'o1', 'o3', 'o4'];
+
+    /**
+     * The same table as a catalog ladder: every {@see self::TIERS} prefix in
+     * order, then the o-series on the fallback tiers. A model outside
+     * {@see self::REASONING_FAMILIES} matches no rule.
+     */
+    public static function ladder(): ReasoningLadder
+    {
+        $ladder = ReasoningLadder::prefixes(self::TIERS);
+        $fallbackFamilies = array_values(array_filter(
+            self::REASONING_FAMILIES,
+            static fn (string $family): bool => !isset(self::TIERS[$family]),
+        ));
+
+        return $ladder->with(new ReasoningLevelRule(ReasoningMatch::Prefix, $fallbackFamilies, self::TIERS_FALLBACK));
+    }
 
     /**
      * Tiers the given model accepts, cheapest first.

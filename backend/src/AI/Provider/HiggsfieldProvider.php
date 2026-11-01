@@ -45,7 +45,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
     private const PROVIDER_NAME = 'higgsfield';
     private const DISPLAY_NAME = 'Higgsfield';
 
-    private const BASE_URL = 'https://platform.higgsfield.ai';
+    public const BASE_URL = 'https://platform.higgsfield.ai';
 
     private const DEFAULT_TEXT_TO_IMAGE_MODEL = 'higgsfield-ai/soul/standard';
     private const DEFAULT_IMAGE_TO_VIDEO_MODEL = 'higgsfield-ai/dop/standard';

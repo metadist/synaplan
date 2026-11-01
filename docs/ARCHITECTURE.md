@@ -371,6 +371,38 @@ Hooks implement `AiCallHookInterface` (or `StreamingAiCallHookInterface` to obse
 
 `HookContractTest` pins the priority order and enforces that non-blocking hooks never inject `HttpClientInterface`, `AiFacade`, `EntityManagerInterface`, or a repository. Blocking hooks receive a cooperative `AiCallDeadline` on `$call->options->deadline`; `AiCallPipeline` times every hook with `hrtime(true)`, logs `ai.hook_timeout` when a hook exceeds its `budgetMs`, and applies `HookFailure::Closed` refusals when an over-budget `before()` returns. Embedding cache + fallback (`AiEmbeddingExecutor`) and vision candidate fallback (`AiVisionExecutor`) sit under `AiFacade` and dispatch each provider call through the same pipeline.
 
+### Provider catalog — `ProviderCatalog`
+
+Every provider describes itself once, in typed PHP
+(`_devextras/planning/20261021-architecture-update/03_contracts.md` §2): a
+`ProviderDescriptor` (`App\AI\Catalog\`) with its name, display name,
+capabilities (`ProviderCapability`, the eight registry keys), the hosts it
+calls (`ProviderEndpoint`), how it is authenticated (`ProviderKeySpec`:
+store kind, env vars, console URL, validation request, model listing, the
+Admin → AI keys presentation), its request dialects (`ProviderDialects`:
+structured-output dialect, tool calling, inline images, the
+`ReasoningLadder`), its recommended defaults (`ProviderDefaults`), its
+price-sync lookup (`ProviderPricing`), its live-voice cap and its branding
+(`ProviderBranding`). The class carries `#[AsAiProvider]` and implements
+`DescribesProviderInterface` (`public static function descriptor()`);
+`App\Kernel::build()` registers the attribute for autoconfiguration, the
+configurator refuses a class that does not describe itself, and
+`ProviderCatalogPass` hands the class names to `ProviderCatalog`, which
+never instantiates a provider. Adapters frozen in the size ledger describe
+themselves through a sibling `App\AI\Provider\Descriptor\<Name>Descriptor`
+instead; a key-only row without an adapter (ElevenLabs) is a descriptor
+class with no capability.
+
+`ProviderCatalogParityTest` rebuilds every name-keyed provider table of the
+code base from the descriptors — the key store and key catalog, the BYOK
+list, the recommended defaults and preference order, the Chat Completions
+upstreams, the structured-output and tool-calling rules, the reasoning
+ladders, the model-list probe, the price prefixes, the live-voice caps, the
+admin enum, the system-config fields, the container tags, the exception
+spellings, the egress hosts — and compares each with today's constant. Until
+those consumers read the catalog (AU20) the descriptors are a proven second
+copy; after it, the catalog is the only copy.
+
 A vendor's adapter in `App\AI\Provider\` is what the registry knows: its
 name, its capability interfaces and its `app.ai.<capability>` tags in
 `config/services.yaml`. A large adapter is a façade over a folder of its

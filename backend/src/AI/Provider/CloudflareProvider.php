@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use Psr\Log\LoggerInterface;
@@ -27,7 +36,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://developers.cloudflare.com/workers-ai/models/bge-m3/
  * @see https://developers.cloudflare.com/workers-ai/models/qwen3-embedding-0.6b/
  */
-class CloudflareProvider implements EmbeddingProviderInterface
+#[AsAiProvider]
+class CloudflareProvider implements EmbeddingProviderInterface, DescribesProviderInterface
 {
     private const API_BASE = 'https://api.cloudflare.com/client/v4/accounts';
     private const DEFAULT_MODEL = '@cf/baai/bge-m3';
@@ -41,6 +51,24 @@ class CloudflareProvider implements EmbeddingProviderInterface
         private readonly ?string $accountId = null,
         private readonly ?string $apiToken = null,
     ) {
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'cloudflare',
+            displayName: 'Cloudflare Workers AI',
+            capabilities: [ProviderCapability::Embedding],
+            endpoints: [ProviderEndpoint::api(self::API_BASE)],
+            // The token and the account id are environment-only; no row in the
+            // platform key store.
+            key: ProviderKeySpec::envOnly('CLOUDFLARE_API_TOKEN', 'Cloudflare API token with Workers AI access'),
+            dialects: new ProviderDialects(),
+            defaults: null,
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding(icon: 'simple-icons:cloudflare'),
+        );
     }
 
     public function getName(): string

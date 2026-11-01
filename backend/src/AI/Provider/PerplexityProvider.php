@@ -4,6 +4,18 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
@@ -17,7 +29,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Search stays on {@see \App\Plug\WebSearch\Adapter\PerplexityAdapter}; both
  * share {@see ProviderKeyStore} key `perplexity`.
  */
-final class PerplexityProvider implements ChatProviderInterface
+#[AsAiProvider]
+final class PerplexityProvider implements ChatProviderInterface, DescribesProviderInterface
 {
     private const PROVIDER_NAME = 'perplexity';
     private const DISPLAY_NAME = 'Perplexity';
@@ -38,6 +51,31 @@ final class PerplexityProvider implements ChatProviderInterface
         private readonly ?\Closure $sdkFactory = null,
         private readonly ?HttpClientInterface $httpClient = null,
     ) {
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: self::PROVIDER_NAME,
+            displayName: self::DISPLAY_NAME,
+            capabilities: [ProviderCapability::Chat],
+            endpoints: [ProviderEndpoint::chatCompletions(self::BASE_URI.'/chat/completions')],
+            key: ProviderKeySpec::platform(
+                envVar: self::ENV_VAR,
+                consoleUrl: 'https://www.perplexity.ai/account/api',
+                validation: ProviderKeyValidation::bearer(self::BASE_URI.'/models'),
+                listOrder: 12,
+                modelListing: ModelListing::Lists,
+            ),
+            // Sonar answers from live search; no schema mode, no tool routing.
+            dialects: new ProviderDialects(),
+            // A chat default, never auto-picked on first run: Sonar is a web answer
+            // engine, not a general assistant.
+            defaults: new ProviderDefaults(bindings: ['CHAT' => 'perplexity:sonar:chat'], preferenceRank: null),
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding(icon: 'mdi:robot', helpKey: 'perplexity'),
+        );
     }
 
     public function getName(): string

@@ -56,7 +56,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
     private const DISPLAY_NAME = 'xAI';
     private const ENV_VAR = 'XAI_API_KEY';
 
-    private const BASE_URI = 'https://api.x.ai/v1';
+    public const BASE_URI = 'https://api.x.ai/v1';
 
     private const DEFAULT_CHAT_MODEL = 'grok-4.5';
     private const DEFAULT_VISION_MODEL = 'grok-4.5';
@@ -80,12 +80,12 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
      *
      * @var list<string>
      */
-    private const REASONING_EFFORTS = ['none', 'low', 'medium', 'high'];
+    public const REASONING_EFFORTS = ['none', 'low', 'medium', 'high'];
 
     /**
      * @var list<string>
      */
-    private const REASONING_EFFORTS_47 = ['low', 'medium', 'high', 'xhigh'];
+    public const REASONING_EFFORTS_47 = ['low', 'medium', 'high', 'xhigh'];
 
     /**
      * Model families that accept `reasoning_effort`. grok-4.5 and grok-4.6

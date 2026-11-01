@@ -56,8 +56,8 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  */
 class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
 {
-    private const API_VERSION = '2023-06-01';
-    private const BASE_URL = 'https://api.anthropic.com/v1';
+    public const API_VERSION = '2023-06-01';
+    public const BASE_URL = 'https://api.anthropic.com/v1';
     private const DEFAULT_MAX_TOKENS = 4096;
 
     private const THINKING_MODELS = [
@@ -136,7 +136,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     private const THINKING_DISPLAY_UPDATES_BETA = 'thinking-display-updates-2026-08-18';
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
-    private const ADAPTIVE_THINKING_MODELS = [
+    public const ADAPTIVE_THINKING_MODELS = [
         'claude-opus-4-6',
         'claude-opus-4-7',
         'claude-opus-4-8',

@@ -53,7 +53,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
     private const DEFAULT_TTS_VOICE = 'fr_marie_neutral';
     private const DEFAULT_VISION_MODEL = 'mistral-medium-latest';
     private const VISION_MAX_TOKENS = 2048;
-    private const CHAT_ENDPOINT = 'https://api.mistral.ai/v1/chat/completions';
+    public const CHAT_ENDPOINT = 'https://api.mistral.ai/v1/chat/completions';
     private const CHAT_TIMEOUT_SECONDS = 180;
 
     /**

@@ -4,6 +4,19 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
+use App\AI\StructuredOutput\StructuredOutputDialect;
+
 /**
  * A2Agent — OpenAI-compatible gateway (Omnimodel Technology Limited) for
  * Chinese frontier models (Qwen, DeepSeek, MiniMax).
@@ -15,12 +28,48 @@ namespace App\AI\Provider;
  * @see https://a2agent.me/integrations
  * @see https://a2agent.me/v1
  */
+#[AsAiProvider]
 class A2AgentProvider extends AbstractChatCompletionsCloudProvider
 {
     private const PROVIDER_NAME = 'a2agent';
     private const BASE_URI = 'https://a2agent.me/v1';
     private const DEFAULT_CHAT_MODEL = 'deepseek-v4-pro';
     private const DEFAULT_VISION_MODEL = 'qwen3.8-flash';
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: self::PROVIDER_NAME,
+            displayName: 'A2Agent',
+            capabilities: [ProviderCapability::Chat, ProviderCapability::Vision],
+            endpoints: [ProviderEndpoint::chatCompletions(self::BASE_URI.'/chat/completions')],
+            key: ProviderKeySpec::platform(
+                envVar: 'A2AGENT_API_KEY',
+                consoleUrl: 'https://a2agent.me/',
+                validation: ProviderKeyValidation::bearer(self::BASE_URI.'/models'),
+                listOrder: 7,
+                modelListing: ModelListing::Lists,
+                fieldDescription: 'A2Agent API key — Qwen, DeepSeek and MiniMax via the A2Agent gateway (Chinese model vendors)',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
+                catalogToolUse: true,
+            ),
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'a2agent:deepseek-v4-pro:chat',
+                'TOOLS' => 'a2agent:deepseek-v4-pro:chat',
+                'ANALYZE' => 'a2agent:deepseek-v4-pro:chat',
+                'SORT' => 'a2agent:qwen3.8-flash:chat',
+                'PLAN' => 'a2agent:qwen3.8-flash:chat',
+                'SUMMARIZE' => 'a2agent:qwen3.8-flash:chat',
+                'PIC2TEXT' => 'a2agent:qwen3.8-flash:pic2text',
+            ], preferenceRank: 9),
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            // No brand glyph in Iconify; a transit hub reads as "routed through a reseller".
+            branding: new ProviderBranding(icon: 'mdi:transit-connection-variant', flag: 'circle-flags:cn', helpKey: 'a2agent'),
+        );
+    }
 
     public function getName(): string
     {

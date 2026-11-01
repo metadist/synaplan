@@ -4,11 +4,24 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\ModelListing;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeySpec;
+use App\AI\Catalog\ProviderKeyValidation;
+use App\AI\Catalog\ProviderPricing;
+use App\AI\Catalog\ReasoningLadder;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -37,6 +50,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://dev.meta.ai/docs/speech-to-text
  * @see https://dev.meta.ai/docs/models
  */
+#[AsAiProvider]
 class MetaProvider extends AbstractChatCompletionsCloudProvider implements ImageGenerationProviderInterface, SpeechToTextProviderInterface
 {
     private const PROVIDER_NAME = 'meta';
@@ -111,6 +125,41 @@ class MetaProvider extends AbstractChatCompletionsCloudProvider implements Image
 
     /** @var list<string> */
     private const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: self::PROVIDER_NAME,
+            displayName: 'Meta',
+            capabilities: [ProviderCapability::Chat, ProviderCapability::Vision, ProviderCapability::ImageGeneration, ProviderCapability::SpeechToText],
+            endpoints: [ProviderEndpoint::chatCompletions(self::BASE_URI.'/chat/completions')],
+            key: ProviderKeySpec::platform(
+                envVar: 'META_API_KEY',
+                consoleUrl: 'https://dev.meta.ai/',
+                validation: ProviderKeyValidation::bearer(self::BASE_URI.'/models'),
+                listOrder: 9,
+                modelListing: ModelListing::Lists,
+                fieldDescription: 'Meta Model API key — Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Create it at https://dev.meta.ai/ (API keys)',
+            ),
+            dialects: new ProviderDialects(
+                structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
+                catalogToolUse: true,
+                reasoning: ReasoningLadder::always(self::REASONING_EFFORTS),
+            ),
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'meta:muse-spark-1.3:chat',
+                'TOOLS' => 'meta:muse-spark-1.3:chat',
+                'ANALYZE' => 'meta:muse-spark-1.3:chat',
+                'SORT' => 'meta:muse-spark-1.3:chat',
+                'PLAN' => 'meta:muse-spark-1.3:chat',
+                'SUMMARIZE' => 'meta:muse-spark-1.3:chat',
+                'PIC2TEXT' => 'meta:muse-spark-1.3:pic2text',
+            ], preferenceRank: 10),
+            pricing: ProviderPricing::byServiceName(),
+            liveVoiceSessions: null,
+            branding: new ProviderBranding(icon: 'logos:meta-icon', flag: 'circle-flags:us', helpKey: 'meta'),
+        );
+    }
 
     public function getName(): string
     {

@@ -2,18 +2,29 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\Attribute\AsAiProvider;
+use App\AI\Catalog\DescribesProviderInterface;
+use App\AI\Catalog\ProviderBranding;
+use App\AI\Catalog\ProviderCapability;
+use App\AI\Catalog\ProviderDefaults;
+use App\AI\Catalog\ProviderDescriptor;
+use App\AI\Catalog\ProviderDialects;
+use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderPricing;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\Service\ResetInterface;
 
-class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterface, ResetInterface
+#[AsAiProvider]
+class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterface, ResetInterface, DescribesProviderInterface
 {
     /**
      * Status, availability and the pulled-model list run on every health check
@@ -36,6 +47,35 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private HttpClientInterface $httpClient,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
+    }
+
+    public static function descriptor(): ProviderDescriptor
+    {
+        return new ProviderDescriptor(
+            name: 'ollama',
+            displayName: 'Ollama',
+            capabilities: [ProviderCapability::Chat, ProviderCapability::Embedding],
+            // The host is OLLAMA_BASE_URL; the Messages gateway needs no key for it.
+            endpoints: [ProviderEndpoint::localChatCompletions()],
+            key: null,
+            dialects: new ProviderDialects(structuredOutput: StructuredOutputDialect::OLLAMA_FORMAT),
+            // Last resort on first run, when a chat-capable model is already
+            // pulled. gpt-oss:20b is what the entrypoint downloads, so these
+            // bindings reference a model that can exist on a self-hosted install;
+            // the providerId "gpt-oss:20b" normalises to "gpt-oss-20b" in keys.
+            defaults: new ProviderDefaults(bindings: [
+                'CHAT' => 'ollama:gpt-oss-20b:chat',
+                'TOOLS' => 'ollama:gpt-oss-20b:chat',
+                'ANALYZE' => 'ollama:gpt-oss-20b:chat',
+                'SORT' => 'ollama:gpt-oss-20b:chat',
+                'PLAN' => 'ollama:gpt-oss-20b:chat',
+                'SUMMARIZE' => 'ollama:gpt-oss-20b:chat',
+                'MEM' => 'ollama:gpt-oss-20b:mem',
+            ], preferenceRank: 12),
+            pricing: ProviderPricing::none(),
+            liveVoiceSessions: null,
+            branding: ProviderBranding::local('simple-icons:ollama', helpKey: 'ollama', helpUrl: 'https://ollama.com/download', helpIsDownload: true, helpFields: ['OLLAMA_BASE_URL']),
+        );
     }
 
     public function getName(): string
