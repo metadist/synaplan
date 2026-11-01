@@ -1242,7 +1242,7 @@
       },
       "check": "Fact-check: {ratio} statements backed",
       "checkRemoved": "{count} left out of the answer because no source confirmed them.",
-      "checkSameProvider": "Checked by a model of the same provider.",
+      "checkSameProvider": "This project has one model family. Research keeps only sentences a source quote supports. Add a second provider for a checked overview.",
       "complete": "Done",
       "stopped": "Stopped",
       "failed": "Could not finish"

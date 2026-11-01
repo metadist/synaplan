@@ -79,6 +79,25 @@ function visibleFrame(panel: HTMLElement): { top: number; bottom: number } {
 }
 
 /**
+ * Nested menus (the tools flyout inside the plus menu) are taken out of the
+ * measurement. They are position:absolute, so the parent's scrollHeight
+ * otherwise includes them and the parent grows over the flyout. Clicks then
+ * land on the parent.
+ */
+function withoutNestedMenus(panel: HTMLElement, measure: () => number): number {
+  const nested = [...panel.querySelectorAll<HTMLElement>(MENU_SELECTOR)]
+  const display = nested.map((node) => node.style.display)
+  for (const node of nested) node.style.display = 'none'
+  try {
+    return measure()
+  } finally {
+    nested.forEach((node, index) => {
+      node.style.display = display[index] ?? ''
+    })
+  }
+}
+
+/**
  * The full menu height, not the height already capped by a previous placement.
  * Restores the inner scroll position so a remeasure does not jump back to the top.
  */
@@ -94,7 +113,7 @@ function contentHeight(panel: HTMLElement): number {
   const scrollTops = children.map((child) => child.scrollTop)
   panel.style.maxHeight = 'none'
   for (const child of children) child.style.flex = ''
-  const height = panel.scrollHeight
+  const height = withoutNestedMenus(panel, () => panel.scrollHeight)
   panel.style.maxHeight = previousMax
   children.forEach((child, index) => {
     child.style.flex = flex[index] ?? ''

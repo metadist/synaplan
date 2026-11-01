@@ -1240,7 +1240,7 @@
       },
       "check": "Faktencheck: {ratio} Aussagen belegt",
       "checkRemoved": "{count} aus der Antwort gelassen, weil keine Quelle sie bestätigt hat.",
-      "checkSameProvider": "Geprüft hat ein Modell desselben Anbieters.",
+      "checkSameProvider": "In diesem Projekt gibt es nur eine Modellfamilie. Die Recherche behält nur Sätze, die ein Quellenauszug stützt. Für eine geprüfte Übersicht einen zweiten Anbieter hinzufügen.",
       "complete": "Fertig",
       "stopped": "Gestoppt",
       "failed": "Nicht abgeschlossen"

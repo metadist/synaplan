@@ -381,7 +381,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     )
     await expect(check.locator(selectors.research.phaseSummary)).toContainText('1 softened')
     await check.locator(selectors.research.phaseToggle).click()
-    await expect(check.locator(selectors.research.steps)).toContainText('same provider')
+    await expect(check.locator(selectors.research.steps)).toContainText('one model family')
     await expect(check.locator(selectors.research.steps)).toContainText('Softened')
     await expect(check.locator(selectors.research.steps)).toContainText(SOFTENED)
     const verdict = check.locator('[data-step-kind="verdict"]')

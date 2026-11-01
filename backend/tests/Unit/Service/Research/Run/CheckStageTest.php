@@ -56,14 +56,11 @@ REPORT);
 
         self::assertSame('deliver', $result->next);
         $report = (string) $ctx->state->ledger->report();
-        $body = strstr($report, '## Not confirmed', true);
-        self::assertIsString($body);
-        self::assertStringContainsString('The price is 12.40 EUR.', $body);
-        self::assertStringNotContainsString('five years', $body);
-        self::assertStringNotContainsString('Paris', $body);
-        self::assertStringNotContainsString('blue', $body);
-        self::assertStringNotContainsString('50 EUR', $body);
-        self::assertStringContainsString('## Not confirmed', $report);
+        self::assertStringContainsString('The price is 12.40 EUR.', $report);
+        self::assertStringNotContainsString('five years', $report);
+        self::assertStringNotContainsString('Paris', $report);
+        self::assertStringNotContainsString('blue', $report);
+        self::assertStringNotContainsString('50 EUR', $report);
         self::assertStringContainsString('1 of 5 statements are backed by a source. 4 were removed', $report);
         self::assertStringNotContainsString('same provider', $report);
         self::assertSame(['statements' => 5, 'supported' => 1, 'removed' => 4], $ctx->state->ledger->check());
@@ -169,8 +166,8 @@ REPORT);
 
         $report = (string) $ctx->state->ledger->report();
         self::assertSame(1, substr_count($report, 'Not confirmed'));
-        self::assertStringNotContainsString("\n-\n", $report);
-        self::assertStringContainsString("Hamburg Altona is not published.\n\n- The warranty is five years.", $report);
+        self::assertStringContainsString('Hamburg Altona is not published.', $report);
+        self::assertStringNotContainsString('five years', $report);
         self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
         self::assertStringNotContainsString('Hamburg', $caller->seen[0]['user']);
     }
@@ -205,7 +202,9 @@ REPORT);
         self::assertSame('deliver', $result->next);
         self::assertCount(1, $caller->seen);
         self::assertSame(['statements' => 2, 'supported' => 1, 'removed' => 1], $ctx->state->ledger->check());
-        self::assertStringContainsString("## Not confirmed\n\n- Beta is two.", (string) $ctx->state->ledger->report());
+        $report = (string) $ctx->state->ledger->report();
+        self::assertStringContainsString('Alpha is one.', $report);
+        self::assertStringNotContainsString('Beta is two.', $report);
     }
 
     public function testAnUnusableRowCountsAsUnsupportedWithoutEndingTheRun(): void
@@ -258,7 +257,77 @@ REPORT);
 
         $this->stage($caller)->run($ctx);
 
-        self::assertStringContainsString('A model of the same provider did the fact-check.', (string) $ctx->state->ledger->report());
+        $report = (string) $ctx->state->ledger->report();
+        self::assertCount(0, $caller->seen);
+        self::assertStringContainsString('The price is 12.40 EUR. [e1]', $report);
+        self::assertStringContainsString('This project has one model family.', $report);
+        self::assertSame(['statements' => 1, 'supported' => 1, 'removed' => 0], $ctx->state->ledger->check());
+    }
+
+    public function testAPlanPointCitationIsDeleted(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $ctx->state->ledger->setReport('Talks remain unspecified. [p1]');
+
+        $this->stage($caller)->run($ctx);
+
+        $report = (string) $ctx->state->ledger->report();
+        self::assertCount(0, $caller->seen);
+        self::assertStringNotContainsString('Talks remain unspecified', $report);
+        self::assertStringNotContainsString('[p1]', $report);
+        self::assertSame(['statements' => 1, 'supported' => 0, 'removed' => 1], $ctx->state->ledger->check());
+    }
+
+    public function testAClaimHiddenUnderNotConfirmedIsDeletedAndTheGapStays(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $ctx->state->ledger->setReport(<<<'REPORT'
+## Not confirmed
+
+The delivery time is not published.
+
+- The fee is 50 EUR. [p1]
+REPORT);
+
+        $this->stage($caller)->run($ctx);
+
+        $report = (string) $ctx->state->ledger->report();
+        self::assertStringContainsString('The delivery time is not published.', $report);
+        self::assertStringNotContainsString('50 EUR', $report);
+        self::assertStringNotContainsString('[p1]', $report);
+    }
+
+    public function testASourceOutsideTheBriefDatesCannotSupportASentence(): void
+    {
+        [$ctx, $caller] = $this->open(true);
+        $ctx->state->ledger->setBrief(new \App\Service\Research\Run\Ledger\ResearchBrief(
+            'What is the news today?',
+            'en',
+            'report',
+            null,
+            ['from' => '2026-11-01', 'to' => '2026-11-01'],
+        ));
+        $ledger = $ctx->state->ledger;
+        $ledger->addPoint('Energy');
+        $source = $ledger->addSource(Source::web('https://energy.example/policy', 'Energy', 'April 2026'));
+        $ledger->addEvidence(new EvidenceCard(
+            'x',
+            $source,
+            'p1',
+            'The target is 42.5 percent.',
+            ['§1'],
+            [new QuoteMatch('42.5 percent', '§1', true)],
+        ));
+        $ctx->state->ledger->setReport('The target is 42.5 percent. [e1]');
+
+        $this->stage($caller)->run($ctx);
+
+        $report = (string) $ctx->state->ledger->report();
+        self::assertCount(0, $caller->seen);
+        self::assertStringNotContainsString('42.5', $report);
+        self::assertStringContainsString('one model family', $report);
     }
 
     public function testAThoroughRevisionKeepsTheSupportedPartOfAPartialStatement(): void

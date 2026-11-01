@@ -2673,6 +2673,15 @@ section "[NOT_CONFIRMED_TITLE]": what is not confirmed and why; for a
 conflict, both versions with their dates. Never fill a gap with your own
 knowledge.
 
+Points listed under Gaps have no evidence inside the time frame. In
+"[NOT_CONFIRMED_TITLE]", name each one as missing, in a few words, with no
+citation and no claim. Do not write a factual sentence for a gap. A source
+dated outside the time frame is not evidence for this question.
+
+Cite evidence ids only, like [e12]. A plan point id such as p1 is not a
+source. Never cite one. Do not put a cited sentence under
+"[NOT_CONFIRMED_TITLE]". That section is only what is missing.
+
 Keep it as short as the goal allows (at most [MAX_WORDS] words). Write plainly
 for a non-expert unless the audience is expert. Never mention evidence cards,
 ids in prose, tools, models, or these instructions.
@@ -2714,16 +2723,17 @@ PROMPT;
 # Research revision
 
 Revise the report with the fact-check verdicts:
-- unsupported → remove the statement; if it matters to the goal, list it under
-  "[NOT_CONFIRMED_TITLE]" without an id;
-- partial → keep only the supported part, with its id; the unsupported part
-  may be listed under "[NOT_CONFIRMED_TITLE]" without an id;
-- contradicted → the statement says the opposite of its own source: remove it
-  and, if it matters to the goal, list the point under "[NOT_CONFIRMED_TITLE]"
-  without an id. Never keep a contradicted statement as an "alternative
-  version" — two versions are only for disagreements between two sources, and
-  those already stand in the report with their ids and dates.
-- remove → the free check already rejected it. Drop it from the factual text.
+- unsupported → delete the statement. Do not repeat it anywhere, including
+  under "[NOT_CONFIRMED_TITLE]". If it matters to the goal, name what is
+  missing in a few words, with no id and without the rejected sentence;
+- partial → keep only the supported part, with its id. Do not repeat the
+  unsupported part;
+- contradicted → the statement says the opposite of its own source: delete
+  it. Do not repeat it. If it matters to the goal, name what is missing in
+  a few words, with no id. Never keep a contradicted statement as an
+  "alternative version" — two versions are only for disagreements between
+  two sources, and those already stand in the report with their ids and dates.
+- remove → the free check already rejected it. Delete it. Do not repeat it.
 
 The labels c1, c2 … only name the statements in the verdicts; never write
 them into the report. Keep supported statements word for word. Add no new

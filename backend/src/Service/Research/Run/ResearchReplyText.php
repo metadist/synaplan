@@ -38,7 +38,10 @@ final readonly class ResearchReplyText
         }
 
         $reader = ReaderReport::from($report, $state->ledger);
-        $markdown = '' !== $reader['markdown'] ? $reader['markdown'] : $report;
+        $markdown = $reader['markdown'];
+        if ('' === $markdown) {
+            return ['text' => $this->outcomes->sentence($outcome, $locale), 'file' => null, 'sources' => []];
+        }
         $text = ResearchOutcome::COMPLETE === $outcome?->code
             ? $markdown
             : '> '.$this->outcomes->sentence($outcome, $locale)."\n\n".$markdown;

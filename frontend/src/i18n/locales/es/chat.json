@@ -1183,7 +1183,7 @@
       },
       "check": "Verificación: {ratio} afirmaciones respaldadas",
       "checkRemoved": "{count} fuera de la respuesta porque ninguna fuente las confirmó.",
-      "checkSameProvider": "Revisado por un modelo del mismo proveedor.",
+      "checkSameProvider": "Este proyecto tiene una sola familia de modelos. La investigación conserva solo las frases que respalda una cita de la fuente. Añada un segundo proveedor para un resumen verificado.",
       "complete": "Listo",
       "stopped": "Detenida",
       "failed": "No terminó"

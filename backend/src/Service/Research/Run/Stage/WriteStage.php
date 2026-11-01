@@ -75,10 +75,16 @@ final readonly class WriteStage implements ResearchStage
     private function evidence(StageContext $ctx): string
     {
         $lines = [];
-        $grouped = $ctx->state->ledger->evidenceForWriter();
+        $gaps = [];
+        $grouped = EvidenceWindow::cards($ctx->state->ledger, $ctx->roles->checkerSameFamily);
         foreach ($ctx->state->ledger->points() as $point) {
-            $lines[] = $point->id.' '.$point->title;
-            foreach ($grouped[$point->id] ?? [] as $card) {
+            $cards = $grouped[$point->id] ?? [];
+            if ([] === $cards) {
+                $gaps[] = $point->title;
+                continue;
+            }
+            $lines[] = $point->title;
+            foreach ($cards as $card) {
                 $quote = '';
                 foreach (is_array($card['quotes'] ?? null) ? $card['quotes'] : [] as $row) {
                     if (is_array($row) && is_string($row['text'] ?? null)) {
@@ -86,6 +92,12 @@ final readonly class WriteStage implements ResearchStage
                     }
                 }
                 $lines[] = '- '.$card['id'].' '.$card['fact'].$quote;
+            }
+        }
+        if ([] !== $gaps) {
+            $lines[] = 'Gaps (missing — name each as missing, do not write a claim):';
+            foreach ($gaps as $title) {
+                $lines[] = '- '.$title;
             }
         }
 

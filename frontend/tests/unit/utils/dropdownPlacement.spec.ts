@@ -105,6 +105,49 @@ describe('dropdown placement', () => {
     parent.remove()
   })
 
+  it('does not grow a menu to cover a nested flyout', () => {
+    const parent = document.createElement('div')
+    const button = document.createElement('button')
+    const panel = document.createElement('div')
+    panel.className = 'dropdown-up'
+    const flyout = document.createElement('div')
+    flyout.className = 'dropdown-up side-flyout'
+    panel.append(flyout)
+    parent.append(button, panel)
+    document.body.append(parent)
+
+    const box = (top: number, height: number): DOMRect =>
+      ({
+        x: 0,
+        y: top,
+        top,
+        left: 0,
+        right: 80,
+        bottom: top + height,
+        width: 80,
+        height,
+        toJSON: () => ({}),
+      }) as DOMRect
+    button.getBoundingClientRect = () => box(500, 40)
+    parent.getBoundingClientRect = () => box(500, 40)
+    Object.defineProperty(panel, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return flyout.style.display === 'none' ? 164 : 754
+      },
+    })
+
+    applyDropdownPlacement(panel)
+
+    expect(panel.dataset.dropdownContentHeight).toBe('164')
+    expect(panel.style.maxHeight).toBe('none')
+    expect(panel.style.overflowY).toBe('visible')
+    expect(flyout.style.display).toBe('')
+    expect(flyout.isConnected).toBe(true)
+    panel.remove()
+    parent.remove()
+  })
+
   it('sizes a nested menu against the page, not the parent menu', () => {
     const shell = document.createElement('div')
     const plusButton = document.createElement('button')

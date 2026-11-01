@@ -1242,7 +1242,7 @@
       },
       "check": "Vérification : {ratio} affirmations étayées",
       "checkRemoved": "{count} laissées hors de la réponse, car aucune source ne les a confirmées.",
-      "checkSameProvider": "Vérifié par un modèle du même fournisseur.",
+      "checkSameProvider": "Ce projet n'a qu'une famille de modèles. La recherche ne garde que les phrases qu'une citation de source confirme. Ajoutez un second fournisseur pour une synthèse vérifiée.",
       "complete": "Terminé",
       "stopped": "Arrêtée",
       "failed": "Non aboutie"

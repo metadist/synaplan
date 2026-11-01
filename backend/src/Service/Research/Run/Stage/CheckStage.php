@@ -19,11 +19,14 @@ use App\Service\Research\Run\ResearchStatus;
  * tries one revision that keeps the supported part; if that revision adds
  * a fact or keeps a rejected statement, the removal stands. Without a
  * partial statement a revision could only remove, so no call is made. The
- * report ends with
- * the count. When the budget runs out after the first batch, the
- * statements not yet checked count as not confirmed, so the paid report
- * is still delivered. When the checker does not answer at all, the draft
- * is delivered as it was written.
+ * report ends with the count. A rejected statement is deleted. It is not
+ * written back under Not confirmed. When the budget runs out after the
+ * first batch, the statements not yet checked are removed the same way,
+ * and the paid report is still delivered. When the checker does not
+ * answer at all, sentences the draft check already rejected leave and the
+ * rest stay. When the checker is the same model family as the writer,
+ * there is no second opinion: a sentence stays only when a source quote
+ * inside the brief's dates supports it.
  */
 final readonly class CheckStage implements ResearchStage
 {
@@ -42,15 +45,26 @@ final readonly class CheckStage implements ResearchStage
 
     public function run(StageContext $ctx): StageResult
     {
-        $original = $ctx->state->ledger->report();
-        if (null === $original || '' === trim($original)) {
+        $stored = $ctx->state->ledger->report();
+        if (null === $stored || '' === trim($stored)) {
             return new StageResult('deliver');
         }
+        $prepared = CitationMarks::prepare($stored);
+        $original = $prepared['report'];
+        $ctx->state->ledger->setReport($original);
         $ctx->state->advance(ResearchStatus::Checking);
         $ctx->events->append($ctx->state->ref->id, 'checking', []);
 
+        if ($ctx->roles->checkerSameFamily) {
+            return $this->quoteOnly($ctx, $original, $prepared['plan']);
+        }
+
         $passages = $this->passages($ctx);
-        $sorted = $this->sort(CheckReport::withoutNotConfirmed($original), $passages);
+        $sorted = $this->withoutPlan(
+            $this->sort(CheckReport::withoutNotConfirmed($original), $passages, EvidenceWindow::freshIds($ctx->state->ledger)),
+            $prepared['plan'],
+            $original,
+        );
         $ask = $sorted['ask'];
         $carried = [];
         if (ResearchFollowUp::REVISE === $ctx->state->followUp) {
@@ -98,6 +112,7 @@ final readonly class CheckStage implements ResearchStage
             return $revised;
         }
         if (is_string($revised)) {
+            $revised = CheckReport::excise($revised, $this->rejectedText($sorted, $verdicts));
             $tally = $this->tally($sorted, $verdicts);
             $counts = [
                 'statements' => $tally['statements'],
@@ -110,6 +125,35 @@ final readonly class CheckStage implements ResearchStage
 
             return new StageResult('deliver');
         }
+        $this->record($ctx, $counts, $counts['supported'], 0);
+        $ctx->state->ledger->setReport($report);
+
+        return new StageResult('deliver');
+    }
+
+    /**
+     * One model family cannot check its own overview. A sentence stays only
+     * when a verified quote from inside the brief's dates supports it.
+     * Everything else is deleted.
+     *
+     * @param array<string, true> $plan
+     */
+    private function quoteOnly(StageContext $ctx, string $original, array $plan): StageResult
+    {
+        $passages = $this->quotePassages($ctx);
+        $sorted = $this->withoutPlan(
+            $this->sort(CheckReport::withoutNotConfirmed($original), $passages, EvidenceWindow::freshIds($ctx->state->ledger)),
+            $plan,
+            $original,
+        );
+        $verdicts = [];
+        foreach ($sorted['ask'] as $item) {
+            $verdicts[$item['id']] = ['verdict' => 'supported', 'part' => ''];
+        }
+        $counts = $this->counts($sorted, $verdicts);
+        $brief = $ctx->state->ledger->brief();
+        $language = null !== $brief ? $brief->language : 'en';
+        $report = CheckReport::apply($original, $sorted['drop'], $this->labels($verdicts), $sorted['ask'], $language, $counts, true);
         $this->record($ctx, $counts, $counts['supported'], 0);
         $ctx->state->ledger->setReport($report);
 
@@ -140,10 +184,11 @@ final readonly class CheckStage implements ResearchStage
 
     /**
      * @param array<string, string> $passages
+     * @param list<string>|null     $freshIds evidence inside the brief's dates, or null when the brief sets no dates
      *
      * @return array{drop: list<array{sentence: string, text: string, reason: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>}
      */
-    private function sort(string $report, array $passages): array
+    private function sort(string $report, array $passages, ?array $freshIds = null): array
     {
         $flagged = [];
         foreach ($this->draft->check($report, $passages) as $issue) {
@@ -160,6 +205,10 @@ final readonly class CheckStage implements ResearchStage
                 $drop[] = ['sentence' => $sentence, 'text' => $bare, 'reason' => $reason];
                 continue;
             }
+            if (null !== $freshIds && [] !== $this->ids($sentence) && [] !== array_diff($this->ids($sentence), $freshIds)) {
+                $drop[] = ['sentence' => $sentence, 'text' => $bare, 'reason' => 'stale'];
+                continue;
+            }
             if ([] === $this->ids($sentence)) {
                 continue;
             }
@@ -173,6 +222,69 @@ final readonly class CheckStage implements ResearchStage
         }
 
         return ['drop' => $drop, 'ask' => $ask];
+    }
+
+    /**
+     * A sentence cited only as a plan point is not evidence. It leaves,
+     * even when it names no number the draft check would catch.
+     *
+     * @param array{drop: list<array{sentence: string, text: string, reason: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     * @param array<string, true>                                                                                                                                      $plan
+     *
+     * @return array{drop: list<array{sentence: string, text: string, reason: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>}
+     */
+    private function withoutPlan(array $sorted, array $plan, string $report): array
+    {
+        $dropped = [];
+        foreach ($sorted['drop'] as $item) {
+            $dropped[PassageText::normalise($item['text'])] = true;
+        }
+        $ask = [];
+        foreach ($sorted['ask'] as $item) {
+            $key = PassageText::normalise($item['bare']);
+            if (isset($plan[$key])) {
+                if (!isset($dropped[$key])) {
+                    $sorted['drop'][] = ['sentence' => $item['sentence'], 'text' => $item['bare'], 'reason' => 'plan_point'];
+                    $dropped[$key] = true;
+                }
+                continue;
+            }
+            $ask[] = $item;
+        }
+        $sorted['ask'] = $ask;
+        foreach (DraftSentences::split($report) as $sentence) {
+            $bare = DraftSentences::bare($sentence);
+            $key = PassageText::normalise($bare);
+            if (!isset($plan[$key]) || isset($dropped[$key])) {
+                continue;
+            }
+            $sorted['drop'][] = ['sentence' => $sentence, 'text' => $bare, 'reason' => 'plan_point'];
+            $dropped[$key] = true;
+        }
+
+        return $sorted;
+    }
+
+    /**
+     * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     * @param array<string, array{verdict: string, part: string}>                                                                                      $verdicts
+     *
+     * @return list<string>
+     */
+    private function rejectedText(array $sorted, array $verdicts): array
+    {
+        $text = [];
+        foreach ($sorted['drop'] as $item) {
+            $text[] = $item['text'];
+        }
+        foreach ($sorted['ask'] as $item) {
+            if ('supported' === ($verdicts[$item['id']]['verdict'] ?? 'unsupported')) {
+                continue;
+            }
+            $text[] = $item['bare'];
+        }
+
+        return $text;
     }
 
     /**
@@ -380,6 +492,32 @@ final readonly class CheckStage implements ResearchStage
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Verified quotes of cards inside the brief's dates. A card with no
+     * quote cannot support a sentence when there is no second model family.
+     *
+     * @return array<string, string>
+     */
+    private function quotePassages(StageContext $ctx): array
+    {
+        $out = [];
+        foreach (EvidenceWindow::cards($ctx->state->ledger, true) as $cards) {
+            foreach ($cards as $card) {
+                $parts = [];
+                foreach (is_array($card['quotes'] ?? null) ? $card['quotes'] : [] as $quote) {
+                    if (is_array($quote) && is_string($quote['text'] ?? null) && '' !== $quote['text']) {
+                        $parts[] = $quote['text'];
+                    }
+                }
+                if ([] !== $parts) {
+                    $out[(string) $card['id']] = implode("\n", $parts);
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**
