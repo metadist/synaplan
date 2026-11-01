@@ -22,7 +22,8 @@ use App\Service\Research\Run\ResearchStatus;
  * report ends with
  * the count. When the budget runs out after the first batch, the
  * statements not yet checked count as not confirmed, so the paid report
- * is still delivered.
+ * is still delivered. When the checker does not answer at all, the draft
+ * is delivered as it was written.
  */
 final readonly class CheckStage implements ResearchStage
 {
@@ -73,12 +74,15 @@ final readonly class CheckStage implements ResearchStage
             }
             $parsed = $this->verdicts($called->reply?->data, $group);
             if (null === $parsed) {
-                return StageEnds::model($ctx, 'checker');
+                break;
             }
             $verdicts += $parsed;
         }
         foreach ($carried as $item) {
             $verdicts[$item['id']] = ['verdict' => 'supported', 'part' => ''];
+        }
+        if ([] === $verdicts && [] !== $sorted['ask']) {
+            return $this->deliverUnchecked($ctx, $original, $sorted);
         }
 
         CheckVerdictEvents::announce($ctx, $sorted, $verdicts);
@@ -107,6 +111,28 @@ final readonly class CheckStage implements ResearchStage
             return new StageResult('deliver');
         }
         $this->record($ctx, $counts, $counts['supported'], 0);
+        $ctx->state->ledger->setReport($report);
+
+        return new StageResult('deliver');
+    }
+
+    /**
+     * The checker did not answer. Sentences the draft check already rejected
+     * still leave. The rest stay, and they are not counted as backed.
+     *
+     * @param array{drop: list<array{sentence: string, text: string}>, ask: list<array{id: string, sentence: string, bare: string, passages: string}>} $sorted
+     */
+    private function deliverUnchecked(StageContext $ctx, string $original, array $sorted): StageResult
+    {
+        $counts = [
+            'statements' => count($sorted['drop']) + count($sorted['ask']),
+            'supported' => 0,
+            'removed' => count($sorted['drop']),
+        ];
+        $brief = $ctx->state->ledger->brief();
+        $language = null !== $brief ? $brief->language : 'en';
+        $report = CheckReport::apply($original, $sorted['drop'], [], [], $language, $counts, $ctx->roles->checkerSameFamily);
+        $this->record($ctx, $counts, 0, 0);
         $ctx->state->ledger->setReport($report);
 
         return new StageResult('deliver');

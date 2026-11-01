@@ -31,6 +31,7 @@ const ROUND_REASONS = new Set([
   'rounds',
   'gather',
   'nothing_queued',
+  'decision_failed',
 ])
 
 /**

@@ -170,8 +170,14 @@ final readonly class ReadStage implements ResearchStage
 
             return $called->stop;
         }
+        $reply = $called->reply;
+        if (!$reply instanceof ResearchModelReply || !$reply->ok || !is_array($reply->data)) {
+            $this->mark($ctx, $source->id, Source::BLOCKED, 'The reading model did not answer, so this page was not used.');
 
-        $data = $called->reply->data ?? [];
+            return null;
+        }
+
+        $data = $reply->data;
         $accepted = $this->accepted->accept($source->id, $data, $map, $links, $ctx->state->ledger);
         foreach ($accepted['cards'] as $index => $card) {
             $ctx->state->ledger->addEvidence($card);

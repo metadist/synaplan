@@ -67,11 +67,13 @@ final readonly class LeadStage
         if ($turn->called) {
             $this->charge($ctx, $turn);
         }
-        if (!$turn->called) {
-            return StageEnds::roleUnavailable($ctx, 'planning');
-        }
-        if (!$turn->ok) {
-            return StageEnds::model($ctx, 'planning');
+        if (!$turn->called || !$turn->ok) {
+            $this->roundEvent($ctx, 'write', 'decision_failed');
+            if ($this->hasPendingRead($ctx)) {
+                return new StageResult('read');
+            }
+
+            return $this->toReport($ctx);
         }
 
         $ctx->state->budget->spend('rounds');
@@ -155,6 +157,21 @@ final readonly class LeadStage
      * cite. Finish is refused once while a found source can still be read;
      * after a read, even one that found nothing, finish is accepted.
      */
+    /** Sources a failed lead already found, still inside the read budget. */
+    private function hasPendingRead(StageContext $ctx): bool
+    {
+        if ($ctx->state->budget->sourcesLeft() < 1) {
+            return false;
+        }
+        foreach ($ctx->state->ledger->sources() as $source) {
+            if (Source::FOUND === $source->status && (null !== $source->url || (Source::FILE === $source->kind && null !== $source->fileId))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function mustRead(StageContext $ctx): bool
     {
         $budget = $ctx->state->budget;

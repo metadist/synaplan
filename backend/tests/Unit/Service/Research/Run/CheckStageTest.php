@@ -111,7 +111,7 @@ REPORT);
         ], $verdicts);
     }
 
-    public function testAnAnswerWithoutTheVerdictEnvelopeStopsTheRun(): void
+    public function testAnAnswerWithoutTheVerdictEnvelopeStillDeliversTheDraft(): void
     {
         [$ctx, $caller] = $this->open(false);
         $this->card($ctx, 'The unit price is 12.40 EUR.');
@@ -120,10 +120,15 @@ REPORT);
 
         $result = $this->stage($caller)->run($ctx);
 
-        self::assertSame('done', $result->next);
-        self::assertSame(ResearchStatus::Failed, $ctx->state->status);
-        self::assertNotNull($ctx->state->outcome);
-        self::assertSame(ResearchOutcome::FAILED_MODEL_ERROR, $ctx->state->outcome->code);
+        $report = $ctx->state->ledger->report();
+
+        self::assertSame('deliver', $result->next);
+        self::assertSame(ResearchStatus::Checking, $ctx->state->status);
+        self::assertNull($ctx->state->outcome);
+        self::assertIsString($report);
+        self::assertStringContainsString('The price is 12.40 EUR. [e1]', $report);
+        self::assertStringContainsString('0 of 1 statements are backed by a source.', $report);
+        self::assertSame(['statements' => 1, 'supported' => 0, 'removed' => 0], $ctx->state->ledger->check());
     }
 
     public function testStatementsAreCheckedInBatches(): void

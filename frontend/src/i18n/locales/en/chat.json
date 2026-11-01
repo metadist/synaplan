@@ -1222,7 +1222,8 @@
         "cost": "The cost limit is reached.",
         "rounds": "The limit of rounds is reached.",
         "gather": "No searches or reads are left.",
-        "nothing_queued": "Nothing was left to look up."
+        "nothing_queued": "Nothing was left to look up.",
+        "decision_failed": "The next step could not be chosen, so the answer is written from what was already found."
       },
       "writing": "Writing",
       "section": "Wrote",

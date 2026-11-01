@@ -49,7 +49,7 @@ final readonly class BriefStage implements ResearchStage
         $language = self::language((string) ($data['language'] ?? ''));
         $output = (string) ($data['output'] ?? '');
         if (null === $language || !in_array($output, self::OUTPUTS, true)) {
-            return StageEnds::model($ctx, 'sorting');
+            return (new ResearchCarryOn())->brief($ctx);
         }
 
         try {
@@ -64,7 +64,7 @@ final readonly class BriefStage implements ResearchStage
                 'must_avoid' => $data['must_avoid'] ?? [],
             ]);
         } catch (\InvalidArgumentException) {
-            return StageEnds::model($ctx, 'sorting');
+            return (new ResearchCarryOn())->brief($ctx);
         }
 
         $ctx->state->ledger->setBrief($brief);

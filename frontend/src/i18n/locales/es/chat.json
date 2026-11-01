@@ -1163,7 +1163,8 @@
         "cost": "Se alcanzó el límite de coste.",
         "rounds": "Se alcanzó el límite de rondas.",
         "gather": "No quedan búsquedas ni lecturas.",
-        "nothing_queued": "No quedaba nada por consultar."
+        "nothing_queued": "No quedaba nada por consultar.",
+        "decision_failed": "No se pudo elegir el siguiente paso, así que la respuesta se escribe con lo que ya se encontró."
       },
       "writing": "Escribiendo",
       "section": "Escrito",

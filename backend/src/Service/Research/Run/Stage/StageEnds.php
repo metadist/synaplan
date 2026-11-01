@@ -31,20 +31,6 @@ final class StageEnds
         ]), 'stopped');
     }
 
-    public static function model(StageContext $ctx, string $role): StageResult
-    {
-        return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_MODEL_ERROR, [
-            'role' => $role,
-        ]), 'failed');
-    }
-
-    public static function roleUnavailable(StageContext $ctx, string $role): StageResult
-    {
-        return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_ROLE_UNAVAILABLE, [
-            'role' => $role,
-        ]), 'failed');
-    }
-
     public static function noSources(StageContext $ctx): StageResult
     {
         return self::finish($ctx, ResearchStatus::Failed, new ResearchOutcome(ResearchOutcome::FAILED_NO_SOURCES), 'failed');
