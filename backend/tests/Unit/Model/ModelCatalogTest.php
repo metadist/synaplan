@@ -233,6 +233,13 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('https://docs.mistral.ai/inference/pricing', $entry['source']);
         $this->assertSame('2026-11-01', $entry['verifiedOn']);
         $this->assertNotSame('', trim($entry['reason']));
+
+        // The key covers the providerId, and the drift log names both BIDs —
+        // a dropped or added mistral-large-4 row must make this claim fail.
+        $this->assertSame(
+            [387, 388],
+            array_map(static fn (array $row): int => $row['id'], ModelCatalog::find('mistral:mistral-large-4')),
+        );
     }
 
     /**

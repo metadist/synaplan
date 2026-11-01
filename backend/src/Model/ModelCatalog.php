@@ -570,7 +570,7 @@ class ModelCatalog
             'litellm_cache_read' => 0.14,
             'source' => 'https://docs.mistral.ai/inference/pricing',
             'verifiedOn' => '2026-11-01',
-            'reason' => "LiteLLM lists Mistral's pre-discount list rate (\$1.36 / \$4.18, cached \$0.14) while the official page still bills the launch rate the catalog holds; correction to BerriAI/litellm not filed yet.",
+            'reason' => "LiteLLM lists Mistral's pre-discount list rate (\$1.36 / \$4.18, cached \$0.14) while the official page lists the launch rate the catalog holds; correction to BerriAI/litellm not filed yet — retires only when LiteLLM fully moves to the launch rate (docs/PRICING_MAINTENANCE.md, Known LiteLLM deviations).",
         ],
     ];
 
