@@ -119,6 +119,7 @@
     <extensions>
         <bootstrap class="DG\BypassFinals\PHPUnitExtension"/>
         <bootstrap class="DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension"/>
+        <bootstrap class="App\Tests\Support\NoExecutionTimeLimitExtension"/>
     </extensions>
 
     <logging>

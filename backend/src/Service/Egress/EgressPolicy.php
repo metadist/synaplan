@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Egress;
 
+use App\AI\Catalog\ProviderCatalog;
+
 /**
- * Decides one destination. Built-in services and provider hosts, the
- * administrator's list, and the no-proxy hosts are allowed. A URL a person
+ * Decides one destination. Built-in services, the hosts of every described
+ * provider, the administrator's list, and the no-proxy hosts are allowed. A URL a person
  * typed is allowed only when the guard accepts it, and is not stored.
  */
 final readonly class EgressPolicy
@@ -14,6 +16,7 @@ final readonly class EgressPolicy
     public function __construct(
         private EgressConfig $config,
         private EgressTypedUrlGuard $typedUrls,
+        private ProviderCatalog $providers,
     ) {
     }
 
@@ -78,7 +81,7 @@ final readonly class EgressPolicy
     {
         $rules = [];
         foreach ([
-            ...EgressBuiltinDestinations::rules(),
+            ...EgressBuiltinDestinations::rules($this->providers),
             ...$this->config->allowRules(),
             ...$this->config->noProxyHosts(),
         ] as $item) {

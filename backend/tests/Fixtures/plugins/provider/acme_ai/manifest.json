@@ -1,0 +1,10 @@
+{
+    "id": "acme_ai",
+    "name": "Acme AI",
+    "namespace": "Plugin\\AcmeAi",
+    "version": "1.0.0",
+    "description": "Test fixture: an OpenAI-compatible provider that registers itself through one class.",
+    "provides": {
+        "plugs": []
+    }
+}

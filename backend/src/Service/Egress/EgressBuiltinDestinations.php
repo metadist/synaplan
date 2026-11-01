@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Service\Egress;
 
+use App\AI\Catalog\ProviderCatalog;
+
 /**
- * Destinations the installation always talks to, until a provider describes
- * itself (AU22). A host rule matches any port. A `*.example.org` rule is one
- * wildcard label. A leading dot is a suffix (`.svc.cluster.local`).
+ * Destinations the installation always talks to. The AI providers' hosts
+ * come from their descriptors ({@see ProviderCatalog::endpoints()}), so a
+ * provider added in one class is allowed without an entry here. A host rule
+ * matches any port. A `*.example.org` rule is one wildcard label. A leading
+ * dot is a suffix (`.svc.cluster.local`).
  */
 final class EgressBuiltinDestinations
 {
@@ -39,25 +43,14 @@ final class EgressBuiltinDestinations
     ];
 
     /**
-     * Cloud provider and integration hosts. Custom OpenAI-compatible base
-     * URLs are not here: in `report` mode they show up as `would_block`,
-     * which is the gap AU22 closes.
+     * Integrations that are not AI providers: payments, messengers, web
+     * search, sign-in and app stores, source hosting, bot checks. Custom
+     * OpenAI-compatible base URLs are not here: in `report` mode they show
+     * up as `would_block` until an administrator lists them.
      *
      * @var list<string>
      */
-    public const PROVIDERS = [
-        'api.openai.com',
-        'api.anthropic.com',
-        'generativelanguage.googleapis.com',
-        'api.groq.com',
-        'api.mistral.ai',
-        'api.x.ai',
-        'router.huggingface.co',
-        'api.trustedtokens.eu',
-        'a2agent.me',
-        'api.meta.ai',
-        'api.cerebras.ai',
-        'api.perplexity.ai',
+    public const INTEGRATIONS = [
         'api.stripe.com',
         'api.telegram.org',
         'graph.facebook.com',
@@ -77,8 +70,8 @@ final class EgressBuiltinDestinations
     /**
      * @return list<string>
      */
-    public static function rules(): array
+    public static function rules(ProviderCatalog $catalog): array
     {
-        return [...self::INTERNAL, ...self::PROVIDERS];
+        return [...self::INTERNAL, ...$catalog->endpoints(), ...self::INTEGRATIONS];
     }
 }

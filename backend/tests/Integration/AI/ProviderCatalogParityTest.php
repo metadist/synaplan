@@ -34,6 +34,7 @@ use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Service\Admin\SystemConfig\Tab\AiTab;
 use App\Service\Egress\EgressBuiltinDestinations;
+use App\Service\Egress\EgressPolicy;
 use App\Service\Voice\VoiceLiveConcurrency;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -587,18 +588,34 @@ final class ProviderCatalogParityTest extends KernelTestCase
         }
     }
 
-    /** T23 */
-    public function testEgressProviderHostsAreAllDescribedEndpoints(): void
+    /** T23 — the allowlist is the internal names, the catalog's hosts and the integrations; nothing of AU15's constant is lost */
+    public function testEgressAllowlistIsBuiltFromTheCatalogAndKeepsEveryStaticEntry(): void
     {
-        $providerHosts = [
+        $au15Providers = [
             'api.openai.com', 'api.anthropic.com', 'generativelanguage.googleapis.com', 'api.groq.com',
             'api.mistral.ai', 'api.x.ai', 'router.huggingface.co', 'api.trustedtokens.eu', 'a2agent.me',
             'api.meta.ai', 'api.cerebras.ai', 'api.perplexity.ai',
         ];
-        $hosts = $this->catalog->endpoints();
-        foreach ($providerHosts as $host) {
-            self::assertContains($host, EgressBuiltinDestinations::PROVIDERS, $host.' is on the static list');
-            self::assertContains($host, $hosts, $host.' is a described endpoint');
+        $au15Integrations = [
+            'api.stripe.com', 'api.telegram.org', 'graph.facebook.com', 'api.search.brave.com',
+            'accounts.google.com', 'androidpublisher.googleapis.com', 'oauth2.googleapis.com', 'www.googleapis.com',
+            'github.com', 'api.github.com', 'appleid.apple.com', 'www.google.com', 'www.recaptcha.net', 'challenges.cloudflare.com',
+        ];
+        $policy = self::getContainer()->get(EgressPolicy::class);
+        \assert($policy instanceof EgressPolicy);
+        $published = $policy->publishedRules();
+
+        self::assertSame($au15Integrations, EgressBuiltinDestinations::INTEGRATIONS, 'the integration half is the hand-kept list');
+        foreach ([...$au15Providers, ...$au15Integrations, ...EgressBuiltinDestinations::INTERNAL] as $entry) {
+            self::assertContains($entry, $published, $entry.' stays allowed');
+        }
+        foreach ($au15Providers as $host) {
+            self::assertContains($host, $this->catalog->endpoints(), $host.' is a described endpoint');
+        }
+        // The hosts the static list lacked (`03` §2.3.4 #10) are allowed now.
+        foreach (['huggingface.co', 'platform.higgsfield.ai', 'api.thehive.ai', 'api.elevenlabs.io', 'api.cloudflare.com', 'us-central1-aiplatform.googleapis.com'] as $host) {
+            self::assertContains($host, $published, $host.' comes from a descriptor');
+            self::assertTrue($policy->decide('https://'.$host.'/')->allowed, $host);
         }
     }
 

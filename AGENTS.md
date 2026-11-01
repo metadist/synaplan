@@ -479,6 +479,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 ## Detailed Documentation
 
 - `docs/ARCHITECTURE.md` — backend layers, size limits (`make -C backend metrics`), the chat and stream request paths
+- `docs/PROVIDERS.md` — adding an AI provider as one class (`app:provider:scaffold`), what the descriptor decides
 - `docs/PHP_CONVENTIONS.md` — PHP code style, examples, patterns
 - `docs/FRONTEND_CONVENTIONS.md` — TypeScript, Vue, styling tokens, i18n
 - `docs/UX_CONTRACT.md` — UX rules U1–U12, shared patterns (share, inbox, gallery, triggers), sprint-file contract

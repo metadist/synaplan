@@ -99,6 +99,20 @@ literals for those tunnels, or turn the typed-URL features off. The
 gateway log line is `reason=upstream_refused` and it names the host and
 port only. A grant id is not written to a log.
 
+## Where the allowlist comes from
+
+`EgressBuiltinDestinations::INTERNAL` is this installation's own services
+(Docker and Kubernetes names). The AI providers' hosts are not a list in
+the egress code: `EgressPolicy` reads `ProviderCatalog::endpoints()`, every
+endpoint host and key-validation host of every described provider, so a
+provider added as one class ([`PROVIDERS.md`](PROVIDERS.md)) is allowed the
+moment its class exists. `EgressBuiltinDestinations::INTEGRATIONS` keeps the
+hosts that are not providers: Stripe, Telegram, Meta Graph, Brave, Google
+sign-in and Play, GitHub, Apple, reCAPTCHA, Cloudflare challenges. Then
+`EGRESS.ALLOW` and the no-proxy hosts. Custom OpenAI-compatible base URLs an
+administrator configured are not derived: in `report` mode they show as
+`would_block` until they are listed in `EGRESS.ALLOW`.
+
 ## What is deliberately not a shared allowlist entry
 
 A URL a person types (the URL reader, a custom HTTP tool, a person's MCP
