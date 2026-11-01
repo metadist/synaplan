@@ -37,8 +37,6 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Messages Gateway', description: 'Anthropic-compatible Messages API gateway settings')]
 final class MessagesGatewayController extends AbstractController
 {
-    private const SUPPORTED_PROVIDERS = ['anthropic', 'openai', 'google'];
-
     public function __construct(
         private readonly MessagesGatewayConfig $config,
         private readonly UserProviderKeyResolver $keyResolver,
@@ -236,7 +234,7 @@ final class MessagesGatewayController extends AbstractController
         ]);
     }
 
-    #[Route('/keys/{provider}', name: 'put_key', methods: ['PUT', 'POST'], requirements: ['provider' => 'anthropic|openai|google'])]
+    #[Route('/keys/{provider}', name: 'put_key', methods: ['PUT', 'POST'])]
     #[OA\Post(
         path: '/api/v1/messages-gateway/keys/{provider}',
         summary: 'Save a BYO provider API key for the Messages gateway',
@@ -295,7 +293,7 @@ final class MessagesGatewayController extends AbstractController
         }
 
         $provider = strtolower($provider);
-        if (!\in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+        if (!$this->keyResolver->supports($provider)) {
             return $this->json(['error' => 'Unsupported provider'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -325,7 +323,7 @@ final class MessagesGatewayController extends AbstractController
         ]);
     }
 
-    #[Route('/keys/{provider}', name: 'delete_key', methods: ['DELETE'], requirements: ['provider' => 'anthropic|openai|google'])]
+    #[Route('/keys/{provider}', name: 'delete_key', methods: ['DELETE'])]
     #[OA\Delete(
         path: '/api/v1/messages-gateway/keys/{provider}',
         summary: 'Clear the BYO provider API key for the Messages gateway',
@@ -351,6 +349,9 @@ final class MessagesGatewayController extends AbstractController
         }
 
         $provider = strtolower($provider);
+        if (!$this->keyResolver->supports($provider)) {
+            return $this->json(['error' => 'Unsupported provider'], Response::HTTP_BAD_REQUEST);
+        }
         $userId = (int) $user->getId();
         $this->keyResolver->clearUserKey($userId, $provider);
 
@@ -668,7 +669,7 @@ final class MessagesGatewayController extends AbstractController
     private function providerKeyStatus(int $userId): array
     {
         $keys = [];
-        foreach (self::SUPPORTED_PROVIDERS as $provider) {
+        foreach ($this->keyResolver->supportedProviders() as $provider) {
             $resolved = $this->keyResolver->resolve($provider, $userId, $this->config->allowOperatorKey($userId));
             $keys[$provider] = [
                 'has_user_key' => $this->keyResolver->hasUserKey($userId, $provider),

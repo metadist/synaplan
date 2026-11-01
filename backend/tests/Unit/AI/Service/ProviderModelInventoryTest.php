@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Service;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderModelInventory;
@@ -338,9 +340,10 @@ final class ProviderModelInventoryTest extends TestCase
             $this->createStub(ConfigRepository::class),
             new EncryptionService('unit-test-secret', new NullLogger()),
             new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
             [$provider => 'unit-test-provider-key-0123456789'],
         );
 
-        return new ProviderModelInventory($client, $keyStore, new NullLogger());
+        return new ProviderModelInventory($client, $keyStore, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()));
     }
 }

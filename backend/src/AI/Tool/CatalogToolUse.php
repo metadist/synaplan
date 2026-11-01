@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Tool;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\Model\ModelCatalog;
 
 /**
@@ -15,27 +16,6 @@ use App\Model\ModelCatalog;
  */
 final class CatalogToolUse
 {
-    /**
-     * Chat services whose upstream documents function calling. Every chat-tag
-     * row in these families MUST carry `tool_use`. Ollama / Triton are
-     * opt-in (only when the pulled model is flagged).
-     *
-     * @var list<string>
-     */
-    public const CAPABLE_CHAT_SERVICES = [
-        'openai',
-        'groq',
-        'anthropic',
-        'google',
-        'xai',
-        'mistral',
-        'huggingface',
-        'trustedtokens',
-        'a2agent',
-        'meta',
-        'cerebras',
-    ];
-
     /**
      * Tags that must never carry `tool_use`, even when they share a provider
      * id with a chat row.
@@ -101,8 +81,15 @@ final class CatalogToolUse
         return null;
     }
 
+    /**
+     * Chat services whose upstream documents function calling: every chat-tag
+     * row in these families MUST carry `tool_use`. Ollama / Triton are opt-in
+     * (only when the pulled model is flagged). Read from the descriptors'
+     * `catalogToolUse`; static like the rest of this class, so it answers for
+     * the shipped providers.
+     */
     public static function isCapableChatService(string $service): bool
     {
-        return in_array(ModelCatalog::normalizeProvider($service), self::CAPABLE_CHAT_SERVICES, true);
+        return true === ProviderCatalog::builtIn()->find(ModelCatalog::normalizeProvider($service))?->dialects->catalogToolUse;
     }
 }

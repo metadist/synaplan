@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Catalog\ProviderPricing;
 use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
 use App\Model\CatalogPriceOwnership;
@@ -66,43 +68,23 @@ class SyncModelPricesCommand extends Command
      */
     private const RESOLUTION_TIER_PREFIX = 'output_cost_per_second_';
 
-    private const LOCAL_PROVIDERS = ['ollama', 'triton', 'test', 'piper', 'thehive'];
-
     /**
-     * Maps DB service names (lowercase) to LiteLLM key prefixes to try.
-     *
-     * @var array<string, list<string>>
-     */
-    private const PREFIX_MAP = [
-        'openai' => ['openai'],
-        'anthropic' => ['anthropic'],
-        'google' => ['gemini', 'google'],
-        'groq' => ['groq'],
-        'huggingface' => ['huggingface'],
-    ];
-
-    /**
-     * Maps DB service names (lowercase) to the `litellm_provider` values that
-     * legitimately belong to that vendor, gating the bare-id match below.
+     * `litellm_provider` values that legitimately belong to a rerank or
+     * embedding plug vendor, gating the bare-id match below. The AI providers'
+     * vendors come from their descriptors ({@see ProviderPricing::$bareMatchVendors});
+     * Cohere and Jina are plugs, not providers, so they stay here.
      *
      * A gateway resells an upstream model under the upstream's own id, so
      * A2Agent's `deepseek-v4-pro` collides with LiteLLM's top-level
      * `deepseek-v4-pro` — DeepSeek's first-party rate, a different product sold
-     * at a different price ($1.32/1M vs the gateway's $0.435/1M). Comparing
-     * them reads as drift on a correctly priced row, so a bare id only counts
-     * when LiteLLM attributes it to our own vendor. A service with no entry
-     * here never matches bare and lands in the `unmatched` bucket for manual
-     * verification, which is where gateways belong.
-     *
-     * An alias matches as a prefix, so Google's `vertex_ai-*` families need no
-     * entry each.
+     * at a different price. Comparing them reads as drift on a correctly priced
+     * row, so a bare id only counts when LiteLLM attributes it to our own
+     * vendor. A service with no vendors never matches bare and lands in the
+     * `unmatched` bucket for manual verification, which is where gateways belong.
      *
      * @var array<string, list<string>>
      */
-    private const BARE_MATCH_PROVIDERS = [
-        'openai' => ['openai'],
-        'anthropic' => ['anthropic'],
-        'google' => ['gemini', 'google', 'vertex_ai'],
+    private const PLUG_BARE_MATCH_VENDORS = [
         'cohere' => ['cohere'],
         'jina' => ['jina_ai', 'jina'],
     ];
@@ -123,6 +105,8 @@ class SyncModelPricesCommand extends Command
      * }>
      */
     private readonly array $litellmDeviations;
+
+    private readonly ProviderCatalog $catalog;
 
     /**
      * $litellmDeviations replaces ModelCatalog::LITELLM_DEVIATIONS; only tests
@@ -150,9 +134,17 @@ class SyncModelPricesCommand extends Command
         private LoggerInterface $logger,
         ?array $litellmDeviations = null,
         private CachePriceResolver $cachePriceResolver = new CachePriceResolver(),
+        ?ProviderCatalog $catalog = null,
     ) {
         parent::__construct();
         $this->litellmDeviations = $litellmDeviations ?? ModelCatalog::litellmDeviations();
+        $this->catalog = $catalog ?? ProviderCatalog::builtIn();
+    }
+
+    /** How a service is looked up in the LiteLLM list; the default for a service no descriptor names. */
+    private function pricing(string $service): ProviderPricing
+    {
+        return $this->catalog->find($service)->pricing ?? ProviderPricing::byServiceName();
     }
 
     protected function configure(): void
@@ -212,7 +204,7 @@ class SyncModelPricesCommand extends Command
                 continue;
             }
 
-            if (in_array(strtolower($service), self::LOCAL_PROVIDERS, true)) {
+            if (!$this->pricing($service)->synced) {
                 continue;
             }
 
@@ -1010,13 +1002,13 @@ class SyncModelPricesCommand extends Command
 
         // 1) Direct match (e.g. "gpt-5", "claude-sonnet-4-6", "gemini-2.5-pro"),
         // but only when LiteLLM attributes the id to our own vendor — a bare id
-        // is not unique across providers (see BARE_MATCH_PROVIDERS).
+        // is not unique across providers (see bareIdBelongsToService()).
         if (isset($litellmData[$providerId]) && $this->bareIdBelongsToService($serviceLower, $litellmData[$providerId])) {
             return $providerId;
         }
 
         // 2) Try all known prefixes for this service
-        $prefixes = self::PREFIX_MAP[$serviceLower] ?? [$serviceLower];
+        $prefixes = $this->pricing($serviceLower)->prefixesFor($serviceLower);
         foreach ($prefixes as $prefix) {
             $key = $prefix.'/'.$providerId;
             if (isset($litellmData[$key])) {
@@ -1044,7 +1036,7 @@ class SyncModelPricesCommand extends Command
             return true;
         }
 
-        foreach (self::BARE_MATCH_PROVIDERS[$serviceLower] ?? [] as $vendor) {
+        foreach ([...$this->pricing($serviceLower)->bareMatchVendors, ...self::PLUG_BARE_MATCH_VENDORS[$serviceLower] ?? []] as $vendor) {
             if (str_starts_with($litellmProvider, $vendor)) {
                 return true;
             }
@@ -1060,7 +1052,7 @@ class SyncModelPricesCommand extends Command
      * "LiteLLM has never heard of this model" and "LiteLLM's only candidate
      * prices someone else's product" are different findings with the same
      * silent outcome, and this bucket is the one the procedure says to skip. A
-     * first-party service missing from BARE_MATCH_PROVIDERS reads exactly like
+     * first-party service whose descriptor names no vendor reads exactly like
      * the gateway case, so it says so instead of quietly dropping out of the
      * drift check.
      *

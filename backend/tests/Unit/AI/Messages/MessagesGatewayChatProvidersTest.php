@@ -61,6 +61,7 @@ final class MessagesGatewayChatProvidersTest extends TestCase
     {
         $keyResolver = $this->createMock(UserProviderKeyResolver::class);
         $keyResolver->expects($this->never())->method('resolve');
+        $keyResolver->method('isLocalHost')->willReturn(true);
 
         $gateway = $this->gateway(
             provider: 'ollama',

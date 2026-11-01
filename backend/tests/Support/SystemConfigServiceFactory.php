@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
@@ -73,10 +75,11 @@ final class SystemConfigServiceFactory
             values: new SystemConfigValues(
                 $schema,
                 $repository,
-                $doubles['providerKeyStore'] ?? new ProviderKeyStore($repository, $encryption, new NullLogger()),
+                $doubles['providerKeyStore'] ?? new ProviderKeyStore($repository, $encryption, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn())),
                 $env,
                 new RegistrationConfig($repository),
                 new GuestChatConfig($repository),
+                new ProviderKeyCatalog(ProviderCatalog::builtIn()),
                 $doubles['featureFlagEnv'] ?? new FeatureFlagEnv(),
                 $doubles['chatArtifactsConfig'] ?? null,
             ),
@@ -102,7 +105,7 @@ final class SystemConfigServiceFactory
     public static function schema(ConfigRepository $repository, ?ModuleRegistry $modules = null): SystemConfigSchema
     {
         return new SystemConfigSchema([
-            new AiTab(self::TTS_URL),
+            new AiTab(self::TTS_URL, ProviderCatalog::builtIn()),
             new EmailTab(),
             new BrandingTab(),
             new MobileTab(),
@@ -116,6 +119,6 @@ final class SystemConfigServiceFactory
             new InterfaceTab(),
             new GuestLandingTab(),
             new VectorDbTab(),
-        ]);
+        ], new ProviderKeyCatalog(ProviderCatalog::builtIn()));
     }
 }

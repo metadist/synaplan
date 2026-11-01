@@ -57,6 +57,8 @@ final readonly class ProviderKeySpec
         ?string $displayName = null,
         ?string $fieldDescription = null,
         ?string $secretFieldDescription = null,
+        ?string $configSection = null,
+        int $configOrder = 0,
     ): self {
         return new self(
             store: ProviderKeyStoreKind::Platform,
@@ -68,7 +70,7 @@ final readonly class ProviderKeySpec
             modelListing: $modelListing,
             servesChat: $servesChat,
             userCredential: $userCredential,
-            presentation: new ProviderKeyPresentation($listOrder, $displayName, $freeTier, $recommended, $fieldDescription, $secretFieldDescription),
+            presentation: new ProviderKeyPresentation($listOrder, $displayName, $freeTier, $recommended, $fieldDescription, $secretFieldDescription, $configSection, $configOrder),
         );
     }
 
@@ -89,6 +91,8 @@ final readonly class ProviderKeySpec
         array $envAliases = [],
         ?string $displayName = null,
         ?string $fieldDescription = null,
+        ?string $configSection = null,
+        int $configOrder = 0,
     ): self {
         return self::platform(
             envVar: $envVar,
@@ -102,6 +106,8 @@ final readonly class ProviderKeySpec
             envAliases: $envAliases,
             displayName: $displayName,
             fieldDescription: $fieldDescription,
+            configSection: $configSection,
+            configOrder: $configOrder,
         );
     }
 

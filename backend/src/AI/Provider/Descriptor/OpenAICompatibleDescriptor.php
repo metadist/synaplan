@@ -21,7 +21,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * The descriptor of {@see OpenAICompatibleProvider}, kept beside the adapter
  * because the adapter is at the size limit (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: OpenAICompatibleProvider::class)]
 final class OpenAICompatibleDescriptor implements DescribesProviderInterface
 {
     /** Live voice sessions this install may hold open against compatible realtime endpoints. */

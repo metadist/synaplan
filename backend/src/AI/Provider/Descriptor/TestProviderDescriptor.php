@@ -19,7 +19,7 @@ use App\AI\Provider\TestProvider;
  * is a dev and test fixture; `PerfTestProviderPass` removes its service
  * elsewhere, and this descriptor goes with it.
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: TestProvider::class)]
 final class TestProviderDescriptor implements DescribesProviderInterface
 {
     public static function descriptor(): ProviderDescriptor

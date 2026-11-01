@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\AI\Catalog\ProviderDescriptor;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
@@ -16,8 +18,9 @@ use Psr\Log\LoggerInterface;
  *   1. Per-user encrypted BCONFIG row (group=provider_keys_user, setting=$provider)
  *   2. Operator key via ProviderKeyStore (when $allowOperatorKey is true)
  *
- * Generalized from {@see HiggsfieldCredentialResolver} for anthropic / openai /
- * google (and any future provider name).
+ * Generalized from {@see HiggsfieldCredentialResolver}. The providers a
+ * person may bring a key for are those whose descriptor says
+ * `UserCredential::Gateway` ({@see self::supportedProviders()}).
  */
 final class UserProviderKeyResolver
 {
@@ -28,7 +31,33 @@ final class UserProviderKeyResolver
         private readonly EncryptionService $encryption,
         private readonly ProviderKeyStore $providerKeyStore,
         private readonly LoggerInterface $logger,
+        private readonly ProviderCatalog $catalog,
     ) {
+    }
+
+    /**
+     * Providers that accept a user's own key on the Messages gateway.
+     *
+     * @return list<string>
+     */
+    public function supportedProviders(): array
+    {
+        return array_map(static fn (ProviderDescriptor $d): string => $d->name, $this->catalog->withUserKey());
+    }
+
+    public function supports(string $provider): bool
+    {
+        return \in_array(strtolower(trim($provider)), $this->supportedProviders(), true);
+    }
+
+    /**
+     * An install-configured host that needs no key from the store or the
+     * user: Ollama, or an admin-registered OpenAI-compatible endpoint whose
+     * own credential the translator attaches.
+     */
+    public function isLocalHost(string $provider): bool
+    {
+        return true === $this->catalog->find($provider)?->isLocal();
     }
 
     /**

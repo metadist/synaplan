@@ -38,6 +38,7 @@ final class AdminProviderKeysController extends AbstractController
         private readonly ProviderDefaultsService $defaults,
         private readonly ConfigRepository $configRepository,
         private readonly ChatReadinessService $chatReadiness,
+        private readonly ProviderKeyCatalog $keyCatalog,
         private readonly ?CapabilityInventory $capabilityInventory = null,
         private readonly ?FreeApiAutoLeave $freeApiAutoLeave = null,
     ) {
@@ -159,8 +160,8 @@ final class AdminProviderKeysController extends AbstractController
         $validate = (bool) ($data['validate'] ?? true);
         $applyDefaults = (bool) ($data['applyDefaults'] ?? false);
 
-        if (ProviderKeyCatalog::requiresSecret($provider) && ('' === $secret || null === $secret)) {
-            return $this->json(['error' => sprintf('%s needs the API key and the API secret together — paste both from the provider console.', ProviderKeyCatalog::get($provider)['displayName'])], Response::HTTP_BAD_REQUEST);
+        if ($this->keyCatalog->requiresSecret($provider) && ('' === $secret || null === $secret)) {
+            return $this->json(['error' => sprintf('%s needs the API key and the API secret together — paste both from the provider console.', $this->keyCatalog->get($provider)['displayName'])], Response::HTTP_BAD_REQUEST);
         }
 
         $tested = false;
@@ -188,7 +189,7 @@ final class AdminProviderKeysController extends AbstractController
         $this->capabilityInventory?->forget();
 
         // Leave first, so the defaults check below sees the bindings the Demo restored.
-        $demoLeft = ProviderKeyCatalog::servesChat($provider)
+        $demoLeft = $this->keyCatalog->servesChat($provider)
             && true === $this->freeApiAutoLeave?->ownProviderConnected($provider);
         $defaultsApplied = $this->applyDefaultsAfterSave($provider, $applyDefaults);
 
@@ -244,7 +245,7 @@ final class AdminProviderKeysController extends AbstractController
         return $this->json([
             'success' => true,
             'envFallbackActive' => $this->keyStore->hasEnvKey($provider),
-            'envVar' => ProviderKeyCatalog::get($provider)['envVar'],
+            'envVar' => $this->keyCatalog->get($provider)['envVar'],
         ]);
     }
 
@@ -324,7 +325,7 @@ final class AdminProviderKeysController extends AbstractController
         if ($resp = $this->requireKnownProvider($provider)) {
             return $resp;
         }
-        if (!ProviderDefaultsService::supports($provider)) {
+        if (!$this->defaults->supports($provider)) {
             return $this->json([
                 'error' => sprintf('"%s" has no chat defaults — media and speech keys never become the default chat provider.', strtolower($provider)),
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -347,8 +348,8 @@ final class AdminProviderKeysController extends AbstractController
     private function buildProviderList(): array
     {
         $providers = [];
-        foreach (ProviderKeyCatalog::providerNames() as $name) {
-            $meta = ProviderKeyCatalog::get($name);
+        foreach ($this->keyCatalog->providerNames() as $name) {
+            $meta = $this->keyCatalog->get($name);
             $status = $this->keyStore->getStatus($name);
             $providers[] = [
                 'name' => $name,
@@ -361,8 +362,8 @@ final class AdminProviderKeysController extends AbstractController
                 'envVar' => $meta['envVar'],
                 'secretEnvVar' => $meta['secretEnvVar'] ?? null,
                 'hasSecret' => $status['hasSecret'],
-                'testable' => ProviderKeyCatalog::isTestable($name),
-                'chat' => ProviderKeyCatalog::servesChat($name),
+                'testable' => $this->keyCatalog->isTestable($name),
+                'chat' => $this->keyCatalog->servesChat($name),
                 'freeTier' => $meta['freeTier'],
                 'recommended' => $meta['recommended'],
             ];
@@ -373,7 +374,7 @@ final class AdminProviderKeysController extends AbstractController
 
     private function applyDefaultsAfterSave(string $provider, bool $requested): bool
     {
-        if (!ProviderDefaultsService::supports($provider)) {
+        if (!$this->defaults->supports($provider)) {
             return false;
         }
         if (!$requested) {
@@ -383,7 +384,7 @@ final class AdminProviderKeysController extends AbstractController
             // is a deliberate choice and is never overridden.
             $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
             $currentReady = '' !== $current
-                && (!ProviderKeyCatalog::has($current) || null !== $this->keyStore->getKey($current));
+                && (!$this->keyCatalog->has($current) || null !== $this->keyStore->getKey($current));
             if ($currentReady) {
                 return false;
             }
@@ -404,7 +405,7 @@ final class AdminProviderKeysController extends AbstractController
 
     private function requireKnownProvider(string $provider): ?JsonResponse
     {
-        if (!ProviderKeyCatalog::has($provider)) {
+        if (!$this->keyCatalog->has($provider)) {
             return $this->json(['error' => sprintf('Unknown provider "%s".', $provider)], Response::HTTP_NOT_FOUND);
         }
 

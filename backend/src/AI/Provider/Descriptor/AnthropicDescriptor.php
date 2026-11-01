@@ -13,6 +13,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -28,7 +29,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  * (`03_contracts.md` §2.3.3); the request-shape constants it quotes stay on
  * the adapter.
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: AnthropicProvider::class)]
 final class AnthropicDescriptor implements DescribesProviderInterface
 {
     /**
@@ -75,6 +76,8 @@ final class AnthropicDescriptor implements DescribesProviderInterface
                 listOrder: 3,
                 modelListing: ModelListing::Lists,
                 fieldDescription: 'Anthropic (Claude) API key',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 2,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::ANTHROPIC_TOOL_FORCING,

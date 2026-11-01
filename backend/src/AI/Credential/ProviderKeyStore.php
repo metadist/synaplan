@@ -52,25 +52,6 @@ final class ProviderKeyStore
     public const ORIGIN_ENV = 'env';
     public const ORIGIN_UI = 'ui';
 
-    /** Providers whose platform API key may live in this store. */
-    public const SUPPORTED_PROVIDERS = [
-        'anthropic',
-        'openai',
-        'groq',
-        'google',
-        'mistral',
-        'trustedtokens',
-        'a2agent',
-        'meta',
-        'cerebras',
-        'huggingface',
-        'xai',
-        'perplexity',
-        'thehive',
-        'higgsfield',
-        'elevenlabs',
-    ];
-
     private const MEMO_TTL_SECONDS = 15;
 
     /** @var array<string, array{creds: array{key: string, secret: ?string}|null, at: int}> */
@@ -89,19 +70,25 @@ final class ProviderKeyStore
      *                                                                 half from the environment, for
      *                                                                 providers whose catalog entry
      *                                                                 names a `secretEnvVar`
+     *
+     * Both maps are built by ProviderCatalogPass from the provider descriptors
+     * (`%env(default::X)%` per declared env var), so a provider class is the
+     * only place that names its variables
      */
     public function __construct(
         private readonly ConfigRepository $configRepository,
         private readonly EncryptionService $encryption,
         private readonly LoggerInterface $logger,
+        private readonly ProviderKeyCatalog $keyCatalog,
         private readonly array $envKeys = [],
         private readonly array $envSecrets = [],
     ) {
     }
 
-    public static function isSupported(string $provider): bool
+    /** Does a platform key for this provider belong in the store? */
+    public function supports(string $provider): bool
     {
-        return in_array($provider, self::SUPPORTED_PROVIDERS, true);
+        return $this->keyCatalog->has(strtolower(trim($provider)));
     }
 
     /**
@@ -129,7 +116,7 @@ final class ProviderKeyStore
     private function getCredentials(string $provider): ?array
     {
         $provider = strtolower(trim($provider));
-        if (!self::isSupported($provider)) {
+        if (!$this->supports($provider)) {
             return null;
         }
 
@@ -152,8 +139,8 @@ final class ProviderKeyStore
     public function saveKey(string $provider, string $key, string $origin = self::ORIGIN_UI, ?string $secret = null): void
     {
         $provider = strtolower(trim($provider));
-        if (!self::isSupported($provider)) {
-            throw new \InvalidArgumentException(sprintf('Unknown AI provider "%s". Supported: %s.', $provider, implode(', ', self::SUPPORTED_PROVIDERS)));
+        if (!$this->supports($provider)) {
+            throw new \InvalidArgumentException(sprintf('Unknown AI provider "%s". Supported: %s.', $provider, implode(', ', $this->keyCatalog->providerNames())));
         }
 
         $key = trim($key);
@@ -168,9 +155,9 @@ final class ProviderKeyStore
         }
 
         $secret = null === $secret ? null : trim($secret);
-        if (ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider)) {
+        if ($this->keyCatalog->requiresSecret($provider)) {
             if (null === $secret || '' === $secret) {
-                throw new \InvalidArgumentException(sprintf('%s needs the API key and the API secret together — the key alone will not authenticate. Paste both from the provider console.', ProviderKeyCatalog::get($provider)['displayName']));
+                throw new \InvalidArgumentException(sprintf('%s needs the API key and the API secret together — the key alone will not authenticate. Paste both from the provider console.', $this->keyCatalog->get($provider)['displayName']));
             }
             if (SecretValueGuard::isMasked($secret)) {
                 throw new \InvalidArgumentException('That is the masked display value, not an API secret. Leave the field untouched to keep the stored secret, or paste a new one.');
@@ -221,7 +208,7 @@ final class ProviderKeyStore
     public function getStatus(string $provider): array
     {
         $provider = strtolower(trim($provider));
-        $needsSecret = ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider);
+        $needsSecret = $this->keyCatalog->has($provider) && $this->keyCatalog->requiresSecret($provider);
         $row = $this->loadRow($provider);
         if (null !== $row) {
             $hasSecret = null !== $row['secret'] && '' !== $row['secret'];
@@ -286,7 +273,7 @@ final class ProviderKeyStore
     {
         $envKey = $this->envKey($provider);
         $envSecret = $this->envSecret($provider);
-        $needsSecret = ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider);
+        $needsSecret = $this->keyCatalog->requiresSecret($provider);
         // A key + secret provider is only "set in the environment" when both
         // halves are: half a pair authenticates nothing.
         $envConfigured = '' !== $envKey && (!$needsSecret || '' !== $envSecret);

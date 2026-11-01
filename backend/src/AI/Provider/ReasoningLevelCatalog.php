@@ -4,50 +4,22 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Catalog\ProviderCatalog;
+use App\Model\ModelCatalog;
+
 /**
  * Discrete reasoning levels a chat model exposes, cheapest first.
  *
  * A reasoning model with no selectable levels returns null so the chat keeps
- * the on/off Thinking toggle. Families that reject an unknown name (HTTP 400)
- * are listed explicitly; everything else stays on the toggle.
- *
- * The first matching prefix wins, so longer prefixes come first.
+ * the on/off Thinking toggle. The ladders — which families take which level
+ * names — live on each provider's descriptor ({@see \App\AI\Catalog\ReasoningLadder});
+ * this class applies them. It is static like its callers and reads the
+ * shipped catalog.
  */
 final class ReasoningLevelCatalog
 {
     /** Every tier name any provider uses, cheapest first. */
     private const LADDER = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
-
-    /**
-     * Claude Sonnet 5.5 accepts xhigh and max in addition to low|medium|high.
-     *
-     * Checked before {@see self::ANTHROPIC_EFFORT_MODELS}: `claude-sonnet-5`
-     * is a prefix of `claude-sonnet-5-5`.
-     *
-     * @var list<string>
-     */
-    private const ANTHROPIC_EXTENDED_EFFORT_MODELS = [
-        'claude-sonnet-5-5',
-    ];
-
-    /**
-     * Adaptive Claude models accept output_config.effort low|medium|high.
-     * Must stay aligned with AnthropicProvider::ADAPTIVE_THINKING_MODELS.
-     * Budget-token models are omitted on purpose: they keep the toggle.
-     *
-     * @var list<string>
-     */
-    private const ANTHROPIC_EFFORT_MODELS = [
-        'claude-opus-4-6',
-        'claude-opus-4-7',
-        'claude-opus-4-8',
-        'claude-sonnet-4-6',
-        'claude-opus-5-5',
-        'claude-opus-5',
-        'claude-sonnet-5',
-        'claude-fable-5-1',
-        'claude-fable-5',
-    ];
 
     /**
      * @param list<string> $features
@@ -60,18 +32,7 @@ final class ReasoningLevelCatalog
             return null;
         }
 
-        $providerId = strtolower($providerId);
-
-        return match (self::normalizeService($service)) {
-            'openai' => self::openAiLevels($providerId),
-            'xai' => self::xaiLevels($providerId),
-            'google', 'gemini' => ['low', 'medium', 'high'],
-            'anthropic' => self::anthropicLevels($providerId),
-            'meta' => ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
-            'huggingface', 'hugging face' => self::huggingFaceLevels($providerId),
-            'cerebras' => self::cerebrasLevels($providerId),
-            default => null,
-        };
+        return ProviderCatalog::builtIn()->find(ModelCatalog::normalizeProvider($service))?->dialects->reasoning?->levelsFor($providerId);
     }
 
     /**
@@ -207,95 +168,5 @@ final class ReasoningLevelCatalog
         }
 
         return null;
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private static function openAiLevels(string $providerId): ?array
-    {
-        foreach (['gpt-5', 'gpt-6', 'o1', 'o3', 'o4'] as $prefix) {
-            if (str_starts_with($providerId, $prefix)) {
-                return OpenAiReasoningEffort::tiers($providerId);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * grok-4.5 and grok-4.6 reason at a fixed depth and reject the parameter.
-     *
-     * @return list<string>|null
-     */
-    private static function xaiLevels(string $providerId): ?array
-    {
-        if (str_starts_with($providerId, 'grok-4.7')) {
-            return ['low', 'medium', 'high', 'xhigh'];
-        }
-
-        if (str_starts_with($providerId, 'grok-4.3')) {
-            return ['none', 'low', 'medium', 'high'];
-        }
-
-        return null;
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private static function anthropicLevels(string $providerId): ?array
-    {
-        foreach (self::ANTHROPIC_EXTENDED_EFFORT_MODELS as $prefix) {
-            if (str_starts_with($providerId, $prefix)) {
-                return ['low', 'medium', 'high', 'xhigh', 'max'];
-            }
-        }
-
-        foreach (self::ANTHROPIC_EFFORT_MODELS as $prefix) {
-            if (str_starts_with($providerId, $prefix)) {
-                return ['low', 'medium', 'high'];
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Kimi K3 accepts low|high|max. K2 rows that advertise reasoning share it.
-     *
-     * @return list<string>|null
-     */
-    private static function huggingFaceLevels(string $providerId): ?array
-    {
-        if (str_contains($providerId, 'kimi-k3') || str_contains($providerId, 'kimi-k2')) {
-            return ['low', 'high', 'max'];
-        }
-
-        return null;
-    }
-
-    /**
-     * Qwen 3.8 can switch reasoning off; GPT OSS cannot (`none` is a 400).
-     * Must stay aligned with CerebrasProvider::REASONING_EFFORTS.
-     *
-     * @return list<string>|null
-     */
-    private static function cerebrasLevels(string $providerId): ?array
-    {
-        if (str_starts_with($providerId, 'qwen-3.8')) {
-            return ['none', 'low', 'medium', 'high'];
-        }
-
-        if (str_starts_with($providerId, 'gpt-oss')) {
-            return ['low', 'medium', 'high'];
-        }
-
-        return null;
-    }
-
-    private static function normalizeService(string $service): string
-    {
-        return strtolower(trim($service));
     }
 }

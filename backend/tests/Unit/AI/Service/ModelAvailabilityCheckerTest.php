@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Service;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Service\ModelAvailabilityChecker;
 use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderModelInventoryInterface;
@@ -247,6 +249,8 @@ final class ModelAvailabilityCheckerTest extends TestCase
             $this->createStub(ConfigRepository::class),
             new ArrayAdapter(),
             new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
+            ProviderCatalog::builtIn(),
         );
     }
 

@@ -17,7 +17,7 @@ use App\AI\Provider\TritonProvider;
  * The descriptor of {@see TritonProvider}, kept beside the adapter because
  * the adapter is frozen in the size ledger (`03_contracts.md` §2.3.3).
  */
-#[AsAiProvider]
+#[AsAiProvider(adapter: TritonProvider::class)]
 final class TritonDescriptor implements DescribesProviderInterface
 {
     public static function descriptor(): ProviderDescriptor

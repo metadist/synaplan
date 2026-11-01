@@ -33,6 +33,7 @@ final readonly class SystemConfigSchema
     public function __construct(
         #[AutowireIterator(SystemConfigTab::TAG)]
         iterable $tabs,
+        ProviderKeyCatalog $keyCatalog,
     ) {
         $structure = [];
         $fields = [];
@@ -50,7 +51,7 @@ final readonly class SystemConfigSchema
             $structure[$tab->id()] = ['label' => $tab->label(), 'sections' => $sections];
         }
 
-        foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
+        foreach ($keyCatalog->managedEnvVars() as $envVar) {
             if (isset($fields[$envVar])) {
                 // Stored encrypted in BCONFIG by the store and applied per call.
                 $fields[$envVar] = $fields[$envVar]->managedIn(ProviderKeyCatalog::MANAGED_BY);

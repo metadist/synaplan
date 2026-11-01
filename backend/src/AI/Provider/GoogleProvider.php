@@ -11,6 +11,7 @@ use App\AI\Catalog\ProviderDefaults;
 use App\AI\Catalog\ProviderDescriptor;
 use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderEndpoint;
+use App\AI\Catalog\ProviderKeyPresentation;
 use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
@@ -115,6 +116,8 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 envAliases: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
                 displayName: 'Google Gemini',
                 fieldDescription: 'Google Gemini API key — also unlocks Imagen, Nano Banana, Veo and Gemini TTS',
+                configSection: ProviderKeyPresentation::SECTION_CLOUD,
+                configOrder: 4,
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA,

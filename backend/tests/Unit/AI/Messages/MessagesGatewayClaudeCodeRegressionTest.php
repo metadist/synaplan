@@ -12,7 +12,6 @@ use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
-use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\GeminiMessagesTranslator;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use App\AI\Messages\Vision\VisionPolicy;
@@ -87,7 +86,7 @@ final class MessagesGatewayClaudeCodeRegressionTest extends TestCase
 
         $executed = $gateway->executeComplete($prepared, $this->user());
         self::assertSame(200, $executed['status']);
-        self::assertSame(ChatCompletionsUpstreams::URLS['openai'], $seenUrl);
+        self::assertSame('https://api.openai.com/v1/chat/completions', $seenUrl);
         self::assertStringNotContainsString('groq', (string) $seenUrl);
     }
 

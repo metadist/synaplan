@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\AI\Credential;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
@@ -79,7 +80,12 @@ final class ProviderKeyStoreTest extends TestCase
      */
     private function makeStore(array $envKeys = [], array $envSecrets = []): ProviderKeyStore
     {
-        return new ProviderKeyStore($this->configRepository, $this->encryption, new NullLogger(), $envKeys, $envSecrets);
+        return new ProviderKeyStore($this->configRepository, $this->encryption, new NullLogger(), new ProviderKeyCatalog(ProviderCatalog::builtIn()), $envKeys, $envSecrets);
+    }
+
+    private static function catalog(): ProviderKeyCatalog
+    {
+        return new ProviderKeyCatalog(ProviderCatalog::builtIn());
     }
 
     /**
@@ -182,12 +188,12 @@ final class ProviderKeyStoreTest extends TestCase
 
     public function testMediaAndSpeechProvidersAreSupported(): void
     {
+        $store = $this->makeStore(['thehive' => 'hive-env-key']);
         foreach (['thehive', 'higgsfield', 'elevenlabs'] as $provider) {
-            self::assertTrue(ProviderKeyStore::isSupported($provider), $provider.' must live in the one key store');
-            self::assertTrue(ProviderKeyCatalog::has($provider));
+            self::assertTrue($store->supports($provider), $provider.' must live in the one key store');
+            self::assertTrue(self::catalog()->has($provider));
         }
 
-        $store = $this->makeStore(['thehive' => 'hive-env-key']);
         self::assertSame('hive-env-key', $store->getKey('thehive'));
         self::assertNull($store->getSecret('thehive'), 'a single-key provider has no secret half');
     }
@@ -197,7 +203,7 @@ final class ProviderKeyStoreTest extends TestCase
         $store = $this->makeStore(['groq' => 'gsk_env']);
 
         self::assertNull($store->getKey('not-a-provider'));
-        self::assertFalse(ProviderKeyStore::isSupported('not-a-provider'));
+        self::assertFalse($store->supports('not-a-provider'));
     }
 
     public function testUnconfiguredProviderResolvesToNullWithoutWriting(): void
@@ -431,44 +437,43 @@ final class ProviderKeyStoreTest extends TestCase
 
     public function testCatalogCoversEverySupportedProvider(): void
     {
-        foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
-            self::assertTrue(ProviderKeyCatalog::has($provider), sprintf('ProviderKeyCatalog is missing metadata for "%s"', $provider));
-        }
-        foreach (ProviderKeyCatalog::providerNames() as $provider) {
-            self::assertTrue(ProviderKeyStore::isSupported($provider), sprintf('ProviderKeyStore cannot store a key for catalog provider "%s"', $provider));
+        $store = $this->makeStore();
+        self::assertCount(15, self::catalog()->providerNames());
+        foreach (self::catalog()->providerNames() as $provider) {
+            self::assertTrue($store->supports($provider), sprintf('ProviderKeyStore cannot store a key for catalog provider "%s"', $provider));
         }
     }
 
     public function testCatalogDescribesSecretsAndTestability(): void
     {
-        self::assertSame('HIGGSFIELD_API_SECRET', ProviderKeyCatalog::secretEnvVarFor('higgsfield'));
-        self::assertTrue(ProviderKeyCatalog::requiresSecret('higgsfield'));
-        self::assertFalse(ProviderKeyCatalog::requiresSecret('groq'));
-        self::assertSame('higgsfield', ProviderKeyCatalog::providerForEnvVar('HIGGSFIELD_API_SECRET'));
-        self::assertTrue(ProviderKeyCatalog::isSecretEnvVar('HIGGSFIELD_API_SECRET'));
-        self::assertFalse(ProviderKeyCatalog::isSecretEnvVar('HIGGSFIELD_API_KEY'));
+        self::assertSame('HIGGSFIELD_API_SECRET', self::catalog()->secretEnvVarFor('higgsfield'));
+        self::assertTrue(self::catalog()->requiresSecret('higgsfield'));
+        self::assertFalse(self::catalog()->requiresSecret('groq'));
+        self::assertSame('higgsfield', self::catalog()->providerForEnvVar('HIGGSFIELD_API_SECRET'));
+        self::assertTrue(self::catalog()->isSecretEnvVar('HIGGSFIELD_API_SECRET'));
+        self::assertFalse(self::catalog()->isSecretEnvVar('HIGGSFIELD_API_KEY'));
 
-        self::assertFalse(ProviderKeyCatalog::isTestable('thehive'), 'no free authenticated endpoint — saved untested');
-        self::assertTrue(ProviderKeyCatalog::isTestable('elevenlabs'));
+        self::assertFalse(self::catalog()->isTestable('thehive'), 'no free authenticated endpoint — saved untested');
+        self::assertTrue(self::catalog()->isTestable('elevenlabs'));
 
         // Only a real model listing may feed model health / the inventory.
-        self::assertTrue(ProviderKeyCatalog::listsModels('groq'));
+        self::assertTrue(self::catalog()->listsModels('groq'));
         foreach (['huggingface', 'higgsfield', 'elevenlabs', 'thehive'] as $provider) {
-            self::assertFalse(ProviderKeyCatalog::listsModels($provider), $provider.' must not be read as a model listing');
+            self::assertFalse(self::catalog()->listsModels($provider), $provider.' must not be read as a model listing');
         }
 
-        self::assertContains('HIGGSFIELD_API_SECRET', ProviderKeyCatalog::managedEnvVars());
-        self::assertContains('THEHIVE_API_KEY', ProviderKeyCatalog::managedEnvVars());
+        self::assertContains('HIGGSFIELD_API_SECRET', self::catalog()->managedEnvVars());
+        self::assertContains('THEHIVE_API_KEY', self::catalog()->managedEnvVars());
 
-        self::assertTrue(ProviderKeyCatalog::servesChat('groq'));
+        self::assertTrue(self::catalog()->servesChat('groq'));
         foreach (['thehive', 'higgsfield', 'elevenlabs'] as $provider) {
-            self::assertFalse(ProviderKeyCatalog::servesChat($provider), $provider.' never makes chat ready');
+            self::assertFalse(self::catalog()->servesChat($provider), $provider.' never makes chat ready');
         }
     }
 
     public function testA2AgentCatalogUsesBearerKeyPlaceholderAndPaidTier(): void
     {
-        $meta = ProviderKeyCatalog::get('a2agent');
+        $meta = self::catalog()->get('a2agent');
 
         self::assertFalse($meta['freeTier']);
         self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
@@ -476,7 +481,7 @@ final class ProviderKeyStoreTest extends TestCase
 
     public function testMetaCatalogPointsAtTheModelApiDashboard(): void
     {
-        $meta = ProviderKeyCatalog::get('meta');
+        $meta = self::catalog()->get('meta');
 
         self::assertSame('META_API_KEY', $meta['envVar']);
         self::assertSame('https://dev.meta.ai/', $meta['consoleUrl']);
@@ -486,13 +491,13 @@ final class ProviderKeyStoreTest extends TestCase
 
     public function testCerebrasCatalogUsesTheCanonicalEnvVarAndModelListing(): void
     {
-        $meta = ProviderKeyCatalog::get('cerebras');
+        $meta = self::catalog()->get('cerebras');
 
         self::assertSame('CEREBRAS_API_KEY', $meta['envVar']);
         self::assertSame('https://cloud.cerebras.ai/', $meta['consoleUrl']);
         self::assertSame('https://api.cerebras.ai/v1/models', $meta['validation']['url']);
         self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
-        self::assertTrue(ProviderKeyCatalog::listsModels('cerebras'));
-        self::assertContains('cerebras', ProviderKeyStore::SUPPORTED_PROVIDERS);
+        self::assertTrue(self::catalog()->listsModels('cerebras'));
+        self::assertTrue($this->makeStore()->supports('cerebras'));
     }
 }
