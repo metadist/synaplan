@@ -217,6 +217,32 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * #2859: LiteLLM still carries Mistral's pre-discount list rate for Mistral
+     * Large 4 (in 1.36 / cached 0.14 / out 4.18) while the official page bills
+     * the launch rate the catalog holds (0.68 / 0.068 / 2.09). Both rows share
+     * the providerId, so one entry must silence chat (387) and vision (388).
+     */
+    public function testMistralLarge4DeviationPinsLiteLLMsListRate(): void
+    {
+        $entry = ModelCatalog::litellmDeviations()['mistral:mistral-large-4'] ?? null;
+
+        $this->assertNotNull($entry, 'LITELLM_DEVIATIONS must record the verified Mistral Large 4 error');
+        $this->assertSame(1.36, $entry['litellm_in']);
+        $this->assertSame(4.18, $entry['litellm_out']);
+        $this->assertSame(0.14, $entry['litellm_cache_read']);
+        $this->assertSame('https://docs.mistral.ai/inference/pricing', $entry['source']);
+        $this->assertSame('2026-11-01', $entry['verifiedOn']);
+        $this->assertNotSame('', trim($entry['reason']));
+
+        // The key covers the providerId, and the drift log names both BIDs —
+        // a dropped or added mistral-large-4 row must make this claim fail.
+        $this->assertSame(
+            [387, 388],
+            array_map(static fn (array $row): int => $row['id'], ModelCatalog::find('mistral:mistral-large-4')),
+        );
+    }
+
+    /**
      * On a row with `resolution_prices` billing charges from the tier table and
      * `priceOut` is only its fallback. The drift check therefore compares the
      * tiers and skips the headline — which is safe only while the headline IS one
