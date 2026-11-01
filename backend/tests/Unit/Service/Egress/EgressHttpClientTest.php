@@ -13,17 +13,21 @@ use App\Service\Egress\EgressDirectoryRefresher;
 use App\Service\Egress\EgressHttpClient;
 use App\Service\Egress\EgressMetrics;
 use App\Service\Egress\EgressMode;
+use App\Service\Egress\EgressPendingResponse;
 use App\Service\Egress\EgressPolicy;
 use App\Service\Egress\EgressRefusedException;
 use App\Service\Egress\EgressRule;
 use App\Service\Egress\EgressTypedUrlGuard;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Event\ConsoleCommandEvent;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Psr18Client;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class EgressHttpClientTest extends TestCase
 {
@@ -57,6 +61,65 @@ final class EgressHttpClientTest extends TestCase
         self::assertSame('POST', $seen['method']);
         self::assertSame('https://unknown.example/v1', $seen['url']);
         self::assertSame(3, $seen['redirects']);
+        self::assertInstanceOf(MockResponse::class, $response);
+    }
+
+    #[DataProvider('guardedModes')]
+    public function testTheReportModeBodyIsSeekableForPsr18Clients(EgressMode $mode): void
+    {
+        $payload = '{"choices":[]}';
+        $inner = new MockHttpClient(static fn (): MockResponse => new MockResponse($payload));
+        $psr18 = new Psr18Client($this->client($inner, $mode));
+
+        $body = $psr18->sendRequest($psr18->createRequest('GET', 'https://api.groq.com/openai/v1/chat/completions'))->getBody();
+
+        self::assertTrue($body->isSeekable());
+        self::assertSame($payload, $body->getContents());
+        $body->rewind();
+        self::assertSame($payload, $body->getContents());
+    }
+
+    /**
+     * @return array<string, array{EgressMode}>
+     */
+    public static function guardedModes(): array
+    {
+        return ['report' => [EgressMode::Report], 'enforce' => [EgressMode::Enforce]];
+    }
+
+    public function testTheRedirectBodyIsNotTheStreamTheCallerReads(): void
+    {
+        $inner = new MockHttpClient(static fn (string $method, string $url): MockResponse => str_contains($url, '/start')
+            ? new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => 'https://api.openai.com/next']])
+            : new MockResponse('final'));
+        $psr18 = new Psr18Client($this->client($inner, EgressMode::Report));
+
+        $body = $psr18->sendRequest($psr18->createRequest('GET', 'https://api.openai.com/start'))->getBody();
+
+        self::assertSame('final', $body->getContents());
+    }
+
+    public function testAClientErrorBodyStaysReadableThroughPsr18(): void
+    {
+        $payload = '{"error":{"message":"invalid api key"}}';
+        $inner = new MockHttpClient(static fn (): MockResponse => new MockResponse($payload, ['http_code' => 401]));
+        $psr18 = new Psr18Client($this->client($inner, EgressMode::Enforce));
+
+        $response = $psr18->sendRequest($psr18->createRequest('GET', 'https://api.groq.com/openai/v1/chat/completions'));
+
+        self::assertSame(401, $response->getStatusCode());
+        self::assertSame($payload, $response->getBody()->getContents());
+    }
+
+    public function testANonStreamableInnerResponseIsBufferedIntoASeekableStream(): void
+    {
+        $pending = new EgressPendingResponse(static fn (ResponseInterface $inner): ResponseInterface => $inner, new NonStreamableResponse(), 0);
+
+        $stream = $pending->toStream(false);
+
+        self::assertSame('{"choices":[]}', stream_get_contents($stream));
+        self::assertSame(0, fseek($stream, 0));
+        self::assertSame('{"choices":[]}', stream_get_contents($stream));
     }
 
     public function testEnforceRefusesBeforeASocketOpens(): void
@@ -597,6 +660,48 @@ final class AllowTypedGuard implements EgressTypedUrlGuard
     public function pins(string $host): array
     {
         return $this->pins;
+    }
+}
+
+/**
+ * @internal
+ */
+final class NonStreamableResponse implements ResponseInterface
+{
+    public function getStatusCode(): int
+    {
+        return 400;
+    }
+
+    public function getHeaders(bool $throw = true): array
+    {
+        return [];
+    }
+
+    /**
+     * A 4xx body must be readable with `$throw = false`; the SDK reads it.
+     */
+    public function getContent(bool $throw = true): string
+    {
+        if ($throw) {
+            throw new \RuntimeException('A non-streamable error body must not throw.');
+        }
+
+        return '{"choices":[]}';
+    }
+
+    public function toArray(bool $throw = true): array
+    {
+        return [];
+    }
+
+    public function cancel(): void
+    {
+    }
+
+    public function getInfo(?string $type = null): mixed
+    {
+        return null;
     }
 }
 

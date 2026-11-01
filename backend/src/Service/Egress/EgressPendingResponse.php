@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Egress;
 
+use Symfony\Component\HttpClient\Response\StreamableInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
@@ -11,7 +12,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * read or streamed, not when {@see EgressHttpClient::request()} returns.
  * Starting several reads therefore overlaps, the way Symfony's own client does.
  */
-final class EgressPendingResponse implements ResponseInterface
+final class EgressPendingResponse implements ResponseInterface, StreamableInterface
 {
     private ?ResponseInterface $final = null;
 
@@ -62,6 +63,32 @@ final class EgressPendingResponse implements ResponseInterface
     public function toArray(bool $throw = true): array
     {
         return $this->settle()->toArray($throw);
+    }
+
+    /**
+     * PSR-18 runs with `$buffer = false` and would otherwise wrap this
+     * response in a resource whose `seekable` flag lies, which breaks every
+     * caller that rewinds the body (the OpenAI SDK does, twice).
+     *
+     * @return resource
+     */
+    public function toStream(bool $throw = true)
+    {
+        $response = $this->settle();
+        if ($response instanceof StreamableInterface) {
+            return $response->toStream($throw);
+        }
+        $stream = fopen('php://temp', 'r+');
+        if (false === $stream) {
+            throw new \RuntimeException('Unable to buffer the response body.');
+        }
+        $body = $response->getContent($throw);
+        if (fwrite($stream, $body) !== \strlen($body)) {
+            throw new \RuntimeException('Unable to buffer the response body.');
+        }
+        rewind($stream);
+
+        return $stream;
     }
 
     public function cancel(): void
