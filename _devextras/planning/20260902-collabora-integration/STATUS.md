@@ -30,6 +30,7 @@ that suite, so it is not the test bed for Epic 0.
 | 4.1 — Provider provisioning per platform | integration repos | planned | Nextcloud first (`richdocuments` `UserPrivateInfo` hook) |
 | 4.2 — Extension distribution | `synaplan-collabora` | planned | |
 | 4.3 — Platform-native AI hooks | integration repos | planned | Nextcloud Task Processing provider |
+| Charts — editor URLs on openDesk | `synaplan-charts` `feat/opendesk-office-editor` | in review | `office.publicUrl` + `office.wopiUrl`, both or neither. Previews stay `apps.collabora.enabled`. The chart does not change openDesk's Collabora. |
 
 ## Decisions
 
@@ -39,6 +40,7 @@ that suite, so it is not the test bed for Epic 0.
 | 2026-09-02 | The Synaplan WOPI host ("Open in editor") belongs to this plan as Epic 0; the office-docs plan only links to it. |
 | 2026-09-02 | Tool calling in chat providers is one shared building block for office-docs Phase B and Epic 1.1; whichever lands first records it in both STATUS files. |
 | 2026-11-02 | Dev editor is the pinned CODE sidecar on `127.0.0.1:9981`, not the Nextcloud container on `:9980` and not the Vultr openDesk Collabora. A WOPI save does not append a document revision: the previous binary hash stops matching, so the next chat edit re-imports. |
+| 2026-11-02 | openDesk in `synaplan-charts` keeps previews on `apps.collabora.enabled`. The editor is a separate pair of URLs and stays off until both are set. The chart does not edit openDesk's Collabora. |
 
 ## Versions and contracts we depend on
 

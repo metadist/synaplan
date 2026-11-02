@@ -15,6 +15,7 @@ session `.plan.md` files are not authoritative.
 | [`03_epic_2_synaplan_extension.md`](./03_epic_2_synaplan_extension.md) | iframe-hosted Synaplan extension |
 | [`04_epic_3_mcp_and_tasks.md`](./04_epic_3_mcp_and_tasks.md) | Collabora MCP from Synaplan tasks |
 | [`05_epic_4_partner_platforms.md`](./05_epic_4_partner_platforms.md) | Nextcloud / OpenCloud / ownCloud |
+| [`06_charts_opendesk.md`](./06_charts_opendesk.md) | openDesk delivery in `synaplan-charts` |
 | [`STATUS.md`](./STATUS.md) | Step table and decision log |
 
 **Shared with office-docs:** Collabora CODE sidecar (A0) and Phase T tool
