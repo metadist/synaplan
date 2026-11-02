@@ -9,11 +9,7 @@
       {{ $t('templates.back') }}
     </button>
     <header class="space-y-1">
-      <p
-        v-if="isPlugin"
-        class="txt-secondary text-xs"
-        data-testid="badge-from-plugin"
-      >
+      <p v-if="isPlugin" class="txt-secondary text-xs" data-testid="badge-from-plugin">
         {{ $t('templates.fromPlugin', { name: template.pluginName }) }}
       </p>
       <h2 class="txt-primary text-lg font-medium">{{ templateTitle(template, t) }}</h2>
@@ -29,11 +25,7 @@
     <p class="txt-primary text-sm" data-testid="text-template-preview">
       {{ preview }}
     </p>
-    <p
-      v-if="isPlugin && !sharingOff"
-      class="txt-secondary text-sm"
-      data-testid="text-plugin-stop"
-    >
+    <p v-if="isPlugin && !sharingOff" class="txt-secondary text-sm" data-testid="text-plugin-stop">
       {{ $t('templates.pluginStop') }}
     </p>
     <ul class="space-y-2" data-testid="list-template-requires">
@@ -180,9 +172,7 @@ async function addPlugin(): Promise<void> {
   if (!id) return
   const name = props.template.pluginName ?? ''
   const ok = await confirm({
-    title: sharingOff.value
-      ? t('templates.pluginAddMine')
-      : t('templates.pluginAddConfirmTitle'),
+    title: sharingOff.value ? t('templates.pluginAddMine') : t('templates.pluginAddConfirmTitle'),
     message: sharingOff.value
       ? t('templates.pluginAddSharingOff', { name })
       : t('templates.pluginAddConfirm', { name }),

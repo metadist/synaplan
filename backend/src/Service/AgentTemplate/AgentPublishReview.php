@@ -22,6 +22,7 @@ use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ShareService;
+use App\Service\Tool\ApprovalRealtimeNotifier;
 
 /**
  * Holds "share with everyone" until another admin approves it.
@@ -49,6 +50,7 @@ final readonly class AgentPublishReview
         private IamConfig $iam,
         private AgentRepository $agents,
         private UserRepository $users,
+        private ?ApprovalRealtimeNotifier $realtime = null,
     ) {
     }
 
@@ -81,6 +83,7 @@ final readonly class AgentPublishReview
         ]);
         $approval->setPreview($agent->getName());
         $this->approvals->save($approval);
+        $this->realtime?->pending($approval);
     }
 
     public function sharedWithEveryone(Agent $agent): bool
@@ -170,6 +173,7 @@ final readonly class AgentPublishReview
         }
         $approval->markApproved((int) $actor->getId());
         $this->approvals->save($approval);
+        $this->realtime?->decided($approval);
 
         return $approval;
     }
@@ -181,6 +185,7 @@ final readonly class AgentPublishReview
             throw AgentPublishReviewException::forbidden();
         }
         $this->close($approval, $actor, self::OUTCOME_SENT_BACK, $note);
+        $this->realtime?->decided($approval);
 
         return $approval;
     }
@@ -193,6 +198,7 @@ final readonly class AgentPublishReview
             throw AgentPublishReviewException::notFound();
         }
         $this->close($latest, $author, self::OUTCOME_WITHDRAWN, null);
+        $this->realtime?->decided($latest);
     }
 
     public function isPublishReview(int $id): bool

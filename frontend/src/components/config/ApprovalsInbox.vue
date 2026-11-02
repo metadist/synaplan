@@ -82,14 +82,18 @@ const onApprove = async (id: number, alwaysAllow = false) => {
   const row = rows.value.find((item) => item.id === id)
   try {
     await store.approve(id, alwaysAllow)
-    success(row?.tool === 'agent.publish' ? t('approvals.sharedWithEveryone') : t('approvals.approvedToast'))
+    success(
+      row?.tool === 'agent.publish'
+        ? t('approvals.sharedWithEveryone')
+        : t('approvals.approvedToast')
+    )
   } catch (err) {
     showError(
       err instanceof ApiError && err.status === 409
         ? t('approvals.sharingOff')
         : err instanceof ApiError && err.status === 403
           ? t('approvals.waitingForAnotherAdmin')
-          : t('approvals.decideFailed'),
+          : t('approvals.decideFailed')
     )
   }
 }
@@ -98,9 +102,15 @@ const onReject = async (id: number, reason?: string) => {
   const row = rows.value.find((item) => item.id === id)
   try {
     await store.reject(id, reason)
-    success(row?.tool === 'agent.publish' ? t('approvals.sentBackToast') : t('approvals.rejectedToast'))
+    success(
+      row?.tool === 'agent.publish' ? t('approvals.sentBackToast') : t('approvals.rejectedToast')
+    )
   } catch (err) {
-    showError(err instanceof ApiError && err.status === 403 ? t('approvals.waitingForAnotherAdmin') : t('approvals.decideFailed'))
+    showError(
+      err instanceof ApiError && err.status === 403
+        ? t('approvals.waitingForAnotherAdmin')
+        : t('approvals.decideFailed')
+    )
   }
 }
 

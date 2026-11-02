@@ -12,10 +12,7 @@ export type AgentTemplate = NonNullable<
   z.infer<typeof GetApiAgentTemplatesListResponseSchema>['templates']
 >[number]
 
-export function templateTitle(
-  template: AgentTemplate,
-  translate: (key: string) => string
-): string {
+export function templateTitle(template: AgentTemplate, translate: (key: string) => string): string {
   if (template.pluginName) return template.title ?? template.pluginName
   return translate(template.titleKey ?? '')
 }

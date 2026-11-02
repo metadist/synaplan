@@ -54,7 +54,7 @@ const onAlwaysAllow = () => {
 
 const onReject = async () => {
   const reason = await dialog.prompt({
-    title: t('approvals.reject'),
+    title: isPublishReview.value ? t('approvals.sendBack') : t('approvals.reject'),
     message: isPublishReview.value ? t('approvals.sendBackReason') : t('approvals.rejectReason'),
     placeholder: t('approvals.rejectReasonPlaceholder'),
   })
@@ -83,7 +83,9 @@ const onReject = async () => {
         class="text-xs txt-primary whitespace-pre-wrap break-words surface-chip p-2 rounded-xl"
         >{{ approval.resolvedRequest.body }}</pre>
     </div>
-    <p v-else-if="!isPublishReview" class="txt-primary font-medium">{{ approval.preview || approval.tool }}</p>
+    <p v-else-if="!isPublishReview" class="txt-primary font-medium">
+      {{ approval.preview || approval.tool }}
+    </p>
     <p
       v-if="isPublishReview && !canDecide"
       class="text-sm txt-secondary"

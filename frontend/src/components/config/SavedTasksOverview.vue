@@ -71,7 +71,7 @@ watch(
       activeTab.value = 'watches'
     }
   },
-  { immediate: true },
+  { immediate: true }
 )
 
 const onWatchesUnavailable = () => {

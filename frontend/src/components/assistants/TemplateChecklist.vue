@@ -9,7 +9,11 @@
     </p>
     <h2 class="txt-primary font-medium">{{ title }}</h2>
 
-    <div v-if="template?.publishReview === 'waiting'" class="space-y-2" data-testid="notice-template-review">
+    <div
+      v-if="template?.publishReview === 'waiting'"
+      class="space-y-2"
+      data-testid="notice-template-review"
+    >
       <p class="txt-primary text-sm">{{ $t('templates.reviewWaiting') }}</p>
       <button
         type="button"

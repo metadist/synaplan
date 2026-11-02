@@ -36,16 +36,17 @@ export function templatePreview(template: AgentTemplate, translate: Translate): 
     template.installedAgentId != null
       ? translate('templates.previewAlready')
       : prompts > 0
-        ? translate(
-            'templates.previewCreatesBoth',
-            {
-              assistants: translate('templates.previewAssistants', { count: assistants }, assistants),
-              prompts: translate('templates.previewPrompts', { count: prompts }, prompts),
-            }
-          )
+        ? translate('templates.previewCreatesBoth', {
+            assistants: translate('templates.previewAssistants', { count: assistants }, assistants),
+            prompts: translate('templates.previewPrompts', { count: prompts }, prompts),
+          })
         : tasks > 0
           ? translate('templates.previewCreatesTask', {
-              assistants: translate('templates.previewAssistants', { count: assistants }, assistants),
+              assistants: translate(
+                'templates.previewAssistants',
+                { count: assistants },
+                assistants
+              ),
               tasks: translate('templates.previewTasks', { count: tasks }, tasks),
             })
           : `${translate('templates.previewAssistants', { count: assistants }, assistants)}.`
@@ -64,7 +65,8 @@ function modelSentence(template: AgentTemplate, translate: Translate): string | 
   const image = capabilities.find((row) => (row.value ?? '').toLowerCase() === 'pic2text')
   if (chat && chat.state !== 'ready') return null
   if (image && image.state !== 'ready' && !chat) return null
-  if (chat?.state === 'ready' && image?.state === 'ready') return translate('templates.previewModelBoth')
+  if (chat?.state === 'ready' && image?.state === 'ready')
+    return translate('templates.previewModelBoth')
   if (image?.state === 'ready' && chat?.state !== 'ready') {
     return translate('templates.previewModelImage')
   }

@@ -70,7 +70,11 @@ describe('ChannelAssistantSelect', () => {
     await wrapper.vm.$nextTick()
 
     const options = wrapper.findAll('option')
-    expect(options.map((option) => option.text())).toEqual(['None', 'Contract review', 'Citizens desk'])
+    expect(options.map((option) => option.text())).toEqual([
+      'None',
+      'Contract review',
+      'Citizens desk',
+    ])
     expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('13')
   })
 })

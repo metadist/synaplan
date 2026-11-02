@@ -501,7 +501,12 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
-import { listedWidgets } from '@/utils/widgetList'
+import {
+  listedWidgets,
+  mapSharedWidgetItem,
+  queryWithoutWizardParams,
+  wizardAgentIdFromQuery,
+} from '@/utils/widgetList'
 import { iamApi } from '@/services/api/iamApi'
 
 const router = useRouter()
@@ -523,10 +528,7 @@ const visibleWidgets = computed(() =>
   listedWidgets(widgets.value, sharedWidgets.value, filterShared.value)
 )
 const showWizard = ref(false)
-const wizardAgentId = computed(() => {
-  const id = Number(route.query.agentId)
-  return Number.isInteger(id) && id > 0 ? id : null
-})
+const wizardAgentId = computed(() => wizardAgentIdFromQuery(route.query))
 const successWidget = ref<widgetsApi.Widget | null>(null)
 const setupWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
@@ -585,33 +587,13 @@ const showCustomFieldsPanel = computed(
 
 const apiUrl = computed(() => configStore.apiBaseUrl || window.location.origin)
 
-/**
- * Load widgets
- */
 const loadWidgets = async () => {
   loading.value = true
   try {
     widgets.value = await widgetsApi.listWidgets()
-    if (isIamSharingEnabled()) {
-      const items = await iamApi.listSharedWithMe('widget')
-      sharedWidgets.value = items.map((item) => ({
-        id: Number(item.id),
-        widgetId: String(item.meta?.widgetId ?? ''),
-        name: item.name,
-        taskPromptTopic: '',
-        status: 'active' as const,
-        config: {},
-        isActive: true,
-        created: 0,
-        updated: 0,
-        shared: true,
-        access: item.permission,
-        ownerName: item.ownerName ?? undefined,
-        sharedVia: item.sharedVia ?? null,
-      }))
-    } else {
-      sharedWidgets.value = []
-    }
+    sharedWidgets.value = isIamSharingEnabled()
+      ? (await iamApi.listSharedWithMe('widget')).map(mapSharedWidgetItem)
+      : []
   } catch (err: unknown) {
     error(getErrorMessage(err) || 'Failed to load widgets')
   } finally {
@@ -625,20 +607,15 @@ const openWidgetShare = (widget: widgetsApi.Widget) => {
   iamShareOpen.value = true
 }
 
-/**
- * Start widget creation (step-by-step wizard)
- */
 const startCreation = () => {
   showWizard.value = true
 }
 
 const closeWizard = () => {
   showWizard.value = false
-  if (route.query.new !== '1') return
-  const query = { ...route.query }
-  delete query.new
-  delete query.agentId
-  void router.replace({ query })
+  if (route.query.new === '1') {
+    void router.replace({ query: queryWithoutWizardParams(route.query) })
+  }
 }
 
 watch(
@@ -646,12 +623,9 @@ watch(
   (value) => {
     if (value === '1') showWizard.value = true
   },
-  { immediate: true },
+  { immediate: true }
 )
 
-/**
- * Handle widget created - show success modal
- */
 const handleWidgetCreated = async (widget: widgetsApi.Widget) => {
   closeWizard()
   successWidget.value = widget
