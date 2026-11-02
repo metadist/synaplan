@@ -2,6 +2,14 @@
 
 Commands and workflows for developing Synaplan.
 
+## Where a change goes
+
+| I want to… | Open |
+| ---------- | ---- |
+| Add an AI provider | [PROVIDERS.md](PROVIDERS.md). One class. One command for an OpenAI-compatible API. |
+| Change a tool call | [ARCHITECTURE.md](ARCHITECTURE.md#tool-path). Chat, the APIs, Saved Tasks and MCP all use `ToolInvoker`. |
+| Change a screen a person sees | [UX_CONTRACT.md](UX_CONTRACT.md). |
+
 ## Service Management
 
 ```bash

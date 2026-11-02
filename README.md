@@ -356,6 +356,8 @@ Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API
 
 Synaplan is provider-neutral: connect the providers you want in **Operate → AI infrastructure → Providers & keys** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
 
+A new OpenAI-compatible provider is one class. Names, icons, the key check and the outbound allowlist all read that class. The command is in [docs/PROVIDERS.md](docs/PROVIDERS.md).
+
 | Provider | Variable in `backend/.env` | Models |
 |----------|---------------------------|--------|
 | OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini), GPT Image, Whisper, text-embedding-3 |
@@ -478,9 +480,16 @@ make lint
 
 ## Documentation
 
-User-facing & API docs live at **[docs.synaplan.com](https://docs.synaplan.com/)**. Source: [`metadist/synaplan-docs`](https://github.com/metadist/synaplan-docs).
+User-facing and API docs live at **[docs.synaplan.com](https://docs.synaplan.com/)**. Source: [`metadist/synaplan-docs`](https://github.com/metadist/synaplan-docs).
 
-In-repo guides (for developers working on this codebase):
+Changing this codebase? Start with one of these two:
+
+| I want to… | Open |
+| ---------- | ---- |
+| Add an AI provider | [PROVIDERS.md](docs/PROVIDERS.md) — one class, one command |
+| Follow a tool call | [ARCHITECTURE.md](docs/ARCHITECTURE.md#tool-path) — one invoker for chat, the APIs, Saved Tasks and MCP |
+
+The rest of the in-repo guides:
 
 | Guide | Description |
 |-------|-------------|

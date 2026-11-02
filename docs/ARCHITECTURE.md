@@ -461,6 +461,30 @@ adapter:
 4. Keep the façade while other classes name it (`AiFacade`, the module
    system); registering the capability classes directly comes after that.
 
+## Tool path
+
+Every tool call goes through `ToolInvoker`
+(`App\Service\Tool\Execution\`). Chat, the Messages API, the
+OpenAI-compatible API, Saved Tasks, MCP fetch and action, approval resume,
+and memory and file ingest all use it. The invoker asks the gate, runs one
+executor, and shortens the text the model sees to 12,000 characters.
+
+| Caller | What happens today |
+| ------ | ------------------ |
+| Chat and document edits | The tool runs. The approval gate is not asked. |
+| Messages API and OpenAI-compatible API | The gate is asked only when approvals are on. |
+| Saved Tasks and MCP actions | The gate is asked. |
+| File work | The gate is asked here. The file-work runner then runs the code. |
+| Read-only MCP fetch | The gate is not asked. A shared Notion connection is allowed. A write is not. |
+| Resume after someone approves | The gate is not asked again. |
+
+A Saved Task keeps the full MCP text for the next step. The 12,000-character
+limit is only for the model.
+
+`backend/tests/Characterization/__snapshots__/tool_loops.json` is the
+contract for stop reasons, gate decisions and result text. Usage rows and
+the `tool.executed` audit line still belong to the caller.
+
 ## Lists are tagged collections
 
 A list of collaborators is a tag, not a constructor: runtime config
