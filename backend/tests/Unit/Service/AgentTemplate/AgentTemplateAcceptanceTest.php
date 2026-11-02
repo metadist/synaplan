@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\AgentTemplate;
 
+use App\AI\Provider\TestProvider;
 use App\Bundle\BundleEnvelopeValidator;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\AgentTemplate\AgentTemplateCatalog;
 use App\Service\AgentTemplate\AgentTemplateRef;
+use App\Tests\Support\AgentTemplate\AgentTemplateAcceptanceProvider;
+use App\Tests\Support\AgentTemplate\AgentTemplateAcceptanceRunner;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Yaml\Yaml;
 
@@ -56,5 +59,41 @@ final class AgentTemplateAcceptanceTest extends TestCase
         sort($ids);
         sort($yamlIds);
         self::assertSame($yamlIds, $ids);
+    }
+
+    public function testEveryTryItSentenceRunsAgainstTheMockedProvider(): void
+    {
+        $backend = dirname(__DIR__, 4);
+        $catalog = new AgentTemplateCatalog(
+            $backend.'/templates/agents',
+            new BundleEnvelopeValidator(),
+            new AgentDefinitionValidator(),
+        );
+        $runner = new AgentTemplateAcceptanceRunner(new AgentTemplateAcceptanceProvider(), new TestProvider());
+        $failures = [];
+        foreach ($catalog->all() as $template) {
+            $acceptance = Yaml::parseFile($backend.'/tests/templates/'.$template->id.'.yaml');
+            $failures = array_merge($failures, $runner->run($template, $acceptance));
+        }
+
+        self::assertSame([], $failures, implode("\n", $failures));
+    }
+
+    public function testACitationAppearsOnlyWhenTheInstructionAsksForIt(): void
+    {
+        $provider = new AgentTemplateAcceptanceProvider();
+        $user = $provider->attach('How much is a license?', "price-list.txt\n10 licenses cost 100 EUR.");
+        $cited = $provider->chat([
+            ['role' => 'system', 'content' => 'Cite the file for each price. Do not invent one.'],
+            ['role' => 'user', 'content' => $user],
+        ]);
+        $plain = $provider->chat([
+            ['role' => 'system', 'content' => 'Be helpful. Do not invent one.'],
+            ['role' => 'user', 'content' => $user],
+        ]);
+
+        self::assertStringContainsString('Source: price-list.txt', $cited['content']);
+        self::assertStringContainsString('100 EUR', $cited['content']);
+        self::assertStringNotContainsString('Source:', $plain['content']);
     }
 }

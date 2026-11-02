@@ -3,3 +3,43 @@ version: "2026.11.1"
 mustMention:
   - "Do not invent"
   - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "Turn these notes into minutes with decisions and action items."
+    knowledge: |
+      notes.txt
+      Decision: launch in May.
+      Action: Ada sends the notes.
+    expects:
+      answerContains:
+        - "launch in May"
+        - "Ada sends the notes"
+      answerOmits:
+        - "Bob"
+        - "Source:"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "List only the actions, with the owner when one was named."
+    knowledge: |
+      notes.txt
+      Decision: launch in May.
+      Action: Ada sends the notes.
+    expects:
+      answerContains:
+        - "Ada sends the notes"
+      answerOmits:
+        - "Bob"
+        - "Source:"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Turn these notes into minutes with decisions and action items."
+    expects:
+      answerContains:
+        - "paste or upload"
+      answerOmits:
+        - "Ada"
+      toolCalled: null
+      approvalRequested: false

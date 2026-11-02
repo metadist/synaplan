@@ -3,3 +3,47 @@ version: "2026.11.1"
 mustMention:
   - "not legal advice"
   - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "Summarise the parties, the term and the payment."
+    knowledge: |
+      contract.txt
+      Parties: Ada and Northwind.
+      Term: 12 months.
+      Payment: 500 EUR per month.
+    expects:
+      answerContains:
+        - "Ada and Northwind"
+        - "12 months"
+        - "500 EUR"
+        - "This is not legal advice."
+      answerOmits:
+        - "you should sign"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "What happens if we end the contract early?"
+    knowledge: |
+      contract.txt
+      Parties: Ada and Northwind.
+      Term: 12 months.
+      Payment: 500 EUR per month.
+    expects:
+      answerContains:
+        - "Ada and Northwind"
+        - "This is not legal advice."
+      answerOmits:
+        - "you should sign"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Summarise the parties, the term and the payment."
+    expects:
+      answerContains:
+        - "add the file"
+        - "This is not legal advice."
+      answerOmits:
+        - "500 EUR"
+      toolCalled: null
+      approvalRequested: false

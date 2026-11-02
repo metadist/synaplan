@@ -3,3 +3,45 @@ version: "2026.11.1"
 mustMention:
   - "do not evaluate candidates"
   - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "How many days of leave does the handbook allow?"
+    knowledge: |
+      handbook.txt
+      Leave: 30 days.
+      Working from home: two days a week.
+    expects:
+      answerContains:
+        - "30 days"
+        - "Source: handbook.txt"
+        - "This does not evaluate a candidate."
+      answerOmits:
+        - "hire them"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "What does the handbook say about working from home?"
+    knowledge: |
+      handbook.txt
+      Leave: 30 days.
+      Working from home: two days a week.
+    expects:
+      answerContains:
+        - "two days a week"
+        - "Source: handbook.txt"
+        - "This does not evaluate a candidate."
+      answerOmits:
+        - "hire them"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "How many days of leave does the handbook allow?"
+    expects:
+      answerContains:
+        - "handbook"
+        - "This does not evaluate a candidate."
+      answerOmits:
+        - "30 days"
+      toolCalled: null
+      approvalRequested: false

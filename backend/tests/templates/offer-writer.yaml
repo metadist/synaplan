@@ -3,3 +3,43 @@ version: "2026.11.1"
 mustMention:
   - "do not invent"
   - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "Write an offer for Müller GmbH for 10 licenses."
+    knowledge: |
+      price-list.txt
+      10 licenses cost 100 EUR each.
+      One-year support costs 200 EUR.
+    expects:
+      answerContains:
+        - "100 EUR"
+        - "Source: price-list.txt"
+      answerOmits:
+        - "999 EUR"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Which prices in the list apply to a one-year support contract?"
+    knowledge: |
+      price-list.txt
+      10 licenses cost 100 EUR each.
+      One-year support costs 200 EUR.
+    expects:
+      answerContains:
+        - "200 EUR"
+        - "Source: price-list.txt"
+      answerOmits:
+        - "999 EUR"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Write an offer for Müller GmbH for 10 licenses."
+    expects:
+      answerContains:
+        - "price list"
+        - "do not invent prices"
+      answerOmits:
+        - "100 EUR"
+      toolCalled: null
+      approvalRequested: false

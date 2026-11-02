@@ -3,3 +3,45 @@ version: "2026.11.1"
 mustMention:
   - "do not claim a ticket"
   - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "A colleague cannot connect to the VPN. What should they try first?"
+    knowledge: |
+      vpn.txt
+      Reset the VPN client, then reconnect.
+      Password resets are done by the helpdesk lead.
+    expects:
+      answerContains:
+        - "Reset the VPN client"
+        - "Source: vpn.txt"
+        - "No ticket was opened."
+      answerOmits:
+        - "ticket IT-100"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "How do we reset a forgotten password?"
+    knowledge: |
+      vpn.txt
+      Reset the VPN client, then reconnect.
+      Password resets are done by the helpdesk lead.
+    expects:
+      answerContains:
+        - "Password resets are done by the helpdesk lead."
+        - "Source: vpn.txt"
+        - "No ticket was opened."
+      answerOmits:
+        - "ticket IT-100"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "A colleague cannot connect to the VPN. What should they try first?"
+    expects:
+      answerContains:
+        - "help articles"
+        - "No ticket was opened."
+      answerOmits:
+        - "Reset the VPN client"
+      toolCalled: null
+      approvalRequested: false
