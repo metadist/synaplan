@@ -704,6 +704,10 @@ final readonly class GatewayToolLoop
         $results = [];
         $lastPing = microtime(true);
         $owned = $this->owned();
+        $afterRun = null !== $ping ? function () use ($ping, &$lastPing): void {
+            $ping();
+            $lastPing = microtime(true);
+        } : null;
 
         foreach ($toolUses as $block) {
             if (null !== $ping && (microtime(true) - $lastPing) >= self::PING_INTERVAL_SECONDS) {
@@ -742,20 +746,12 @@ final readonly class GatewayToolLoop
             }
 
             if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
-                $results[] = $owned->native($entry, $name, $arguments, $toolUseId, $user, $pages, $assistant);
-                if (null !== $ping) {
-                    $ping();
-                    $lastPing = microtime(true);
-                }
+                $results[] = $owned->native($entry, $name, $arguments, $toolUseId, $user, $pages, $assistant, $afterRun);
                 continue;
             }
 
             if (GatewayToolCatalog::KIND_CUSTOM === $entry['kind']) {
-                $results[] = $owned->custom($entry, $name, $arguments, $toolUseId, $user);
-                if (null !== $ping) {
-                    $ping();
-                    $lastPing = microtime(true);
-                }
+                $results[] = $owned->custom($entry, $name, $arguments, $toolUseId, $user, $afterRun);
                 continue;
             }
 
@@ -778,12 +774,7 @@ final readonly class GatewayToolLoop
                 continue;
             }
 
-            $results[] = $owned->mcp($entry, $name, $arguments, $toolUseId, $user);
-
-            if (null !== $ping) {
-                $ping();
-                $lastPing = microtime(true);
-            }
+            $results[] = $owned->mcp($entry, $name, $arguments, $toolUseId, $user, $afterRun);
         }
 
         return $results;

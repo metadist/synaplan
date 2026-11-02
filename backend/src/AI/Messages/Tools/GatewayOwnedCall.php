@@ -50,12 +50,13 @@ final readonly class GatewayOwnedCall
     }
 
     /**
-     * @param DispatchEntry        $entry
-     * @param array<string, mixed> $arguments
+     * @param DispatchEntry           $entry
+     * @param array<string, mixed>    $arguments
+     * @param (callable(): void)|null $ping      kept off a gate stop, matching the loop's old keep-alive: a ping means the tool call itself ran
      *
      * @return array<string, mixed>
      */
-    public function mcp(array $entry, string $name, array $arguments, string $toolUseId, User $user): array
+    public function mcp(array $entry, string $name, array $arguments, string $toolUseId, User $user, ?callable $ping = null): array
     {
         $this->assertRegistered($user, $name);
         $outcome = $this->tools()->invoke(
@@ -74,21 +75,22 @@ final readonly class GatewayOwnedCall
             ]);
             ($this->recordMcp)($user, $entry['serverId'], $entry['tool'], true);
 
-            return ($this->block)($toolUseId, 'Tool call failed: '.$outcome->resultText, true);
+            return $this->afterRun(($this->block)($toolUseId, 'Tool call failed: '.$outcome->resultText, true), $ping);
         }
         $isError = ToolOutcomeKind::Failed === $outcome->kind;
         ($this->recordMcp)($user, $entry['serverId'], $entry['tool'], $isError);
 
-        return ($this->block)($toolUseId, $this->present($outcome->resultText), $isError);
+        return $this->afterRun(($this->block)($toolUseId, $this->present($outcome->resultText), $isError), $ping);
     }
 
     /**
-     * @param DispatchEntry        $entry
-     * @param array<string, mixed> $arguments
+     * @param DispatchEntry           $entry
+     * @param array<string, mixed>    $arguments
+     * @param (callable(): void)|null $ping
      *
      * @return array<string, mixed>
      */
-    public function custom(array $entry, string $name, array $arguments, string $toolUseId, User $user): array
+    public function custom(array $entry, string $name, array $arguments, string $toolUseId, User $user, ?callable $ping = null): array
     {
         $this->assertRegistered($user, $name);
         $outcome = $this->tools()->invoke(
@@ -100,16 +102,17 @@ final readonly class GatewayOwnedCall
             return $blocked;
         }
 
-        return ($this->block)($toolUseId, $this->present($outcome->resultText), ToolOutcomeKind::Failed === $outcome->kind);
+        return $this->afterRun(($this->block)($toolUseId, $this->present($outcome->resultText), ToolOutcomeKind::Failed === $outcome->kind), $ping);
     }
 
     /**
-     * @param DispatchEntry        $entry
-     * @param array<string, mixed> $arguments
+     * @param DispatchEntry           $entry
+     * @param array<string, mixed>    $arguments
+     * @param (callable(): void)|null $ping
      *
      * @return array<string, mixed>
      */
-    public function native(array $entry, string $name, array $arguments, string $toolUseId, User $user, WebFetchBudget $pages, ?RuntimeProfile $assistant = null): array
+    public function native(array $entry, string $name, array $arguments, string $toolUseId, User $user, WebFetchBudget $pages, ?RuntimeProfile $assistant = null, ?callable $ping = null): array
     {
         $this->assertRegistered($user, $name);
         $tool = $entry['tool'];
@@ -124,7 +127,7 @@ final readonly class GatewayOwnedCall
         }
         if ($decideOnly) {
             if (null === $this->deps->codeExecutionTool) {
-                return ($this->block)($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), true);
+                return $this->afterRun(($this->block)($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), true), $ping);
             }
             $result = $this->deps->codeExecutionTool->execute(
                 $arguments,
@@ -136,7 +139,7 @@ final readonly class GatewayOwnedCall
             );
             ($this->recordNative)($user, 'COMPUTE_RUNS', $tool, 'file_work', $result['isError']);
 
-            return ($this->block)($toolUseId, $this->present($result['text']), $result['isError']);
+            return $this->afterRun(($this->block)($toolUseId, $this->present($result['text']), $result['isError']), $ping);
         }
         $source = $outcome->details['usageSource'] ?? null;
         if (is_string($source)) {
@@ -144,7 +147,22 @@ final readonly class GatewayOwnedCall
             ($this->recordNative)($user, $source, $tool, is_string($input) ? $input : '', ToolOutcomeKind::Failed === $outcome->kind);
         }
 
-        return ($this->block)($toolUseId, $this->present($outcome->resultText), ToolOutcomeKind::Failed === $outcome->kind);
+        return $this->afterRun(($this->block)($toolUseId, $this->present($outcome->resultText), ToolOutcomeKind::Failed === $outcome->kind), $ping);
+    }
+
+    /**
+     * @param array<string, mixed>    $block
+     * @param (callable(): void)|null $ping
+     *
+     * @return array<string, mixed>
+     */
+    private function afterRun(array $block, ?callable $ping): array
+    {
+        if (null !== $ping) {
+            $ping();
+        }
+
+        return $block;
     }
 
     /**
