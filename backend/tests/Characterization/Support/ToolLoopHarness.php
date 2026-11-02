@@ -357,15 +357,20 @@ final class ToolLoopHarness
         );
         $body = is_array($result['body'] ?? null) ? $result['body'] : [];
         $reason = $result['usage']->stopReason;
+        $recorded = [
+            'assistant' => $this->assistantText($body),
+            'tool_results' => $this->translator->toolResults,
+            'status' => $result['status'],
+        ];
+        $clientTools = $this->gatewayClientTools($body);
+        if ([] !== $clientTools) {
+            $recorded['client_tools'] = $clientTools;
+        }
 
         return [
             'stop' => $this->stop($reason, $this->translator->calls, $this->knobs->maxIterations, $this->translator->toolResults),
             'iterations' => $result['iterations'],
-            'result' => [
-                'assistant' => $this->assistantText($body),
-                'tool_results' => $this->translator->toolResults,
-                'status' => $result['status'],
-            ],
+            'result' => $recorded,
         ];
     }
 
@@ -376,19 +381,24 @@ final class ToolLoopHarness
      */
     private function runGatewayStream(array $snapshot): array
     {
+        $events = [];
         $usage = $this->gateway->runStream(
             $this->requestBody(),
             $this->translatorContext(),
             $this->translator,
             $this->user,
             $snapshot,
-            static function (string|array $chunk): void {
+            function (string|array $chunk) use (&$events): void {
+                $events[] = $this->gatewayEvent($chunk);
             },
         );
 
         return [
             'stop' => $this->stop($usage->stopReason, $this->translator->calls, $this->knobs->maxIterations, $this->translator->toolResults),
-            'result' => ['tool_results' => $this->translator->toolResults],
+            'result' => [
+                'tool_results' => $this->translator->toolResults,
+                'events' => $events,
+            ],
         ];
     }
 
@@ -404,14 +414,19 @@ final class ToolLoopHarness
             'tools' => $clientTools,
         ]);
         $finish = is_string($result['finish_reason'] ?? null) ? $result['finish_reason'] : '';
+        $recorded = [
+            'assistant' => is_string($result['content'] ?? null) ? $result['content'] : '',
+            'tool_results' => $this->openaiModel->toolResults,
+            'finish_reason' => $finish,
+        ];
+        $clientTools = $this->openAiClientTools($result);
+        if ([] !== $clientTools) {
+            $recorded['client_tools'] = $clientTools;
+        }
 
         return [
             'stop' => $this->openAiStop($finish),
-            'result' => [
-                'assistant' => is_string($result['content'] ?? null) ? $result['content'] : '',
-                'tool_results' => $this->openaiModel->toolResults,
-                'finish_reason' => $finish,
-            ],
+            'result' => $recorded,
         ];
     }
 
@@ -423,20 +438,33 @@ final class ToolLoopHarness
     private function runOpenAiStream(array $clientTools): array
     {
         $finish = 'tool_calls';
+        $events = [];
         $this->openai->stream(
             $this->user,
             [['role' => 'user', 'content' => 'Edit the report']],
-            static function (mixed $chunk) use (&$finish): void {
-                if (is_array($chunk) && is_string($chunk['finish_reason'] ?? null)) {
+            function (mixed $chunk) use (&$finish, &$events): void {
+                if (is_string($chunk)) {
+                    $events[] = ['type' => 'text', 'text' => $chunk];
+
+                    return;
+                }
+                if (!is_array($chunk)) {
+                    return;
+                }
+                if (is_string($chunk['finish_reason'] ?? null)) {
                     $finish = $chunk['finish_reason'];
                 }
+                $events[] = $this->openAiEvent($chunk);
             },
             ['model' => 'test', 'tools' => $clientTools],
         );
 
         return [
             'stop' => $this->openAiStop($finish),
-            'result' => ['tool_results' => $this->openaiModel->toolResults],
+            'result' => [
+                'tool_results' => $this->openaiModel->toolResults,
+                'events' => $events,
+            ],
         ];
     }
 
@@ -675,6 +703,114 @@ final class ToolLoopHarness
         }
 
         return implode('', $parts);
+    }
+
+    /**
+     * The tool_use blocks handed back to the client. Owned tools are absent
+     * here because the loop already ran them.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return list<array{id: mixed, name: mixed, input: array<string, mixed>}>
+     */
+    private function gatewayClientTools(array $body): array
+    {
+        $content = $body['content'] ?? [];
+        if (!is_array($content)) {
+            return [];
+        }
+        $tools = [];
+        foreach ($content as $block) {
+            if (!is_array($block) || 'tool_use' !== ($block['type'] ?? null)) {
+                continue;
+            }
+            $input = $block['input'] ?? [];
+            $tools[] = [
+                'id' => $block['id'] ?? null,
+                'name' => $block['name'] ?? null,
+                'input' => is_array($input) ? $input : [],
+            ];
+        }
+
+        return $tools;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return list<array{id: mixed, name: mixed, arguments: mixed}>
+     */
+    private function openAiClientTools(array $result): array
+    {
+        $calls = $result['tool_calls'] ?? [];
+        if (!is_array($calls)) {
+            return [];
+        }
+        $tools = [];
+        foreach ($calls as $call) {
+            if (!is_array($call)) {
+                continue;
+            }
+            $function = is_array($call['function'] ?? null) ? $call['function'] : [];
+            $arguments = $function['arguments'] ?? [];
+            if (is_string($arguments)) {
+                $decoded = json_decode($arguments, true);
+                $arguments = is_array($decoded) ? $decoded : $arguments;
+            }
+            $tools[] = [
+                'id' => $call['id'] ?? null,
+                'name' => $function['name'] ?? null,
+                'arguments' => $arguments,
+            ];
+        }
+
+        return $tools;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function gatewayEvent(string|array $chunk): array
+    {
+        if (is_string($chunk)) {
+            return ['event' => 'text', 'text' => $chunk];
+        }
+        $data = is_array($chunk['data'] ?? null) ? $chunk['data'] : [];
+        $event = ['event' => is_string($chunk['event'] ?? null) ? $chunk['event'] : 'unknown'];
+        $block = is_array($data['content_block'] ?? null) ? $data['content_block'] : null;
+        if (null !== $block && 'tool_use' === ($block['type'] ?? null)) {
+            $event['id'] = $block['id'] ?? null;
+            $event['name'] = $block['name'] ?? null;
+        }
+        $delta = is_array($data['delta'] ?? null) ? $data['delta'] : null;
+        if (null !== $delta && is_string($delta['text'] ?? null)) {
+            $event['text'] = $delta['text'];
+        }
+        if (null !== $delta && is_string($delta['partial_json'] ?? null)) {
+            $event['partial_json'] = $delta['partial_json'];
+        }
+        if (null !== $delta && is_string($delta['stop_reason'] ?? null)) {
+            $event['stop_reason'] = $delta['stop_reason'];
+        }
+
+        return $event;
+    }
+
+    /**
+     * @param array<string, mixed> $chunk
+     *
+     * @return array<string, mixed>
+     */
+    private function openAiEvent(array $chunk): array
+    {
+        $event = ['type' => is_string($chunk['type'] ?? null) ? $chunk['type'] : 'chunk'];
+        foreach (['index', 'id', 'name', 'arguments', 'finish_reason'] as $key) {
+            if (array_key_exists($key, $chunk)) {
+                $event[$key] = $chunk[$key];
+            }
+        }
+
+        return $event;
     }
 
     private function reset(bool $approvals, int $max = 8): void
@@ -1107,7 +1243,18 @@ final class ToolLoopHarness
             return 'document' === $this->facadeMode ? $this->documentModel->reply($list) : $this->openaiModel->reply($list);
         });
         $facade->method('chatStream')->willReturnCallback(function (array|string $messages, callable $callback, ?int $userId = null, array $options = []): array {
-            return $this->openaiModel->reply(is_array($messages) ? $messages : []);
+            $reply = $this->openaiModel->reply(is_array($messages) ? $messages : []);
+            $text = is_string($reply['content'] ?? null) ? $reply['content'] : '';
+            if ('' !== $text) {
+                $mid = (int) max(1, (int) ceil(strlen($text) / 2));
+                $callback(substr($text, 0, $mid));
+                $rest = substr($text, $mid);
+                if ('' !== $rest) {
+                    $callback($rest);
+                }
+            }
+
+            return $reply;
         });
 
         $openaiCatalog = $this->double(\App\AI\OpenAI\OpenAiGatewayToolCatalog::class);

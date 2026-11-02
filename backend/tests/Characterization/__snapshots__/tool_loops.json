@@ -88,6 +88,15 @@
             "iterations": 1,
             "result": {
                 "assistant": "",
+                "client_tools": [
+                    {
+                        "id": "toolu_1",
+                        "input": {
+                            "city": "Bern"
+                        },
+                        "name": "get_weather"
+                    }
+                ],
                 "status": 200,
                 "tool_results": []
             },
@@ -290,6 +299,15 @@
             "iterations": 1,
             "result": {
                 "assistant": "",
+                "client_tools": [
+                    {
+                        "id": "toolu_1",
+                        "input": {
+                            "query": "q3"
+                        },
+                        "name": "mcp__1__rag_search"
+                    }
+                ],
                 "status": 200,
                 "tool_results": []
             },
@@ -558,6 +576,30 @@
             "executed": [],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "content_block_start",
+                        "id": "toolu_1",
+                        "name": "get_weather"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "partial_json": "{\"city\":\"Bern\"}"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "tool_use"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": []
             },
             "stop": "client_tool",
@@ -572,6 +614,31 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "printed-ok"
                 ]
@@ -597,6 +664,31 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "Ticket SYN-1 created"
                 ]
@@ -613,6 +705,31 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "A chart."
                 ]
@@ -638,6 +755,31 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "mcp:rag_search"
                 ]
@@ -669,6 +811,31 @@
                 }
             ],
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "mcp:rag_search"
                 ]
@@ -692,6 +859,28 @@
             "executed": [],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     {
                         "error": true,
@@ -734,6 +923,28 @@
                 }
             ],
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "requires approval; request #1 created"
                 ]
@@ -750,6 +961,31 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "mcp:rag_search"
                 ]
@@ -775,6 +1011,31 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
                 "tool_results": [
                     "Rates at https://example.test/rates"
                 ]
@@ -851,6 +1112,15 @@
             "gate": "no gate",
             "result": {
                 "assistant": "",
+                "client_tools": [
+                    {
+                        "arguments": {
+                            "city": "Bern"
+                        },
+                        "id": "call_1",
+                        "name": "get_weather"
+                    }
+                ],
                 "finish_reason": "tool_calls",
                 "tool_results": []
             },
@@ -963,6 +1233,15 @@
             "gate": "no gate",
             "result": {
                 "assistant": "",
+                "client_tools": [
+                    {
+                        "arguments": {
+                            "query": "q3"
+                        },
+                        "id": "call_1",
+                        "name": "mcp__1__rag_search"
+                    }
+                ],
                 "finish_reason": "tool_calls",
                 "tool_results": []
             },
@@ -1078,6 +1357,15 @@
             "gate": "no gate",
             "result": {
                 "assistant": "",
+                "client_tools": [
+                    {
+                        "arguments": {
+                            "city": "Bern"
+                        },
+                        "id": "call_2",
+                        "name": "get_weather"
+                    }
+                ],
                 "finish_reason": "tool_calls",
                 "tool_results": []
             },
@@ -1133,6 +1421,26 @@
             "executed": [],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "arguments": "{\"city\":",
+                        "id": "call_1",
+                        "index": 0,
+                        "name": "get_weather",
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "arguments": "\"Bern\"}",
+                        "id": null,
+                        "index": 0,
+                        "name": null,
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "finish_reason": "tool_calls",
+                        "type": "finish"
+                    }
+                ],
                 "tool_results": []
             },
             "stop": "client_tool",
@@ -1147,6 +1455,20 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
                 "tool_results": [
                     "mcp:rag_search"
                 ]
@@ -1169,6 +1491,20 @@
                 }
             ],
             "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
                 "tool_results": [
                     "mcp:rag_search"
                 ]
@@ -1208,6 +1544,20 @@
                 }
             ],
             "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
                 "tool_results": [
                     "requires approval; request #1 created"
                 ]
@@ -1224,6 +1574,26 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "arguments": "{\"city\":",
+                        "id": "call_2",
+                        "index": 0,
+                        "name": "get_weather",
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "arguments": "\"Bern\"}",
+                        "id": null,
+                        "index": 0,
+                        "name": null,
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "finish_reason": "tool_calls",
+                        "type": "finish"
+                    }
+                ],
                 "tool_results": []
             },
             "stop": "client_tool",
@@ -1238,6 +1608,20 @@
             ],
             "gate": "no gate",
             "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
                 "tool_results": [
                     "Rates at https://example.test/rates"
                 ]
