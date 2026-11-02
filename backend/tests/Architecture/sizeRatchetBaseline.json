@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 47,
         "constructorParams": 64,
-        "methodLines": 119
+        "methodLines": 118
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1025,
@@ -131,7 +131,6 @@
         "src/AI/Health/ModelHealthOverview.php::ModelHealthOverview::build": 131,
         "src/AI/Messages/MessagesGateway.php::MessagesGateway::prepare": 284,
         "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::collectStreamedTurn": 191,
-        "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::executeOurs": 125,
         "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::runComplete": 148,
         "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::runStream": 116,
         "src/AI/Messages/Translator/GeminiMessagesTranslator.php::GeminiMessagesTranslator::streamGeminiToAnthropic": 175,
