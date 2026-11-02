@@ -90,6 +90,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAgentsStore } from '@/stores/agents'
+import { useChatsStore } from '@/stores/chats'
 import { useNotification } from '@/composables/useNotification'
 import {
   agentTemplatesApi,
@@ -100,6 +101,7 @@ import {
 const { t } = useI18n()
 const router = useRouter()
 const store = useAgentsStore()
+const chatsStore = useChatsStore()
 const { success, error } = useNotification()
 
 const template = ref<AgentTemplate | null>(null)
@@ -198,10 +200,19 @@ async function applyUpdate(): Promise<void> {
   }
 }
 
-function tryExample(example: string): void {
+async function tryExample(example: string): Promise<void> {
   const id = store.current?.id
   if (id == null) return
-  void router.push({ name: 'chat', query: { agentId: String(id), prefill: example } })
+  try {
+    if (chatsStore.chats.length === 0) {
+      await chatsStore.loadChats()
+    }
+    await chatsStore.findOrCreateEmptyChat()
+  } catch {
+    error(t('assistants.startChatFailed'))
+    return
+  }
+  await router.push({ name: 'chat', query: { agentId: String(id), prefill: example } })
 }
 
 onMounted(() => {

@@ -172,6 +172,12 @@ final readonly class AgentTemplateInstaller
         }
         $next['models'] = $nextModels;
 
+        foreach (['tools', 'skills', 'parameters', 'behaviour', 'triggers'] as $section) {
+            if (is_array($current[$section] ?? null)) {
+                $next[$section] = $current[$section];
+            }
+        }
+
         return $next;
     }
 
