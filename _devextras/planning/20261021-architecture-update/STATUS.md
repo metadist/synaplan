@@ -90,7 +90,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913) | merged (`2c5539719`) | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
 | 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914) | merged (`0fa6754e6`) | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
 | 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | merged (`acecdf763`) | `app:provider:scaffold`, `AddProviderJourneyTest`, `EgressPolicy` reads the catalog (T23). `EGRESS.MODE` stays `off` |
-| 2026-11-02 | AU23 | | open | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
+| 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | open | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
 
 ## 2026-11-02 — AU23: characterization of every tool loop
 
