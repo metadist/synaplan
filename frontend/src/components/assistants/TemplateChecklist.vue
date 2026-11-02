@@ -39,10 +39,14 @@
       <p class="txt-secondary text-sm whitespace-pre-wrap">{{ diff.to }}</p>
     </div>
 
-    <p v-if="pending.length === 0" class="txt-primary text-sm" data-testid="text-template-ready">
+    <p
+      v-if="template && pending.length === 0"
+      class="txt-primary text-sm"
+      data-testid="text-template-ready"
+    >
       {{ $t('templates.checklistReady') }}
     </p>
-    <ul v-else class="space-y-2">
+    <ul v-else-if="pending.length > 0" class="space-y-2">
       <li
         v-for="(requirement, index) in pending"
         :key="`${requirement.kind}-${index}`"
@@ -76,6 +80,7 @@
         :key="index"
         type="button"
         class="btn-secondary px-4 py-2.5 text-sm font-medium"
+        :disabled="tryingExample || updating"
         :data-testid="`btn-template-try-${index}`"
         @click="tryExample(example)"
       >
@@ -92,6 +97,8 @@ import { useI18n } from 'vue-i18n'
 import { useAgentsStore } from '@/stores/agents'
 import { useChatsStore } from '@/stores/chats'
 import { useNotification } from '@/composables/useNotification'
+import { agentsApi } from '@/services/api/agentsApi'
+import { ApiError } from '@/services/api/httpClient'
 import {
   agentTemplatesApi,
   type AgentTemplate,
@@ -107,6 +114,7 @@ const { success, error } = useNotification()
 const template = ref<AgentTemplate | null>(null)
 const showDiff = ref(false)
 const updating = ref(false)
+const tryingExample = ref(false)
 const diff = ref<{ from?: string; to?: string } | null>(null)
 
 const templateId = computed(() => {
@@ -121,7 +129,10 @@ const title = computed(() =>
 
 const knowledgeChosen = computed(() => {
   const knowledge = store.current?.draft?.knowledge
-  return (knowledge?.folders.length ?? 0) > 0 || (knowledge?.fileIds?.length ?? 0) > 0
+  const ownFolderReady = knowledge?.ownFolder !== false && store.ownFileCount > 0
+  return (
+    (knowledge?.folders.length ?? 0) > 0 || (knowledge?.fileIds?.length ?? 0) > 0 || ownFolderReady
+  )
 })
 
 const pending = computed(() =>
@@ -135,7 +146,12 @@ const pending = computed(() =>
 )
 
 const examples = computed(() => store.current?.draft?.behaviour.starterPrompts ?? [])
-const updateAvailable = computed(() => template.value?.updateAvailable === true)
+const updateAvailable = computed(
+  () =>
+    template.value?.updateAvailable === true &&
+    template.value.installedAgentId != null &&
+    template.value.installedAgentId === store.current?.id
+)
 
 function requirementText(requirement: AgentTemplateRequirement): string {
   if (requirement.state === 'unavailable' && requirement.value === 'pic2text') {
@@ -188,6 +204,7 @@ async function applyUpdate(): Promise<void> {
   if (!id || agentId == null) return
   updating.value = true
   try {
+    await store.flushSave()
     await agentTemplatesApi.update(id)
     await store.load(agentId)
     showDiff.value = false
@@ -202,17 +219,29 @@ async function applyUpdate(): Promise<void> {
 
 async function tryExample(example: string): Promise<void> {
   const id = store.current?.id
-  if (id == null) return
+  if (id == null || tryingExample.value) return
+  tryingExample.value = true
   try {
+    await store.flushSave()
+    try {
+      await agentsApi.publish(id, '')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      const code = err instanceof ApiError ? (err.code ?? '') : ''
+      if (code !== 'nothing_changed' && !message.includes('nothing_changed')) {
+        throw err
+      }
+    }
     if (chatsStore.chats.length === 0) {
       await chatsStore.loadChats()
     }
     await chatsStore.findOrCreateEmptyChat()
+    await router.push({ name: 'chat', query: { agentId: String(id), prefill: example } })
   } catch {
     error(t('assistants.startChatFailed'))
-    return
+  } finally {
+    tryingExample.value = false
   }
-  await router.push({ name: 'chat', query: { agentId: String(id), prefill: example } })
 }
 
 onMounted(() => {

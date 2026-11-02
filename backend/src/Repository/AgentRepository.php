@@ -141,7 +141,9 @@ class AgentRepository extends ServiceEntityRepository
         return (int) $this->createQueryBuilder('a')
             ->select('COUNT(DISTINCT a.ownerId)')
             ->where('a.source LIKE :prefix')
+            ->andWhere('a.status != :archived')
             ->setParameter('prefix', $sourcePrefix.'%')
+            ->setParameter('archived', Agent::STATUS_ARCHIVED)
             ->getQuery()
             ->getSingleScalarResult();
     }

@@ -245,6 +245,7 @@ function folderLabel(id: string): string {
 async function loadFiles(): Promise<void> {
   if (!topic.value) {
     files.value = []
+    store.ownFileCount = 0
     return
   }
   try {
@@ -252,6 +253,7 @@ async function loadFiles(): Promise<void> {
   } catch {
     files.value = []
   }
+  store.ownFileCount = files.value.filter((file) => (file.chunks ?? 0) > 0).length
 }
 
 async function onDeleteFile(file: PromptFile): Promise<void> {

@@ -183,6 +183,56 @@ final class AgentTriggerMaterializerTest extends TestCase
         ]));
     }
 
+    public function testMailboxScheduleMaterializesWithEmailSearchNode(): void
+    {
+        $savedTaskConfig = $this->createMock(SavedTaskConfig::class);
+        $savedTaskConfig->method('isEnabled')->willReturn(true);
+        $materializer = new AgentTriggerMaterializer(
+            new AgentDefinitionValidator(),
+            $this->createMock(AgentVersionRepository::class),
+            $this->savedTasks,
+            $savedTaskConfig,
+            $this->widgets,
+            $this->createMock(InboundEmailHandlerRepository::class),
+            new WhatsAppAgentBinding($this->config),
+            $this->createMock(EntityManagerInterface::class),
+            $this->logger,
+        );
+
+        $this->savedTasks->expects(self::once())->method('upsertAgentTrigger')->with(
+            self::OWNER,
+            20,
+            'Weekday morning briefing',
+            'daily-briefing:morning',
+            self::callback(static function (array $data): bool {
+                $nodes = $data['graph']['nodes'] ?? [];
+
+                return 2 === count($nodes)
+                    && 'email_search' === ($nodes[0]['capability'] ?? null)
+                    && 'chat' === ($nodes[1]['capability'] ?? null)
+                    && ['n1'] === ($nodes[1]['depends_on'] ?? []);
+            }),
+        );
+
+        $draft = AgentDefinition::defaults()->toArray();
+        $draft['triggers'] = [
+            'events' => [],
+            'schedules' => [[
+                'id' => 'morning',
+                'name' => 'Weekday morning briefing',
+                'cron' => '30 7 * * 1-5',
+                'tz' => 'Europe/Berlin',
+                'instruction' => 'Prepare today\'s briefing from the mailbox.',
+                'allowUnattended' => true,
+                'enabled' => true,
+            ]],
+        ];
+        $agent = new Agent(self::OWNER, 20, 'daily-briefing', 'Daily briefing', $draft);
+        (new \ReflectionProperty(Agent::class, 'id'))->setValue($agent, self::AGENT);
+
+        $materializer->sync($agent);
+    }
+
     /**
      * @param list<array<string, mixed>> $events
      */

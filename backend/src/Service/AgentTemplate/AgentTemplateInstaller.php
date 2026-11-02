@@ -147,6 +147,10 @@ final readonly class AgentTemplateInstaller
     }
 
     /**
+     * Keep the existing draft configuration intact during an instruction-only
+     * template update, while filling any empty model slots from the user's
+     * defaults when the template asks for that capability.
+     *
      * @param array<string, mixed> $next
      * @param array<string, mixed> $current
      *
@@ -154,31 +158,18 @@ final readonly class AgentTemplateInstaller
      */
     private function keepChoices(array $next, array $current): array
     {
-        $currentKnowledge = is_array($current['knowledge'] ?? null) ? $current['knowledge'] : [];
-        $nextKnowledge = is_array($next['knowledge'] ?? null) ? $next['knowledge'] : [];
-        foreach (['folders', 'fileIds', 'includeUserFiles'] as $key) {
-            if (array_key_exists($key, $currentKnowledge)) {
-                $nextKnowledge[$key] = $currentKnowledge[$key];
-            }
-        }
-        $next['knowledge'] = $nextKnowledge;
-
-        $currentModels = is_array($current['models'] ?? null) ? $current['models'] : [];
+        $merged = [] !== $current ? $current : $next;
+        $currentModels = is_array($merged['models'] ?? null) ? $merged['models'] : [];
         $nextModels = is_array($next['models'] ?? null) ? $next['models'] : [];
         foreach (['chat', 'vision', 'vectorize'] as $slot) {
-            if (is_string($currentModels[$slot] ?? null) && '' !== $currentModels[$slot]) {
-                $nextModels[$slot] = $currentModels[$slot];
+            if ((!is_string($currentModels[$slot] ?? null) || '' === $currentModels[$slot])
+                && is_string($nextModels[$slot] ?? null) && '' !== $nextModels[$slot]) {
+                $currentModels[$slot] = $nextModels[$slot];
             }
         }
-        $next['models'] = $nextModels;
+        $merged['models'] = $currentModels;
 
-        foreach (['tools', 'skills', 'parameters', 'behaviour', 'triggers'] as $section) {
-            if (is_array($current[$section] ?? null)) {
-                $next[$section] = $current[$section];
-            }
-        }
-
-        return $next;
+        return $merged;
     }
 
     private function replaceInstruction(Agent $agent, string $instruction): void

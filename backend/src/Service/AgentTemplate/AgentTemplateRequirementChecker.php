@@ -8,8 +8,10 @@ use App\Entity\Agent;
 use App\Entity\Connection;
 use App\Entity\User;
 use App\Repository\ConnectionRepository;
+use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AgentKnowledgeFolders;
 
 /**
  * Says what a template still needs on this install, for this person.
@@ -20,6 +22,7 @@ final readonly class AgentTemplateRequirementChecker
         private ModelRepository $models,
         private ConnectionRepository $connections,
         private InboundEmailHandlerRepository $mailboxes,
+        private ?FileRepository $files = null,
     ) {
     }
 
@@ -72,7 +75,13 @@ final readonly class AgentTemplateRequirementChecker
             return false;
         }
 
-        return [] !== $this->models->findByTag($tag, true);
+        foreach ($this->models->findByTag($tag, true) as $model) {
+            if (1 === $model->getActive()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasKnowledge(?Agent $agent): bool
@@ -86,8 +95,17 @@ final readonly class AgentTemplateRequirementChecker
         }
         $folders = $knowledge['folders'] ?? [];
         $files = $knowledge['fileIds'] ?? [];
+        if ((is_array($folders) && [] !== $folders) || (is_array($files) && [] !== $files)) {
+            return true;
+        }
+        if (false !== ($knowledge['ownFolder'] ?? true) && null !== $this->files) {
+            return $this->files->existsForUserAndGroupKey(
+                $agent->getOwnerId(),
+                AgentKnowledgeFolders::ownFolder($agent),
+            );
+        }
 
-        return (is_array($folders) && [] !== $folders) || (is_array($files) && [] !== $files);
+        return false;
     }
 
     private function hasConnection(string $value, int $userId): bool
@@ -95,12 +113,21 @@ final readonly class AgentTemplateRequirementChecker
         if ('mail' !== $value) {
             return false;
         }
-        if ([] !== $this->mailboxes->findByUser($userId)) {
+        if ([] !== $this->mailboxes->findActiveByUser($userId)) {
+            return true;
+        }
+        foreach ($this->connections->findByOwner($userId) as $connection) {
+            if (Connection::TYPE_M365 !== $connection->getType()) {
+                continue;
+            }
+            if (in_array($connection->getStatus(), [Connection::STATUS_DISCONNECTED, Connection::STATUS_REAUTH_REQUIRED], true)) {
+                continue;
+            }
+
             return true;
         }
 
-        return $this->connections->findOneByOwnerAndType($userId, 'mailbox') instanceof Connection
-            || $this->connections->findOneByOwnerAndType($userId, Connection::TYPE_M365) instanceof Connection;
+        return false;
     }
 
     private function action(string $kind, string $value, bool $unavailable): ?string

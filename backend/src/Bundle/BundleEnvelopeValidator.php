@@ -96,8 +96,8 @@ final class BundleEnvelopeValidator
     }
 
     /**
-     * @param list<mixed>   $sections
-     * @param list<string>  $registeredKinds
+     * @param list<mixed>  $sections
+     * @param list<string> $registeredKinds
      *
      * @return list<array{kind: string, version: int, items: list<array<string, mixed>>}>
      */

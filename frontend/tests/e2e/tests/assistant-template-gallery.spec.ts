@@ -32,7 +32,13 @@ test.describe('@ci Assistant template gallery', () => {
       await expect(page.getByTestId('badge-from-template')).toBeVisible()
     } finally {
       const headers = await getAuthHeaders(request, credentials)
-      await request.delete(`${getApiUrl()}/api/v1/agents/${agentId}`, { headers })
+      const archiveRes = await request.patch(`${getApiUrl()}/api/v1/agents/${agentId}`, {
+        headers,
+        data: { status: 'archived' },
+      })
+      expect(archiveRes.ok()).toBeTruthy()
+      const deleteRes = await request.delete(`${getApiUrl()}/api/v1/agents/${agentId}`, { headers })
+      expect(deleteRes.status()).toBe(204)
     }
   })
 })

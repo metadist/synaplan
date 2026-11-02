@@ -91,7 +91,7 @@
                   "tz": "Europe/Berlin",
                   "instruction": "Prepare today's briefing from the mailbox. One short paragraph per item that needs a decision. Skip newsletters. If no mailbox is connected, say that and stop.",
                   "allowUnattended": true,
-                  "enabled": true
+                  "enabled": false
                 }
               ]
             }
