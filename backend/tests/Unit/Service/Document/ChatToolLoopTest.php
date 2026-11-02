@@ -13,9 +13,9 @@ use App\Service\Document\Tool\SetCellsTool;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
+use App\Tests\Support\DocumentLoopInvoker;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class ChatToolLoopTest extends TestCase
 {
@@ -46,7 +46,8 @@ final class ChatToolLoopTest extends TestCase
             ],
         );
 
-        $loop = new ChatToolLoop($facade, new DocumentToolRegistry([new SetCellsTool()]), $config, new NullLogger());
+        $tools = new DocumentToolRegistry([new SetCellsTool()]);
+        $loop = new ChatToolLoop($facade, $tools, $config, DocumentLoopInvoker::create($tools));
         $session = DocumentSession::empty('xlsx');
         $result = $loop->run([['role' => 'user', 'content' => 'Write Hi']], $session, ['provider' => 'test', 'model' => 'test'], 1);
 
@@ -74,7 +75,8 @@ final class ChatToolLoopTest extends TestCase
             ['content' => 'Could not do that.', 'tool_calls' => []],
         );
 
-        $loop = new ChatToolLoop($facade, new DocumentToolRegistry([]), $config, new NullLogger());
+        $tools = new DocumentToolRegistry([]);
+        $loop = new ChatToolLoop($facade, $tools, $config, DocumentLoopInvoker::create($tools));
         $session = DocumentSession::empty('xlsx');
         $result = $loop->run([['role' => 'user', 'content' => 'x']], $session, [], 1);
         self::assertSame('Could not do that.', $result->content);
@@ -99,11 +101,12 @@ final class ChatToolLoopTest extends TestCase
 
         $toolsConfig = $this->createMock(ToolsConfig::class);
         $toolsConfig->method('isRegistryEnabled')->willReturn(true);
+        $tools = new DocumentToolRegistry([]);
         $loop = new ChatToolLoop(
             $facade,
-            new DocumentToolRegistry([]),
+            $tools,
             $config,
-            new NullLogger(),
+            DocumentLoopInvoker::create($tools),
             new ToolRegistry([]),
             $toolsConfig,
         );
