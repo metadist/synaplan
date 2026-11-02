@@ -95,6 +95,14 @@ final class AgentTemplateAcceptanceProvider
             preg_split('/\R/', $knowledge) ?: [],
         ), static fn (string $line): bool => '' !== $line));
         $file = array_shift($lines) ?? 'source';
+        if ($this->pageUnchanged($system, $lines)) {
+            $body = ['Nothing material changed.'];
+            if ($this->wantsCitation($system)) {
+                $body[] = 'Source: '.$file;
+            }
+
+            return $body;
+        }
         if (str_contains(strtolower($system), 'skip newsletters')) {
             $lines = array_values(array_filter(
                 $lines,
@@ -105,7 +113,7 @@ final class AgentTemplateAcceptanceProvider
         $body = $this->wantsThreePosts($system) && [] !== $lines
             ? $this->threePosts(implode(' ', $lines))
             : $lines;
-        if (1 === preg_match('/cite the (file|passage|article)/i', $system)) {
+        if ($this->wantsCitation($system)) {
             $body[] = 'Source: '.$file;
         }
 
@@ -118,6 +126,28 @@ final class AgentTemplateAcceptanceProvider
     private function threePosts(string $text): array
     {
         return ['1. '.$text, '2. '.$text, '3. '.$text];
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private function pageUnchanged(string $system, array $lines): bool
+    {
+        if (!str_contains(strtolower($system), 'nothing material changed')) {
+            return false;
+        }
+        foreach ($lines as $line) {
+            if ('unchanged' === strtolower($line)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function wantsCitation(string $system): bool
+    {
+        return 1 === preg_match('/cite the (file|passage|article|page)/i', $system);
     }
 
     private function wantsThreePosts(string $system): bool
@@ -159,6 +189,12 @@ final class AgentTemplateAcceptanceProvider
         }
         if (str_contains($lower, 'do not claim a ticket')) {
             $lines[] = 'No ticket was opened.';
+        }
+        if (str_contains($lower, 'not a decision of the office')) {
+            $lines[] = 'This is not a decision of the office.';
+        }
+        if (str_contains($lower, 'do not send a request')) {
+            $lines[] = 'Nothing was sent.';
         }
         if (1 === preg_match('/request approval|ask for approval/i', $system)) {
             $lines[] = 'Approval requested.';

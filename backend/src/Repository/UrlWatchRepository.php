@@ -31,6 +31,16 @@ class UrlWatchRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function countForOwner(int $ownerId): int
+    {
+        return (int) $this->createQueryBuilder('w')
+            ->select('COUNT(w.id)')
+            ->where('w.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function findOneForOwner(int $id, int $ownerId): ?UrlWatch
     {
         return $this->findOneBy(['id' => $id, 'ownerId' => $ownerId]);

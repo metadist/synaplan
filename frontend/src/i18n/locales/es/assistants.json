@@ -320,8 +320,12 @@
     "reviewSentBackPlain": "Devuelta. Se queda solo contigo. No se compartió nada.",
     "unavailableChat": "Necesita un modelo de chat que este servidor no tiene.",
     "unavailableImage": "Necesita un modelo de imagen que este servidor no tiene.",
+    "unavailableWatch": "Las páginas observadas están apagadas en este servidor.",
+    "unavailableResearch": "La investigación está apagada en este servidor. Este asistente sigue respondiendo desde la carpeta que elija.",
     "chooseFolder": "Elegir carpeta",
     "connectMail": "Conectar el correo",
+    "addPage": "Añadir una página",
+    "createWidget": "Crear un widget",
     "checklistTitle": "Aún falta",
     "checklistReady": "No falta nada más. Pruebe un ejemplo abajo.",
     "tryIt": "Probar",
@@ -395,6 +399,29 @@
       "needsMail": "Conecte su correo para que el resumen pueda leerlo.",
       "try1": "¿Qué hay en mi correo que necesite una decisión hoy?",
       "try2": "Omite los boletines y lista solo los mensajes que debería contestar."
+    },
+    "regulationWatch": {
+      "title": "Vigilancia de normas",
+      "summary": "Informa de un cambio en una página que usted observa y cita la página. No inventa un cambio.",
+      "needsPage": "Añada las páginas que quiere observar. Se hace en Tareas guardadas.",
+      "try1": "¿Qué cambió en las páginas que observo?",
+      "try2": "¿Cambió el cuadro de tasas, o sigue igual?"
+    },
+    "expertResearch": {
+      "title": "Investigación propia",
+      "summary": "Responde desde sus propios documentos y cita el pasaje. Dice cuándo los documentos no contienen la respuesta.",
+      "needsFolder": "Necesita la carpeta con sus documentos.",
+      "needsResearch": "La investigación está apagada en este servidor. Este asistente sigue respondiendo desde la carpeta que elija.",
+      "try1": "Cita nuestra opinión anterior sobre esta cláusula y di cuándo las pruebas son escasas.",
+      "try2": "¿Qué dice nuestra nota sobre el plazo de preaviso?"
+    },
+    "serviceDesk": {
+      "title": "Atención a la ciudadanía",
+      "summary": "Responde a quienes visitan su sitio desde sus documentos aprobados, en su idioma, y cita el pasaje. No envía una solicitud y no decide el caso.",
+      "needsFolder": "Necesita la carpeta con los documentos aprobados.",
+      "needsWidget": "Publique este asistente y luego póngalo en un widget de chat. Quienes visitan solo lo oyen después de publicarlo.",
+      "try1": "¿Qué documentos necesito para registrar un cambio de domicilio?",
+      "try2": "¿Cuál es el horario de la oficina de atención?"
     }
   }
 }

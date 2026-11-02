@@ -320,8 +320,12 @@
     "reviewSentBackPlain": "Geri gönderildi. Yalnızca sizde kalır. Hiçbir şey paylaşılmadı.",
     "unavailableChat": "Bu sunucuda olmayan bir sohbet modeli gerekir.",
     "unavailableImage": "Bu sunucuda olmayan bir görüntü modeli gerekir.",
+    "unavailableWatch": "İzlenen sayfalar bu sunucuda kapalı.",
+    "unavailableResearch": "Araştırma bu sunucuda kapalı. Bu asistan yine de seçtiğiniz klasörden yanıt verir.",
     "chooseFolder": "Klasör seç",
     "connectMail": "Postayı bağla",
+    "addPage": "Sayfa ekle",
+    "createWidget": "Widget oluştur",
     "checklistTitle": "Hâlâ gerekli",
     "checklistReady": "Başka bir şey gerekmiyor. Aşağıdan bir örneği deneyin.",
     "tryIt": "Dene",
@@ -395,6 +399,29 @@
       "needsMail": "Özetin okuyabilmesi için postanızı bağlayın.",
       "try1": "Postamda bugün karar bekleyen ne var?",
       "try2": "Bültenleri atla, yalnızca yanıtlamam gereken iletileri listele."
+    },
+    "regulationWatch": {
+      "title": "Mevzuat takibi",
+      "summary": "İzlediğiniz bir sayfadaki değişikliği bildirir ve sayfayı belirtir. Değişiklik uydurmaz.",
+      "needsPage": "İzlenmesini istediğiniz sayfaları ekleyin. Bunu Kayıtlı görevler altında yaparsınız.",
+      "try1": "İzlediğim sayfalarda ne değişti?",
+      "try2": "Ücret tarifesi değişti mi, yoksa aynı mı?"
+    },
+    "expertResearch": {
+      "title": "Kendi belgelerinde araştırma",
+      "summary": "Kendi belgelerinizden yanıtlar ve ilgili yeri belirtir. Belgelerde yanıt yoksa bunu söyler.",
+      "needsFolder": "Belgelerinizin olduğu klasör gerekir.",
+      "needsResearch": "Araştırma bu sunucuda kapalı. Bu asistan yine de seçtiğiniz klasörden yanıt verir.",
+      "try1": "Bu maddeyle ilgili önceki görüşümüzü belirt ve kanıt zayıfsa söyle.",
+      "try2": "Notumuz fesih süresi hakkında ne diyor?"
+    },
+    "serviceDesk": {
+      "title": "Vatandaş hizmet masası",
+      "summary": "Sitenizin ziyaretçilerine onaylı belgelerinizden, onların dilinde yanıt verir ve ilgili yeri belirtir. Başvuru göndermez ve dosyayı karara bağlamaz.",
+      "needsFolder": "Onaylı belgelerin olduğu klasör gerekir.",
+      "needsWidget": "Bu asistanı yayımlayın, sonra bir sohbet widget’ına koyun. Ziyaretçiler onu ancak yayımlandıktan sonra duyar.",
+      "try1": "Adres değişikliği için hangi belgeler gerekir?",
+      "try2": "Vatandaş ofisinin çalışma saatleri nedir?"
     }
   }
 }

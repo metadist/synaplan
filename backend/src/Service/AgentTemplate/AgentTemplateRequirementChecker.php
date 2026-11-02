@@ -11,7 +11,11 @@ use App\Repository\ConnectionRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UrlWatchRepository;
+use App\Repository\WidgetRepository;
 use App\Service\Agent\AgentKnowledgeFolders;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Research\Run\ResearchConfig;
 
 /**
  * Says what a template still needs on this install, for this person.
@@ -23,6 +27,10 @@ final readonly class AgentTemplateRequirementChecker
         private ConnectionRepository $connections,
         private InboundEmailHandlerRepository $mailboxes,
         private ?FileRepository $files = null,
+        private ?UrlWatchRepository $watches = null,
+        private ?WidgetRepository $widgets = null,
+        private ?ResearchConfig $research = null,
+        private ?MultitaskRoutingConfig $routing = null,
     ) {
     }
 
@@ -48,15 +56,21 @@ final readonly class AgentTemplateRequirementChecker
      */
     private function one(array $requirement, User $user, ?Agent $agent): array
     {
+        $value = (string) ($requirement['value'] ?? '');
         $met = match ($requirement['kind']) {
-            'capability' => $this->hasCapability((string) ($requirement['value'] ?? '')),
+            'capability' => $this->hasCapability($value),
             'knowledgeFolder' => $this->hasKnowledge($agent),
-            'connection' => $this->hasConnection((string) ($requirement['value'] ?? ''), (int) $user->getId()),
+            'connection' => $this->hasConnection($value, (int) $user->getId()),
+            'watch' => 'url' === $value && $this->hasWatchedPage((int) $user->getId()),
+            'feature' => $this->hasFeature($value, $agent),
             default => false,
         };
-        $unavailable = 'capability' === $requirement['kind'] && !$met;
+        $unavailable = $this->isUnavailable($requirement['kind'], $value, $user, $met);
+        if ($unavailable) {
+            $met = false;
+        }
         $state = $met ? 'ready' : ($unavailable ? 'unavailable' : 'needsYou');
-        $action = $met ? null : $this->action($requirement['kind'], (string) ($requirement['value'] ?? ''), $unavailable);
+        $action = $met ? null : $this->action($requirement['kind'], $value, $unavailable);
 
         return [
             'kind' => $requirement['kind'],
@@ -82,6 +96,48 @@ final readonly class AgentTemplateRequirementChecker
         }
 
         return false;
+    }
+
+    private function isUnavailable(string $kind, string $value, User $user, bool $met): bool
+    {
+        if ('capability' === $kind) {
+            return !$met;
+        }
+        if ('watch' === $kind && 'url' === $value) {
+            return null !== $this->routing
+                && !$this->routing->isFeatureEnabled(
+                    MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
+                    (int) $user->getId(),
+                    true,
+                );
+        }
+        if ('feature' === $kind && 'research' === $value) {
+            return !$met;
+        }
+
+        return false;
+    }
+
+    private function hasWatchedPage(int $userId): bool
+    {
+        return null !== $this->watches && $this->watches->countForOwner($userId) > 0;
+    }
+
+    private function hasFeature(string $value, ?Agent $agent): bool
+    {
+        if ('research' === $value) {
+            return null !== $this->research && $this->research->isEnabled();
+        }
+        if ('widget' !== $value || !$agent instanceof Agent || null === $this->widgets) {
+            return false;
+        }
+        $agentId = $agent->getId();
+        if (null === $agentId) {
+            return false;
+        }
+
+        return $agent->hasPublishedVersion()
+            && $this->widgets->countForOwnerAndAgent($agent->getOwnerId(), $agentId) > 0;
     }
 
     private function hasKnowledge(?Agent $agent): bool
@@ -139,6 +195,8 @@ final readonly class AgentTemplateRequirementChecker
         return match ($kind) {
             'knowledgeFolder' => 'chooseFolder',
             'connection' => 'mail' === $value ? 'connectMail' : null,
+            'watch' => 'url' === $value ? 'addPage' : null,
+            'feature' => 'widget' === $value ? 'createWidget' : null,
             default => null,
         };
     }

@@ -64,7 +64,7 @@ final class AgentTemplateController extends AbstractController
                                         new OA\Property(property: 'hintKey', type: 'string', nullable: true),
                                         new OA\Property(property: 'optional', type: 'boolean', example: false),
                                         new OA\Property(property: 'state', type: 'string', enum: ['ready', 'needsYou', 'unavailable']),
-                                        new OA\Property(property: 'action', type: 'string', nullable: true, enum: ['chooseFolder', 'connectMail']),
+                                        new OA\Property(property: 'action', type: 'string', nullable: true, enum: ['chooseFolder', 'connectMail', 'addPage', 'createWidget']),
                                     ],
                                 )),
                                 new OA\Property(property: 'usedBy', type: 'integer', example: 3),

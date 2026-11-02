@@ -64,6 +64,16 @@ const onTabChange = (id: string) => {
   }
 }
 
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (tab === 'watches' && watchesAvailable.value) {
+      activeTab.value = 'watches'
+    }
+  },
+  { immediate: true },
+)
+
 const onWatchesUnavailable = () => {
   watchesAvailable.value = false
   activeTab.value = 'tasks'

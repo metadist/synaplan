@@ -13,7 +13,11 @@ use App\Repository\ConnectionRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UrlWatchRepository;
+use App\Repository\WidgetRepository;
 use App\Service\AgentTemplate\AgentTemplateRequirementChecker;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Research\Run\ResearchConfig;
 use PHPUnit\Framework\TestCase;
 
 final class AgentTemplateRequirementCheckerTest extends TestCase
@@ -103,6 +107,45 @@ final class AgentTemplateRequirementCheckerTest extends TestCase
         ], $this->user(), $agent);
 
         self::assertSame('ready', $rows[0]['state']);
+    }
+
+    public function testWatchedPageResearchAndWidget(): void
+    {
+        $models = $this->createStub(ModelRepository::class);
+        $watches = $this->createStub(UrlWatchRepository::class);
+        $watches->method('countForOwner')->willReturn(0);
+        $widgets = $this->createStub(WidgetRepository::class);
+        $widgets->method('countForOwnerAndAgent')->willReturn(0);
+        $research = $this->createStub(ResearchConfig::class);
+        $research->method('isEnabled')->willReturn(false);
+        $routing = $this->createStub(MultitaskRoutingConfig::class);
+        $routing->method('isFeatureEnabled')->willReturn(true);
+        $checker = new AgentTemplateRequirementChecker(
+            $models,
+            $this->createStub(ConnectionRepository::class),
+            $this->createStub(InboundEmailHandlerRepository::class),
+            null,
+            $watches,
+            $widgets,
+            $research,
+            $routing,
+        );
+        $agent = new Agent(3, 1, 'service-desk', 'Service desk', []);
+        $id = new \ReflectionProperty(Agent::class, 'id');
+        $id->setValue($agent, 9);
+
+        $rows = $checker->check([
+            ['kind' => 'watch', 'value' => 'url', 'hintKey' => 'templates.regulationWatch.needsPage', 'optional' => false],
+            ['kind' => 'feature', 'value' => 'research', 'hintKey' => 'templates.expertResearch.needsResearch', 'optional' => true],
+            ['kind' => 'feature', 'value' => 'widget', 'hintKey' => 'templates.serviceDesk.needsWidget', 'optional' => false],
+        ], $this->user(), $agent);
+
+        self::assertSame('needsYou', $rows[0]['state']);
+        self::assertSame('addPage', $rows[0]['action']);
+        self::assertSame('unavailable', $rows[1]['state']);
+        self::assertNull($rows[1]['action']);
+        self::assertSame('needsYou', $rows[2]['state']);
+        self::assertSame('createWidget', $rows[2]['action']);
     }
 
     /**

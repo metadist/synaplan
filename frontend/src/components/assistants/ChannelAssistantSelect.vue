@@ -21,7 +21,7 @@ import { computed, ref, watch } from 'vue'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import { agentsApi, type GalleryCard } from '@/services/api/agentsApi'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     modelValue?: number | null
     label: string
@@ -46,7 +46,9 @@ const cards = ref<GalleryCard[]>([])
 const visible = computed(() => isAgentsEnabled())
 const published = computed(() =>
   cards.value.filter(
-    (card) => card.status === 'published' && (card.origin === 'mine' || card.origin === 'shared')
+    (card) =>
+      (card.status === 'published' && (card.origin === 'mine' || card.origin === 'shared')) ||
+      (props.modelValue != null && card.id === props.modelValue)
   )
 )
 

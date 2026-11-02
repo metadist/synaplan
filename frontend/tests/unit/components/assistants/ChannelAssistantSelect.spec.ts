@@ -19,11 +19,11 @@ vi.mock('@/services/api/agentsApi', () => ({
   },
 }))
 
-function mountSelect() {
+function mountSelect(modelValue: number | null = null) {
   const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(ChannelAssistantSelect, {
     props: {
-      modelValue: null,
+      modelValue,
       label: 'Use an assistant',
       noneLabel: 'None',
       hint: 'Optional',
@@ -56,5 +56,21 @@ describe('ChannelAssistantSelect', () => {
 
     await wrapper.get('select').setValue('12')
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([12])
+  })
+
+  it('keeps the assistant this screen already picked, even before it is published', async () => {
+    agentsEnabled.mockReturnValue(true)
+    gallery.mockResolvedValue([
+      { id: 12, name: 'Contract review', status: 'published', origin: 'mine' },
+      { id: 13, name: 'Citizens desk', status: 'draft', origin: 'mine' },
+    ])
+    const wrapper = mountSelect(13)
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    const options = wrapper.findAll('option')
+    expect(options.map((option) => option.text())).toEqual(['None', 'Contract review', 'Citizens desk'])
+    expect((wrapper.get('select').element as HTMLSelectElement).value).toBe('13')
   })
 })

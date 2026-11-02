@@ -1,0 +1,48 @@
+id: expert-research
+version: "2026.11.1"
+mustMention:
+  - "do not guess"
+  - "not legal advice"
+  - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "Cite our past opinion on this clause, and say when the evidence is thin."
+    knowledge: |
+      opinion.txt
+      Past opinion: the clause is acceptable when notice is 30 days.
+      The evidence here is thin.
+    expects:
+      answerContains:
+        - "30 days"
+        - "thin"
+        - "Source: opinion.txt"
+        - "This is not legal advice."
+      answerOmits:
+        - "hire them"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "What does our note say about the notice period?"
+    knowledge: |
+      note.txt
+      Notice period: 90 days.
+    expects:
+      answerContains:
+        - "90 days"
+        - "Source: note.txt"
+        - "This is not legal advice."
+      answerOmits:
+        - "30 days"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Cite our past opinion on this clause, and say when the evidence is thin."
+    expects:
+      answerContains:
+        - "still needs to choose the folder"
+        - "This is not legal advice."
+      answerOmits:
+        - "30 days"
+      toolCalled: null
+      approvalRequested: false

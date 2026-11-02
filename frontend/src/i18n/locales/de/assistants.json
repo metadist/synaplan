@@ -320,8 +320,12 @@
     "reviewSentBackPlain": "Zurückgegeben. Er bleibt nur bei Ihnen. Es wurde nichts geteilt.",
     "unavailableChat": "Braucht ein Chat-Modell, das dieser Server nicht hat.",
     "unavailableImage": "Braucht ein Bild-Modell, das dieser Server nicht hat.",
+    "unavailableWatch": "Beobachtete Seiten sind auf diesem Server ausgeschaltet.",
+    "unavailableResearch": "Die Recherche ist auf diesem Server ausgeschaltet. Dieser Assistent antwortet trotzdem aus dem Ordner, den Sie wählen.",
     "chooseFolder": "Ordner wählen",
     "connectMail": "Postfach verbinden",
+    "addPage": "Seite hinzufügen",
+    "createWidget": "Widget anlegen",
     "checklistTitle": "Noch nötig",
     "checklistReady": "Es fehlt nichts mehr. Probieren Sie unten ein Beispiel.",
     "tryIt": "Ausprobieren",
@@ -395,6 +399,29 @@
       "needsMail": "Verbinden Sie Ihr Postfach, damit das Briefing es lesen kann.",
       "try1": "Was in meinem Postfach braucht heute eine Entscheidung?",
       "try2": "Lass Newsletter weg und liste nur die Nachrichten, die ich beantworten sollte."
+    },
+    "regulationWatch": {
+      "title": "Vorschriften im Blick",
+      "summary": "Meldet eine Änderung auf einer Seite, die Sie beobachten, und nennt die Seite. Es erfindet keine Änderung.",
+      "needsPage": "Fügen Sie die Seiten hinzu, die beobachtet werden sollen. Das geht unter Gespeicherte Aufgaben.",
+      "try1": "Was hat sich auf den Seiten geändert, die ich beobachte?",
+      "try2": "Hat sich die Gebührenordnung geändert, oder ist sie unverändert?"
+    },
+    "expertResearch": {
+      "title": "Eigene Recherche",
+      "summary": "Antwortet aus Ihren eigenen Dokumenten und nennt die Stelle. Es sagt, wenn die Dokumente die Antwort nicht enthalten.",
+      "needsFolder": "Braucht den Ordner mit Ihren Dokumenten.",
+      "needsResearch": "Die Recherche ist auf diesem Server ausgeschaltet. Dieser Assistent antwortet trotzdem aus dem Ordner, den Sie wählen.",
+      "try1": "Nenne unsere bisherige Meinung zu dieser Klausel und sag, wenn die Belege dünn sind.",
+      "try2": "Was sagt unsere Notiz zur Kündigungsfrist?"
+    },
+    "serviceDesk": {
+      "title": "Bürgerservice",
+      "summary": "Beantwortet Fragen von Besuchern Ihrer Website aus Ihren freigegebenen Dokumenten, in ihrer Sprache, und nennt die Stelle. Es schickt keinen Antrag und entscheidet den Fall nicht.",
+      "needsFolder": "Braucht den Ordner mit den freigegebenen Dokumenten.",
+      "needsWidget": "Veröffentlichen Sie diesen Assistenten und legen Sie ihn dann auf ein Chat-Widget. Besucher hören ihn erst nach der Veröffentlichung.",
+      "try1": "Welche Unterlagen brauche ich für eine Ummeldung?",
+      "try2": "Wie sind die Öffnungszeiten des Bürgeramts?"
     }
   }
 }

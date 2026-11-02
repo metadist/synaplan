@@ -93,6 +93,12 @@ const isAdmin = computed(() => auth.isAdmin)
 const unmet = computed(() => (props.template.requires ?? []).filter((row) => row.state !== 'ready'))
 
 function requirementText(requirement: AgentTemplateRequirement): string {
+  if (requirement.state === 'unavailable' && requirement.kind === 'watch') {
+    return t('templates.unavailableWatch')
+  }
+  if (requirement.state === 'unavailable' && requirement.value === 'research') {
+    return t('templates.unavailableResearch')
+  }
   if (requirement.state === 'unavailable' && requirement.value === 'pic2text') {
     return t('templates.unavailableImage')
   }

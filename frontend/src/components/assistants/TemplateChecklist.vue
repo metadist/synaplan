@@ -95,6 +95,24 @@
         >
           {{ $t('templates.connectMail') }}
         </button>
+        <button
+          v-else-if="requirement.action === 'addPage'"
+          type="button"
+          class="btn-secondary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-template-add-page"
+          @click="router.push({ path: '/tasks', query: { tab: 'watches' } })"
+        >
+          {{ $t('templates.addPage') }}
+        </button>
+        <button
+          v-else-if="requirement.action === 'createWidget'"
+          type="button"
+          class="btn-secondary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-template-create-widget"
+          @click="createWidget"
+        >
+          {{ $t('templates.createWidget') }}
+        </button>
       </li>
     </ul>
 
@@ -179,12 +197,26 @@ const updateAvailable = computed(
 )
 
 function requirementText(requirement: AgentTemplateRequirement): string {
+  if (requirement.state === 'unavailable' && requirement.kind === 'watch') {
+    return t('templates.unavailableWatch')
+  }
+  if (requirement.state === 'unavailable' && requirement.value === 'research') {
+    return t('templates.unavailableResearch')
+  }
   if (requirement.state === 'unavailable' && requirement.value === 'pic2text') {
     return t('templates.unavailableImage')
   }
   if (requirement.state === 'unavailable') return t('templates.unavailableChat')
   if (requirement.hintKey) return t(requirement.hintKey)
   return t('templates.checklistTitle')
+}
+
+function createWidget(): void {
+  const agentId = store.current?.id
+  void router.push({
+    path: '/channels/widgets',
+    query: agentId ? { new: '1', agentId: String(agentId) } : { new: '1' },
+  })
 }
 
 function chooseFolder(): void {

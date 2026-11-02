@@ -296,7 +296,8 @@
     <WidgetSetupWizard
       v-if="showWizard"
       data-testid="comp-widget-wizard"
-      @close="showWizard = false"
+      :initial-agent-id="wizardAgentId"
+      @close="closeWizard"
       @created="handleWidgetCreated"
     />
 
@@ -522,6 +523,10 @@ const visibleWidgets = computed(() =>
   listedWidgets(widgets.value, sharedWidgets.value, filterShared.value)
 )
 const showWizard = ref(false)
+const wizardAgentId = computed(() => {
+  const id = Number(route.query.agentId)
+  return Number.isInteger(id) && id > 0 ? id : null
+})
 const successWidget = ref<widgetsApi.Widget | null>(null)
 const setupWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
@@ -627,11 +632,28 @@ const startCreation = () => {
   showWizard.value = true
 }
 
+const closeWizard = () => {
+  showWizard.value = false
+  if (route.query.new !== '1') return
+  const query = { ...route.query }
+  delete query.new
+  delete query.agentId
+  void router.replace({ query })
+}
+
+watch(
+  () => route.query.new,
+  (value) => {
+    if (value === '1') showWizard.value = true
+  },
+  { immediate: true },
+)
+
 /**
  * Handle widget created - show success modal
  */
 const handleWidgetCreated = async (widget: widgetsApi.Widget) => {
-  showWizard.value = false
+  closeWizard()
   successWidget.value = widget
   await loadWidgets()
   success(t('widgets.createSuccess'))

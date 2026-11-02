@@ -1,0 +1,94 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "expert-research",
+    "version": "2026.11.1",
+    "titleKey": "templates.expertResearch.title",
+    "summaryKey": "templates.expertResearch.summary",
+    "category": "work",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "knowledgeFolder",
+        "hintKey": "templates.expertResearch.needsFolder"
+      },
+      {
+        "kind": "feature",
+        "value": "research",
+        "hintKey": "templates.expertResearch.needsResearch",
+        "optional": true
+      }
+    ],
+    "tryIt": [
+      "templates.expertResearch.try1",
+      "templates.expertResearch.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "expert-research",
+          "name": "Expert research",
+          "description": "Answers from your own documents and cites the passage.",
+          "icon": "mdi:text-search",
+          "instruction": "You answer only from the person's own documents. Cite the passage. If the documents do not contain the answer, say what is missing and do not guess. If no document is attached, say that the person still needs to choose the folder. This is not legal advice. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.2,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "Cite our past opinion on this clause, and say when the evidence is thin.",
+                "What does our note say about the notice period?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

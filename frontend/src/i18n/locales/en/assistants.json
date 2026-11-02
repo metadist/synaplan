@@ -320,8 +320,12 @@
     "reviewSentBackPlain": "Sent back. It stays only with you. Nothing was shared.",
     "unavailableChat": "Needs a chat model, which this server does not have.",
     "unavailableImage": "Needs an image model, which this server does not have.",
+    "unavailableWatch": "Watched pages are turned off on this server.",
+    "unavailableResearch": "Research is turned off on this server. This assistant still answers from the folder you choose.",
     "chooseFolder": "Choose folder",
     "connectMail": "Connect mail",
+    "addPage": "Add a page",
+    "createWidget": "Create a widget",
     "checklistTitle": "Still needed",
     "checklistReady": "Nothing else is needed. Try an example below.",
     "tryIt": "Try it",
@@ -395,6 +399,29 @@
       "needsMail": "Connect your mailbox so the briefing can read it.",
       "try1": "What in my mailbox needs a decision today?",
       "try2": "Skip newsletters and list only the messages I should answer."
+    },
+    "regulationWatch": {
+      "title": "Regulation watch",
+      "summary": "Reports a change on a page you watch and cites the page. It does not invent a change.",
+      "needsPage": "Add the pages you want watched. You do this under Saved tasks.",
+      "try1": "What changed on the pages I watch?",
+      "try2": "Did the fee schedule change, or is it unchanged?"
+    },
+    "expertResearch": {
+      "title": "Expert research",
+      "summary": "Answers from your own documents and cites the passage. It says when the documents do not contain the answer.",
+      "needsFolder": "Needs the folder with your documents.",
+      "needsResearch": "Research is turned off on this server. This assistant still answers from the folder you choose.",
+      "try1": "Cite our past opinion on this clause, and say when the evidence is thin.",
+      "try2": "What does our note say about the notice period?"
+    },
+    "serviceDesk": {
+      "title": "Citizens' service desk",
+      "summary": "Answers website visitors from your approved documents, in their language, and cites the passage. It does not send a request and it does not decide the case.",
+      "needsFolder": "Needs the folder with the approved documents.",
+      "needsWidget": "Publish this assistant, then put it on a chat widget. Visitors only hear it after it is published.",
+      "try1": "Which documents do I need to register a move?",
+      "try2": "What are the opening hours of the citizens' office?"
     }
   }
 }

@@ -320,8 +320,12 @@
     "reviewSentBackPlain": "Renvoyée. Il reste uniquement pour vous. Rien n’a été partagé.",
     "unavailableChat": "Il faut un modèle de chat, que ce serveur n’a pas.",
     "unavailableImage": "Il faut un modèle d’image, que ce serveur n’a pas.",
+    "unavailableWatch": "Les pages suivies sont désactivées sur ce serveur.",
+    "unavailableResearch": "La recherche est désactivée sur ce serveur. Cet assistant répond quand même à partir du dossier que vous choisissez.",
     "chooseFolder": "Choisir un dossier",
     "connectMail": "Connecter la messagerie",
+    "addPage": "Ajouter une page",
+    "createWidget": "Créer un widget",
     "checklistTitle": "Encore nécessaire",
     "checklistReady": "Plus rien ne manque. Essayez un exemple ci-dessous.",
     "tryIt": "Essayer",
@@ -395,6 +399,29 @@
       "needsMail": "Connectez votre messagerie pour que le briefing puisse la lire.",
       "try1": "Qu’est-ce qui dans ma messagerie demande une décision aujourd’hui ?",
       "try2": "Laisse les newsletters de côté et liste seulement les messages auxquels je dois répondre."
+    },
+    "regulationWatch": {
+      "title": "Veille réglementaire",
+      "summary": "Signale un changement sur une page que vous suivez et cite la page. Il n’invente pas de changement.",
+      "needsPage": "Ajoutez les pages à suivre. Cela se fait dans Tâches enregistrées.",
+      "try1": "Qu’est-ce qui a changé sur les pages que je suis ?",
+      "try2": "Le barème des frais a-t-il changé, ou est-il inchangé ?"
+    },
+    "expertResearch": {
+      "title": "Recherche interne",
+      "summary": "Répond à partir de vos propres documents et cite le passage. Il dit quand les documents ne contiennent pas la réponse.",
+      "needsFolder": "Il faut le dossier avec vos documents.",
+      "needsResearch": "La recherche est désactivée sur ce serveur. Cet assistant répond quand même à partir du dossier que vous choisissez.",
+      "try1": "Cite notre avis précédent sur cette clause, et dis quand les preuves sont minces.",
+      "try2": "Que dit notre note sur le délai de préavis ?"
+    },
+    "serviceDesk": {
+      "title": "Accueil des usagers",
+      "summary": "Répond aux visiteurs de votre site à partir de vos documents approuvés, dans leur langue, et cite le passage. Il n’envoie pas de demande et ne tranche pas le dossier.",
+      "needsFolder": "Il faut le dossier avec les documents approuvés.",
+      "needsWidget": "Publiez cet assistant, puis placez-le sur un widget de chat. Les visiteurs ne l’entendent qu’après la publication.",
+      "try1": "Quels documents dois-je fournir pour déclarer un déménagement ?",
+      "try2": "Quels sont les horaires d’ouverture du service des usagers ?"
     }
   }
 }
