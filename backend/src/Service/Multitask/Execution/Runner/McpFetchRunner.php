@@ -10,7 +10,6 @@ use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpArgumentSchema;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
-use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Mcp\Notion\NotionImageAttach;
@@ -25,7 +24,18 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Prompt\PromptService;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\McpToolExecutor;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolDescriptor;
+use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * `mcp_fetch` runner — pull data from one of the user's connected external
@@ -51,6 +61,8 @@ final readonly class McpFetchRunner implements TaskRunner
     /** Cap on the formatted node output (token control, like url_fetch). */
     private const MAX_OUTPUT_CHARS = 12000;
 
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private McpClient $client,
         private McpToolRegistry $toolRegistry,
@@ -63,6 +75,13 @@ final readonly class McpFetchRunner implements TaskRunner
         private NotionFetchArguments $notionFetch,
         private NotionImageAttach $images,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     public function supportedCapabilities(): array
@@ -146,14 +165,28 @@ final readonly class McpFetchRunner implements TaskRunner
             return $this->images->attach($server, $tool, $arguments, $this->language($context));
         }
 
-        try {
-            $result = $this->client->callTool($server, $tool, $arguments);
-        } catch (McpClientException $e) {
-            return $this->requestFailed($serverId, $server->getName(), $tool, $e->getMessage(), $e->httpStatus);
+        $outcome = $this->tools()->invoke(
+            new ToolDescriptor('mcp_fetch', $tool, '', [], SideEffect::Read, ToolSource::Mcp, (int) $userId, null, [
+                'serverId' => $serverId,
+                'tool' => $tool,
+            ]),
+            new ToolInvocation(
+                $tool,
+                $arguments,
+                new ToolCaller((int) $userId, ToolChannel::MCP_FETCH),
+                GateMode::AsTodayNever,
+            ),
+        );
+        if (true === ($outcome->details['transport'] ?? false)) {
+            $status = $outcome->details['httpStatus'] ?? null;
+
+            return $this->requestFailed($serverId, $server->getName(), $tool, $outcome->resultText, is_int($status) ? $status : null);
         }
 
-        $text = $this->formatContent($result['content']);
-        if ($result['isError']) {
+        /** @var list<array<string, mixed>> $content */
+        $content = is_array($outcome->details['content'] ?? null) ? $outcome->details['content'] : [];
+        $text = $this->formatContent($content);
+        if (true === ($outcome->details['toolError'] ?? false)) {
             return $this->reportedError($serverId, $server->getName(), $tool, $text);
         }
         if ('' === trim($text)) {
@@ -481,6 +514,13 @@ final readonly class McpFetchRunner implements TaskRunner
         }
 
         return [];
+    }
+
+    private function tools(): ToolInvoker
+    {
+        return $this->toolInvoker->get() ?? new ToolInvoker([
+            new McpToolExecutor($this->client, $this->servers),
+        ]);
     }
 
     /**

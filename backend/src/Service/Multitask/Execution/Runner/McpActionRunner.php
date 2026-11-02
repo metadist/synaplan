@@ -12,7 +12,6 @@ use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpArgumentSchema;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
-use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Mcp\Notion\NotionPageWrite;
@@ -28,11 +27,23 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Prompt\PromptService;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
+use App\Service\Tool\Execution\McpToolExecutor;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
-use App\Service\Tool\Policy\PolicyOutcome;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolExecutionGate;
 use App\Service\Tool\ToolsConfig;
+use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * `mcp_action` runner — performs a WRITE action (create/update) on one of the
@@ -58,6 +69,8 @@ final readonly class McpActionRunner implements TaskRunner
     /** Cap on the formatted node output (token control, like mcp_fetch). */
     private const MAX_OUTPUT_CHARS = 12000;
 
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private McpClient $client,
         private McpToolRegistry $toolRegistry,
@@ -71,6 +84,13 @@ final readonly class McpActionRunner implements TaskRunner
         private ?ToolsConfig $toolsConfig = null,
         private ?UserRepository $users = null,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     public function supportedCapabilities(): array
@@ -153,26 +173,79 @@ final readonly class McpActionRunner implements TaskRunner
             return NodeResult::reportableFailure($refusal, $this->callMetadata($serverId, $server->getName(), $tool));
         }
 
-        $gated = $this->consultGate($context, $node, $serverId, $tool, $arguments);
-        if (null !== $gated) {
-            return $gated;
-        }
+        return $this->callConnected($context, $node, $userId, $server, $serverId, $tool, $arguments);
+    }
 
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function callConnected(NodeContext $context, TaskNode $node, ?int $userId, McpServerConfig $server, int $serverId, string $tool, array $arguments): NodeResult
+    {
+        $gateUserId = $context->userId;
+        $approved = $context->isApproved($node->id);
+        $actor = null !== $gateUserId ? $this->users?->find($gateUserId) : null;
+        $inspect = null !== $gateUserId
+            && null !== $this->executionGate
+            && null !== $this->toolsConfig
+            && $this->toolsConfig->isApprovalsEnabled($gateUserId)
+            && !$approved
+            && $actor instanceof User;
+        $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
+        $unattended = true === ($context->options['saved_task'] ?? false);
+        $requestedBy = $runId > 0
+            ? sprintf('task_run:%d:%s', $runId, $node->id)
+            : 'chat:'.(int) $context->message->getId();
+        $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
         try {
-            $result = $this->client->callTool($server, $tool, $arguments);
-        } catch (McpClientException $e) {
-            return $this->unconfirmedWrite($userId, $serverId, $server->getName(), $tool, $arguments, $e->getMessage());
+            $outcome = $this->tools()->invoke(
+                new ToolDescriptor($gateName, $tool, '', [], SideEffect::Write, ToolSource::Mcp, (int) $userId, null, [
+                    'serverId' => $serverId,
+                    'tool' => $tool,
+                ]),
+                new ToolInvocation(
+                    $gateName,
+                    $arguments,
+                    new ToolCaller((int) $userId, ToolChannel::MCP_ACTION, unattended: $unattended),
+                    $inspect ? GateMode::AsTodayWhenApprovalsOn : GateMode::AsTodayNever,
+                    decision: new GateRequest(
+                        $actor,
+                        $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
+                        $requestedBy,
+                        allowUnattended: true === ($context->options['allow_unattended'] ?? false),
+                    ),
+                    user: $actor,
+                ),
+            );
+        } catch (ToolNotRegisteredException $e) {
+            return NodeResult::failed($e->getMessage());
+        }
+        if (ToolOutcomeKind::NeedsApproval === $outcome->kind && null !== $outcome->approval) {
+            $approval = $outcome->approval;
+
+            return NodeResult::waitingApproval((int) $approval->getId(), $arguments, [
+                'tool' => $approval->getTool(),
+                'preview' => $approval->getPreview(),
+                'expires_at' => $approval->getExpiresAt(),
+                'side_effect' => $approval->getSideEffect(),
+            ]);
+        }
+        if (ToolOutcomeKind::Refused === $outcome->kind) {
+            return NodeResult::failed($outcome->resultText);
+        }
+        if (true === ($outcome->details['transport'] ?? false)) {
+            return $this->unconfirmedWrite($userId, $serverId, $server->getName(), $tool, $arguments, $outcome->resultText);
         }
 
-        $text = $this->formatContent($result['content']);
-        if ($result['isError']) {
+        /** @var list<array<string, mixed>> $content */
+        $content = is_array($outcome->details['content'] ?? null) ? $outcome->details['content'] : [];
+        $text = $this->formatContent($content);
+        if (true === ($outcome->details['toolError'] ?? false)) {
             return $this->reportedError($userId, $serverId, $server->getName(), $tool, $arguments, $text);
         }
         if ('' === trim($text)) {
             $text = sprintf("The action '%s' on %s completed.", $tool, $server->getName());
         }
 
-        // Auditable trace of every external write (who/where/what).
         $this->logger->info('McpActionRunner: write action succeeded', [
             'user_id' => $userId,
             'server_id' => $serverId,
@@ -533,57 +606,12 @@ final readonly class McpActionRunner implements TaskRunner
         return mb_strlen($line) > 140 ? mb_substr($line, 0, 137).'…' : $line;
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function consultGate(NodeContext $context, TaskNode $node, int $serverId, string $tool, array $arguments): ?NodeResult
+    private function tools(): ToolInvoker
     {
-        $userId = $context->userId;
-        if (null === $userId || null === $this->executionGate || null === $this->toolsConfig || !$this->toolsConfig->isApprovalsEnabled($userId)) {
-            return null;
-        }
-        if ($context->isApproved($node->id)) {
-            return null;
-        }
-        $actor = $this->users?->find($userId);
-        if (!$actor instanceof User) {
-            return null;
-        }
-        $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
-        $unattended = true === ($context->options['saved_task'] ?? false);
-        $allowUnattended = true === ($context->options['allow_unattended'] ?? false);
-        $requestedBy = $runId > 0
-            ? sprintf('task_run:%d:%s', $runId, $node->id)
-            : 'chat:'.(int) $context->message->getId();
-        $name = sprintf('mcp:%d:%s', $serverId, $tool);
-        try {
-            $decision = $this->executionGate->inspect(
-                $userId,
-                $name,
-                $arguments,
-                $actor,
-                $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
-                $requestedBy,
-                null,
-                $allowUnattended,
-            );
-        } catch (ToolNotRegisteredException $e) {
-            return NodeResult::failed($e->getMessage());
-        }
-        if (PolicyOutcome::Block === $decision['outcome']) {
-            return NodeResult::failed((string) $decision['refusal']);
-        }
-        if (PolicyOutcome::Approve === $decision['outcome'] && null !== $decision['approval']) {
-            $approval = $decision['approval'];
-
-            return NodeResult::waitingApproval((int) $approval->getId(), $arguments, [
-                'tool' => $approval->getTool(),
-                'preview' => $approval->getPreview(),
-                'expires_at' => $approval->getExpiresAt(),
-                'side_effect' => $approval->getSideEffect(),
-            ]);
-        }
-
-        return null;
+        return $this->toolInvoker->get() ?? new ToolInvoker(
+            [new McpToolExecutor($this->client, $this->servers)],
+            gate: $this->executionGate,
+            toolsConfig: $this->toolsConfig,
+        );
     }
 }
