@@ -295,6 +295,10 @@
     "previewAssistants": "Creates {count} assistant | Creates {count} assistants",
     "previewPrompts": "{count} instruction | {count} instructions",
     "previewCreatesBoth": "{assistants} and {prompts}.",
+    "previewTasks": "{count} task | {count} tasks",
+    "previewCreatesTask": "{assistants} and {tasks}.",
+    "previewTaskHome": "The task is under Tasks, and you can turn it off there.",
+    "openTasks": "Open tasks",
     "previewModelChat": "Uses your default chat model.",
     "previewModelImage": "Uses your default image model.",
     "previewModelBoth": "Uses your default chat model and your default image model.",
@@ -415,7 +419,7 @@
     },
     "dailyBriefing": {
       "title": "Daily briefing",
-      "summary": "Prepares a weekday morning briefing from your mailbox after you connect it and publish the assistant.",
+      "summary": "A weekday morning briefing from your mailbox.",
       "needsMail": "Connect your mailbox so the briefing can read it.",
       "try1": "What in my mailbox needs a decision today?",
       "try2": "Skip newsletters and list only the messages I should answer."

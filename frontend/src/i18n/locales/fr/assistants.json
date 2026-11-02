@@ -295,6 +295,10 @@
     "previewAssistants": "Crée {count} assistant | Crée {count} assistants",
     "previewPrompts": "{count} instruction | {count} instructions",
     "previewCreatesBoth": "{assistants} et {prompts}.",
+    "previewTasks": "{count} tâche | {count} tâches",
+    "previewCreatesTask": "{assistants} et {tasks}.",
+    "previewTaskHome": "La tâche est sous Tâches, et vous pouvez l’y arrêter.",
+    "openTasks": "Ouvrir les tâches",
     "previewModelChat": "Utilise votre modèle de chat par défaut.",
     "previewModelImage": "Utilise votre modèle d’image par défaut.",
     "previewModelBoth": "Utilise votre modèle de chat par défaut et votre modèle d’image par défaut.",
@@ -415,7 +419,7 @@
     },
     "dailyBriefing": {
       "title": "Briefing du matin",
-      "summary": "Prépare un briefing en semaine le matin à partir de votre messagerie, après l’avoir connectée et publié l’assistant.",
+      "summary": "Un briefing en semaine le matin à partir de votre messagerie.",
       "needsMail": "Connectez votre messagerie pour que le briefing puisse la lire.",
       "try1": "Qu’est-ce qui dans ma messagerie demande une décision aujourd’hui ?",
       "try2": "Laisse les newsletters de côté et liste seulement les messages auxquels je dois répondre."

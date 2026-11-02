@@ -295,6 +295,10 @@
     "previewAssistants": "{count} asistan oluşturur",
     "previewPrompts": "{count} yönerge",
     "previewCreatesBoth": "{assistants} ve {prompts}.",
+    "previewTasks": "{count} görev",
+    "previewCreatesTask": "{assistants} ve {tasks}.",
+    "previewTaskHome": "Görev, Görevler altındadır ve orada kapatabilirsiniz.",
+    "openTasks": "Görevleri aç",
     "previewModelChat": "Varsayılan sohbet modelinizi kullanır.",
     "previewModelImage": "Varsayılan görüntü modelinizi kullanır.",
     "previewModelBoth": "Varsayılan sohbet modelinizi ve varsayılan görüntü modelinizi kullanır.",
@@ -415,7 +419,7 @@
     },
     "dailyBriefing": {
       "title": "Günlük özet",
-      "summary": "Postanızı bağlayıp asistanı yayımladıktan sonra hafta içi sabahları postanızdan bir özet hazırlar.",
+      "summary": "Posta kutunuzdan hafta içi sabah özeti.",
       "needsMail": "Özetin okuyabilmesi için postanızı bağlayın.",
       "try1": "Postamda bugün karar bekleyen ne var?",
       "try2": "Bültenleri atla, yalnızca yanıtlamam gereken iletileri listele."

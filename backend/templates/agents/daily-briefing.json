@@ -35,7 +35,7 @@
         {
           "key": "daily-briefing",
           "name": "Daily briefing",
-          "description": "A weekday morning briefing from your mailbox, after you connect it and publish.",
+          "description": "A weekday morning briefing from your mailbox.",
           "icon": "mdi:email-newsletter",
           "instruction": "You prepare a short morning briefing from the person's mailbox when it is connected. Group items that need a decision, and skip newsletters and automated notices. If no mailbox is connected, say that in one sentence and do not invent messages. Answer in the user's language.",
           "definition": {
@@ -89,9 +89,9 @@
                     "at": "07:30"
                   },
                   "tz": "Europe/Berlin",
-                  "instruction": "Prepare today's briefing from the mailbox. One short paragraph per item that needs a decision. Skip newsletters. If no mailbox is connected, say that and stop.",
+                  "instruction": "Prepare today's briefing only from the mailbox search. One short paragraph per item that needs a decision. Skip newsletters. If the search says no mailbox is connected or that no mail was read, answer with that sentence only and do not invent messages.",
                   "allowUnattended": true,
-                  "enabled": false
+                  "enabled": true
                 }
               ]
             }

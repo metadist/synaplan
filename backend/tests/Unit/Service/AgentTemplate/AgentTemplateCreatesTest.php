@@ -21,6 +21,21 @@ final class AgentTemplateCreatesTest extends TestCase
 
         self::assertSame(1, $creates->assistants);
         self::assertSame(2, $creates->prompts);
+        self::assertSame(0, $creates->tasks);
+    }
+
+    public function testASwitchedOffScheduleIsNotATask(): void
+    {
+        $creates = AgentTemplateCreates::fromSections([
+            ['kind' => 'agents', 'version' => 1, 'items' => [[
+                'definition' => ['triggers' => ['schedules' => [
+                    ['id' => 'morning', 'enabled' => false],
+                    ['id' => 'later', 'enabled' => true],
+                ]]],
+            ]]],
+        ]);
+
+        self::assertSame(1, $creates->tasks);
     }
 
     public function testBuiltInOfferWriterCreatesOneAssistantAndNoExtraInstruction(): void
@@ -33,10 +48,14 @@ final class AgentTemplateCreatesTest extends TestCase
         );
 
         $offer = null;
+        $briefing = null;
         foreach ($catalog->all() as $template) {
             self::assertGreaterThan(0, $template->creates->assistants, $template->id);
             if ('offer-writer' === $template->id) {
                 $offer = $template;
+            }
+            if ('daily-briefing' === $template->id) {
+                $briefing = $template;
             }
         }
 
@@ -45,5 +64,11 @@ final class AgentTemplateCreatesTest extends TestCase
         }
         self::assertSame(1, $offer->creates->assistants);
         self::assertSame(0, $offer->creates->prompts);
+        self::assertSame(0, $offer->creates->tasks);
+        if (null === $briefing) {
+            self::fail('daily-briefing is missing from the built-in templates');
+        }
+        self::assertSame(1, $briefing->creates->tasks);
+        self::assertTrue($briefing->body->definition['triggers']['schedules'][0]['enabled']);
     }
 }

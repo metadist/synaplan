@@ -69,10 +69,11 @@ final class AgentTemplateController extends AbstractController
                                     type: 'object',
                                     nullable: true,
                                     description: 'How many assistants and instructions this template will create. Models are not named.',
-                                    required: ['assistants', 'prompts'],
+                                    required: ['assistants', 'prompts', 'tasks'],
                                     properties: [
                                         new OA\Property(property: 'assistants', type: 'integer', example: 1),
                                         new OA\Property(property: 'prompts', type: 'integer', example: 0),
+                                        new OA\Property(property: 'tasks', type: 'integer', example: 0),
                                     ],
                                 ),
                                 new OA\Property(property: 'requires', type: 'array', items: new OA\Items(

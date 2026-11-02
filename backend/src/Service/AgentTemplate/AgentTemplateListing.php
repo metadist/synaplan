@@ -8,6 +8,7 @@ use App\Entity\Agent;
 use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\UserRepository;
+use App\Service\SavedTask\SavedTaskConfig;
 
 final readonly class AgentTemplateListing
 {
@@ -18,6 +19,7 @@ final readonly class AgentTemplateListing
         private UserRepository $users,
         private AgentPublishReview $reviews,
         private PluginPackGallery $packs,
+        private SavedTaskConfig $tasks,
     ) {
     }
 
@@ -43,6 +45,7 @@ final readonly class AgentTemplateListing
                 'creates' => [
                     'assistants' => $template->creates->assistants,
                     'prompts' => $template->creates->prompts,
+                    'tasks' => $this->tasks->isEnabled((int) $user->getId()) ? $template->creates->tasks : 0,
                 ],
                 'requires' => $this->requirements->check($template->requires, $user, $installed),
                 'usedBy' => $this->agents->countTemplateOwners(AgentTemplateRef::prefix($template->id)),

@@ -295,6 +295,10 @@
     "previewAssistants": "Crea {count} asistente | Crea {count} asistentes",
     "previewPrompts": "{count} instrucción | {count} instrucciones",
     "previewCreatesBoth": "{assistants} y {prompts}.",
+    "previewTasks": "{count} tarea | {count} tareas",
+    "previewCreatesTask": "{assistants} y {tasks}.",
+    "previewTaskHome": "La tarea está en Tareas, y puede desactivarla allí.",
+    "openTasks": "Abrir tareas",
     "previewModelChat": "Usa su modelo de chat predeterminado.",
     "previewModelImage": "Usa su modelo de imagen predeterminado.",
     "previewModelBoth": "Usa su modelo de chat predeterminado y su modelo de imagen predeterminado.",
@@ -415,7 +419,7 @@
     },
     "dailyBriefing": {
       "title": "Resumen diario",
-      "summary": "Prepara un resumen de lunes a viernes por la mañana a partir de su correo, después de conectarlo y publicar el asistente.",
+      "summary": "Un resumen de lunes a viernes por la mañana a partir de su correo.",
       "needsMail": "Conecte su correo para que el resumen pueda leerlo.",
       "try1": "¿Qué hay en mi correo que necesite una decisión hoy?",
       "try2": "Omite los boletines y lista solo los mensajes que debería contestar."

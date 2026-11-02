@@ -10,7 +10,9 @@ function translate(key: string, named?: Record<string, unknown>, plural?: number
   ) {
     return key
   }
-  const nested = [named?.assistants, named?.prompts].filter((part) => part != null).join('+')
+  const nested = [named?.assistants, named?.prompts, named?.tasks]
+    .filter((part) => part != null)
+    .join('+')
   return `${key}|${plural ?? ''}|${named?.count ?? ''}${nested === '' ? '' : `|${nested}`}`
 }
 
@@ -33,7 +35,7 @@ function template(overrides: Partial<AgentTemplate> = {}): AgentTemplate {
     ],
     usedBy: 0,
     updateAvailable: false,
-    creates: { assistants: 1, prompts: 0 },
+    creates: { assistants: 1, prompts: 0, tasks: 0 },
     ...overrides,
   }
 }
@@ -49,7 +51,10 @@ describe('templatePreview', () => {
   })
 
   it('counts instructions when the bundle has them', () => {
-    const text = templatePreview(template({ creates: { assistants: 1, prompts: 2 } }), translate)
+    const text = templatePreview(
+      template({ creates: { assistants: 1, prompts: 2, tasks: 0 } }),
+      translate
+    )
 
     expect(text).toContain('templates.previewCreatesBoth')
     expect(text).toContain('templates.previewPrompts|2|2')
@@ -68,6 +73,31 @@ describe('templatePreview', () => {
     expect(text).not.toContain('templates.previewAssistants')
     expect(text).not.toContain('templates.previewModelChat')
     expect(text).toContain('templates.unavailableChat')
+  })
+
+  it('says a weekday task is created and where to turn it off', () => {
+    const text = templatePreview(
+      template({
+        id: 'daily-briefing',
+        creates: { assistants: 1, prompts: 0, tasks: 1 },
+        requires: [
+          { kind: 'capability', value: 'chat', optional: false, state: 'ready' },
+          {
+            kind: 'connection',
+            hintKey: 'templates.dailyBriefing.needsMail',
+            optional: true,
+            state: 'needsYou',
+          },
+        ],
+      }),
+      translate
+    )
+
+    expect(text).toContain('templates.previewCreatesTask')
+    expect(text).toContain('templates.previewTasks|1|1')
+    expect(text).toContain('templates.previewTaskHome')
+    expect(text).toContain('templates.dailyBriefing.needsMail')
+    expect(text).not.toContain('templates.previewNothingElse')
   })
 
   it('says nothing else is needed when every requirement is ready', () => {

@@ -31,6 +31,7 @@ export function requirementLabel(
 export function templatePreview(template: AgentTemplate, translate: Translate): string {
   const assistants = template.creates?.assistants ?? 1
   const prompts = template.creates?.prompts ?? 0
+  const tasks = template.creates?.tasks ?? 0
   const created =
     template.installedAgentId != null
       ? translate('templates.previewAlready')
@@ -42,9 +43,15 @@ export function templatePreview(template: AgentTemplate, translate: Translate): 
               prompts: translate('templates.previewPrompts', { count: prompts }, prompts),
             }
           )
-        : `${translate('templates.previewAssistants', { count: assistants }, assistants)}.`
+        : tasks > 0
+          ? translate('templates.previewCreatesTask', {
+              assistants: translate('templates.previewAssistants', { count: assistants }, assistants),
+              tasks: translate('templates.previewTasks', { count: tasks }, tasks),
+            })
+          : `${translate('templates.previewAssistants', { count: assistants }, assistants)}.`
 
   const parts = [created]
+  if (tasks > 0) parts.push(translate('templates.previewTaskHome'))
   const model = modelSentence(template, translate)
   if (model) parts.push(model)
   parts.push(needsSentence(template, translate))

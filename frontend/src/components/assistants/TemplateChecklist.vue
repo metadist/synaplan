@@ -116,6 +116,22 @@
       </li>
     </ul>
 
+    <div
+      v-if="(template?.creates?.tasks ?? 0) > 0"
+      class="flex flex-wrap items-center justify-between gap-2"
+      data-testid="section-template-task"
+    >
+      <p class="txt-primary text-sm">{{ $t('templates.previewTaskHome') }}</p>
+      <button
+        type="button"
+        class="btn-secondary px-4 py-2.5 text-sm font-medium"
+        data-testid="btn-template-open-tasks"
+        @click="router.push('/tasks')"
+      >
+        {{ $t('templates.openTasks') }}
+      </button>
+    </div>
+
     <div v-if="examples.length > 0" class="flex flex-wrap gap-2">
       <button
         v-for="(example, index) in examples"

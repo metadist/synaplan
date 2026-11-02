@@ -295,6 +295,10 @@
     "previewAssistants": "Legt {count} Assistenten an | Legt {count} Assistenten an",
     "previewPrompts": "{count} Anweisung | {count} Anweisungen",
     "previewCreatesBoth": "{assistants} und {prompts}.",
+    "previewTasks": "{count} Aufgabe | {count} Aufgaben",
+    "previewCreatesTask": "{assistants} und {tasks}.",
+    "previewTaskHome": "Die Aufgabe liegt unter Aufgaben, und Sie können sie dort ausschalten.",
+    "openTasks": "Aufgaben öffnen",
     "previewModelChat": "Nutzt Ihr Standard-Chat-Modell.",
     "previewModelImage": "Nutzt Ihr Standard-Bild-Modell.",
     "previewModelBoth": "Nutzt Ihr Standard-Chat-Modell und Ihr Standard-Bild-Modell.",
@@ -415,7 +419,7 @@
     },
     "dailyBriefing": {
       "title": "Tägliches Briefing",
-      "summary": "Bereitet an Werktagen morgens ein Briefing aus Ihrem Postfach vor, nachdem Sie es verbunden und den Assistenten veröffentlicht haben.",
+      "summary": "Ein Briefing an Werktagen morgens aus Ihrem Postfach.",
       "needsMail": "Verbinden Sie Ihr Postfach, damit das Briefing es lesen kann.",
       "try1": "Was in meinem Postfach braucht heute eine Entscheidung?",
       "try2": "Lass Newsletter weg und liste nur die Nachrichten, die ich beantworten sollte."
