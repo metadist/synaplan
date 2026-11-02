@@ -118,6 +118,7 @@ function runtimeConfigFallback(): RuntimeConfig {
     features: {
       memoryService: false,
       officeConvertEnabled: false,
+      officeEditorEnabled: false,
       documentToolsEnabled: false,
       computeEnabled: false,
       computeWorkspacesEnabled: false,

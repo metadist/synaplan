@@ -1,6 +1,6 @@
 # Collabora integration (Synaplan inside the editor)
 
-**Status:** planned (2026-09-02). No product code in this change.
+**Status:** Epic 0.1 in review (`feat/wopi-host`). Epics 0.2–4 planned.
 **Sibling:** [`../2026-archive/20260902-office-docs/`](../2026-archive/20260902-office-docs) — create,
 analyse, convert, merge and edit office files *inside Synaplan*.
 

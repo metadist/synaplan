@@ -15,6 +15,11 @@ parameters:
     # nothing hard-codes a release number that inevitably drifts.
     app_version_default: 'dev'
 
+    # Office editor (WOPI). Empty keeps "Open in editor" off. The browser URL
+    # and the callback URL differ in Docker; see OfficeEditorConfig.
+    env(OFFICE_PUBLIC_URL): ''
+    env(OFFICE_WOPI_URL): ''
+
     # The capacity watchdog runs unless SYNAPLAN_WATCHDOG is set to 0.
     synaplan_watchdog_default: '1'
 
@@ -1220,6 +1225,35 @@ services:
     App\Module\Sidecar\OfficeConvertModule:
         arguments:
             $baseUrl: '%env(OFFICE_CONVERT_URL)%'
+
+    App\Module\Sidecar\OfficeEditorModule:
+        arguments:
+            $publicUrl: '%env(OFFICE_PUBLIC_URL)%'
+            $wopiUrl: '%env(OFFICE_WOPI_URL)%'
+            $convertUrl: '%env(OFFICE_CONVERT_URL)%'
+
+    App\Service\Office\Wopi\OfficeEditorConfig:
+        arguments:
+            $publicUrl: '%env(OFFICE_PUBLIC_URL)%'
+            $wopiUrl: '%env(OFFICE_WOPI_URL)%'
+            $convertUrl: '%env(OFFICE_CONVERT_URL)%'
+            $frontendUrl: '%env(default:synaplan_url:FRONTEND_URL)%'
+
+    App\Service\Office\Wopi\WopiTokenService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
+    App\Service\Office\Wopi\WopiDiscovery:
+        arguments:
+            $cache: '@cache.app'
+
+    App\Service\Office\Wopi\WopiLockStore:
+        arguments:
+            $cache: '@cache.app'
+
+    App\Service\Office\Wopi\WopiDocumentService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Module\Sidecar\ComputeModule:
         arguments:
