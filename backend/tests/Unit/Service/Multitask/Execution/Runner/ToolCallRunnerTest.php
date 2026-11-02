@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
+use App\Entity\McpServerConfig;
 use App\Entity\Message;
 use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
@@ -113,6 +114,51 @@ final class ToolCallRunnerTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertSame('Custom tools are turned off', $result->error);
+    }
+
+    public function testAnMcpStepKeepsTextLongerThanTheModelClamp(): void
+    {
+        $long = str_repeat('B', 13000);
+        $registry = $this->createStub(ToolRegistry::class);
+        $registry->method('get')->willReturn(new ToolDescriptor(
+            'mcp:3:lookup',
+            'lookup',
+            '',
+            [],
+            SideEffect::Read,
+            ToolSource::Mcp,
+            4,
+            meta: ['serverId' => 3, 'tool' => 'lookup'],
+        ));
+        $server = new McpServerConfig();
+        $server->setUserId(4)->setName('crm')->setUrl('https://8.8.8.8/mcp')->setEnabled(true);
+        $servers = $this->createStub(McpServerConfigRepository::class);
+        $servers->method('findByIdAndUser')->willReturn($server);
+        $client = $this->createStub(McpClient::class);
+        $client->method('callTool')->willReturn([
+            'content' => [['type' => 'text', 'text' => $long]],
+            'isError' => false,
+        ]);
+        $runner = new ToolCallRunner(
+            $registry,
+            new StepInputResolver(),
+            $this->createStub(HttpToolExecutor::class),
+            $this->createStub(CustomToolRepository::class),
+            $client,
+            $servers,
+            $this->createStub(UserRepository::class),
+            new NullLogger(),
+        );
+        $message = new Message();
+        $message->setUserId(4);
+        $result = $runner->run(
+            new TaskNode('t1', Capability::ToolCall, [], [], ['tool' => 'mcp:3:lookup']),
+            new NodeContext($message, [], 4, ['language' => 'en']),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame($long, $result->text);
+        self::assertSame($long, $result->metadata['summary']);
     }
 
     private function runner(ToolRegistry $registry, ?ToolsConfig $toolsConfig = null): ToolCallRunner

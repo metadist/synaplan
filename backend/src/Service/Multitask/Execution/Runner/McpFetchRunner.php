@@ -519,7 +519,7 @@ final readonly class McpFetchRunner implements TaskRunner
     private function tools(): ToolInvoker
     {
         return $this->toolInvoker->get() ?? new ToolInvoker([
-            new McpToolExecutor($this->client, $this->servers),
+            new McpToolExecutor($this->client, $this->servers, $this->toolRegistry),
         ]);
     }
 

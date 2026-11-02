@@ -4,16 +4,25 @@ declare(strict_types=1);
 
 namespace App\Service\Tool\Execution;
 
+use App\Service\Infrastructure\RedisService;
+
 /**
- * In-process counter for `synaplan_tool_calls_total`.
+ * Counter for `synaplan_tool_calls_total`.
  *
- * Labels stay bounded: source, kind and outcome. No user id, no tool
- * arguments, no result text.
+ * The process array is what {@see prometheus()} prints. The same count is
+ * written to Redis when it is up, under `tool:calls:{source}:{kind}:{outcome}`,
+ * so a new worker still has the totals. Labels stay bounded: source, kind
+ * and outcome. No user id, no tool arguments, no result text.
  */
 final class ToolMetrics
 {
     /** @var array<string, int> */
     private array $counts = [];
+
+    public function __construct(
+        private readonly ?RedisService $redis = null,
+    ) {
+    }
 
     public function record(string $source, string $kind, string $outcome): void
     {
@@ -22,6 +31,7 @@ final class ToolMetrics
         $outcome = $this->label($outcome);
         $field = $source.'|'.$kind.'|'.$outcome;
         $this->counts[$field] = ($this->counts[$field] ?? 0) + 1;
+        $this->redis?->increment('tool:calls:'.$source.':'.$kind.':'.$outcome);
     }
 
     public function count(string $source, string $kind, string $outcome): int

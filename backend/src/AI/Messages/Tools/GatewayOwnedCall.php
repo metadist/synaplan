@@ -165,11 +165,20 @@ final readonly class GatewayOwnedCall
     private function assertRegistered(User $user, string $name): void
     {
         $userId = (int) $user->getId();
-        if (null !== $this->deps->toolRegistry && null !== $this->deps->toolsConfig && $this->deps->toolsConfig->isRegistryEnabled($userId)) {
-            if (null === $this->deps->toolRegistry->get($userId, $name)) {
-                throw new ToolNotRegisteredException($name);
-            }
+        if ($this->registryEnabled($userId) && null === $this->deps->toolRegistry?->get($userId, $name)) {
+            throw new ToolNotRegisteredException($name);
         }
+    }
+
+    /**
+     * A disabled registry must not call ToolRegistry::get(): that lists
+     * every source, and a cold MCP catalog waits on each server's timeout.
+     */
+    private function registryEnabled(int $userId): bool
+    {
+        return null !== $this->deps->toolRegistry
+            && null !== $this->deps->toolsConfig
+            && $this->deps->toolsConfig->isRegistryEnabled($userId);
     }
 
     /**
@@ -177,9 +186,11 @@ final readonly class GatewayOwnedCall
      */
     private function descriptorFor(int $userId, string $name, array $entry): ToolDescriptor
     {
-        $existing = $this->deps->toolRegistry?->get($userId, $name);
-        if (null !== $existing) {
-            return $existing;
+        if ($this->registryEnabled($userId)) {
+            $existing = $this->deps->toolRegistry?->get($userId, $name);
+            if (null !== $existing) {
+                return $existing;
+            }
         }
         $source = match ($entry['kind']) {
             GatewayToolCatalog::KIND_CUSTOM => ToolSource::Custom,

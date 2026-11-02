@@ -177,7 +177,7 @@ final readonly class ToolCallRunner implements TaskRunner
             return NodeResult::failed($outcome->resultText);
         }
         if (true === ($outcome->details['toolError'] ?? false)) {
-            return NodeResult::failed('the connected system reported an error: '.mb_substr($outcome->resultText, 0, 300));
+            return NodeResult::failed('the connected system reported an error: '.mb_substr($this->mcpNodeText($outcome), 0, 300));
         }
         if (ToolSource::Custom === $descriptor->source) {
             $summary = $outcome->details['summary'] ?? $outcome->resultText;
@@ -190,12 +190,36 @@ final readonly class ToolCallRunner implements TaskRunner
             ]);
         }
 
-        $text = $outcome->resultText;
+        $text = $this->mcpNodeText($outcome);
 
         return NodeResult::ok('' !== $text ? $text : 'The tool finished', [], [
             'tool' => $toolName,
             'summary' => $text,
         ]);
+    }
+
+    /**
+     * The node output is the full tool text. The invoker clamps model-facing
+     * text to {@see \App\Service\Tool\Execution\ToolLimits::RESULT_CHARS};
+     * a later Saved Task step still needs the complete content.
+     */
+    private function mcpNodeText(ToolOutcome $outcome): string
+    {
+        $content = $outcome->details['content'] ?? null;
+        if (!is_array($content)) {
+            return $outcome->resultText;
+        }
+        $parts = [];
+        foreach ($content as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            if ('text' === ($item['type'] ?? null) && is_string($item['text'] ?? null) && '' !== $item['text']) {
+                $parts[] = $item['text'];
+            }
+        }
+
+        return trim(implode("\n", $parts));
     }
 
     private function tools(): ToolInvoker

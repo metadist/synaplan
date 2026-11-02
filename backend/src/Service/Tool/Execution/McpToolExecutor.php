@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Tool\Execution;
 
+use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
+use App\Service\Mcp\McpToolRegistry;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
 
@@ -20,6 +22,7 @@ final readonly class McpToolExecutor implements ToolExecutorInterface
     public function __construct(
         private McpClient $client,
         private McpServerConfigRepository $servers,
+        private ?McpToolRegistry $catalog = null,
     ) {
     }
 
@@ -33,8 +36,8 @@ final readonly class McpToolExecutor implements ToolExecutorInterface
         $serverId = (int) ($tool->meta['serverId'] ?? 0);
         $mcpTool = is_string($tool->meta['tool'] ?? null) ? $tool->meta['tool'] : '';
         $userId = (int) ($invocation->caller->userId ?? 0);
-        $server = $serverId > 0 ? $this->servers->findByIdAndUser($serverId, $userId) : null;
-        if (null === $server || !$server->isEnabled() || '' === $mcpTool) {
+        $server = $this->serverFor($invocation, $serverId, $userId);
+        if (null === $server || '' === $mcpTool) {
             return $this->unavailable($invocation, $serverId, $mcpTool);
         }
 
@@ -66,6 +69,24 @@ final readonly class McpToolExecutor implements ToolExecutorInterface
             'ref' => 'mcp:'.$serverId.':'.$mcpTool,
             'summary' => $this->plain($content),
         ]);
+    }
+
+    /**
+     * Ownership first. A read-only fetch may then use the organisation's
+     * shared Notion connection. Write channels never do.
+     */
+    private function serverFor(ToolInvocation $invocation, int $serverId, int $userId): ?McpServerConfig
+    {
+        $owned = $serverId > 0 ? $this->servers->findByIdAndUser($serverId, $userId) : null;
+        if (null !== $owned && $owned->isEnabled()) {
+            return $owned;
+        }
+        if (ToolChannel::MCP_FETCH !== $invocation->caller->channel || null === $this->catalog || $serverId < 1) {
+            return null;
+        }
+        $shared = $this->catalog->sharedServer($serverId, $userId);
+
+        return null !== $shared && $shared->isEnabled() ? $shared : null;
     }
 
     private function unavailable(ToolInvocation $invocation, int $serverId, string $mcpTool): ToolExecution
