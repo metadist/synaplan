@@ -91,6 +91,21 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914) | merged (`0fa6754e6`) | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
 | 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | merged (`acecdf763`) | `app:provider:scaffold`, `AddProviderJourneyTest`, `EgressPolicy` reads the catalog (T23). `EGRESS.MODE` stays `off` |
 | 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | open | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
+| 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936), stacked on #2935 | open | Every loop and runner calls `ToolInvoker`. `tool_loops.json` unchanged. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
+
+## 2026-11-02 — AU24: one tool invoker behind every loop
+
+Stacked on #2935. `ChatToolLoop`, `GatewayOwnedCall`, `OpenAiGatewayToolLoop`,
+`ToolCallRunner`, `McpFetchRunner`, `McpActionRunner`, `CodeRunApproval`,
+`ResumeApprovalCommandHandler`, and `McpServerFactory::pluginResult` call
+`ToolInvoker`. Gate mode is still per caller (`AsTodayNever`,
+`AsTodayWhenApprovalsOn`, `AsTodayAlways`), so the AU23 gaps stay. File work
+is `decideOnly`: the gate runs, the sidecar stays in `CodeRunRunner`.
+Usage and `tool.executed` stay with the caller until AU25.
+
+Local gate: `make -C backend phpstan`, `deptrac`, `lint:container`, and
+`make -C backend test` (11,326 tests). Named Playwright specs and
+`make perf-runtime` are not run yet.
 
 ## 2026-11-02 — AU23: characterization of every tool loop
 
