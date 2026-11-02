@@ -11,6 +11,7 @@ final readonly class AgentTemplateInstallResult
         public bool $alreadyInstalled,
         public bool $shared,
         public bool $sharingOff,
+        public bool $waitingForReview = false,
     ) {
     }
 }

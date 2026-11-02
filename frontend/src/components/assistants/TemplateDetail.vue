@@ -76,6 +76,7 @@ import {
 const props = defineProps<{
   template: AgentTemplate
   peopleCount: number | null
+  publishReviewRequired: boolean
 }>()
 
 const emit = defineEmits<{
@@ -114,7 +115,9 @@ async function install(audience: 'me' | 'everyone'): Promise<void> {
   if (audience === 'everyone') {
     const ok = await confirm({
       title: t('templates.installForEveryoneConfirmTitle'),
-      message: t('templates.installForEveryoneConfirm', { count: props.peopleCount ?? 0 }),
+      message: props.publishReviewRequired
+        ? t('templates.installForEveryoneConfirmReview', { count: props.peopleCount ?? 0 })
+        : t('templates.installForEveryoneConfirm', { count: props.peopleCount ?? 0 }),
     })
     if (!ok) return
   }
@@ -130,7 +133,8 @@ async function install(audience: 'me' | 'everyone'): Promise<void> {
       error(t('templates.installFailed'))
       return
     }
-    if (result.alreadyInstalled) success(t('templates.alreadyInstalled'))
+    if (result.waitingForReview) success(t('templates.installedWaitingReview'))
+    else if (result.alreadyInstalled) success(t('templates.alreadyInstalled'))
     else if (result.sharingOff) success(t('templates.installedSharingOff'))
     else if (result.shared) success(t('templates.installedShared'))
     else success(t('templates.installed'))

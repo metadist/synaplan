@@ -24,6 +24,7 @@
       v-else-if="selected"
       :template="selected"
       :people-count="peopleCount"
+      :publish-review-required="publishReviewRequired"
       @back="selectedId = null"
       @installed="onInstalled"
     />
@@ -116,6 +117,7 @@ const loading = ref(true)
 const loadError = ref(false)
 const templates = ref<AgentTemplate[]>([])
 const peopleCount = ref<number | null>(null)
+const publishReviewRequired = ref(false)
 const search = ref('')
 const category = ref('all')
 const selectedId = ref<string | null>(null)
@@ -150,6 +152,7 @@ async function load(): Promise<void> {
     const data = await agentTemplatesApi.list()
     templates.value = data.templates
     peopleCount.value = data.peopleCount
+    publishReviewRequired.value = data.publishReviewRequired
   } catch {
     loadError.value = true
   } finally {

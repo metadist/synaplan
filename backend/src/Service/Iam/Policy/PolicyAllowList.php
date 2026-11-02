@@ -42,6 +42,7 @@ final class PolicyAllowList
         'WORKFLOWS.BUILDER_ENABLED',
         'CHAT.EXPORT_ENABLED',
         'CHAT.SHARE_ENABLED',
+        'AGENTS.PUBLISH_REVIEW',
     ];
 
     /**

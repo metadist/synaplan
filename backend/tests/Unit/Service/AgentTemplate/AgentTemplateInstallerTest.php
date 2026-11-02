@@ -16,6 +16,7 @@ use App\Service\Agent\AgentPublisher;
 use App\Service\Agent\AgentService;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
+use App\Service\AgentTemplate\AgentPublishReview;
 use App\Service\AgentTemplate\AgentTemplateCatalog;
 use App\Service\AgentTemplate\AgentTemplateInstaller;
 use App\Service\AgentTemplate\AgentTemplateInstallRequest;
@@ -89,6 +90,7 @@ final class AgentTemplateInstallerTest extends TestCase
             $this->createStub(ShareService::class),
             $this->createStub(IamConfig::class),
             $this->createStub(EntityManagerInterface::class),
+            $this->reviewOff(),
         );
 
         $user = $this->createStub(User::class);
@@ -149,6 +151,7 @@ final class AgentTemplateInstallerTest extends TestCase
             $shares,
             $iam,
             $this->createStub(EntityManagerInterface::class),
+            $this->reviewOff(),
         );
 
         $admin = $this->createStub(User::class);
@@ -161,5 +164,69 @@ final class AgentTemplateInstallerTest extends TestCase
         self::assertTrue($result->alreadyInstalled);
         self::assertFalse($result->shared);
         self::assertTrue($result->sharingOff);
+        self::assertFalse($result->waitingForReview);
+    }
+
+    public function testInstallForEveryoneWaitsWhenTheGroupRequiresReview(): void
+    {
+        $backend = dirname(__DIR__, 4);
+        $catalog = new AgentTemplateCatalog(
+            $backend.'/templates/agents',
+            new BundleEnvelopeValidator(),
+            new AgentDefinitionValidator(),
+        );
+        $defaults = $this->createStub(ModelConfigService::class);
+        $defaults->method('getDefaultModel')->willReturn(null);
+        $binder = new AgentTemplateModelBinder($defaults, $this->createStub(ModelRepository::class));
+
+        $agent = new Agent(1, 20, 'offer-writer', 'Offer writer', AgentDefinition::defaults()->toArray());
+        (new \ReflectionProperty(Agent::class, 'id'))->setValue($agent, 42);
+
+        $agents = $this->createStub(AgentRepository::class);
+        $agents->method('findInstalledTemplate')->willReturn($agent);
+
+        $shares = $this->createMock(ShareService::class);
+        $shares->expects(self::never())->method('grant');
+
+        $iam = $this->createStub(IamConfig::class);
+        $iam->method('isSharingEnabled')->willReturn(true);
+        $iam->method('canShareWithEveryone')->willReturn(true);
+
+        $reviews = $this->createMock(AgentPublishReview::class);
+        $reviews->method('required')->willReturn(true);
+        $reviews->method('sharedWithEveryone')->willReturn(false);
+        $reviews->expects(self::once())->method('request')->with(self::isInstanceOf(User::class), $agent);
+
+        $installer = new AgentTemplateInstaller(
+            $catalog,
+            $binder,
+            $agents,
+            $this->createStub(AgentService::class),
+            $this->createStub(AgentPublisher::class),
+            $this->createStub(PromptRepository::class),
+            $shares,
+            $iam,
+            $this->createStub(EntityManagerInterface::class),
+            $reviews,
+        );
+
+        $admin = $this->createStub(User::class);
+        $admin->method('getId')->willReturn(1);
+        $admin->method('isAdmin')->willReturn(true);
+
+        $result = $installer->install($admin, 'offer-writer', new AgentTemplateInstallRequest('everyone', null, null, []));
+
+        self::assertTrue($result->waitingForReview);
+        self::assertFalse($result->shared);
+        self::assertFalse($result->sharingOff);
+        self::assertTrue($result->alreadyInstalled);
+    }
+
+    private function reviewOff(): AgentPublishReview
+    {
+        $reviews = $this->createStub(AgentPublishReview::class);
+        $reviews->method('required')->willReturn(false);
+
+        return $reviews;
     }
 }

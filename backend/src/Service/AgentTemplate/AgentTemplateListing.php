@@ -16,11 +16,12 @@ final readonly class AgentTemplateListing
         private AgentTemplateRequirementChecker $requirements,
         private AgentRepository $agents,
         private UserRepository $users,
+        private AgentPublishReview $reviews,
     ) {
     }
 
     /**
-     * @return array{peopleCount: int|null, templates: list<array<string, mixed>>}
+     * @return array{peopleCount: int|null, publishReviewRequired: bool, templates: list<array<string, mixed>>}
      */
     public function forUser(User $user): array
     {
@@ -30,6 +31,7 @@ final readonly class AgentTemplateListing
             $installedVersion = $installed instanceof Agent
                 ? AgentTemplateRef::versionFromSource($installed->getSource())
                 : null;
+            $review = $this->reviews->stateFor($user, $installed);
             $rows[] = [
                 'id' => $template->id,
                 'version' => $template->version,
@@ -42,11 +44,14 @@ final readonly class AgentTemplateListing
                 'installedAgentId' => $installed?->getId(),
                 'installedVersion' => $installedVersion,
                 'updateAvailable' => null !== $installedVersion && $installedVersion !== $template->version,
+                'publishReview' => $review['status'] ?? null,
+                'publishReviewNote' => $review['note'] ?? null,
             ];
         }
 
         return [
             'peopleCount' => $user->isAdmin() ? $this->users->count([]) : null,
+            'publishReviewRequired' => $this->reviews->required($user),
             'templates' => $rows,
         ];
     }

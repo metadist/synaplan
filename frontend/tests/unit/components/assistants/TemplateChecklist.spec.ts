@@ -57,6 +57,7 @@ describe('TemplateChecklist', () => {
   it('clears knowledgeFolder requirement when ownFolder has uploaded files', async () => {
     vi.spyOn(agentTemplatesApi, 'list').mockResolvedValue({
       peopleCount: null,
+      publishReviewRequired: false,
       templates: [
         {
           id: 'offer-writer',
@@ -118,6 +119,7 @@ describe('TemplateChecklist', () => {
   it('hides update actions when viewing someone else shared assistant', async () => {
     vi.spyOn(agentTemplatesApi, 'list').mockResolvedValue({
       peopleCount: null,
+      publishReviewRequired: false,
       templates: [
         {
           id: 'offer-writer',
@@ -164,6 +166,7 @@ describe('TemplateChecklist', () => {
   it('flushes draft, publishes, and opens an empty chat on Try it', async () => {
     vi.spyOn(agentTemplatesApi, 'list').mockResolvedValue({
       peopleCount: null,
+      publishReviewRequired: false,
       templates: [],
     })
     const publishSpy = vi.spyOn(agentsApi, 'publish').mockResolvedValue({

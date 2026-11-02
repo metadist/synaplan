@@ -5,6 +5,7 @@ import {
   GetApiAgentTemplatesListResponseSchema,
   PostApiAgentTemplatesInstallResponseSchema,
   PostApiAgentTemplatesUpdateResponseSchema,
+  PostApiAgentTemplatesWithdrawReviewResponseSchema,
 } from '@/generated/api-schemas'
 
 export type AgentTemplate = NonNullable<
@@ -16,15 +17,27 @@ export type AgentTemplateRequirement = NonNullable<AgentTemplate['requires']>[nu
 export type AgentTemplateInstallResult = z.infer<typeof PostApiAgentTemplatesInstallResponseSchema>
 
 const agentTemplatesApi = {
-  async list(): Promise<{ peopleCount: number | null; templates: AgentTemplate[] }> {
+  async list(): Promise<{
+    peopleCount: number | null
+    publishReviewRequired: boolean
+    templates: AgentTemplate[]
+  }> {
     const data = await httpClient('/api/v1/agent-templates', {
       method: 'GET',
       schema: GetApiAgentTemplatesListResponseSchema,
     })
     return {
       peopleCount: data.peopleCount ?? null,
+      publishReviewRequired: data.publishReviewRequired === true,
       templates: data.templates ?? [],
     }
+  },
+
+  async withdrawReview(id: string): Promise<void> {
+    await httpClient(`/api/v1/agent-templates/${id}/withdraw-review`, {
+      method: 'POST',
+      schema: PostApiAgentTemplatesWithdrawReviewResponseSchema,
+    })
   },
 
   async install(

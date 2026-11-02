@@ -125,6 +125,45 @@ class ApprovalRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    /**
+     * @param list<string> $statuses
+     *
+     * @return list<Approval>
+     */
+    public function findByToolAndStatuses(string $tool, array $statuses): array
+    {
+        if ([] === $statuses) {
+            return [];
+        }
+
+        /** @var list<Approval> $rows */
+        $rows = $this->createQueryBuilder('a')
+            ->where('a.tool = :tool')
+            ->andWhere('a.status IN (:statuses)')
+            ->setParameter('tool', $tool)
+            ->setParameter('statuses', $statuses)
+            ->orderBy('a.created', 'DESC')
+            ->setMaxResults(100)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    public function findLatestForRequestedBy(string $requestedBy): ?Approval
+    {
+        /** @var Approval|null $row */
+        $row = $this->createQueryBuilder('a')
+            ->where('a.requestedBy = :requestedBy')
+            ->setParameter('requestedBy', $requestedBy)
+            ->orderBy('a.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $row;
+    }
+
     public function deleteByOwner(int $ownerId): void
     {
         $this->createQueryBuilder('a')

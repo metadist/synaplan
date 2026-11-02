@@ -37,6 +37,7 @@ final readonly class AgentTemplateInstaller
         private ShareService $shares,
         private IamConfig $iam,
         private EntityManagerInterface $em,
+        private AgentPublishReview $reviews,
     ) {
     }
 
@@ -48,6 +49,10 @@ final readonly class AgentTemplateInstaller
         $template = $this->catalog->get($id);
         $existing = $this->agents->findInstalledTemplate((int) $user->getId(), AgentTemplateRef::prefix($id));
         if ($existing instanceof Agent && null !== $existing->getId()) {
+            $held = $this->holdForReview($user, $existing, $request, true);
+            if ($held instanceof AgentTemplateInstallResult) {
+                return $held;
+            }
             $shared = 'everyone' === $request->audience && $this->share($user, $existing);
 
             return new AgentTemplateInstallResult($existing->getId(), true, $shared, 'everyone' === $request->audience && !$shared);
@@ -68,6 +73,10 @@ final readonly class AgentTemplateInstaller
             AgentTemplateRef::source($template->id, $template->version),
         );
         $this->publish($agent, $user, self::INSTALL_CHANGELOG);
+        $held = $this->holdForReview($user, $agent, $request, false);
+        if ($held instanceof AgentTemplateInstallResult) {
+            return $held;
+        }
         $shared = 'everyone' === $request->audience && $this->share($user, $agent);
         $agentId = $agent->getId();
         if (null === $agentId) {
@@ -196,6 +205,29 @@ final readonly class AgentTemplateInstaller
             $this->publisher->publish($agent, $user, $changelog);
         } catch (AgentNothingChangedException) {
         }
+    }
+
+    public function withdrawReview(User $user, string $id): void
+    {
+        $agent = $this->installed($user, $id);
+        $this->reviews->withdraw($user, $agent);
+    }
+
+    private function holdForReview(User $user, Agent $agent, AgentTemplateInstallRequest $request, bool $already): ?AgentTemplateInstallResult
+    {
+        if ('everyone' !== $request->audience || !$this->reviews->required($user) || $this->reviews->sharedWithEveryone($agent)) {
+            return null;
+        }
+        if (!$this->iam->isSharingEnabled((int) $user->getId()) || !$this->iam->canShareWithEveryone($user)) {
+            return null;
+        }
+        $this->reviews->request($user, $agent);
+        $agentId = $agent->getId();
+        if (null === $agentId) {
+            throw new \RuntimeException('The assistant was created without an id.');
+        }
+
+        return new AgentTemplateInstallResult($agentId, $already, false, false, true);
     }
 
     private function share(User $admin, Agent $agent): bool

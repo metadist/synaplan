@@ -9,6 +9,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\AgentTemplate\AgentTemplateInstaller;
 use App\Service\AgentTemplate\AgentTemplateInstallRequest;
 use App\Service\AgentTemplate\AgentTemplateListing;
+use App\Service\AgentTemplate\Exception\AgentPublishReviewException;
 use App\Service\AgentTemplate\Exception\AgentTemplateForbiddenException;
 use App\Service\AgentTemplate\Exception\AgentTemplateNotFoundException;
 use OpenApi\Attributes as OA;
@@ -45,6 +46,7 @@ final class AgentTemplateController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'peopleCount', type: 'integer', nullable: true, example: 40),
+                        new OA\Property(property: 'publishReviewRequired', type: 'boolean', example: false),
                         new OA\Property(property: 'templates', type: 'array', items: new OA\Items(
                             required: ['id', 'version', 'titleKey', 'summaryKey', 'category', 'tryIt', 'requires', 'usedBy', 'updateAvailable'],
                             properties: [
@@ -69,6 +71,8 @@ final class AgentTemplateController extends AbstractController
                                 new OA\Property(property: 'installedAgentId', type: 'integer', nullable: true, example: null),
                                 new OA\Property(property: 'installedVersion', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'updateAvailable', type: 'boolean', example: false),
+                                new OA\Property(property: 'publishReview', type: 'string', nullable: true, enum: ['waiting', 'sent_back']),
+                                new OA\Property(property: 'publishReviewNote', type: 'string', nullable: true),
                             ],
                         )),
                     ],
@@ -87,7 +91,12 @@ final class AgentTemplateController extends AbstractController
         \assert($user instanceof User);
         $payload = $this->listing->forUser($user);
 
-        return $this->json(['success' => true, 'peopleCount' => $payload['peopleCount'], 'templates' => $payload['templates']]);
+        return $this->json([
+            'success' => true,
+            'peopleCount' => $payload['peopleCount'],
+            'publishReviewRequired' => $payload['publishReviewRequired'],
+            'templates' => $payload['templates'],
+        ]);
     }
 
     #[Route('/{id}/install', name: 'install', methods: ['POST'], requirements: ['id' => '[a-z0-9][a-z0-9-]{0,31}'])]
@@ -105,13 +114,14 @@ final class AgentTemplateController extends AbstractController
         ])),
         responses: [
             new OA\Response(response: 200, description: 'Assistant created, or the person already has it', content: new OA\JsonContent(
-                required: ['success', 'agentId', 'alreadyInstalled', 'shared', 'sharingOff'],
+                required: ['success', 'agentId', 'alreadyInstalled', 'shared', 'sharingOff', 'waitingForReview'],
                 properties: [
                     new OA\Property(property: 'success', type: 'boolean', example: true),
                     new OA\Property(property: 'agentId', type: 'integer', example: 12),
                     new OA\Property(property: 'alreadyInstalled', type: 'boolean', example: false),
                     new OA\Property(property: 'shared', type: 'boolean', example: false),
                     new OA\Property(property: 'sharingOff', type: 'boolean', example: false),
+                    new OA\Property(property: 'waitingForReview', type: 'boolean', example: false),
                 ],
             )),
             new OA\Response(response: 400, description: 'The request body is not usable'),
@@ -131,7 +141,7 @@ final class AgentTemplateController extends AbstractController
         return $this->run(function () use ($user, $id, $request): JsonResponse {
             $result = $this->installer->install($user, $id, AgentTemplateInstallRequest::fromBody($request->getContent()));
 
-            return $this->json($this->resultBody($result->agentId, $result->alreadyInstalled, $result->shared, $result->sharingOff));
+            return $this->json($this->resultBody($result->agentId, $result->alreadyInstalled, $result->shared, $result->sharingOff, $result->waitingForReview));
         });
     }
 
@@ -180,13 +190,14 @@ final class AgentTemplateController extends AbstractController
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
         responses: [
             new OA\Response(response: 200, description: 'Updated', content: new OA\JsonContent(
-                required: ['success', 'agentId', 'alreadyInstalled', 'shared', 'sharingOff'],
+                required: ['success', 'agentId', 'alreadyInstalled', 'shared', 'sharingOff', 'waitingForReview'],
                 properties: [
                     new OA\Property(property: 'success', type: 'boolean', example: true),
                     new OA\Property(property: 'agentId', type: 'integer', example: 12),
                     new OA\Property(property: 'alreadyInstalled', type: 'boolean', example: false),
                     new OA\Property(property: 'shared', type: 'boolean', example: false),
                     new OA\Property(property: 'sharingOff', type: 'boolean', example: false),
+                    new OA\Property(property: 'waitingForReview', type: 'boolean', example: false),
                 ],
             )),
             new OA\Response(response: 401, description: 'Not authenticated'),
@@ -204,14 +215,45 @@ final class AgentTemplateController extends AbstractController
         return $this->run(function () use ($user, $id): JsonResponse {
             $result = $this->installer->update($user, $id);
 
-            return $this->json($this->resultBody($result->agentId, false, false, false));
+            return $this->json($this->resultBody($result->agentId, false, false, false, false));
+        });
+    }
+
+    #[Route('/{id}/withdraw-review', name: 'withdraw_review', methods: ['POST'], requirements: ['id' => '[a-z0-9][a-z0-9-]{0,31}'])]
+    #[OA\Post(
+        path: '/api/v1/agent-templates/{id}/withdraw-review',
+        summary: 'Take back a request to share an assistant with everyone',
+        description: 'The assistant stays with the person who installed it. Nothing is shared.',
+        tags: ['Agent templates'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The request was taken back', content: new OA\JsonContent(
+                required: ['success'],
+                properties: [new OA\Property(property: 'success', type: 'boolean', example: true)],
+            )),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'No waiting request, or assistants are turned off'),
+        ],
+    )]
+    public function withdrawReview(string $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        return $this->run(function () use ($user, $id): JsonResponse {
+            $this->installer->withdrawReview($user, $id);
+
+            return $this->json(['success' => true]);
         });
     }
 
     /**
-     * @return array{success: true, agentId: int, alreadyInstalled: bool, shared: bool, sharingOff: bool}
+     * @return array{success: true, agentId: int, alreadyInstalled: bool, shared: bool, sharingOff: bool, waitingForReview: bool}
      */
-    private function resultBody(int $agentId, bool $alreadyInstalled, bool $shared, bool $sharingOff): array
+    private function resultBody(int $agentId, bool $alreadyInstalled, bool $shared, bool $sharingOff, bool $waitingForReview): array
     {
         return [
             'success' => true,
@@ -219,6 +261,7 @@ final class AgentTemplateController extends AbstractController
             'alreadyInstalled' => $alreadyInstalled,
             'shared' => $shared,
             'sharingOff' => $sharingOff,
+            'waitingForReview' => $waitingForReview,
         ];
     }
 
@@ -230,6 +273,10 @@ final class AgentTemplateController extends AbstractController
             return $this->json(['error' => 'That template is not on this server.'], Response::HTTP_NOT_FOUND);
         } catch (AgentTemplateForbiddenException) {
             return $this->json(['error' => 'Only an administrator can install an assistant for everyone.'], Response::HTTP_FORBIDDEN);
+        } catch (AgentPublishReviewException $e) {
+            $status = AgentPublishReviewException::FORBIDDEN === $e->reason ? Response::HTTP_FORBIDDEN : Response::HTTP_NOT_FOUND;
+
+            return $this->json(['error' => $e->getMessage(), 'code' => $e->reason], $status);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }

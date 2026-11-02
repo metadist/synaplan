@@ -9,6 +9,30 @@
     </p>
     <h2 class="txt-primary font-medium">{{ title }}</h2>
 
+    <div v-if="template?.publishReview === 'waiting'" class="space-y-2" data-testid="notice-template-review">
+      <p class="txt-primary text-sm">{{ $t('templates.reviewWaiting') }}</p>
+      <button
+        type="button"
+        class="btn-secondary px-4 py-2.5 text-sm font-medium"
+        :disabled="withdrawing"
+        data-testid="btn-template-withdraw-review"
+        @click="withdrawReview"
+      >
+        {{ $t('templates.reviewWithdraw') }}
+      </button>
+    </div>
+    <p
+      v-else-if="template?.publishReview === 'sent_back'"
+      class="txt-primary text-sm"
+      data-testid="notice-template-review-sent-back"
+    >
+      {{
+        template.publishReviewNote
+          ? $t('templates.reviewSentBack', { note: template.publishReviewNote })
+          : $t('templates.reviewSentBackPlain')
+      }}
+    </p>
+
     <p v-if="updateAvailable" class="txt-primary text-sm" data-testid="notice-template-update">
       {{ $t('templates.updateAvailable') }}
     </p>
@@ -112,6 +136,7 @@ const chatsStore = useChatsStore()
 const { success, error } = useNotification()
 
 const template = ref<AgentTemplate | null>(null)
+const withdrawing = ref(false)
 const showDiff = ref(false)
 const updating = ref(false)
 const tryingExample = ref(false)
@@ -180,6 +205,21 @@ async function load(): Promise<void> {
     template.value = data.templates.find((row) => row.id === id) ?? null
   } catch {
     template.value = null
+  }
+}
+
+async function withdrawReview(): Promise<void> {
+  const id = templateId.value
+  if (!id || withdrawing.value) return
+  withdrawing.value = true
+  try {
+    await agentTemplatesApi.withdrawReview(id)
+    success(t('templates.reviewWithdrawn'))
+    await load()
+  } catch {
+    error(t('templates.reviewWithdrawFailed'))
+  } finally {
+    withdrawing.value = false
   }
 }
 
