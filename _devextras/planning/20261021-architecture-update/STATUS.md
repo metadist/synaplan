@@ -1,5 +1,12 @@
 # Architecture update — status
 
+> **2026-11-02 — S4 started.** S3 is on `main` (AU22 merged
+> [#2918](https://github.com/metadist/synaplan/pull/2918)). AU23 records
+> every tool loop on that code. The snapshot shows the gaps AU25 closes:
+> document edits and MCP reads do not reach the gate, an executed tool
+> leaves no audit row, and the OpenAI loop writes no tool usage row.
+> `EGRESS.MODE` stays `off`.
+
 > **2026-10-31 — S3 started.** The `03` §2.3 hardening is written: 26
 > name-keyed provider tables frozen with file and line (T1–T26), the
 > descriptor sub-types defined, discovery by `#[AsAiProvider]` plus a
@@ -82,7 +89,47 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | AU19 | [#2912](https://github.com/metadist/synaplan/pull/2912) | merged (`e7191414a`) | `App\AI\Catalog`, `#[AsAiProvider]`, a descriptor on all 22 providers, `ProviderCatalogParityTest` (T1–T23, 1,166 assertions). No consumer changed |
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913) | merged (`2c5539719`) | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
 | 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914) | merged (`0fa6754e6`) | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
-| 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | open | `app:provider:scaffold`, `AddProviderJourneyTest` (red on the parent at the egress table), `EgressPolicy` reads the catalog (T23), `docs/PROVIDERS.md`; J-AU-4 walked with a stub: one class + one test + one model row + five locale keys. `EGRESS.MODE` stays `off` |
+| 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | merged (`acecdf763`) | `app:provider:scaffold`, `AddProviderJourneyTest`, `EgressPolicy` reads the catalog (T23). `EGRESS.MODE` stays `off` |
+| 2026-11-02 | AU23 | | open | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
+
+## 2026-11-02 — AU23: characterization of every tool loop
+
+Recorded on `main` at `708f1489a` (AU22 is `acecdf763`). No production
+code changed. `ToolLoopCharacterizationTest` drives scripted model turns
+through the real loops, the real gate and the real approval policy.
+`tool_loops.json` is the baseline. Re-record only with
+`UPDATE_TOOL_LOOP_SNAPSHOTS=1`.
+
+**Gaps the snapshot shows** (these are today's behaviour; AU24 must not
+move them, AU25 closes them):
+
+| Gap | Where | What the snapshot shows |
+| --- | ----- | ----------------------- |
+| Document edits never reach the gate | `ChatToolLoop` has no gate. The tool runs at `ChatToolLoop.php:103-110`. Caps at lines 26-28 | `chat.document_edit.approvals_on` is `gate: no gate`, cell A1 is `Hi`, no audit row |
+| MCP reads skip the gate while approvals are off | `GatewayToolLoop.php:831` and `OpenAiGatewayToolLoop.php:501` return before `inspect` when approvals are off. `McpFetchRunner` has no gate at all (`McpFetchRunner.php:54-66`) | `*.mcp_read.approvals_off` and both `runner_mcp_fetch.read.*` are `gate: no gate`. With approvals on, the gateway and OpenAI loops do call the gate and a read is `auto` |
+| MCP writes skip the gate while approvals are off | `GatewayToolLoop.php:765` refuses a mutating MCP tool as read-only before the gate. `McpActionRunner.php:542` returns before `inspect` when approvals are off | `gateway_*.mcp_write.approvals_off` executes nothing and records `no gate`. `runner_mcp_action.write.approvals_off` runs the write with `no gate` |
+| An executed tool leaves no audit row | `AuditLogWriter` is only reached from `ApprovalService` (`approval.requested`). No `tool.executed` | Every case that runs a tool has `audit: []`. An approval, when one is opened, is the only audit row |
+| The OpenAI loop writes no tool usage row | `OpenAiGatewayToolLoop` never calls `recordUsage` for a tool. `GatewayToolLoop.php:1355-1377` writes `TOOLS` (zero tokens) | `openai_*` `usage: []` after web search, MCP, image and code. The matching `gateway_*` cases have one `TOOLS` row. Gateway custom HTTP (`executeCustom`) also writes no `TOOLS` row |
+| Synaplan's own MCP server does not use the gate | `McpServerFactory.php:1006` `memoryAddHandler`, `:924` `fileIngestHandler` | `mcp_server.memory_add` and `mcp_server.file_ingest` are `gate: no gate` and have no audit row. File ingest writes one `FILE_ANALYSIS` row. `createMemory()` is stubbed here, so the embeddings row it writes in production is not in this snapshot |
+| Approval resume runs the tool outside the loop, with no second gate and no audit | `ResumeApprovalCommandHandler.php:94-97`. An already-approved Saved Task node skips `inspect` on purpose (`ToolCallRunner.php:118`, `McpActionRunner.php:545`) so a second call cannot open another approval | `resume_approval.*` and `*.already_approved` are `gate: no gate`, status executed or done, `audit: []` |
+
+**Not a gap.** `ToolCallRunner.php:130` and `CodeRunRunner` call `inspect`
+even when approvals are off; the gate then answers `auto` without asking.
+`runner_tool_call.custom.approvals_off` and `runner_code.approvals_off`
+record that. Removing the `inspect` call in `ToolCallRunner` makes the
+snapshot fail (the approvals-on cases execute instead of waiting). Restored.
+
+**Caps**, read from the three copies: 240 seconds, 16 tools, 12,000
+characters (`ChatToolLoop.php:26-28`, `GatewayToolLoop.php:60-62`,
+`OpenAiGatewayToolLoop.php:47-49`). The 240 second stop is the wall clock,
+so the suite does not wait it out. `gateway_complete.iterations` and
+`openai_complete.iterations` are the live cap (one round). A document
+result and an MCP read longer than 12,000 characters come back as 12,001
+with an ellipsis.
+
+**Left for AU24.** The snapshot is the contract. A refactor that changes
+a decision, a result text or a row is wrong. The already-approved skip
+stays a skip.
 
 ## 2026-10-31 — AU22: add an OpenAI-compatible provider in one file
 
