@@ -90,6 +90,7 @@ final readonly class AgentTemplateCatalog
             (string) $block['category'],
             $requires,
             $tryIt,
+            AgentTemplateCreates::fromSections($envelope['sections']),
             new AgentTemplateBody($name, $description, $icon, $instruction, $validated),
         );
     }

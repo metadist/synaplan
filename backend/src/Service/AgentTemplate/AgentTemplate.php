@@ -21,6 +21,7 @@ final readonly class AgentTemplate
         public string $category,
         public array $requires,
         public array $tryIt,
+        public AgentTemplateCreates $creates,
         public AgentTemplateBody $body,
     ) {
     }

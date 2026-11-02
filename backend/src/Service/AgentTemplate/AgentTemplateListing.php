@@ -40,6 +40,10 @@ final readonly class AgentTemplateListing
                 'summaryKey' => $template->summaryKey,
                 'category' => $template->category,
                 'tryIt' => $template->tryIt,
+                'creates' => [
+                    'assistants' => $template->creates->assistants,
+                    'prompts' => $template->creates->prompts,
+                ],
                 'requires' => $this->requirements->check($template->requires, $user, $installed),
                 'usedBy' => $this->agents->countTemplateOwners(AgentTemplateRef::prefix($template->id)),
                 'installedAgentId' => $installed?->getId(),

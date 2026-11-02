@@ -64,6 +64,17 @@ final class AgentTemplateController extends AbstractController
                                 new OA\Property(property: 'pluginName', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'category', type: 'string', example: 'sales'),
                                 new OA\Property(property: 'tryIt', type: 'array', items: new OA\Items(type: 'string')),
+                                new OA\Property(
+                                    property: 'creates',
+                                    type: 'object',
+                                    nullable: true,
+                                    description: 'How many assistants and instructions this template will create. Models are not named.',
+                                    required: ['assistants', 'prompts'],
+                                    properties: [
+                                        new OA\Property(property: 'assistants', type: 'integer', example: 1),
+                                        new OA\Property(property: 'prompts', type: 'integer', example: 0),
+                                    ],
+                                ),
                                 new OA\Property(property: 'requires', type: 'array', items: new OA\Items(
                                     required: ['kind', 'optional', 'state'],
                                     properties: [

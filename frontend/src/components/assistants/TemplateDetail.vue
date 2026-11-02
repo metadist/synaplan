@@ -93,6 +93,7 @@ import {
   type AgentTemplate,
   type AgentTemplateRequirement,
 } from '@/services/api/agentTemplatesApi'
+import { requirementLabel, templatePreview } from './templatePreview'
 
 const props = defineProps<{
   template: AgentTemplate
@@ -121,7 +122,7 @@ const showTry = computed(
 const showAdd = computed(() => isPlugin.value && installedId.value == null && isAdmin.value)
 const unmet = computed(() => (props.template.requires ?? []).filter((row) => row.state !== 'ready'))
 const preview = computed(() => {
-  if (!isPlugin.value) return t('templates.preview')
+  if (!isPlugin.value) return templatePreview(props.template, t)
   const name = props.template.pluginName ?? ''
   if (installedId.value == null) {
     return sharingOff.value
@@ -148,22 +149,7 @@ const primaryLabel = computed(() => {
 })
 
 function requirementText(requirement: AgentTemplateRequirement): string {
-  if (requirement.state === 'unavailable' && requirement.kind === 'watch') {
-    return t('templates.unavailableWatch')
-  }
-  if (requirement.state === 'unavailable' && requirement.value === 'research') {
-    return t('templates.unavailableResearch')
-  }
-  if (requirement.state === 'unavailable' && requirement.value === 'pic2text') {
-    return t('templates.unavailableImage')
-  }
-  if (requirement.state === 'unavailable') {
-    return t('templates.unavailableChat')
-  }
-  if (requirement.hintKey) return t(requirement.hintKey)
-  if (requirement.kind === 'connection') return t('templates.connectMail')
-  if (requirement.kind === 'knowledgeFolder') return t('templates.chooseFolder')
-  return t('templates.preview')
+  return requirementLabel(requirement, t)
 }
 
 function onPrimary(): void {

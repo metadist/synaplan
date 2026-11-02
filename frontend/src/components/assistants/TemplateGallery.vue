@@ -79,6 +79,13 @@
           <h3 class="txt-primary font-medium">{{ templateTitle(template, t) }}</h3>
           <p class="txt-secondary text-sm">{{ templateSummary(template, t) }}</p>
           <p
+            v-if="!template.pluginName"
+            class="txt-primary text-sm"
+            :data-testid="`text-template-preview-${template.id}`"
+          >
+            {{ templatePreview(template, t) }}
+          </p>
+          <p
             v-if="template.pluginName"
             class="txt-secondary text-xs"
             :data-testid="`badge-from-plugin-${template.id}`"
@@ -118,6 +125,7 @@ import {
   templateTitle,
   type AgentTemplate,
 } from '@/services/api/agentTemplatesApi'
+import { templatePreview } from './templatePreview'
 
 const emit = defineEmits<{
   'start-empty': []
@@ -154,7 +162,13 @@ const visible = computed(() => {
     const title = templateTitle(template, t).toLowerCase()
     const summary = templateSummary(template, t).toLowerCase()
     const plugin = (template.pluginName ?? '').toLowerCase()
-    return title.includes(query) || summary.includes(query) || plugin.includes(query)
+    const previewText = template.pluginName ? '' : templatePreview(template, t).toLowerCase()
+    return (
+      title.includes(query) ||
+      summary.includes(query) ||
+      plugin.includes(query) ||
+      previewText.includes(query)
+    )
   })
 })
 
