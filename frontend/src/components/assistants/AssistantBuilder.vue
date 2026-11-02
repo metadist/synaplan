@@ -33,6 +33,7 @@
           {{ entry.message }}
         </p>
       </div>
+      <TemplateChecklist />
       <BuilderBasics />
       <BuilderInstructions />
       <BuilderModels />
@@ -48,6 +49,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAgentsStore } from '@/stores/agents'
+import TemplateChecklist from './TemplateChecklist.vue'
 import BuilderBasics from './BuilderBasics.vue'
 import BuilderInstructions from './BuilderInstructions.vue'
 import BuilderModels from './BuilderModels.vue'

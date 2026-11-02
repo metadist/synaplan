@@ -1,0 +1,5 @@
+id: it-helpdesk
+version: "2026.11.1"
+mustMention:
+  - "do not claim a ticket"
+  - "Answer in the user's language."

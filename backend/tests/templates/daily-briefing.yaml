@@ -1,0 +1,5 @@
+id: daily-briefing
+version: "2026.11.1"
+mustMention:
+  - "do not invent messages"
+  - "Answer in the user's language."

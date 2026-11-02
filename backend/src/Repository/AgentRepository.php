@@ -119,6 +119,31 @@ class AgentRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function findInstalledTemplate(int $ownerId, string $sourcePrefix): ?Agent
+    {
+        $agent = $this->createQueryBuilder('a')
+            ->where('a.ownerId = :ownerId')
+            ->andWhere('a.source LIKE :prefix')
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('prefix', $sourcePrefix.'%')
+            ->orderBy('a.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $agent instanceof Agent ? $agent : null;
+    }
+
+    public function countTemplateOwners(string $sourcePrefix): int
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(DISTINCT a.ownerId)')
+            ->where('a.source LIKE :prefix')
+            ->setParameter('prefix', $sourcePrefix.'%')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function slugTaken(int $ownerId, string $slug, ?int $exceptId = null): bool
     {
         $qb = $this->createQueryBuilder('a')

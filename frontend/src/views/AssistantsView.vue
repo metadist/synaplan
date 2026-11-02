@@ -4,7 +4,7 @@
       <div class="mx-auto w-full max-w-[100rem]">
         <PageHeader
           :title="headerTitle"
-          :subtitle="builderMode ? currentName : $t('assistants.intro')"
+          :subtitle="headerSubtitle"
           icon="mdi:robot-outline"
           tour-id="assistants"
         >
@@ -29,7 +29,12 @@
           </button>
         </PageHeader>
 
-        <AssistantBuilder v-if="builderMode && store.current" @deleted="onDeleted" />
+        <TemplateGallery
+          v-if="pickingTemplate"
+          @start-empty="startEmpty"
+          @installed="openInstalled"
+        />
+        <AssistantBuilder v-else-if="builderMode && store.current" @deleted="onDeleted" />
         <AssistantGallery
           v-else-if="!builderMode"
           @create="createAssistant"
@@ -51,6 +56,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AssistantGallery from '@/components/assistants/AssistantGallery.vue'
 import AssistantBuilder from '@/components/assistants/AssistantBuilder.vue'
+import TemplateGallery from '@/components/assistants/TemplateGallery.vue'
 import { useAgentsStore } from '@/stores/agents'
 import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
@@ -66,10 +72,21 @@ const { confirm } = useDialog()
 const { error, success } = useNotification()
 
 const builderMode = computed(() => route.name === 'ai-assistant-builder')
+const pickingTemplate = computed(() => builderMode.value && String(route.params.id ?? '') === 'new')
 const headerTitle = computed(() =>
-  builderMode.value ? t('pageTitles.assistantBuilder') : t('assistants.title')
+  pickingTemplate.value
+    ? t('templates.pickTitle')
+    : builderMode.value
+      ? t('pageTitles.assistantBuilder')
+      : t('assistants.title')
 )
-const currentName = computed(() => store.current?.name ?? '')
+const headerSubtitle = computed(() =>
+  pickingTemplate.value
+    ? t('templates.pickSubtitle')
+    : builderMode.value
+      ? (store.current?.name ?? '')
+      : t('assistants.intro')
+)
 
 const untouchedDraft = ref<{ id: number; snapshot: string } | null>(null)
 
@@ -98,20 +115,7 @@ async function discardUntouchedDraft(): Promise<void> {
 }
 
 async function openBuilder(id: string): Promise<void> {
-  if (id === 'new') {
-    try {
-      const agent = await store.create(t('assistants.untitled'))
-      if (agent.id == null) {
-        error(t('assistants.createFailed'))
-        return
-      }
-      untouchedDraft.value = { id: agent.id, snapshot: '' }
-      await router.replace({ name: 'ai-assistant-builder', params: { id: String(agent.id) } })
-    } catch {
-      error(t('assistants.createFailed'))
-    }
-    return
-  }
+  if (id === 'new') return
   const numericId = Number(id)
   if (!Number.isFinite(numericId) || numericId < 1) {
     await router.replace({ name: 'ai-assistants' })
@@ -136,6 +140,24 @@ async function openBuilder(id: string): Promise<void> {
 
 async function createAssistant(): Promise<void> {
   await router.push({ name: 'ai-assistant-builder', params: { id: 'new' } })
+}
+
+async function startEmpty(): Promise<void> {
+  try {
+    const agent = await store.create(t('assistants.untitled'))
+    if (agent.id == null) {
+      error(t('assistants.createFailed'))
+      return
+    }
+    untouchedDraft.value = { id: agent.id, snapshot: '' }
+    await router.replace({ name: 'ai-assistant-builder', params: { id: String(agent.id) } })
+  } catch {
+    error(t('assistants.createFailed'))
+  }
+}
+
+async function openInstalled(id: number): Promise<void> {
+  await router.replace({ name: 'ai-assistant-builder', params: { id: String(id) } })
 }
 
 function editAssistant(id: number): void {

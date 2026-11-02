@@ -283,5 +283,110 @@
       "skipped": "Übersprungen ({key})"
     },
     "publishedOnly": "Nur veröffentlichte KI-Assistenten sind enthalten. Entwürfe bleiben auf diesem Konto."
+  },
+  "templates": {
+    "pickTitle": "Neuer Assistent",
+    "pickSubtitle": "Starten Sie mit einem fertigen Assistenten oder mit einem leeren.",
+    "searchPlaceholder": "Vorlagen suchen",
+    "all": "Alle",
+    "startEmpty": "Leer starten",
+    "startEmptyHint": "Ein leerer Assistent. Die Anweisungen schreiben Sie selbst.",
+    "preview": "Legt 1 Assistenten an und nutzt Ihr Standard-Chat-Modell.",
+    "install": "Installieren",
+    "installing": "Wird installiert…",
+    "installForEveryone": "Für alle installieren",
+    "installForEveryoneConfirmTitle": "Diesen Assistenten mit allen teilen?",
+    "installForEveryoneConfirm": "Für alle installieren teilt diesen Assistenten mit allen {count} Personen hier. Sie können ihn nutzen, aber nicht ändern.",
+    "installed": "Der Assistent ist bereit. Ergänzen Sie, was noch fehlt, und probieren Sie ein Beispiel.",
+    "installedShared": "Mit allen geteilt. Sie finden ihn unter Assistenten.",
+    "installedSharingOff": "Der Assistent wurde für Sie angelegt. Teilen ist aus, deshalb sehen ihn andere nicht.",
+    "alreadyInstalled": "Sie haben diesen Assistenten schon.",
+    "open": "Öffnen",
+    "installFailed": "Der Assistent wurde nicht angelegt. Es wurde nichts geteilt. Versuchen Sie es erneut.",
+    "loadFailed": "Die Vorlagen konnten nicht geladen werden. Versuchen Sie es erneut.",
+    "retry": "Erneut versuchen",
+    "noResults": "Keine Vorlage passt zu „{query}“.",
+    "empty": "Auf diesem Server gibt es keine fertigen Assistenten.",
+    "usedBy": "Von {count} Personen hier genutzt",
+    "usedByZero": "Hier noch von niemandem genutzt",
+    "fromTemplate": "Aus einer Vorlage",
+    "unavailableChat": "Braucht ein Chat-Modell, das dieser Server nicht hat.",
+    "unavailableImage": "Braucht ein Bild-Modell, das dieser Server nicht hat.",
+    "chooseFolder": "Ordner wählen",
+    "connectMail": "Postfach verbinden",
+    "checklistTitle": "Noch nötig",
+    "checklistReady": "Es fehlt nichts mehr. Probieren Sie unten ein Beispiel.",
+    "tryIt": "Ausprobieren",
+    "updateAvailable": "Es gibt eine neuere Version der Vorlage.",
+    "showChanges": "Änderungen zeigen",
+    "hideChanges": "Änderungen ausblenden",
+    "update": "Aktualisieren",
+    "updating": "Wird aktualisiert…",
+    "updateKeepsName": "Der Name, den Sie vergeben haben, bleibt.",
+    "updateDone": "Aktualisiert. Der Name, den Sie vergeben haben, bleibt.",
+    "updateFailed": "Der Assistent wurde nicht aktualisiert. Die jetzigen Anweisungen sind unverändert.",
+    "diffFrom": "Jetzige Anweisungen",
+    "diffTo": "Neue Anweisungen",
+    "back": "Alle Vorlagen",
+    "category": {
+      "sales": "Vertrieb",
+      "people": "Personal",
+      "work": "Alltag",
+      "support": "Support"
+    },
+    "offerWriter": {
+      "title": "Angebots-Schreiber",
+      "summary": "Schreibt ein Angebot aus Ihrer Preisliste und nennt zu jedem Preis die Quelle.",
+      "needsPriceList": "Braucht den Ordner mit Ihrer Preisliste.",
+      "try1": "Schreib ein Angebot für die Müller GmbH über 10 Lizenzen.",
+      "try2": "Welche Preise gelten für einen Supportvertrag über ein Jahr?"
+    },
+    "hrHandbook": {
+      "title": "HR-Handbuch",
+      "summary": "Beantwortet Fragen zum geschriebenen Handbuch und nennt die Stelle. Es trifft keine Personalentscheidung.",
+      "needsHandbook": "Braucht den Ordner mit Ihrem Handbuch.",
+      "try1": "Wie viele Urlaubstage erlaubt das Handbuch?",
+      "try2": "Was steht im Handbuch zum Arbeiten von zu Hause?"
+    },
+    "tenderResponse": {
+      "title": "Antwort auf Ausschreibung",
+      "summary": "Entwirft Antworten auf Ausschreibungsfragen und nennt die Quelldatei.",
+      "needsFolder": "Braucht den Ordner mit Ihren Ausschreibungsunterlagen.",
+      "try1": "Beantworte die Frage zu unseren Supportzeiten und nenne die Datei.",
+      "try2": "Welche Unterlagen fehlen uns für diese Ausschreibung noch?"
+    },
+    "contractSummary": {
+      "title": "Vertragszusammenfassung",
+      "summary": "Fasst einen Vertrag in einfacher Sprache zusammen. Das ist keine Rechtsberatung.",
+      "needsFile": "Braucht die Vertragsdatei.",
+      "try1": "Fasse die Parteien, die Laufzeit und die Zahlung zusammen.",
+      "try2": "Was passiert, wenn wir den Vertrag vorzeitig beenden?"
+    },
+    "meetingMinutes": {
+      "title": "Besprechungsprotokoll",
+      "summary": "Macht aus Notizen oder einem Transkript Beschlüsse und Aufgaben.",
+      "try1": "Mach aus diesen Notizen ein Protokoll mit Beschlüssen und Aufgaben.",
+      "try2": "Liste nur die Aufgaben, mit der Person, wenn eine genannt wurde."
+    },
+    "socialPosts": {
+      "title": "Beiträge für soziale Medien",
+      "summary": "Entwirft drei Beiträge aus einer Pressemitteilung, ohne Fakten zu ergänzen.",
+      "try1": "Schreib drei Beiträge aus dieser Pressemitteilung.",
+      "try2": "Mach eine kürzere Fassung des zweiten Beitrags."
+    },
+    "itHelpdesk": {
+      "title": "IT-Helpdesk",
+      "summary": "Schreibt eine erste Antwort aus Ihren Hilfeartikeln und nennt den Artikel. Es öffnet kein Ticket.",
+      "needsArticles": "Braucht den Ordner mit Ihren Hilfeartikeln.",
+      "try1": "Eine Kollegin kommt nicht ins VPN. Was soll sie zuerst versuchen?",
+      "try2": "Wie setzen wir ein vergessenes Passwort zurück?"
+    },
+    "dailyBriefing": {
+      "title": "Tägliches Briefing",
+      "summary": "Bereitet an Werktagen morgens ein Briefing aus Ihrem Postfach vor, nachdem Sie es verbunden und den Assistenten veröffentlicht haben.",
+      "needsMail": "Verbinden Sie Ihr Postfach, damit das Briefing es lesen kann.",
+      "try1": "Was in meinem Postfach braucht heute eine Entscheidung?",
+      "try2": "Lass Newsletter weg und liste nur die Nachrichten, die ich beantworten sollte."
+    }
   }
 }

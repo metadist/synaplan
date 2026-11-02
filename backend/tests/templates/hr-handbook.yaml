@@ -1,0 +1,5 @@
+id: hr-handbook
+version: "2026.11.1"
+mustMention:
+  - "do not evaluate candidates"
+  - "Answer in the user's language."

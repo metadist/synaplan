@@ -1,0 +1,5 @@
+id: offer-writer
+version: "2026.11.1"
+mustMention:
+  - "do not invent"
+  - "Answer in the user's language."

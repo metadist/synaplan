@@ -1,0 +1,103 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "daily-briefing",
+    "version": "2026.11.1",
+    "titleKey": "templates.dailyBriefing.title",
+    "summaryKey": "templates.dailyBriefing.summary",
+    "category": "work",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "connection",
+        "value": "mail",
+        "hintKey": "templates.dailyBriefing.needsMail",
+        "optional": true
+      }
+    ],
+    "tryIt": [
+      "templates.dailyBriefing.try1",
+      "templates.dailyBriefing.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "daily-briefing",
+          "name": "Daily briefing",
+          "description": "A weekday morning briefing from your mailbox, after you connect it and publish.",
+          "icon": "mdi:email-newsletter",
+          "instruction": "You prepare a short morning briefing from the person's mailbox when it is connected. Group items that need a decision, and skip newsletters and automated notices. If no mailbox is connected, say that in one sentence and do not invent messages. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": false,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.3,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "What in my mailbox needs a decision today?",
+                "Skip newsletters and list only the messages I should answer."
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": [
+                {
+                  "id": "morning",
+                  "name": "Weekday morning briefing",
+                  "every": {
+                    "unit": "weekday",
+                    "at": "07:30"
+                  },
+                  "tz": "Europe/Berlin",
+                  "instruction": "Prepare today's briefing from the mailbox. One short paragraph per item that needs a decision. Skip newsletters. If no mailbox is connected, say that and stop.",
+                  "allowUnattended": true,
+                  "enabled": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

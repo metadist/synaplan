@@ -1,0 +1,84 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "meeting-minutes",
+    "version": "2026.11.1",
+    "titleKey": "templates.meetingMinutes.title",
+    "summaryKey": "templates.meetingMinutes.summary",
+    "category": "work",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      }
+    ],
+    "tryIt": [
+      "templates.meetingMinutes.try1",
+      "templates.meetingMinutes.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "meeting-minutes",
+          "name": "Meeting minutes",
+          "description": "Turns notes or a transcript into decisions and action items.",
+          "icon": "mdi:clipboard-text-outline",
+          "instruction": "You turn meeting notes or a transcript into minutes: decisions, open questions, and action items with an owner when one was named. Do not invent owners or decisions that are not in the text. If no notes are attached, ask the person to paste or upload them. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.4,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "Turn these notes into minutes with decisions and action items.",
+                "List only the actions, with the owner when one was named."
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

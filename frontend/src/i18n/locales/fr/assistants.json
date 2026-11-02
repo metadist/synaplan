@@ -283,5 +283,110 @@
       "skipped": "Ignoré ({key})"
     },
     "publishedOnly": "Seuls les assistants publiés sont inclus. Les brouillons restent sur ce compte."
+  },
+  "templates": {
+    "pickTitle": "Nouvel assistant",
+    "pickSubtitle": "Partez d’un assistant prêt, ou d’un assistant vide.",
+    "searchPlaceholder": "Chercher un modèle",
+    "all": "Tous",
+    "startEmpty": "Partir de zéro",
+    "startEmptyHint": "Un assistant vide. Vous écrivez les consignes vous-même.",
+    "preview": "Crée 1 assistant et utilise votre modèle de chat par défaut.",
+    "install": "Installer",
+    "installing": "Installation…",
+    "installForEveryone": "Installer pour tout le monde",
+    "installForEveryoneConfirmTitle": "Partager cet assistant avec tout le monde ?",
+    "installForEveryoneConfirm": "Installer pour tout le monde partage cet assistant avec les {count} personnes ici. Elles peuvent l’utiliser, mais pas le modifier.",
+    "installed": "L’assistant est prêt. Ajoutez ce qui manque, puis essayez un exemple.",
+    "installedShared": "Partagé avec tout le monde. Ils le trouveront sous Assistants.",
+    "installedSharingOff": "L’assistant a été créé pour vous. Le partage est désactivé, les autres ne le voient donc pas.",
+    "alreadyInstalled": "Vous avez déjà cet assistant.",
+    "open": "Ouvrir",
+    "installFailed": "L’assistant n’a pas été créé. Rien n’a été partagé. Réessayez.",
+    "loadFailed": "Les modèles n’ont pas pu être chargés. Réessayez.",
+    "retry": "Réessayer",
+    "noResults": "Aucun modèle ne correspond à « {query} ».",
+    "empty": "Ce serveur n’a pas d’assistants prêts.",
+    "usedBy": "Utilisé par {count} personnes ici",
+    "usedByZero": "Personne ne l’utilise encore ici",
+    "fromTemplate": "Issu d’un modèle",
+    "unavailableChat": "Il faut un modèle de chat, que ce serveur n’a pas.",
+    "unavailableImage": "Il faut un modèle d’image, que ce serveur n’a pas.",
+    "chooseFolder": "Choisir un dossier",
+    "connectMail": "Connecter la messagerie",
+    "checklistTitle": "Encore nécessaire",
+    "checklistReady": "Plus rien ne manque. Essayez un exemple ci-dessous.",
+    "tryIt": "Essayer",
+    "updateAvailable": "Une version plus récente du modèle existe.",
+    "showChanges": "Voir les changements",
+    "hideChanges": "Masquer les changements",
+    "update": "Mettre à jour",
+    "updating": "Mise à jour…",
+    "updateKeepsName": "Le nom que vous avez donné reste.",
+    "updateDone": "Mis à jour. Le nom que vous avez donné reste.",
+    "updateFailed": "L’assistant n’a pas été mis à jour. Les consignes actuelles sont inchangées.",
+    "diffFrom": "Consignes actuelles",
+    "diffTo": "Nouvelles consignes",
+    "back": "Tous les modèles",
+    "category": {
+      "sales": "Ventes",
+      "people": "Personnes",
+      "work": "Quotidien",
+      "support": "Support"
+    },
+    "offerWriter": {
+      "title": "Rédacteur d’offres",
+      "summary": "Rédige une offre à partir de votre liste de prix et cite chaque prix.",
+      "needsPriceList": "Il faut le dossier avec votre liste de prix.",
+      "try1": "Rédige une offre pour Müller GmbH pour 10 licences.",
+      "try2": "Quels prix de la liste s’appliquent à un contrat de support d’un an ?"
+    },
+    "hrHandbook": {
+      "title": "Manuel RH",
+      "summary": "Répond aux questions sur le manuel écrit et cite le passage. Il ne prend pas de décision d’embauche.",
+      "needsHandbook": "Il faut le dossier avec votre manuel.",
+      "try1": "Combien de jours de congé le manuel prévoit-il ?",
+      "try2": "Que dit le manuel sur le travail à domicile ?"
+    },
+    "tenderResponse": {
+      "title": "Réponse à un appel d’offres",
+      "summary": "Rédige des réponses aux questions d’un appel d’offres et cite le fichier source.",
+      "needsFolder": "Il faut le dossier avec vos documents d’appel d’offres.",
+      "try1": "Réponds à la question sur nos horaires de support et cite le fichier.",
+      "try2": "Quels documents nous manquent encore pour cet appel d’offres ?"
+    },
+    "contractSummary": {
+      "title": "Résumé de contrat",
+      "summary": "Résume un contrat en langage simple. Ce n’est pas un conseil juridique.",
+      "needsFile": "Il faut le fichier du contrat.",
+      "try1": "Résume les parties, la durée et le paiement.",
+      "try2": "Que se passe-t-il si nous arrêtons le contrat plus tôt ?"
+    },
+    "meetingMinutes": {
+      "title": "Compte rendu",
+      "summary": "Transforme des notes ou une transcription en décisions et en actions.",
+      "try1": "Transforme ces notes en compte rendu avec décisions et actions.",
+      "try2": "Liste seulement les actions, avec la personne quand elle a été nommée."
+    },
+    "socialPosts": {
+      "title": "Publications",
+      "summary": "Rédige trois publications à partir d’un communiqué, sans ajouter de faits.",
+      "try1": "Écris trois publications à partir de ce communiqué.",
+      "try2": "Fais une version plus courte de la deuxième."
+    },
+    "itHelpdesk": {
+      "title": "Support informatique",
+      "summary": "Écrit une première réponse à partir de vos articles d’aide et cite l’article. Il n’ouvre pas de ticket.",
+      "needsArticles": "Il faut le dossier avec vos articles d’aide.",
+      "try1": "Une collègue n’arrive pas à se connecter au VPN. Que doit-elle essayer d’abord ?",
+      "try2": "Comment réinitialiser un mot de passe oublié ?"
+    },
+    "dailyBriefing": {
+      "title": "Briefing du matin",
+      "summary": "Prépare un briefing en semaine le matin à partir de votre messagerie, après l’avoir connectée et publié l’assistant.",
+      "needsMail": "Connectez votre messagerie pour que le briefing puisse la lire.",
+      "try1": "Qu’est-ce qui dans ma messagerie demande une décision aujourd’hui ?",
+      "try2": "Laisse les newsletters de côté et liste seulement les messages auxquels je dois répondre."
+    }
   }
 }

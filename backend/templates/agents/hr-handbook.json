@@ -1,0 +1,88 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "hr-handbook",
+    "version": "2026.11.1",
+    "titleKey": "templates.hrHandbook.title",
+    "summaryKey": "templates.hrHandbook.summary",
+    "category": "people",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "knowledgeFolder",
+        "hintKey": "templates.hrHandbook.needsHandbook"
+      }
+    ],
+    "tryIt": [
+      "templates.hrHandbook.try1",
+      "templates.hrHandbook.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "hr-handbook",
+          "name": "HR handbook",
+          "description": "Answers questions about the written handbook and cites the passage.",
+          "icon": "mdi:book-open-page-variant-outline",
+          "instruction": "You answer questions about the organisation's handbook in your knowledge. Cite the passage you used. You explain the written policy only. You do not evaluate candidates, and you do not make a hiring or disciplinary decision. If the handbook does not say, say that it does not say. If no handbook is attached, say that the person still needs to choose the folder with the handbook. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.3,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "How many days of leave does the handbook allow?",
+                "What does the handbook say about working from home?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

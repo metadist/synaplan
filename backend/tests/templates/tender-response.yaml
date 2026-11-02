@@ -1,0 +1,5 @@
+id: tender-response
+version: "2026.11.1"
+mustMention:
+  - "Cite the file"
+  - "Answer in the user's language."

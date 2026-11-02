@@ -283,5 +283,110 @@
       "skipped": "Omitido ({key})"
     },
     "publishedOnly": "Solo se incluyen los asistentes publicados. Los borradores se quedan en esta cuenta."
+  },
+  "templates": {
+    "pickTitle": "Nuevo asistente",
+    "pickSubtitle": "Empiece con un asistente listo o con uno vacío.",
+    "searchPlaceholder": "Buscar plantillas",
+    "all": "Todas",
+    "startEmpty": "Empezar vacío",
+    "startEmptyHint": "Un asistente en blanco. Usted escribe las instrucciones.",
+    "preview": "Crea 1 asistente y usa su modelo de chat predeterminado.",
+    "install": "Instalar",
+    "installing": "Instalando…",
+    "installForEveryone": "Instalar para todos",
+    "installForEveryoneConfirmTitle": "¿Compartir este asistente con todos?",
+    "installForEveryoneConfirm": "Instalar para todos comparte este asistente con las {count} personas de aquí. Pueden usarlo, pero no cambiarlo.",
+    "installed": "El asistente está listo. Añada lo que falte y pruebe un ejemplo.",
+    "installedShared": "Compartido con todos. Lo encontrarán en Asistentes.",
+    "installedSharingOff": "El asistente se creó para usted. Compartir está desactivado, así que los demás no lo ven.",
+    "alreadyInstalled": "Usted ya tiene este asistente.",
+    "open": "Abrir",
+    "installFailed": "El asistente no se creó. No se compartió nada. Inténtelo de nuevo.",
+    "loadFailed": "No se pudieron cargar las plantillas. Inténtelo de nuevo.",
+    "retry": "Intentar de nuevo",
+    "noResults": "Ninguna plantilla coincide con \"{query}\".",
+    "empty": "En este servidor no hay asistentes listos.",
+    "usedBy": "Lo usan {count} personas aquí",
+    "usedByZero": "Nadie lo usa aquí todavía",
+    "fromTemplate": "De una plantilla",
+    "unavailableChat": "Necesita un modelo de chat que este servidor no tiene.",
+    "unavailableImage": "Necesita un modelo de imagen que este servidor no tiene.",
+    "chooseFolder": "Elegir carpeta",
+    "connectMail": "Conectar el correo",
+    "checklistTitle": "Aún falta",
+    "checklistReady": "No falta nada más. Pruebe un ejemplo abajo.",
+    "tryIt": "Probar",
+    "updateAvailable": "Hay una versión más nueva de la plantilla.",
+    "showChanges": "Ver cambios",
+    "hideChanges": "Ocultar cambios",
+    "update": "Actualizar",
+    "updating": "Actualizando…",
+    "updateKeepsName": "El nombre que usted puso se mantiene.",
+    "updateDone": "Actualizado. El nombre que usted puso se mantiene.",
+    "updateFailed": "El asistente no se actualizó. Las instrucciones actuales no cambiaron.",
+    "diffFrom": "Instrucciones actuales",
+    "diffTo": "Instrucciones nuevas",
+    "back": "Todas las plantillas",
+    "category": {
+      "sales": "Ventas",
+      "people": "Personas",
+      "work": "Día a día",
+      "support": "Soporte"
+    },
+    "offerWriter": {
+      "title": "Redactor de ofertas",
+      "summary": "Escribe una oferta a partir de su lista de precios y cita cada precio.",
+      "needsPriceList": "Necesita la carpeta con su lista de precios.",
+      "try1": "Escribe una oferta para Müller GmbH por 10 licencias.",
+      "try2": "¿Qué precios de la lista valen para un contrato de soporte de un año?"
+    },
+    "hrHandbook": {
+      "title": "Manual de RR. HH.",
+      "summary": "Responde preguntas sobre el manual escrito y cita el pasaje. No toma decisiones de contratación.",
+      "needsHandbook": "Necesita la carpeta con su manual.",
+      "try1": "¿Cuántos días de vacaciones permite el manual?",
+      "try2": "¿Qué dice el manual sobre trabajar desde casa?"
+    },
+    "tenderResponse": {
+      "title": "Respuesta a licitación",
+      "summary": "Redacta respuestas a preguntas de una licitación y cita el archivo de origen.",
+      "needsFolder": "Necesita la carpeta con sus documentos de licitación.",
+      "try1": "Responde la pregunta sobre nuestro horario de soporte y cita el archivo.",
+      "try2": "¿Qué documentos nos faltan todavía para esta licitación?"
+    },
+    "contractSummary": {
+      "title": "Resumen de contrato",
+      "summary": "Resume un contrato en lenguaje sencillo. No es asesoramiento legal.",
+      "needsFile": "Necesita el archivo del contrato.",
+      "try1": "Resume las partes, el plazo y el pago.",
+      "try2": "¿Qué pasa si terminamos el contrato antes?"
+    },
+    "meetingMinutes": {
+      "title": "Acta de reunión",
+      "summary": "Convierte notas o una transcripción en decisiones y tareas.",
+      "try1": "Convierte estas notas en un acta con decisiones y tareas.",
+      "try2": "Lista solo las tareas, con la persona cuando se haya nombrado."
+    },
+    "socialPosts": {
+      "title": "Publicaciones",
+      "summary": "Redacta tres publicaciones a partir de una nota de prensa, sin añadir datos.",
+      "try1": "Escribe tres publicaciones a partir de esta nota de prensa.",
+      "try2": "Haz una versión más corta de la segunda."
+    },
+    "itHelpdesk": {
+      "title": "Mesa de ayuda de TI",
+      "summary": "Escribe una primera respuesta con sus artículos de ayuda y cita el artículo. No abre un ticket.",
+      "needsArticles": "Necesita la carpeta con sus artículos de ayuda.",
+      "try1": "Una compañera no puede conectar la VPN. ¿Qué debe probar primero?",
+      "try2": "¿Cómo restablecemos una contraseña olvidada?"
+    },
+    "dailyBriefing": {
+      "title": "Resumen diario",
+      "summary": "Prepara un resumen de lunes a viernes por la mañana a partir de su correo, después de conectarlo y publicar el asistente.",
+      "needsMail": "Conecte su correo para que el resumen pueda leerlo.",
+      "try1": "¿Qué hay en mi correo que necesite una decisión hoy?",
+      "try2": "Omite los boletines y lista solo los mensajes que debería contestar."
+    }
   }
 }

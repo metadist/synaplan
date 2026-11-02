@@ -1,0 +1,5 @@
+id: social-posts
+version: "2026.11.1"
+mustMention:
+  - "Do not add facts"
+  - "Answer in the user's language."
