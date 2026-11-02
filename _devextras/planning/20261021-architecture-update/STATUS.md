@@ -90,12 +90,12 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | AU20 | [#2913](https://github.com/metadist/synaplan/pull/2913) | merged (`2c5539719`) | every consumer of `03` §2.1 reads the catalog; `services.yaml` names no provider capability or key variable; tags and registry order identical before and after |
 | 2026-10-31 | AU21 | [#2914](https://github.com/metadist/synaplan/pull/2914) | merged (`0fa6754e6`) | `GET /api/v1/ai/providers`; `stores/providerCatalog.ts` answers T24–T26 with the bundled maps as the fallback; the provider enum left the spec (T19); three places walked, identical before and after |
 | 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | merged (`acecdf763`) | `app:provider:scaffold`, `AddProviderJourneyTest`, `EgressPolicy` reads the catalog (T23). `EGRESS.MODE` stays `off` |
-| 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | open | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
-| 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936), stacked on #2935 | open | Every loop and runner calls `ToolInvoker`. `tool_loops.json` unchanged. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
+| 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | merged (`39a07233d`) | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
+| 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
 
 ## 2026-11-02 — AU24: one tool invoker behind every loop
 
-Stacked on #2935. `ChatToolLoop`, `GatewayOwnedCall`, `OpenAiGatewayToolLoop`,
+`ChatToolLoop`, `GatewayOwnedCall`, `OpenAiGatewayToolLoop`,
 `ToolCallRunner`, `McpFetchRunner`, `McpActionRunner`, `CodeRunApproval`,
 `ResumeApprovalCommandHandler`, and `McpServerFactory::pluginResult` call
 `ToolInvoker`. Gate mode is still per caller (`AsTodayNever`,
@@ -103,9 +103,14 @@ Stacked on #2935. `ChatToolLoop`, `GatewayOwnedCall`, `OpenAiGatewayToolLoop`,
 is `decideOnly`: the gate runs, the sidecar stays in `CodeRunRunner`.
 Usage and `tool.executed` stay with the caller until AU25.
 
+The four review notes on #2936 are fixed: the registry is not discovered
+while it is off, a Saved Task keeps the full MCP text, a shared Notion
+connection is read-only, and tool counts increment in Redis the same way
+egress counts do.
+
 Local gate: `make -C backend phpstan`, `deptrac`, `lint:container`, and
-`make -C backend test` (11,326 tests). Named Playwright specs and
-`make perf-runtime` are not run yet.
+`make -C backend test`. Named Playwright specs and `make perf-runtime` are
+not run yet.
 
 ## 2026-11-02 — AU23: characterization of every tool loop
 
