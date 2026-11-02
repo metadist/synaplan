@@ -86,6 +86,14 @@ class AgentRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<Agent>
+     */
+    public function findBySource(string $source): array
+    {
+        return $this->findBy(['source' => $source], ['id' => 'ASC']);
+    }
+
+    /**
      * Published assistants the router may offer. Callers must still filter
      * by {@see \App\Service\Iam\Permission::Use} for the viewing user.
      *

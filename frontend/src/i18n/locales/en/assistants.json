@@ -312,6 +312,16 @@
     "usedBy": "Used by {count} people here",
     "usedByZero": "Not used here yet",
     "fromTemplate": "From a template",
+    "fromPlugin": "From plugin {name}",
+    "pluginAdd": "Add for everyone",
+    "pluginAddMine": "Add this assistant",
+    "pluginAddConfirmTitle": "Add this assistant for everyone?",
+    "pluginAddConfirm": "This adds the assistant from the plugin {name} for everyone here. They can use it but not change it.",
+    "pluginAddSharingOff": "This adds the assistant from the plugin {name} for you. Sharing is turned off, so other people will not see it.",
+    "pluginReady": "An administrator added this assistant from the plugin {name}. People it was shared with can use it but not change it.",
+    "pluginOwnerSharingOff": "This assistant is yours. Sharing is turned off, so other people cannot see it. It comes from the plugin {name}.",
+    "pluginUse": "You can use this assistant from the plugin {name}. You cannot change it.",
+    "pluginStop": "An administrator turns the plugin off to take that access back. The assistant stays.",
     "reviewWaiting": "Waiting for another admin. Until then only you can use it. They find the request under Approvals.",
     "reviewWithdraw": "Take it back",
     "reviewWithdrawn": "Taken back. The assistant stays only with you. Nothing was shared.",
@@ -344,7 +354,8 @@
       "sales": "Sales",
       "people": "People",
       "work": "Everyday work",
-      "support": "Support"
+      "support": "Support",
+      "plugin": "Plugins"
     },
     "offerWriter": {
       "title": "Offer writer",

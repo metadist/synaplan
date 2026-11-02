@@ -12,6 +12,22 @@ export type AgentTemplate = NonNullable<
   z.infer<typeof GetApiAgentTemplatesListResponseSchema>['templates']
 >[number]
 
+export function templateTitle(
+  template: AgentTemplate,
+  translate: (key: string) => string
+): string {
+  if (template.pluginName) return template.title ?? template.pluginName
+  return translate(template.titleKey ?? '')
+}
+
+export function templateSummary(
+  template: AgentTemplate,
+  translate: (key: string) => string
+): string {
+  if (template.pluginName) return template.summary ?? ''
+  return translate(template.summaryKey ?? '')
+}
+
 export type AgentTemplateRequirement = NonNullable<AgentTemplate['requires']>[number]
 
 export type AgentTemplateInstallResult = z.infer<typeof PostApiAgentTemplatesInstallResponseSchema>

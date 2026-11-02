@@ -76,9 +76,16 @@
           :data-testid="`card-template-${template.id}`"
           @click="selectedId = template.id ?? null"
         >
-          <h3 class="txt-primary font-medium">{{ $t(template.titleKey ?? '') }}</h3>
-          <p class="txt-secondary text-sm">{{ $t(template.summaryKey ?? '') }}</p>
-          <p class="txt-secondary text-xs">
+          <h3 class="txt-primary font-medium">{{ templateTitle(template, t) }}</h3>
+          <p class="txt-secondary text-sm">{{ templateSummary(template, t) }}</p>
+          <p
+            v-if="template.pluginName"
+            class="txt-secondary text-xs"
+            :data-testid="`badge-from-plugin-${template.id}`"
+          >
+            {{ $t('templates.fromPlugin', { name: template.pluginName }) }}
+          </p>
+          <p v-else class="txt-secondary text-xs">
             {{
               (template.usedBy ?? 0) > 0
                 ? $t('templates.usedBy', { count: template.usedBy ?? 0 })
@@ -105,7 +112,12 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import TemplateDetail from './TemplateDetail.vue'
-import { agentTemplatesApi, type AgentTemplate } from '@/services/api/agentTemplatesApi'
+import {
+  agentTemplatesApi,
+  templateSummary,
+  templateTitle,
+  type AgentTemplate,
+} from '@/services/api/agentTemplatesApi'
 
 const emit = defineEmits<{
   'start-empty': []
@@ -139,9 +151,10 @@ const visible = computed(() => {
   return templates.value.filter((template) => {
     if (category.value !== 'all' && template.category !== category.value) return false
     if (!query) return true
-    const title = t(template.titleKey ?? '').toLowerCase()
-    const summary = t(template.summaryKey ?? '').toLowerCase()
-    return title.includes(query) || summary.includes(query)
+    const title = templateTitle(template, t).toLowerCase()
+    const summary = templateSummary(template, t).toLowerCase()
+    const plugin = (template.pluginName ?? '').toLowerCase()
+    return title.includes(query) || summary.includes(query) || plugin.includes(query)
   })
 })
 

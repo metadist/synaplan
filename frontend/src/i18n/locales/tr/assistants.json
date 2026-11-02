@@ -312,6 +312,16 @@
     "usedBy": "Burada {count} kişi kullanıyor",
     "usedByZero": "Burada henüz kimse kullanmıyor",
     "fromTemplate": "Bir şablondan",
+    "fromPlugin": "{name} eklentisinden",
+    "pluginAdd": "Herkes için ekle",
+    "pluginAddMine": "Bu asistanı ekle",
+    "pluginAddConfirmTitle": "Bu asistan herkes için eklensin mi?",
+    "pluginAddConfirm": "Bu, {name} eklentisindeki asistanı buradaki herkes için ekler. Kullanabilirler, ancak değiştiremezler.",
+    "pluginAddSharingOff": "Bu, {name} eklentisindeki asistanı sizin için ekler. Paylaşım kapalı, bu yüzden diğer kişiler onu görmez.",
+    "pluginReady": "Bir yönetici bu asistanı {name} eklentisinden ekledi. Paylaşıldığı kişiler kullanabilir, ancak değiştiremez.",
+    "pluginOwnerSharingOff": "Bu asistan sizindir. Paylaşım kapalı, bu yüzden diğer kişiler onu görmez. {name} eklentisinden geliyor.",
+    "pluginUse": "Bu asistanı {name} eklentisinden kullanabilirsiniz. Değiştiremezsiniz.",
+    "pluginStop": "Bir yönetici bu erişimi geri almak için eklentiyi kapatır. Asistan kalır.",
     "reviewWaiting": "Yönetici erişimi olan başka bir kişi bekleniyor. O zamana kadar yalnızca siz kullanabilirsiniz. İstek Onaylar altında.",
     "reviewWithdraw": "Geri al",
     "reviewWithdrawn": "Geri alındı. Asistan yalnızca sizde kalır. Hiçbir şey paylaşılmadı.",
@@ -344,7 +354,8 @@
       "sales": "Satış",
       "people": "İnsanlar",
       "work": "Günlük iş",
-      "support": "Destek"
+      "support": "Destek",
+      "plugin": "Eklentiler"
     },
     "offerWriter": {
       "title": "Teklif yazarı",

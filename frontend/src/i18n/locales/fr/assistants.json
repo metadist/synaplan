@@ -312,6 +312,16 @@
     "usedBy": "Utilisé par {count} personnes ici",
     "usedByZero": "Personne ne l’utilise encore ici",
     "fromTemplate": "Issu d’un modèle",
+    "fromPlugin": "Du plugin {name}",
+    "pluginAdd": "Ajouter pour tout le monde",
+    "pluginAddMine": "Ajouter cet assistant",
+    "pluginAddConfirmTitle": "Ajouter cet assistant pour tout le monde ?",
+    "pluginAddConfirm": "Cela ajoute l’assistant du plugin {name} pour tout le monde ici. Ils peuvent l’utiliser, mais pas le modifier.",
+    "pluginAddSharingOff": "Cela ajoute l’assistant du plugin {name} pour vous. Le partage est désactivé, les autres personnes ne le verront donc pas.",
+    "pluginReady": "Une personne administratrice a ajouté cet assistant depuis le plugin {name}. Les personnes avec qui il est partagé peuvent l’utiliser, mais pas le modifier.",
+    "pluginOwnerSharingOff": "Cet assistant est le vôtre. Le partage est désactivé, les autres personnes ne le voient donc pas. Il vient du plugin {name}.",
+    "pluginUse": "Vous pouvez utiliser cet assistant du plugin {name}. Vous ne pouvez pas le modifier.",
+    "pluginStop": "Une personne administratrice désactive le plugin pour retirer cet accès. L’assistant reste.",
     "reviewWaiting": "En attente d’une autre personne avec un accès administrateur. D’ici là, vous seul pouvez l’utiliser. La demande est dans Approbations.",
     "reviewWithdraw": "Retirer la demande",
     "reviewWithdrawn": "Demande retirée. L’assistant reste uniquement pour vous. Rien n’a été partagé.",
@@ -344,7 +354,8 @@
       "sales": "Ventes",
       "people": "Personnes",
       "work": "Quotidien",
-      "support": "Support"
+      "support": "Support",
+      "plugin": "Plugins"
     },
     "offerWriter": {
       "title": "Rédacteur d’offres",

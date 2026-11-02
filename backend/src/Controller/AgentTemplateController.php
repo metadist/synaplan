@@ -9,6 +9,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\AgentTemplate\AgentTemplateInstaller;
 use App\Service\AgentTemplate\AgentTemplateInstallRequest;
 use App\Service\AgentTemplate\AgentTemplateListing;
+use App\Service\AgentTemplate\PluginPackGallery;
 use App\Service\AgentTemplate\Exception\AgentPublishReviewException;
 use App\Service\AgentTemplate\Exception\AgentTemplateForbiddenException;
 use App\Service\AgentTemplate\Exception\AgentTemplateNotFoundException;
@@ -24,18 +25,22 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Agent templates')]
 final class AgentTemplateController extends AbstractController
 {
+    /** 1 character plus up to 63 more. Plugin pack ids use the same limit. */
+    private const ID_PATTERN = '[a-z0-9][a-z0-9-]{0,63}';
+
     public function __construct(
         private readonly AgentConfig $config,
         private readonly AgentTemplateListing $listing,
         private readonly AgentTemplateInstaller $installer,
+        private readonly PluginPackGallery $packs,
     ) {
     }
 
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/agent-templates',
-        summary: 'List built-in assistant templates',
-        description: 'Returns 404 when AGENTS.ENABLED is off. Templates never name a model. peopleCount is present for administrators only.',
+        summary: 'List assistant templates and plugin packs',
+        description: 'Built-in templates, plus packs a plugin already declares. A plugin pack carries pluginName and its own title. A pack that is not installed yet is listed only for an administrator, who can add it for everyone. Returns 404 when AGENTS.ENABLED is off. Templates never name a model. peopleCount is present for administrators only.',
         tags: ['Agent templates'],
         responses: [
             new OA\Response(
@@ -54,6 +59,9 @@ final class AgentTemplateController extends AbstractController
                                 new OA\Property(property: 'version', type: 'string', example: '2026.11.1'),
                                 new OA\Property(property: 'titleKey', type: 'string', example: 'templates.offerWriter.title'),
                                 new OA\Property(property: 'summaryKey', type: 'string', example: 'templates.offerWriter.summary'),
+                                new OA\Property(property: 'title', type: 'string', nullable: true, example: null),
+                                new OA\Property(property: 'summary', type: 'string', nullable: true, example: null),
+                                new OA\Property(property: 'pluginName', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'category', type: 'string', example: 'sales'),
                                 new OA\Property(property: 'tryIt', type: 'array', items: new OA\Items(type: 'string')),
                                 new OA\Property(property: 'requires', type: 'array', items: new OA\Items(
@@ -73,6 +81,8 @@ final class AgentTemplateController extends AbstractController
                                 new OA\Property(property: 'updateAvailable', type: 'boolean', example: false),
                                 new OA\Property(property: 'publishReview', type: 'string', nullable: true, enum: ['waiting', 'sent_back']),
                                 new OA\Property(property: 'publishReviewNote', type: 'string', nullable: true),
+                                new OA\Property(property: 'canEdit', type: 'boolean', nullable: true, example: null),
+                                new OA\Property(property: 'sharingOff', type: 'boolean', nullable: true, example: null),
                             ],
                         )),
                     ],
@@ -99,11 +109,11 @@ final class AgentTemplateController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/install', name: 'install', methods: ['POST'], requirements: ['id' => '[a-z0-9][a-z0-9-]{0,31}'])]
+    #[Route('/{id}/install', name: 'install', methods: ['POST'], requirements: ['id' => self::ID_PATTERN])]
     #[OA\Post(
         path: '/api/v1/agent-templates/{id}/install',
         summary: 'Install an assistant from a template',
-        description: 'Creates a private assistant for the signed-in person and publishes it so they can try it. Administrators may pass audience=everyone to share it. A second install opens the assistant that is already there. The name the client sends is kept.',
+        description: 'Creates a private assistant for the signed-in person and publishes it so they can try it. Administrators may pass audience=everyone to share it. A plugin pack is not copied again: an administrator adds the assistant the plugin already declares, for everyone, through the plugin installer. A second install opens the assistant that is already there. The name the client sends is kept for built-in templates.',
         tags: ['Agent templates'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', example: 'offer-writer'))],
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
@@ -139,13 +149,15 @@ final class AgentTemplateController extends AbstractController
         \assert($user instanceof User);
 
         return $this->run(function () use ($user, $id, $request): JsonResponse {
-            $result = $this->installer->install($user, $id, AgentTemplateInstallRequest::fromBody($request->getContent()));
+            $result = $this->packs->knows($id)
+                ? $this->packs->add($user, $id)
+                : $this->installer->install($user, $id, AgentTemplateInstallRequest::fromBody($request->getContent()));
 
             return $this->json($this->resultBody($result->agentId, $result->alreadyInstalled, $result->shared, $result->sharingOff, $result->waitingForReview));
         });
     }
 
-    #[Route('/{id}/diff', name: 'diff', methods: ['GET'], requirements: ['id' => '[a-z0-9][a-z0-9-]{0,31}'])]
+    #[Route('/{id}/diff', name: 'diff', methods: ['GET'], requirements: ['id' => self::ID_PATTERN])]
     #[OA\Get(
         path: '/api/v1/agent-templates/{id}/diff',
         summary: 'Show what a template update would change',
@@ -181,7 +193,7 @@ final class AgentTemplateController extends AbstractController
         });
     }
 
-    #[Route('/{id}/update', name: 'update', methods: ['POST'], requirements: ['id' => '[a-z0-9][a-z0-9-]{0,31}'])]
+    #[Route('/{id}/update', name: 'update', methods: ['POST'], requirements: ['id' => self::ID_PATTERN])]
     #[OA\Post(
         path: '/api/v1/agent-templates/{id}/update',
         summary: 'Update an installed template without renaming it',
@@ -219,7 +231,7 @@ final class AgentTemplateController extends AbstractController
         });
     }
 
-    #[Route('/{id}/withdraw-review', name: 'withdraw_review', methods: ['POST'], requirements: ['id' => '[a-z0-9][a-z0-9-]{0,31}'])]
+    #[Route('/{id}/withdraw-review', name: 'withdraw_review', methods: ['POST'], requirements: ['id' => self::ID_PATTERN])]
     #[OA\Post(
         path: '/api/v1/agent-templates/{id}/withdraw-review',
         summary: 'Take back a request to share an assistant with everyone',

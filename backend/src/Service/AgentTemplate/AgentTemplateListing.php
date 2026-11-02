@@ -17,6 +17,7 @@ final readonly class AgentTemplateListing
         private AgentRepository $agents,
         private UserRepository $users,
         private AgentPublishReview $reviews,
+        private PluginPackGallery $packs,
     ) {
     }
 
@@ -47,6 +48,9 @@ final readonly class AgentTemplateListing
                 'publishReview' => $review['status'] ?? null,
                 'publishReviewNote' => $review['note'] ?? null,
             ];
+        }
+        foreach ($this->packs->rows($user) as $row) {
+            $rows[] = $row;
         }
 
         return [

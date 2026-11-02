@@ -312,6 +312,16 @@
     "usedBy": "Lo usan {count} personas aquí",
     "usedByZero": "Nadie lo usa aquí todavía",
     "fromTemplate": "De una plantilla",
+    "fromPlugin": "Del plugin {name}",
+    "pluginAdd": "Añadir para todos",
+    "pluginAddMine": "Añadir este asistente",
+    "pluginAddConfirmTitle": "¿Añadir este asistente para todos?",
+    "pluginAddConfirm": "Esto añade el asistente del plugin {name} para todos aquí. Pueden usarlo, pero no cambiarlo.",
+    "pluginAddSharingOff": "Esto añade el asistente del plugin {name} para usted. Compartir está desactivado, así que las demás personas no lo verán.",
+    "pluginReady": "Una persona administradora añadió este asistente desde el plugin {name}. Quienes lo tienen compartido pueden usarlo, pero no cambiarlo.",
+    "pluginOwnerSharingOff": "Este asistente es suyo. Compartir está desactivado, así que las demás personas no lo ven. Viene del plugin {name}.",
+    "pluginUse": "Puede usar este asistente del plugin {name}. No puede cambiarlo.",
+    "pluginStop": "Una persona administradora desactiva el plugin para retirar ese acceso. El asistente permanece.",
     "reviewWaiting": "Espera a otra persona con acceso de administración. Hasta entonces solo tú puedes usarlo. La solicitud está en Aprobaciones.",
     "reviewWithdraw": "Retirarla",
     "reviewWithdrawn": "Retirada. El asistente se queda solo contigo. No se compartió nada.",
@@ -344,7 +354,8 @@
       "sales": "Ventas",
       "people": "Personas",
       "work": "Día a día",
-      "support": "Soporte"
+      "support": "Soporte",
+      "plugin": "Plugins"
     },
     "offerWriter": {
       "title": "Redactor de ofertas",

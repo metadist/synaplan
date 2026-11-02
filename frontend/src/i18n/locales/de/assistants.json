@@ -312,6 +312,16 @@
     "usedBy": "Von {count} Personen hier genutzt",
     "usedByZero": "Hier noch von niemandem genutzt",
     "fromTemplate": "Aus einer Vorlage",
+    "fromPlugin": "Aus Plugin {name}",
+    "pluginAdd": "Für alle hinzufügen",
+    "pluginAddMine": "Diesen Assistenten hinzufügen",
+    "pluginAddConfirmTitle": "Diesen Assistenten für alle hinzufügen?",
+    "pluginAddConfirm": "Das fügt den Assistenten aus dem Plugin {name} für alle hier hinzu. Sie können ihn nutzen, aber nicht ändern.",
+    "pluginAddSharingOff": "Das fügt den Assistenten aus dem Plugin {name} für Sie hinzu. Teilen ist aus, deshalb sehen ihn andere nicht.",
+    "pluginReady": "Eine Person mit Administratorrechten hat diesen Assistenten aus dem Plugin {name} hinzugefügt. Personen, für die er freigegeben ist, können ihn nutzen, aber nicht ändern.",
+    "pluginOwnerSharingOff": "Dieser Assistent gehört Ihnen. Teilen ist aus, deshalb sehen ihn andere nicht. Er kommt aus dem Plugin {name}.",
+    "pluginUse": "Sie können diesen Assistenten aus dem Plugin {name} nutzen. Sie können ihn nicht ändern.",
+    "pluginStop": "Eine Person mit Administratorrechten schaltet das Plugin aus, um diesen Zugriff zurückzunehmen. Der Assistent bleibt.",
     "reviewWaiting": "Wartet auf eine andere Person mit Administratorrechten. Bis dahin können nur Sie ihn nutzen. Die Anfrage liegt unter Freigaben.",
     "reviewWithdraw": "Zurücknehmen",
     "reviewWithdrawn": "Zurückgenommen. Der Assistent bleibt nur bei Ihnen. Es wurde nichts geteilt.",
@@ -344,7 +354,8 @@
       "sales": "Vertrieb",
       "people": "Personal",
       "work": "Alltag",
-      "support": "Support"
+      "support": "Support",
+      "plugin": "Plugins"
     },
     "offerWriter": {
       "title": "Angebots-Schreiber",
