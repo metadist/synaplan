@@ -14,16 +14,29 @@ use App\Entity\ComputeRun;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
-use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Execution\BuiltinToolExecutor;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
+use App\Service\Tool\Execution\McpToolExecutor;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolExecutionGate;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
+use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * OpenAI-shaped hybrid tool loop for POST /v1/chat/completions.
@@ -54,6 +67,8 @@ final readonly class OpenAiGatewayToolLoop
      */
     public const DEMO_HOURLY_CAP_WAIVED = 'demo_hourly_cap_waived';
 
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private OpenAiGatewayToolCatalog $catalog,
         private AiFacade $aiFacade,
@@ -69,6 +84,13 @@ final readonly class OpenAiGatewayToolLoop
         private ?ToolsConfig $toolsConfig = null,
         private ?CodeExecutionTool $codeExecutionTool = null,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     /**
@@ -426,12 +448,7 @@ final readonly class OpenAiGatewayToolLoop
             }
 
             if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
-                $gated = $this->gatedToolMessage($user, $name, $arguments, $id);
-                if (null !== $gated) {
-                    $results[] = $gated;
-                    continue;
-                }
-                $results[] = $this->executeNative($entry['tool'], $arguments, $id, $user, $notes, $assistant);
+                $results[] = $this->executeNative($entry, $name, $arguments, $id, $user, $notes, $assistant);
                 continue;
             }
 
@@ -451,24 +468,7 @@ final readonly class OpenAiGatewayToolLoop
                 continue;
             }
 
-            try {
-                $gated = $this->gatedToolMessage($user, $name, $arguments, $id);
-                if (null !== $gated) {
-                    $results[] = $gated;
-                    continue;
-                }
-                $callResult = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
-                $text = $this->formatMcpContent($callResult['content']);
-                $results[] = $this->toolMessage($id, $text);
-                $notes[] = sprintf('[mcp:%d/%s]', $entry['serverId'], $entry['tool']);
-            } catch (McpClientException $e) {
-                $this->logger->warning('OpenAiGatewayToolLoop: MCP tool call failed', [
-                    'server_id' => $entry['serverId'],
-                    'tool' => $entry['tool'],
-                    'error' => $e->getMessage(),
-                ]);
-                $results[] = $this->toolMessage($id, 'Tool call failed: '.$e->getMessage());
-            }
+            $results[] = $this->executeMcp($entry, $name, $arguments, $id, $user, $notes);
         }
 
         return $results;
@@ -486,34 +486,47 @@ final readonly class OpenAiGatewayToolLoop
     }
 
     /**
+     * @param DispatchEntry        $entry
      * @param array<string, mixed> $arguments
+     * @param list<string>         $notes
      *
+     * @return array<string, mixed>
+     */
+    private function executeMcp(array $entry, string $name, array $arguments, string $id, User $user, array &$notes): array
+    {
+        $this->assertRegistered($user, $name);
+        $outcome = $this->tools()->invoke(
+            $this->descriptorFor((int) $user->getId(), $name, $entry),
+            $this->invocation($user, $name, $arguments),
+        );
+        $blocked = $this->blocked($id, $outcome);
+        if (null !== $blocked) {
+            return $blocked;
+        }
+        if (true === ($outcome->details['transport'] ?? false)) {
+            $this->logger->warning('OpenAiGatewayToolLoop: MCP tool call failed', [
+                'server_id' => $entry['serverId'],
+                'tool' => $entry['tool'],
+                'error' => $outcome->resultText,
+            ]);
+
+            return $this->toolMessage($id, 'Tool call failed: '.$outcome->resultText);
+        }
+        $notes[] = sprintf('[mcp:%d/%s]', $entry['serverId'], $entry['tool']);
+
+        return $this->toolMessage($id, $outcome->resultText);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
-    private function gatedToolMessage(User $user, string $name, array $arguments, string $id): ?array
+    private function blocked(string $id, \App\Service\Tool\Execution\ToolOutcome $outcome): ?array
     {
-        $userId = (int) $user->getId();
-        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
-            if (null === $this->toolRegistry->get($userId, $name)) {
-                throw new ToolNotRegisteredException($name);
-            }
+        if (ToolOutcomeKind::NeedsApproval === $outcome->kind) {
+            return $this->toolMessage($id, sprintf('requires approval; request #%d created', (int) $outcome->approvalId));
         }
-        if (null === $this->executionGate || !$this->approvalsOn($userId)) {
-            return null;
-        }
-        $decision = $this->executionGate->inspect(
-            $userId,
-            $name,
-            $arguments,
-            $user,
-            PolicyContext::Interactive,
-            'chat:0',
-        );
-        if (null !== $decision['refusal']) {
-            return $this->toolMessage($id, $decision['refusal']);
-        }
-        if (null !== $decision['approval']) {
-            return $this->toolMessage($id, sprintf('requires approval; request #%d created', (int) $decision['approval']->getId()));
+        if (ToolOutcomeKind::Refused === $outcome->kind) {
+            return $this->toolMessage($id, $outcome->resultText);
         }
 
         return null;
@@ -525,22 +538,29 @@ final readonly class OpenAiGatewayToolLoop
     }
 
     /**
+     * @param DispatchEntry        $entry
      * @param array<string, mixed> $arguments
      * @param list<string>         $notes
      *
      * @return array<string, mixed>
      */
-    private function executeNative(string $tool, array $arguments, string $id, User $user, array &$notes, ?RuntimeProfile $assistant = null): array
+    private function executeNative(array $entry, string $name, array $arguments, string $id, User $user, array &$notes, ?RuntimeProfile $assistant = null): array
     {
-        if (WebSearchTool::NAME === $tool) {
-            $result = $this->webSearchTool->execute($arguments);
-            $query = $result['query'];
-            $notes[] = '[web_search:'.('' !== $query ? $query : '…').']';
-
-            return $this->toolMessage($id, $this->clamp($result['text']));
+        $this->assertRegistered($user, $name);
+        $tool = $entry['tool'];
+        $decideOnly = CodeExecutionTool::NAME === $tool;
+        $outcome = $this->tools()->invoke(
+            $this->descriptorFor((int) $user->getId(), $name, $entry),
+            $this->invocation($user, $name, $arguments, $assistant, $decideOnly),
+        );
+        $blocked = $this->blocked($id, $outcome);
+        if (null !== $blocked) {
+            return $blocked;
         }
-
-        if (CodeExecutionTool::NAME === $tool && null !== $this->codeExecutionTool) {
+        if ($decideOnly) {
+            if (null === $this->codeExecutionTool) {
+                return $this->toolMessage($id, sprintf('Unknown Synaplan tool `%s`.', $tool));
+            }
             $result = $this->codeExecutionTool->execute(
                 $arguments,
                 $user,
@@ -551,10 +571,74 @@ final readonly class OpenAiGatewayToolLoop
             );
             $notes[] = '[code_execution]';
 
-            return $this->toolMessage($id, $this->clamp($result['text']));
+            return $this->toolMessage($id, $result['text']);
+        }
+        if (WebSearchTool::NAME === $tool) {
+            $query = $outcome->details['usageInput'] ?? '';
+            $notes[] = '[web_search:'.(is_string($query) && '' !== $query ? $query : '…').']';
         }
 
-        return $this->toolMessage($id, sprintf('Unknown Synaplan tool `%s`.', $tool));
+        return $this->toolMessage($id, $outcome->resultText);
+    }
+
+    private function assertRegistered(User $user, string $name): void
+    {
+        $userId = (int) $user->getId();
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
+            if (null === $this->toolRegistry->get($userId, $name)) {
+                throw new ToolNotRegisteredException($name);
+            }
+        }
+    }
+
+    /**
+     * @param DispatchEntry $entry
+     */
+    private function descriptorFor(int $userId, string $name, array $entry): ToolDescriptor
+    {
+        $existing = $this->toolRegistry?->get($userId, $name);
+        if (null !== $existing) {
+            return $existing;
+        }
+        $source = match ($entry['kind']) {
+            GatewayToolCatalog::KIND_CUSTOM => ToolSource::Custom,
+            GatewayToolCatalog::KIND_NATIVE => ToolSource::Builtin,
+            default => ToolSource::Mcp,
+        };
+
+        return new ToolDescriptor($name, $entry['tool'], '', [], SideEffect::Read, $source, $userId, null, [
+            'serverId' => $entry['serverId'],
+            'tool' => $entry['tool'],
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function invocation(User $user, string $name, array $arguments, ?RuntimeProfile $assistant = null, bool $decideOnly = false): ToolInvocation
+    {
+        return new ToolInvocation(
+            $name,
+            $arguments,
+            new ToolCaller((int) $user->getId(), ToolChannel::OPENAI),
+            GateMode::AsTodayWhenApprovalsOn,
+            decision: new GateRequest($user, PolicyContext::Interactive, 'chat:0'),
+            decideOnly: $decideOnly,
+            user: $user,
+            assistant: $assistant,
+        );
+    }
+
+    private function tools(): ToolInvoker
+    {
+        return $this->toolInvoker->get() ?? new ToolInvoker(
+            [
+                new McpToolExecutor($this->mcpClient, $this->servers),
+                new BuiltinToolExecutor(webSearch: $this->webSearchTool),
+            ],
+            gate: $this->executionGate,
+            toolsConfig: $this->toolsConfig,
+        );
     }
 
     /**
@@ -604,23 +688,6 @@ final readonly class OpenAiGatewayToolLoop
         $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? $decoded : [];
-    }
-
-    /**
-     * @param list<array<string, mixed>> $content
-     */
-    private function formatMcpContent(array $content): string
-    {
-        $parts = [];
-        foreach ($content as $block) {
-            if ('text' === ($block['type'] ?? '') && is_string($block['text'] ?? null)) {
-                $parts[] = $block['text'];
-            }
-        }
-
-        $text = trim(implode("\n\n", $parts));
-
-        return '' !== $text ? $text : '(empty tool result)';
     }
 
     private function clamp(string $text): string
