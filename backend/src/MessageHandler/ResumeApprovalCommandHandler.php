@@ -17,12 +17,23 @@ use App\Service\Tool\ApprovalReference;
 use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ChatApprovalContinuationService;
 use App\Service\Tool\Custom\HttpToolExecutor;
+use App\Service\Tool\Execution\CustomHttpToolExecutor;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\McpToolExecutor;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcome;
+use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Runs an approved tool call under the owner's identity.
@@ -42,6 +53,8 @@ final readonly class ResumeApprovalCommandHandler
 {
     private const RESULT_PREVIEW_CHARS = 2000;
 
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private ApprovalRepository $approvals,
         private ToolRegistry $registry,
@@ -55,6 +68,13 @@ final readonly class ResumeApprovalCommandHandler
         private MessageBusInterface $bus,
         private LoggerInterface $logger,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     public function __invoke(ResumeApprovalCommand $command): void
@@ -145,14 +165,7 @@ final readonly class ResumeApprovalCommandHandler
      */
     private function executeCustom(Approval $approval, ToolDescriptor $descriptor): array
     {
-        $toolId = $descriptor->meta['toolId'] ?? null;
-        $tool = is_numeric($toolId) ? $this->customTools->find((int) $toolId) : null;
-        if (null === $tool) {
-            throw new \RuntimeException(sprintf('Custom tool %s is no longer available', $approval->getTool()));
-        }
-        $result = $this->httpExecutor->execute($tool, ApprovalService::executionArgs($approval), $approval->getOwnerId());
-
-        return ['custom:'.$tool->getId().':'.$result['status'], $this->clip($result['summary'])];
+        return $this->finish($this->invoke($approval, $descriptor));
     }
 
     /**
@@ -160,18 +173,45 @@ final readonly class ResumeApprovalCommandHandler
      */
     private function executeMcp(Approval $approval, ToolDescriptor $descriptor): array
     {
-        $serverId = (int) ($descriptor->meta['serverId'] ?? 0);
-        $toolName = (string) ($descriptor->meta['tool'] ?? '');
-        $server = $serverId > 0 ? $this->mcpServers->findByIdAndUser($serverId, $approval->getOwnerId()) : null;
-        if (null === $server || !$server->isEnabled() || '' === $toolName) {
-            throw new \RuntimeException(sprintf('MCP server %d for tool %s is not available', $serverId, $approval->getTool()));
-        }
-        $call = $this->mcpClient->callTool($server, $toolName, ApprovalService::executionArgs($approval));
-        if ($call['isError']) {
-            throw new \RuntimeException(sprintf('MCP tool %s reported an error: %s', $toolName, $this->formatContent($call['content'])));
-        }
+        return $this->finish($this->invoke($approval, $descriptor));
+    }
 
-        return ['mcp:'.$serverId.':'.$toolName, $this->clip($this->formatContent($call['content']))];
+    private function invoke(Approval $approval, ToolDescriptor $descriptor): ToolOutcome
+    {
+        return $this->tools()->invoke(
+            $descriptor,
+            new ToolInvocation(
+                $approval->getTool(),
+                ApprovalService::executionArgs($approval),
+                new ToolCaller($approval->getOwnerId(), ToolChannel::RESUME),
+                GateMode::AsTodayNever,
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: string, 1: string|null}
+     */
+    private function finish(ToolOutcome $outcome): array
+    {
+        if (ToolOutcomeKind::Failed === $outcome->kind) {
+            throw new \RuntimeException($outcome->resultText);
+        }
+        $ref = $outcome->details['ref'] ?? '';
+        $summary = $outcome->details['summary'] ?? '';
+
+        return [
+            is_string($ref) ? $ref : '',
+            $this->clip(is_string($summary) ? $summary : ''),
+        ];
+    }
+
+    private function tools(): ToolInvoker
+    {
+        return $this->toolInvoker->get() ?? new ToolInvoker([
+            new McpToolExecutor($this->mcpClient, $this->mcpServers),
+            new CustomHttpToolExecutor($this->logger, $this->customTools, $this->httpExecutor),
+        ]);
     }
 
     private function fail(Approval $approval, string $reason, ?string $detail): void
@@ -184,23 +224,6 @@ final readonly class ResumeApprovalCommandHandler
         if (null !== $announce) {
             $announce();
         }
-    }
-
-    /**
-     * @param list<array<string, mixed>> $content
-     */
-    private function formatContent(array $content): string
-    {
-        $parts = [];
-        foreach ($content as $block) {
-            if ('text' === ($block['type'] ?? null) && is_string($block['text'] ?? null)) {
-                $parts[] = $block['text'];
-            } elseif (is_array($block['resource'] ?? null) && is_string($block['resource']['text'] ?? null)) {
-                $parts[] = $block['resource']['text'];
-            }
-        }
-
-        return trim(implode("\n\n", $parts));
     }
 
     private function clip(string $text): ?string
