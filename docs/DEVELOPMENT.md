@@ -13,10 +13,12 @@ Commands and workflows for developing Synaplan.
 ## Service Management
 
 ```bash
-# Start all services (status page on :5173 first, then remaining images)
+# Start all services: status page, then chat, then the remaining images
 make up
 # equivalent: ./scripts/compose-up.sh
-# A plain `docker compose up -d` waits for every image pull before :5173 answers.
+# A plain `docker compose up -d` pulls every image before :5173 answers.
+# `make up` pulls database, Redis and the backend before memories, spoken
+# answers, office files and the dev tools.
 # It also warns when the project .env (next to docker-compose.yml) replaces
 # Docker defaults or holds app settings Compose never reads. That file is only
 # for SYNAPLAN_*_PORT and compose overrides (.env.example); app settings go in

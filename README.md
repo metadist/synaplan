@@ -140,7 +140,7 @@ The [quickstart](#quickstart) is a local checkout. The variants below are a publ
 
 The [quickstart](#quickstart) is this path. Open **<http://localhost:5173>**. A status screen is up within seconds and lists every boot step, then switches to the app when it is ready. First start: 5–15 minutes. Later starts: seconds.
 
-`make up` answers on `:5173` before the rest of the images finish pulling. `docker compose up -d` starts the same stack; `:5173` stays quiet until those pulls finish.
+`make up` answers on `:5173` first, then downloads the chat services (database, Redis, backend) before memories, spoken answers, office files and the dev tools. `docker compose up -d` starts the same stack; `:5173` stays quiet until every image has been pulled.
 
 1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
 2. Type your first chat message: it starts the Synaplan Demo (14 days, 40 messages a day via `web.synaplan.com`). Or paste one provider key (free: [Groq](https://console.groq.com)). You do not edit a config file for that.
@@ -293,7 +293,7 @@ Everything below is the same platform, packaged for different homes. Pick what f
 | **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
 | **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |
 
-A plain `docker compose up -d` starts the same stack but `:5173` stays silent until every image is pulled — `make up` exists so the status page answers within seconds.
+A plain `docker compose up -d` starts the same stack but `:5173` stays silent until every image is pulled. `make up` answers within seconds, then finishes chat before it downloads the optional images.
 
 No AI weights are downloaded by default, so the first boot is dominated by the Docker images and `npm ci`. `COMPOSE_PROFILES=local-ai` is the same switch a self-hosted install uses in `deploy/.env`, and it pulls the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
 
