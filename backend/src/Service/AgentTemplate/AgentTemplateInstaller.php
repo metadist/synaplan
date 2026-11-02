@@ -6,6 +6,7 @@ namespace App\Service\AgentTemplate;
 
 use App\Entity\Agent;
 use App\Entity\Prompt;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\PromptRepository;
@@ -204,7 +205,7 @@ final readonly class AgentTemplateInstaller
             return false;
         }
         try {
-            $this->shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $id, Permission::Use);
+            $this->shares->grant($admin, AgentKind::KEY, (string) $id, Share::SUBJECT_EVERYONE, 0, Permission::Use->value);
         } catch (ShareNotAllowedException|\InvalidArgumentException) {
             return false;
         }

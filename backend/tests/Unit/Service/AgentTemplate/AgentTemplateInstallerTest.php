@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\AgentTemplate;
 use App\Bundle\BundleEnvelopeValidator;
 use App\Entity\Agent;
 use App\Entity\Prompt;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\ModelRepository;
@@ -17,8 +18,12 @@ use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\AgentTemplate\AgentTemplateCatalog;
 use App\Service\AgentTemplate\AgentTemplateInstaller;
+use App\Service\AgentTemplate\AgentTemplateInstallRequest;
 use App\Service\AgentTemplate\AgentTemplateModelBinder;
+use App\Service\Iam\Exception\ShareNotAllowedException;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ShareService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -97,5 +102,64 @@ final class AgentTemplateInstallerTest extends TestCase
         self::assertFalse($agent->getDraft()['triggers']['schedules'][0]['enabled']);
         self::assertSame(['4:prices'], $agent->getDraft()['knowledge']['folders']);
         self::assertStringContainsString('do not invent messages', $prompt->getPrompt());
+    }
+
+    public function testInstallForEveryoneUsesNormalPersonShareGrantAndRespectsPolicy(): void
+    {
+        $backend = dirname(__DIR__, 4);
+        $catalog = new AgentTemplateCatalog(
+            $backend.'/templates/agents',
+            new BundleEnvelopeValidator(),
+            new AgentDefinitionValidator(),
+        );
+        $defaults = $this->createStub(ModelConfigService::class);
+        $defaults->method('getDefaultModel')->willReturn(null);
+        $binder = new AgentTemplateModelBinder($defaults, $this->createStub(ModelRepository::class));
+
+        $agent = new Agent(1, 20, 'offer-writer', 'Offer writer', AgentDefinition::defaults()->toArray());
+        (new \ReflectionProperty(Agent::class, 'id'))->setValue($agent, 42);
+
+        $agents = $this->createStub(AgentRepository::class);
+        $agents->method('findInstalledTemplate')->willReturn($agent);
+
+        $iam = $this->createStub(IamConfig::class);
+        $iam->method('isSharingEnabled')->willReturn(true);
+
+        $shares = $this->createMock(ShareService::class);
+        $shares->expects(self::once())
+            ->method('grant')
+            ->with(
+                self::isInstanceOf(User::class),
+                AgentKind::KEY,
+                '42',
+                Share::SUBJECT_EVERYONE,
+                0,
+                Permission::Use->value,
+            )
+            ->willThrowException(new ShareNotAllowedException('Sharing with everyone is turned off.'));
+        $shares->expects(self::never())->method('grantPlatformDistribution');
+
+        $installer = new AgentTemplateInstaller(
+            $catalog,
+            $binder,
+            $agents,
+            $this->createStub(AgentService::class),
+            $this->createStub(AgentPublisher::class),
+            $this->createStub(PromptRepository::class),
+            $shares,
+            $iam,
+            $this->createStub(EntityManagerInterface::class),
+        );
+
+        $admin = $this->createStub(User::class);
+        $admin->method('getId')->willReturn(1);
+        $admin->method('isAdmin')->willReturn(true);
+
+        $result = $installer->install($admin, 'offer-writer', new AgentTemplateInstallRequest('everyone', null, null, []));
+
+        self::assertSame(42, $result->agentId);
+        self::assertTrue($result->alreadyInstalled);
+        self::assertFalse($result->shared);
+        self::assertTrue($result->sharingOff);
     }
 }
