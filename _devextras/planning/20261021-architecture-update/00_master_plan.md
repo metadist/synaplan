@@ -1,12 +1,10 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** S0, S1 and S2 (AU1–AU18) are on `main`. S3's contract
-hardening of `03_contracts.md` §2.3 (frozen inventory, sub-type shapes,
-discovery), AU19 (descriptors and the catalog), AU20 (every consumer reads
-it) and AU21 (the frontend reads `GET /api/v1/ai/providers`) are on
-`main`. AU22 (one provider = one class, the egress allowlist from the
-catalog) is in review. S3 is complete when AU22 is merged. `EGRESS.MODE`
-stays `off`. The production reading is one day, not a week: a worker is
+**Status:** S0, S1, S2 and S3 (AU1–AU22) are on `main`. S4 starts at
+AU23: the tool-loop snapshot is recorded on that code, and the gaps it
+shows (document edits and MCP reads without a gate, no audit row for an
+executed tool, no tool usage row on the OpenAI loop) are what AU25 closes.
+`EGRESS.MODE` stays `off`. The production reading is one day, not a week: a worker is
 listed only when it reported in the last 24 hours. The vultr-cluster load test (M6) waits until
 after S2 has been read in production. `03_contracts.md` §7.1 must merge
 before AU28. §1.7 landed with AU10.

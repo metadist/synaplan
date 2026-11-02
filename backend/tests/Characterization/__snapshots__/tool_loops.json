@@ -1,0 +1,2141 @@
+{
+    "bounds": {
+        "chat": {
+            "max_result_chars": 12000,
+            "max_tools_per_turn": 16,
+            "wall_clock_seconds": 240
+        },
+        "gateway": {
+            "max_result_chars": 12000,
+            "max_tools_per_turn": 16,
+            "wall_clock_seconds": 240
+        },
+        "note": "The 240s deadline is read from the wall clock, so this suite does not wait it out. The iterations case is the live cap.",
+        "openai": {
+            "max_result_chars": 12000,
+            "max_tools_per_turn": 16,
+            "wall_clock_seconds": 240
+        }
+    },
+    "cases": {
+        "chat.document_edit.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "set_cells"
+            ],
+            "gate": "no gate",
+            "result": {
+                "a1": "Hi",
+                "assistant": "Updated the sheet.",
+                "mutated": true,
+                "tool_results": [
+                    "Updated 1 cells"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "chat.document_edit.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "set_cells"
+            ],
+            "gate": "no gate",
+            "result": {
+                "a1": "Hi",
+                "assistant": "Updated the sheet.",
+                "mutated": true,
+                "tool_results": [
+                    "Updated 1 cells"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "chat.document_edit.clamp": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "echo_long"
+            ],
+            "gate": "no gate",
+            "result": {
+                "a1": null,
+                "assistant": "Updated the sheet.",
+                "mutated": true,
+                "tool_results": [
+                    {
+                        "chars": 12001,
+                        "head": "AAAAAAAA",
+                        "tail": "AAAAAAA…"
+                    }
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_complete.client_tool": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "iterations": 1,
+            "result": {
+                "assistant": "",
+                "client_tools": [
+                    {
+                        "id": "toolu_1",
+                        "input": {
+                            "city": "Bern"
+                        },
+                        "name": "get_weather"
+                    }
+                ],
+                "status": 200,
+                "tool_results": []
+            },
+            "stop": "client_tool",
+            "usage": []
+        },
+        "gateway_complete.code.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "code_execution"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "printed-ok"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "file_work",
+                    "model": "tool:code_execution",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "COMPUTE_RUNS"
+                }
+            ]
+        },
+        "gateway_complete.code.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "code_execution"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "code_execution"
+                }
+            ],
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "printed-ok"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "file_work",
+                    "model": "tool:code_execution",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "COMPUTE_RUNS"
+                }
+            ]
+        },
+        "gateway_complete.custom_http.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "create_ticket"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "Ticket SYN-1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_complete.custom_http.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:0",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "create_ticket"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "create_ticket"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "create_ticket"
+                }
+            ],
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "requires approval; request #1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_complete.image.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "analyze_image"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "A chart."
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "chart",
+                    "model": "tool:analyze_image",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "VISION"
+                }
+            ]
+        },
+        "gateway_complete.image.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "analyze_image"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "analyze_image"
+                }
+            ],
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "A chart."
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "chart",
+                    "model": "tool:analyze_image",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "VISION"
+                }
+            ]
+        },
+        "gateway_complete.iterations": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "iterations": 1,
+            "result": {
+                "assistant": "",
+                "client_tools": [
+                    {
+                        "id": "toolu_1",
+                        "input": {
+                            "query": "q3"
+                        },
+                        "name": "mcp__1__rag_search"
+                    }
+                ],
+                "status": 200,
+                "tool_results": []
+            },
+            "stop": "iterations",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_complete.mcp_read.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_complete.mcp_read.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "mcp__1__rag_search"
+                }
+            ],
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_complete.mcp_read.clamp": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    {
+                        "chars": 12001,
+                        "head": "AAAAAAAA",
+                        "tail": "AAAAAAA…"
+                    }
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_complete.mcp_write.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    {
+                        "error": true,
+                        "text": "the tool 'create_issue' can modify data and is not allowed (read-only)"
+                    }
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_complete.mcp_write.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:0",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "mcp__1__create_issue"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "requires approval; request #1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_complete.mix": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_complete.web_search.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "web_search"
+            ],
+            "gate": "no gate",
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "Rates at https://example.test/rates"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "euro",
+                    "model": "tool:web_search",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "WEB_SEARCH"
+                }
+            ]
+        },
+        "gateway_complete.web_search.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "web_search"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "web_search"
+                }
+            ],
+            "iterations": 2,
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "status": 200,
+                "tool_results": [
+                    "Rates at https://example.test/rates"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "euro",
+                    "model": "tool:web_search",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "WEB_SEARCH"
+                }
+            ]
+        },
+        "gateway_stream.client_tool": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "content_block_start",
+                        "id": "toolu_1",
+                        "name": "get_weather"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "partial_json": "{\"city\":\"Bern\"}"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "tool_use"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": []
+            },
+            "stop": "client_tool",
+            "usage": []
+        },
+        "gateway_stream.code.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "code_execution"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "printed-ok"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "file_work",
+                    "model": "tool:code_execution",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "COMPUTE_RUNS"
+                }
+            ]
+        },
+        "gateway_stream.custom_http.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "create_ticket"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "Ticket SYN-1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_stream.image.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "analyze_image"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "A chart."
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "chart",
+                    "model": "tool:analyze_image",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "VISION"
+                }
+            ]
+        },
+        "gateway_stream.mcp_read.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_stream.mcp_read.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "mcp__1__rag_search"
+                }
+            ],
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_stream.mcp_write.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    {
+                        "error": true,
+                        "text": "the tool 'create_issue' can modify data and is not allowed (read-only)"
+                    }
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_stream.mcp_write.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:0",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "mcp__1__create_issue"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "requires approval; request #1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "gateway_stream.mix": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "rag_search",
+                    "model": "server:1/rag_search",
+                    "provider": "mcp",
+                    "response": "ok",
+                    "source": "MCP_TOOL"
+                }
+            ]
+        },
+        "gateway_stream.web_search.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "web_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "event": "message_start"
+                    },
+                    {
+                        "event": "ping"
+                    },
+                    {
+                        "event": "content_block_start"
+                    },
+                    {
+                        "event": "content_block_delta",
+                        "text": "Done. https://example.test/rates"
+                    },
+                    {
+                        "event": "content_block_stop"
+                    },
+                    {
+                        "event": "message_delta",
+                        "stop_reason": "end_turn"
+                    },
+                    {
+                        "event": "message_stop"
+                    }
+                ],
+                "tool_results": [
+                    "Rates at https://example.test/rates"
+                ]
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "TOOLS",
+                    "input": "euro",
+                    "model": "tool:web_search",
+                    "provider": "synaplan",
+                    "response": "ok",
+                    "source": "WEB_SEARCH"
+                }
+            ]
+        },
+        "mcp_server.file_ingest": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "file_ingest"
+            ],
+            "gate": "no gate",
+            "result": {
+                "chunks_created": 1,
+                "file_id": 42,
+                "group_key": "reports",
+                "name": "notes",
+                "provider": "test",
+                "success": true
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "FILE_ANALYSIS",
+                    "file_id": 42,
+                    "filename": "notes",
+                    "source": "MCP"
+                }
+            ]
+        },
+        "mcp_server.memory_add": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "memory_add"
+            ],
+            "gate": "no gate",
+            "result": {
+                "memory": {
+                    "active": true,
+                    "category": "work",
+                    "created": 1,
+                    "id": 5,
+                    "key": "quarter",
+                    "messageId": null,
+                    "source": "user_created",
+                    "updated": 1,
+                    "userId": 7,
+                    "value": "Q3 is closed"
+                },
+                "success": true
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.client_tool": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "assistant": "",
+                "client_tools": [
+                    {
+                        "arguments": {
+                            "city": "Bern"
+                        },
+                        "id": "call_1",
+                        "name": "get_weather"
+                    }
+                ],
+                "finish_reason": "tool_calls",
+                "tool_results": []
+            },
+            "stop": "client_tool",
+            "usage": []
+        },
+        "openai_complete.code.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "code_execution"
+            ],
+            "gate": "no gate",
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "printed-ok"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.code.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "code_execution"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "code_execution"
+                }
+            ],
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "printed-ok"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.custom_http": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "This custom tool cannot run on this channel."
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.image.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "Unknown Synaplan tool `analyze_image`."
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.image.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "analyze_image"
+                }
+            ],
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "Unknown Synaplan tool `analyze_image`."
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.iterations": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "assistant": "",
+                "client_tools": [
+                    {
+                        "arguments": {
+                            "query": "q3"
+                        },
+                        "id": "call_1",
+                        "name": "mcp__1__rag_search"
+                    }
+                ],
+                "finish_reason": "tool_calls",
+                "tool_results": []
+            },
+            "stop": "iterations",
+            "usage": []
+        },
+        "openai_complete.mcp_read.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.mcp_read.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "mcp__1__rag_search"
+                }
+            ],
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.mcp_write.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "the tool 'create_issue' can modify data and is not allowed (read-only)"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.mcp_write.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:0",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "mcp__1__create_issue"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "requires approval; request #1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.mix": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "assistant": "",
+                "client_tools": [
+                    {
+                        "arguments": {
+                            "city": "Bern"
+                        },
+                        "id": "call_2",
+                        "name": "get_weather"
+                    }
+                ],
+                "finish_reason": "tool_calls",
+                "tool_results": []
+            },
+            "stop": "client_tool",
+            "usage": []
+        },
+        "openai_complete.web_search.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "web_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "Rates at https://example.test/rates"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_complete.web_search.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "web_search"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "web_search"
+                }
+            ],
+            "result": {
+                "assistant": "Done. https://example.test/rates",
+                "finish_reason": "stop",
+                "tool_results": [
+                    "Rates at https://example.test/rates"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_stream.client_tool": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "arguments": "{\"city\":",
+                        "id": "call_1",
+                        "index": 0,
+                        "name": "get_weather",
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "arguments": "\"Bern\"}",
+                        "id": null,
+                        "index": 0,
+                        "name": null,
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "finish_reason": "tool_calls",
+                        "type": "finish"
+                    }
+                ],
+                "tool_results": []
+            },
+            "stop": "client_tool",
+            "usage": []
+        },
+        "openai_stream.mcp_read.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_stream.mcp_read.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "mcp__1__rag_search"
+                }
+            ],
+            "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
+                "tool_results": [
+                    "mcp:rag_search"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_stream.mcp_write.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:0",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "mcp__1__create_issue"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
+                "tool_results": [
+                    "requires approval; request #1 created"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "openai_stream.mix": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "rag_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "arguments": "{\"city\":",
+                        "id": "call_2",
+                        "index": 0,
+                        "name": "get_weather",
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "arguments": "\"Bern\"}",
+                        "id": null,
+                        "index": 0,
+                        "name": null,
+                        "type": "tool_call_delta"
+                    },
+                    {
+                        "finish_reason": "tool_calls",
+                        "type": "finish"
+                    }
+                ],
+                "tool_results": []
+            },
+            "stop": "client_tool",
+            "usage": []
+        },
+        "openai_stream.web_search.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "web_search"
+            ],
+            "gate": "no gate",
+            "result": {
+                "events": [
+                    {
+                        "text": "Done. https://ex",
+                        "type": "text"
+                    },
+                    {
+                        "text": "ample.test/rates",
+                        "type": "text"
+                    },
+                    {
+                        "finish_reason": "stop",
+                        "type": "finish"
+                    }
+                ],
+                "tool_results": [
+                    "Rates at https://example.test/rates"
+                ]
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "resume_approval.custom_http": {
+            "approvals": [
+                {
+                    "id": 3,
+                    "requestedBy": "chat:11",
+                    "sideEffect": "write",
+                    "status": "executed",
+                    "tool": "create_ticket"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "create_ticket"
+            ],
+            "gate": "no gate",
+            "result": {
+                "ref": "custom:4:201",
+                "status": "executed"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "resume_approval.mcp_write": {
+            "approvals": [
+                {
+                    "id": 3,
+                    "requestedBy": "chat:11",
+                    "sideEffect": "write",
+                    "status": "executed",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "create_issue"
+            ],
+            "gate": "no gate",
+            "result": {
+                "ref": "mcp:1:create_issue",
+                "status": "executed"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_code.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "code_run"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "code_run"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "compute_run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                    "exit_code": 0,
+                    "used_workspace": false
+                },
+                "status": "done",
+                "text": "printed-ok"
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "COMPUTE_RUNS",
+                    "cpuSec": 0.1
+                }
+            ]
+        },
+        "runner_code.approvals_on_interactive": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "code_run"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "code_run"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "compute_run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                    "exit_code": 0,
+                    "used_workspace": false
+                },
+                "status": "done",
+                "text": "printed-ok"
+            },
+            "stop": "done",
+            "usage": [
+                {
+                    "action": "COMPUTE_RUNS",
+                    "cpuSec": 0.1
+                }
+            ]
+        },
+        "runner_code.approvals_on_unattended": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "task_run:4:n1",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "code_run"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "code_run"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "code_run"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "approval_id": 1,
+                    "approved_args": [],
+                    "compute_run_id": "q…",
+                    "tool": "code_run"
+                },
+                "status": "waiting_approval",
+                "text": null
+            },
+            "stop": "needs_approval",
+            "usage": []
+        },
+        "runner_mcp_action.write.already_approved": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "create_issue"
+            ],
+            "gate": "no gate",
+            "result": {
+                "error": null,
+                "metadata": {
+                    "mcp": {
+                        "server": "Jira",
+                        "server_id": 1,
+                        "tool": "create_issue",
+                        "write": true
+                    },
+                    "query": "Jira · create_issue"
+                },
+                "status": "done",
+                "text": "mcp:create_issue"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_mcp_action.write.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "create_issue"
+            ],
+            "gate": "no gate",
+            "result": {
+                "error": null,
+                "metadata": {
+                    "mcp": {
+                        "server": "Jira",
+                        "server_id": 1,
+                        "tool": "create_issue",
+                        "write": true
+                    },
+                    "query": "Jira · create_issue"
+                },
+                "status": "done",
+                "text": "mcp:create_issue"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_mcp_action.write.approvals_on_interactive": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:11",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "mcp:1:create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "mcp:1:create_issue"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "mcp:1:create_issue"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "approval_id": 1,
+                    "approved_args": {
+                        "summary": "Q3"
+                    },
+                    "preview": "Create issue — summary: Q3",
+                    "side_effect": "write",
+                    "tool": "mcp:1:create_issue"
+                },
+                "status": "waiting_approval",
+                "text": null
+            },
+            "stop": "needs_approval",
+            "usage": []
+        },
+        "runner_mcp_action.write.approvals_on_unattended": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "create_issue"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "mcp:1:create_issue"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "mcp": {
+                        "server": "Jira",
+                        "server_id": 1,
+                        "tool": "create_issue",
+                        "write": true
+                    },
+                    "query": "Jira · create_issue"
+                },
+                "status": "done",
+                "text": "mcp:create_issue"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_mcp_fetch.read.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "search_customers"
+            ],
+            "gate": "no gate",
+            "result": {
+                "error": null,
+                "metadata": {
+                    "mcp": {
+                        "server": "Jira",
+                        "server_id": 1,
+                        "tool": "search_customers"
+                    },
+                    "query": "Jira · search_customers"
+                },
+                "status": "done",
+                "text": "mcp:search_customers"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_mcp_fetch.read.approvals_on": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "search_customers"
+            ],
+            "gate": "no gate",
+            "result": {
+                "error": null,
+                "metadata": {
+                    "mcp": {
+                        "server": "Jira",
+                        "server_id": 1,
+                        "tool": "search_customers"
+                    },
+                    "query": "Jira · search_customers"
+                },
+                "status": "done",
+                "text": "mcp:search_customers"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_tool_call.custom.already_approved": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "create_ticket"
+            ],
+            "gate": "no gate",
+            "result": {
+                "error": null,
+                "metadata": {
+                    "fields": [],
+                    "query": "create_ticket",
+                    "summary": "Ticket SYN-1 created",
+                    "tool": "create_ticket"
+                },
+                "status": "done",
+                "text": "Ticket SYN-1 created"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_tool_call.custom.approvals_off": {
+            "approvals": [],
+            "approvals_enabled": false,
+            "audit": [],
+            "executed": [
+                "create_ticket"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "create_ticket"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "fields": [],
+                    "query": "create_ticket",
+                    "summary": "Ticket SYN-1 created",
+                    "tool": "create_ticket"
+                },
+                "status": "done",
+                "text": "Ticket SYN-1 created"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_tool_call.custom.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:11",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "create_ticket"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "create_ticket"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "create_ticket"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "approval_id": 1,
+                    "approved_args": {
+                        "summary": "Q3"
+                    },
+                    "preview": "Create ticket — summary: Q3",
+                    "query": "create_ticket",
+                    "side_effect": "write",
+                    "tool": "create_ticket"
+                },
+                "status": "waiting_approval",
+                "text": null
+            },
+            "stop": "needs_approval",
+            "usage": []
+        },
+        "runner_tool_call.custom.approvals_on_unattended": {
+            "approvals": [],
+            "approvals_enabled": true,
+            "audit": [],
+            "executed": [
+                "create_ticket"
+            ],
+            "gate": [
+                {
+                    "approval": null,
+                    "outcome": "auto",
+                    "tool": "create_ticket"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "fields": [],
+                    "query": "create_ticket",
+                    "summary": "Ticket SYN-1 created",
+                    "tool": "create_ticket"
+                },
+                "status": "done",
+                "text": "Ticket SYN-1 created"
+            },
+            "stop": "done",
+            "usage": []
+        },
+        "runner_tool_call.mcp_write.approvals_on": {
+            "approvals": [
+                {
+                    "id": 1,
+                    "requestedBy": "chat:11",
+                    "sideEffect": "write",
+                    "status": "pending",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "approvals_enabled": true,
+            "audit": [
+                {
+                    "action": "approval.requested",
+                    "actor": 7,
+                    "id": "1",
+                    "kind": "approval",
+                    "subject": {
+                        "sideEffect": "write",
+                        "tool": "mcp__1__create_issue"
+                    }
+                }
+            ],
+            "executed": [],
+            "gate": [
+                {
+                    "approval": 1,
+                    "outcome": "approve",
+                    "tool": "mcp__1__create_issue"
+                }
+            ],
+            "result": {
+                "error": null,
+                "metadata": {
+                    "approval_id": 1,
+                    "approved_args": {
+                        "summary": "Q3"
+                    },
+                    "preview": "Create issue — summary: Q3",
+                    "query": "mcp__1__create_issue",
+                    "side_effect": "write",
+                    "tool": "mcp__1__create_issue"
+                },
+                "status": "waiting_approval",
+                "text": null
+            },
+            "stop": "needs_approval",
+            "usage": []
+        }
+    }
+}
