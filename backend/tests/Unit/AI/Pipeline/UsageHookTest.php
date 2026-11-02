@@ -60,6 +60,7 @@ use App\Service\Voice\VoiceLiveUsageService;
 use App\Tests\Characterization\Support\OpenAIFixtures;
 use App\Tests\Characterization\Support\OpenAISdkRecorder;
 use App\Tests\Characterization\Support\ProviderHttpRecorder;
+use App\Tests\Support\DocumentLoopInvoker;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -296,11 +297,12 @@ final class UsageHookTest extends TestCase
         $docConfig->method('maxIterations')->willReturn(4);
         $docConfig->method('maxOpsPerTurn')->willReturn(8);
 
+        $tools = new DocumentToolRegistry([$tool]);
         $loop = new ChatToolLoop(
             $facade,
-            new DocumentToolRegistry([$tool]),
+            $tools,
             $docConfig,
-            new NullLogger(),
+            DocumentLoopInvoker::create($tools),
         );
 
         $session = new DocumentSession(WordModel::empty());

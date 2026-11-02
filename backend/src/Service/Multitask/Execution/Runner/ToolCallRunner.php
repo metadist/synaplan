@@ -10,7 +10,6 @@ use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Mcp\McpClient;
-use App\Service\Mcp\McpClientException;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -21,13 +20,25 @@ use App\Service\SavedTask\Graph\StepInputResolver;
 use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\Custom\InvalidToolTemplateException;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Execution\CustomHttpToolExecutor;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
+use App\Service\Tool\Execution\McpToolExecutor;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcome;
+use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
-use App\Service\Tool\Policy\PolicyOutcome;
+use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolExecutionGate;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Runs a registered custom or MCP tool from an authored Saved Task step
@@ -35,6 +46,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class ToolCallRunner implements TaskRunner
 {
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private ToolRegistry $registry,
         private StepInputResolver $inputs,
@@ -47,6 +60,13 @@ final readonly class ToolCallRunner implements TaskRunner
         private ?ToolExecutionGate $executionGate = null,
         private ?ToolsConfig $toolsConfig = null,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     public function supportedCapabilities(): array
@@ -87,68 +107,51 @@ final readonly class ToolCallRunner implements TaskRunner
 
         $rawInputs = is_array($node->params['inputs'] ?? null) ? $node->params['inputs'] : $node->inputs;
         $arguments = $this->inputs->resolveAll($rawInputs, $context);
-
-        $gated = $this->consultGate($context, $node, $toolName, $arguments, (int) $userId);
-        if (null !== $gated) {
-            return $gated;
-        }
-
-        try {
-            return match ($descriptor->source) {
-                ToolSource::Custom => $this->runCustom($descriptor->meta, $arguments, (int) $userId, $toolName),
-                ToolSource::Mcp => $this->runMcp($descriptor->meta, $arguments, (int) $userId, $toolName),
-                default => NodeResult::failed('This tool cannot run as a Saved Task step'),
-            };
-        } catch (ToolNotRegisteredException $e) {
-            return NodeResult::failed($e->getMessage());
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $arguments
-     */
-    private function consultGate(NodeContext $context, TaskNode $node, string $toolName, array $arguments, int $userId): ?NodeResult
-    {
-        $override = is_string($node->params['approval'] ?? null) ? $node->params['approval'] : null;
-        if (null === $this->executionGate) {
-            return PolicyOutcome::Block->value === $override
-                ? NodeResult::failed(ToolExecutionGate::NODE_BLOCK_REFUSAL)
-                : null;
-        }
-        if ($context->isApproved($node->id)) {
-            return null;
-        }
-        $actor = $this->users->find($userId);
-        if (!$actor instanceof User) {
+        $approved = $context->isApproved($node->id);
+        $actor = $this->users->find((int) $userId);
+        if (!$approved && null !== $this->executionGate && !$actor instanceof User) {
             return NodeResult::failed('This account cannot run Saved Tasks');
         }
+
+        $override = is_string($node->params['approval'] ?? null) ? $node->params['approval'] : null;
         $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
         $requestedBy = $runId > 0
             ? sprintf('task_run:%d:%s', $runId, $node->id)
             : 'chat:'.(int) $context->message->getId();
         try {
-            $decision = $this->executionGate->inspect(
-                $userId,
-                $toolName,
-                $arguments,
-                $actor,
-                PolicyContext::Unattended,
-                $requestedBy,
-                null,
-                true === ($context->options['allow_unattended'] ?? false),
-                null,
-                $override,
-                false,
-                $this->resolvedRequest($userId, $toolName, $arguments),
+            $outcome = $this->tools()->invoke(
+                $descriptor,
+                new ToolInvocation(
+                    $toolName,
+                    $arguments,
+                    new ToolCaller((int) $userId, ToolChannel::SAVED_TASK, unattended: true),
+                    $approved ? GateMode::AsTodayNever : GateMode::AsTodayAlways,
+                    decision: new GateRequest(
+                        $actor instanceof User ? $actor : null,
+                        PolicyContext::Unattended,
+                        $requestedBy,
+                        allowUnattended: true === ($context->options['allow_unattended'] ?? false),
+                        nodeApproval: $override,
+                        resolvedRequest: $actor instanceof User ? $this->resolvedRequest((int) $userId, $toolName, $arguments) : null,
+                    ),
+                    user: $actor instanceof User ? $actor : null,
+                    decideOnly: ToolSource::Custom !== $descriptor->source && ToolSource::Mcp !== $descriptor->source,
+                ),
             );
         } catch (ToolNotRegisteredException $e) {
             return NodeResult::failed($e->getMessage());
         }
-        if (PolicyOutcome::Block === $decision['outcome']) {
-            return NodeResult::failed((string) $decision['refusal']);
-        }
-        if (PolicyOutcome::Approve === $decision['outcome'] && null !== $decision['approval']) {
-            $approval = $decision['approval'];
+
+        return $this->toResult($descriptor, $toolName, $arguments, $outcome);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function toResult(ToolDescriptor $descriptor, string $toolName, array $arguments, ToolOutcome $outcome): NodeResult
+    {
+        if (ToolOutcomeKind::NeedsApproval === $outcome->kind && null !== $outcome->approval) {
+            $approval = $outcome->approval;
 
             return NodeResult::waitingApproval((int) $approval->getId(), $arguments, [
                 'tool' => $approval->getTool(),
@@ -158,38 +161,77 @@ final readonly class ToolCallRunner implements TaskRunner
                 'side_effect' => $approval->getSideEffect(),
             ]);
         }
+        if (ToolOutcomeKind::Refused === $outcome->kind || (ToolOutcomeKind::Failed === $outcome->kind && true === ($outcome->details['missing'] ?? false))) {
+            return NodeResult::failed($outcome->resultText);
+        }
+        if (ToolSource::Custom !== $descriptor->source && ToolSource::Mcp !== $descriptor->source) {
+            return NodeResult::failed('This tool cannot run as a Saved Task step');
+        }
+        if (true === ($outcome->details['unavailable'] ?? false)) {
+            return NodeResult::failed((new ToolNotRegisteredException($toolName))->getMessage());
+        }
+        if (true === ($outcome->details['transport'] ?? false)) {
+            return NodeResult::failed('could not reach the connected system: '.$outcome->resultText);
+        }
+        if (ToolOutcomeKind::Failed === $outcome->kind && ToolSource::Custom === $descriptor->source) {
+            return NodeResult::failed($outcome->resultText);
+        }
+        if (true === ($outcome->details['toolError'] ?? false)) {
+            return NodeResult::failed('the connected system reported an error: '.mb_substr($this->mcpNodeText($outcome), 0, 300));
+        }
+        if (ToolSource::Custom === $descriptor->source) {
+            $summary = $outcome->details['summary'] ?? $outcome->resultText;
 
-        return null;
+            return NodeResult::ok(is_string($summary) ? $summary : $outcome->resultText, [], [
+                'tool' => $toolName,
+                'query' => $toolName,
+                'fields' => is_array($outcome->details['fields'] ?? null) ? $outcome->details['fields'] : [],
+                'summary' => is_string($summary) ? $summary : $outcome->resultText,
+            ]);
+        }
+
+        $text = $this->mcpNodeText($outcome);
+
+        return NodeResult::ok('' !== $text ? $text : 'The tool finished', [], [
+            'tool' => $toolName,
+            'summary' => $text,
+        ]);
     }
 
     /**
-     * @param array<string, mixed> $meta
-     * @param array<string, mixed> $arguments
+     * The node output is the full tool text. The invoker clamps model-facing
+     * text to {@see \App\Service\Tool\Execution\ToolLimits::RESULT_CHARS};
+     * a later Saved Task step still needs the complete content.
      */
-    private function runCustom(array $meta, array $arguments, int $userId, string $toolName): NodeResult
+    private function mcpNodeText(ToolOutcome $outcome): string
     {
-        $toolId = $meta['toolId'] ?? null;
-        $tool = is_numeric($toolId) ? $this->customTools->find((int) $toolId) : null;
-        if (null === $tool) {
-            throw new ToolNotRegisteredException($toolName);
+        $content = $outcome->details['content'] ?? null;
+        if (!is_array($content)) {
+            return $outcome->resultText;
         }
-        try {
-            $result = $this->httpExecutor->execute($tool, $arguments, $userId);
-        } catch (InvalidToolTemplateException $e) {
-            $this->logger->info('ToolCallRunner: custom tool failed', [
-                'tool' => $toolName,
-                'error' => $e->getMessage(),
-            ]);
-
-            return NodeResult::failed($e->getMessage());
+        $parts = [];
+        foreach ($content as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            if ('text' === ($item['type'] ?? null) && is_string($item['text'] ?? null) && '' !== $item['text']) {
+                $parts[] = $item['text'];
+            }
         }
 
-        return NodeResult::ok($result['summary'], [], [
-            'tool' => $toolName,
-            'query' => $toolName,
-            'fields' => $result['fields'],
-            'summary' => $result['summary'],
-        ]);
+        return trim(implode("\n", $parts));
+    }
+
+    private function tools(): ToolInvoker
+    {
+        return $this->toolInvoker->get() ?? new ToolInvoker(
+            [
+                new McpToolExecutor($this->mcpClient, $this->mcpServers),
+                new CustomHttpToolExecutor($this->logger, $this->customTools, $this->httpExecutor, $this->toolsConfig),
+            ],
+            gate: $this->executionGate,
+            toolsConfig: $this->toolsConfig,
+        );
     }
 
     /**
@@ -216,49 +258,6 @@ final readonly class ToolCallRunner implements TaskRunner
         } catch (InvalidToolTemplateException) {
             return null;
         }
-    }
-
-    /**
-     * @param array<string, mixed> $meta
-     * @param array<string, mixed> $arguments
-     */
-    private function runMcp(array $meta, array $arguments, int $userId, string $toolName): NodeResult
-    {
-        $serverId = (int) ($meta['serverId'] ?? 0);
-        $mcpTool = is_string($meta['tool'] ?? null) ? $meta['tool'] : '';
-        $server = $serverId > 0 ? $this->mcpServers->findByIdAndUser($serverId, $userId) : null;
-        if (null === $server || !$server->isEnabled() || '' === $mcpTool) {
-            throw new ToolNotRegisteredException($toolName);
-        }
-        try {
-            $call = $this->mcpClient->callTool($server, $mcpTool, $arguments);
-        } catch (McpClientException $e) {
-            return NodeResult::failed('could not reach the connected system: '.$e->getMessage());
-        }
-        $text = $this->formatContent($call['content']);
-        if ($call['isError']) {
-            return NodeResult::failed('the connected system reported an error: '.mb_substr($text, 0, 300));
-        }
-
-        return NodeResult::ok('' !== $text ? $text : 'The tool finished', [], [
-            'tool' => $toolName,
-            'summary' => $text,
-        ]);
-    }
-
-    /**
-     * @param list<array<string, mixed>> $content
-     */
-    private function formatContent(array $content): string
-    {
-        $parts = [];
-        foreach ($content as $item) {
-            if (is_string($item['text'] ?? null) && '' !== $item['text']) {
-                $parts[] = $item['text'];
-            }
-        }
-
-        return trim(implode("\n", $parts));
     }
 
     /**

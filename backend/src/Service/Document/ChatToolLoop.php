@@ -10,9 +10,15 @@ use App\Service\Document\Tool\DocumentSession;
 use App\Service\Document\Tool\DocumentToolRegistry;
 use App\Service\Document\Tool\DocumentToolResult;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
-use Psr\Log\LoggerInterface;
+use App\Service\Tool\ToolSource;
 
 /**
  * Multi-round document tool loop on ChatProviderInterface / AiFacade.
@@ -31,7 +37,7 @@ final readonly class ChatToolLoop
         private AiFacade $aiFacade,
         private DocumentToolRegistry $registry,
         private DocumentToolsConfig $config,
-        private LoggerInterface $logger,
+        private ToolInvoker $invoker,
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
         private ?ProviderTranscriptCapture $transcripts = null,
@@ -100,22 +106,19 @@ final readonly class ChatToolLoop
                         throw new ToolNotRegisteredException($name);
                     }
                     $result = DocumentToolResult::error('Unknown tool '.$name, 'processing.documentStepUnknownTool', ['name' => $name]);
+                    $session->record($result);
+                    $payload = $this->clamp($result->message);
                 } else {
-                    try {
-                        $result = $tool->execute($session, $args);
-                    } catch (\Throwable $e) {
-                        $this->logger->warning('ChatToolLoop: tool threw', ['tool' => $name, 'error' => $e->getMessage()]);
-                        $result = DocumentToolResult::error($e->getMessage(), 'processing.documentStepFailed', ['name' => $name]);
-                    }
+                    $outcome = $this->invoker->invoke(
+                        new ToolDescriptor($name, $name, '', [], SideEffect::Write, ToolSource::Document, $userId ?? 0),
+                        new ToolInvocation($name, $args, new ToolCaller($userId, 'chat', document: $session), GateMode::AsTodayNever),
+                    );
+                    $result = $outcome->document ?? DocumentToolResult::error($outcome->resultText, 'processing.documentStepFailed', ['name' => $name]);
+                    $payload = $outcome->resultText;
                 }
-                $session->record($result);
                 ++$ops;
                 if (null !== $onStep) {
                     $onStep($result, $ops);
-                }
-                $payload = $result->message;
-                if (strlen($payload) > self::MAX_RESULT_CHARS) {
-                    $payload = substr($payload, 0, self::MAX_RESULT_CHARS).'…';
                 }
                 $messages[] = [
                     'role' => 'tool',
@@ -127,6 +130,15 @@ final readonly class ChatToolLoop
         }
 
         return new ChatToolLoopResult($content, $session, $usage, $facadeMetered, $facadeMetered ? number_format($charged, 6, '.', '') : null, $priceKnown);
+    }
+
+    private function clamp(string $payload): string
+    {
+        if (strlen($payload) > self::MAX_RESULT_CHARS) {
+            return substr($payload, 0, self::MAX_RESULT_CHARS).'…';
+        }
+
+        return $payload;
     }
 
     /**

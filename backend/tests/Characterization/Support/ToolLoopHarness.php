@@ -95,6 +95,7 @@ use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\StorageQuotaService;
+use App\Tests\Support\DocumentLoopInvoker;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Cache\CacheItemPoolInterface;
@@ -1297,11 +1298,12 @@ final class ToolLoopHarness
         $docConfig = $this->double(DocumentToolsConfig::class);
         $docConfig->method('maxIterations')->willReturn(4);
         $docConfig->method('maxOpsPerTurn')->willReturn(8);
+        $documentTools = new DocumentToolRegistry([new SetCellsTool(), new LongEchoDocumentTool()]);
         $this->chat = new ChatToolLoop(
             $facade,
-            new DocumentToolRegistry([new SetCellsTool(), new LongEchoDocumentTool()]),
+            $documentTools,
             $docConfig,
-            $logger,
+            DocumentLoopInvoker::create($documentTools),
             $registry,
             $toolsConfig,
         );

@@ -22,8 +22,6 @@ use App\Service\Desktop\DesktopJobContract;
 use App\Service\Desktop\DesktopJobResultNotifier;
 use App\Service\Desktop\DesktopJobStore;
 use App\Service\Desktop\Exception\ResultTooLargeException;
-use App\Service\Exception\MemoryServiceUnavailableException;
-use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Memory\UserMemoryService;
@@ -31,6 +29,18 @@ use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
+use App\Service\Tool\Execution\FileIngestExecutor;
+use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\MemoryAddExecutor;
+use App\Service\Tool\Execution\ToolCaller;
+use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcomeKind;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolDescriptor;
+use App\Service\Tool\ToolSource;
 use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -44,6 +54,7 @@ use Mcp\Server\Session\SessionStoreInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Cache\Psr16Cache;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Builds a per-request MCP {@see Server} exposing a curated, user-scoped set of
@@ -86,6 +97,8 @@ final class McpServerFactory
 
     private ?SessionStoreInterface $sessionStore = null;
 
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private readonly VectorSearchService $vectorSearch,
         private readonly UserMemoryService $memoryService,
@@ -109,6 +122,13 @@ final class McpServerFactory
         private readonly ?AssistantAliasResolver $assistantAliases = null,
         private readonly ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     /**
@@ -924,79 +944,11 @@ final class McpServerFactory
     private function fileIngestHandler(User $user): \Closure
     {
         return function (string $name, string $content, ?string $group_key = null) use ($user): array {
-            if ('' === trim($content)) {
-                throw new ToolCallException('content must not be empty.');
-            }
-
-            // Ingestion runs the embedding pipeline (provider cost) — gate it.
-            if (!($this->rateLimit->checkLimit($user, 'FILE_ANALYSIS')['allowed'] ?? false)) {
-                throw new ToolCallException('Rate limit exceeded for file ingestion.');
-            }
-
-            $userId = (int) $user->getId();
-            $size = \strlen($content);
-
-            try {
-                $this->storageQuota->checkStorageLimit($user, $size);
-            } catch (\RuntimeException $e) {
-                throw new ToolCallException($e->getMessage());
-            }
-
-            $title = '' !== trim($name) ? trim($name) : 'mcp-document';
-
-            $stored = $this->fileStorage->storeRawContent($content, $userId, $title.'.txt', 'text/plain');
-            if (!$stored['success']) {
-                throw new ToolCallException($stored['error'] ?? 'Failed to store content.');
-            }
-
-            $file = (new File())
-                ->setUserId($userId)
-                ->setFilePath((string) $stored['path'])
-                ->setFileType('txt')
-                ->setFileName($title)
-                ->setFileSize((int) $stored['size'])
-                ->setFileMime('text/plain')
-                ->setFileText($content)
-                ->setGroupKey($group_key)
-                ->setStatus('extracted');
-
-            $this->em->persist($file);
-            $this->em->flush();
-
-            $vector = $this->vectorization->vectorizeAndStore(
-                $content,
-                $userId,
-                (int) $file->getId(),
-                $group_key ?? '',
-                FileHelper::getFileTypeCode('txt'),
-            );
-
-            if (!($vector['success'] ?? false)) {
-                // Roll back so a failed ingest does not leave an un-searchable file
-                // consuming storage quota.
-                $this->fileStorage->deleteFile((string) $stored['path']);
-                $this->em->remove($file);
-                $this->em->flush();
-
-                throw new ToolCallException($vector['error'] ?? 'Vectorization failed.');
-            }
-
-            $file->markVectorized();
-            $this->em->flush();
-
-            $this->rateLimit->recordFileAnalysisOnce($user, (int) $file->getId(), [
-                'source' => 'MCP',
-                'filename' => $title,
-            ]);
-
-            return [
-                'success' => true,
-                'file_id' => $file->getId(),
-                'name' => $title,
+            return $this->pluginResult('file_ingest', [
+                'name' => $name,
+                'content' => $content,
                 'group_key' => $group_key,
-                'chunks_created' => $vector['chunks_created'] ?? 0,
-                'provider' => $vector['provider'] ?? null,
-            ];
+            ], $user);
         };
     }
 
@@ -1006,29 +958,49 @@ final class McpServerFactory
     private function memoryAddHandler(User $user): \Closure
     {
         return function (string $category, string $key, string $value) use ($user): array {
-            // Creating a memory embeds the value (provider cost) — gate it.
-            // createMemory() records the EMBEDDINGS usage internally.
-            if (!($this->rateLimit->checkLimit($user, 'EMBEDDINGS')['allowed'] ?? false)) {
-                throw new ToolCallException('Rate limit exceeded for embeddings.');
-            }
-
-            if (!$this->memoryService->isAvailable()) {
-                throw new ToolCallException('Memory service is currently unavailable.');
-            }
-
-            try {
-                $memory = $this->memoryService->createMemory($user, $category, $key, $value, 'user_created');
-            } catch (\InvalidArgumentException $e) {
-                throw new ToolCallException($e->getMessage());
-            } catch (MemoryServiceUnavailableException) {
-                throw new ToolCallException('Memory service is currently unavailable.');
-            }
-
-            return [
-                'success' => true,
-                'memory' => $memory->toArray(),
-            ];
+            return $this->pluginResult('memory_add', [
+                'category' => $category,
+                'key' => $key,
+                'value' => $value,
+            ], $user);
         };
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed>
+     */
+    private function pluginResult(string $name, array $arguments, User $user): array
+    {
+        $outcome = $this->tools()->invoke(
+            new ToolDescriptor($name, $name, '', [], SideEffect::Write, ToolSource::Plugin, (int) $user->getId()),
+            new ToolInvocation(
+                $name,
+                $arguments,
+                new ToolCaller((int) $user->getId(), ToolChannel::MCP_SERVER),
+                GateMode::AsTodayNever,
+                user: $user,
+            ),
+        );
+        if (ToolOutcomeKind::Failed === $outcome->kind) {
+            throw new ToolCallException($outcome->resultText);
+        }
+        $payload = $outcome->details['payload'] ?? null;
+        if (!is_array($payload)) {
+            throw new ToolCallException('The tool finished without a result.');
+        }
+
+        /* @var array<string, mixed> $payload */
+        return $payload;
+    }
+
+    private function tools(): ToolInvoker
+    {
+        return $this->toolInvoker->get() ?? new ToolInvoker([
+            new MemoryAddExecutor($this->memoryService, $this->rateLimit),
+            new FileIngestExecutor($this->fileStorage, $this->storageQuota, $this->vectorization, $this->em, $this->rateLimit),
+        ]);
     }
 
     /**

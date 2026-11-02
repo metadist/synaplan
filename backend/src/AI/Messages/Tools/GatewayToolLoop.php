@@ -9,24 +9,21 @@ use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesEventEmitter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
-use App\Entity\ComputeRun;
-use App\Entity\CustomTool;
 use App\Entity\User;
 use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
-use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Custom\HttpToolExecutor;
-use App\Service\Tool\Custom\InvalidToolTemplateException;
-use App\Service\Tool\Exception\ToolNotRegisteredException;
-use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\ToolExecutionGate;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Agentic server-side tool loop for the Messages gateway.
@@ -57,12 +54,14 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class GatewayToolLoop
 {
-    private const MAX_TOOL_RESULT_CHARS = 12000;
+    public const MAX_TOOL_RESULT_CHARS = 12000;
     private const MAX_TOOLS_PER_TURN = 16;
     private const WALL_CLOCK_SECONDS = 240;
     private const PING_INTERVAL_SECONDS = 15;
     public const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user\'s question now from these results, as completely as the question needs, and cite the https URLs you used. Do not search again.';
     private const EMPTY_SEARCH_RECOVERY = 'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.';
+
+    private ToolInvokerSlot $toolInvoker;
 
     public function __construct(
         private McpToolCatalogAdapter $catalogAdapter,
@@ -80,6 +79,13 @@ final readonly class GatewayToolLoop
         private ?HttpToolExecutor $httpExecutor = null,
         private ?CustomToolRepository $customTools = null,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     /**
@@ -697,6 +703,11 @@ final readonly class GatewayToolLoop
 
         $results = [];
         $lastPing = microtime(true);
+        $owned = $this->owned();
+        $afterRun = null !== $ping ? function () use ($ping, &$lastPing): void {
+            $ping();
+            $lastPing = microtime(true);
+        } : null;
 
         foreach ($toolUses as $block) {
             if (null !== $ping && (microtime(true) - $lastPing) >= self::PING_INTERVAL_SECONDS) {
@@ -735,30 +746,12 @@ final readonly class GatewayToolLoop
             }
 
             if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
-                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
-                if (null !== $gated) {
-                    $results[] = $gated;
-                    continue;
-                }
-                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $pages, $assistant);
-                if (null !== $ping) {
-                    $ping();
-                    $lastPing = microtime(true);
-                }
+                $results[] = $owned->native($entry, $name, $arguments, $toolUseId, $user, $pages, $assistant, $afterRun);
                 continue;
             }
 
             if (GatewayToolCatalog::KIND_CUSTOM === $entry['kind']) {
-                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
-                if (null !== $gated) {
-                    $results[] = $gated;
-                    continue;
-                }
-                $results[] = $this->executeCustom($entry, $arguments, $toolUseId, $user);
-                if (null !== $ping) {
-                    $ping();
-                    $lastPing = microtime(true);
-                }
+                $results[] = $owned->custom($entry, $name, $arguments, $toolUseId, $user, $afterRun);
                 continue;
             }
 
@@ -781,162 +774,38 @@ final readonly class GatewayToolLoop
                 continue;
             }
 
-            try {
-                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
-                if (null !== $gated) {
-                    $results[] = $gated;
-                    continue;
-                }
-                $call = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
-                $text = $this->formatToolContent($call['content']);
-                $isError = $call['isError'];
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], $isError);
-                $results[] = $this->toolResultBlock($toolUseId, $text, $isError);
-            } catch (McpClientException $e) {
-                $this->logger->warning('GatewayToolLoop: MCP tool call failed', [
-                    'server_id' => $entry['serverId'],
-                    'tool' => $entry['tool'],
-                    'error' => $e->getMessage(),
-                ]);
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
-                $results[] = $this->toolResultBlock(
-                    $toolUseId,
-                    'Tool call failed: '.$e->getMessage(),
-                    isError: true,
-                );
-            }
-
-            if (null !== $ping) {
-                $ping();
-                $lastPing = microtime(true);
-            }
+            $results[] = $owned->mcp($entry, $name, $arguments, $toolUseId, $user, $afterRun);
         }
 
         return $results;
     }
 
-    /**
-     * @param array<string, mixed> $arguments
-     *
-     * @return array<string, mixed>|null a tool_result block when the call must not execute
-     */
-    private function gatedToolResult(User $user, string $name, array $arguments, string $toolUseId): ?array
+    private function owned(): GatewayOwnedCall
     {
-        $userId = (int) $user->getId();
-        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
-            if (null === $this->toolRegistry->get($userId, $name)) {
-                throw new ToolNotRegisteredException($name);
-            }
-        }
-        if (null === $this->executionGate || !$this->approvalsOn($userId)) {
-            return null;
-        }
-        $decision = $this->executionGate->inspect(
-            $userId,
-            $name,
-            $arguments,
-            $user,
-            PolicyContext::Interactive,
-            'chat:0',
+        return new GatewayOwnedCall(
+            $this->logger,
+            new GatewayOwnedDeps(
+                $this->mcpClient,
+                $this->servers,
+                $this->nativeTools,
+                $this->analyzeImageTool,
+                $this->executionGate,
+                $this->toolRegistry,
+                $this->toolsConfig,
+                $this->codeExecutionTool,
+                $this->httpExecutor,
+                $this->customTools,
+            ),
+            $this->toolInvoker,
+            $this->toolResultBlock(...),
+            $this->recordMcpUsage(...),
+            $this->recordNativeUsage(...),
         );
-        if (null !== $decision['refusal']) {
-            return $this->toolResultBlock($toolUseId, $decision['refusal'], isError: true);
-        }
-        if (null !== $decision['approval']) {
-            return $this->toolResultBlock(
-                $toolUseId,
-                sprintf('requires approval; request #%d created', (int) $decision['approval']->getId()),
-            );
-        }
-
-        return null;
     }
 
     private function approvalsOn(int $userId): bool
     {
         return null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($userId);
-    }
-
-    /**
-     * @param DispatchEntry        $entry
-     * @param array<string, mixed> $arguments
-     *
-     * @return array<string, mixed> tool_result content block
-     */
-    private function executeCustom(array $entry, array $arguments, string $toolUseId, User $user): array
-    {
-        if (null === $this->httpExecutor || null === $this->customTools) {
-            return $this->toolResultBlock($toolUseId, 'This custom tool cannot run right now.', isError: true);
-        }
-        $userId = (int) $user->getId();
-        if (
-            null !== $this->toolsConfig
-            && (!$this->toolsConfig->isRegistryEnabled($userId) || !$this->toolsConfig->isCustomHttpEnabled($userId))
-        ) {
-            return $this->toolResultBlock($toolUseId, 'This custom tool is not available.', isError: true);
-        }
-
-        $toolId = (int) ($entry['annotations']['toolId'] ?? 0);
-        $tool = $toolId > 0 ? $this->customTools->find($toolId) : null;
-        if (!$tool instanceof CustomTool || !$tool->isEnabled()) {
-            return $this->toolResultBlock($toolUseId, 'This custom tool is not available.', isError: true);
-        }
-
-        try {
-            $result = $this->httpExecutor->execute($tool, $arguments, (int) $user->getId());
-        } catch (InvalidToolTemplateException $e) {
-            $this->logger->info('GatewayToolLoop: custom tool failed', [
-                'tool' => $entry['tool'],
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->toolResultBlock($toolUseId, $e->getMessage(), isError: true);
-        }
-
-        $text = '' !== $result['summary'] ? $result['summary'] : 'The tool finished';
-        $failed = $result['status'] < 200 || $result['status'] >= 300;
-
-        return $this->toolResultBlock($toolUseId, $this->clampToolText($text), isError: $failed);
-    }
-
-    /**
-     * Execute one of Synaplan's built-in tools.
-     *
-     * @param array<string, mixed> $arguments
-     *
-     * @return array<string, mixed> tool_result content block
-     */
-    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, WebFetchBudget $pages, ?RuntimeProfile $assistant = null): array
-    {
-        $native = $this->nativeTools->tryExecute($tool, $arguments, $user, $pages, $assistant);
-        if (null !== $native) {
-            $this->recordNativeUsage($user, $native['source'], $tool, $native['summary'], $native['isError']);
-
-            return $this->toolResultBlock($toolUseId, $this->clampToolText($native['text']), $native['isError']);
-        }
-
-        if (AnalyzeImageTool::NAME === $tool) {
-            $result = $this->analyzeImageTool->execute($arguments, $user->getId(), $user->getLocale());
-            $this->recordNativeUsage($user, 'VISION', $tool, $result['summary'], $result['isError']);
-
-            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
-        }
-
-        if (CodeExecutionTool::NAME === $tool && null !== $this->codeExecutionTool) {
-            $result = $this->codeExecutionTool->execute(
-                $arguments,
-                $user,
-                ComputeRun::VIA_GATEWAY_ANTHROPIC,
-                $assistant,
-                null,
-                $assistant?->promptId,
-            );
-            $this->recordNativeUsage($user, 'COMPUTE_RUNS', $tool, 'file_work', $result['isError']);
-
-            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
-        }
-
-        return $this->toolResultBlock($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), isError: true);
     }
 
     /**
@@ -1304,38 +1173,6 @@ final readonly class GatewayToolLoop
         }
 
         return $block;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $content
-     */
-    private function formatToolContent(array $content): string
-    {
-        $parts = [];
-        foreach ($content as $block) {
-            $type = $block['type'] ?? null;
-            if ('text' === $type && \is_string($block['text'] ?? null)) {
-                $parts[] = $block['text'];
-            } elseif (\is_array($block['resource'] ?? null) && \is_string($block['resource']['text'] ?? null)) {
-                $parts[] = $block['resource']['text'];
-            } else {
-                $encoded = json_encode($block, \JSON_INVALID_UTF8_SUBSTITUTE);
-                if (false !== $encoded) {
-                    $parts[] = $encoded;
-                }
-            }
-        }
-
-        return $this->clampToolText(trim(implode("\n\n", $parts)));
-    }
-
-    private function clampToolText(string $text): string
-    {
-        if (mb_strlen($text) > self::MAX_TOOL_RESULT_CHARS) {
-            $text = mb_substr($text, 0, self::MAX_TOOL_RESULT_CHARS).'…';
-        }
-
-        return '' !== $text ? $text : '(empty tool result)';
     }
 
     private function recordMcpUsage(User $user, int $serverId, string $tool, bool $error): void

@@ -29,13 +29,14 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
-use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\Policy\PolicyContext;
-use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\ToolExecutionGate;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory as SpreadsheetIOFactory;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Planner-visible file-work step. Hidden when compute is off (C1).
@@ -54,6 +55,8 @@ final readonly class CodeRunRunner implements TaskRunner
     /** Max stderr characters surfaced when a run fails (the tail carries the actual error). */
     private const STDERR_REPLY_CAP = 1500;
 
+    private ToolInvokerSlot $toolInvoker;
+
     public function __construct(
         private ComputeConfig $computeConfig,
         private ComputeClient $client,
@@ -69,6 +72,13 @@ final readonly class CodeRunRunner implements TaskRunner
         private ?ComputeEgressResolver $egress = null,
         private ?ComputeRequestBuilder $requests = null,
     ) {
+        $this->toolInvoker = new ToolInvokerSlot();
+    }
+
+    #[Required]
+    public function setToolInvoker(ToolInvoker $toolInvoker): void
+    {
+        $this->toolInvoker->set($toolInvoker);
     }
 
     public function supportedCapabilities(): array
@@ -481,85 +491,23 @@ final readonly class CodeRunRunner implements TaskRunner
         bool $forceApproveForEgress = false,
         array $egressHosts = [],
     ): ?array {
-        if (null === $this->executionGate) {
-            return null;
-        }
+        $decision = (new CodeRunApproval($this->computeConfig, $this->runs, $this->toolInvoker, $this->executionGate))->decide(
+            $user,
+            $language,
+            $code,
+            $inputFileIds,
+            $timeoutSec,
+            $invokedVia,
+            $policyContext,
+            $allowUnattended,
+            $savedTaskRunId,
+            $messageId,
+            $node,
+            $forceApproveForEgress,
+            $egressHosts,
+        );
 
-        $userId = (int) $user->getId();
-        $args = [
-            'language' => $language,
-        ];
-        if ([] !== $egressHosts) {
-            // A scalar so the approval preview shows which websites the run may
-            // reach (U7: "what will it touch?") — arrays are left out of previews.
-            $args['websites'] = implode(', ', $egressHosts);
-        }
-        $args += [
-            'code' => $code,
-            'input_file_ids' => $inputFileIds,
-            'timeout_sec' => $timeoutSec,
-        ];
-        $requestedBy = null !== $savedTaskRunId && null !== $node
-            ? sprintf('task_run:%d:%s', $savedTaskRunId, $node->id)
-            : 'chat:'.(int) ($messageId ?? 0);
-        $override = is_string($node?->params['approval'] ?? null) ? $node->params['approval'] : null;
-
-        try {
-            // A run with egress must reach a human: the gate lifts Auto to
-            // Approve so neither always-allow nor allow_unattended can skip it
-            // (Block from the policy or the node still wins).
-            $decision = $this->executionGate->inspect(
-                $userId,
-                Capability::CodeRun->value,
-                $args,
-                $user,
-                $policyContext,
-                $requestedBy,
-                null,
-                $allowUnattended,
-                null,
-                $override,
-                $forceApproveForEgress,
-            );
-        } catch (ToolNotRegisteredException) {
-            return null;
-        }
-
-        if (PolicyOutcome::Block === $decision['outcome']) {
-            return $this->failedOutcome((string) $decision['refusal']);
-        }
-
-        if (PolicyOutcome::Approve === $decision['outcome'] && null !== $decision['approval']) {
-            $approvalId = (int) $decision['approval']->getId();
-            $image = 'node' === $language ? 'node' : 'python';
-            $limits = $this->computeConfig->clampLimits(null !== $timeoutSec ? ['timeoutSec' => $timeoutSec] : []);
-            $audit = new ComputeRun(
-                $userId,
-                'q'.bin2hex(random_bytes(12)),
-                $invokedVia,
-                $image,
-                $image,
-                $limits,
-            );
-            $audit->setApprovalId($approvalId);
-            $audit->setMessageId($messageId);
-            $audit->setSavedTaskRunId($savedTaskRunId);
-            $this->runs->save($audit);
-
-            return [
-                'outcome' => 'waiting_approval',
-                'status' => ComputeRun::STATUS_QUEUED,
-                'exit_code' => null,
-                'stdout' => '',
-                'stderr' => '',
-                'artefacts' => [],
-                'error' => null,
-                'approval_id' => $approvalId,
-                'compute_run_id' => $audit->getRunId(),
-            ];
-        }
-
-        return null;
+        return is_string($decision) ? $this->failedOutcome($decision) : $decision;
     }
 
     /**
