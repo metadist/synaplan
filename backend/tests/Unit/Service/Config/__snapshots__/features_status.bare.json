@@ -507,6 +507,27 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "office_editor",
+            "label_key": "modules.office_editor.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "OFFICE_PUBLIC_URL or OFFICE_WOPI_URL is unset or disabled",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "OFFICE_PUBLIC_URL",
+                    "OFFICE_WOPI_URL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/office-editor",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "opendesk_stt",
             "label_key": "modules.opendesk_stt.label",
             "state": "absent",

@@ -9,6 +9,7 @@ use App\Module\CloudFiles\CloudFilesModule;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\OfficeConvertModule;
+use App\Module\Sidecar\OfficeEditorModule;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Config\Runtime\RuntimeConfigContext;
 use App\Service\Config\Runtime\RuntimeConfigContributorInterface;
@@ -69,6 +70,7 @@ final readonly class ModulesRuntimeConfig implements RuntimeConfigContributorInt
                 'memoryService' => !empty($_ENV['QDRANT_URL']),
                 'bundleEnabled' => null !== $this->bundleConfig && $this->bundleConfig->isEnabled($user?->getId()),
                 'officeConvertEnabled' => $this->modules->get(OfficeConvertModule::ID)->isConfigured(),
+                'officeEditorEnabled' => $this->modules->get(OfficeEditorModule::ID)->isConfigured(),
                 'computeEnabled' => null !== $this->computeConfig && $this->computeConfig->isEnabled($user?->getId()),
                 'computeWorkspacesEnabled' => null !== $this->computeConfig && $this->computeConfig->workspacesEnabled($user?->getId()),
             ],

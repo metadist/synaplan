@@ -215,6 +215,9 @@ sidecar (`collabora/code`). Chat, Tika RAG and officemaker DOCX / XLSX / PPTX
 work without it. `make up` starts Collabora with the standard compose file
 (`OFFICE_CONVERT_URL=http://collabora:9980` in `backend/.env.example`). It
 uses about 2 GB of RAM. Stop it with `docker compose stop collabora`.
+The standard compose file also publishes the editor on `127.0.0.1:9981`
+(`OFFICE_PUBLIC_URL` / `OFFICE_WOPI_URL`). Conversion does not need that
+port. Leave either URL empty to hide the editor.
 
 The lean file, `deploy/compose.yaml`, Umbrel, AWS Marketplace and Elestio
 stay off unless you opt in, so the official 8 GB Cloud-AI floor stays valid.

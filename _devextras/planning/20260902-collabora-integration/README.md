@@ -1,6 +1,6 @@
 # Collabora integration (Synaplan inside the editor)
 
-**Status:** planned (2026-09-02). No product code in this change.
+**Status:** Epic 0.1 in review (`feat/wopi-host`). Epics 0.2–4 planned.
 **Sibling:** [`../2026-archive/20260902-office-docs/`](../2026-archive/20260902-office-docs) — create,
 analyse, convert, merge and edit office files *inside Synaplan*.
 
@@ -15,6 +15,7 @@ session `.plan.md` files are not authoritative.
 | [`03_epic_2_synaplan_extension.md`](./03_epic_2_synaplan_extension.md) | iframe-hosted Synaplan extension |
 | [`04_epic_3_mcp_and_tasks.md`](./04_epic_3_mcp_and_tasks.md) | Collabora MCP from Synaplan tasks |
 | [`05_epic_4_partner_platforms.md`](./05_epic_4_partner_platforms.md) | Nextcloud / OpenCloud / ownCloud |
+| [`06_charts_opendesk.md`](./06_charts_opendesk.md) | openDesk delivery in `synaplan-charts` |
 | [`STATUS.md`](./STATUS.md) | Step table and decision log |
 
 **Shared with office-docs:** Collabora CODE sidecar (A0) and Phase T tool

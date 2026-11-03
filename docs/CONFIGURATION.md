@@ -706,6 +706,21 @@ never execs LibreOffice; it only calls `OFFICE_CONVERT_URL`. Host
 `apt install libreoffice` is unused by the containers. Desktop’s local
 LibreOffice (Agent Skills) is a different binary on the user’s PC.
 
+Opening a file in the editor is separate from conversion. It stays off until
+both of these are set:
+
+```bash
+# What the browser loads. In dev compose this is http://localhost:9981.
+OFFICE_PUBLIC_URL=https://office.example.com
+# What Collabora calls back. In dev compose this is http://backend:80.
+OFFICE_WOPI_URL=https://app.example.com
+```
+
+Collabora's `aliasgroup1` must list the WOPI host (`OFFICE_WOPI_URL`'s
+scheme, host and port). The editor iframe also needs that page's origin in
+`net.frame_ancestors`. Dev compose does both. A self-host that only wants
+thumbnails and PDF export leaves the two URLs empty.
+
 ---
 
 ## WhatsApp Integration

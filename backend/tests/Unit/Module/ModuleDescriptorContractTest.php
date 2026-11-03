@@ -23,6 +23,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'tika',
         'docling',
         'office_convert',
+        'office_editor',
         'searxng',
         'piper_tts',
         'local_ai',
