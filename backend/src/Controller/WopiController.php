@@ -133,7 +133,7 @@ final class WopiController extends AbstractController
         path: '/api/v1/wopi/files/{id}/contents',
         operationId: 'wopiPutFile',
         summary: 'WOPI PutFile',
-        description: 'Writes the document when X-COOL-WOPI-Timestamp matches CheckFileInfo LastModifiedTime and the WOPI lock matches. A mismatch answers 409 with COOLStatusCode 1010 and does not write.',
+        description: 'Writes the document when the WOPI lock matches and X-COOL-WOPI-Timestamp matches CheckFileInfo LastModifiedTime. An unlocked file is accepted only while it is still empty. A timestamp mismatch answers 409 with COOLStatusCode 1010 and does not write.',
         tags: ['WOPI'],
         security: [],
         parameters: [
@@ -147,7 +147,9 @@ final class WopiController extends AbstractController
             new OA\Response(response: 200, description: 'Saved. Body contains the new LastModifiedTime.'),
             new OA\Response(response: 401, description: 'Missing or invalid access token'),
             new OA\Response(response: 404, description: 'File not found'),
-            new OA\Response(response: 409, description: 'Lock mismatch, or the timestamp no longer matches (COOLStatusCode 1010)'),
+            new OA\Response(response: 409, description: 'Lock mismatch, unlocked file that is not empty, or the timestamp no longer matches (COOLStatusCode 1010)'),
+            new OA\Response(response: 413, description: 'File is larger than the 128 MB limit'),
+            new OA\Response(response: 507, description: 'Not enough storage left for this save'),
         ],
     )]
     public function putFile(int $id, Request $request): Response
@@ -178,7 +180,7 @@ final class WopiController extends AbstractController
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'access_token', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-WOPI-Override', in: 'header', required: true, schema: new OA\Schema(type: 'string', enum: ['LOCK', 'UNLOCK', 'REFRESH_LOCK', 'UNLOCK_AND_RELOCK', 'GET_LOCK'])),
+            new OA\Parameter(name: 'X-WOPI-Override', in: 'header', required: true, description: 'LOCK with a non-empty X-WOPI-OldLock is UnlockAndRelock. UNLOCK_AND_RELOCK is the same operation.', schema: new OA\Schema(type: 'string', enum: ['LOCK', 'UNLOCK', 'REFRESH_LOCK', 'UNLOCK_AND_RELOCK', 'GET_LOCK'])),
             new OA\Parameter(name: 'X-WOPI-Lock', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'X-WOPI-OldLock', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
         ],
@@ -234,8 +236,11 @@ final class WopiController extends AbstractController
     private function respond(WopiHttpResult $result): Response
     {
         if (null !== $result->filePath) {
-            $response = new BinaryFileResponse($result->filePath);
+            // The access token sits in the query string, so this response is private and carries no Last-Modified.
+            $response = new BinaryFileResponse($result->filePath, Response::HTTP_OK, [], false, null, false, false);
             $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $result->downloadName ?? 'document');
+            $response->setPrivate();
+            $response->headers->set('Cache-Control', 'private, no-store');
             $response->headers->set('X-Content-Type-Options', 'nosniff');
 
             return $response;

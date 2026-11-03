@@ -378,9 +378,10 @@ services:
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       # Browser-facing editor (localhost only) and the callback Collabora uses
-      # on the compose network. Empty either one to hide "Open in editor".
-      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL:-http://localhost:9981}
-      OFFICE_WOPI_URL: ${OFFICE_WOPI_URL:-http://backend:80}
+      # on the compose network. `${VAR-default}` keeps an explicit empty value,
+      # so an empty .env entry hides "Open in editor".
+      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL-http://localhost:9981}
+      OFFICE_WOPI_URL: ${OFFICE_WOPI_URL-http://backend:80}
       # File work sidecar. Defaults match the compute service below so
       # `docker compose up` enables it with no extra env.
       # The token default is fixed on purpose (developer install + nightly).
@@ -593,9 +594,10 @@ services:
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       # Browser-facing editor (localhost only) and the callback Collabora uses
-      # on the compose network. Empty either one to hide "Open in editor".
-      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL:-http://localhost:9981}
-      OFFICE_WOPI_URL: ${OFFICE_WOPI_URL:-http://backend:80}
+      # on the compose network. `${VAR-default}` keeps an explicit empty value,
+      # so an empty .env entry hides "Open in editor".
+      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL-http://localhost:9981}
+      OFFICE_WOPI_URL: ${OFFICE_WOPI_URL-http://backend:80}
       COMPUTE_URL: ${COMPUTE_URL:-http://compute:8080}
       COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}

@@ -14,9 +14,12 @@ use App\Service\Office\Wopi\OfficeEditorConfig;
 use App\Service\Office\Wopi\WopiDiscovery;
 use App\Service\Office\Wopi\WopiDiscoveryParser;
 use App\Service\Office\Wopi\WopiDocumentService;
+use App\Service\Office\Wopi\WopiFileUpdate;
 use App\Service\Office\Wopi\WopiLockStore;
 use App\Service\Office\Wopi\WopiTimestamp;
 use App\Service\Office\Wopi\WopiTokenService;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -24,12 +27,18 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class WopiHostTest extends TestCase
 {
     private const SECRET = 'test-secret';
+
+    private File $file;
+
+    private WopiLockStore $locks;
 
     public function testTokenIsScopedToOneFileAndExpires(): void
     {
@@ -82,7 +91,7 @@ final class WopiHostTest extends TestCase
 
     public function testLockConflictReturnsTheCurrentLock(): void
     {
-        $locks = new WopiLockStore(new ArrayAdapter());
+        $locks = new WopiLockStore(new ArrayAdapter(), new LockFactory(new InMemoryStore()));
         $this->assertTrue($locks->lock(3, 'alpha')['ok']);
         $conflict = $locks->lock(3, 'beta');
         $this->assertFalse($conflict['ok']);
@@ -126,8 +135,9 @@ final class WopiHostTest extends TestCase
         $service = $this->service($dir);
         $access = $this->tokens()->verify($this->tokens()->issue(9, 4));
         $this->assertNotNull($access);
+        $this->assertTrue($this->locks->lock(9, 'held')['ok']);
 
-        $result = $service->putFile($access, 'after', WopiTimestamp::format(1_700_000_050), '');
+        $result = $service->putFile($access, 'after', WopiTimestamp::format(1_700_000_050), 'held');
 
         $this->assertSame(Response::HTTP_CONFLICT, $result->status);
         $this->assertSame(WopiDocumentService::CONFLICT_CODE, $result->json['COOLStatusCode']);
@@ -141,12 +151,84 @@ final class WopiHostTest extends TestCase
         $service = $this->service($dir, expectThumbnail: true);
         $access = $this->tokens()->verify($this->tokens()->issue(9, 4));
         $this->assertNotNull($access);
+        $this->file->setFileText('stale text');
+        $this->file->setVectorState(File::VECTOR_STATE_VECTORIZED);
+        $this->file->setThumbPath('posters/notes.jpg');
+        mkdir($dir.'/posters');
+        file_put_contents($dir.'/posters/notes.jpg', 'poster');
+        $this->assertTrue($this->locks->lock(9, 'held')['ok']);
 
-        $result = $service->putFile($access, 'after', WopiTimestamp::format(1_700_000_000), '');
+        $result = $service->putFile($access, 'after', WopiTimestamp::format(1_700_000_000), 'held');
 
         $this->assertSame(Response::HTTP_OK, $result->status);
         $this->assertSame('after', (string) file_get_contents($dir.'/notes.docx'));
         $this->assertNotSame(WopiTimestamp::format(1_700_000_000), $result->json['LastModifiedTime']);
+        $this->assertGreaterThan(1_700_000_000, $this->file->getUpdatedAt());
+        $this->assertSame('', $this->file->getFileText());
+        $this->assertSame('uploaded', $this->file->getStatus());
+        $this->assertSame(File::VECTOR_STATE_PENDING, $this->file->getVectorState());
+        $this->assertNull($this->file->getThumbPath());
+        $this->assertFileDoesNotExist($dir.'/posters/notes.jpg');
+    }
+
+    public function testPutFileRejectsAnUnlockedFileThatAlreadyHasBytes(): void
+    {
+        $dir = $this->tempDir();
+        $path = $dir.'/notes.docx';
+        file_put_contents($path, 'before');
+        $service = $this->service($dir);
+        $access = $this->tokens()->verify($this->tokens()->issue(9, 4));
+        $this->assertNotNull($access);
+
+        $result = $service->putFile($access, 'after', '', '');
+
+        $this->assertSame(Response::HTTP_CONFLICT, $result->status);
+        $this->assertSame('', $result->headers['X-WOPI-Lock']);
+        $this->assertSame('before', (string) file_get_contents($path));
+    }
+
+    public function testPutFileOnAnEmptyUnlockedFileIsAllowed(): void
+    {
+        $dir = $this->tempDir();
+        file_put_contents($dir.'/notes.docx', '');
+        $service = $this->service($dir, fileSize: 0, expectThumbnail: true);
+        $access = $this->tokens()->verify($this->tokens()->issue(9, 4));
+        $this->assertNotNull($access);
+
+        $result = $service->putFile($access, 'after', '', '');
+
+        $this->assertSame(Response::HTTP_OK, $result->status);
+        $this->assertSame('after', (string) file_get_contents($dir.'/notes.docx'));
+    }
+
+    public function testPutFileRejectsASavePastTheRemainingQuota(): void
+    {
+        $dir = $this->tempDir();
+        $path = $dir.'/notes.docx';
+        file_put_contents($path, 'before');
+        $service = $this->service($dir, remainingBytes: 0);
+        $access = $this->tokens()->verify($this->tokens()->issue(9, 4));
+        $this->assertNotNull($access);
+        $this->assertTrue($this->locks->lock(9, 'held')['ok']);
+
+        $result = $service->putFile($access, str_repeat('x', 20), '', 'held');
+
+        $this->assertSame(Response::HTTP_INSUFFICIENT_STORAGE, $result->status);
+        $this->assertSame('before', (string) file_get_contents($path));
+    }
+
+    public function testLockWithAnOldLockRelocks(): void
+    {
+        $service = $this->service();
+        $access = $this->tokens()->verify($this->tokens()->issue(9, 4));
+        $this->assertNotNull($access);
+
+        $this->assertSame(Response::HTTP_OK, $service->lock($access, 'LOCK', 'alpha', '')->status);
+        $result = $service->lock($access, 'LOCK', 'beta', 'alpha');
+
+        $this->assertSame(Response::HTTP_OK, $result->status);
+        $this->assertSame('beta', $result->headers['X-WOPI-Lock']);
+        $this->assertSame('beta', $this->locks->current(9));
     }
 
     public function testEditSessionIsOwnerOnlyAndHidesWhenUnconfigured(): void
@@ -188,7 +270,7 @@ final class WopiHostTest extends TestCase
         );
     }
 
-    private function service(?string $dir = null, ?OfficeEditorConfig $config = null, bool $expectThumbnail = false, ?string $discoveryXml = null): WopiDocumentService
+    private function service(?string $dir = null, ?OfficeEditorConfig $config = null, bool $expectThumbnail = false, ?string $discoveryXml = null, int $fileSize = 12, int $remainingBytes = 1_073_741_824): WopiDocumentService
     {
         $dir ??= $this->tempDir();
         $file = new File();
@@ -197,10 +279,11 @@ final class WopiHostTest extends TestCase
         $file->setUserId(4);
         $file->setFileName('notes.docx');
         $file->setFilePath('notes.docx');
-        $file->setFileSize(12);
+        $file->setFileSize($fileSize);
         $file->setFileType('docx');
         $file->setUpdatedAt(1_700_000_000);
         $file->setCreatedAt(1_700_000_000);
+        $this->file = $file;
 
         $files = $this->createStub(FileRepository::class);
         $files->method('find')->willReturnCallback(static function (int $id) use ($file): ?File {
@@ -229,16 +312,19 @@ final class WopiHostTest extends TestCase
             $config ?? $this->config(),
         );
 
+        $this->locks = new WopiLockStore(new ArrayAdapter(), new LockFactory(new InMemoryStore()));
+        $quota = $this->createStub(StorageQuotaService::class);
+        $quota->method('getRemainingStorage')->willReturn($remainingBytes);
+        $vectors = $this->createStub(VectorStorageFacade::class);
+
         return new WopiDocumentService(
             $files,
             $users,
-            $em,
             $this->tokens(),
             $discovery,
-            new WopiLockStore(new ArrayAdapter()),
-            new DocumentThumbnailDispatcher($bus, $converter),
+            $this->locks,
+            new WopiFileUpdate($em, new DocumentThumbnailDispatcher($bus, $converter), $vectors, $quota, new NullLogger(), $dir),
             $config ?? $this->config(),
-            new NullLogger(),
             $dir,
         );
     }

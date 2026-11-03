@@ -1255,6 +1255,10 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Service\Office\Wopi\WopiFileUpdate:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\Module\Sidecar\ComputeModule:
         arguments:
             $baseUrl: '%env(COMPUTE_URL)%'

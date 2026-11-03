@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Service\Office\Wopi;
 
 use Psr\Cache\CacheItemPoolInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * The WOPI lock Collabora holds while a document is open.
  *
  * The cache is the shared store (Redis in compose), so two PHP workers agree
- * on the lock. The item expires if a client never unlocks.
+ * on the lock id. Each change also takes the application lock for that file,
+ * because a cache read followed by a cache write is not atomic on its own.
+ * The item expires if a client never unlocks.
  */
 final readonly class WopiLockStore
 {
@@ -18,7 +21,26 @@ final readonly class WopiLockStore
 
     public function __construct(
         private CacheItemPoolInterface $cache,
+        private LockFactory $locks,
     ) {
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    public function exclusive(int $fileId, callable $work): mixed
+    {
+        $lock = $this->locks->createLock('wopi-file:'.$fileId);
+        $lock->acquire(true);
+        try {
+            return $work();
+        } finally {
+            $lock->release();
+        }
     }
 
     public function current(int $fileId): string
@@ -37,17 +59,19 @@ final readonly class WopiLockStore
      */
     public function lock(int $fileId, string $lock): array
     {
-        $lock = trim($lock);
-        $current = $this->current($fileId);
-        if ('' === $lock) {
-            return ['ok' => false, 'current' => $current];
-        }
-        if ('' !== $current && !hash_equals($current, $lock)) {
-            return ['ok' => false, 'current' => $current];
-        }
-        $this->store($fileId, $lock);
+        return $this->exclusive($fileId, function () use ($fileId, $lock): array {
+            $lock = trim($lock);
+            $current = $this->current($fileId);
+            if ('' === $lock) {
+                return ['ok' => false, 'current' => $current];
+            }
+            if ('' !== $current && !hash_equals($current, $lock)) {
+                return ['ok' => false, 'current' => $current];
+            }
+            $this->store($fileId, $lock);
 
-        return ['ok' => true, 'current' => $lock];
+            return ['ok' => true, 'current' => $lock];
+        });
     }
 
     /**
@@ -55,13 +79,15 @@ final readonly class WopiLockStore
      */
     public function unlock(int $fileId, string $lock): array
     {
-        $current = $this->current($fileId);
-        if ('' === $current || !hash_equals($current, trim($lock))) {
-            return ['ok' => false, 'current' => $current];
-        }
-        $this->cache->deleteItem($this->key($fileId));
+        return $this->exclusive($fileId, function () use ($fileId, $lock): array {
+            $current = $this->current($fileId);
+            if ('' === $current || !hash_equals($current, trim($lock))) {
+                return ['ok' => false, 'current' => $current];
+            }
+            $this->cache->deleteItem($this->key($fileId));
 
-        return ['ok' => true, 'current' => ''];
+            return ['ok' => true, 'current' => ''];
+        });
     }
 
     /**
@@ -69,13 +95,15 @@ final readonly class WopiLockStore
      */
     public function refresh(int $fileId, string $lock): array
     {
-        $current = $this->current($fileId);
-        if ('' === $current || !hash_equals($current, trim($lock))) {
-            return ['ok' => false, 'current' => $current];
-        }
-        $this->store($fileId, $current);
+        return $this->exclusive($fileId, function () use ($fileId, $lock): array {
+            $current = $this->current($fileId);
+            if ('' === $current || !hash_equals($current, trim($lock))) {
+                return ['ok' => false, 'current' => $current];
+            }
+            $this->store($fileId, $current);
 
-        return ['ok' => true, 'current' => $current];
+            return ['ok' => true, 'current' => $current];
+        });
     }
 
     /**
@@ -83,14 +111,16 @@ final readonly class WopiLockStore
      */
     public function relock(int $fileId, string $oldLock, string $newLock): array
     {
-        $current = $this->current($fileId);
-        $newLock = trim($newLock);
-        if ('' === $newLock || '' === $current || !hash_equals($current, trim($oldLock))) {
-            return ['ok' => false, 'current' => $current];
-        }
-        $this->store($fileId, $newLock);
+        return $this->exclusive($fileId, function () use ($fileId, $oldLock, $newLock): array {
+            $current = $this->current($fileId);
+            $newLock = trim($newLock);
+            if ('' === $newLock || '' === $current || !hash_equals($current, trim($oldLock))) {
+                return ['ok' => false, 'current' => $current];
+            }
+            $this->store($fileId, $newLock);
 
-        return ['ok' => true, 'current' => $newLock];
+            return ['ok' => true, 'current' => $newLock];
+        });
     }
 
     private function store(int $fileId, string $lock): void

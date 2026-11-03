@@ -75,8 +75,8 @@ final readonly class DocumentRevisionService
         $this->em->flush();
 
         $file->setFileText($this->projector->project($model));
+        $this->dropThumbnail($file);
         $this->em->flush();
-
         $this->invalidateExportCache($file);
         $this->thumbnails?->dispatchIfNeeded($file);
 
@@ -110,6 +110,8 @@ final readonly class DocumentRevisionService
         if (false !== $size) {
             $file->setFileSize($size);
         }
+        $this->advanceUpdatedAt($file);
+        $this->dropThumbnail($file);
         $this->em->flush();
         $this->append($file, $model, 'Restored version '.$version, DocumentRevision::SOURCE_MODEL, $absolute);
         $this->invalidateExportCache($file);
@@ -156,8 +158,29 @@ final readonly class DocumentRevisionService
         if (false !== $size) {
             $file->setFileSize($size);
         }
+        $this->advanceUpdatedAt($file);
+        $this->dropThumbnail($file);
+        $this->em->flush();
         $this->invalidateExportCache($file);
         $this->thumbnails?->dispatchIfNeeded($file);
+    }
+
+    private function advanceUpdatedAt(File $file): void
+    {
+        $now = time();
+        $file->setUpdatedAt($now > $file->getUpdatedAt() ? $now : $file->getUpdatedAt() + 1);
+    }
+
+    private function dropThumbnail(File $file): void
+    {
+        $relative = $file->getThumbPath();
+        if (is_string($relative) && '' !== $relative) {
+            $path = $this->uploadDir.'/'.ltrim($relative, '/');
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+        $file->setThumbPath(null);
     }
 
     private function absolutePath(File $file): ?string

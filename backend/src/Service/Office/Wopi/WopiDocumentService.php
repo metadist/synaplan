@@ -8,12 +8,7 @@ use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\UserRepository;
-use App\Service\File\FileHelper;
-use App\Service\File\Office\DocumentExportService;
-use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Office\DocumentThumbnailGenerator;
-use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -30,13 +25,11 @@ final readonly class WopiDocumentService
     public function __construct(
         private FileRepository $files,
         private UserRepository $users,
-        private EntityManagerInterface $em,
         private WopiTokenService $tokens,
         private WopiDiscovery $discovery,
         private WopiLockStore $locks,
-        private DocumentThumbnailDispatcher $thumbnails,
+        private WopiFileUpdate $updates,
         private OfficeEditorConfig $config,
-        private LoggerInterface $logger,
         private string $uploadDir,
     ) {
     }
@@ -136,41 +129,42 @@ final readonly class WopiDocumentService
 
     public function putFile(WopiAccess $access, string $bytes, string $timestamp, string $lock): WopiHttpResult
     {
-        $loaded = $this->loadOwned($access);
-        if ($loaded instanceof WopiHttpResult) {
-            return $loaded;
-        }
-        [$file] = $loaded;
-        $lockResult = $this->locks->current($file->getId() ?? $access->fileId);
-        if ('' !== $lockResult && !hash_equals($lockResult, trim($lock))) {
-            return new WopiHttpResult(Response::HTTP_CONFLICT, headers: ['X-WOPI-Lock' => $lockResult]);
-        }
-        if ('' !== trim($timestamp) && !WopiTimestamp::matches($timestamp, $file->getUpdatedAt())) {
-            return new WopiHttpResult(Response::HTTP_CONFLICT, ['COOLStatusCode' => self::CONFLICT_CODE]);
-        }
-        $absolute = $this->absolutePath($file);
-        if (null === $absolute) {
-            return $this->error(Response::HTTP_NOT_FOUND, 'File not found');
-        }
-        if (!$this->writeAtomically($absolute, $bytes)) {
-            $this->logger->error('WOPI PutFile failed to write', ['file_id' => $access->fileId, 'user_id' => $access->userId]);
+        return $this->locks->exclusive($access->fileId, function () use ($access, $bytes, $timestamp, $lock): WopiHttpResult {
+            $loaded = $this->loadOwned($access);
+            if ($loaded instanceof WopiHttpResult) {
+                return $loaded;
+            }
+            [$file, $user] = $loaded;
+            if (!$this->updates->refresh($file)) {
+                return $this->error(Response::HTTP_NOT_FOUND, 'File not found');
+            }
+            $fileId = $file->getId() ?? $access->fileId;
+            $held = $this->locks->current($fileId);
+            $requested = trim($lock);
+            if ('' === $held) {
+                // An unlocked file accepts PutFile only while it is still empty.
+                if ('' !== $requested || $file->getFileSize() > 0) {
+                    return new WopiHttpResult(Response::HTTP_CONFLICT, headers: ['X-WOPI-Lock' => '']);
+                }
+            } elseif (!hash_equals($held, $requested)) {
+                return new WopiHttpResult(Response::HTTP_CONFLICT, headers: ['X-WOPI-Lock' => $held]);
+            }
+            if ('' !== trim($timestamp) && !WopiTimestamp::matches($timestamp, $file->getUpdatedAt())) {
+                return new WopiHttpResult(Response::HTTP_CONFLICT, ['COOLStatusCode' => self::CONFLICT_CODE]);
+            }
+            $rejection = $this->updates->rejection($user, strlen($bytes), $file->getFileSize());
+            if ($rejection instanceof WopiHttpResult) {
+                return $rejection;
+            }
+            $failed = $this->updates->store($file, $bytes, $access->fileId, $access->userId);
+            if ($failed instanceof WopiHttpResult) {
+                return $failed;
+            }
 
-            return $this->error(Response::HTTP_INTERNAL_SERVER_ERROR, 'The file could not be saved.');
-        }
-        $file->setFileSize(strlen($bytes));
-        $file->setUpdatedAt(time());
-        $this->em->flush();
-        $this->invalidateExportCache($file);
-        $this->thumbnails->dispatchIfNeeded($file);
-        $this->logger->info('WOPI PutFile', [
-            'file_id' => $access->fileId,
-            'user_id' => $access->userId,
-            'bytes' => strlen($bytes),
-        ]);
-
-        return new WopiHttpResult(Response::HTTP_OK, [
-            'LastModifiedTime' => WopiTimestamp::format($file->getUpdatedAt()),
-        ]);
+            return new WopiHttpResult(Response::HTTP_OK, [
+                'LastModifiedTime' => WopiTimestamp::format($file->getUpdatedAt()),
+            ]);
+        });
     }
 
     public function lock(WopiAccess $access, string $override, string $lockId, string $oldLock): WopiHttpResult
@@ -182,7 +176,9 @@ final readonly class WopiDocumentService
         $fileId = $access->fileId;
         $verb = strtoupper(trim($override));
         $result = match ($verb) {
-            'LOCK' => $this->locks->lock($fileId, $lockId),
+            'LOCK' => '' !== trim($oldLock)
+                ? $this->locks->relock($fileId, $oldLock, $lockId)
+                : $this->locks->lock($fileId, $lockId),
             'UNLOCK' => $this->locks->unlock($fileId, $lockId),
             'REFRESH_LOCK' => $this->locks->refresh($fileId, $lockId),
             'UNLOCK_AND_RELOCK' => $this->locks->relock($fileId, $oldLock, $lockId),
@@ -227,36 +223,6 @@ final readonly class WopiDocumentService
         }
 
         return $this->uploadDir.'/'.ltrim($relative, '/');
-    }
-
-    private function writeAtomically(string $absolute, string $bytes): bool
-    {
-        $directory = dirname($absolute);
-        if (!is_dir($directory)) {
-            return false;
-        }
-        $temporary = $absolute.'.wopi-'.bin2hex(random_bytes(4));
-        if (false === FileHelper::writeFile($temporary, $bytes)) {
-            return false;
-        }
-        if (!rename($temporary, $absolute)) {
-            @unlink($temporary);
-
-            return false;
-        }
-        FileHelper::setFilePermissions($absolute);
-
-        return true;
-    }
-
-    private function invalidateExportCache(File $file): void
-    {
-        foreach (DocumentExportService::cachedRelativePaths($file->getFilePath()) as $relative) {
-            $export = $this->uploadDir.'/'.ltrim($relative, '/');
-            if (is_file($export)) {
-                @unlink($export);
-            }
-        }
     }
 
     private function error(int $status, string $message): WopiHttpResult
