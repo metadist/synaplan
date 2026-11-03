@@ -161,6 +161,7 @@ final class ResearchRunnerTest extends TestCase
         $users = $this->createStub(UserRepository::class);
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
+        $user->method('getLocale')->willReturn('en');
         $users->method('find')->willReturn($user);
 
         $translator = $this->createStub(TranslatorInterface::class);
@@ -172,7 +173,7 @@ final class ResearchRunnerTest extends TestCase
             new ResearchConfig($this->createStub(ConfigRepository::class), $engine ? '1' : '0'),
             new MultitaskRoutingConfig($configs),
             new NullLogger(),
-            new ResearchTaskHandover(new ResearchOutcomeText($translator), $users),
+            new ResearchTaskHandover(new ResearchOutcomeText($translator), $users, $translator),
         );
     }
 

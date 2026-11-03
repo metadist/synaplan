@@ -271,7 +271,8 @@ A saved task can take a `research` step when `MULTITASK.RESEARCH_ENABLED` is on
 and research itself is on. The step starts a quick or standard run in the
 task's chat, then waits. The research units keep running on their own worker,
 so the saved-task worker is free. When the report is ready, the next step
-(for example "email me") receives the report text.
+(for example "email me") receives the same report the person reads, with the
+numbered sources listed at the end. No file is attached.
 A run that does not finish fails the step with its sentence, and later steps
 skip. The step does not ask questions and cannot be thorough.
 

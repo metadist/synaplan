@@ -512,6 +512,9 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
         // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
         'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
+        // Retired 2026-11-03 (BIDs 61 and 65). A past prompt is still priced
+        // from this map, not from a snapshot, so the above-200k rate stays.
+        'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.25],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
         'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
@@ -529,6 +532,19 @@ class ModelCatalog
     public static function contextPricing(string $providerId): ?array
     {
         return self::CONTEXT_PRICING[$providerId] ?? null;
+    }
+
+    /**
+     * Provider ids that keep a long-context tier after every row is retired.
+     * Cost calculation reads the tier from the current catalog, not from a
+     * price snapshot, so dropping it would reprice a past long prompt at the
+     * base rate.
+     *
+     * @return list<string>
+     */
+    public static function historicalContextProviderIds(): array
+    {
+        return ['gemini-2.5-pro'];
     }
 
     /**

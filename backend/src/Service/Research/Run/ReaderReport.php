@@ -42,6 +42,27 @@ final class ReaderReport
     }
 
     /**
+     * The same report with its sources written out, for a step that receives
+     * only text (an email, a later saved-task step). The chat lists the
+     * sources under the reply instead, so this is not attached as a file.
+     *
+     * @param list<array{title: string, url: string, host: string, description: string}> $sources
+     */
+    public static function withSourceList(string $markdown, array $sources, string $title): string
+    {
+        if ([] === $sources) {
+            return $markdown;
+        }
+        $lines = ['## '.$title, ''];
+        foreach ($sources as $index => $source) {
+            $where = '' !== $source['url'] ? ' — '.$source['url'] : '';
+            $lines[] = sprintf('%d. %s%s', $index + 1, $source['title'], $where);
+        }
+
+        return trim($markdown)."\n\n".implode("\n", $lines);
+    }
+
+    /**
      * The gaps, when the check left no sentence a source supports. A line
      * that still cites a source is a rejected claim and stays out.
      */

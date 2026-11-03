@@ -15,6 +15,8 @@ research:
     failed_model_error: 'El modelo de %role% dejó de responder. No se cobró nada más; inténtalo de nuevo o elige otro modelo.'
     failed_interrupted: 'La investigación se interrumpió en el servidor. Vuelve a iniciarla: las fuentes encontradas hasta ahora se conservan aquí.'
     unknown: 'La investigación se detuvo. Vuelve a iniciarla si aún necesitas la respuesta.'
+  report:
+    sources: 'Fuentes'
   auto:
     notice: 'Estoy consultando varias fuentes para esto; unos %minutes% minutos.'
     why:

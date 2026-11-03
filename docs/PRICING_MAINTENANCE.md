@@ -229,7 +229,7 @@ Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations)
 | 170 | Gemini 2.5 Flash | `gemini-2.5-flash` | `google:gemini-3.5-flash-lite:chat` (BID 356) |
 | 171 | Gemini 2.5 Flash (Vision) | `gemini-2.5-flash` | `google:gemini-3.5-flash-lite:pic2text` (BID 357) |
 
-Retired ahead of the redirect, via the registry, no migration. A stored binding follows `BSUCCESSORID`. The long-context tier for `gemini-2.5-pro` left `CONTEXT_PRICING` with the last live row. The image-comparison fallback in `GoogleVision` moved to `gemini-3.8-flash`.
+Retired ahead of the redirect, via the registry, no migration. A stored binding follows `BSUCCESSORID`. The long-context tier for `gemini-2.5-pro` stays in `CONTEXT_PRICING` (`historicalContextProviderIds()`): a past prompt above 200k is still priced at 2.50 / 15, because billing reads the tier from the current catalog. New requests follow the successor and use that model's rate. The image-comparison fallback in `GoogleVision` moved to `gemini-3.8-flash`.
 
 ## Maintenance links
 
@@ -716,6 +716,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gpt-6.1-sol | 272k | 2.00 / 10 (0.10) | 4.00 / 15 (0.20) |
 | gpt-6-luna | 272k | 0.10 / 0.50 (0.01) | 0.20 / 0.75 (0.02) |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
+| gemini-2.5-pro (retired; past bills only) | 200k | 1.25 / 10 (0.125) | 2.50 / 15 (0.25) |
 | grok-4.5 | 200k | 2.00 / 6.00 (0.30) | 4.00 / 12.00 (0.60) |
 | grok-4.6 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |
 | grok-4.7 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |

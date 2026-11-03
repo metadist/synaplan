@@ -71,6 +71,15 @@ final class ReaderReportTest extends TestCase
         self::assertSame('file', $reader['sources'][0]['host']);
     }
 
+    public function testTheTextForALaterStepListsTheSourcesAtTheEnd(): void
+    {
+        $reader = ReaderReport::from('The fee is 90 EUR. [e1]', $this->ledger());
+
+        $text = ReaderReport::withSourceList($reader['markdown'], $reader['sources'], 'Sources');
+
+        self::assertSame("The fee is 90 EUR. [1]\n\n## Sources\n\n1. Spain — https://es.example/visa", $text);
+    }
+
     private function ledger(): EvidenceLedger
     {
         $ledger = new EvidenceLedger();

@@ -106,6 +106,19 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame(number_format($expectedOutput, 6, '.', ''), $result->outputCost);
     }
 
+    public function testCalculateCostKeepsTheRetiredGeminiProLongContextTier(): void
+    {
+        $model = $this->createModelMock(61, 'Google', 1.25, 10.0, 'per1M', 'per1M', [], 'gemini-2.5-pro');
+
+        $this->modelRepository->expects(self::any())->method('find')->with(61)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateCost(250_000, 1_000, 0, 0, 61);
+
+        $this->assertSame(number_format(250_000 * (2.5 / 1_000_000), 6, '.', ''), $result->inputCost);
+        $this->assertSame(number_format(1_000 * (15.0 / 1_000_000), 6, '.', ''), $result->outputCost);
+    }
+
     public function testCalculateCostWithoutContextTierIsUnaffectedByHugePrompt(): void
     {
         // A model with no context tier must bill the flat base rate even for a
