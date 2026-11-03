@@ -42,26 +42,6 @@ final class ReaderReport
     }
 
     /**
-     * The reader's report with its sources listed at the end, for the file
-     * that is attached to the reply and read outside the chat.
-     *
-     * @param list<array{title: string, url: string, host: string, description: string}> $sources
-     */
-    public static function withSourceList(string $markdown, array $sources, string $title): string
-    {
-        if ([] === $sources) {
-            return $markdown;
-        }
-        $lines = ['## '.$title, ''];
-        foreach ($sources as $index => $source) {
-            $where = '' !== $source['url'] ? ' — '.$source['url'] : '';
-            $lines[] = sprintf('%d. %s%s', $index + 1, $source['title'], $where);
-        }
-
-        return trim($markdown)."\n\n".implode("\n", $lines);
-    }
-
-    /**
      * The gaps, when the check left no sentence a source supports. A line
      * that still cites a source is a rejected claim and stays out.
      */

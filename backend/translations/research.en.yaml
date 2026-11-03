@@ -15,8 +15,6 @@ research:
     failed_model_error: 'The %role% model stopped answering. Nothing else was charged; try again or pick another model.'
     failed_interrupted: 'The research was interrupted on the server. Start it again — the sources found so far are kept here.'
     unknown: 'The research stopped. Start it again if you still need the answer.'
-  report:
-    sources: 'Sources'
   auto:
     notice: 'I am looking through several sources for this — about %minutes% minutes.'
     why:

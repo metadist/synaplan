@@ -15,8 +15,6 @@ research:
     failed_model_error: 'Das Modell für %role% hat nicht mehr geantwortet. Sonst wurde nichts berechnet; versuche es erneut oder wähle ein anderes Modell.'
     failed_interrupted: 'Die Recherche wurde auf dem Server unterbrochen. Starte sie neu – die bisher gefundenen Quellen bleiben hier erhalten.'
     unknown: 'Die Recherche wurde beendet. Starte sie neu, wenn du die Antwort noch brauchst.'
-  report:
-    sources: 'Quellen'
   auto:
     notice: 'Ich sehe das für dich in mehreren Quellen nach — etwa %minutes% Minuten.'
     why:

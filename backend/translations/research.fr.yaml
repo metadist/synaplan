@@ -15,8 +15,6 @@ research:
     failed_model_error: 'Le modèle de %role% a cessé de répondre. Rien d’autre n’a été facturé ; réessayez ou choisissez un autre modèle.'
     failed_interrupted: 'La recherche a été interrompue sur le serveur. Relancez-la : les sources trouvées jusqu’ici sont conservées.'
     unknown: 'La recherche s’est arrêtée. Relancez-la si vous avez encore besoin de la réponse.'
-  report:
-    sources: 'Sources'
   auto:
     notice: 'Je consulte plusieurs sources pour cela — environ %minutes% minutes.'
     why:

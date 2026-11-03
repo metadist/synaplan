@@ -71,16 +71,6 @@ final class ReaderReportTest extends TestCase
         self::assertSame('file', $reader['sources'][0]['host']);
     }
 
-    public function testTheFileListsTheSourcesAtTheEnd(): void
-    {
-        $text = ReaderReport::withSourceList('Fee 90 EUR. [1]', [
-            ['title' => 'Portugal', 'url' => 'https://pt.example/visa', 'host' => 'pt.example', 'description' => ''],
-        ], 'Quellen');
-
-        self::assertSame("Fee 90 EUR. [1]\n\n## Quellen\n\n1. Portugal — https://pt.example/visa", $text);
-        self::assertSame('Fee 90 EUR.', ReaderReport::withSourceList('Fee 90 EUR.', [], 'Quellen'));
-    }
-
     private function ledger(): EvidenceLedger
     {
         $ledger = new EvidenceLedger();
