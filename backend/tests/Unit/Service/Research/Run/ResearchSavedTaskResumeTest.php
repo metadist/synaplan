@@ -121,7 +121,7 @@ final class ResearchSavedTaskResumeTest extends ResearchUnitCase
 
         return new ResearchSavedTaskResume(
             $tasks,
-            new ResearchTaskHandover(new ResearchOutcomeText($translator), $users),
+            new ResearchTaskHandover(new ResearchOutcomeText($translator), $users, $translator),
             $this->store,
             $bus ?? $this->createStub(MessageBusInterface::class),
             new NullLogger(),

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Service\Research;
 
 use App\Entity\Chat;
-use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\Research\Run\ResearchBudget;
@@ -21,8 +20,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * The report reaches the chat through the same Message<->File relation the
- * chat history loads, so the person sees the file under the answer.
+ * The report reaches the chat as the assistant message. Sources stay on the
+ * message; no markdown file is written.
  */
 final class ResearchReportDeliveryIntegrationTest extends KernelTestCase
 {
@@ -54,9 +53,6 @@ final class ResearchReportDeliveryIntegrationTest extends KernelTestCase
         foreach (array_reverse($this->created) as $entity) {
             $managed = $this->em->find($entity::class, $entity->getId());
             if (null !== $managed) {
-                if ($managed instanceof File) {
-                    @unlink(static::getContainer()->getParameter('app.upload_dir').'/'.$managed->getFilePath());
-                }
                 $this->em->remove($managed);
             }
         }
@@ -64,7 +60,7 @@ final class ResearchReportDeliveryIntegrationTest extends KernelTestCase
         parent::tearDown();
     }
 
-    public function testACompleteRunPostsTheReportWithItsFileInThePersonsLanguage(): void
+    public function testACompleteRunPostsTheReportInThePersonsLanguageAndWritesNoFile(): void
     {
         $user = (new User())
             ->setCreated(date('Y-m-d H:i:s'))
@@ -102,13 +98,8 @@ final class ResearchReportDeliveryIntegrationTest extends KernelTestCase
         $message = $messages[0];
         self::assertSame("# Iceland\n\nAbout 396,500 people.", $message->getText());
         self::assertSame('de', $message->getLanguage());
-        self::assertCount(1, $message->getFiles());
-        $file = $message->getFiles()->first();
-        self::assertInstanceOf(File::class, $file);
-        $this->created[] = $file;
+        self::assertCount(0, $message->getFiles());
         $this->created[] = $message;
-        self::assertSame($message->getId(), $file->getMessageId());
-        self::assertSame('text/markdown', $file->getFileMime());
         self::assertTrue($this->store->wasDelivered($this->state->ref->id));
     }
 }

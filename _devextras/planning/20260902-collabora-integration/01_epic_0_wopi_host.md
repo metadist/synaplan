@@ -12,7 +12,7 @@ host. Reference implementation: Nextcloud `richdocuments`.
 
 ## Step 0.1 — WOPI endpoints (backend)
 
-Branch: `feat/wopi-host`
+Branch: `feat/wopi-host` — in review.
 
 - `Controller/WopiController.php`, routes under `/api/v1/wopi/files/{id}`
   (thin; logic in `Service/Office/Wopi/*`):

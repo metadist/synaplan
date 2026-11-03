@@ -25,6 +25,7 @@ use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
+use App\Module\Sidecar\OfficeEditorModule;
 use App\Module\Sidecar\OpendeskSttModule;
 use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
@@ -75,6 +76,7 @@ trait BuildsAllModules
             new TikaModule($probe, ''),
             new DoclingModule($probe, ''),
             new OfficeConvertModule($probe, ''),
+            new OfficeEditorModule($probe, '', '', ''),
             new SearxngModule($probe, ''),
             new PiperTtsModule($probe, ''),
             new LocalAiModule($probe, ''),

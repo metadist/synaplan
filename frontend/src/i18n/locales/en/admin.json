@@ -1457,6 +1457,9 @@
     "office_convert": {
       "label": "Office conversion"
     },
+    "office_editor": {
+      "label": "Office editor"
+    },
     "searxng": {
       "label": "SearXNG web search"
     },

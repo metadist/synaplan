@@ -39,6 +39,7 @@ final class ModuleOwnershipTest extends TestCase
         'tika',
         'docling',
         'office_convert',
+        'office_editor',
         'searxng',
         'piper_tts',
         'local_ai',
@@ -251,7 +252,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(22, self::MODULE_IDS);
+        $this->assertCount(23, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

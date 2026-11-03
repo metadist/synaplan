@@ -86,6 +86,7 @@ flowchart LR
 | 2 | Synaplan extension for Collabora (iframe-hosted, `cool.callRemote`), postMessage fallback | `03_epic_2_synaplan_extension.md` |
 | 3 | Collabora MCP endpoint driven by Synaplan tasks / agents | `04_epic_3_mcp_and_tasks.md` |
 | 4 | Partner platforms: Nextcloud, OpenCloud, ownCloud provisioning | `05_epic_4_partner_platforms.md` |
+| — | openDesk delivery in `synaplan-charts` (editor URLs, previews unchanged) | `06_charts_opendesk.md` |
 
 Dependencies on the office-docs plan: A0 (the `collabora/code` sidecar and
 `OFFICE_CONVERT_URL`) for Epic 0; Phase B2 (`ToolCallingChatProviderInterface`

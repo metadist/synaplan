@@ -213,9 +213,8 @@ started on its own already has a reply — the one stamped with the run id
 started by **Look deeper** or the research API gets a new reply carrying the
 same stamp, which is how the chat shows the run and later its steps:
 
-- **Complete:** the report is the message, and the markdown file is attached
-  to it. The file also shows in the file manager's Generated gallery with
-  "Open in chat".
+- **Complete:** the report is the message. Sources sit under it, the same
+  way a web-search answer lists them. No separate file is written.
 
 The person reads the **reader's report**, not the checked report the run
 keeps (`report.markdown` in the run's state). The reader's report answers
@@ -225,9 +224,8 @@ of its source in the order the sources first appear (`[e12][e31]` reads as
 `[1][2]`). When that leaves no sentence, the message shows the gaps under
 "Not confirmed" and not the checked report. The sources are stored under
 the question like web-search results, so the chat shows them beneath the
-reply and the numbers link to them; the attached file lists them at the
-end. What the check removed, and that the project has one model family, is
-told in the research fold under the reply
+reply and the numbers link to them. What the check removed, and that the
+project has one model family, is told in the research fold under the reply
 (`check` event: `statements`, `supported`, `softened`, `removed`,
 `same_provider`), and **Look deeper** still seeds its plan from the checked
 report's "Not confirmed" list. The reply's info panel shows what the run
@@ -257,7 +255,7 @@ before it folds to one line and opens on a click.
 
 - **Stopped or failed with something found:** the sentence why it ended
   stands above the report, so a partial report never reads as a finished one.
-- **Stopped or failed with nothing found:** only that sentence, no file.
+- **Stopped or failed with nothing found:** only that sentence.
 
 This holds for a stop by the person, by an administrator, a plan that was
 not confirmed in time and a run the reaper had to interrupt. An API run has
@@ -273,7 +271,8 @@ A saved task can take a `research` step when `MULTITASK.RESEARCH_ENABLED` is on
 and research itself is on. The step starts a quick or standard run in the
 task's chat, then waits. The research units keep running on their own worker,
 so the saved-task worker is free. When the report is ready, the next step
-(for example "email me") receives the report text and the markdown file.
+(for example "email me") receives the same report the person reads, with the
+numbered sources listed at the end. No file is attached.
 A run that does not finish fails the step with its sentence, and later steps
 skip. The step does not ask questions and cannot be thorough.
 

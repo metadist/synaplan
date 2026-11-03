@@ -279,9 +279,10 @@ final class ModelCatalogRetirementTest extends TestCase
      * config that reads like a live rate — and dropping it was another line on
      * the retirement checklist that only a person could remember.
      *
-     * The tier is keyed by providerId and applies to every tag of that model, so
-     * it stays legitimate as long as one row still carries the id: retiring the
-     * chat row of a model whose vision row lives on changes nothing here.
+     * Past usage does not need the tier: the cost was stored on the usage row
+     * when the request was billed. The tier is keyed by providerId and applies
+     * to every tag of that model, so it stays legitimate as long as one row
+     * still carries the id.
      */
     public function testNoLongContextTierIsKeyedOnAModelThatIsFullyRetired(): void
     {
