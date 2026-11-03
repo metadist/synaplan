@@ -275,14 +275,14 @@ final class ModelCatalogRetirementTest extends TestCase
     }
 
     /**
-     * A long-context tier keyed on a model nobody can select any more reads
-     * like a live rate. It may stay only when named in
-     * {@see ModelCatalog::historicalContextProviderIds()}: past usage is
-     * repriced from the current catalog, not from a snapshot.
+     * A long-context tier keyed on a model nobody can select any more is dead
+     * config that reads like a live rate — and dropping it was another line on
+     * the retirement checklist that only a person could remember.
      *
-     * The tier is keyed by providerId and applies to every tag of that model, so
-     * it stays legitimate as long as one row still carries the id: retiring the
-     * chat row of a model whose vision row lives on changes nothing here.
+     * Past usage does not need the tier: the cost was stored on the usage row
+     * when the request was billed. The tier is keyed by providerId and applies
+     * to every tag of that model, so it stays legitimate as long as one row
+     * still carries the id.
      */
     public function testNoLongContextTierIsKeyedOnAModelThatIsFullyRetired(): void
     {
@@ -293,20 +293,10 @@ final class ModelCatalogRetirementTest extends TestCase
             }
         }
 
-        $historical = array_fill_keys(ModelCatalog::historicalContextProviderIds(), true);
         $stale = [];
-        $seenRetired = [];
         foreach (ModelCatalog::retirements() as $record) {
             $providerId = $record['providerId'];
-            $seenRetired[$providerId] = true;
             if (isset($liveProviderIds[$providerId])) {
-                continue;
-            }
-            if (isset($historical[$providerId])) {
-                self::assertNotNull(
-                    ModelCatalog::contextPricing($providerId),
-                    $providerId.' is kept for past bills but CONTEXT_PRICING has no tier.',
-                );
                 continue;
             }
             if (null !== ModelCatalog::contextPricing($providerId)) {
@@ -314,22 +304,9 @@ final class ModelCatalogRetirementTest extends TestCase
             }
         }
 
-        foreach (array_keys($historical) as $providerId) {
-            self::assertArrayNotHasKey(
-                $providerId,
-                $liveProviderIds,
-                $providerId.' still has a live row, so its tier does not belong on the historical list.',
-            );
-            self::assertArrayHasKey(
-                $providerId,
-                $seenRetired,
-                $providerId.' is listed as historical but no retirement names it.',
-            );
-        }
-
         self::assertSame([], array_keys($stale), sprintf(
             'ModelCatalog::CONTEXT_PRICING still prices a long-context tier for %s, which no live row '
-            .'carries any more. Drop the tier, or name the id in historicalContextProviderIds() when past bills still need it.',
+            .'carries any more. Drop the tier together with the last row of that model.',
             implode(', ', array_keys($stale)),
         ));
     }
