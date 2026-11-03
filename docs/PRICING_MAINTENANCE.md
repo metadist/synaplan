@@ -218,6 +218,19 @@ The OpenAI image guide ([image prompting](https://developers.openai.com/api/docs
 
 **Retired ahead of the shutdown**, for the same reason as BID 234: the availability check only reports a model once OpenAI stops serving it. Flare is the same provider and key on the same Responses API edit path, ranks above both on the public image-edit boards (LMArena image edit 2026-10-06: Flare 1481, `gpt-image-1.5` 1370, `gpt-image-1` 1139) and is cheaper per image (`quality_prices.high` 1024²: $0.05268 vs $0.133 / $0.167). Retired via the registry, no migration: `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` and switches both rows off on deploy, and any stored binding (`DEFAULTMODEL`, a task prompt's pinned `aiModel`, an "Again" pick in chat, an explicit `modelId` on the media API) follows `BSUCCESSORID` to Flare at resolution time (`ModelConfigService::replacementForRetiredModel()`). When neither the successor nor any capability default can serve, the request is refused instead of reaching the shut-down id. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names either BID. The edit path's fallback model id in `OpenAIProvider` moved to `gpt-image-2.5-flare`.
 
+### Gemini 2.5 Pro and 2.5 Flash (redirect 2026-12-01)
+
+Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) (read 2026-11-03) deprecates `gemini-2.5-pro` and `gemini-2.5-flash`. They are no longer selectable in AI Studio. On **2026-12-01** API requests to `gemini-2.5-pro` route to `gemini-3.8-flash`, and requests to `gemini-2.5-flash` route to `gemini-3.5-flash-lite`, billed at the replacement's rates. `gemini-2.5-flash-lite`, the image models and the TTS preview are not this notice.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 61 | Gemini 2.5 Pro | `gemini-2.5-pro` | `google:gemini-3.8-flash:chat` (BID 350) |
+| 65 | Gemini 2.5 Pro (Vision) | `gemini-2.5-pro` | `google:gemini-3.8-flash:pic2text` (BID 351) |
+| 170 | Gemini 2.5 Flash | `gemini-2.5-flash` | `google:gemini-3.5-flash-lite:chat` (BID 356) |
+| 171 | Gemini 2.5 Flash (Vision) | `gemini-2.5-flash` | `google:gemini-3.5-flash-lite:pic2text` (BID 357) |
+
+Retired ahead of the redirect, via the registry, no migration. A stored binding follows `BSUCCESSORID`. The long-context tier for `gemini-2.5-pro` left `CONTEXT_PRICING` with the last live row. The image-comparison fallback in `GoogleVision` moved to `gemini-3.8-flash`.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
@@ -686,7 +699,7 @@ GPT Image 2.5 Flare and Sunburst share OpenAI's token rates ($5/1M text in, $8/1
 
 ## Long-context tiers — #1319
 
-Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro and Grok above 200k, GPT-5.x / GPT-6 above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches input, output **and the cached-input rate** to the above values when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
+Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 3.1 Pro and Grok above 200k, GPT-5.x / GPT-6 above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches input, output **and the cached-input rate** to the above values when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
 
 The cached rate rises with the tier at every provider ("2x input **and cache** rates" at OpenAI; Gemini and xAI publish an explicit long-context cache row), and it is always exactly 2× the short-context rate — `ModelCatalogTest::testLongContextTiersDoubleTheCachedInputRate()` enforces that, and also that no tiered model omits its cache rate. `gpt-5.5-pro` is the one model OpenAI sells **without** a cached-input discount; it still states a cache rate, equal to its plain input rate (30 / 60), because an omitted rate would fall through to the 50% default discount and halve the bill.
 
@@ -702,7 +715,6 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gpt-6-sol | 272k | 2.00 / 10 (0.20) | 4.00 / 15 (0.40) |
 | gpt-6.1-sol | 272k | 2.00 / 10 (0.10) | 4.00 / 15 (0.20) |
 | gpt-6-luna | 272k | 0.10 / 0.50 (0.01) | 0.20 / 0.75 (0.02) |
-| gemini-2.5-pro | 200k | 1.25 / 10 (0.125) | 2.50 / 15 (0.25) |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
 | grok-4.5 | 200k | 2.00 / 6.00 (0.30) | 4.00 / 12.00 (0.60) |
 | grok-4.6 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |

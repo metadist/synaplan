@@ -35,7 +35,7 @@ final class GoogleVisionTest extends TestCase
         self::assertSame('A pixel.', $vision->explainImage('photo.png'));
 
         $request = $this->requests()[0];
-        self::assertStringEndsWith('/models/gemini-2.5-pro:generateContent', $request['url']);
+        self::assertStringEndsWith('/models/gemini-3.8-flash:generateContent', $request['url']);
         self::assertSame('Describe what you see in this image in detail.', $request['body']['contents'][0]['parts'][0]['text']);
         self::assertSame(['mime_type' => 'image/png', 'data' => base64_encode((string) file_get_contents($this->uploadDir.'/photo.png'))], $request['body']['contents'][0]['parts'][1]['inline_data']);
         self::assertSame(8192, $request['body']['generationConfig']['maxOutputTokens']);
