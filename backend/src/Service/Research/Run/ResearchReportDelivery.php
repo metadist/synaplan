@@ -12,18 +12,16 @@ use App\Repository\MessageMetaRepository;
 use App\Repository\SearchResultRepository;
 use App\Repository\UserRepository;
 use App\Service\Chat\Stream\StreamMessageMeta;
-use App\Service\File\FileStorageService;
-use App\Service\Media\GeneratedFileRegistrar;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
  * Puts a finished web research run into its chat: the reader's report as the
- * assistant's message with the markdown file attached, or the sentence why
- * the run ended without one. The sources the report cites are stored under
- * the question, where the chat history shows them beneath the reply and
- * turns the citation numbers into links. The run's model calls go under the
- * reply's usage, so its tokens and cost show what the research spent.
+ * assistant's message, or the sentence why the run ended without one. The
+ * sources the report cites are stored under the question, where the chat
+ * history shows them beneath the reply and turns the citation numbers into
+ * links. The run's model calls go under the reply's usage, so its tokens
+ * and cost show what the research spent.
  *
  * A run the chat started on its own already has a reply — the one stamped
  * with the run id — and the report replaces that reply's text, so the person
@@ -43,8 +41,6 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         private ChatRepository $chats,
         private UserRepository $users,
         private EntityManagerInterface $em,
-        private FileStorageService $storage,
-        private GeneratedFileRegistrar $files,
         private ResearchStateStore $store,
         private ResearchReplyText $replies,
         private LoggerInterface $logger,
@@ -70,9 +66,8 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
 
                 return;
             }
-            [$message, $file] = $this->post($state, $chat);
+            $this->post($state, $chat);
             $this->store->markDelivered($state->ref->id);
-            $this->attachReport($state, $message, $file);
         } catch (\Throwable $e) {
             $this->logger->warning('Research report was not posted to the chat', [
                 'run_id' => $state->ref->id,
@@ -82,10 +77,7 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         }
     }
 
-    /**
-     * @return array{0: Message, 1: ?string} the reply and the text of the file to attach
-     */
-    private function post(ResearchRunState $state, Chat $chat): array
+    private function post(ResearchRunState $state, Chat $chat): void
     {
         $locale = $this->locale($state->ref->userId);
         $message = $this->metas->findMessageInChatByMeta((int) $chat->getId(), StreamMessageMeta::RESEARCH_RUN, $state->ref->id)
@@ -102,8 +94,6 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
         $this->em->persist($message);
         $chat->updateTimestamp();
         $this->em->flush();
-
-        return [$message, $reply['file']];
     }
 
     /**
@@ -145,34 +135,6 @@ final readonly class ResearchReportDelivery implements ResearchReportPoster
             ->setTopic('CHAT')
             ->setLanguage($locale)
             ->setDirection('OUT');
-    }
-
-    private function attachReport(ResearchRunState $state, Message $message, ?string $report): void
-    {
-        if (null === $report || '' === trim($report)) {
-            return;
-        }
-        $stored = $this->storage->storeRawContent($report, $state->ref->userId, 'research-'.$state->ref->id.'.md', 'text/markdown');
-        $file = true === $stored['success']
-            ? $this->files->register($state->ref->userId, $stored['path'], '', $message->getId())
-            : null;
-        if (null === $file) {
-            $this->logger->warning('Research report file was not saved; the report stays in the chat message', [
-                'run_id' => $state->ref->id,
-                'error' => $stored['error'],
-            ]);
-
-            return;
-        }
-        $message->addFile($file);
-        $this->em->flush();
-        if ('' !== $stored['path']) {
-            $state->reportFile = [
-                'path' => '/api/v1/files/uploads/'.$stored['path'],
-                'type' => 'text/markdown',
-                'local_path' => $stored['path'],
-            ];
-        }
     }
 
     private function locale(int $userId): string

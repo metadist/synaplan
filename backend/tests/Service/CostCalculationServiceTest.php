@@ -70,8 +70,8 @@ class CostCalculationServiceTest extends TestCase
 
     public function testCalculateCostAppliesLongContextTierAboveThreshold(): void
     {
-        // gemini-2.5-pro: base 1.25/10 per 1M, above-200k tier 2.50/15 (#1319).
-        $model = $this->createModelMock(20, 'Google', 1.25, 10.0, 'per1M', 'per1M', [], 'gemini-2.5-pro');
+        // gemini-3.1-pro-preview: base 2/12 per 1M, above-200k tier 4/18.
+        $model = $this->createModelMock(20, 'Google', 2.0, 12.0, 'per1M', 'per1M', [], 'gemini-3.1-pro-preview');
 
         $this->modelRepository->expects(self::any())->method('find')->with(20)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
@@ -80,8 +80,8 @@ class CostCalculationServiceTest extends TestCase
         $completionTokens = 1_000;
         $result = $this->service->calculateCost($promptTokens, $completionTokens, 0, 0, 20);
 
-        $expectedInput = $promptTokens * (2.5 / 1_000_000);
-        $expectedOutput = $completionTokens * (15.0 / 1_000_000);
+        $expectedInput = $promptTokens * (4.0 / 1_000_000);
+        $expectedOutput = $completionTokens * (18.0 / 1_000_000);
 
         $this->assertSame(number_format($expectedInput, 6, '.', ''), $result->inputCost);
         $this->assertSame(number_format($expectedOutput, 6, '.', ''), $result->outputCost);
@@ -90,7 +90,7 @@ class CostCalculationServiceTest extends TestCase
 
     public function testCalculateCostUsesBaseTierBelowThreshold(): void
     {
-        $model = $this->createModelMock(21, 'Google', 1.25, 10.0, 'per1M', 'per1M', [], 'gemini-2.5-pro');
+        $model = $this->createModelMock(21, 'Google', 2.0, 12.0, 'per1M', 'per1M', [], 'gemini-3.1-pro-preview');
 
         $this->modelRepository->expects(self::any())->method('find')->with(21)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
@@ -99,8 +99,8 @@ class CostCalculationServiceTest extends TestCase
         $completionTokens = 1_000;
         $result = $this->service->calculateCost($promptTokens, $completionTokens, 0, 0, 21);
 
-        $expectedInput = $promptTokens * (1.25 / 1_000_000);
-        $expectedOutput = $completionTokens * (10.0 / 1_000_000);
+        $expectedInput = $promptTokens * (2.0 / 1_000_000);
+        $expectedOutput = $completionTokens * (12.0 / 1_000_000);
 
         $this->assertSame(number_format($expectedInput, 6, '.', ''), $result->inputCost);
         $this->assertSame(number_format($expectedOutput, 6, '.', ''), $result->outputCost);

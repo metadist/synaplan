@@ -2413,7 +2413,7 @@
                 ],
                 "method": "POST",
                 "timeout": 60,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
             }
         ],
         "result": {
@@ -2455,7 +2455,7 @@
                 ],
                 "method": "POST",
                 "timeout": 60,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
             }
         ],
         "result": "A tiny image."
@@ -2493,7 +2493,7 @@
                 ],
                 "method": "POST",
                 "timeout": 60,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
             }
         ],
         "result": ""
@@ -2502,7 +2502,7 @@
         "error": {
             "class": "ProviderException",
             "context": null,
-            "message": "Google image comparison error: HTTP 403 returned for \"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent\".",
+            "message": "Google image comparison error: HTTP 403 returned for \"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent\".",
             "provider": "google",
             "upstream_status": null
         },
@@ -2541,7 +2541,7 @@
                 ],
                 "method": "POST",
                 "timeout": 60,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
             }
         ]
     },
