@@ -77,6 +77,7 @@
                 "iamSharing": "bool",
                 "memoryService": "bool",
                 "officeConvertEnabled": "bool",
+                "officeEditorEnabled": "bool",
                 "platformLinksEnabled": "bool",
                 "savedTasks": "bool",
                 "selfAware": "bool",
@@ -150,6 +151,10 @@
                     "gated": "bool"
                 },
                 "office_convert": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "office_editor": {
                     "configured": "bool",
                     "gated": "bool"
                 },
@@ -310,6 +315,7 @@
                 "iamSharing": "bool",
                 "memoryService": "bool",
                 "officeConvertEnabled": "bool",
+                "officeEditorEnabled": "bool",
                 "platformLinksEnabled": "bool",
                 "savedTasks": "bool",
                 "selfAware": "bool",
@@ -383,6 +389,10 @@
                     "gated": "bool"
                 },
                 "office_convert": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "office_editor": {
                     "configured": "bool",
                     "gated": "bool"
                 },
@@ -543,6 +553,7 @@
                 "iamSharing": "bool",
                 "memoryService": "bool",
                 "officeConvertEnabled": "bool",
+                "officeEditorEnabled": "bool",
                 "platformLinksEnabled": "bool",
                 "savedTasks": "bool",
                 "selfAware": "bool",
@@ -616,6 +627,10 @@
                     "gated": "bool"
                 },
                 "office_convert": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "office_editor": {
                     "configured": "bool",
                     "gated": "bool"
                 },

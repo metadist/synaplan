@@ -81,7 +81,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(expectedIds).toContain('research')
     expect(expectedIds).toContain('capacity')
     expect(expectedIds).toContain('cloud_files')
-    expect(expectedIds).toHaveLength(22)
+    expect(expectedIds).toHaveLength(23)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -193,7 +193,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(ids).toContain('research')
     expect(ids).toContain('capacity')
     expect(ids).toContain('cloud_files')
-    expect(ids).toHaveLength(22)
+    expect(ids).toHaveLength(23)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)

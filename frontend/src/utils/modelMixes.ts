@@ -159,7 +159,7 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
       CHAT: [google('gemini-3.1-pro-preview'), google('gemini-3.5-flash')],
       ANALYZE: [google('gemini-3.5-flash'), google('gemini-3.1-pro-preview')],
       // A Flash model is fast and JSON-reliable enough to take over sorting.
-      SORT: [google('gemini-3.5-flash'), google('gemini-2.5-flash')],
+      SORT: [google('gemini-3.5-flash'), google('gemini-3.5-flash-lite')],
       PIC2TEXT: [google('gemini-3.1-pro-preview'), google('gemini-3.5-flash')],
       TEXT2PIC: [
         google('gemini-3.1-flash-image'),

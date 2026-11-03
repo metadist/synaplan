@@ -60,7 +60,7 @@ final class GoogleVision
             $mimeType1 = mime_content_type($fullPath1);
             $mimeType2 = mime_content_type($fullPath2);
 
-            $model = 'gemini-2.5-pro';
+            $model = 'gemini-3.8-flash';
             $url = $this->api->modelUrl($model, 'generateContent');
 
             $payload = [
@@ -108,7 +108,7 @@ final class GoogleVision
         $key = $this->api->requireKey();
 
         try {
-            $model = $options['model'] ?? 'gemini-2.5-pro';
+            $model = $options['model'] ?? 'gemini-3.8-flash';
 
             $fullPath = $this->uploadDir.'/'.ltrim($imagePath, '/');
 

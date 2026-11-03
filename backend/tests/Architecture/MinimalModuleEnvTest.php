@@ -29,6 +29,7 @@ final class MinimalModuleEnvTest extends TestCase
         'tika' => ['TIKA_BASE_URL', 'TIKA_URL'],
         'docling' => ['DOCLING_BASE_URL'],
         'office_convert' => ['OFFICE_CONVERT_URL'],
+        'office_editor' => ['OFFICE_PUBLIC_URL', 'OFFICE_WOPI_URL'],
         'searxng' => ['SEARXNG_BASE_URL'],
         'piper_tts' => ['SYNAPLAN_TTS_URL'],
         'local_ai' => ['OLLAMA_BASE_URL'],

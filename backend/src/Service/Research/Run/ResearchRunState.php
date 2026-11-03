@@ -82,8 +82,9 @@ final class ResearchRunState
     public ?ResearchDepth $ceiling = null;
 
     /**
-     * The report file, set when it is saved. Not stored: the resume reads it
-     * in the same request that wrote the file.
+     * A report file already written before this run was handed to a saved
+     * task. New runs do not write one. Not stored: the resume reads it from
+     * the hand-over message.
      *
      * @var array{path: string, type: string, local_path: string}|null
      */

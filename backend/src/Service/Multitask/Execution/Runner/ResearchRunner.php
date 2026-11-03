@@ -50,7 +50,7 @@ final readonly class ResearchRunner implements TaskRunner
                 'Research a question on the web and in the person\'s files, then hand the report to the next step. It does not stop to ask. Use it only when the task asks for research, a brief or a report on a topic. params: question, optional depth ("quick" or "standard", default "standard").',
                 // A chat turn has its own research mode; only a saved task can wait for a report.
                 dynamicNote: static fn (?int $userId, array $context): ?string => true === ($context['saved_task'] ?? false)
-                    ? '  Runs as its own step; later steps get the report text and its markdown file.'
+                    ? '  Runs as its own step; later steps get the report text.'
                     : null,
                 enabledFlag: MultitaskRoutingConfig::KEY_RESEARCH_ENABLED,
                 enabledDefault: false,

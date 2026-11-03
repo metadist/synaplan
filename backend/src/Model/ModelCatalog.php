@@ -415,6 +415,36 @@ class ModelCatalog
             'successor' => 'openai:gpt-image-2.5-flare:text2pic',
             'reason' => 'Deprecated by OpenAI; access ends on 2026-12-01. Migrate to GPT Image 2.5 Flare.',
         ],
+
+        // --- 2026-11-03 (Gemini API deprecations page) ---
+        // Retired on the notice, before the 2026-12-01 auto-redirect. The
+        // availability check still sees both ids until Google stops serving
+        // them. Flash-Lite, the image models and the TTS preview are not
+        // this notice.
+        61 => [
+            'providerId' => 'gemini-2.5-pro',
+            'retiredOn' => '2026-11-03',
+            'successor' => 'google:gemini-3.8-flash:chat',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.8-flash on 2026-12-01.',
+        ],
+        65 => [
+            'providerId' => 'gemini-2.5-pro',
+            'retiredOn' => '2026-11-03',
+            'successor' => 'google:gemini-3.8-flash:pic2text',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.8-flash on 2026-12-01.',
+        ],
+        170 => [
+            'providerId' => 'gemini-2.5-flash',
+            'retiredOn' => '2026-11-03',
+            'successor' => 'google:gemini-3.5-flash-lite:chat',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
+        ],
+        171 => [
+            'providerId' => 'gemini-2.5-flash',
+            'retiredOn' => '2026-11-03',
+            'successor' => 'google:gemini-3.5-flash-lite:pic2text',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
+        ],
     ];
 
     /**
@@ -441,7 +471,7 @@ class ModelCatalog
      * Long-context pricing tiers, keyed by providerId.
      *
      * Several providers charge a higher per-token rate for the ENTIRE request
-     * once the prompt crosses a token threshold: Gemini 2.5/3.1 Pro above 200k,
+     * once the prompt crosses a token threshold: Gemini 3.1 Pro above 200k,
      * GPT-5.x / GPT-6 above 272k. Prices are per 1M tokens — the
      * same unit as the catalog base `priceIn`/`priceOut`. Kept here keyed by
      * providerId (not duplicated into each model's chat + vision rows) because
@@ -482,7 +512,6 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
         // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
         'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
-        'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.25],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
         'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
@@ -2997,8 +3026,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 2.5 Pro',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google redirects this id to gemini-3.8-flash on 2026-12-01.
+            // See ModelCatalog::RETIREMENTS[61].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-pro',
             'priceIn' => 1.25,
             'inUnit' => 'per1M',
@@ -3020,8 +3051,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 2.5 Pro (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired with BID 61. See ModelCatalog::RETIREMENTS[65].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-pro',
             'priceIn' => 1.25,
             'inUnit' => 'per1M',
@@ -3171,16 +3203,15 @@ class ModelCatalog
             ],
         ],
         [
-            // BID 170 stays pinned to Gemini 2.5 Flash. Existing widgets that
-            // reference BID 170 should keep talking to 2.5 Flash; the newer
-            // 3.5 Flash flagship is published as a separate slot (see BID 237
-            // below) so consumers opt in instead of being silently swapped.
+            // Retired: Google redirects this id to gemini-3.5-flash-lite on
+            // 2026-12-01. See ModelCatalog::RETIREMENTS[170]. A chat that
+            // still points here follows that successor.
             'id' => 170,
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-flash',
             'priceIn' => 0.30,
             'inUnit' => 'per1M',
@@ -3200,14 +3231,13 @@ class ModelCatalog
             ],
         ],
         [
-            // BID 171 is the vision twin of BID 170 (Gemini 2.5 Flash). The
-            // 3.5 Flash vision pair lives at BID 223 below.
+            // Retired with BID 170. See ModelCatalog::RETIREMENTS[171].
             'id' => 171,
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-flash',
             'priceIn' => 0.30,
             'inUnit' => 'per1M',

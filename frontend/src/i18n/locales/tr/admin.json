@@ -1453,6 +1453,9 @@
     "office_convert": {
       "label": "Office dönüştürme"
     },
+    "office_editor": {
+      "label": "Office düzenleyici"
+    },
     "searxng": {
       "label": "SearXNG web araması"
     },

@@ -215,6 +215,10 @@ One-liner for the development stack, if you would rather not clone by hand:
 curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
 ```
 
+### One-click deploy
+
+<a href="https://repocloud.io/details/Synaplan/"><img src="https://d16t0pc4846x52.cloudfront.net/deploylobe.svg" alt="Deploy on RepoCloud" height="42"></a>
+<a href="https://elest.io/open-source/synaplan"><img src="https://elest.io/images/logos/deploy-to-elestio-btn.png" alt="Deploy on Elestio" height="42"></a>
 
 ---
 

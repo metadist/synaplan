@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Entity\Chat;
-use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageMetaRepository;
 use App\Repository\SearchResultRepository;
 use App\Repository\UserRepository;
-use App\Service\File\FileStorageService;
-use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Research\Run\Ledger\EvidenceCard;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchBudget;
@@ -36,14 +33,10 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
     /** @var list<Message> */
     private array $posted = [];
 
-    private int $registered = 0;
-
-    private ?string $storedFile = null;
-
     /** @var list<array{title: string, url: string, host: string, description: string}> */
     private array $savedSources = [];
 
-    public function testAFinishedRunPostsTheReportWithTheFileAttachedOnce(): void
+    public function testAFinishedRunPostsTheReportOnceAndWritesNoFile(): void
     {
         $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, '# Prices'."\n\nThe price is 12.", 11);
         $delivery = $this->delivery();
@@ -55,8 +48,7 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame("# Prices\n\nThe price is 12.", $this->posted[0]->getText());
         self::assertSame('de', $this->posted[0]->getLanguage());
         self::assertSame('OUT', $this->posted[0]->getDirection());
-        self::assertCount(1, $this->posted[0]->getFiles());
-        self::assertSame(1, $this->registered);
+        self::assertCount(0, $this->posted[0]->getFiles());
     }
 
     public function testAStoppedRunSaysSoAboveWhatWasFound(): void
@@ -78,7 +70,6 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertCount(1, $this->posted);
         self::assertSame('de:research.outcome.failed_interrupted', $this->posted[0]->getText());
         self::assertCount(0, $this->posted[0]->getFiles());
-        self::assertSame(0, $this->registered);
     }
 
     public function testTheReportReplacesTheReplyThatAnnouncedTheRun(): void
@@ -93,7 +84,7 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame($reply, $this->posted[0]);
         self::assertSame("# Prices\n\nThe price is 12.", $reply->getText());
         self::assertSame($state->ref->id, $reply->getMeta('research_run_id'));
-        self::assertCount(1, $reply->getFiles());
+        self::assertCount(0, $reply->getFiles());
     }
 
     public function testANewReplyCarriesTheRunIdSoTheStepsCanBeOpenedLater(): void
@@ -105,7 +96,7 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame($state->ref->id, $this->posted[0]->getMeta('research_run_id'));
     }
 
-    public function testThePersonReadsTheAnswerWithNumberedSourcesAndTheFileListsThem(): void
+    public function testThePersonReadsTheAnswerWithNumberedSources(): void
     {
         $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE, null, 11);
         $state->ledger->addPoint('Costs');
@@ -118,7 +109,7 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame('The fee is 90 EUR. [1]', $this->posted[0]->getText());
         self::assertSame('1', $this->posted[0]->getMeta('web_search_results_count'));
         self::assertSame(['Portugal'], array_column($this->savedSources, 'title'));
-        self::assertSame("The fee is 90 EUR. [1]\n\n## de:research.report.sources\n\n1. Portugal — https://pt.example/visa", $this->storedFile);
+        self::assertCount(0, $this->posted[0]->getFiles());
     }
 
     public function testTheReplyShowsTheRunsTokensAndCostNextToTheSorting(): void
@@ -189,23 +180,11 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
             }
         });
 
-        $storage = $this->createStub(FileStorageService::class);
-        $storage->method('storeRawContent')->willReturnCallback(function (string $content): array {
-            $this->storedFile = $content;
-
-            return ['success' => true, 'path' => '7/2026/10/research.md', 'size' => 12, 'mime' => 'text/markdown', 'error' => null];
-        });
         $sources = $this->createStub(SearchResultRepository::class);
         $sources->method('saveForReply')->willReturnCallback(function (Message $reply, array $sources): bool {
             $this->savedSources = $sources;
 
             return true;
-        });
-        $files = $this->createStub(GeneratedFileRegistrar::class);
-        $files->method('register')->willReturnCallback(function (): File {
-            ++$this->registered;
-
-            return new File();
         });
 
         $translator = $this->createStub(TranslatorInterface::class);
@@ -217,10 +196,8 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
             $chats,
             $users,
             $em,
-            $storage,
-            $files,
             $this->store,
-            new ResearchReplyText(new ResearchOutcomeText($translator), $translator),
+            new ResearchReplyText(new ResearchOutcomeText($translator)),
             new NullLogger(),
             $metas,
             $sources,

@@ -1,0 +1,12 @@
+<wopi-discovery>
+    <net-zone name="external-http">
+        <app name="writer">
+            <action ext="docx" name="edit" default="true" urlsrc="http://collabora:9980/browser/abc/cool.html?"/>
+            <action ext="docx" name="view" urlsrc="http://collabora:9980/browser/abc/cool.html?"/>
+            <action ext="pdf" name="view" default="true" urlsrc="http://collabora:9980/browser/abc/cool.html?"/>
+        </app>
+        <app name="calc">
+            <action ext="xlsx" name="edit" urlsrc="http://collabora:9980/browser/abc/cool.html?lang=en"/>
+        </app>
+    </net-zone>
+</wopi-discovery>

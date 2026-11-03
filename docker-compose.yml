@@ -377,6 +377,11 @@ services:
       # OFFICE_CONVERT_URL=disabled to turn the engine off.
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
+      # Browser-facing editor (localhost only) and the callback Collabora uses
+      # on the compose network. `${VAR-default}` keeps an explicit empty value,
+      # so an empty .env entry hides "Open in editor".
+      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL-http://localhost:9981}
+      OFFICE_WOPI_URL: ${OFFICE_WOPI_URL-http://backend:80}
       # File work sidecar. Defaults match the compute service below so
       # `docker compose up` enables it with no extra env.
       # The token default is fixed on purpose (developer install + nightly).
@@ -588,6 +593,11 @@ services:
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
+      # Browser-facing editor (localhost only) and the callback Collabora uses
+      # on the compose network. `${VAR-default}` keeps an explicit empty value,
+      # so an empty .env entry hides "Open in editor".
+      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL-http://localhost:9981}
+      OFFICE_WOPI_URL: ${OFFICE_WOPI_URL-http://backend:80}
       COMPUTE_URL: ${COMPUTE_URL:-http://compute:8080}
       COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}
@@ -953,7 +963,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
+    image: ollama/ollama:latest@sha256:ebaef4f4c5d93660e1f25f8ad085a112f51ccfb0e8458073e71793959dba91c9
     container_name: synaplan-ollama
     depends_on:
       backend:
@@ -1132,7 +1142,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin:latest@sha256:fb0cb638f7d1c2529407921d86679b2b2faf5bb8542314821e9f16e7e3d2954f
+    image: phpmyadmin:latest@sha256:9feb3b1734e2538ba633c1301ca5d08fc06cc8902428fe578034edef7897792a
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db
@@ -1256,12 +1266,13 @@ services:
     networks:
       - synaplan-network
 
-  # Collabora CODE — LibreOffice convert-to over HTTP. Starts with the
-  # stack (wave 2, after the backend is healthy) so office thumbnails,
-  # “Download as PDF” and combine-as-PDF work on a plain `make up`.
+  # Collabora CODE — LibreOffice convert-to over HTTP, and the local office
+  # editor. Starts with the stack (wave 2, after the backend is healthy).
   # About 2 GB RAM. Stop it with: docker compose stop collabora
+  # Convert-to stays on the compose network (collabora:9980, unpublished).
+  # The editor iframe is published on 127.0.0.1 only, so a browser on this
+  # machine can load it. aliasgroup1 is the WOPI host Collabora may call.
   # Docs: docs/DEVELOPMENT.md ("Office conversion")
-  # No published port: the backend talks to collabora:9980 on the compose network.
   collabora:
     image: collabora/code:26.04.5.2.1@sha256:c7415b963e32eb0986a562583f154d36d3d7a461e1ddfb660a95e87094328acb
     container_name: synaplan-collabora
@@ -1270,8 +1281,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
     mem_limit: 2g
+    ports:
+      - "127.0.0.1:${COLLABORA_PUBLIC_PORT:-9981}:9980"
     environment:
-      extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
+      aliasgroup1: http://backend:80
+      server_name: localhost:${COLLABORA_PUBLIC_PORT:-9981}
+      extra_params: >-
+        --o:ssl.enable=false
+        --o:ssl.termination=false
+        --o:num_prespawn_children=2
+        --o:net.frame_ancestors=http://localhost:5173 http://127.0.0.1:5173
+        --o:welcome.enable=false
     # CODE 26.04 is distroless: no bash, so the /dev/tcp probe of 25.04 cannot
     # run here. coolwsd --probe is the upstream check (it is what the image's
     # own HEALTHCHECK runs) and needs the exec form — a plain string would go

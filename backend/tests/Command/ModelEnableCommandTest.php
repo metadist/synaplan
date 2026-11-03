@@ -91,10 +91,10 @@ class ModelEnableCommandTest extends TestCase
 
     public function testEnableGroupedKeyEnablesAllVariants(): void
     {
-        // google:gemini-2.5-pro resolves to chat + pic2text
+        // google:gemini-3.8-flash resolves to chat + pic2text
         $this->givenModelsAreMissing();
 
-        $this->commandTester->execute(['models' => ['google:gemini-2.5-pro']]);
+        $this->commandTester->execute(['models' => ['google:gemini-3.8-flash']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Enabled 2 model(s)', $this->commandTester->getDisplay());

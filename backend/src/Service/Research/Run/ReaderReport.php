@@ -42,8 +42,9 @@ final class ReaderReport
     }
 
     /**
-     * The reader's report with its sources listed at the end, for the file
-     * that is attached to the reply and read outside the chat.
+     * The same report with its sources written out, for a step that receives
+     * only text (an email, a later saved-task step). The chat lists the
+     * sources under the reply instead, so this is not attached as a file.
      *
      * @param list<array{title: string, url: string, host: string, description: string}> $sources
      */

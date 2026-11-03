@@ -120,6 +120,13 @@ COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
 ```
 
 `GET /api/v1/config/runtime` then reports `features.officeConvertEnabled: true`.
+The same sidecar can also open files in the editor. Dev compose publishes
+Collabora on `127.0.0.1:9981` and sets `OFFICE_PUBLIC_URL` plus
+`OFFICE_WOPI_URL`, so runtime config reports `features.officeEditorEnabled`.
+Leave either URL empty (or `disabled`) and the editor stays hidden;
+conversion keeps working. Self-host does not publish the editor until you
+set both URLs and an `aliasgroup1` that names the WOPI host Collabora is
+allowed to call.
 Admin **Settings → Features** (`/api/v1/config/features`) pings
 `/hosting/capabilities`. Umbrel / AWS Marketplace / Elestio stay off unless
 the operator opts in the same way.
@@ -395,7 +402,7 @@ make test    # Run tests
 | phpMyAdmin | http://localhost:8082 |
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
-| Collabora CODE (no published port) | `http://collabora:9980` on the compose network |
+| Collabora CODE | convert-to `http://collabora:9980` (compose network); editor http://localhost:9981 |
 | Docling (profile `docling`, no published port) | `http://docling:5001` on the compose network |
 | SearXNG (profile `searxng`, no published port) | `http://searxng:8080` on the compose network |
 
