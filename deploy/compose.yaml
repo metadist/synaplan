@@ -491,7 +491,7 @@ services:
   # the network. It runs as root so it can read the mode-0600 key; it does
   # not run the application.
   tls-proxy:
-    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
     profiles: [local-tls]
     user: "0:0"
     ports:
@@ -707,7 +707,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
+    image: ollama/ollama:latest@sha256:ebaef4f4c5d93660e1f25f8ad085a112f51ccfb0e8458073e71793959dba91c9
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0
