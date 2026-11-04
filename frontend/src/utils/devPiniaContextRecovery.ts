@@ -13,8 +13,17 @@ const STORAGE_KEY = 'synaplan.devPiniaReload'
 
 let recoveryInProgress = false
 let reloadStarted = false
+let hotUpdateEpoch = 0
 let reloadPage = (): void => {
   window.location.reload()
+}
+
+export function getDevPiniaHotUpdateEpoch(): number {
+  return hotUpdateEpoch
+}
+
+export function noteDevPiniaHotUpdate(): void {
+  hotUpdateEpoch += 1
 }
 
 export function isDevPiniaContextLoss(err: unknown): boolean {
@@ -76,6 +85,7 @@ export function resetDevPiniaContextRecovery(
 ): void {
   recoveryInProgress = false
   reloadStarted = false
+  hotUpdateEpoch = 0
   reloadPage = reload
   try {
     sessionStorage.removeItem(STORAGE_KEY)

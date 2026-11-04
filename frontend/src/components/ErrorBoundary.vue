@@ -18,6 +18,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import {
   beginDevPiniaRecovery,
   finishDevPiniaRecovery,
+  getDevPiniaHotUpdateEpoch,
   isDevPiniaContextLoss,
   noteDevPiniaContextHealthy,
   reloadAfterDevPiniaContextLoss,
@@ -45,6 +46,7 @@ const lastErrorPath = ref<string | null>(null)
 /** False for one frame while a hot-update remounts the tree. */
 const treeVisible = ref(true)
 let piniaRecoveryAttempts = 0
+let lastRecoveryEpoch = -1
 /** True until the scheduled remount renders. Errors in that window are one attempt. */
 let piniaRemountPending = false
 
@@ -53,9 +55,13 @@ const activeError = computed<GlobalErrorPayload | null>(
 )
 
 onMounted(() => {
-  void nextTick(() => {
-    if (!activeError.value) noteDevPiniaContextHealthy()
-  })
+  void router
+    .isReady()
+    .catch(() => {})
+    .then(() => nextTick())
+    .then(() => {
+      if (!activeError.value) noteDevPiniaContextHealthy()
+    })
 })
 
 /**
@@ -69,6 +75,11 @@ onMounted(() => {
 function recoverDevPiniaContext(err: unknown): boolean {
   if (!import.meta.env.DEV || !isDevPiniaContextLoss(err)) return false
   if (piniaRemountPending) return true
+  const epoch = getDevPiniaHotUpdateEpoch()
+  if (epoch !== lastRecoveryEpoch) {
+    lastRecoveryEpoch = epoch
+    piniaRecoveryAttempts = 0
+  }
   piniaRecoveryAttempts += 1
   if (piniaRecoveryAttempts === 1) {
     piniaRemountPending = true
@@ -89,10 +100,10 @@ function recoverDevPiniaContext(err: unknown): boolean {
 watch(
   treeVisible,
   (visible) => {
-    // Only the scheduled remount (attempt 1) counts as recovered. Attempt 2
-    // has already decided to reload or to show the fatal screen.
+    // Finish the in-flight remount after attempt 1 renders; keep the attempt
+    // budget for the current hot update so delayed async failures escalate to
+    // reload instead of remounting indefinitely.
     if (!visible || piniaRecoveryAttempts !== 1 || activeError.value) return
-    piniaRecoveryAttempts = 0
     finishDevPiniaRecovery()
   },
   { flush: 'post' }

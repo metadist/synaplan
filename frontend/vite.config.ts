@@ -46,12 +46,18 @@ export function piniaStoreHmrPlugin(): Plugin {
       if (process.env.VITEST) return null
       const path = id.split('?')[0] ?? id
       if (!/\/src\/stores\/[^/]+\.ts$/.test(path)) return null
+      // realtime.ts holds a live WebSocket client instance in a closure;
+      // hot-replacing the setup closure orphans the active socket.
+      if (path.endsWith('/src/stores/realtime.ts')) return null
       if (code.includes('acceptHMRUpdate') || code.includes('__acceptPiniaHmr')) return null
-      const names = [...code.matchAll(/export const (use\w+) = defineStore\(/g)].map(
+      const runtimeExports = [
+        ...code.matchAll(/^export\s+(?:async\s+)?(?:const|let|var|function|class|default)\b/gm),
+      ]
+      const names = [...code.matchAll(/^export const (use\w+) = defineStore\(/gm)].map(
         (match) => match[1]
       )
       const name = names[0]
-      if (names.length !== 1 || name == null) return null
+      if (runtimeExports.length !== 1 || names.length !== 1 || name == null) return null
       return {
         code:
           `import { acceptHMRUpdate as __acceptPiniaHmr } from 'pinia'\n` +

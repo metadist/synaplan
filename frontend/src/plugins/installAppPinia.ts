@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import type { App } from 'vue'
+import { noteDevPiniaHotUpdate } from '@/utils/devPiniaContextRecovery'
 
 /**
  * Install the app's single Pinia instance before any await.
@@ -22,6 +23,7 @@ export function installAppPinia(app: App): Pinia {
       hot.off('vite:beforeUpdate', previous)
     }
     const reactivatePinia = (): void => {
+      noteDevPiniaHotUpdate()
       setActivePinia(pinia)
     }
     hot.data.reactivatePinia = reactivatePinia

@@ -1,11 +1,15 @@
-import { defineComponent, h, nextTick, type Component } from 'vue'
+/* eslint-disable vue/one-component-per-file */
+import { defineComponent, h, nextTick, onMounted } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
-import { resetDevPiniaContextRecovery } from '@/utils/devPiniaContextRecovery'
+import {
+  noteDevPiniaHotUpdate,
+  resetDevPiniaContextRecovery,
+} from '@/utils/devPiniaContextRecovery'
 
 const PINIA_ERROR =
   '[🍍]: "getActivePinia()" was called but there was no active Pinia. Are you trying to use a store before calling "app.use(pinia)"?'
@@ -48,7 +52,7 @@ function piniaErrorBurst() {
   })
 }
 
-async function mountBoundary(slot: Component) {
+async function mountBoundary(slot: ReturnType<typeof child>) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', component: { template: '<div />' } }],
@@ -112,5 +116,64 @@ describe('ErrorBoundary Pinia hot-update recovery', () => {
 
     expect(wrapper.find('[data-testid="comp-error-boundary"]').exists()).toBe(true)
     expect(reloads).toBe(0)
+  })
+
+  it('escalates delayed async child Pinia failures to reload instead of remounting endlessly', async () => {
+    const AsyncFailingChild = defineComponent({
+      name: 'AsyncFailingChild',
+      setup() {
+        onMounted(async () => {
+          await Promise.resolve()
+          throw new Error(PINIA_ERROR)
+        })
+        return () => h('p', 'pending')
+      },
+    })
+
+    await mountBoundary(AsyncFailingChild)
+    await flushPromises()
+    await nextTick()
+    await flushPromises()
+
+    expect(reloads).toBe(1)
+
+    // A fresh hot update resets the remount budget for the next edit
+    noteDevPiniaHotUpdate()
+    expect(reloads).toBe(1)
+  })
+
+  it('waits for router.isReady() before clearing the persisted reload guard', async () => {
+    sessionStorage.setItem('synaplan.devPiniaReload', '1')
+    let releaseNavigation!: () => void
+    const navGate = new Promise<void>((resolve) => {
+      releaseNavigation = resolve
+    })
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div data-testid="routed-ok" />' } }],
+    })
+    router.beforeEach(async () => {
+      await navGate
+    })
+    void router.push('/')
+
+    mount(ErrorBoundary, {
+      slots: { default: () => h('div', 'slot') },
+      global: {
+        plugins: [createPinia(), router, i18n],
+        stubs: { ErrorView: { template: '<div data-testid="page-error" />' } },
+      },
+    })
+
+    await nextTick()
+    expect(sessionStorage.getItem('synaplan.devPiniaReload')).toBe('1')
+
+    releaseNavigation()
+    await router.isReady()
+    await flushPromises()
+    await nextTick()
+
+    expect(sessionStorage.getItem('synaplan.devPiniaReload')).toBeNull()
   })
 })
