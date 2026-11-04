@@ -59,7 +59,7 @@ test.describe('@ci UX journeys', () => {
       const checklist = page.locator(CHECKLIST)
       await expect(checklist).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('[data-testid="item-getting-started-file"]')).toContainText(
-        'Library › Files'
+        'A document or a photo'
       )
       await expect(page.locator('[data-testid="item-getting-started-provider"]')).toHaveCount(0)
     })

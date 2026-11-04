@@ -8,9 +8,7 @@ import {
   Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
-import { useChatsStore } from '@/stores/chats'
 import { requestComposerFocus } from './useComposerTyping'
-import { goToFreshChat } from './usePinnedAssistant'
 import {
   groupNavChildren,
   isNavChildActive,
@@ -24,33 +22,29 @@ export type NavSectionKey = 'chats' | 'library' | 'assistants' | 'channels' | 'o
 /** Incremented when the chats rail icon is clicked while the chats panel stays mounted. */
 export const chatsPanelRefresh = ref(0)
 
-/** One in-flight "open a new chat" so a double click cannot create two. */
+/** One in-flight return to Chats so a double click cannot race two navigations. */
 let chatsHomeOpen: Promise<void> | null = null
 
-function queueFreshChat(
+function queueRestoreChats(
   router: ReturnType<typeof useRouter>,
   route: ReturnType<typeof useRoute>,
-  isGuest: boolean,
   sectionKey: NavSectionKey | null
 ): Promise<void> {
-  chatsHomeOpen ??= openFreshChat(router, route, isGuest, sectionKey).finally(() => {
+  chatsHomeOpen ??= restoreChatsHome(router, route, sectionKey).finally(() => {
     chatsHomeOpen = null
   })
   return chatsHomeOpen
 }
 
-async function openFreshChat(
+async function restoreChatsHome(
   router: ReturnType<typeof useRouter>,
   route: ReturnType<typeof useRoute>,
-  isGuest: boolean,
   sectionKey: NavSectionKey | null
 ): Promise<void> {
-  // Pick the empty chat before navigating so the composer restores that draft
-  // instead of flashing the last thread.
-  if (!isGuest) await useChatsStore().findOrCreateEmptyChat()
+  // The last open thread stays selected. An empty chat is only created by
+  // New Chat, never by the Chats rail.
   if (sectionKey === 'chats') chatsPanelRefresh.value += 1
-  if (route.path === '/') await goToFreshChat(router, route)
-  else await router.push({ path: '/' })
+  if (route.path !== '/') await router.push({ path: '/' })
   requestComposerFocus()
 }
 
@@ -311,7 +305,7 @@ export function useNavSections() {
 
   function selectSection(key: NavSectionKey): Promise<void> | void {
     if (key === 'chats') {
-      return queueFreshChat(router, route, isGuestMode.value, sectionKeyForPath(route.path))
+      return queueRestoreChats(router, route, sectionKeyForPath(route.path))
     }
     if (sectionKeyForPath(route.path) === key) return
     const target = homePath(key)

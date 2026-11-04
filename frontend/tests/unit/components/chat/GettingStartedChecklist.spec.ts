@@ -51,7 +51,7 @@ describe('GettingStartedChecklist', () => {
     expect(item(wrapper, 'file').attributes('data-done')).toBe('true')
     expect(item(wrapper, 'assistant').attributes('data-done')).toBe('false')
     expect(item(wrapper, 'assistant').attributes('href')).toBe('/ai/assistants')
-    expect(item(wrapper, 'file').text()).toContain('Library › Files')
+    expect(item(wrapper, 'file').text()).toContain('A document or a photo')
     expect(item(wrapper, 'provider').exists()).toBe(false)
     expect(wrapper.get('[data-testid="text-getting-started-progress"]').text()).toContain('1 of 3')
   })
@@ -77,7 +77,7 @@ describe('GettingStartedChecklist', () => {
     const wrapper = await mountChecklist()
 
     expect(item(wrapper, 'provider').text()).toContain('Add your own AI provider')
-    expect(item(wrapper, 'provider').text()).toContain('You are on the Synaplan Demo')
+    expect(item(wrapper, 'provider').text()).toContain('The Synaplan Demo is for trying things out')
     expect(item(wrapper, 'provider').attributes('data-done')).toBe('false')
   })
 

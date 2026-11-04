@@ -53,8 +53,7 @@ test.describe('@ci Incognito Chat', () => {
 
     await test.step('Assert: the chat list has no row for the incognito turn', async () => {
       const list = page.locator(selectors.nav.sidebarChats)
-      // The rail icon starts a new chat and would end this session. The list
-      // is already open on the chat page.
+      // The list is already open on the chat page.
       if (!(await list.isVisible())) {
         await page.locator(selectors.nav.sidebarV2ChatNav).click()
       }

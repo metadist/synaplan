@@ -909,23 +909,23 @@
       "items": {
         "provider": {
           "title": "Configurer un fournisseur IA",
-          "where": "Sous Administration › Infrastructure IA"
+          "where": "Synaplan a besoin d’un fournisseur pour répondre, par exemple Claude ou un modèle sur votre propre serveur."
         },
         "file": {
           "title": "Téléverser un fichier",
-          "where": "Vous le retrouvez ensuite sous Bibliothèque › Fichiers"
+          "where": "Un document ou une photo dont l’IA pourra se servir plus tard pour répondre."
         },
         "assistant": {
           "title": "Créer un assistant",
-          "where": "Il apparaît sous Assistants"
+          "where": "Définissez une fois les instructions, les fichiers et les outils. Chaque chat avec cet assistant les connaît déjà."
         },
         "app": {
           "title": "Connecter une app",
-          "where": "Les apps connectées figurent sous Apps › Connectées"
+          "where": "Quelque chose que vous utilisez déjà, comme le mail ou le calendrier. Synaplan pourra alors s’en servir."
         },
         "providerDemo": {
           "title": "Ajouter votre propre fournisseur d’IA",
-          "where": "Vous utilisez Synaplan Demo"
+          "where": "Synaplan Demo sert à essayer. Avec votre propre fournisseur, les réponses restent chez vous."
         }
       }
     }

@@ -835,23 +835,23 @@
       "items": {
         "provider": {
           "title": "Bir AI sağlayıcısı kurun",
-          "where": "Yönetim › AI altyapısı altında"
+          "where": "Synaplan’ın yanıt verebilmesi için bir sağlayıcı gerekir, örneğin Claude veya kendi sunucunuzdaki bir model."
         },
         "file": {
           "title": "Dosya yükleyin",
-          "where": "Sonra Kütüphane › Dosyalar altında bulursunuz"
+          "where": "Yapay zekanın daha sonra yanıtlayabileceği bir belge veya fotoğraf."
         },
         "assistant": {
           "title": "Asistan oluşturun",
-          "where": "Asistanlar altında görünür"
+          "where": "Talimatları, dosyaları ve araçları bir kez ayarlayın. Bu asistanla her sohbet bunları zaten bilir."
         },
         "app": {
           "title": "Bir uygulama bağlayın",
-          "where": "Bağlı uygulamalar Uygulamalar › Bağlı altında listelenir"
+          "where": "Zaten kullandığınız bir şey, örneğin e-posta veya takvim. Synaplan o zaman onunla çalışabilir."
         },
         "providerDemo": {
           "title": "Kendi AI sağlayıcınızı ekleyin",
-          "where": "Şu anda Synaplan Demo kullanıyorsunuz"
+          "where": "Synaplan Demo denemek içindir. Kendi sağlayıcınızla yanıtlar sizde kalır."
         }
       }
     }
