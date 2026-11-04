@@ -3,12 +3,12 @@ package runner
 import (
 	"testing"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/mount"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 )
 
-func daemonMounts() []types.MountPoint {
-	return []types.MountPoint{
+func daemonMounts() []container.MountPoint {
+	return []container.MountPoint{
 		{Type: mount.TypeBind, Source: "/synaplan-compute/scratch", Destination: "/scratch"},
 		{Type: mount.TypeBind, Source: "/synaplan-compute/workspaces", Destination: "/workspaces"},
 		{Type: mount.TypeVolume, Source: "some_volume", Destination: "/data"},
@@ -52,7 +52,7 @@ func TestDaemonBindSourceRefusesTraversal(t *testing.T) {
 
 func TestDaemonBindSourceLongestPrefixWins(t *testing.T) {
 	t.Parallel()
-	mounts := []types.MountPoint{
+	mounts := []container.MountPoint{
 		{Type: mount.TypeBind, Source: "/a", Destination: "/x"},
 		{Type: mount.TypeBind, Source: "/b", Destination: "/x/sub"},
 	}

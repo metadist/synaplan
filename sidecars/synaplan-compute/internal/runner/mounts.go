@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/mount"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 )
 
 // DaemonBindSource translates a container-absolute bind source into the path
@@ -18,7 +18,7 @@ import (
 //
 // mounts comes from our own container inspect (Source = daemon path,
 // Destination = our path).
-func DaemonBindSource(mounts []types.MountPoint, source string) (string, error) {
+func DaemonBindSource(mounts []container.MountPoint, source string) (string, error) {
 	if !path.IsAbs(source) {
 		return "", fmt.Errorf("bind source %q is not absolute", source)
 	}
