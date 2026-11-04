@@ -1,6 +1,6 @@
 ---
 name: Synaplan
-description: Coding-agent rules — formatting, tests, green CI, clean source
+description: Coding-agent rules — land the pull request, green CI, clean source
 ---
 
 # Synaplan
@@ -13,35 +13,51 @@ end. The previous guides are `_devextras/bak_AGENTS_root.md` and
 
 ## Loop
 
-One topic, one branch off `main`, one pull request. Conventional Commits
-(`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`). A subject that
-**starts with `feat`** — any casing, including a squash-merged PR title —
-bumps the **minor** release; anything else bumps the patch. A major bump is
-explicit. No AI attribution (`Co-Authored-By`, "Generated with…"). Never
-commit or push to `main`. Never force-push `main` or `master`.
+The agent lands every code change in this repository. The request to
+implement a topic is already the request to commit it, push it, and open
+the pull request. Do not stop after the files are edited, and do not ask
+for a separate go-ahead to commit, push, or open the pull request. A topic
+is finished only when Copilot has reviewed the current head and **All
+Checks Passed** is green on that head.
 
-Code, comments, and commits are English.
+1. **Branch** off current `main`. One topic, one branch, one pull request.
+   Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`,
+   `test:`). A subject that **starts with `feat`** — any casing, including
+   a squash-merged PR title — bumps the **minor** release; anything else
+   bumps the patch. A major bump is explicit. No AI attribution
+   (`Co-Authored-By`, "Generated with…"). Never commit or push to `main`.
+   Never force-push `main` or `master`. Code, comments, and commits are
+   English. Merge conflicts by hand and keep both sides' behavior. Never
+   `git checkout --ours` or `--theirs` on code. If unsure, ask.
+2. **Implement** that topic only. A user-visible change is done when its
+   journey has been walked in the browser on the running stack: click,
+   type, find, undo. A screenshot is not that walk. Sign in with a seeded
+   account (`docs/DEVELOPMENT.md`). Never print, log, or commit a provider
+   key. The product bar is `docs/UX_CONTRACT.md` (U1–U12). Before the
+   commit, run `make ci-local` unfiltered. Before the push that touches
+   the UI, a route, OpenAPI the UI consumes, chat, or auth, also run
+   `make test-e2e`. Backend-only PHP with no HTTP or UI contract may skip
+   Playwright. A bad selector, i18n key, or route shows up only in E2E.
+   Push only after that local gate is green.
+3. **Commit and push** the branch.
+4. **Open the pull request** on GitHub with `gh pr create` against `main`,
+   ready for review. The title is the conventional commit subject. The
+   body says what changed, how to see it, and `Fixes #NNNN` when an issue
+   exists.
+5. **Wait for the Copilot review** of that head. Copilot reviews every
+   pull request to `main`. Poll until `copilot-pull-request-reviewer` has
+   submitted a review of the current head SHA. Every thread — Copilot's or
+   a person's — gets a reply: the hash of the fixing commit, or one
+   sentence on why it does not apply. Resolve a thread only after the code
+   or the text matches the reply. Push the fix to the same branch, then
+   wait for Copilot on the new head.
+6. **Wait until `All Checks Passed` is green** on that head. Reproduce a
+   red check locally, fix it on the same branch, push, and wait again. A
+   pending check is still open. Then say the pull request is ready and
+   give its URL. The owner merges. Do not merge. Do not start the next
+   topic before this one is ready.
 
-Merge conflicts by hand and keep both sides' behavior. Never
-`git checkout --ours` or `--theirs` on code. If unsure, ask.
-
-Before every commit, run `make ci-local` unfiltered. Before every push that
-touches the UI, a route, OpenAPI the UI consumes, chat, or auth, also run
-`make test-e2e`. Backend-only PHP with no HTTP or UI contract may skip
-Playwright. A bad selector, i18n key, or route shows up only in E2E.
-
-PR body: what changed, how to see it, and `Fixes #NNNN` when an issue
-exists. Reply on every review thread (the fixing commit, or one sentence on
-why it does not apply). Wait until **All Checks Passed** is green on that
-head. The owner merges. Then start the next topic.
-
-A user-visible change is done when its journey has been walked in the
-browser on the running stack: click, type, find, undo. A screenshot is not
-that walk. Sign in with a seeded account (`docs/DEVELOPMENT.md`). Never
-print, log, or commit a provider key. The product bar is
-`docs/UX_CONTRACT.md` (U1–U12).
-
-Once that gate is green, a review or CI fix re-runs only the side it
+Once the local gate is green, a review or CI fix re-runs only the side it
 touches: frontend gets `make -C frontend lint`, `vue-tsc`, and the full
 Vitest; backend gets the backend targets. `--filter` is diagnosis. Do not
 rebuild the stack or re-run every local E2E job when CI already runs the
