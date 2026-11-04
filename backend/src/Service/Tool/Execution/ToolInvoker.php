@@ -47,12 +47,12 @@ final readonly class ToolInvoker
     public function invoke(ToolDescriptor $tool, ToolInvocation $invocation): ToolOutcome
     {
         $started = hrtime(true);
-        $gated = $this->consult($invocation);
+        [$gated, $effect] = $this->consult($tool, $invocation);
         if (null !== $gated) {
-            return $this->observe($gated, $started, $tool, $invocation, false, true);
+            return $this->observe($gated, $started, $tool, $invocation, $effect, false, true);
         }
         if ($invocation->decideOnly) {
-            return $this->observe(new ToolOutcome(ToolOutcomeKind::Done, ''), $started, $tool, $invocation, false, false);
+            return $this->observe(new ToolOutcome(ToolOutcomeKind::Done, ''), $started, $tool, $invocation, $effect, false, false);
         }
 
         $execution = $this->executorFor($tool)->execute($tool, $invocation);
@@ -66,19 +66,32 @@ final readonly class ToolInvoker
             $execution->details,
         );
 
-        return $this->observe($outcome, $started, $tool, $invocation, true, true);
+        return $this->observe($outcome, $started, $tool, $invocation, $effect, true, true);
     }
 
-    private function consult(ToolInvocation $invocation): ?ToolOutcome
+    /**
+     * The audit row for a tool that has finished outside the invoker
+     * (file work runs in the sidecar after the gate). A policy-only
+     * check does not call this.
+     */
+    public function recordRan(ToolDescriptor $tool, int $actorId, string $requestId, ToolOutcomeKind $kind, int $durationMs): void
+    {
+        $this->writeAudit($tool, $actorId, $requestId, $kind, $durationMs, null);
+    }
+
+    /**
+     * @return array{0: ?ToolOutcome, 1: SideEffect}
+     */
+    private function consult(ToolDescriptor $tool, ToolInvocation $invocation): array
     {
         $gate = $this->gate;
         $request = $invocation->decision;
         if (null === $gate) {
             if (PolicyOutcome::Block->value === $request?->nodeApproval) {
-                return new ToolOutcome(ToolOutcomeKind::Refused, ToolExecutionGate::NODE_BLOCK_REFUSAL);
+                return [new ToolOutcome(ToolOutcomeKind::Refused, ToolExecutionGate::NODE_BLOCK_REFUSAL), $tool->sideEffect];
             }
 
-            return null;
+            return [null, $tool->sideEffect];
         }
 
         $actor = $this->actor($invocation);
@@ -121,17 +134,18 @@ final readonly class ToolInvoker
             $resolvedRequest,
             $alreadyApproved,
         );
+        $effect = $decision['descriptor']->sideEffect;
         if (PolicyOutcome::Block === $decision['outcome']) {
             $refusal = $decision['refusal'] ?? 'I cannot do that. An administrator has turned this off.';
 
-            return new ToolOutcome(ToolOutcomeKind::Refused, (string) $refusal);
+            return [new ToolOutcome(ToolOutcomeKind::Refused, (string) $refusal), $effect];
         }
         $approval = $decision['approval'] ?? null;
         if (PolicyOutcome::Approve === $decision['outcome'] && $approval instanceof Approval) {
-            return new ToolOutcome(ToolOutcomeKind::NeedsApproval, '', (int) $approval->getId(), null, 0, $approval);
+            return [new ToolOutcome(ToolOutcomeKind::NeedsApproval, '', (int) $approval->getId(), null, 0, $approval), $effect];
         }
 
-        return null;
+        return [null, $effect];
     }
 
     private function observe(
@@ -139,17 +153,29 @@ final readonly class ToolInvoker
         int $started,
         ToolDescriptor $tool,
         ToolInvocation $invocation,
+        SideEffect $effect,
         bool $ran,
         bool $count,
     ): ToolOutcome {
         $durationMs = (int) ((hrtime(true) - $started) / 1_000_000);
         $observed = $outcome->withDuration($durationMs);
         if ($count) {
-            $this->metrics?->record($tool->source->value, $tool->sideEffect->value, $observed->kind->value);
-            $this->timeline?->recordTool($tool->source->value, $tool->sideEffect->value, $observed->kind->value, $durationMs);
+            $this->metrics?->record($tool->source->value, $effect->value, $observed->kind->value);
+            $this->timeline?->recordTool($tool->source->value, $effect->value, $observed->kind->value, $durationMs);
         }
-        if ($ran || ($invocation->decideOnly && ToolOutcomeKind::Done === $observed->kind)) {
-            $this->auditExecuted($tool, $invocation, $observed);
+        if ($ran) {
+            $requestId = $invocation->caller->requestId;
+            if (null !== $invocation->decision) {
+                $requestId = $invocation->decision->requestedBy;
+            }
+            $this->writeAudit(
+                $this->classified($tool, $effect),
+                (int) ($invocation->caller->userId ?? 0),
+                $requestId ?? '',
+                $observed->kind,
+                $observed->durationMs,
+                $observed->approvalId,
+            );
         }
         if ($ran && $invocation->recordUsage) {
             $this->recordUsage($tool, $invocation, $observed);
@@ -158,43 +184,58 @@ final readonly class ToolInvoker
         return $observed;
     }
 
-    private function auditExecuted(ToolDescriptor $tool, ToolInvocation $invocation, ToolOutcome $outcome): void
+    private function classified(ToolDescriptor $tool, SideEffect $effect): ToolDescriptor
     {
+        if ($effect === $tool->sideEffect) {
+            return $tool;
+        }
+
+        return new ToolDescriptor(
+            $tool->name,
+            $tool->title,
+            $tool->description,
+            $tool->inputSchema,
+            $effect,
+            $tool->source,
+            $tool->ownerId,
+            $tool->policyException,
+            $tool->meta,
+        );
+    }
+
+    private function writeAudit(
+        ToolDescriptor $tool,
+        int $actorId,
+        string $requestId,
+        ToolOutcomeKind $kind,
+        int $durationMs,
+        ?int $approvalId,
+    ): void {
         if (null === $this->audit) {
             return;
         }
         if (SideEffect::Write !== $tool->sideEffect && SideEffect::Destructive !== $tool->sideEffect) {
             return;
         }
-        if (ToolOutcomeKind::Done !== $outcome->kind && ToolOutcomeKind::Failed !== $outcome->kind) {
+        if (ToolOutcomeKind::Done !== $kind && ToolOutcomeKind::Failed !== $kind) {
             return;
         }
 
-        $requestId = $invocation->caller->requestId;
-        if (null !== $invocation->decision) {
-            $requestId = $invocation->decision->requestedBy;
-        }
         $subject = [
-            'tool' => $invocation->toolName,
+            'tool' => $tool->name,
             'source' => $tool->source->value,
             'kind' => $tool->sideEffect->value,
-            'outcome' => $outcome->kind->value,
-            'durationMs' => $outcome->durationMs,
+            'outcome' => $kind->value,
+            'durationMs' => $durationMs,
         ];
-        if (null !== $requestId && '' !== $requestId) {
+        if ('' !== $requestId) {
             $subject['requestId'] = $requestId;
         }
-        if (null !== $outcome->approvalId) {
-            $subject['approvalId'] = $outcome->approvalId;
+        if (null !== $approvalId) {
+            $subject['approvalId'] = $approvalId;
         }
 
-        $this->audit->record(
-            (int) ($invocation->caller->userId ?? 0),
-            'tool.executed',
-            'tool',
-            $invocation->toolName,
-            $subject,
-        );
+        $this->audit->record($actorId, 'tool.executed', 'tool', $tool->name, $subject);
     }
 
     private function recordUsage(ToolDescriptor $tool, ToolInvocation $invocation, ToolOutcome $outcome): void

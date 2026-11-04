@@ -31,6 +31,7 @@ use App\Service\Tool\Execution\ToolChannel;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
@@ -166,19 +167,48 @@ final readonly class McpFetchRunner implements TaskRunner
             return $this->images->attach($server, $tool, $arguments, $this->language($context));
         }
 
+        return $this->callTool($context, $node, $server, $serverId, $tool, $arguments, (int) $userId);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function callTool(
+        NodeContext $context,
+        TaskNode $node,
+        McpServerConfig $server,
+        int $serverId,
+        string $tool,
+        array $arguments,
+        int $userId,
+    ): NodeResult {
         $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
         $outcome = $this->tools()->invoke(
-            new ToolDescriptor($gateName, $tool, '', [], SideEffect::Read, ToolSource::Mcp, (int) $userId, null, [
+            new ToolDescriptor($gateName, $tool, '', [], SideEffect::Read, ToolSource::Mcp, $userId, null, [
                 'serverId' => $serverId,
                 'tool' => $tool,
             ]),
             new ToolInvocation(
                 $gateName,
                 $arguments,
-                new ToolCaller((int) $userId, ToolChannel::MCP_FETCH, requestId: 'chat:'.(int) $context->message->getId()),
-                decision: new GateRequest(null, PolicyContext::Interactive, 'chat:'.(int) $context->message->getId()),
+                new ToolCaller($userId, ToolChannel::MCP_FETCH, requestId: 'chat:'.(int) $context->message->getId()),
+                decision: new GateRequest(
+                    null,
+                    PolicyContext::Interactive,
+                    'chat:'.(int) $context->message->getId(),
+                    alreadyApproved: $context->isApproved($node->id),
+                ),
             ),
         );
+        if (ToolOutcomeKind::NeedsApproval === $outcome->kind && null !== $outcome->approvalId) {
+            return NodeResult::waitingApproval($outcome->approvalId, $arguments, [
+                'tool' => $gateName,
+                'side_effect' => SideEffect::Read->value,
+            ]);
+        }
+        if (ToolOutcomeKind::Refused === $outcome->kind) {
+            return NodeResult::failed($outcome->resultText);
+        }
         if (true === ($outcome->details['transport'] ?? false)) {
             $status = $outcome->details['httpStatus'] ?? null;
 

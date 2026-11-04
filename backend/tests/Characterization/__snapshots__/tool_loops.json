@@ -169,22 +169,7 @@
         "gateway_complete.code.approvals_off": {
             "approvals": [],
             "approvals_enabled": false,
-            "audit": [
-                {
-                    "action": "tool.executed",
-                    "actor": 7,
-                    "id": "code_execution",
-                    "kind": "tool",
-                    "subject": {
-                        "durationMs": 0,
-                        "kind": "write",
-                        "outcome": "done",
-                        "requestId": "chat:0",
-                        "source": "compute",
-                        "tool": "code_execution"
-                    }
-                }
-            ],
+            "audit": [],
             "executed": [
                 "code_execution"
             ],
@@ -218,22 +203,7 @@
         "gateway_complete.code.approvals_on": {
             "approvals": [],
             "approvals_enabled": true,
-            "audit": [
-                {
-                    "action": "tool.executed",
-                    "actor": 7,
-                    "id": "code_execution",
-                    "kind": "tool",
-                    "subject": {
-                        "durationMs": 0,
-                        "kind": "write",
-                        "outcome": "done",
-                        "requestId": "chat:0",
-                        "source": "compute",
-                        "tool": "code_execution"
-                    }
-                }
-            ],
+            "audit": [],
             "executed": [
                 "code_execution"
             ],
@@ -779,22 +749,7 @@
         "gateway_stream.code.approvals_off": {
             "approvals": [],
             "approvals_enabled": false,
-            "audit": [
-                {
-                    "action": "tool.executed",
-                    "actor": 7,
-                    "id": "code_execution",
-                    "kind": "tool",
-                    "subject": {
-                        "durationMs": 0,
-                        "kind": "write",
-                        "outcome": "done",
-                        "requestId": "chat:0",
-                        "source": "compute",
-                        "tool": "code_execution"
-                    }
-                }
-            ],
+            "audit": [],
             "executed": [
                 "code_execution"
             ],
@@ -1424,22 +1379,7 @@
         "openai_complete.code.approvals_off": {
             "approvals": [],
             "approvals_enabled": false,
-            "audit": [
-                {
-                    "action": "tool.executed",
-                    "actor": 7,
-                    "id": "code_execution",
-                    "kind": "tool",
-                    "subject": {
-                        "durationMs": 0,
-                        "kind": "write",
-                        "outcome": "done",
-                        "requestId": "chat:0",
-                        "source": "compute",
-                        "tool": "code_execution"
-                    }
-                }
-            ],
+            "audit": [],
             "executed": [
                 "code_execution"
             ],
@@ -1472,22 +1412,7 @@
         "openai_complete.code.approvals_on": {
             "approvals": [],
             "approvals_enabled": true,
-            "audit": [
-                {
-                    "action": "tool.executed",
-                    "actor": 7,
-                    "id": "code_execution",
-                    "kind": "tool",
-                    "subject": {
-                        "durationMs": 0,
-                        "kind": "write",
-                        "outcome": "done",
-                        "requestId": "chat:0",
-                        "source": "compute",
-                        "tool": "code_execution"
-                    }
-                }
-            ],
+            "audit": [],
             "executed": [
                 "code_execution"
             ],

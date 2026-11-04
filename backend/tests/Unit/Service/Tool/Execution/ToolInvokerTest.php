@@ -29,6 +29,7 @@ final class ToolInvokerTest extends TestCase
         $gate = $this->createMock(ToolExecutionGate::class);
         $gate->expects(self::once())->method('inspect')->willReturn([
             'outcome' => PolicyOutcome::Auto,
+            'descriptor' => $this->tool(),
             'approval' => null,
             'refusal' => null,
         ]);
@@ -48,8 +49,10 @@ final class ToolInvokerTest extends TestCase
     public function testAWriteLeavesAnAuditRowAndNoArguments(): void
     {
         $gate = $this->createMock(ToolExecutionGate::class);
+        $write = new ToolDescriptor('create_ticket', 'Create ticket', '', [], SideEffect::Write, ToolSource::Custom, 7);
         $gate->expects(self::once())->method('inspect')->willReturn([
             'outcome' => PolicyOutcome::Auto,
+            'descriptor' => $write,
             'approval' => null,
             'refusal' => null,
         ]);
@@ -67,8 +70,7 @@ final class ToolInvokerTest extends TestCase
             }),
         );
         $invoker = new ToolInvoker([new RecordingExecutor()], gate: $gate, audit: $audit);
-        $tool = new ToolDescriptor('create_ticket', 'Create ticket', '', [], SideEffect::Write, ToolSource::Custom, 7);
-        $outcome = $invoker->invoke($tool, $this->call($this->request(), 'create_ticket'));
+        $outcome = $invoker->invoke($write, $this->call($this->request(), 'create_ticket'));
 
         self::assertSame(ToolOutcomeKind::Done, $outcome->kind);
     }
@@ -78,6 +80,10 @@ final class ToolInvokerTest extends TestCase
         $gate = $this->createMock(ToolExecutionGate::class);
         $gate->expects(self::once())->method('inspect')->willReturn([
             'outcome' => PolicyOutcome::Auto,
+            'descriptor' => new ToolDescriptor('mcp__1__rag_search', 'rag_search', '', [], SideEffect::Read, ToolSource::Mcp, 7, null, [
+                'serverId' => 1,
+                'tool' => 'rag_search',
+            ]),
             'approval' => null,
             'refusal' => null,
         ]);
@@ -107,14 +113,42 @@ final class ToolInvokerTest extends TestCase
         $invoker->invoke($tool, $call);
     }
 
+    public function testAReadFallbackStillAuditsWhenTheGateSaysWrite(): void
+    {
+        $write = new ToolDescriptor('mcp__1__create_issue', 'Create issue', '', [], SideEffect::Write, ToolSource::Mcp, 7);
+        $gate = $this->createMock(ToolExecutionGate::class);
+        $gate->expects(self::once())->method('inspect')->willReturn([
+            'outcome' => PolicyOutcome::Auto,
+            'descriptor' => $write,
+            'approval' => null,
+            'refusal' => null,
+        ]);
+        $audit = $this->createMock(AuditLogWriter::class);
+        $audit->expects(self::once())->method('record')->with(
+            7,
+            'tool.executed',
+            'tool',
+            'mcp__1__create_issue',
+            self::callback(static fn (array $subject): bool => 'write' === $subject['kind']),
+        );
+        $fallback = new ToolDescriptor('mcp__1__create_issue', 'Create issue', '', [], SideEffect::Read, ToolSource::Mcp, 7);
+        $invoker = new ToolInvoker([new RecordingExecutor()], gate: $gate, audit: $audit);
+        $invoker->invoke($fallback, $this->call($this->request(), 'mcp__1__create_issue'));
+    }
+
     public function testDecideOnlyRunsTheGateAndSkipsTheExecutorAndTheCounter(): void
     {
         $gate = $this->createMock(ToolExecutionGate::class);
-        $gate->expects(self::once())->method('inspect')->willReturn(['outcome' => PolicyOutcome::Auto, 'approval' => null, 'refusal' => null]);
+        $gate->expects(self::once())->method('inspect')->willReturn([
+            'outcome' => PolicyOutcome::Auto,
+            'descriptor' => new ToolDescriptor('code_run', 'File work', '', [], SideEffect::Write, ToolSource::Compute, 7),
+            'approval' => null,
+            'refusal' => null,
+        ]);
         $executor = new RecordingExecutor();
         $metrics = new ToolMetrics();
         $audit = $this->createMock(AuditLogWriter::class);
-        $audit->expects(self::once())->method('record');
+        $audit->expects(self::never())->method('record');
         $invoker = new ToolInvoker([$executor], $metrics, gate: $gate, audit: $audit);
         $call = $this->call($this->request());
         $tool = new ToolDescriptor('code_run', 'File work', '', [], SideEffect::Write, ToolSource::Compute, 7);
