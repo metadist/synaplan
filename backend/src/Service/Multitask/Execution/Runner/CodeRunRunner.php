@@ -226,6 +226,7 @@ final readonly class CodeRunRunner implements TaskRunner
         if (!is_string($runId) || '' === $runId || !in_array($outcome, ['ok', 'failed'], true)) {
             return;
         }
+        $stored = $this->runs->findOneByRunId($runId);
         $this->toolInvoker->get()?->recordRan(
             new ToolDescriptor(
                 Capability::CodeRun->value,
@@ -239,7 +240,7 @@ final readonly class CodeRunRunner implements TaskRunner
             (int) $user->getId(),
             $requestedBy,
             'ok' === $outcome ? ToolOutcomeKind::Done : ToolOutcomeKind::Failed,
-            0,
+            $stored?->getDurationMs() ?? 0,
         );
     }
 

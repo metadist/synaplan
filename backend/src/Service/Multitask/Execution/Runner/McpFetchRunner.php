@@ -183,6 +183,11 @@ final readonly class McpFetchRunner implements TaskRunner
         int $userId,
     ): NodeResult {
         $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
+        $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
+        $unattended = true === ($context->options['saved_task'] ?? false);
+        $requestedBy = $runId > 0
+            ? sprintf('task_run:%d:%s', $runId, $node->id)
+            : 'chat:'.(int) $context->message->getId();
         $outcome = $this->tools()->invoke(
             new ToolDescriptor($gateName, $tool, '', [], SideEffect::Read, ToolSource::Mcp, $userId, null, [
                 'serverId' => $serverId,
@@ -191,11 +196,12 @@ final readonly class McpFetchRunner implements TaskRunner
             new ToolInvocation(
                 $gateName,
                 $arguments,
-                new ToolCaller($userId, ToolChannel::MCP_FETCH, requestId: 'chat:'.(int) $context->message->getId()),
+                new ToolCaller($userId, ToolChannel::MCP_FETCH, unattended: $unattended, requestId: $requestedBy),
                 decision: new GateRequest(
                     null,
-                    PolicyContext::Interactive,
-                    'chat:'.(int) $context->message->getId(),
+                    $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
+                    $requestedBy,
+                    allowUnattended: true === ($context->options['allow_unattended'] ?? false),
                     alreadyApproved: $context->isApproved($node->id),
                 ),
             ),
