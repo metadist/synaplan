@@ -6,7 +6,7 @@ namespace App\Service\Tool\Execution;
 
 /**
  * Who is running the tool. Executors use it to keep each caller's
- * current result text until AU25.
+ * result text.
  */
 final class ToolChannel
 {

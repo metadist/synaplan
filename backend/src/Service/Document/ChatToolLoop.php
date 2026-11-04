@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Service\Document;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Document\Tool\DocumentSession;
 use App\Service\Document\Tool\DocumentToolRegistry;
 use App\Service\Document\Tool\DocumentToolResult;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
-use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolRegistry;
@@ -41,6 +44,7 @@ final readonly class ChatToolLoop
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
         private ?ProviderTranscriptCapture $transcripts = null,
+        private ?UserRepository $users = null,
     ) {
     }
 
@@ -109,9 +113,19 @@ final readonly class ChatToolLoop
                     $session->record($result);
                     $payload = $this->clamp($result->message);
                 } else {
+                    $actor = null !== $userId && null !== $this->users ? $this->users->find($userId) : null;
+                    $registered = null !== $this->toolRegistry && null !== $userId
+                        ? $this->toolRegistry->get($userId, $name, ['documentKind' => $session->kind()])
+                        : null;
                     $outcome = $this->invoker->invoke(
-                        new ToolDescriptor($name, $name, '', [], SideEffect::Write, ToolSource::Document, $userId ?? 0),
-                        new ToolInvocation($name, $args, new ToolCaller($userId, 'chat', document: $session), GateMode::AsTodayNever),
+                        $registered ?? new ToolDescriptor($name, $name, '', [], SideEffect::Write, ToolSource::Document, $userId ?? 0, ToolDescriptor::POLICY_OWN_ARTEFACT),
+                        new ToolInvocation(
+                            $name,
+                            $args,
+                            new ToolCaller($userId, 'chat', document: $session),
+                            decision: $actor instanceof User ? new GateRequest($actor, PolicyContext::Interactive, 'chat:0') : null,
+                            user: $actor instanceof User ? $actor : null,
+                        ),
                     );
                     $result = $outcome->document ?? DocumentToolResult::error($outcome->resultText, 'processing.documentStepFailed', ['name' => $name]);
                     $payload = $outcome->resultText;

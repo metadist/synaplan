@@ -18,7 +18,7 @@ use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ChatApprovalContinuationService;
 use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\Execution\CustomHttpToolExecutor;
-use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolChannel;
@@ -27,6 +27,7 @@ use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\Execution\ToolOutcome;
 use App\Service\Tool\Execution\ToolOutcomeKind;
+use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolSource;
@@ -184,7 +185,7 @@ final readonly class ResumeApprovalCommandHandler
                 $approval->getTool(),
                 ApprovalService::executionArgs($approval),
                 new ToolCaller($approval->getOwnerId(), ToolChannel::RESUME),
-                GateMode::AsTodayNever,
+                decision: new GateRequest(null, PolicyContext::Interactive, $approval->getRequestedBy(), alreadyApproved: true),
             ),
         );
     }

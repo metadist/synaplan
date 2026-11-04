@@ -17,7 +17,6 @@ final readonly class ToolInvocation
         public string $toolName,
         public array $arguments,
         public ToolCaller $caller,
-        public GateMode $gate,
         public bool $recordUsage = false,
         public ?GateRequest $decision = null,
         public bool $decideOnly = false,

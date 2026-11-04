@@ -232,6 +232,11 @@ class ComputeRun
         $this->durationMs = $durationMs;
     }
 
+    public function getDurationMs(): ?int
+    {
+        return $this->durationMs;
+    }
+
     public function setBytesIn(int $bytesIn): void
     {
         $this->bytesIn = $bytesIn;
