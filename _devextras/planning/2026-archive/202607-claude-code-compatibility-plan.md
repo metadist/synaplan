@@ -4,7 +4,7 @@ Status of the plan: **phases 0–2b are implemented on this branch**, phase 3 is
 scoped but not built. Each item below states what it fixes, how it is verified,
 and what is deliberately left out.
 
-Related: [ANTHROPIC_COMPATIBLE_API.md](./ANTHROPIC_COMPATIBLE_API.md) (reference
+Related: [ANTHROPIC_COMPATIBLE_API.md](../../../docs/ANTHROPIC_COMPATIBLE_API.md) (reference
 documentation for the gateway itself).
 
 ## 1. What a Claude Code user sees today

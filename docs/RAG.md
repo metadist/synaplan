@@ -41,16 +41,18 @@ Extraction is governed by per-family chains (`EXTRACTION.CHAIN.*` in `BCONFIG` g
 | **Audio** | `.mp3`, `.wav`, `.ogg`, `.m4a`, `.opus`, `.flac`, `.webm`, `.aac`, `.wma` | Cloud STT provider or local **Whisper.cpp** (with FFmpeg) |
 | **Video** | `.mp4`, `.mov`, `.webm` | Audio transcript + key-frame vision description |
 
-### Processing Levels on Upload
+### Document Processing Levels on Upload
 
-When uploading via the UI or API (`process_level`), you choose how far the pipeline runs:
+When uploading documents via the UI or API (`process_level`), you choose how far the upload pipeline runs:
 
-| Level | Parameter | What Happens | When to Use |
-| ----- | --------- | ------------ | ----------- |
+| Level | Parameter | What Happens (Documents) | When to Use |
+| ----- | --------- | ------------------------ | ----------- |
 | **Store Only** | `store` | Saves the file on disk without extraction | Output artifacts from Secure Compute or Desktop skills |
 | **Extract Only** | `extract` | Extracts text, no vector embeddings | Quick one-off preview in a single chat |
 | **Extract + Vectorize** | `vectorize` | Extracts text, chunks it, and stores embeddings | Standard Knowledge Base / RAG search (default; any unknown value such as `analyze` falls back to `vectorize`) |
 | **Full Analysis** | `full` | Extracts and vectorizes; the AI-processing step currently returns `ai_processed: false` (*"AI processing not yet implemented"*) | Reserved for full upload-time AI processing |
+
+> **Media uploads (images, audio, video):** Uploading an image, audio, or video file stores the file and returns `media_pending_describe: true` without running extraction or vectorization at upload time (even when `process_level` is `vectorize` or `full`). To transcribe or describe media and index it into RAG, call `POST /api/v1/files/{id}/describe` (the **Describe, vectorize & sort** action in the Library UI).
 
 ---
 

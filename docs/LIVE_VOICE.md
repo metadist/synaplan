@@ -6,11 +6,15 @@
 > **In this guide:** How Synaplan's full-duplex speech-to-speech layer works across Web, iOS, Android, and CarPlay—covering the `voice` sidecar (`LIVE_VOICE_GATEWAY_URL`), WebSocket PCM16 relay vs. OpenAI WebRTC transport, factual question delegation back into Synaplan's chat/media/document pipeline, HMAC gateway callbacks, and concurrency limits.
 
 ```
-Browser / Mobile / CarPlay ◄──WebSocket (PCM16) or WebRTC (Opus)──► Voice Sidecar (voice:8096) ◄──► Provider (OpenAI / Gemini / xAI)
-                                                                          │
-                                                    POST /internal/voice/sessions/{id}/delegate
-                                                                          ▼
-                                                             Synaplan PHP Backend (Sorter, RAG, Media, Docs)
+Relay mode (default — OpenAI, Gemini, xAI, CarPlay, Compatible WS):
+  Browser / Mobile / CarPlay ◄──WebSocket (PCM16 audio + control)──► Voice Sidecar (voice:8096) ◄──Provider WS──► Provider
+
+Direct WebRTC mode (opt-in LIVE_VOICE.WEBRTC_OPENAI=1, OpenAI only):
+  Browser / Mobile ◄───────────WebRTC peer connection (Opus audio)──────────────────────────────────────────────► OpenAI
+  Browser / Mobile ◄──WebSocket (SDP signaling + captions/control)──► Voice Sidecar (voice:8096) ◄──Sideband WS──► OpenAI
+
+Delegation (both modes):
+  Voice Sidecar ──POST /internal/voice/sessions/{id}/delegate──► Synaplan PHP Backend (Sorter, RAG, Media, Docs)
 ```
 
 Full-duplex speech. The browser, the app, or CarPlay opens one WebSocket to Synaplan. A sidecar holds the provider socket. Synaplan's own chat model answers factual questions. The voice model only speaks that answer.

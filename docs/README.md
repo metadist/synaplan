@@ -35,15 +35,17 @@ flowchart LR
         SC["Collabora · Docling · SearXNG\nSecure Compute · Piper TTS · Voice"]
     end
 
-    Surfaces --> MP
+    UI --> MP
+    Msg --> MP
     MP --> CH
     MP --> DAG
     CH --> Core
     DAG --> Core
+    GW --> Core
     Core --> Sidecars
 ```
 
-1. **One intake pipeline (`MessageProcessor`).** Whether a prompt arrives from the web chat, an embedded website widget, WhatsApp, an inbound email, or a Saved Task, it passes through the same classification cascade (`SlashCommandRoute` → `AgentPinRoute` → `AttachmentIntent` → AI `MessageSorter`).
+1. **Conversation intake (`MessageProcessor`) vs. direct API gateways (`/v1`, `/v1/messages`, `/mcp`).** Interactive and messaging channels (web chat, mobile, embedded widget, WhatsApp, inbound email, and Saved Tasks) pass through `MessageProcessor`'s classification cascade (`SlashCommandRoute` → `AgentPinRoute` → `AttachmentIntent` → AI `MessageSorter`). Machine gateways (`/v1/chat/completions`, `/v1/messages`, and `/mcp`) bypass `MessageProcessor` and connect directly to the shared core (`OpenAiGatewayToolLoop` / `MessagesGateway` → `AiCallPipeline` & `ToolInvoker`).
 2. **Right-sized execution (`ChatHandler`, `TaskPlanner`, `Research`).** Simple turns go straight to the chosen model. Multi-step prompts are decomposed into a directed acyclic graph (DAG) of data and generation nodes (`web_search`, `mcp_fetch`, `email_search`, `code_run`, media). Complex factual questions trigger a multi-round `Research` run whose claims are verified by a second model before delivery.
 3. **One AI & tool boundary (`AiCallPipeline` & `ToolInvoker`).** Every AI provider call traverses `AiCallPipeline` (request correlation, circuit breaker, model health, cost accounting). Every tool call—across chat, `/v1/messages`, `/v1/chat/completions`, Saved Tasks, and MCP—passes through `ToolInvoker`, which enforces read/write approval policies and writes an audit record for every mutating call.
 4. **Core vs. optional sidecars.** The core requires only PHP (FrankenPHP), MariaDB, and Redis. Heavy capabilities—local LLMs (`ollama`), vector memory (`qdrant`), realtime WebSockets (`centrifugo`), document extraction (`tika`, `docling`), Office conversion (`collabora`), Python/Node sandboxes (`compute`), and voice (`tts`, `voice`, `transcriber`)—run as optional containers that degrade cleanly when switched off.

@@ -22,14 +22,14 @@ Synaplan supports four distinct email flows:
 
 ## Smart Addressing (`smart+keyword@`)
 
-When a mail relay or the smart-mailbox poller forwards messages to Synaplan, the recipient address controls the conversation context:
+When a mail relay or the smart-mailbox poller forwards messages to Synaplan, the recipient address controls the conversation context (`SmartEmailHelper` matches `smart@synaplan.net` / `smart+keyword@synaplan.net` and legacy `synaplan.com`; custom recipient domains are not parsed for `+keyword` by the built-in helper):
 
 | Recipient Address | Chat Context Created | Typical Use |
 | ----------------- | -------------------- | ----------- |
-| `smart@yourdomain.com` | General email chat | Quick one-off questions |
-| `smart+project@yourdomain.com` | Dedicated `project` thread | Ongoing project discussions |
-| `smart+support@yourdomain.com` | Dedicated `support` thread | Customer or team support threads |
-| `smart+research@yourdomain.com` | Dedicated `research` thread | Long-running research topics |
+| `smart@synaplan.net` | General email chat | Quick one-off questions |
+| `smart+project@synaplan.net` | Dedicated `project` thread | Ongoing project discussions |
+| `smart+support@synaplan.net` | Dedicated `support` thread | Customer or team support threads |
+| `smart+research@synaplan.net` | Dedicated `research` thread | Long-running research topics |
 
 ### Intake & Threading Pipeline
 
@@ -61,7 +61,7 @@ Content-Type: application/json
 
 {
   "from": "sender@example.com",
-  "to": "smart+topic@yourdomain.com",
+  "to": "smart+topic@synaplan.net",
   "subject": "Question about Q3 numbers",
   "body": "Plain text email body",
   "html": "<p>Optional HTML body</p>",
