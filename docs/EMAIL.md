@@ -1,167 +1,75 @@
-# Email Integration
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (8/11)**  
+> **← Previous:** [4.7 WhatsApp Business Channel](WHATSAPP.md) · **Next:** [4.9 Live Voice (Full-Duplex Speech) →](LIVE_VOICE.md)
 
-AI-powered email conversations with smart context management.
+# Email Channel, IMAP & SMTP Configuration
 
-## Overview
-
-Send emails to Synaplan and get AI responses:
-
-- **General inbox**: `smart@synaplan.net`
-- **Topic-specific**: `smart+keyword@synaplan.net`
+> **In this guide:** How Synaplan's four email capabilities work together—inbound email webhooks (`smart+keyword@` topic threads), IMAP mailbox handlers, live read-only mailbox search (`email_search`), and outgoing SMTP configuration (`MAILER_DSN` percent-encoding and AWS SES connection keepalive).
 
 ---
 
-## Email Addresses
+## How Email Works in Synaplan
 
-| Address | Creates | Example Use |
-|---------|---------|-------------|
-| `smart@synaplan.net` | General chat | Quick questions |
-| `smart+project@synaplan.net` | Project context | Project discussions |
-| `smart+support@synaplan.net` | Support context | Help tickets |
-| `smart+research@synaplan.net` | Research context | Research threads |
+Synaplan supports four distinct email flows:
 
-The `+keyword` becomes a dedicated chat context, keeping related conversations together.
+| Flow | Direction | How It Is Configured | Purpose |
+| ---- | --------- | -------------------- | ------- |
+| **1. Smart Email Webhook (`smart+keyword@`)** | Inbound + Reply | `POST /api/v1/webhooks/email` (or `SYNAPLAN_SCHEDULER_SMART_MAILBOX=1` polling `GMAIL_USERNAME`) | Users email `smart@` or `smart+project@`; each `+keyword` maps to a persistent conversation thread and replies by email. |
+| **2. User IMAP Mail Handlers** | Inbound routing | **Manage → Channels → Email** (`InboundEmailHandler`, polled by the scheduler every minute) | Connects a user's or department's IMAP/POP3 mailbox for automated AI triage and routing. |
+| **3. Live Mailbox Search (`email_search`)** | Read-only pull during chat | Automatic once an IMAP handler or [Microsoft 365 connection](CONNECTIONS.md#microsoft-365) exists | When you ask *"summarize the latest email from X about Y"*, the multi-task planner searches IMAP and M365 live without storing your inbox on the server. |
+| **4. Outgoing SMTP (`MAILER_DSN`)** | Outbound | `MAILER_DSN` in `backend/.env` or `deploy/.env` | Sends verification emails, password resets, email-channel replies, watched-page diffs, and Saved Task deliveries. |
 
 ---
 
-## How It Works
+## Smart Addressing (`smart+keyword@`)
+
+When a mail relay or the smart-mailbox poller forwards messages to Synaplan, the recipient address controls the conversation context:
+
+| Recipient Address | Chat Context Created | Typical Use |
+| ----------------- | -------------------- | ----------- |
+| `smart@yourdomain.com` | General email chat | Quick one-off questions |
+| `smart+project@yourdomain.com` | Dedicated `project` thread | Ongoing project discussions |
+| `smart+support@yourdomain.com` | Dedicated `support` thread | Customer or team support threads |
+| `smart+research@yourdomain.com` | Dedicated `research` thread | Long-running research topics |
+
+### Intake & Threading Pipeline
 
 ```
-User sends email
-    ↓
-System checks sender
-    ↓
-Registered? → Use user's rate limits
-Unknown? → Create anonymous user (ANONYMOUS limits)
-    ↓
-Parse keyword from recipient (smart+keyword@)
-    ↓
-Find or create chat context
-    ↓
-Process through AI pipeline
-    ↓
-Send response via email
+Incoming Email → InboundEmailIntake (MIME parse, +keyword extraction, idempotency check)
+  ├─ Known sender (matches BUSER.BMAIL) → Uses the account's subscription rate limits
+  ├─ Unknown sender                     → Creates/uses an ANONYMOUS user (10 messages/day, max 10/hr spam guard)
+  └─ Blacklisted / over limit           → Refused (sender is notified once)
+      ↓
+EmailConversation (stores message & attachments; audio attachment requests a spoken reply)
+      ↓
+MessageProcessor (classifies and runs AI turn with thread history)
+      ↓
+EmailReply (sends reply in the same email thread with generated files & doc links)
 ```
-
----
-
-## User Types
-
-| User Type | Detection | Rate Limits |
-|-----------|-----------|-------------|
-| **Registered** | Email matches account | Subscription limits |
-| **Anonymous** | Unknown sender | ANONYMOUS (10 messages) |
-| **Blacklisted** | Spam detected | Blocked |
-
----
-
-## Spam Protection
-
-Built-in spam prevention:
-
-- **Rate limit**: Max 10 emails/hour per unknown address
-- **Auto-blacklist**: Triggered after exceeding limits
-- **Unified limits**: Same limits across Email, WhatsApp, Web
-
----
-
-## Email Threading
-
-Replies stay in the same chat context:
-
-1. User sends to `smart+project@synaplan.net`
-2. AI responds
-3. User replies to the email
-4. Conversation continues in "project" context
 
 ---
 
 ## Setup (Self-Hosted)
 
-### Incoming Email
+### Incoming Email Webhook
 
-Configure your mail server to forward to Synaplan's webhook:
-
-```bash
-# Webhook endpoint
-POST /api/v1/webhooks/email
-
-# Headers
-X-API-Key: your_api_key
-Content-Type: application/json
-
-# Body
-{
-  "from": "user@example.com",
-  "to": "smart+topic@yourdomain.com",
-  "subject": "Question about...",
-  "body": "Your question here"
-}
-```
-
-### Outgoing Email (SMTP)
-
-Configure in `backend/.env`:
-
-```bash
-MAILER_DSN=smtp://user:pass@smtp.example.com:587
-```
-
-> **Percent-encode special characters in the user name and password.** The DSN is
-> a URL, so a character that has a meaning in a URL ends the password early or is
-> read as the start of the next part of the address. Replace each one with its
-> percent code and leave the rest of the value untouched: `$` becomes `%24`, `@`
-> becomes `%40`, `:` becomes `%3A`, `/` becomes `%2F`, `#` becomes `%23`, `?`
-> becomes `%3F`, and a literal `%` becomes `%25`. Synaplan decodes them again
-> before it connects, so your SMTP server receives the original password.
->
-> ```bash
-> # SMTP password: pa$$:word
-> MAILER_DSN=smtp://user:pa%24%24%3Aword@smtp.example.com:587
-> ```
->
-> Encoding is also what keeps the value intact in a production `deploy/.env`
-> file. Docker Compose reads that file with its own rules and would silently drop
-> everything from the first `$` onwards, and the deployment refuses such a value
-> instead of mailing with a truncated password. An encoded DSN contains no `$` at
-> all and is passed through exactly as written.
-
-> **AWS SES (and other strict SMTP servers):** SES hard-closes connections
-> that are idle for more than ~10 seconds, while Symfony Mailer keeps the
-> connection open between sends and only health-checks it after 100 seconds.
-> In long-running processes (FrankenPHP workers, messenger consumers) a reused
-> stale connection fails with `451 4.4.2 Timeout waiting for data from client`.
-> Append `?ping_threshold=9` to the DSN so the transport pings (and reconnects)
-> before reusing a connection that has been idle for 9+ seconds:
->
-> ```bash
-> MAILER_DSN=smtp://USER:PASS@email-smtp.eu-west-1.amazonaws.com:587?ping_threshold=9
-> ```
->
-> Independently of this setting, the backend retries a transiently failed
-> send once on a fresh connection (permanent 5xx rejections are not retried).
-
----
-
-## API Reference
-
-### Webhook Endpoint
+Configure your mail server or relay to forward inbound emails to Synaplan's webhook:
 
 ```bash
 POST /api/v1/webhooks/email
 X-API-Key: sk_your_api_key
+Content-Type: application/json
 
 {
   "from": "sender@example.com",
-  "to": "smart+topic@synaplan.net",
-  "subject": "Email subject",
-  "body": "Email body text",
+  "to": "smart+topic@yourdomain.com",
+  "subject": "Question about Q3 numbers",
+  "body": "Plain text email body",
   "html": "<p>Optional HTML body</p>",
   "attachments": []
 }
 ```
 
-### Response
+**Response:**
 
 ```json
 {
@@ -172,25 +80,52 @@ X-API-Key: sk_your_api_key
 }
 ```
 
+### Outgoing Email (SMTP)
+
+Configure `MAILER_DSN` in `backend/.env` (or `deploy/.env` in production):
+
+```bash
+MAILER_DSN=smtp://user:pass@smtp.example.com:587
+```
+
+> **Percent-encode special characters in the username and password.** Because `MAILER_DSN` is parsed as a URL, characters with URL syntax meaning will truncate the password or break host parsing. Replace special characters with their percent codes and leave the rest untouched:
+>
+> | Character | `$` | `@` | `:` | `/` | `#` | `?` | `%` |
+> | --------- | --- | --- | --- | --- | --- | --- | --- |
+> | **Encoded** | `%24` | `%40` | `%3A` | `%2F` | `%23` | `%3F` | `%25` |
+>
+> Synaplan decodes them before authenticating with your SMTP server:
+>
+> ```bash
+> # Example for SMTP password: pa$$:word
+> MAILER_DSN=smtp://user:pa%24%24%3Aword@smtp.example.com:587
+> ```
+>
+> Percent-encoding is also mandatory in `deploy/.env`: Docker Compose strips everything from an unescaped `$` onward, and `validate-release.sh` refuses raw `$` values so a deployment never starts with a corrupted SMTP password.
+
+> **AWS SES (and other strict SMTP servers):** SES closes idle connections after ~10 seconds, whereas Symfony Mailer reuses open connections across worker turns and only pings after 100 seconds by default—causing `451 4.4.2 Timeout waiting for data from client`. Append `?ping_threshold=9` so the transport health-checks connections idle for 9+ seconds:
+>
+> ```bash
+> MAILER_DSN=smtp://USER:PASS@email-smtp.eu-west-1.amazonaws.com:587?ping_threshold=9
+> ```
+>
+> In addition, the backend automatically retries a transiently failed send once on a fresh connection (permanent `5xx` rejections are not retried).
+
 ---
 
-## Rate Limits
+## Rate Limits Across Channels
 
-Unified across all channels:
+Rate limits are shared across Email, WhatsApp, and Web:
 
-| Level | Messages | Reset |
-|-------|----------|-------|
-| ANONYMOUS | 10 | Daily |
-| NEW | 20 | Daily |
-| PRO | 100 | Daily |
-| TEAM | 500 | Daily |
-| BUSINESS | Unlimited | - |
+| User Level | Messages | Reset Window |
+| ---------- | -------- | ------------ |
+| `ANONYMOUS` | 10 | Daily (plus max 10 emails/hour spam guard) |
+| `NEW` | 20 | Daily |
+| `PRO` | 100 | Daily |
+| `TEAM` | 500 | Daily |
+| `BUSINESS` | Unlimited | — |
 
 ---
 
-## Best Practices
-
-1. **Use keywords** - Organize conversations with `+keyword`
-2. **Register users** - Higher limits, persistent history
-3. **Monitor spam** - Review blacklisted addresses periodically
-4. **Set up SMTP** - Enable outgoing responses
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (8/11)**  
+> **← Previous:** [4.7 WhatsApp Business Channel](WHATSAPP.md) · **Next:** [4.9 Live Voice (Full-Duplex Speech) →](LIVE_VOICE.md)

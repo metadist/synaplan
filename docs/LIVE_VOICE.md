@@ -1,4 +1,17 @@
-# Live voice
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (9/11)**  
+> **← Previous:** [4.8 Email Channel & Smart Addressing](EMAIL.md) · **Next:** [4.10 Self-Hosted Live Voice Endpoints →](LIVE_VOICE_SELF_HOSTED.md)
+
+# Live Voice (Full-Duplex Speech)
+
+> **In this guide:** How Synaplan's full-duplex speech-to-speech layer works across Web, iOS, Android, and CarPlay—covering the `voice` sidecar (`LIVE_VOICE_GATEWAY_URL`), WebSocket PCM16 relay vs. OpenAI WebRTC transport, factual question delegation back into Synaplan's chat/media/document pipeline, HMAC gateway callbacks, and concurrency limits.
+
+```
+Browser / Mobile / CarPlay ◄──WebSocket (PCM16) or WebRTC (Opus)──► Voice Sidecar (voice:8096) ◄──► Provider (OpenAI / Gemini / xAI)
+                                                                          │
+                                                    POST /internal/voice/sessions/{id}/delegate
+                                                                          ▼
+                                                             Synaplan PHP Backend (Sorter, RAG, Media, Docs)
+```
 
 Full-duplex speech. The browser, the app, or CarPlay opens one WebSocket to Synaplan. A sidecar holds the provider socket. Synaplan's own chat model answers factual questions. The voice model only speaks that answer.
 
@@ -97,3 +110,8 @@ Gemini sessions send `contextWindowCompression` and reconnect with the resumptio
 `LIVE_VOICE_COMPATIBLE_WS_URL` points the sidecar at one OpenAI-Realtime-compatible websocket. Empty hides the "Compatible realtime" model. The same variables belong on the backend and on the voice container. Details, including Azure, Qwen Cloud, vLLM-Omni, and the Unmute recipe, are in [LIVE_VOICE_SELF_HOSTED.md](LIVE_VOICE_SELF_HOSTED.md).
 
 That model always uses the relay. Synaplan records the talk time and does not add a per-minute price. A spoken reply in the normal chat stops when the person talks over it, if the microphone was already allowed.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (9/11)**  
+> **← Previous:** [4.8 Email Channel & Smart Addressing](EMAIL.md) · **Next:** [4.10 Self-Hosted Live Voice Endpoints →](LIVE_VOICE_SELF_HOSTED.md)

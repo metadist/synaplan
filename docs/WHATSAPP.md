@@ -1,4 +1,9 @@
-# WhatsApp Integration
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (7/11)**  
+> **← Previous:** [4.6 Embeddable Website Chat Widget](WIDGET.md) · **Next:** [4.8 Email Channel & Smart Addressing →](EMAIL.md)
+
+# WhatsApp Business Channel
+
+> **In this guide:** How to connect Meta's WhatsApp Business Cloud API (`POST /api/v1/webhooks/whatsapp`) to Synaplan for bidirectional text, media, and voice-note conversations across up to 20 phone numbers.
 
 Connect Synaplan to WhatsApp Business API for AI-powered messaging.
 
@@ -162,3 +167,8 @@ GET /api/v1/webhooks/whatsapp?hub.verify_token=...
 - Webhook verify token prevents spoofing
 - Phone numbers are hashed for privacy
 - Rate limiting prevents abuse
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (7/11)**  
+> **← Previous:** [4.6 Embeddable Website Chat Widget](WIDGET.md) · **Next:** [4.8 Email Channel & Smart Addressing →](EMAIL.md)

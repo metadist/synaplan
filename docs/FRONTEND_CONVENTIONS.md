@@ -1,4 +1,9 @@
-# Frontend Conventions
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (5/11)**  
+> **← Previous:** [5.4 Backend PHP Conventions](PHP_CONVENTIONS.md) · **Next:** [5.6 OpenAPI & Zod Schema Pipeline →](API_PATTERNS.md)
+
+# Frontend Vue & TypeScript Conventions
+
+> **In this guide:** TypeScript and Vue 3 (`<script setup lang="ts">`) standards, CSS design tokens and house classes for buttons/inputs, the Heroicons action map (`FileRowActions.vue`), 5-locale namespace i18n rules, size ratchets, and the chat stream handler architecture.
 
 ## TypeScript Standards
 
@@ -42,6 +47,13 @@ Always use CSS variables from `frontend/src/style.css`. **NEVER** use Tailwind c
 | `pill`, `pill--active` | Pill buttons |
 | `nav-item`, `nav-item--active` | Navigation items |
 | `tab-nav`, `tab-nav-item`, `tab-nav-item--active` | Page tab bars (canonical pill style; prefer `TabNav.vue`) |
+
+### House Classes for Buttons, Inputs & Errors
+
+- **Buttons:** Always use a house class plus explicit padding: `btn-primary px-4 py-2.5 text-sm font-medium` (or `btn-secondary` with the same padding; `btn-danger` with its own radius). Do **not** add `rounded-lg` to `.btn-primary` or `.btn-secondary`, and never render an unstyled raw `<button>`.
+- **Form controls (`input`, `textarea`, `select`):** Always apply `px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm` and the brand focus ring (`focus:outline-none focus:ring-2 focus:ring-[var(--brand)]`). Layout classes alone render an invisible field.
+- **Error copy:** `var(--danger)` is not defined; use `text-sm text-red-600 dark:text-red-400`.
+- **Contrast & inheritance:** Both light and dark themes must meet WCAG AA (4.5:1 for text, 3:1 for large text and icons). Never recolor `.pill`, `.txt-secondary`, or `.icon-ghost` from an ancestor selector—overlays and tooltips inside that subtree inherit the overridden ink.
 
 ### Standard Layout
 
@@ -341,3 +353,8 @@ make -C frontend build         # Build app + widget
 make -C frontend build-widget  # Build widget only
 make -C frontend deps          # Install dependencies
 ```
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (5/11)**  
+> **← Previous:** [5.4 Backend PHP Conventions](PHP_CONVENTIONS.md) · **Next:** [5.6 OpenAPI & Zod Schema Pipeline →](API_PATTERNS.md)

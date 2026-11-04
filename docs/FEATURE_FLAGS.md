@@ -1,4 +1,9 @@
-# Feature flags
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (4/8)**  
+> **← Previous:** [1.3 Configuration & AI Providers](CONFIGURATION.md) · **Next:** [1.5 Runtime & Outbound Options →](RUNTIME_OPTIONS.md)
+
+# Feature Flags & Module Gates
+
+> **In this guide:** How every platform feature flag resolves (`FEATURE_*` environment pin → per-user row → group policy → global `BCONFIG` row → code fallback), where each flag lives in the Admin UI, and how to hide unconfigured optional modules (`FEATURE_MODULES_GATE_<ID>`).
 
 Every feature that shipped in the September 2026 waves is behind a flag in
 `BCONFIG` (owner `0`). All of them are **on by default**: a fresh install seeds
@@ -162,3 +167,8 @@ See `docs/RESEARCH.md`.
 
 See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md),
 [DESKTOP.md](DESKTOP.md) and [COMPUTE.md](COMPUTE.md).
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (4/8)**  
+> **← Previous:** [1.3 Configuration & AI Providers](CONFIGURATION.md) · **Next:** [1.5 Runtime & Outbound Options →](RUNTIME_OPTIONS.md)

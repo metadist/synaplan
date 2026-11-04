@@ -1,12 +1,27 @@
-# Connections
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (1/11)**  
+> **← Previous:** [3.6 Secure Compute (File Work)](COMPUTE.md) · **Next:** [4.2 Saved Tasks & n8n Webhooks →](N8N.md)
+
+# External Connections
+
+> **In this guide:** How to connect external cloud storage, calendars, mailboxes, and issue trackers so Synaplan's multi-task planner and Saved Tasks can read live data (`email_search`, `mcp_fetch`) and deliver generated files, emails, and calendar events (`nextcloud`, `folder`, `calendar`, `dropbox`, `outlook`, `mcp_action`).
 
 Connections let Synaplan reach systems you own — to read from them (Microsoft 365
 mail, IMAP mailboxes, MCP servers) or to deliver results into them (a cloud
-folder, a calendar). You set a connection up once under **Settings →
-Connections**; saved tasks and file delivery then use it.
+folder, a calendar). You set a connection up once under **Manage → Connections**;
+chat plans, saved tasks, and file delivery then use it.
 
-Credentials are stored in Synaplan's encrypted credential vault and are never
+Credentials are stored in Synaplan's encrypted credential vault (`BCREDENTIALS`) and are never
 returned by the API. Deleting a connection also deletes its credential.
+
+| Connection | Auth Mechanism | Channel Word / Tool | Direction |
+| ---------- | -------------- | ------------------- | --------- |
+| **[Nextcloud / ownCloud / WebDAV](#nextcloud--owncloud--generic-webdav-folder-delivery)** | App password | `nextcloud` / `folder` | Write (deliver generated files) |
+| **[CalDAV Calendar](#caldav-calendar-event-delivery)** | App password | `calendar` | Write (idempotent `.ics` event delivery) |
+| **[Dropbox](#dropbox-folder-delivery)** | OAuth 2.0 (offline refresh) | `dropbox` | Write (deliver generated files) |
+| **[Microsoft 365](#microsoft-365)** | OAuth 2.0 (Microsoft Graph) | `email_search`, `outlook`, `Mail.Send` | Read mail + Write calendar events + Send mail |
+| **[Jira & Confluence](#jira--confluence-via-mcp)** | Atlassian OAuth (hosted MCP) | `mcp_fetch`, `mcp_action` | Read pages/tickets + Opt-in write |
+
+---
 
 ## Nextcloud / ownCloud / generic WebDAV (folder delivery)
 
@@ -178,3 +193,8 @@ connections it may use, does not call Atlassian.
 
 Use the **Test** button on any connection to re-verify it; the result and
 timestamp are stored.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (1/11)**  
+> **← Previous:** [3.6 Secure Compute (File Work)](COMPUTE.md) · **Next:** [4.2 Saved Tasks & n8n Webhooks →](N8N.md)

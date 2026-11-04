@@ -1,209 +1,145 @@
-# RAG System
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (1/6)**  
+> **← Previous:** [2.9 AWS Marketplace AMI Operations](AWS_MARKETPLACE_LISTING.md) · **Next:** [3.2 Conversation Continuity & Deep Memory →](CONVERSATION_CONTINUITY.md)
 
-Retrieval-Augmented Generation (RAG) for semantic document search.
+# Knowledge Base & RAG System
+
+> **In this guide:** How Synaplan turns uploaded documents, spreadsheets, images, and audio into searchable knowledge—covering extraction chains (Tika, Docling, Collabora, OCR, Whisper), `bge-m3` embeddings, MariaDB `VECTOR` vs. Qdrant hybrid BM25 search, optional reranking, and owner-scoped sharing.
 
 ![RAG Search Interface](images/tour/rag-search.webp)
 
-## Overview
-
-Synaplan's RAG system lets you:
-- Upload documents (PDF, Word, Excel, images, audio)
-- Automatically extract and vectorize content
-- Search semantically (by meaning, not just keywords)
-- Use document context in AI conversations
-
 ---
 
-## How It Works
+## End-to-End RAG Pipeline
 
-```
-Upload → Extract → Vectorize → Store → Search → Generate
+```mermaid
+flowchart LR
+    U["1. Upload\n(PDF, Office, Image, Audio)"] --> E["2. Extract\n(Docling / Tika / OCR / Whisper)"]
+    E --> C["3. Chunk\n(Heading-aware or Window)"]
+    C --> V["4. Vectorize\n(bge-m3, 1024-dim)"]
+    V --> S["5. Store & Index\n(MariaDB VECTOR or Qdrant)"]
+    S --> Q["6. Scoped Search\n(+ Optional Rerank)"]
+    Q --> G["7. Answer Generation\nwith Citations"]
 ```
 
-1. **Upload** - Drop files into the system
-2. **Extract** - Tika (default) or optional Docling extracts text; OCR for images; Whisper for audio
-3. **Vectorize** - bge-m3 creates 1024-dimensional embeddings
-4. **Store** - MariaDB VECTOR type stores embeddings natively
-5. **Search** - Cosine similarity finds relevant documents
-6. **Generate** - AI uses retrieved context to answer questions
+1. **Upload** — Files are uploaded into **Library** (optionally organized into knowledge folders/groups).
+2. **Extract** — Synaplan runs the family extraction chain (`PLUGS`, configured under **Operate → AI infrastructure → Document reading**).
+3. **Chunk & Vectorize** — Text is split into chunks (heading-aware for Docling markdown so tables stay intact) and embedded into 1024-dimensional vectors (default: `bge-m3`).
+4. **Store** — Vectors are stored in **MariaDB 11.8+ native `VECTOR`** (default) or **Qdrant** (which adds a full-text BM25 index).
+5. **Retrieve & Rerank** — Queries search across the caller's authorized owner scopes, optionally reorder candidates with a dedicated reranker, and inject the top passages into the prompt.
 
 ---
 
-## Supported Formats
+## Supported Formats & Extraction Chains
 
-### Documents
-- PDF, Word (.doc, .docx, .rtf, .odt)
-- Excel (.xls, .xlsx, .ods)
-- PowerPoint (.ppt, .pptx, .odp)
-- Apple iWork (.pages, .numbers, .key) — converted via the office engine when it is on
-- Spreadsheets and decks are extracted sheet-by-sheet / slide-by-slide (A1 coordinates, speaker notes)
-- Plain text, Markdown, HTML
+Extraction is governed by per-family chains (`EXTRACTION.CHAIN.*` in `BCONFIG` group `PLUGS`; see [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs)):
 
-### Images (with OCR)
-- PNG, JPEG, GIF, WebP
-- TIFF, BMP
+| Family | Supported Formats | Extraction Chain (Order of Execution) |
+| ------ | ----------------- | ------------------------------------- |
+| **Plain Text** | `.txt`, `.md`, `.csv`, `.html` | Native parser |
+| **Documents & Office** | `.pdf`, `.doc`, `.docx`, `.rtf`, `.odt`, `.xls`, `.xlsx`, `.ods`, `.ppt`, `.pptx`, `.odp`, Apple iWork (`.pages`, `.numbers`, `.key`) | Optional **Docling** sidecar (layout/table-aware markdown) → structured Office reader (sheet-by-sheet with `A1` coordinates; slide-by-slide with speaker notes) → **Collabora CODE** conversion → **Apache Tika** → PDF Vision fallback (when extracted text fails the length/entropy quality gate) |
+| **Images** | `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.tiff`, `.bmp` | Vision model description / Tesseract OCR |
+| **Audio** | `.mp3`, `.wav`, `.ogg`, `.m4a`, `.opus`, `.flac`, `.webm`, `.aac`, `.wma` | Cloud STT provider or local **Whisper.cpp** (with FFmpeg) |
+| **Video** | `.mp4`, `.mov`, `.webm` | Audio transcript + key-frame vision description |
 
-### Audio (with Whisper)
-- MP3, WAV, OGG, M4A
-- OPUS, FLAC, WebM, AAC, WMA
+### Processing Levels on Upload
 
----
+When uploading via the UI or API (`process_level`), you choose how far the pipeline runs:
 
-## Processing Levels
-
-When uploading, choose a processing level:
-
-| Level | What Happens | Use Case |
-|-------|--------------|----------|
-| **Extract Only** | Text extraction, no vectors | Quick preview |
-| **Extract + Vectorize** | Full RAG indexing | Standard search |
-| **Full Analysis** | AI summarization + vectors | Deep analysis |
+| Level | Parameter | What Happens | When to Use |
+| ----- | --------- | ------------ | ----------- |
+| **Store Only** | `store` | Saves the file on disk without extraction | Output artifacts from Secure Compute or Desktop skills |
+| **Extract Only** | `extract` | Extracts text, no vector embeddings | Quick one-off preview in a single chat |
+| **Extract + Vectorize** | `vectorize` | Extracts text, chunks it, and stores embeddings | Standard Knowledge Base / RAG search |
+| **Full Analysis** | `full` / `analyze` | Runs AI summarization + vector indexing | Deep document analysis |
 
 ---
 
-## Searching
+## Vector Storage: MariaDB VECTOR vs. Qdrant Hybrid Search
 
-### Semantic Search
-Type natural language queries. The system finds documents by meaning:
+Synaplan supports two vector backends (`VECTOR_STORAGE_PROVIDER`, managed under **Operate → AI infrastructure → Knowledge search**):
 
-- "quarterly sales reports" → finds revenue docs
-- "customer complaints about shipping" → finds support tickets
-- "how to reset password" → finds help articles
+| Capability | MariaDB 11.8+ `VECTOR` (Default) | Qdrant (`http://qdrant:6333`) |
+| ---------- | -------------------------------- | ----------------------------- |
+| **Semantic Search** | Cosine distance (`VEC_DISTANCE_COSINE`) | Cosine similarity |
+| **Keyword / Exact Match** | Meaning-only (no keyword leg) | **Hybrid BM25 + Vector**: creates a full-text index on chunk text on first use. Rare terms (article numbers, product SKUs) are weighted by exact corpus IDF within the searcher's scope; words appearing in >50% of chunks are ignored. Keyword and vector hits are combined via reciprocal rank fusion. |
+| **AI Memories & Digests** | Requires Qdrant | Powers user memories, message digests, and feedback analysis |
 
-### Search Options
-- **Threshold** - Minimum similarity score (0.0-1.0)
-- **Limit** - Max results to return
-- **Groups** - Filter by document groups
+---
 
-### Reranking
-After embedding search, an optional rerank model can reorder a larger
-candidate set and keep the top `k`. It is **off** by default.
+## Reranking
 
-1. Storage fetches `min(k × RERANK.CANDIDATES_MULTIPLIER, 100)` hits.
-2. The bound catalog model (TEI, Jina, Cohere or Voyage) scores them
-   within `RERANK.LATENCY_BUDGET_MS`.
-3. On success the top `k` are returned with an extra `rerank_score`.
-4. On timeout, HTTP error or empty output, the first `k` stay in
-   embedding order. Chat still answers.
+After vector (or hybrid) retrieval, an optional rerank model can re-score a wider candidate pool and keep the best `k` passages. Reranking is **off by default** (`RERANK.ENABLED = 0`).
 
-`RERANK.LLM_FALLBACK=1` uses the summary model only when **no** rerank
-model is bound — not when the HTTP call fails. Configure and test under
-**Operate → AI infrastructure → Knowledge search → Reranking**.
+1. Storage fetches `min(k × RERANK.CANDIDATES_MULTIPLIER, 100)` candidates (default multiplier: `4`).
+2. The bound catalog rerank model (TEI `openaicompatible`, Jina, Cohere, or Voyage) scores each candidate (truncated to `RERANK.MAX_CANDIDATE_CHARS`, default `2000`) within `RERANK.LATENCY_BUDGET_MS` (default `800` ms).
+3. On success, the top `k` chunks are returned with `rerank_score`.
+4. On timeout, HTTP error, or empty output, the pipeline degrades gracefully and keeps the first `k` chunks in embedding order so chat still answers.
 
-Compare off vs on against a user's vector store:
+`RERANK.LLM_FALLBACK = 1` uses the summary model for listwise ranking only when **no** dedicated rerank model is bound—never as a retry when an HTTP reranker times out. Configure and test under **Operate → AI infrastructure → Knowledge search → Reranking**.
+
+### Evaluating Rerank & Hybrid Recall
+
+Compare rerank off vs. on against a user's live vector store:
 
 ```bash
 docker compose exec -T backend php bin/console app:rag:eval-rerank \
   --user=<id> --k=5 --report=var/rerank-eval.md
 ```
 
-The report lists recall@5, MRR and p50/p95 latency, off vs on.
-The seeded default stays `0` until a live report shows recall@5 up and
-p95 inside the budget.
+The report measures `recall@5`, `MRR`, and `p50`/`p95` latency (off vs. on). Note that the command requires a bound rerank model (or `LLM_FALLBACK=1`) and temporarily flips `PLUGS.RERANK.ENABLED=1` during the "on" pass—run it off-peak on busy instances.
 
-The command needs an active adapter for the "on" pass: bind a rerank model
-(or enable the chat-model fallback) first, otherwise it exits with an error
-instead of recording an "on" run that equals "off". It temporarily sets
-`PLUGS.RERANK.ENABLED=1` while the "on" pass runs and restores the previous
-value afterwards — on a busy instance, run it off-peak.
-
-On Qdrant, knowledge search also matches the words in a chunk. The text
-index is created the first time the documents collection is used. Each
-query word is weighted by how rare it is in the searcher's scope (BM25 idf
-from exact Qdrant counts), so an article number or product code outranks
-filler words; a word found in more than half the chunks is ignored while a
-rarer one is left. Qdrant ranks the candidates server-side by that weight.
-Keyword hits and meaning hits are fused with the same rank fusion the
-command palette uses, and they share the owner's scopes. A MariaDB store has
-no keyword leg; the vector storage screen says that search is by meaning only.
-
-A research run searches and reads files only when files are switched on as
-a source for that run; the reader checks the share again before it opens a
-file and keeps at most the same character budget as a web page.
+To evaluate Qdrant hybrid search (keyword + vector rank fusion) without touching the rerank switch:
 
 ```bash
 docker compose exec -T backend php bin/console app:rag:eval-rerank --hybrid --user=<id> --k=5
 ```
 
-`--hybrid` prints recall@k for keyword plus meaning. It does not run the
-rerank on/off passes and does not change their stored record. Document
-cards are not generated: a card would need its own stored text, and there
-is no switch for a step that does not run.
+---
+
+## Sharing & Search Scopes
+
+Documents are **private by default**. A RAG search **never** runs without an explicit, non-empty list of owner scopes:
+
+- **Your own files** are always scope 1.
+- **Shared folders (`IAM.SHARING_ENABLED`)**: When someone shares a knowledge folder (or a referenced chat file) with you or your group at permission **Can use** or higher, that owner+folder becomes an additional search scope. Hits from shared files carry `shared: true` and the owner's display name.
+- **Can view is not searchable**: A share with **Can view** lets a person browse the folder in **Library**, but never injects its chunks into RAG searches.
+- **Research runs**: Deep research only searches and reads files when files are enabled as a source for that run, re-verifying the share before opening each file.
+- **Public link sharing**: Individual files can also be shared externally via token-based links with optional expiry dates.
 
 ---
 
-## Sharing
+## Configuration & API Reference
 
-Documents are **private by default**.
-
-### Share Options
-- **Public link** - Anyone with URL can view
-- **Expiry** - Auto-revoke after date
-- **Token-based** - Secure sharing tokens
-
----
-
-## Configuration
-
-In `backend/.env`:
+### Environment Defaults (`backend/.env`)
 
 ```bash
-# Embedding model (via Ollama)
-# bge-m3 is pulled automatically
-
-# Search defaults
+# Default search parameters
 RAG_DEFAULT_THRESHOLD=0.5
 RAG_DEFAULT_LIMIT=10
+
+# Optional Qdrant URL (started automatically by docker-compose.yml)
+QDRANT_URL=http://qdrant:6333
 ```
 
----
-
-## API Endpoints
+### HTTP API Endpoints
 
 ```bash
-# Upload document
+# 1. Upload and index a document
 POST /api/v1/files/upload
 
-# Search documents
+# 2. Semantic / hybrid search across authorized scopes
 POST /api/v1/rag/search
 {
-  "query": "your search query",
+  "query": "quarterly sales report for DACH",
   "threshold": 0.5,
   "limit": 10
 }
 
-# Get document
+# 3. Fetch file metadata or content
 GET /api/v1/files/{id}
 ```
 
 ---
 
-## Best Practices
-
-1. **Organize with groups** - Tag documents for filtered search
-2. **Use descriptive names** - Helps AI understand context
-3. **Process audio** - Whisper transcription enables voice search
-4. **Set thresholds** - Higher = more relevant, fewer results
-
----
-
-## Sharing and search scopes
-
-A RAG query is always a non-empty list of **owner scopes**. Your own files
-are one scope. When `IAM.SHARING_ENABLED` is on, each knowledge folder (or
-referenced chat file) shared with you at **Can use** or higher becomes
-another scope. There is never an unfiltered search.
-
-Hits from someone else's files are marked `shared: true` and include the
-owner's name. **Can view** alone never adds chunks to a search.
-
----
-
-## Technical Details
-
-- **Embedding Model**: bge-m3 (1024 dimensions)
-- **Vector Storage**: MariaDB 11.8 native VECTOR type
-- **Similarity**: VEC_DISTANCE_COSINE function
-- **Text Extraction**: Apache Tika by default. Optional Docling (`docling` Compose profile + Document reading tab) returns markdown with tables and headings; those files are chunked heading-aware. See [CONFIGURATION.md](CONFIGURATION.md#ai-plugs-plugs).
-- **OCR**: Tesseract (via Tika); Docling can OCR when the sidecar is on
-- **Audio**: Whisper.cpp with FFmpeg
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (1/6)**  
+> **← Previous:** [2.9 AWS Marketplace AMI Operations](AWS_MARKETPLACE_LISTING.md) · **Next:** [3.2 Conversation Continuity & Deep Memory →](CONVERSATION_CONTINUITY.md)

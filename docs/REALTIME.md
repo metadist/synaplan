@@ -1,4 +1,9 @@
-# Realtime / WebSockets
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (7/11)**  
+> **← Previous:** [5.6 OpenAPI & Zod Schema Pipeline](API_PATTERNS.md) · **Next:** [5.8 Database Migrations & Seeders →](MIGRATIONS.md)
+
+# Realtime WebSocket Architecture (Centrifugo)
+
+> **In this guide:** How Synaplan's Centrifugo + Redis realtime layer works across single-node and multi-node clusters, the 7-step playbook for adding a new WebSocket channel (`ChannelInterface`, `ChannelParser`, `ChannelAuthorizerInterface`, `RealtimePublisherInterface`, `useRealtimeChannel`), and when to use server HTTP publish vs. subscriber client-publish.
 
 Synaplan ships a generic realtime layer built on **Centrifugo + Redis**.
 Use it whenever you need to push something from the backend to the
@@ -372,3 +377,8 @@ extra latency:
   reconnects with backoff; if it's truly down, the user sees the
   `ConnectionStatusBadge` in error state and your feature simply pauses
   until they refresh.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (7/11)**  
+> **← Previous:** [5.6 OpenAPI & Zod Schema Pipeline](API_PATTERNS.md) · **Next:** [5.8 Database Migrations & Seeders →](MIGRATIONS.md)
