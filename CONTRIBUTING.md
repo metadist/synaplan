@@ -14,6 +14,8 @@ make up
 
 Open <http://localhost:5173> and sign in as `admin@synaplan.com` / `admin123`. The first start takes a few minutes.
 
+For the full developer learning path—covering local services, backend layers, PHP/Vue conventions, OpenAPI/Zod schemas, database migrations, UX rules, and Playwright E2E tests—start at [`docs/README.md`](docs/README.md#track-5-developer--contributor-guide).
+
 ## Pull requests
 
 Work on a branch. Keep the pull request to one change. Fill in the template: what changed, and how you checked it.

@@ -1,4 +1,17 @@
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (7/9)**  
+> **← Previous:** [2.6 Payment Channels & Store IAP](PAYMENTS_CHANNELS.md) · **Next:** [2.8 Resolving Model Price Drift →](PRICE_DRIFT_PROCEDURE.md)
+
 # AI Model Pricing — Maintenance Notes
+
+> **In this guide:** How Synaplan calculates and meters model costs (`CostCalculationService`), the 7-step playbook for verifying provider rates and billing mechanics, how `app:sync-model-prices` compares against LiteLLM, and how to discover and retire upstream models (`ModelCatalog::RETIREMENTS`).
+
+**On this page:**
+- [Why This Matters (Billing Model)](#why-this-matters-billing-model) · [Where Prices Live & Units](#where-prices-live) · [7-Step Verification Playbook](#verification-playbook-do-this-for-every-model)
+- [Discontinuation Detection (`app:models:check-availability`)](#discontinuation-detection--appmodelscheck-availability) · [New Model Detection (`app:models:discover`)](#new-model-detection--appmodelsdiscover) · [Retiring a Model](#retiring-a-model)
+- [Provider Price Notes & Maintenance Links](#maintenance-links) · [LiteLLM Sync & Deviations (`app:sync-model-prices`)](#appsync-model-prices--mode-aware-guard-1318-fixed)
+- [Transcription, Image Quality & Long-Context Tiers](#transcription-stt-metering--1314) · [Prompt-Cache Mechanics](#prompt-cache-mechanics--read-before-touching-a-cache-rate) · [Production Rollout Migrations](#production-rollout-to-existing-installs)
+
+---
 
 Living playbook for keeping Synaplan's model prices correct **and** billed the way each provider actually charges. Written to be (a) uploadable/shareable so anyone can maintain prices, and (b) a guide an AI agent can follow to do this job well with minimal context.
 
@@ -745,8 +758,7 @@ The provider must also report the token counts, and the field names differ: Open
 - **A migration that force-updates a catalog-owned column MUST refresh `BJSON.__catalog_fingerprint` too.** This is the trap that cost us Sol: `Version20260830190000` rolled out the 2026-08-21 price cut with a bare `UPDATE BMODELS SET BPRICEIN/BPRICEOUT`, leaving the stored fingerprint describing the old 5/30 row. `ModelSeeder` recomputes the fingerprint from the row it reads, sees `stored !== recomputed`, and classifies the row as an operator edit — so BIDs 251/252 were **preserved out of every catalog update for the next two weeks**, and this release's cache rates would have skipped them as well (`Version20260904120000` repairs it). A force-update that "wins" once but freezes the row forever is worse than no migration at all. Write the full row with a matching fingerprint instead, following `Version20260819080000` / `Version20260904120000`: a frozen local copy of `ModelCatalog::fingerprint()` plus the exact catalog snapshot, json key order included, since the hash covers the encoded payload.
 - After writing one, verify the row is genuinely back under catalog management: `make -C backend migrate && make -C backend seed` must report `preserved=0` for `models`. A non-zero count names rows that will silently ignore every future price change.
 
-This PR's corrections are rolled out by `Version20260713190000` (per-token reprices, Kimi DeepInfra pin, TheHive rates, Veo 3.1 Fast, gpt-image quality tiers, Whisper/Voxtral per-second).
+---
 
-## Done in current PR (#1316)
-
-Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix + Kimi/HF DeepInfra pinning + TheHive price corrections + `app:sync-model-prices` mode guard & weekly drift CI (#1318) + Whisper/Voxtral duration metering (#1314) + gpt-image quality/size tiers (#1315) + long-context token tiers (#1319) + production rollout migration `Version20260713190000`.
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (7/9)**  
+> **← Previous:** [2.6 Payment Channels & Store IAP](PAYMENTS_CHANNELS.md) · **Next:** [2.8 Resolving Model Price Drift →](PRICE_DRIFT_PROCEDURE.md)

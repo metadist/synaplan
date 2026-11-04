@@ -1,4 +1,9 @@
-# Embeddable Chat Widget
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (6/11)**  
+> **← Previous:** [4.5 Synaplan Desktop Protocol](DESKTOP.md) · **Next:** [4.7 WhatsApp Business Channel →](WHATSAPP.md)
+
+# Embeddable Website Chat Widget
+
+> **In this guide:** How to embed a Shadow DOM AI chat widget on any website with a single `<script type="module">` tag, configure domain allowlists and styling, control the widget via JavaScript, and hand conversations over to human operators in real time over WebSockets.
 
 Add AI chat to any website with a single script tag.
 
@@ -227,3 +232,8 @@ Widget uses Shadow DOM to isolate styles. If issues persist, check for global CS
 - Rate limiting prevents abuse
 - Domain whitelisting restricts usage
 - No user data stored in widget (unless logged in)
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (6/11)**  
+> **← Previous:** [4.5 Synaplan Desktop Protocol](DESKTOP.md) · **Next:** [4.7 WhatsApp Business Channel →](WHATSAPP.md)

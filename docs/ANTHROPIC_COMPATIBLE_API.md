@@ -1,4 +1,9 @@
-# Anthropic-Compatible Messages API
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (4/11)**  
+> **← Previous:** [4.3 OpenAI-Compatible API (`/v1`)](OPENAI_COMPATIBLE_API.md) · **Next:** [4.5 Synaplan Desktop Protocol →](DESKTOP.md)
+
+# Anthropic-Compatible Messages API (`/v1/messages`)
+
+> **In this guide:** How to connect Claude Code, Synaplan Desktop, and other Anthropic-protocol clients to `POST /v1/messages`—covering the client-tool vs. server-tool funnel, `web_search`, `web_fetch`, `x-synaplan-effort` auto-research, pinned knowledge tools, vision routing, and multi-provider model aliases.
 
 Synaplan exposes an Anthropic Messages API-compatible gateway so Claude Code and other Anthropic-protocol clients can use your instance as their backend.
 
@@ -100,6 +105,26 @@ Anthropic has two kinds of tool entry and the gateway treats them differently:
 - **Server tools** (a versioned `type`, no `input_schema`) are capability requests aimed at the API side. Only `api.anthropic.com` can honour them, so they are never mapped to a function declaration for another provider.
 
 Other Anthropic server tools (`code_execution_*` and friends) stay on the wire for the Anthropic passthrough and are never mapped to an OpenAI/Gemini function.
+
+```
+Client Request (tools: [ {type: web_search_20250305}, {name: Bash, input_schema}, … ])
+  │
+  ▼
+GatewayToolCatalog          Builds one session-pinned tool snapshot:
+  ├─ MCP tools              (mcp__<server>__<tool>, when MCP_TOOLS_ENABLED)
+  └─ Native server tools    (web_search, web_fetch, analyze_image, knowledge_search, read_document)
+  │
+  ▼
+GatewayToolLoop             Injects snapshot tools first (stable prompt-cache prefix),
+  │                         client tools after; replaced server-tool declarations are removed
+  ▼
+Translator                  Anthropic passthrough | OpenAI Chat Completions / Responses | Gemini
+  │
+  ▼
+stop_reason: tool_use ────► Partition by tool name:
+                              ├─ Synaplan-owned → execute server-side via ToolInvoker, append tool_result, re-prompt
+                              └─ Client-owned   → relay verbatim to the client (mixed turns always stay with client)
+```
 
 ### Web search
 
@@ -233,10 +258,15 @@ This routing works technically; Anthropic does not officially support Claude Cod
 
 ## Related
 
-- Tool/web search/vision integration plan: [CLAUDE_CODE_COMPATIBILITY_PLAN.md](./CLAUDE_CODE_COMPATIBILITY_PLAN.md)
+- Historical tool/web-search/vision design notes: [`_devextras/planning/2026-archive/202607-claude-code-compatibility-plan.md`](../_devextras/planning/2026-archive/202607-claude-code-compatibility-plan.md)
 - User docs: [docs.synaplan.com — Claude Code](https://docs.synaplan.com/) (page `claude-code`)
 - OpenAI-compatible sibling: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
 - UI: **Manage → Developer & devices → Coding clients**
 - Smoke scripts: `_devextras/testing/messages-gateway/`
 - Synaplan Desktop (agent client, server side): [DESKTOP.md](./DESKTOP.md)
 - File work (`code_execution` / `compute:run`): [COMPUTE.md](./COMPUTE.md)
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (4/11)**  
+> **← Previous:** [4.3 OpenAI-Compatible API (`/v1`)](OPENAI_COMPATIBLE_API.md) · **Next:** [4.5 Synaplan Desktop Protocol →](DESKTOP.md)

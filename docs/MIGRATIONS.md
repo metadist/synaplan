@@ -1,4 +1,9 @@
-# Database Migrations & Seeding
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (8/11)**  
+> **← Previous:** [5.7 Realtime WebSocket Architecture](REALTIME.md) · **Next:** [5.9 UX Contract (Rules U1–U12) →](UX_CONTRACT.md)
+
+# Database Migrations & Idempotent Seeding
+
+> **In this guide:** How schema changes (`backend/migrations/Version*.php`), idempotent production catalog seeders (`app:seed` and `ModelSeeder` content fingerprints), and development fixtures (`UserFixtures`) are separated—plus the self-healing startup bootstrap and two-phase column drop rules for Galera clusters.
 
 This project uses **Doctrine Migrations** for schema evolution and **idempotent seed
 commands** for production-essential catalog data. Demo/test data lives in DataFixtures.
@@ -307,4 +312,9 @@ backend/
 │   └── Prompt/PromptCatalog.php      # Source of truth for system prompts
 └── Makefile                          # make migrate / migrate-diff / seed / fixtures
 ```
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (8/11)**  
+> **← Previous:** [5.7 Realtime WebSocket Architecture](REALTIME.md) · **Next:** [5.9 UX Contract (Rules U1–U12) →](UX_CONTRACT.md)
 

@@ -1,6 +1,11 @@
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (3/9)**  
+> **← Previous:** [2.2 Health Probes & Uptime Monitoring](HEALTH_MONITORING.md) · **Next:** [2.4 Outbound Traffic & Egress Control →](EGRESS.md)
+
 # Observability — Request Correlation and the Event Ring
 
-Two things that answer "what broke in production?" without ever handing anyone the raw logs.
+> **In this guide:** How Synaplan correlates requests with `X-Request-Id` and records a bounded, PII-scrubbed ring of `warning`-and-above events in Redis so administrators and the in-chat AI (`recent_errors`) can diagnose production issues without exposing raw logs.
+
+Two mechanisms answer *"what broke in production?"* without ever handing anyone the raw application logs.
 
 Raw logs carry chat content, user emails, RAG/document text and secrets. They stay where they are — reachable over SSH by a human who is trusted with them. What this page describes is the *redacted* path: a bounded feed of operational events that an admin, and the in-chat AI, may look at.
 
@@ -90,3 +95,8 @@ The `mcp` firewall authenticates *any* valid API key as `ROLE_USER`, which is ex
 The design applies the standard techniques: data minimisation (allow-list), pseudonymisation (`user_id` only), scrubbing of free text, role-based access control, and a hard retention limit.
 
 That is the engineering side. Calling the result "GDPR compliant" additionally requires an organisational legal basis and a data processing agreement with whichever AI provider the admin's chat runs against — not something code can assert.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (3/9)**  
+> **← Previous:** [2.2 Health Probes & Uptime Monitoring](HEALTH_MONITORING.md) · **Next:** [2.4 Outbound Traffic & Egress Control →](EGRESS.md)

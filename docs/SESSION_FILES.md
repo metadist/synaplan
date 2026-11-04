@@ -1,4 +1,9 @@
-# Session Files & Follow-up Edits
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (3/6)**  
+> **← Previous:** [3.2 Conversation Continuity & Deep Memory](CONVERSATION_CONTINUITY.md) · **Next:** [3.4 Multi-Task Planner & Data Nodes →](MULTITASK_DATA_NODES.md)
+
+# Session Files & Follow-Up Edits
+
+> **In this guide:** How `ConversationFileCatalog` tracks every uploaded and generated file in a conversation across all storage channels so follow-up prompts (*"check the whole contract"*, *"make the car blue"*, *"what is in that image?"*) automatically resolve the right file.
 
 How Synaplan keeps the files of a conversation "in hand" so a follow-up like
 *"make the car blue"* edits the picture that is already there instead of drawing
@@ -103,3 +108,8 @@ INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
 VALUES (0, 'FILE_CONTEXT', 'VISION_INCLUDE_GENERATED', '0')
 ON DUPLICATE KEY UPDATE BVALUE = '0';
 ```
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (3/6)**  
+> **← Previous:** [3.2 Conversation Continuity & Deep Memory](CONVERSATION_CONTINUITY.md) · **Next:** [3.4 Multi-Task Planner & Data Nodes →](MULTITASK_DATA_NODES.md)

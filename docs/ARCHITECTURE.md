@@ -1,4 +1,19 @@
-# Backend architecture
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (2/11)**  
+> **← Previous:** [5.1 Local Development Workflow](DEVELOPMENT.md) · **Next:** [5.3 Adding an AI Provider →](PROVIDERS.md)
+
+# Backend Architecture & Request Lifecycle
+
+> **In this guide:** How the Symfony backend in `backend/` is structured—covering the Deptrac layer contract, size and thin-controller ratchets, FrankenPHP worker pools, and the end-to-end execution paths for `MessageProcessor`, `ChatHandler`, `StreamController`, channel turns, `MediaGenerationHandler`, `AiCallPipeline`, `ProviderCatalog`, `ToolInvoker`, and GDPR account erasure.
+
+**On this page:**
+- [Layers (Deptrac)](#layers) · [Size Limits (`SizeRatchetTest`)](#size-limits)
+- [Runtime Config (`RuntimeConfigAssembler`)](#runtime-config--get-apiv1configruntime) · [Readiness (`/api/health/ready`)](#readiness--get-apihealthready) · [Two Worker Pools](#two-worker-pools)
+- [Chat Turn (`ChatHandler`)](#chat-turn--chathandler) · [Chat Stream (`StreamController`)](#chat-stream--postget-apiv1messagesstream) · [Message Turn (`MessageProcessor`)](#message-turn--messageprocessor)
+- [Channel Turns (Widget, Email, WhatsApp)](#channel-turns) · [Media Turn (`MediaGenerationHandler`)](#media-turn--mediagenerationhandler) · [File Analysis (`FileAnalysisHandler`)](#file-analysis--fileanalysishandler)
+- [Provider Adapters (`AiCallPipeline` & `ProviderCatalog`)](#provider-adapters) · [Tool Path (`ToolInvoker`)](#tool-path)
+- [Tagged Collections, Account Erasure & System Settings](#lists-are-tagged-collections) · [Research Runs](#research-runs) · [Where New Code Goes](#where-new-code-goes)
+
+---
 
 How the Symfony backend in `backend/` is put together, and where new code
 goes. Two checks keep the shape: deptrac enforces the layers, and the size
@@ -596,3 +611,8 @@ run's last step writes the report into the chat. See `docs/RESEARCH.md`.
   job, `AccountLanguage::SUPPORTED` for the UI locales).
 - See `AGENTS.md` for the merge gate and `docs/PHP_CONVENTIONS.md` for code
   style.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (2/11)**  
+> **← Previous:** [5.1 Local Development Workflow](DEVELOPMENT.md) · **Next:** [5.3 Adding an AI Provider →](PROVIDERS.md)
