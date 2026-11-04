@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\FileHelper;
+use App\Service\File\UploadRequestPath;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\Media\OutboundChannelMedia;
 use Psr\Log\LoggerInterface;
@@ -44,6 +45,8 @@ class StaticUploadController extends AbstractController
      * - /api/v1/files/uploads/13/000/00013/2025/01/123_google_1736189000.mp4 (user subdirectories)
      *
      * Access control:
+     * - A path with a `.` or `..` segment or a NUL byte is refused (404) first
+     * - og/ and widget-icons/ are public
      * - Owner can always access
      * - Public if chat is shared
      *
@@ -55,6 +58,11 @@ class StaticUploadController extends AbstractController
         #[CurrentUser] ?User $user,
         Request $request,
     ): Response {
+        $requested = UploadRequestPath::fromRoute($path);
+        if (null === $requested) {
+            throw $this->createNotFoundException('Invalid file path');
+        }
+
         // Extract filename from path (last segment)
         $filename = basename($path);
 
@@ -65,22 +73,9 @@ class StaticUploadController extends AbstractController
         // MediaAccessTokenService.
         $user ??= $this->mediaAccessTokenService->resolveUser($request);
 
-        // Check if this is an OG image for social media sharing
-        // OG images are public and stored in og/{shard}/{token}.{ext}
-        $isOgImage = str_starts_with($path, 'og/');
-
-        if ($isOgImage) {
-            $this->logger->info('StaticUploadController: Serving OG image', [
-                'path' => $path,
-            ]);
-
-            return $this->serveFile($path, $request);
-        }
-
-        // Widget icons are public assets displayed on third-party websites
-        $isWidgetIcon = str_starts_with($path, 'widget-icons/');
-
-        if ($isWidgetIcon) {
+        // OG images of shared chats (og/{shard}/{token}.{ext}) and widget
+        // icons displayed on third-party websites are public assets.
+        if ($requested->isPublicAsset()) {
             return $this->serveFile($path, $request);
         }
 
