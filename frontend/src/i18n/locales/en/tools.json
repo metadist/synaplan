@@ -909,23 +909,23 @@
       "items": {
         "provider": {
           "title": "Set up an AI provider",
-          "where": "Under Admin › AI infrastructure"
+          "where": "Synaplan needs a provider before it can answer, for example Claude or a model on your own server."
         },
         "file": {
           "title": "Upload a file",
-          "where": "You find it later under Library › Files"
+          "where": "A document or a photo the AI can answer from later."
         },
         "assistant": {
           "title": "Create an assistant",
-          "where": "It appears under Assistants"
+          "where": "Set instructions, files and tools once. Every chat with this assistant already knows them."
         },
         "app": {
           "title": "Connect an app",
-          "where": "Connected apps are listed under Apps › Connected"
+          "where": "Something you already use, such as mail or a calendar. Synaplan can then work with it."
         },
         "providerDemo": {
           "title": "Add your own AI provider",
-          "where": "You are on the Synaplan Demo"
+          "where": "The Synaplan Demo is for trying things out. With your own provider, the answers stay with you."
         }
       }
     }

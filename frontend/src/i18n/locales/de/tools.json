@@ -832,23 +832,23 @@
       "items": {
         "provider": {
           "title": "KI-Anbieter einrichten",
-          "where": "Unter Admin › KI-Infrastruktur"
+          "where": "Damit Synaplan antworten kann, braucht es einen Anbieter, zum Beispiel Claude oder ein Modell auf deinem eigenen Server."
         },
         "file": {
           "title": "Datei hochladen",
-          "where": "Du findest sie danach unter Bibliothek › Dateien"
+          "where": "Ein Dokument oder ein Foto, aus dem die KI später antworten kann."
         },
         "assistant": {
           "title": "Assistenten erstellen",
-          "where": "Er erscheint unter Assistenten"
+          "where": "Anweisungen, Dateien und Werkzeuge einmal festlegen. Jeder Chat mit diesem Assistenten kennt sie dann."
         },
         "app": {
           "title": "App verbinden",
-          "where": "Verbundene Apps stehen unter Apps › Verbunden"
+          "where": "Etwas, das du schon nutzt, zum Beispiel Mail oder den Kalender. Synaplan kann dann damit arbeiten."
         },
         "providerDemo": {
           "title": "Eigenen KI-Anbieter hinzufügen",
-          "where": "Du nutzt gerade die Synaplan Demo"
+          "where": "Die Synaplan Demo ist zum Ausprobieren. Mit einem eigenen Anbieter bleiben die Antworten bei dir."
         }
       }
     }

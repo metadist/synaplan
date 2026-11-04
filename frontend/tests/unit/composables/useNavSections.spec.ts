@@ -103,7 +103,7 @@ describe('useNavSections', () => {
     expect(wrapper.vm.activeKey).toBe('library')
   })
 
-  it('opens a new chat instead of the last thread when Chats is chosen from another page', async () => {
+  it('returns to the last thread when Chats is chosen from another page', async () => {
     const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
     const findOrCreate = vi.spyOn(useChatsStore(), 'findOrCreateEmptyChat').mockResolvedValue(null)
     const router = wrapper.vm.$router
@@ -113,11 +113,11 @@ describe('useNavSections', () => {
     await wrapper.vm.selectSection('chats')
     await router.isReady()
 
-    expect(findOrCreate).toHaveBeenCalledOnce()
+    expect(findOrCreate).not.toHaveBeenCalled()
     expect(router.currentRoute.value.path).toBe('/')
   })
 
-  it('opens a new chat when Chats is clicked while a conversation is already open', async () => {
+  it('keeps the open conversation when Chats is clicked on the chat page', async () => {
     const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
     const findOrCreate = vi.spyOn(useChatsStore(), 'findOrCreateEmptyChat').mockResolvedValue(null)
     const router = wrapper.vm.$router
@@ -126,7 +126,7 @@ describe('useNavSections', () => {
     await router.isReady()
     await wrapper.vm.selectSection('chats')
 
-    expect(findOrCreate).toHaveBeenCalledOnce()
+    expect(findOrCreate).not.toHaveBeenCalled()
     expect(router.currentRoute.value.path).toBe('/')
   })
 

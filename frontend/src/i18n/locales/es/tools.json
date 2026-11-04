@@ -835,23 +835,23 @@
       "items": {
         "provider": {
           "title": "Configura un proveedor de IA",
-          "where": "En Administración › Infraestructura de IA"
+          "where": "Synaplan necesita un proveedor para poder responder, por ejemplo Claude o un modelo en tu propio servidor."
         },
         "file": {
           "title": "Sube un archivo",
-          "where": "Después lo encuentras en Biblioteca › Archivos"
+          "where": "Un documento o una foto a partir de los que la IA pueda responder más adelante."
         },
         "assistant": {
           "title": "Crea un asistente",
-          "where": "Aparece en Asistentes"
+          "where": "Define instrucciones, archivos y herramientas una vez. Cada chat con este asistente ya los conoce."
         },
         "app": {
           "title": "Conecta una app",
-          "where": "Las apps conectadas aparecen en Apps › Conectadas"
+          "where": "Algo que ya usas, como el correo o el calendario. Synaplan podrá trabajar con ello."
         },
         "providerDemo": {
           "title": "Añade tu propio proveedor de IA",
-          "where": "Estás usando Synaplan Demo"
+          "where": "Synaplan Demo es para probar. Con tu propio proveedor, las respuestas se quedan contigo."
         }
       }
     }
