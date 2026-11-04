@@ -115,6 +115,45 @@
               <UserCircleIcon class="w-4 h-4" />
               <span>{{ $t('nav.profile') }}</span>
             </button>
+            <p
+              class="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide txt-secondary"
+            >
+              {{ $t('nav.websites') }}
+            </p>
+            <a
+              class="dropdown-item"
+              href="https://www.synaplan.eu/"
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              data-testid="btn-sidebar-v2-website-eu"
+              @click="userMenuOpen = false"
+            >
+              <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span class="min-w-0">
+                <span class="block truncate">{{ $t('nav.websiteTeams') }}</span>
+                <span class="block truncate text-xs txt-secondary">{{
+                  $t('nav.websiteTeamsHint')
+                }}</span>
+              </span>
+            </a>
+            <a
+              class="dropdown-item"
+              href="https://www.synaplan.com/de"
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              data-testid="btn-sidebar-v2-website-tech"
+              @click="userMenuOpen = false"
+            >
+              <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span class="min-w-0">
+                <span class="block truncate">{{ $t('nav.websiteTech') }}</span>
+                <span class="block truncate text-xs txt-secondary">{{
+                  $t('nav.websiteTechHint')
+                }}</span>
+              </span>
+            </a>
             <button
               v-if="!isImpersonating"
               type="button"
@@ -138,6 +177,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRightOnRectangleIcon,
+  ArrowTopRightOnSquareIcon,
   ChevronUpIcon,
   MagnifyingGlassIcon,
   RocketLaunchIcon,
