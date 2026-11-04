@@ -49,8 +49,8 @@ When uploading via the UI or API (`process_level`), you choose how far the pipel
 | ----- | --------- | ------------ | ----------- |
 | **Store Only** | `store` | Saves the file on disk without extraction | Output artifacts from Secure Compute or Desktop skills |
 | **Extract Only** | `extract` | Extracts text, no vector embeddings | Quick one-off preview in a single chat |
-| **Extract + Vectorize** | `vectorize` | Extracts text, chunks it, and stores embeddings | Standard Knowledge Base / RAG search |
-| **Full Analysis** | `full` / `analyze` | Runs AI summarization + vector indexing | Deep document analysis |
+| **Extract + Vectorize** | `vectorize` | Extracts text, chunks it, and stores embeddings | Standard Knowledge Base / RAG search (default; any unknown value such as `analyze` falls back to `vectorize`) |
+| **Full Analysis** | `full` | Extracts and vectorizes; the AI-processing step currently returns `ai_processed: false` (*"AI processing not yet implemented"*) | Reserved for full upload-time AI processing |
 
 ---
 

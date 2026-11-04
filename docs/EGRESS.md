@@ -16,8 +16,8 @@ Operators configure the mode on **Operate → System configuration → Outbound 
 | Mode / Setting | Default | Behavior |
 | -------------- | ------- | -------- |
 | `EGRESS.MODE = off` | **Default** (seeded `off`) | All outbound HTTP calls proceed normally (subject to `SsrfGuard` on user-supplied URLs). |
-| `EGRESS.MODE = report` | Opt-in | Lets unallowlisted calls proceed and records an `egress.would_block` event containing the target **host and port only** (never paths or secrets). Use this to audit custom endpoints before enforcing. |
-| `EGRESS.MODE = enforce` | Opt-in | Refuses any unallowlisted outbound host **before** opening a socket. |
+| `EGRESS.MODE = report` | Opt-in | Lets unallowlisted system/provider calls proceed and records an `egress.would_block` event containing the target **host and port only** (never paths or secrets). User-supplied URLs accepted by `SsrfGuard` are allowed by `EgressPolicy::decide()` and are not reported as `would_block`. |
+| `EGRESS.MODE = enforce` | Opt-in | Refuses any unallowlisted system/provider outbound host **before** opening a socket. User-supplied URLs validated by `SsrfGuard` remain allowed (see [User-Supplied URLs & SSRF IP Pinning](#3-user-supplied-urls--ssrf-ip-pinning)), so `enforce` is not a blanket block on typed URLs. |
 | `EGRESS.ALLOW` | *empty* | Additional hostnames allowed in `report` and `enforce` modes (for example, an admin-configured custom OpenAI-compatible gateway). |
 | `EGRESS_PROXY` | *empty* | Environment variable. Overrides `HTTPS_PROXY` when set; leaving it empty preserves standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` behavior. |
 | `EGRESS_NO_PROXY` | `NO_PROXY` | Environment variable. Hosts that bypass the proxy and are never refused in `enforce` mode. |
@@ -47,11 +47,13 @@ Instead, every user-supplied URL is validated by `SsrfGuard`:
 
 ## 4. The Optional Egress Gateway (`docker-compose.egress.yml`)
 
-For strict network-level enforcement across both PHP and the sidecars, load the optional egress overlay:
+To route outbound HTTP traffic from both PHP and the sidecars through the egress proxy gateway, load the optional egress overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.egress.yml --profile egress up -d
 ```
+
+> **Note on network isolation:** The overlay configures proxy routing (`HTTP_PROXY` / `HTTPS_PROXY`), but leaves direct outbound connectivity open on the default Docker Compose bridge network. Any client or library that ignores proxy environment variables could still connect directly; strict network-level enforcement therefore also requires host firewall rules or an internal-only Docker network that blocks direct internet egress from the application containers.
 
 How the gateway works:
 - Points `backend`, `worker`, `scheduler`, `voice`, and `transcriber` at `http://egress:3128` and sets `NODE_USE_ENV_PROXY=1` on the two Node sidecars.

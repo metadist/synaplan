@@ -133,7 +133,7 @@ The same endpoints are exposed at **`/api/v1/research`** (session-authenticated 
 | `GET` | `research` | Lists the caller's runs from the last 48 hours, newest first (`?active=1` filters to active runs). |
 | `GET` | `research/{id}` | Returns the run state if owned by the caller (`404` otherwise). Includes `queued_since` if waiting >20s for a worker. |
 | `GET` | `research/{id}/events` | SSE stream of run events (`Last-Event-ID` or `?after=` resumes). |
-| `POST` | `research/{id}/input` | Submits answers to open clarifying questions or confirms a thorough plan (`write_now` ends search and writes from current findings). (`404` when off) |
+| `POST` | `research/{id}/input` | Sends an interactive action to an active run: answers open clarifying questions, confirms a thorough plan, sends `stop_gathering` (*Write now* — ends search/collection and starts writing the report from current findings), or sends `answer_now` (*Answer now* — writes the report immediately if sources were read, or ends the run with `answered_without_research` so chat answers directly). (`404` when off) |
 | `POST` | `research/{id}/cancel` | Requests the run to stop. Idle runs close immediately; active steps stop before their next paid model call. |
 | `POST` | `research/{id}/followups` | Starts a linked follow-up run once the parent run has finished (`409` while parent is still running). (`404` when off) |
 | `DELETE` | `research/{id}` | Deletes the run, its events, and cached pages (any message already posted to chat stays). |
@@ -148,7 +148,6 @@ A follow-up creates a new run that inherits the parent's sources, numbering, and
 | `revise` | Yes | Rewrites the parent report per instruction (shorter, board summary, translation, table). Unchanged cited sentences keep their verification verdict; modified sentences are re-checked. (`409` if parent has no report) |
 | `deeper` | Optional | Runs with the `thorough` budget, turning each item under *"Not confirmed"* (up to 8) plus `text` into plan points. |
 | `refresh` | Optional | Re-reads sources dated before the brief's time frame (or all read sources if undated) and reports what changed. |
-| `answer_now` | None | Triggered by **Answer now** on an active card: writes the report immediately if sources were read, or ends with `answered_without_research` so chat answers directly. |
 
 ---
 

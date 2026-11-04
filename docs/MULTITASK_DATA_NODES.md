@@ -3,10 +3,10 @@
 
 # Multi-Task Planner & Data Nodes
 
-> **In this guide:** How Synaplan's multi-task DAG planner (`backend/src/Service/Message/Multitask/`) pulls live external data (`web_search`, `url_fetch`, `mcp_fetch`, `mcp_action`, `email_search`, `rag_query`), repairs planner dependency edges, and guarantees that upstream outputs reach the answering model.
+> **In this guide:** How Synaplan's multi-task DAG planner (`backend/src/Service/Multitask/`) pulls live external data (`web_search`, `url_fetch`, `mcp_fetch`, `mcp_action`, `email_search`, `rag_query`), repairs planner dependency edges, and guarantees that upstream outputs reach the answering model.
 
 The multitask engine plans a user request into a small DAG of capability
-nodes (`backend/src/Service/Message/Multitask/`). Besides the generator/answer nodes
+nodes (`backend/src/Service/Multitask/`). Besides the generator/answer nodes
 (chat, media, documents, TTS) it has a **data layer**: planner-placed nodes
 that pull external information into the turn and hand it downstream as
 citable text via `$nX.text`.

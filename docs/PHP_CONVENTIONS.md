@@ -52,10 +52,10 @@ In DBAL 4, bind parameters explicitly with `bindValue()` and call `executeQuery(
 
 ```php
 $stmt = $this->connection->prepare(
-    'SELECT BID, BNAME FROM BWIDGETS WHERE BOWNERID = :ownerId AND BACTIVE = :active'
+    'SELECT BID, BNAME FROM BWIDGETS WHERE BOWNERID = :ownerId AND BSTATUS = :status'
 );
 $stmt->bindValue('ownerId', $ownerId);
-$stmt->bindValue('active', 1);
+$stmt->bindValue('status', 'active');
 
 $rows = $stmt->executeQuery()->fetchAllAssociative();
 ```
