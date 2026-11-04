@@ -1,498 +1,199 @@
 ---
 name: Synaplan
-description: AI-powered knowledge management system with RAG, chat widgets, and multi-channel integration
+description: Coding-agent rules — formatting, tests, green CI, clean source
 ---
 
-# Synaplan Development Guide
+# Synaplan
 
-Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, embeddable chat widgets, WhatsApp/Email integration, multiple AI providers (Ollama, OpenAI, Anthropic, Groq, Gemini, xAI).
+PHP 8.4 / Symfony 8.1, Vue 3 / TypeScript / Vite, MariaDB, Docker Compose.
+Tooling runs in containers through `make`. App `http://localhost:5173`, API
+`http://localhost:8000`. This file is the gate. Longer references are at the
+end. The previous guides are `_devextras/bak_AGENTS_root.md` and
+`_devextras/bak_AGENTS_planning.md`.
 
-**Stack:** PHP 8.4/Symfony 8.1, Vue 3/TypeScript/Vite, Docker Compose, frankenphp/caddy.
+## Loop
 
-## Repository Architecture
+One topic, one branch off `main`, one pull request. Conventional Commits
+(`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`). A subject that
+**starts with `feat`** — any casing, including a squash-merged PR title —
+bumps the **minor** release; anything else bumps the patch. A major bump is
+explicit. No AI attribution (`Co-Authored-By`, "Generated with…"). Never
+commit or push to `main`. Never force-push `main` or `master`.
 
-| Repo | Purpose |
-| ---- | ------- |
-| `synaplan/` | Main app source code, local development environment (includes Qdrant) |
-| `synaplan-base-php/` | Base Docker image (FrankenPHP + gRPC + whisper.cpp) |
-| `synaplan-platform/` | Production deployment configs, pulls pre-built images |
+Code, comments, and commits are English.
 
-**Local dev** (`synaplan/`): Builds from source, includes all dev tools (phpMyAdmin, MailHog, Vite dev server). Qdrant runs as a Docker service for AI memories and RAG vector search.
+Merge conflicts by hand and keep both sides' behavior. Never
+`git checkout --ours` or `--theirs` on code. If unsure, ask.
 
-**Production** (`synaplan-platform/`): Uses `ghcr.io/metadist/synaplan:latest`, multi-server with external Galera cluster. See `_devextras/SYSADMIN-help.md`.
+Before every commit, run `make ci-local` unfiltered. Before every push that
+touches the UI, a route, OpenAPI the UI consumes, chat, or auth, also run
+`make test-e2e`. Backend-only PHP with no HTTP or UI contract may skip
+Playwright. A bad selector, i18n key, or route shows up only in E2E.
 
-## Critical Rules
+PR body: what changed, how to see it, and `Fixes #NNNN` when an issue
+exists. Reply on every review thread (the fixing commit, or one sentence on
+why it does not apply). Wait until **All Checks Passed** is green on that
+head. The owner merges. Then start the next topic.
 
-### Language
+A user-visible change is done when its journey has been walked in the
+browser on the running stack: click, type, find, undo. A screenshot is not
+that walk. Sign in with a seeded account (`docs/DEVELOPMENT.md`). Never
+print, log, or commit a provider key. The product bar is
+`docs/UX_CONTRACT.md` (U1–U12).
 
-- **Code, comments, commit messages: ALWAYS English.** Never write German (or any other language) in code or comments.
-- Chat responses: in the language the user chooses.
+Once that gate is green, a review or CI fix re-runs only the side it
+touches: frontend gets `make -C frontend lint`, `vue-tsc`, and the full
+Vitest; backend gets the backend targets. `--filter` is diagnosis. Do not
+rebuild the stack or re-run every local E2E job when CI already runs the
+failing one. Fix red on the same branch.
 
-### Perfect UX & Stability — the product bar (MANDATORY)
-
-Without usability and stability the software is bad, whatever the API does.
-Every plan, sprint file and PR that touches anything a person sees or waits
-for is measured against this bar. It is the merge gate, not a polish pass.
-The binding contract is `docs/UX_CONTRACT.md` (rules **U1–U12**); the
-use-case list that applies it is
-`_devextras/planning/20260913-use-case-research/README.md` §1.
-
-A user-visible change is **done** only when all seven hold:
-
-1. **First run without help.** A new user reaches the result from an empty
-   install guided only by the screen. Every empty state is one sentence plus
-   one primary action (U5). Flag off ⇒ the surface is absent, never a teaser
-   or a dead control (U11).
-2. **Ten-second findability.** Whatever was produced or granted — file,
-   mail, calendar entry, pending approval, run, shared item — the person
-   finds it in ten seconds from where they normally work: badge, sibling
-   inbox (Incoming chats / Approvals pattern), or list filter. Name that path
-   in the plan **before** the first `.vue` (U1, U2, U6).
-3. **Five questions on the open surface.** Who owns this? Who else? What will
-   it touch / what can they do? How do I stop it? Where did it come from?
-   Answered on the resource itself, not only inside a dialog (U7).
-4. **Honest outcome copy.** Every run, job and stream reaches a terminal
-   state with one sentence a non-technical user understands — no HTTP code,
-   no stack trace, a named recovery. When a write was involved, say what did
-   **and did not** happen (U8). Never "Nothing was sent" when something was.
-5. **Undo is a click.** Turn off, revoke, reject, disconnect — from the same
-   row, with the consequence stated in one kind-specific sentence (U3).
-6. **Stability is UX.** No stuck "running", no silent skip, no `setTimeout`
-   race fix, no feature that works only while the tab is open. The full
-   pre-commit gate **and** the named journey walked end to end in the browser
-   (click, type, find, undo — U10) are the proof; a screenshot is not.
-7. **Every theme, every size, every locale.** Light, dark, 320 px, WCAG
-   AA, all five locales in the same PR (U9).
-
-Planning rule (sprint files opened after 2026-09-13): a sprint file with
-an `ota-candidate` step names its journey (in its own plan, UX contract §5)
-and lists the five exit bullets from the contract's §6 before
-implementation starts.
-Existing files add those bullets when next edited; they are not a
-retroactive merge block. "A listed screen is not a user-flow."
-
-### Docker Environment
-
-All backend/frontend tooling runs inside containers:
+## Gate
 
 ```bash
-docker compose exec backend php bin/console cache:clear
-docker compose exec -T frontend npm run check:types
+make format      # PSR-12 + Prettier (plugins: make plugins-format)
+make ci-local    # lint, phpstan, deptrac, PHPUnit, Vitest, vue-tsc
+make test-e2e    # Playwright @ci, headless, on the host
 ```
 
-Prefer the `make` targets (they wrap `docker compose exec` correctly).
-
-The database is **MariaDB, not MySQL** — the `db` container has no `mysql` binary. Use the `mariadb` client with the app credentials from `docker-compose.yml`:
-
-```bash
-docker compose exec -T db mariadb -usynaplan_user -psynaplan_password synaplan -e "SELECT ..."
-```
-
-### Git — allowed, but NEVER on main
-
-- Git operations (branch, add, commit, push) are allowed.
-- **NEVER** commit or push directly to `main`; never force-push `main` or `master`. All changes go through feature branches + PRs.
-- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:` — e.g. `feat(frontend): add runtime config API support`.
-- **The commit type is not just style — it drives the release version.** `Cut Release Tag` (`.github/workflows/release-tag.yml`) defaults to `bump: auto`, which reads every commit since the last release tag: any commit whose subject **starts with `feat`** raises the minor version, everything else raises the patch version. Only the start of the subject is matched and the casing is ignored, so `feat:`, `feat(chat):`, `feat!:` and the `Feat/desktop client` shape a squash-merged PR title takes all count alike. A major version is never automatic — it requires explicitly selecting `bump: major`. Getting the type wrong on a feature commit silently ships it as a patch release.
-- **NEVER** add attribution ("Generated with Claude Code", "Co-Authored-By: …", or similar).
-
-### Merge Conflicts — NEVER Accept One Side Blindly
-
-1. **Manually merge both sides** — understand what each adds/changes.
-2. **NEVER** use `git checkout --ours` / `--theirs` for code files.
-3. **Preserve ALL functionality** from both branches unless explicitly instructed.
-4. **If unsure, ASK** — throwing away code is worse than asking.
-
-### MANDATORY Local CI Gate — Run Tests BEFORE Every Commit / Push
-
-Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a miss costs another full cycle. Run the same jobs locally first. If any step fails, fix it before committing. No exceptions.
-
-#### 1. Unit / static — required before every commit
-
-| Local step | CI job it mirrors |
-| ---------- | ----------------- |
-| `make -C backend lint` | PHP Code Formatting |
-| `make -C backend phpstan` | Backend (PHP/Symfony) — PHPStan stage |
-| `make -C backend deptrac` | Backend (PHP/Symfony) — deptrac stage (layer rules, `backend/deptrac.yaml`) |
-| `make -C backend test` | Backend (PHP/Symfony) — PHPUnit stage |
-| `make -C frontend lint` | Frontend (Vue/TypeScript) — lint |
-| `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
-| `make -C frontend test` | Frontend (Vue/TypeScript) — Vitest |
-
-```bash
-make ci-local
-# same as:
-# make lint && make -C backend phpstan && make -C backend deptrac && make test && docker compose exec -T frontend npm run check:types
-```
-
-`make ci-local` is **not** full CI. Green here only means the unit/static jobs will pass. Playwright is a separate required job (below).
-
-#### 2. E2E — required before every push / PR
-
-GitHub `All Checks Passed` also requires the Playwright matrix. Run it locally against the running dev stack (`docker compose up -d`, Vite on `:5173`):
-
-| Local step | CI job it mirrors |
-| ---------- | ----------------- |
-| `make test-e2e` | E2E Tests (chromium [1/3] [2/3] [3/3]) — `@ci` suite |
-| `make -C frontend test-e2e-layout` | E2E Tests (chromium Mobile) — when layout / nav / viewport changed |
-| `cd frontend && npm run test:e2e:firefox` | E2E Tests (firefox) — when `@crossbrowser` flows changed |
-| `cd frontend && npm run test:e2e:oidc` / `test:e2e:oidc-redirect` | OIDC jobs — when auth / OIDC changed |
-| `cd frontend && npm run test:e2e:ollama` | E2E Tests (chromium Ollama) — when chat-model / Ollama path changed |
-| `make test-e2e-full` | Same `@ci` suite on the production test image (`:8001`) — when Docker / compose / the shipped `dist/` changed |
-
-**Minimum before every push** that touches frontend, routes, OpenAPI consumed by the UI, Saved Tasks, chat, or auth:
-
-```bash
-make ci-local && make test-e2e
-```
-
-Backend-only PHP with no HTTP/UI contract change may skip Playwright. A selector, i18n, or route miss will **not** show up in Vitest — only in E2E.
-
-Host Playwright once: `make -C frontend deps-host` then `npx playwright install --with-deps`. See `docs/E2E_TESTING.md`.
-
-**Rules:**
-
-- A green FILTERED run (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`, `npx playwright test tests/foo.spec.ts`) is NOT the gate — always finish with the unfiltered `make` targets (and `make test-e2e` before push).
-- `make -C backend phpstan` analyses `src/` **and** `tests/` — never scope it to a single path.
-- If you only changed backend PHP, you may skip frontend unit checks (and vice versa). You may **not** skip E2E when the change is user-visible or OpenAPI-facing.
-- If you changed backend OpenAPI annotations: `make -C frontend generate-schemas`, then re-run `vue-tsc`.
-- **NEVER** commit with failing tests. **NEVER** use GitHub as the first E2E run.
-
-### Common pre-commit traps
-
-Real failure modes that have caused red CI more than once:
-
-- **`--filter` ≠ `make test`.** Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered before committing.
-- **`phpstan analyse <path>` ≠ `make -C backend phpstan`.** CI analyses the WHOLE project including `tests/`. Example miss: a test closure typed `: ?string` that never returns null trips `Anonymous function never returns null` only in the full run.
-- **`SizeRatchetTest` red = a class, constructor or method got bigger, not a ledger to extend.** `backend/tests/Architecture/sizeRatchetBaseline.json` freezes every file over 800 lines, constructor over 10 parameters and method over 100 lines that predates the gate. Entries may shrink or disappear, never grow or be added: put new code into a class of its own instead of into the one that is already too big. After shrinking or splitting one, `UPDATE_SIZE_RATCHET=1 php bin/phpunit tests/Architecture/SizeRatchetTest.php` drops the dead entries — its diff must contain removals and smaller numbers only.
-- **deptrac red = a new layer violation, not a baseline to extend.** `backend/deptrac.yaml` enforces Entrypoint → Application → Repository → Entity → Shared (`App\Entity\*` must not import `App\Service\*`, `App\Repository\*` must not import `App\AI\*`, …). `backend/deptrac.baseline.yaml` freezes only the violations that predate the gate and may only shrink: fix the import (move the value object to `App\Model\`, pass the value in instead of the service), never add an entry. `make -C backend deptrac-baseline` exists to drop entries that no longer fire, and its diff must contain removals only.
-- **Snapshot / characterization tests.** `backend/tests/Characterization/` locks the routing/classifier contract via JSON snapshots. Any change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift them. Re-record and review every changed line — never silently re-record:
-
-  ```bash
-  docker compose exec -T -e UPDATE_ROUTING_SNAPSHOTS=1 backend ./vendor/bin/phpunit tests/Characterization/RoutingCharacterizationTest.php
-  git diff backend/tests/Characterization/__snapshots__/
-  ```
-
-- **Frontend tests need Pinia + i18n + `useMarkdown` set up.** Stub heavy dependencies (`stubs: { MessageText: { template: '...', props: [...] } }`) instead of pulling the full app context into a unit test.
-- **`Unable to write in the "cache" directory (…/var/cache/test)`.** PHPUnit's `DG\BypassFinals` stream wrapper makes PHP judge `is_writable()` by mode bits, so root cannot write a `www-data:775` test cache. The dev backend entrypoint removes `var/cache/test` on start so PHPUnit recreates it as root; a backend restart fixes it, or directly:
-
-  ```bash
-  docker compose exec -T backend rm -rf var/cache/test
-  ```
-
-- **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
-- **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
-- **Flaky E2E: timeline before hypothesis.** Build the timeline from the trace first — `python3 _devextras/e2e/playwright-trace-timeline.py path/to/trace.zip` puts actions, errors, console and API calls on one clock. A fix that only raises a timeout is not a fix; the timeline shows what was waited for and why it took that long. Failed CI E2E jobs carry the backend container logs (warnings included) under `backend-logs/` in the Playwright results artifact.
-- **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
-- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.63.0-noble` image with `--network host`.
-- **Playwright is headless by default** (`frontend/tests/e2e/playwright.config.ts`). Never set `HEADED=1` or pass `--headed` unless the user explicitly asks to watch the browser. Headed + 4 workers opens a window per worker.
-- **A local test fails in code you did not touch?** Check [Known local-only failures](docs/E2E_TESTING.md#known-local-only-failures) before debugging — a match is the dev stack, not your change.
-
-### Mobile App Compatibility
-
-The private `synaplan-apps` repository consumes this public repository as a pinned submodule. Keep
-mobile support a narrow, reviewable compatibility layer:
-
-- Mark every shared hook with `MOBILE-APP SEAM`; keep the implementation in new, focused files
-  whenever possible.
-- Mobile behavior is **default-off** and web/self-host behavior must remain unchanged without a
-  mobile client or explicit configuration. API and runtime-config changes are additive, optional,
-  and have safe defaults.
-- Classify every change before release:
-  - **backend-only** — server-side code and server-delivered plugins (`backend/**`, `plugins/**`);
-    deploy through the normal platform path, no app delivery.
-  - **ota-candidate** — web-layer changes in `frontend/**` (application code, styles, i18n, assets,
-    generated schemas, web dependencies); ships over the air from `synaplan-apps` under its OTA
-    policy (Apple ADPLA 3.3.2 permits interpreted WebView code).
-  - **store-required** — native projects, plugins, permissions, privacy declarations,
-    IAP/payments/entitlements, authentication transport, native seams, forced-update logic, or the
-    update mechanism itself.
-- **Ship as little as possible through Apple**: prefer `ota-candidate`/`backend-only`;
-  `store-required` is reserved for the categories above, never for ordinary frontend or backend work.
-- **Classify new files and paths in the same PR**: add them to the matching allow-list in
-  `.github/mobile-impact-policy.json` (unlisted paths fail closed to `store-required`), extend
-  `tests/mobile-impact.test.mjs`, and verify with
-  `node scripts/mobile-impact.mjs --base <base> --head <head>`.
-- The app release chain starts only when a GitHub release is **published**
-  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs. Publishing is no
-  longer a manual click: `release-publish.yml` publishes the draft that `Cut Release Tag` left
-  behind as soon as the CI run for that tag is green, so cutting a tag is in practice the decision
-  to start the chain.
-- Treat these as mobile-risk paths: auth/OAuth and Bearer handling, subscription/IAP and
-  entitlement logic, native guards/bootstrap, forced updates, and Capacitor-facing services.
-- Run the complete backend/frontend gate for every affected area. For OpenAPI changes, regenerate
-  schemas, run `vue-tsc`, and verify that the app build consumes the same generated contract.
-- This public repository never publishes OTA bundles and must not contain private app-signing,
-  store-account, OTA-hosting, endpoint, credential, or infrastructure details.
-
-## Essential Commands
-
-```bash
-make up / docker compose down          # Start (status page first) / stop services
-make ci-local                          # Unit/static gate (lint, phpstan, tests, vue-tsc)
-make test-e2e                          # Playwright @ci — required before push
-make build                             # Frontend app + widget
-make help / make -C backend help / make -C frontend help
-
-# Dev URLs
-# Frontend: http://localhost:5173 — Backend: http://localhost:8000 — API docs: http://localhost:8000/api/doc
-```
-
-## Frontend Rules
-
-### Type Safety & Validation (Zod)
-
-- **ALWAYS use Zod schemas for API responses** — generated from the backend OpenAPI spec (`make -C frontend generate-schemas` → `frontend/src/generated/api-schemas.ts`).
-- **NEVER write manual TypeScript interfaces for API responses** — they break silently when the API changes.
-
-```typescript
-import { GetRuntimeConfigResponseSchema } from '@/generated/api-schemas'
-type RuntimeConfig = z.infer<typeof GetRuntimeConfigResponseSchema>
-
-const config = await httpClient('/api/v1/config/runtime', {
-  schema: GetRuntimeConfigResponseSchema
-})
-```
-
-- Use existing API clients in `services/api/` (based on `httpClient`).
-
-### Runtime Config
-
-- **NO** `VITE_*` env vars for runtime config — we're open source, runtime location unknown at build time. Dev-only flags (e.g. `VITE_AUTO_LOGIN_DEV`) are OK.
-- App: `useConfigStore().apiBaseUrl` (loaded from `/api/v1/config/runtime`). Widget: `detectApiUrl()` from `widget-utils.ts`.
-- **NEVER** hardcode `http://localhost:8000`.
-
-### Styling
-
-- Use CSS variables and utility classes from `frontend/src/style.css` (`var(--bg-card)`, `var(--txt-primary)`, `surface-card`, `btn-primary`, …) — **never Tailwind colors directly**, never one-off custom CSS classes.
-- Tailwind utilities for layout/spacing are fine; dark mode must work (tokens handle it).
-- The glass design (`frontend/src/style-v2.css`, active via the `.design-v2` class) overrides many tokens/utilities — a surface can look fine in the base styles and be broken under `.design-v2`.
-- See `docs/FRONTEND_CONVENTIONS.md` for the token/utility reference.
-
-### Buttons (MANDATORY)
-
-`.btn-primary` and `.btn-secondary` set the **color** and the default corner
-(`rounded-xl`, 12px). They do **not** add padding or type size. `.btn-danger`
-sets only the color. A bare `<button class="btn-primary">` still needs padding
-and type size.
-
-Every clickable button must use a house utility **and** the standard shape:
-
-```html
-<button type="button" class="btn-primary px-4 py-2.5 text-sm font-medium">
-```
-
-- Primary action: `btn-primary px-4 py-2.5` (add `inline-flex items-center gap-2` when there is an icon). The corner comes from the class. Do not add `rounded-lg` — that utility is 8px and overrides the default.
-- Secondary / cancel: `btn-secondary` with the same padding. Same default corner.
-- A pill (`rounded-full`) still wins when that shape is intentional.
-- Destructive: `btn-danger` with the same padding, plus an explicit radius (`rounded-lg` or the nearby radius).
-- **Never** a raw `<button>` or `<input type="submit">` without those classes.
-- Match nearby buttons on the same surface — do not invent a one-off size.
-
-### Icons (MANDATORY)
-
-One action ⇒ one glyph, on every surface. The canonical set is Heroicons
-outline 24 and the per-action map lives in `docs/FRONTEND_CONVENTIONS.md`
-(§ Iconography): download is `ArrowDownTrayIcon`, preview is `EyeIcon`,
-delete is `TrashIcon` — never introduce a second glyph for a mapped action.
-`mdi:` is reserved for glyphs Heroicons lacks (file-type icons via
-`previewIconForName()`). File rows use the shared `FileRowActions.vue`.
-
-### Form controls (MANDATORY)
-
-There is **no global baseline for `input` / `textarea` / `select`** in `style.css`.
-Tailwind v4 preflight strips border, padding and background from form elements, so a
-field carrying only layout classes (`class="mt-1 w-full"`) renders as an invisible,
-borderless, zero-padding box. Exactly like a bare `btn-primary` button, that is
-unfinished work — and it already shipped once across the whole assistants builder.
-
-Every text field, textarea and select must carry the full house chain:
-
-```html
-<input class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" />
-```
-
-- Full-width form field: the chain above (drop `mt-1` when the field is not under a label, use `flex-1 min-w-0` instead of `w-full` inside a row).
-- `px-4 py-2` without `text-sm` is the larger variant used on standalone forms — match the nearby fields, don't invent a size.
-- Add `disabled:opacity-50 disabled:cursor-not-allowed` whenever the control binds `:disabled`.
-- **Do not rely on `style-v2.css` §17b.** It force-feeds a border and background to bare fields in the app design only — it supplies no padding or radius, and the widget (which renders without `design-v2`) gets nothing at all. A field that "looks fine" in the app design can be invisible in the widget.
-- Only use a token that actually exists. `var(--danger)` is **not defined** — inline error text is `text-sm text-red-600 dark:text-red-400`.
-
-### Color contrast & theme consistency (MANDATORY)
-
-Every UI surface must be readable in **both light and dark theme**. Poor contrast is a bug, not a style preference.
-
-- **Text must meet WCAG AA against its actual rendered background**: ≥ 4.5:1 for normal text, ≥ 3:1 for large text and icons — in BOTH themes. If you can't eyeball it, measure it (DevTools → element → contrast ratio).
-- **Never recolor a shared utility (`.pill`, `.txt-secondary`, `.icon-ghost`, …) via a broad ancestor-scoped override** (e.g. "everything inside the composer gets dark ink"). Overlays that render inside that DOM subtree — dropdowns, drop-ups, palettes, modals — have their OWN panel background and will inherit ink meant for a different surface. This exact bug shipped once: the white dark-mode composer forced `#3b4353` text onto the near-black `+`-menu panel (~1.6:1, unreadable). Scope recolors to the surface itself and restore theme colors for any overlay panels nested inside (see `style-v2.css` §19b).
-- **One color definition per concept, defined for both themes**: when adding a color, define the light AND dark value in the same change (token pair in `:root` + `.dark`, or a rule pair like `.foo` + `.dark .foo`). A light-only or dark-only color is incomplete work.
-- **Verify before done**: any change touching colors, surfaces, dropdowns, or the chat composer must be checked visually in light mode and dark mode (toggle `.dark` / use the theme switch) before it's considered finished.
-
-### Vue 3 / Composition API
-
-- **ALWAYS `<script setup lang="ts">`** — no Options API.
-- Prefer `ref()` over `reactive()` (including in Pinia stores); `computed()` for derived state (never a method).
-- Clean up listeners/timers in `onUnmounted()`.
-- Unique `:key` in every `v-for`; **never** combine `v-if` and `v-for` on the same element (filter via `computed` instead).
-- **NEVER mutate props** — emit events to the parent.
-- Modern JS: top-level `await` (not `.then()`), `const`/`let`, arrow functions, no semicolons (ESLint enforces).
-- Lazy load only heavy components (charts, editors, modals) via `defineAsyncComponent` / dynamic route imports — not small, frequently used ones.
-- Pinia stores: setup style with `ref()` + `computed()`, actions as plain functions, return only the public API.
-
-### Dialogs & Notifications
-
-- **NEVER** use native `alert()` / `confirm()` / `prompt()`.
-- Confirmation/input: `useDialog()` (`confirm({ title, message, danger: true })`, `prompt({...})`).
-- Toasts: `useNotification()` (`success(t('...'))`, `error(t('...'))`).
-
-### i18n
-
-- All UI text through `vue-i18n` — never hardcode user-facing strings.
-- **Always update ALL five locales** in `frontend/src/i18n/locales/{en,de,es,fr,tr}/<namespace>.json` (registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). Put a new top-level key in the namespace that already owns its siblings — see `NAMESPACE_KEYS` in `frontend/src/i18n/namespaces.ts` and `docs/FRONTEND_CONVENTIONS.md`. A missing key silently falls back to English.
-- **This is enforced.** `tests/unit/i18n/localeParity.spec.ts` gates full-file key parity against `localeParityBaseline.json`, a frozen ledger of the drift that predates the gate (`es`/`tr` ~78% translated, `de` ~93%, `fr` 100%). An English-only key added to a namespace fails the suite. The ledger is compared exactly, so it can only shrink: translate a listed key ⇒ delete its ledger entry in the same change. Only add to the ledger for a genuine exception, never to silence the gate.
-- Placeholder names (`{count}`, `{folder}`) must match English in every locale — a dropped one renders as literal text. Plural **branch counts** may differ legitimately (Turkish uses one form after a numeral), so only the placeholder names are compared.
-
-### UI copy & wording (UX clarity)
-
-User-facing text must be **clean, consistent, and crystal clear for a non-technical user**. Chaotic or contradictory wording is a bug.
-
-- **Write for the average user, not the developer.** No implementation jargon ("interview", "prompt topic", "node") in primary copy.
-- **ONE canonical term per concept**, applied in all five locales:
-  - **chat widget** (short: **widget**) — the embeddable product. (de: *Chat-Widget*, es: *widget de chat*, fr: *widget de chat*, tr: *sohbet widget'ı*)
-  - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, fr: *assistant IA*, tr: *AI asistanı*)
-  - **AI Setup Assistant** — the guided chat that configures a widget. (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, fr: *Assistant de configuration IA*, tr: *AI Kurulum Asistanı*)
-- **Copy must be CORRECT.** When renaming a tab/button/route, grep for every string referencing the old name (breadcrumbs, "the 'X' tab") and update them in the same change.
-
-### Widget Development
-
-- Entry: `frontend/src/widget.ts` → `vite.config.widget.ts` → `dist-widget/` (`make -C frontend build-widget`).
-- Must work cross-origin (CORS-ready); API URL detected from script source at runtime via `detectApiUrl()`.
-
-## Backend Rules
-
-### API Development
-
-- **ALWAYS write complete OpenAPI annotations** on all endpoints (`@OA\Response`, `@OA\Property`, required fields, examples) — the frontend Zod schemas are generated from them.
-- After changing annotations: `make -C frontend generate-schemas`, then re-run `vue-tsc`.
-- Test endpoints via Swagger UI at `http://localhost:8000/api/doc` (not curl/Postman). Before creating a new endpoint, check if a similar one exists.
-
-### Code Style (PHP)
-
-- PSR-12, strict types, type hints everywhere: `public function foo(string $bar): int`.
-- `final` classes and `readonly` properties by default.
-- Specific error messages with context — never `throw new \Exception('Error occurred')`.
-- Named constants instead of magic numbers.
-- No comments about deleted code — git history covers that.
-- Modern Symfony/Doctrine:
-  - DBAL: `bindValue()` first, then `executeQuery()` with no arguments (param-passing is removed in DBAL 4); `ArrayParameterType::INTEGER` for `IN (:ids)`.
-  - Explicit request access: `$request->query->get()` / `$request->request->get()` / `$request->attributes->get()` — never ambiguous `$request->get()`.
-  - Empty `eraseCredentials()` gets `#[\Deprecated]` (Symfony 7.3+).
-
-### Database Usage
-
-- **NEVER hardcode AI model names** — query via `ModelRepository`; users configure models in the UI.
-- All queries in Repositories — no DQL/EntityManager work in controllers.
-
-### Database Schema & Seed Data
-
-Three separated areas — see `docs/MIGRATIONS.md`:
-
-| What | Where | Runs in |
-| ---- | ----- | ------- |
-| **Schema** (CREATE/ALTER/DROP) | Doctrine Migrations in `backend/migrations/` (`make -C backend migrate-diff` → review → `migrate`) | dev + prod |
-| **Catalog data** (models, prompts, default config, rate limits) | Idempotent seeders in `backend/src/Seed/` + `app:seed` (`make -C backend seed`) | dev + prod |
-| **Demo data** (users, example widget) | `backend/src/DataFixtures/` + `App\Seed\DemoWidgetConfigSeeder` | dev/test only |
-
-**CRITICAL:**
-
-- ❌ **NEVER** `doctrine:schema:update --force` against prod or any shared DB.
-- ❌ **NEVER** `doctrine:fixtures:load` in prod (purges all entity tables); never put production data in `DataFixtures/`.
-- ✅ Seeders must be INSERT-IF-NOT-EXISTS (`BConfigSeeder::insertIfMissing`) or `INSERT … ON DUPLICATE KEY UPDATE`. For `BMODELS`, operator-owned toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`) are seeded once and never overwritten.
-- ⚠️ **`BCONFIG` defaults are bootstrap-only** — changing a seeder value does NOT propagate to existing installs. To roll out a new default, ship a migration that explicitly UPDATEs the affected rows.
-- Model bindings reference catalog entries by `service:providerId:tag` keys (via `ModelCatalog::findBidByKey`), never raw BIDs.
-
-### Production Platform Specifics (Galera)
-
-Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker** (one shared schema across `web1`/`web2`/`web3`; migrations run on backend container start). These cause prod-only failures that never reproduce locally:
-
-1. **`DATABASE_*_URL` MUST use `serverVersion=mariadb-<x.y.z>`** — a bare version number selects the MySQL platform and breaks introspection (phantom diffs, `TableDoesNotExist`).
-2. **Prod-reachable migrations MUST NOT touch `Schema $schema`** (`hasTable()`, `getTable()`, …) — the DBAL comparator throws `There is no table with name "<x>"` on this cluster, with a varying table name per run. Use raw, idempotent `addSql()` (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`); for conditional DML, query `information_schema` via `$this->connection`, not the Schema API.
-3. **Several FKs have no `ON DELETE CASCADE`** (e.g. `BPROMPTMETA.BPROMPTID`) — delete child rows before parent rows in migrations.
-4. Manual cluster heal scripts live in `synaplan-platform/` (private repo — never commit node IPs here; this repo is public).
-
-### Project-Specific Patterns
-
-- **Optional features are `FeatureModule`s** — never add a bare `isEnabled()` + status block again. Declare the module in `backend/src/Module/`, list its decisive env in `backend/.env.minimal` and `docker-compose.minimal.yml`, and let the registry drive feature status, runtime config, and the gate 404.
-- **Internal prompts** (not selectable by AI classification) MUST use the `tools:` prefix in `topic` (e.g. `tools:memory_extraction`). `MessageSorter` excludes them via `excludeTools: true`. A user-facing prompt without the prefix WILL be selected by the AI.
-- **Memory badges**: AI responses reference memories as `[Memory:ID]`. Only use IDs from the current memory list in the system prompt — never copy from earlier chat messages, never invent IDs. `MessageText.vue` renders the badges.
-- **Feedback categories** `feedback_negative` / `feedback_positive` / `feedback_false_positive` are hidden from the user memory list, used internally.
-- **Qdrant**: PHP talks directly to Qdrant's REST API via `QdrantClientDirect` (`QDRANT_URL=http://qdrant:6333`); `QdrantClientMock` for dev/test. Collections (`user_memories`, `user_documents`) are auto-created. Memory point IDs are deterministic UUIDv5 from `mem_{userId}_{memoryId}`.
-- **SSE streaming**: backend sends `token`, `memories_loaded`, `feedback_loaded`, `complete`, `error` events via `sendSseEvent()`; frontend handles them in `ChatView.vue`.
-
-## Architecture Patterns
-
-- **Controllers**: HTTP handling only, thin, under 50 lines per method — validation + delegate to a Service.
-- **Services**: All business logic, `final readonly`, constructor DI.
-- **Repositories**: All database queries.
-- **Components**: Modular, under 300 lines — split larger ones.
-- Extract when: controller method > 50 lines → Service; component > 300 lines → split; code repeated 3+ times → composable/service. Don't extract 1-2 trivial methods used once.
-
-## Red Flags — STOP and Rethink
-
-- Native `alert()` / `confirm()` / `prompt()` instead of `useDialog()` / `useNotification()`
-- Manual TS interface for an API response (use generated Zod schemas)
-- Business logic or EntityManager work in a controller
-- Hardcoded user-facing strings (use `$t()`) or hardcoded AI model names (use `ModelRepository`)
-- Tailwind colors / custom CSS instead of `style.css` tokens
-- A raw or `btn-primary`-only button (missing `px-4 py-2.5`), or `rounded-lg` on `.btn-primary` / `.btn-secondary` (that forces 8px over the 12px default)
-- An `input` / `textarea` / `select` with layout classes only (missing `px-3 py-2 rounded-xl surface-card border … txt-primary`)
-- An interactive utility (`.pill`, `.btn-*`, `.icon-ghost`) used for a static, non-clickable badge
-- `setTimeout()` to "fix" race conditions
-- German (or non-English) code comments
-- Committing to `main`, or committing with AI attribution
-- `doctrine:schema:update --force` on a shared DB (generate a migration instead)
-- Internal prompt without `tools:` prefix; invented Memory IDs
-- Hardcoded API URL in the widget (use `detectApiUrl()`)
-- A user-visible feature whose result the other person cannot find in ten seconds; an empty state without a next action; a "coming soon" control behind a flag
-- "Request failed" / a raw API error shown to a user; a write action whose copy does not say what did and did not happen
-- A run or stream that can end in a non-terminal state ("running" forever, silently skipped step)
-- A UI PR without the named journey walked in the browser (screenshot ≠ walk)
-- A second glyph for an action already in the icon map (`mdi:download` beside `ArrowDownTrayIcon`)
-- `console.log` debugging left in; `any` types
-
-## Boundaries
-
-### Ask First Before
-
-- Changing database schema (always via Doctrine Migrations — see `docs/MIGRATIONS.md`)
-- Adding dependencies (npm/composer)
-- Modifying Docker/CI/build configs
-- Adding new AI provider integrations
-
-### Never Do
-
-- Commit secrets or `.env` files with credentials
-- Edit `vendor/` or `node_modules/`
-- Commit `dist/` directories
-- Commit or push directly to `main`; force-push `main`/`master`
-- Skip the pre-commit gate
-
-## Detailed Documentation
-
-- `docs/ARCHITECTURE.md` — backend layers, size limits (`make -C backend metrics`), the chat and stream request paths
-- `docs/PROVIDERS.md` — adding an AI provider as one class (`app:provider:scaffold`), what the descriptor decides
-- `docs/PHP_CONVENTIONS.md` — PHP code style, examples, patterns
-- `docs/FRONTEND_CONVENTIONS.md` — TypeScript, Vue, styling tokens, i18n
-- `docs/UX_CONTRACT.md` — UX rules U1–U12, shared patterns (share, inbox, gallery, triggers), sprint-file contract
-- `docs/API_PATTERNS.md` — Zod schemas, OpenAPI, httpClient usage
-- `docs/MIGRATIONS.md` — Doctrine migrations + idempotent seed workflow
-- `docs/E2E_TESTING.md` — Playwright E2E test guidelines
-- `docs/DEVELOPMENT.md` — Development setup
-- `backend/.env.example` — Environment variables
-
-## Cursor Cloud specific instructions
-
-The whole stack runs in Docker (`docker compose up -d`, standard file — see README/`docs/DEVELOPMENT.md` for URLs and the seeded login `demo@synaplan.com` / `demo123`). The startup script only ensures the Docker **daemon** is running; you still bring the app up yourself with `docker compose up -d`. All lint/test/build commands run inside containers via the `make` targets — see the pre-commit gate above; nothing extra is needed on the host. Non-obvious caveats discovered in this sandbox:
-
-- **`frontend-widgets` cannot start here (optional, ignore it).** It is the only service with a `mem_limit`, and the memory cgroup controller is not delegatable in this VM, so it fails with `cannot enter cgroupv2 "/sys/fs/cgroup/docker" ... threaded mode`. Every other service (frontend, backend, worker, db, redis, centrifugo, qdrant, ollama, tika, mailhog, phpmyadmin) runs fine. If `docker compose up -d` aborts partway with that error, just run it again — the rest come up. It is the dev widget-build watcher only; rebuild the widget on demand with `make -C frontend build-widget`.
-- **PHPStan needs the gRPC stubs.** `backend/lib/grpc/` is gitignored; the dev backend entrypoint (`_devextras/backend/docker-entrypoint.d/10-composer-install.sh`) generates the stubs on start when they are missing. If `make -C backend phpstan` still reports ~52 `class.notFound` errors for `Inference\*`, run `docker compose exec -T backend composer proto:generate`.
-- **Local AI text generation (Ollama) segfaults here; embeddings work.** The pinned `ollama/ollama` image's `llama-server` crashes with a segfault on any chat/generate model in this sandbox (even with `OLLAMA_FLASH_ATTENTION=0`), so local chat is unavailable. Embeddings (`bge-m3`) work, so **RAG document ingestion + semantic search (`/files`, `/files/search`), and Qdrant vector features work fully with no API key.** To use chat/generation, add a cloud provider key (e.g. `GROQ_API_KEY=...` in `backend/.env`, then `docker compose restart backend worker`) — the seeded default chat model is Anthropic, so also set/select a provider you have a key for.
+`make ci-local` is the unit and static mirror. It is not full CI.
+Playwright is its own required check. The database client inside `db` is
+`mariadb`, not `mysql`.
+
+| You changed | Also run |
+| --- | --- |
+| Layout, nav, viewport | `make -C frontend test-e2e-layout` |
+| A `@crossbrowser` flow | `cd frontend && npm run test:e2e:firefox` |
+| Auth or OIDC | `cd frontend && npm run test:e2e:oidc` |
+| Chat model or the Ollama path | `cd frontend && npm run test:e2e:ollama` |
+| Docker, compose, or shipped `dist/` | `make test-e2e-full` |
+| OpenAPI annotations | `make -C frontend generate-schemas`, then vue-tsc |
+
+Install host Playwright once: `make -C frontend deps-host`, then
+`npx playwright install --with-deps`.
+
+- A filtered run (`phpunit --filter`, `phpstan analyse <path>`,
+  `vitest <file>`, one spec) is not the gate. `make -C backend phpstan`
+  covers `src/` and `tests/`.
+- Playwright runs on the host. `docker compose exec frontend npm run test:e2e`
+  talks to the wrong localhost. Stay headless unless asked to watch.
+- A flaky E2E failure starts from the trace timeline:
+  `python3 _devextras/e2e/playwright-trace-timeline.py path/to/trace.zip`.
+  Raising a timeout is not a fix. Every E2E job dying on
+  `Unable to download artifact` is Actions; re-run the workflow.
+- A failure in code you did not touch: read the known local-only failures
+  in `docs/E2E_TESTING.md` first. Unwritable `var/cache/test`:
+  `docker compose exec -T backend rm -rf var/cache/test`.
+
+## Do not silence a red check
+
+These ledgers only shrink. Do not add a row to hide a new violation.
+
+- **Size.** `backend/tests/Architecture/sizeRatchetBaseline.json` freezes
+  files over 800 lines, constructors over 10 parameters, and methods over
+  100 lines. New code goes in a new class. After a real split,
+  `UPDATE_SIZE_RATCHET=1` may drop dead entries only.
+- **Layers.** `backend/deptrac.yaml`: Entrypoint → Application → Repository
+  → Entity → Shared. An entity does not import a service. A repository does
+  not import `App\AI`. Move the value to `App\Model\` or pass it in.
+  `deptrac.baseline.yaml` shrinks via `make -C backend deptrac-baseline`.
+- **Routing snapshots.** Changes to `MessageClassifier`, `MessageSorter`, or
+  the sorter response drift `backend/tests/Characterization/`. Re-record
+  with `UPDATE_ROUTING_SNAPSHOTS=1` and review every line.
+- **Locales.** A new UI key lands in all five files,
+  `frontend/src/i18n/locales/{en,de,es,fr,tr}/`, in the namespace that
+  already owns its siblings. `localeParityBaseline.json` only shrinks.
+  Placeholder names (`{count}`) match English in every locale.
+- **Frontend tests.** Provide Pinia, i18n, and `useMarkdown`, or stub the
+  heavy component. Do not mount the whole app.
+- **Flags.** A code path whose `BCONFIG` default is off does nothing in
+  production. A seeder edit does not reach existing installs; ship a new
+  default as a migration `UPDATE`.
+
+## Source stays clean
+
+### PHP
+
+PSR-12, `declare(strict_types=1)`, and a type on every parameter and return.
+`final` classes, `readonly` properties, specific exceptions, named
+constants. No comments about deleted code.
+
+A controller method does HTTP only: validate, delegate, stay under 50
+lines. Services hold the logic (`final readonly`, constructor injection).
+Repositories hold every query. No `EntityManager` and no DQL in a
+controller.
+
+DBAL 4: `bindValue()`, then `executeQuery()` with no arguments. Read the
+request with `$request->query->get()`, `$request->request->get()`, or
+`$request->attributes->get()`.
+
+Every endpoint has complete OpenAPI annotations (`@OA\Response`,
+`@OA\Property`, required fields, examples). Regenerate the Zod schemas
+after they change. Model names come from `ModelRepository`. Schema changes
+are Doctrine migrations (`docs/MIGRATIONS.md`). Catalog data is an
+idempotent seeder. Demo data stays in fixtures and never runs in
+production. Never `doctrine:schema:update --force`. Production migrations
+use raw idempotent SQL, not the Schema API.
+
+An internal prompt topic starts with `tools:`. A memory badge uses an ID
+from the current prompt list only. An optional feature is a `FeatureModule`
+in `backend/src/Module/`.
+
+### Vue and TypeScript
+
+`<script setup lang="ts">`. Prefer `ref()` and `computed()`. Never mutate a
+prop. Never put `v-if` and `v-for` on the same element. No semicolons, no
+`any`, no leftover `console.log`. Drop listeners in `onUnmounted()`. Keep a
+component under 300 lines.
+
+API types come from generated Zod
+(`frontend/src/generated/api-schemas.ts`) through `httpClient` and
+`services/api/`. Do not hand-write an interface for an API payload. No
+`VITE_*` variable for runtime config. The app uses
+`useConfigStore().apiBaseUrl`. The widget uses `detectApiUrl()`. Never
+hardcode `http://localhost:8000`.
+
+User-facing copy goes through `vue-i18n`. Confirmations use `useDialog()`.
+Toasts use `useNotification()`. Never `alert()`, `confirm()`, or `prompt()`.
+
+Colors are tokens in `frontend/src/style.css` (glass overrides live in
+`style-v2.css` under `.design-v2`). No raw Tailwind palette colors and no
+one-off classes. Light and dark both meet WCAG AA: 4.5:1 for text, 3:1 for
+large text and icons. A new color is defined for both themes. Do not
+recolor `.pill`, `.txt-secondary`, or `.icon-ghost` from an ancestor;
+overlays inside that subtree inherit the ink.
+
+A button has a house class and padding:
+`btn-primary px-4 py-2.5 text-sm font-medium` (secondary the same; danger
+plus its own radius). Do not put `rounded-lg` on `.btn-primary` or
+`.btn-secondary`. Never a raw `<button>`.
+
+Every `input`, `textarea`, and `select` carries
+`px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm`
+and the brand focus ring. Layout classes alone draw an invisible field.
+`var(--danger)` is undefined; errors use
+`text-sm text-red-600 dark:text-red-400`.
+
+One Heroicon outline per action (`docs/FRONTEND_CONVENTIONS.md`). `mdi:`
+is for glyphs Heroicons lack. File rows use `FileRowActions.vue`.
+
+## Ask first
+
+Database schema, a new dependency, Docker / CI / build config, a new AI
+provider.
+
+Never commit a secret or a credentialed `.env`. Never edit `vendor/` or
+`node_modules/`. Never commit `dist/`. Never skip the gate. Never put
+app-signing, store-account, or OTA-hosting details in this public repo.
+Classify a new path in the same PR (`.github/mobile-impact-policy.json`);
+an unlisted path fails closed as `store-required`.
+
+## Docs
+
+- `docs/PHP_CONVENTIONS.md`, `docs/FRONTEND_CONVENTIONS.md` — style and tokens
+- `docs/ARCHITECTURE.md` — layers and size limits
+- `docs/API_PATTERNS.md` — Zod, OpenAPI, `httpClient`
+- `docs/MIGRATIONS.md` — migrations and seeders
+- `docs/UX_CONTRACT.md` — U1–U12
+- `docs/E2E_TESTING.md` — Playwright
+- `docs/DEVELOPMENT.md` — setup and test users
+- `docs/PROVIDERS.md` — adding a provider
