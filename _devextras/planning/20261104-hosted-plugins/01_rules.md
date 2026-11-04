@@ -36,7 +36,9 @@ find. It does not wait for a baseline entry.
 - No migration in `backend/migrations/` may create that plugin's tables.
   Plugin SQL stays in `plugins/<id>/migrations/` and runs on install.
 - A missing directory is a skipped manifest. `PLUGINS_DISABLED=<id>`
-  is the same outcome when the directory is still in the image (HP2).
+  is the same outcome when the directory is still in the image (HP2):
+  no routes, no install, no installed-list entry, and both asset routes
+  answer 404, including for a person who already had it installed.
 - `DEFAULT_USER_PLUGINS` may name it. Provisioning skips a name that is
   not available and does not fail user creation. That is already true;
   a test locks it for every plugin this track adds.
@@ -105,10 +107,19 @@ Do not copy:
 The pull request body names the source commit (full SHA) and the files
 that were deliberately left behind.
 
-After the plugin has been an example on `main` for one release, the
-source repository is archived the way synaScriber was: README rewritten
+Archive a source repository only when the whole repository moved here
+and nothing in it is still the product. That is Synaform, Synaads, and
+synafastbill, one release after each is an example: README rewritten
 into a map, archive flag on, repository not deleted. Do that in the
 source repository's own pull request, linked from STATUS.
+
+Repositories that still hold a companion stay open. metadist/Synamail
+keeps the Outlook add-in, its CI, and `addin.synaplan.com`; only the
+"copy `synamail-plugin/`" instructions become a pointer at
+`plugins/synamail`. metadist/Synasort stays private and active because
+the Go sorter still lives there. metadist/synaplan-desktop and
+metadist/synaplan-ai-support-chat are companions and are not archived
+by this track.
 
 ## 5. CI and docs, every time
 

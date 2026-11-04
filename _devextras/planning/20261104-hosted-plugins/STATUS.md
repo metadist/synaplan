@@ -9,7 +9,7 @@ unticked; no step except the plan itself has started.
 
 | Step | State | Example? | Notes |
 | ---- | ----- | -------- | ----- |
-| HP0 | written 2026-11-04 | — | this folder; §8 unticked |
+| HP0 | written 2026-11-04 | — | this folder; §8 unticked. Copilot on #2987: disablement covers install, the installed list, and both asset routes; `PLUGINS.ENABLED` stays a separate per-user list; only plugin-only repositories are archived |
 | HP1 | not started | synascriber is already shipped | homepage still the archived repo |
 | HP2 | not started | — | needs D10 |
 | HP3 | not started | — | needs D1, D9 |

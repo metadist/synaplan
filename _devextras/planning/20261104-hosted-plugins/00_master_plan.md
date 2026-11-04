@@ -148,12 +148,19 @@ Two gestures, both already half-true:
 | Pulled image `ghcr.io/metadist/synaplan` | `rm` inside the container | No. The next container is the image again. |
 
 HP2 adds `PLUGINS_DISABLED`, a comma-separated list of ids (empty by
-default). The kernel does not load those directories. The provisioner
-already skips a plugin that is not available, so a deployment's
-`DEFAULT_USER_PLUGINS` may still name it. Document both gestures in
-`plugins/README.md` and on the docs site: deleting the directory is the
-source-build gesture; `PLUGINS_DISABLED` is the gesture for a pulled
-image.
+default). One filter, used everywhere a plugin is reached:
+
+- `Kernel::getPlugins()` does not load the directory (no services, no routes).
+- `PluginManager::listAvailablePlugins()` omits it, so it cannot be chosen.
+- `PluginManager::installPlugin()` refuses it, including a direct console call.
+- `PluginManager::listInstalledPlugins()` omits it even when a person's symlink is still on disk.
+- Both asset routes 404: `/api/v1/plugins/<id>/assets/…` and `/api/v1/user/<userId>/plugins/<id>/assets/…` (`PluginAssetController`).
+
+The provisioner already skips a plugin that is not available, so a
+deployment's `DEFAULT_USER_PLUGINS` may still name it and user creation
+still succeeds. Document both gestures in `plugins/README.md` and on
+the docs site: deleting the directory is the source-build gesture;
+`PLUGINS_DISABLED` is the gesture for a pulled image.
 
 Per-user uninstall (`app:plugin:install` in reverse, the existing
 `uninstallPlugin`) stays. It removes one person's symlink. It does not
@@ -161,8 +168,10 @@ remove the code from the image.
 
 A test boots with one bundled plugin hidden and asserts the application
 is up, that plugin's routes are absent, and the other plugins still
-answer. A second test sets `PLUGINS_DISABLED` to a plugin that is on
-disk and asserts the same.
+answer. A second test installs a fixture plugin, then sets
+`PLUGINS_DISABLED` to it and asserts the same routes are absent, both
+asset routes 404, `installPlugin` refuses, and the installed list omits
+it.
 
 ## 8. Decisions
 
@@ -262,4 +271,4 @@ is last and stays blocked on the private security note.
 | 10 Wave 6 integrations | Meeting notes already shipped here. HP1 corrects the live sentence that still points at the archived repository. |
 | 28 Admission sign-up | The WordPress wizard must not create a free account. |
 | 38 Service desk | Different product. Do not fold the WordPress rewrite into it. |
-| 15 Config pyramid | `PLUGINS.ENABLED` there and `PLUGINS_DISABLED` here are the same idea from two ends. HP2 uses an env list so it does not wait for the pyramid. When row 15 lands, it should read this list rather than invent a second one. |
+| 15 Config pyramid | Two different lists. `PLUGINS_DISABLED` (HP2) is instance-wide: the code and the routes are not loaded. Row 15's `PLUGINS.ENABLED` chooses who gets a per-user symlink and retires `DEFAULT_USER_PLUGINS`. Provisioning must skip an id that is disabled. HP2 does not wait for the pyramid, and it does not replace that list. |

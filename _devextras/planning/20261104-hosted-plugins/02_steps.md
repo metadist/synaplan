@@ -48,12 +48,18 @@ Depends on D10. Release class: backend-only.
 
 **Operator journey:** J-HP-3 and J-HP-4.
 
-- `Kernel::getPlugins()` skips any id in `PLUGINS_DISABLED` (comma-separated,
-  empty means every directory). Invalid tokens are logged and ignored,
-  the same way the provisioner already ignores an invalid default name.
-- `PluginManager::listAvailablePlugins()` uses the same filter, so a
-  disabled plugin cannot be installed and is not provisioned for a new
-  user.
+- One filter for `PLUGINS_DISABLED` (comma-separated, empty means every
+  directory). Invalid tokens are logged and ignored, the same way the
+  provisioner already ignores an invalid default name. The filter is
+  applied in all of these, not only at discovery:
+  - `Kernel::getPlugins()` — no services, no routes
+  - `PluginManager::listAvailablePlugins()` — not offered
+  - `PluginManager::installPlugin()` — a direct `app:plugin:install` refuses
+  - `PluginManager::listInstalledPlugins()` — omitted even if the symlink remains
+  - `PluginAssetController` — both `/api/v1/plugins/<id>/assets/…` and
+    `/api/v1/user/<userId>/plugins/<id>/assets/…` answer 404
+- The provisioner already skips a name that is not available, so a new
+  user is still created when `DEFAULT_USER_PLUGINS` names a disabled id.
 - Document both gestures in `plugins/README.md`:
   - source build: delete `plugins/<id>/` and start again
   - pulled image: set `PLUGINS_DISABLED=<id>` in the environment and
@@ -63,7 +69,9 @@ Depends on D10. Release class: backend-only.
 - Tests:
   - boot with a fixture plugin directory hidden: the app is up, that
     plugin's route is absent, another fixture plugin's route is present
-  - the same fixture left on disk and named in `PLUGINS_DISABLED`
+  - install a fixture plugin, then name it in `PLUGINS_DISABLED`: its
+    routes are absent, both asset routes 404, `installPlugin` refuses,
+    and `listInstalledPlugins` omits it while another plugin still answers
   - `DEFAULT_USER_PLUGINS` naming the hidden plugin does not fail user
     creation
 - `.env.example` lists `PLUGINS_DISABLED=` with a one-line comment.
@@ -135,9 +143,10 @@ Work:
 - Do not set `DEFAULT_USER_PLUGINS` in this repository (D11).
 
 Exit: `make ci-local` and `make test-e2e` green. J-HP-1 walked. The
-Outlook add-in's repository is unchanged except for a README sentence,
-in its own pull request, that the profile plugin now ships inside
-Synaplan.
+Outlook add-in's repository stays open. Its README, in its own pull
+request, replaces the "copy `synamail-plugin/`" instructions with a
+pointer at `plugins/synamail`. The add-in, its CI, and
+`addin.synaplan.com` stay.
 
 ## HP5 — Desktop download
 
@@ -210,7 +219,9 @@ track. "More love" means the list below, not a new product.
 
 Exit: `make ci-local` green. Offline suite green. J-HP-3 walked.
 Example line checked only if the size bar and five locales hold, which
-they should after the curl replacement and `fr.json`.
+they should after the curl replacement and `fr.json`. One release
+later, archive metadist/synafastbill (the repository is only this
+plugin): README becomes a map, archive flag on, repository kept.
 
 ## HP7 — Synaads
 
@@ -240,7 +251,8 @@ Do not import the manifest homepage `metadist/synaplan-synaads`. Point
 Exit of pull request 2: example checklist in [`01_rules.md`](./01_rules.md)
 §7 all ticked, `make ci-local` green, docs updated, gitignore line gone.
 A browser walk creates a campaign against a fake or a dev model and
-downloads the ZIP. STATUS records it.
+downloads the ZIP. STATUS records it. One release later, archive
+metadist/Synaads the same way (the repository is only this plugin).
 
 ## HP8 — Synaform
 
@@ -327,7 +339,9 @@ Release class: backend-only.
   under the old name, leave the ignore line and say so in STATUS.
 - Update `IGNORED_PLUGINS` in the same commit as the directory that
   actually contains PHP.
-- Do not publish metadist/Synasort.
+- Do not publish metadist/Synasort, and do not archive it. The Go
+  sorter is still the product in that repository. Its README points at
+  `plugins/sortx` for the Synaplan half.
 
 Exit: example checklist ticked, `make ci-local` green, docs say
 "experimental, in the image, the sorter itself is still consulting-only."
