@@ -1,5 +1,4 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
 import { VueReCaptcha } from 'vue-recaptcha-v3'
 import router from './router'
 import { i18n, preloadCore } from './i18n'
@@ -21,6 +20,7 @@ import { setApiBaseUrl } from './services/api/httpClient'
 import { loadNativeTokens } from './services/api/nativeAuth'
 import { applyBrandingTheme } from './utils/brandingTheme'
 import { installDropdownPlacement } from './utils/dropdownPlacement'
+import { installAppPinia } from './plugins/installAppPinia'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -29,6 +29,9 @@ import { installDropdownPlacement } from './utils/dropdownPlacement'
 // already-mounted ErrorBoundary can render the inline ErrorView immediately.
 ;(async () => {
   const app = createApp(App)
+
+  // Pinia before the first await, so a hot update cannot run setup with no instance.
+  installAppPinia(app)
 
   // Core strings must load before first paint, but a chunk failure (broken
   // deploy, offline) must not blank-page the app: record it and keep mounting
@@ -43,7 +46,6 @@ import { installDropdownPlacement } from './utils/dropdownPlacement'
   }
   persistLanguage(i18n.global.locale.value as SupportedLanguage)
 
-  app.use(createPinia())
   app.use(router)
   app.use(i18n)
 

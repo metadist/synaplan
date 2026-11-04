@@ -76,7 +76,7 @@
         "src/Controller/SharedChatPageController.php::SharedChatPageController::generateMetaTags": 63,
         "src/Controller/SharedChatPageController.php::SharedChatPageController::render404": 54,
         "src/Controller/StaticUploadController.php::StaticUploadController::resolveFileContext": 56,
-        "src/Controller/StaticUploadController.php::StaticUploadController::serve": 161,
+        "src/Controller/StaticUploadController.php::StaticUploadController::serve": 153,
         "src/Controller/StaticUploadController.php::StaticUploadController::serveFile": 73,
         "src/Controller/StreamAttachController.php::StreamAttachController::pump": 92,
         "src/Controller/StripeWebhookController.php::StripeWebhookController::handleSubscriptionUpdated": 70,

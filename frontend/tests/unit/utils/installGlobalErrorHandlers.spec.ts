@@ -4,11 +4,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import { installGlobalErrorHandlers } from '@/utils/installGlobalErrorHandlers'
 import { useGlobalErrorStore } from '@/stores/globalError'
 import { useNotification } from '@/composables/useNotification'
+import { resetDevPiniaContextRecovery } from '@/utils/devPiniaContextRecovery'
 
 describe('installGlobalErrorHandlers', () => {
   let app: ReturnType<typeof createApp>
 
+  let piniaReloads = 0
+
   beforeEach(() => {
+    piniaReloads = 0
+    resetDevPiniaContextRecovery(() => {
+      piniaReloads += 1
+    })
     setActivePinia(createPinia())
     app = createApp({ template: '<div />' })
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -20,6 +27,7 @@ describe('installGlobalErrorHandlers', () => {
   })
 
   afterEach(() => {
+    resetDevPiniaContextRecovery()
     vi.restoreAllMocks()
   })
 
@@ -247,6 +255,36 @@ describe('installGlobalErrorHandlers', () => {
     expect(store.hasError).toBe(true)
     expect(store.current?.message).toContain('Cannot read properties of undefined')
     expect(notifications.value).toHaveLength(0)
+  })
+
+  it('reloads a dev Pinia context loss instead of opening the fatal screen', () => {
+    installGlobalErrorHandlers(app)
+    const store = useGlobalErrorStore()
+
+    app.config.errorHandler!(
+      new Error(
+        '[🍍]: "getActivePinia()" was called but there was no active Pinia. Are you trying to use a store before calling "app.use(pinia)"?'
+      ),
+      null,
+      'setup function'
+    )
+
+    expect(store.hasError).toBe(false)
+    expect(piniaReloads).toBe(1)
+  })
+
+  it('reloads when a Pinia context loss is pushed directly to globalErrorStore (e.g. router.onError)', () => {
+    const store = useGlobalErrorStore()
+
+    store.setError({
+      message:
+        '[🍍]: "getActivePinia()" was called but there was no active Pinia. Are you trying to use a store before calling "app.use(pinia)"?',
+      reason: 'router_navigation',
+      source: 'router:onError',
+    })
+
+    expect(store.hasError).toBe(false)
+    expect(piniaReloads).toBe(1)
   })
 
   it('is idempotent — re-installing replaces previous listeners cleanly', () => {
