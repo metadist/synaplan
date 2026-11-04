@@ -92,4 +92,15 @@ final class GeneratedMediaTextRendererTest extends TestCase
         $this->assertSame('__VIDEO_GENERATED__', GeneratedMediaTextRenderer::storageMarker('video'));
         $this->assertSame('__AUDIO_GENERATED__', GeneratedMediaTextRenderer::storageMarker('audio'));
     }
+
+    public function testGeneratingMarkerAndBareToken(): void
+    {
+        $this->assertSame('__IMAGE_GENERATING__', GeneratedMediaTextRenderer::generatingMarker('image'));
+        $this->assertSame('__VIDEO_GENERATING__', GeneratedMediaTextRenderer::generatingMarker('video'));
+        $this->assertSame('__AUDIO_GENERATING__', GeneratedMediaTextRenderer::generatingMarker('audio'));
+        $this->assertTrue(GeneratedMediaTextRenderer::isBareMediaToken('__IMAGE_GENERATING__'));
+        $this->assertTrue(GeneratedMediaTextRenderer::isBareMediaToken('__IMAGE_GENERATED__'));
+        $this->assertFalse(GeneratedMediaTextRenderer::isBareMediaToken("__IMAGE_GENERATED__\n\nSaved to Projects/Art."));
+        $this->assertFalse(GeneratedMediaTextRenderer::isBareMediaToken('Here is your parrot.'));
+    }
 }

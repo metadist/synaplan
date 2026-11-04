@@ -1176,6 +1176,7 @@ import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { formatFileSize, getFileIcon } from '@/utils/messageFileDisplay'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
+import { shouldHidePlaceholderReply } from '@/utils/placeholderReply'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
 import { extractArtifacts, type ChatArtifact } from '@/utils/chatArtifacts'
@@ -1605,20 +1606,19 @@ const feedbacks = computed(() => {
 const contentParts = computed(() => {
   let parts = props.parts.filter((p) => p.type !== 'thinking')
 
-  // The `__VIDEO_GENERATING__` token is a backend placeholder, never user-facing
-  // text. The dedicated banner (while running/failed) or the finished video part
-  // (when done) is the real surface. Strip the placeholder whenever this message
-  // carries a media job in ANY state — gating it on the banner's visibility
-  // alone made the placeholder reappear next to the video the moment the job
-  // completed, producing the text↔video flicker.
-  if (props.role === 'assistant' && props.mediaJob) {
-    const generatingTokens = [
-      '__VIDEO_GENERATING__',
-      '__IMAGE_GENERATING__',
-      '__AUDIO_GENERATING__',
-    ]
+  // Generating/generated tokens and the assembler fallback are not answers.
+  // Single-task banners and DAG media cards are the surface. Strip them here
+  // so a live stream and a reloaded history row match.
+  if (props.role === 'assistant') {
     parts = parts.filter(
-      (p) => !(p.type === 'text' && generatingTokens.includes(p.content?.trim() ?? ''))
+      (p) =>
+        !(
+          p.type === 'text' &&
+          shouldHidePlaceholderReply(p.content ?? '', {
+            hasMediaJob: Boolean(props.mediaJob),
+            cards: props.taskPlan?.cards ?? [],
+          })
+        )
     )
   }
 

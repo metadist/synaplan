@@ -20,6 +20,9 @@ final readonly class GeneratedMediaTextRenderer
     public const MARKER_IMAGE = '__IMAGE_GENERATED__';
     public const MARKER_VIDEO = '__VIDEO_GENERATED__';
     public const MARKER_AUDIO = '__AUDIO_GENERATED__';
+    public const MARKER_IMAGE_GENERATING = '__IMAGE_GENERATING__';
+    public const MARKER_VIDEO_GENERATING = '__VIDEO_GENERATING__';
+    public const MARKER_AUDIO_GENERATING = '__AUDIO_GENERATING__';
     public const MARKER_FILE_PREFIX = '__FILE_GENERATED__:';
     public const MARKER_FILE_FAILED = '__FILE_GENERATION_FAILED__';
 
@@ -165,6 +168,36 @@ final readonly class GeneratedMediaTextRenderer
             'audio' => self::MARKER_AUDIO,
             default => self::MARKER_AUDIO,
         };
+    }
+
+    /**
+     * Placeholder streamed while an async media job is still running.
+     */
+    public static function generatingMarker(string $mediaType): string
+    {
+        return match (strtolower($mediaType)) {
+            'image' => self::MARKER_IMAGE_GENERATING,
+            'audio' => self::MARKER_AUDIO_GENERATING,
+            default => self::MARKER_VIDEO_GENERATING,
+        };
+    }
+
+    /**
+     * True when the whole trimmed text is a generating or generated media token
+     * with no surrounding prose. Folder notes and file markers are real content.
+     */
+    public static function isBareMediaToken(?string $text): bool
+    {
+        $trimmed = trim((string) $text);
+
+        return in_array($trimmed, [
+            self::MARKER_IMAGE,
+            self::MARKER_VIDEO,
+            self::MARKER_AUDIO,
+            self::MARKER_IMAGE_GENERATING,
+            self::MARKER_VIDEO_GENERATING,
+            self::MARKER_AUDIO_GENERATING,
+        ], true);
     }
 
     /**
