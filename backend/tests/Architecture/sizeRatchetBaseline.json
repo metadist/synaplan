@@ -77,7 +77,6 @@
         "src/Controller/FileController.php::FileController": 25,
         "src/Controller/GuestChatController.php::GuestChatController": 12,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController": 16,
-        "src/Controller/LegacyApiController.php::LegacyApiController": 11,
         "src/Controller/MessageController.php::MessageController": 14,
         "src/Controller/MessagesGatewayController.php::MessagesGatewayController": 15,
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController": 11,

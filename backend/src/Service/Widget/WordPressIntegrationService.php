@@ -12,6 +12,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Prompt\PromptService;
+use App\Service\Security\SsrfGuard;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -61,17 +62,24 @@ final readonly class WordPressIntegrationService
             throw new \InvalidArgumentException('Email and password are required');
         }
 
-        $this->verifyWordPressSite($verificationUrl, $verificationToken);
+        // Reject a private or cross-host target before any lookup, so a bad
+        // password never becomes an outbound request.
+        $this->assertSamePublicSite($siteUrl, $verificationUrl);
 
-        // Check if user already exists
         $existingUser = $this->userRepository->findByEmail($email);
 
-        if ($existingUser) {
-            // User already exists - update WordPress verification details and continue
-            $this->logger->debug('WordPress wizard: Reusing existing user', [
-                'user_id' => $existingUser->getId(),
-            ]);
+        if ($existingUser instanceof User) {
+            $hash = $existingUser->getPassword();
+            if ('' === $hash || !password_verify($password, $hash)) {
+                $this->logger->info('WordPress wizard: rejected an existing account without a matching password');
 
+                throw new \RuntimeException('WordPress site verification failed');
+            }
+        }
+
+        $this->verifyWordPressSite($verificationUrl, $verificationToken);
+
+        if ($existingUser instanceof User) {
             $userDetails = $existingUser->getUserDetails();
             $userDetails['wordpress_verified'] = true;
             $userDetails['wordpress_site'] = $siteUrl;
@@ -97,7 +105,9 @@ final readonly class WordPressIntegrationService
         $user->setProviderId('local');
         $user->setType('MAIL');
         $user->setUserLevel('NEW');
-        $user->setEmailVerified(true);
+        // Not pre-verified. Key issuance requires a verified address, and this
+        // wizard used to skip that and hand back a usable key.
+        $user->setEmailVerified(false);
         $user->setUserDetails([
             'language' => $language,
             'wordpress_verified' => true,
@@ -358,8 +368,40 @@ final readonly class WordPressIntegrationService
         ];
     }
 
+    private function assertSamePublicSite(string $siteUrl, string $verificationUrl): void
+    {
+        if (!$this->isPlainHttpsUrl($siteUrl) || !$this->isPlainHttpsUrl($verificationUrl)) {
+            throw new \RuntimeException('WordPress site verification failed');
+        }
+
+        $siteHost = $this->extractHostFromUrl($siteUrl);
+        $verifyHost = $this->extractHostFromUrl($verificationUrl);
+        if (null === $siteHost || null === $verifyHost || $siteHost !== $verifyHost) {
+            throw new \RuntimeException('WordPress site verification failed');
+        }
+
+        if ((new SsrfGuard())->isBlockedUrl($verificationUrl)) {
+            throw new \RuntimeException('WordPress site verification failed');
+        }
+    }
+
+    private function isPlainHttpsUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        if (!is_array($parts) || isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+
+        return 'https' === strtolower((string) ($parts['scheme'] ?? ''))
+            && '' !== (string) ($parts['host'] ?? '');
+    }
+
     private function verifyWordPressSite(string $verificationUrl, string $token): void
     {
+        if ((new SsrfGuard())->isBlockedUrl($verificationUrl) || !$this->isPlainHttpsUrl($verificationUrl)) {
+            throw new \RuntimeException('WordPress site verification failed');
+        }
+
         try {
             $response = $this->httpClient->request('POST', $verificationUrl, [
                 'body' => ['token' => $token],

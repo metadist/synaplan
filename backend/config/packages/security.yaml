@@ -231,14 +231,11 @@ security:
         # Public marketeer published pages (anonymous slug URLs)
         - { path: ^/api/v1/marketeer/public/, methods: [GET, HEAD], roles: PUBLIC_ACCESS }
 
-        # Legacy widget.php endpoint (compatibility layer)
+        # Legacy widget.php endpoint (compatibility layer). This is the embed
+        # loader for chat widgets already on customer sites. It does not read
+        # or change an account. /api.php is intentionally not public: it used
+        # to trust a user_id parameter.
         - { path: ^/widget\.php, roles: PUBLIC_ACCESS }
-
-        # Legacy api.php endpoint (WordPress wizard compatibility)
-        - { path: ^/api\.php, roles: PUBLIC_ACCESS }
-
-        # WordPress integration endpoints (public for plugin onboarding)
-        - { path: ^/api/v1/integrations/wordpress, roles: PUBLIC_ACCESS }
 
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
