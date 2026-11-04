@@ -1,4 +1,9 @@
-# Payment Channels & Subscription Source (Epic 5)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (6/9)**  
+> **← Previous:** [2.5 Self-Hosted Billing (Stripe)](BILLING_SELFHOST.md) · **Next:** [2.7 Model Catalog & Pricing Maintenance →](PRICING_MAINTENANCE.md)
+
+# Payment Channels & Subscription Source
+
+> **In this guide:** How subscription entitlements work across Web (`stripe`), iOS (`apple`), and Android (`google`), why store prices include a ~30% commission markup, how server-side receipt verification prevents cross-channel conflicts, and how signup/payment abuse guards work.
 
 > A Synaplan subscription is either **ACTIVE** or not, and it is owned by **exactly one
 > channel** at a time. The server is the single source of truth for entitlement.
@@ -212,3 +217,8 @@ actually charged); the server price is the fallback and the web's only source.
 
 Creating the actual store products, sandbox testers, the real prices and the validation
 credentials is account-bound and is tracked in `synaplan-apps/docs/LAUNCH_CHECKLIST.md`.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (6/9)**  
+> **← Previous:** [2.5 Self-Hosted Billing (Stripe)](BILLING_SELFHOST.md) · **Next:** [2.7 Model Catalog & Pricing Maintenance →](PRICING_MAINTENANCE.md)

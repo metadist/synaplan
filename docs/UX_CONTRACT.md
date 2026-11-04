@@ -1,4 +1,9 @@
-# UX contract — rules U1–U12
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (9/11)**  
+> **← Previous:** [5.8 Database Migrations & Seeders](MIGRATIONS.md) · **Next:** [5.10 End-to-End Testing (Playwright) →](E2E_TESTING.md)
+
+# UX Contract — Rules U1–U12
+
+> **In this guide:** The 12 binding UX rules (U1–U12) that govern every user-visible surface in Synaplan—covering the five-item navigation rail, 10-second recipient findability, kind-specific consequence copy, shared UI patterns (Share dialog, sibling inboxes, galleries, triggers), and browser journey gates.
 
 **Status:** Binding for every user-visible change since 2026-09-07; this is
 the merge gate behind the AGENTS.md "Perfect UX & Stability" bar. Moved
@@ -272,3 +277,8 @@ Frozen in
 5. Primary copy in all five locales stays free of the banned words of each
    plan, plus: ACL, tenant, DAG, node, sandbox, container, auth code,
    provisioning, stdout.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (9/11)**  
+> **← Previous:** [5.8 Database Migrations & Seeders](MIGRATIONS.md) · **Next:** [5.10 End-to-End Testing (Playwright) →](E2E_TESTING.md)

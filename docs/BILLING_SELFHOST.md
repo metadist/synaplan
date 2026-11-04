@@ -1,4 +1,9 @@
-# Billing on a self-hosted install
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (5/9)**  
+> **← Previous:** [2.4 Outbound Traffic & Egress Control](EGRESS.md) · **Next:** [2.6 Payment Channels & Store IAP →](PAYMENTS_CHANNELS.md)
+
+# Billing on a Self-Hosted Install (Stripe)
+
+> **In this guide:** Why Synaplan ships with billing turned off (unrestricted open-source mode), and how to connect your own Stripe account if you host Synaplan for paying customers.
 
 Synaplan ships with billing **off**. Without Stripe credentials the install runs
 in open-source mode: no limits, no quotas, no upgrade prompts, no subscription
@@ -141,3 +146,8 @@ the first payment.
 Remove the `STRIPE_*` values (or set them back to the placeholders) and restart.
 The install returns to open-source mode immediately. Existing subscriptions in
 Stripe are unaffected — cancel or refund them there.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (5/9)**  
+> **← Previous:** [2.4 Outbound Traffic & Egress Control](EGRESS.md) · **Next:** [2.6 Payment Channels & Store IAP →](PAYMENTS_CHANNELS.md)

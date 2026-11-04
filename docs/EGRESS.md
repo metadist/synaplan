@@ -1,126 +1,92 @@
-# Outbound traffic
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (4/9)**  
+> **← Previous:** [2.3 Observability & Redacted Error Ring](OBSERVABILITY.md) · **Next:** [2.5 Self-Hosted Billing (Stripe) →](BILLING_SELFHOST.md)
 
-Every byte Synaplan sends to another host, as of the inventory frozen in
-`backend/tests/Architecture/egressInventoryBaseline.json` (S2 AU14). The
-policy that will stand in front of these calls is
-[`03_contracts.md`](../_devextras/planning/20261021-architecture-update/03_contracts.md)
-§3. Operators change the mode on
-[Runtime and outbound traffic](https://docs.synaplan.com/runtime-setup);
-the keys are in [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md). `EGRESS.MODE` is seeded `off`. `report` lets a call out and records
-`egress.would_block` with the host and port only. `enforce` refuses before
-a socket opens. The extra allowlist is `EGRESS.ALLOW`. `EGRESS_PROXY`
-overrides `HTTPS_PROXY` when it is set; an empty value leaves the
-environment proxy alone. A URL a person typed is not added to the list:
-`SsrfGuard` decides, and behind a proxy the tunnel goes to the pinned
-address (`CURLOPT_CONNECT_TO`). Raw cURL moved onto this client in AU16.
-The OpenAI-compatible SDKs, Ollama, Stripe, Google Play and reCAPTCHA
-moved on in AU17. Apple's verifier has no HTTP hook: online checks are
-off unless the operator turns them on, and then OCSP stays inside the
-library.
+# Outbound Traffic & Egress Control
 
-The 2026-10-21 map in `STATUS.md` counted 9 `curl_init` calls, one
-`file_get_contents` fallback, and one `HttpClient::create()`. The scan of
-`backend/src` and the plugins committed in this repository finds those
-backend cURL sites, three `file_get_contents` downloads of an image URL in
-OpenAI image generation, and `OpenAI::client()` in `OpenAIApiClient`.
-Plugins named in `.gitignore` (Synaform, Synamail, and the other external
-checkouts) are absent from a clean checkout and stay out of this inventory.
+> **In this guide:** Every outbound network connection Synaplan makes, how the outbound HTTP allowlist (`EGRESS.MODE`) is derived automatically from `ProviderCatalog`, how user-supplied URLs are guarded against SSRF with IP pinning, and how to run the optional egress gateway (`docker-compose.egress.yml`).
 
-## HTTP stacks that bypass Symfony HttpClient
+---
 
-76 classes inject `HttpClientInterface`. They already share one client.
-These sites do not.
+## 1. Outbound Policy Modes (`EGRESS.MODE`)
 
-| Kind | Where | What it calls |
-| ---- | ----- | ------------- |
-| Apple App Store library | `AppleStoreKitVerifier` | `new SignedDataVerifier(...)`. Online checks, when enabled, use the library's own HTTP client. The constructor has no client argument, so OCSP cannot be moved onto the shared client. The default is off. |
+Every outbound HTTP call from the PHP backend (76 services injecting Symfony's `HttpClientInterface`, plus the OpenAI-compatible SDKs, Ollama, Stripe, Google Play, and reCAPTCHA) passes through a single policy layer (`EgressPolicy`, contract in [`03_contracts.md`](../_devextras/planning/20261021-architecture-update/03_contracts.md) §3).
 
-`EgressInventoryTest` fails when any of these patterns appears at a new
-site. The baseline may only shrink (`UPDATE_EGRESS_INVENTORY=1` drops sites
-that are gone and refuses to add one).
+Operators configure the mode on **Operate → System configuration → Outbound traffic** (guide: [Runtime and outbound traffic](https://docs.synaplan.com/runtime-setup); settings summary: [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md)):
 
-## Not HTTP, and not wrapped
+| Mode / Setting | Default | Behavior |
+| -------------- | ------- | -------- |
+| `EGRESS.MODE = off` | **Default** (seeded `off`) | All outbound HTTP calls proceed normally (subject to `SsrfGuard` on user-supplied URLs). |
+| `EGRESS.MODE = report` | Opt-in | Lets unallowlisted system/provider calls proceed and records an `egress.would_block` event containing the target **host and port only** (never paths or secrets). User-supplied URLs accepted by `SsrfGuard` are allowed by `EgressPolicy::decide()` and are not reported as `would_block`. |
+| `EGRESS.MODE = enforce` | Opt-in | Refuses any unallowlisted system/provider outbound host **before** opening a socket. User-supplied URLs validated by `SsrfGuard` remain allowed (see [User-Supplied URLs & SSRF IP Pinning](#3-user-supplied-urls--ssrf-ip-pinning)), so `enforce` is not a blanket block on typed URLs. |
+| `EGRESS.ALLOW` | *empty* | Additional hostnames allowed in `report` and `enforce` modes (for example, an admin-configured custom OpenAI-compatible gateway). |
+| `EGRESS_PROXY` | *empty* | Environment variable. Overrides `HTTPS_PROXY` when set; leaving it empty preserves standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` behavior. |
+| `EGRESS_NO_PROXY` | `NO_PROXY` | Environment variable. Hosts that bypass the proxy and are never refused in `enforce` mode. |
 
-These stay on their own protocols. The inventory does not list them. The
-optional egress gateway (AU18) can carry the WebSocket through CONNECT.
-Nothing else in this table moves onto the HTTP client.
+---
 
-| Protocol | Where | Setting |
-| -------- | ----- | ------- |
-| MariaDB | Doctrine DBAL | `DATABASE_WRITE_URL`, `DATABASE_READ_URL` |
-| Redis | `RedisService` (Predis) | `REDIS_DSN` |
-| SMTP | Symfony Mailer | `MAILER_DSN` |
-| IMAP | `InboundEmailHandlerService`, `InboundEmailService`, `ImapMailboxSearcher` | The mailbox settings of the email handler |
-| gRPC | Triton, from `LocalProviderAvailabilityProbe` and the model catalog | The Triton endpoint on the AI settings tab |
-| WebSocket | The voice sidecar's provider socket | The voice service URL. PHP does not open it. |
+## 2. Where the Allowlist Comes From
 
-The default compose file sets none of `HTTP_PROXY`, `HTTPS_PROXY`, or
-`NO_PROXY`. Symfony HttpClient honours those environment variables on its
-own. The SDKs that accept a client now use that client. Apple OCSP does
-not, and only when online checks are on.
+You do not maintain a static list of AI provider domains by hand. `EgressPolicy` assembles the allowlist from four sources:
 
-## The optional gateway
+1. **Internal installation services (`EgressBuiltinDestinations::INTERNAL`)** — The Docker Compose and Kubernetes service names of this installation (`db`, `redis`, `qdrant`, `tika`, `docling`, `searxng`, `collabora`, `tts`, `compute`, `centrifugo`, `voice`, `transcriber`).
+2. **AI provider endpoints (`ProviderCatalog::endpoints()`)** — Every inference host and key-validation host declared in each provider's `ProviderDescriptor`. Adding a provider as one PHP class ([PROVIDERS.md](PROVIDERS.md)) automatically adds its hosts to the allowlist in `enforce` mode.
+3. **Non-AI integrations (`EgressBuiltinDestinations::INTEGRATIONS`)** — Fixed upstream hosts for Stripe, Telegram, Meta Graph (WhatsApp), Brave Search, Google OAuth & Play Billing, GitHub OAuth, Apple Sign-In, reCAPTCHA, and Cloudflare Turnstile.
+4. **Operator additions (`EGRESS.ALLOW` and `EGRESS_NO_PROXY`)** — Custom OpenAI-compatible base URLs entered by an administrator are not auto-added; in `report` mode they appear as `egress.would_block` until listed in `EGRESS.ALLOW`.
 
-`docker-compose.egress.yml` is off unless you load it:
+---
+
+## 3. User-Supplied URLs & SSRF IP Pinning
+
+A URL typed by a user—in the URL reader (`url_fetch`), a watched page, a custom HTTP tool (`HttpToolExecutor`), or a personal MCP server—is **never** added to the installation allowlist.
+
+Instead, every user-supplied URL is validated by `SsrfGuard`:
+- Private, loopback, link-local (`169.254.0.0/16`), and non-globally-routable IP ranges are rejected.
+- To prevent DNS rebinding between the check and the connection—even behind an outbound HTTP proxy that would normally re-resolve the hostname—Synaplan pins the connection to the validated IP address (`CURLOPT_CONNECT_TO`, or a one-request IP grant when the optional egress gateway is active).
+
+---
+
+## 4. The Optional Egress Gateway (`docker-compose.egress.yml`)
+
+To route outbound HTTP traffic from both PHP and the sidecars through the egress proxy gateway, load the optional egress overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.egress.yml --profile egress up -d
 ```
 
-That file points PHP, the worker, the scheduler, voice, and the
-transcriber at `http://egress:3128`, and sets `NODE_USE_ENV_PROXY=1` on the
-two Node sidecars so they actually use the proxy. Plain HTTP is sent as a
-CONNECT tunnel (`CURLOPT_HTTPPROXYTUNNEL`), because the gateway accepts
-CONNECT only. `EGRESS_GATEWAY=1` tells PHP to send a one-request grant on
-`CURLOPT_PROXYHEADER`, which is the header curl puts on CONNECT. The
-gateway dials the pinned address and deletes the grant. An allowlisted
-name is resolved by the gateway. The allowlist is written when the
-process starts (the entrypoint runs a console command) and again on each
-command and request; the key lasts a day. Without this file, nothing in
-the default stack changes.
+> **Note on network isolation:** The overlay configures proxy routing (`HTTP_PROXY` / `HTTPS_PROXY`), but leaves direct outbound connectivity open on the default Docker Compose bridge network. Any client or library that ignores proxy environment variables could still connect directly; strict network-level enforcement therefore also requires host firewall rules or an internal-only Docker network that blocks direct internet egress from the application containers.
 
-A compute run does not use that proxy environment. Its pin proxy dials
-the approved address itself. When `EGRESS_UPSTREAM` and
-`EGRESS_UPSTREAM_TOKEN` are set, that proxy sends `CONNECT <pinned ip>`
-to the gateway with the token. The gateway dials that public address and
-does not log the token. `docling` and `searxng` are in `NO_PROXY`. The dev overlay also bypasses
-Packagist and GitHub: Composer runs before PHP has published the allowlist,
-and without that bypass the backend and the worker never become healthy.
+How the gateway works:
+- Points `backend`, `worker`, `scheduler`, `voice`, and `transcriber` at `http://egress:3128` and sets `NODE_USE_ENV_PROXY=1` on the two Node sidecars.
+- Accepts `CONNECT` tunnels only (`CURLOPT_HTTPPROXYTUNNEL` for plain HTTP).
+- When `EGRESS_GATEWAY=1` is set, PHP attaches a single-use grant header (`CURLOPT_PROXYHEADER`) for user-typed URLs; the gateway dials the pinned IP and deletes the grant immediately without logging the grant ID.
+- Publishes the allowlist to Redis on container boot and refreshes it on each command and request (24-hour TTL). `REDIS_KEY_PREFIX` must match `RedisService` (`synaplan:{APP_ENV}:`; `synaplan:dev:` in the dev overlay).
+- **Secure compute runs** do not inherit `HTTP_PROXY`: their internal pin-proxy dials approved addresses directly, or forwards `CONNECT <pinned ip>` to the egress gateway using `EGRESS_UPSTREAM` and `EGRESS_UPSTREAM_TOKEN` (`EGRESS_COMPUTE_TOKEN` on the gateway).
+- **Enterprise upstream proxy chaining:** When chained to a corporate proxy via `UPSTREAM_PROXY`, the gateway sends `CONNECT <pinned ip>:<port>`. If the corporate proxy refuses IP-literal `CONNECT` requests, user-typed URL features will fail with `reason=upstream_refused` (logging host and port only); allow IP literals on that tunnel or disable typed-URL features.
 
-`REDIS_KEY_PREFIX` must be the prefix `RedisService` writes
-(`synaplan:` plus `APP_ENV` plus `:`). The dev overlay uses `synaplan:dev:`
-because this compose file pins `APP_ENV=dev`. Production sets
-`EGRESS_COMPUTE_TOKEN` to the same value on the gateway and the compute
-service. The dev overlay has a local default.
+---
 
-An enterprise proxy still uses `EGRESS_PROXY` and `CURLOPT_CONNECT_TO`.
-The gateway, when it is chained with `UPSTREAM_PROXY`, sends
-`CONNECT <pinned ip>:<port>` to that proxy. If the enterprise proxy
-refuses a CONNECT to an IP address, typed-URL features stop: allow IP
-literals for those tunnels, or turn the typed-URL features off. The
-gateway log line is `reason=upstream_refused` and it names the host and
-port only. A grant id is not written to a log.
+## 5. Non-HTTP Traffic & Inventory Baseline
 
-## Where the allowlist comes from
+### Protocols Not Wrapped by `HttpClientInterface`
 
-`EgressBuiltinDestinations::INTERNAL` is this installation's own services
-(Docker and Kubernetes names). The AI providers' hosts are not a list in
-the egress code: `EgressPolicy` reads `ProviderCatalog::endpoints()`, every
-endpoint host and key-validation host of every described provider, so a
-provider added as one class ([`PROVIDERS.md`](PROVIDERS.md)) is allowed the
-moment its class exists. `EgressBuiltinDestinations::INTEGRATIONS` keeps the
-hosts that are not providers: Stripe, Telegram, Meta Graph, Brave, Google
-sign-in and Play, GitHub, Apple, reCAPTCHA, Cloudflare challenges. Then
-`EGRESS.ALLOW` and the no-proxy hosts. Custom OpenAI-compatible base URLs an
-administrator configured are not derived: in `report` mode they show as
-`would_block` until they are listed in `EGRESS.ALLOW`.
+These services speak binary or non-HTTP protocols directly (the optional egress gateway can carry the voice sidecar's WebSocket via `CONNECT`):
 
-## What is deliberately not a shared allowlist entry
+| Protocol | Used By | Configuration Setting |
+| -------- | ------- | --------------------- |
+| **MariaDB** | Doctrine DBAL | `DATABASE_WRITE_URL`, `DATABASE_READ_URL` |
+| **Redis** | `RedisService` (Predis) & `ext-redis` | `REDIS_DSN`, `LOCK_DSN` |
+| **SMTP** | Symfony Mailer | `MAILER_DSN` |
+| **IMAP** | `InboundEmailHandlerService`, `InboundEmailService`, `ImapMailboxSearcher` | Per-mailbox handler settings |
+| **gRPC** | Triton Inference Server (`LocalProviderAvailabilityProbe`) | Triton endpoint in AI settings |
+| **WebSocket** | Live voice sidecar's outbound provider sockets (`sidecars/synaplan-voice`) | Built-in provider adapter endpoints (`OPENAI_LIVE_REGION`, Gemini, xAI) and `LIVE_VOICE_COMPATIBLE_WS_URL` (opened by the sidecar, never by PHP; `LIVE_VOICE_GATEWAY_URL` is PHP's internal HTTP URL to the sidecar) |
 
-A URL a person types (the URL reader, a custom HTTP tool, a person's MCP
-server, a URL watch) is checked by `SsrfGuard`. `HttpToolExecutor` is the
-only place that pins the connection to the address that check resolved.
-That pin is lost behind an HTTP proxy, because the proxy resolves the name
-again. AU15 keeps the pin by tunnelling to the pinned IP. AU18 does the
-same with a one-request grant. Neither adds the host to the installation
-allowlist.
+### Architecture Gate (`egressInventoryBaseline.json`)
+
+`EgressInventoryTest` scans `backend/src` and committed plugins to ensure no new raw `curl_init`, `file_get_contents(http…)`, or uninjected `HttpClient::create()` calls are introduced. The frozen baseline (`backend/tests/Architecture/egressInventoryBaseline.json`) may only shrink via `UPDATE_EGRESS_INVENTORY=1`.
+
+The sole third-party library without an injectable HTTP client is `AppleStoreKitVerifier` (`new SignedDataVerifier(...)`), whose online OCSP check is **off by default**.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (4/9)**  
+> **← Previous:** [2.3 Observability & Redacted Error Ring](OBSERVABILITY.md) · **Next:** [2.5 Self-Hosted Billing (Stripe) →](BILLING_SELFHOST.md)

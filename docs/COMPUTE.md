@@ -1,4 +1,9 @@
-# File work (secure compute)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (6/6)**  
+> **← Previous:** [3.5 Deep & Automatic Research](RESEARCH.md) · **Next:** [4.1 External Connections →](CONNECTIONS.md)
+
+# File Work (Secure Compute)
+
+> **In this guide:** How Synaplan executes short Python or Node programs on copies of user-selected files inside the isolated `synaplan-compute` sidecar—covering `COMPUTE.*` feature flags, T1 (local Docker) vs. T2 (dedicated gVisor node) isolation, per-tier quotas, persistent workspaces, SSRF-pinned egress, and rollback.
 
 > **Status.** Short Python or Node work on copies of files the user chose.
 > Local `make up` starts the sidecar and turns file work +
@@ -208,3 +213,8 @@ item for the compute v1.x release.
 - Feature flags: [FEATURE_FLAGS.md](./FEATURE_FLAGS.md)
 - User docs (when published): [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute)
 - Plan of record: `_devextras/planning/20260903_secure_compute/`
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (6/6)**  
+> **← Previous:** [3.5 Deep & Automatic Research](RESEARCH.md) · **Next:** [4.1 External Connections →](CONNECTIONS.md)

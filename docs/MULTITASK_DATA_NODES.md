@@ -1,4 +1,9 @@
-# Multitask Data Nodes (release 4.0)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (4/6)**  
+> **← Previous:** [3.3 Session Files & Follow-Up Edits](SESSION_FILES.md) · **Next:** [3.5 Deep & Automatic Research →](RESEARCH.md)
+
+# Multi-Task Planner & Data Nodes
+
+> **In this guide:** How Synaplan's multi-task DAG planner (`backend/src/Service/Multitask/`) pulls live external data (`web_search`, `url_fetch`, `mcp_fetch`, `mcp_action`, `email_search`, `rag_query`), repairs planner dependency edges, and guarantees that upstream outputs reach the answering model.
 
 The multitask engine plans a user request into a small DAG of capability
 nodes (`backend/src/Service/Multitask/`). Besides the generator/answer nodes
@@ -227,3 +232,8 @@ could silently never be consulted while the fast-path flag is on.
   catalog — run those with `--user=<id>` against an account that has a
   connected server and a `tool_mcp`-enabled topic
   (`--filter=mcp --user=1` on the dev stack).
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (4/6)**  
+> **← Previous:** [3.3 Session Files & Follow-Up Edits](SESSION_FILES.md) · **Next:** [3.5 Deep & Automatic Research →](RESEARCH.md)

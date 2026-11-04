@@ -205,6 +205,7 @@ an unlisted path fails closed as `store-required`.
 
 ## Docs
 
+- `docs/README.md` — full documentation index and 5-track learning path
 - `docs/PHP_CONVENTIONS.md`, `docs/FRONTEND_CONVENTIONS.md` — style and tokens
 - `docs/ARCHITECTURE.md` — layers and size limits
 - `docs/API_PATTERNS.md` — Zod, OpenAPI, `httpClient`

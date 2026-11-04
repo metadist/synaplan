@@ -1,10 +1,28 @@
-# Installation Guide
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (2/8)**  
+> **← Previous:** [1.1 Platform Capabilities & Mental Model](FEATURES.md) · **Next:** [1.3 Configuration & AI Providers →](CONFIGURATION.md)
 
-Complete installation instructions for Synaplan.
+# Installation & Deployment Guide
+
+> **In this guide:** How to choose the right Synaplan deployment mode (one-file Quickstart, production Linux server, closed-network HTTPS, or local source checkout), how first-run administrator bootstrap works, and how to enable optional building blocks (Local AI, Collabora Office, Secure Compute).
+
+**On this page:**
+- [Choose the Right Deployment Path](#choose-the-right-deployment-path)
+- [Production Self-Hosting (`deploy/`)](#production-self-hosting) — [First Administrator](#create-the-first-administrator) · [Local AI](#optional-local-ai) · [Collabora Office](#office-conversion-collabora) · [File Work](#file-work-secure-compute)
+- [Local Development (`make up`)](#local-development) — [Quick Start](#quick-start) · [Connect an AI Provider](#connect-an-ai-provider) · [Test Accounts](#development-login-credentials)
+- [Troubleshooting & Reference](#troubleshooting) — [Apple Silicon](#slow-performance-on-apple-silicon-mac) · [Port Conflicts](#port-conflicts) · [Service URLs](#development-service-urls)
+
+---
 
 ## Choose the Right Deployment Path
 
-Synaplan has separate development and production deployment contracts:
+Synaplan has separate development and production deployment contracts. Pick the one that matches your goal:
+
+| Path | Compose File | Port | Data Location | Best For |
+| ---- | ------------ | ---- | ------------- | -------- |
+| **Quickstart (Published Image)** | `deploy/quickstart/compose.yaml` (or `compose.lite.yaml`) | `127.0.0.1:8000` | Named Docker volumes | Fastest evaluation or Docker GUI (Portainer, Dockge, NAS) with no git clone or `.env` required |
+| **Production Self-Hosting** | `deploy/compose.yaml` + `deploy/.env` | `127.0.0.1:8000` (behind reverse proxy or `local-tls`) | `deploy/data/` bind mounts + `deploy/data/secrets.env` | Linux servers, closed networks, scripted backups, and pinned releases |
+| **Local Development** | Root `docker-compose.yml` (`make up`) | `:5173` (UI), `:8000` (API) | Dev Docker volumes + source bind mounts | Developing Synaplan, running tests, and inspecting MailHog / phpMyAdmin |
+| **Managed Cloud / Appliance** | `elestio.yml`, `deploy/aws/`, `deploy/umbrel/` | Platform HTTPS | Platform volume | One-click Elestio pipelines, AWS Marketplace AMI, or Umbrel OS |
 
 - **Local development:** use the root `docker-compose.yml` or
   `docker-compose-minimal.yml`. These files build from source and include
@@ -14,7 +32,7 @@ Synaplan has separate development and production deployment contracts:
   `docker compose up -d`, or paste it into a Docker GUI (Portainer, Dockge,
   Synology). No git checkout and no `.env` are required; the optional settings
   are in `deploy/quickstart/.env.example`. See the root README section
-  "Published image, no git checkout".
+  [Published image, no git checkout](../README.md#published-image-no-git-checkout).
 - **Production self-hosting:** use `deploy/compose.yaml` with a pinned Synaplan
   image version and secrets supplied through `deploy/.env`.
 - **Elestio evaluation:** import the repository as a custom Docker Compose
@@ -32,7 +50,7 @@ Synaplan has been accepted into Elestio's Fully Managed Catalog.
 - A Linux server with at least 4 vCPU, 8 GB RAM, and sufficient persistent disk
 - HTTPS for anyone off this machine. A public name uses your own reverse proxy.
   A network with no public route uses the opt-in local-network certificate
-  ([Local network](../README.md#local-network)): any IPv4 address that network
+  ([Closed network](../README.md#closed-network)): any IPv4 address that network
   uses, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
   `100.64.0.0/10`, `169.254.0.0/16`, and any other block you do not announce.
 - A released Synaplan version to pin instead of `latest`
@@ -604,6 +622,12 @@ docker compose exec redis redis-cli ping   # expects PONG
 
 ## Next Steps
 
-- [Configuration Guide](CONFIGURATION.md) - API keys, environment variables
-- [Features Overview](FEATURES.md) - What Synaplan can do
-- [Development Guide](DEVELOPMENT.md) - Contributing and testing
+- **[Configuration & AI Providers](CONFIGURATION.md)** — API keys, OIDC/SSO, worker pools, and `BCONFIG` settings
+- **[Feature Flags & Module Gates](FEATURE_FLAGS.md)** — Toggling or pinning platform capabilities
+- **[Day-2 Operations & Governance](ADMIN.md)** — Backups, user management, and background jobs
+- **[Local Development Workflow](DEVELOPMENT.md)** — Contributing, Make targets, and testing
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (2/8)**  
+> **← Previous:** [1.1 Platform Capabilities & Mental Model](FEATURES.md) · **Next:** [1.3 Configuration & AI Providers →](CONFIGURATION.md)

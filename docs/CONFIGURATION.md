@@ -1,12 +1,29 @@
-# Configuration Guide
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (3/8)**  
+> **← Previous:** [1.2 Installation & Deployment](INSTALLATION.md) · **Next:** [1.4 Feature Flags & Module Gates →](FEATURE_FLAGS.md)
+
+# Configuration & AI Providers
+
+> **In this guide:** How Synaplan's three configuration layers work (`backend/.env` boot variables, the encrypted database store for AI provider keys, and live `BCONFIG` runtime switches), how to set up first-run or SSO-only authentication, and how to configure AI providers, extraction chains, web search, and media jobs.
+
+**On this page:**
+- [Quick Reference](#quick-reference) · [First-Run Setup](#first-run-setup) · [SSO-Only Instances (OIDC)](#sso-only-instances-no-local-accounts)
+- [Worker Pools](#worker-pools) · [Access Policy](#access-policy)
+- [AI Providers & Availability](#ai-providers) · [Importing Models & Endpoint Rules](#importing-models-from-an-endpoint)
+- [Database](#database) · [Redis (Required)](#redis-required)
+- [Multi-Task Routing](#multi-task-routing-bconfig) · [Saved Tasks](#saved-tasks-bconfig) · [Research](#research-bconfig)
+- [Connectors (M365 & Dropbox)](#microsoft-365-connector-bconfig) · [Async Media Jobs](#async-media-jobs-bconfig)
+- [Audio (Whisper & Piper TTS)](#audio-transcription-whisper) · [Office Conversion (Collabora)](#office-conversion-collabora-code) · [WhatsApp](#whatsapp-integration) · [Email](#email-channel) · [Qdrant](#qdrant-vector-database)
+- [Production Settings](#production-settings) · [Users, Sharing & Directory (`IAM`)](#users-sharing-and-directory-iam) · [Linked Platforms](#linked-platforms-platform_links) · [Messages Gateway](#messages-gateway-messages_gateway) · [AI Plugs (`PLUGS`)](#ai-plugs-plugs) · [Feature Flags](#feature-flags-feature_)
+
+---
 
 Synaplan reads configuration from three places, and it matters which one you reach for:
 
 | Where | What belongs there | Takes effect |
 |-------|--------------------|--------------|
-| `backend/.env` | Infrastructure and boot settings: database, Redis, public URLs, `APP_SECRET`, channel credentials | When the container starts |
-| **Admin → AI Providers** (`/admin/setup`) | AI provider API keys — validated live, stored encrypted in the database | Immediately, no restart |
-| **Admin → System Configuration** (`/admin/config`), backed by `BCONFIG` rows | Behavior switches: multi-task routing, async media jobs, white-label branding | Immediately, no restart |
+| `backend/.env` (or `deploy/.env`) | Infrastructure and boot settings: database, Redis, public URLs, `APP_SECRET`, channel credentials, and `FEATURE_*` pins | When the container starts |
+| **Operate → AI infrastructure → Providers & keys** (`/admin/setup`) | AI provider API keys — validated live, stored AES-256-CBC encrypted in the database | Immediately, no restart |
+| **Operate → System configuration** (`/admin/config`), backed by `BCONFIG` rows | Behavior switches: multi-task routing, async media jobs, access policy, white-label branding | Immediately, no restart |
 
 Provider keys are the common case and belong in the UI — see [AI Providers](#ai-providers) below. Environment variables remain supported for scripted and orchestrated deploys.
 
@@ -955,7 +972,7 @@ Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
 `VOYAGE_API_KEY` or **plug_keys**. A TEI `/rerank` endpoint is an
 OpenAI-compatible endpoint with the `rerank` capability. With rerank
 off, storage `limit` stays exactly `k`. See [RAG.md](RAG.md#reranking)
-and [AI plugs](ADMIN.md#ai-plugs-s1-s4).
+and [AI plugs](ADMIN.md#ai-plugs-s1s5).
 
 ---
 
@@ -984,6 +1001,11 @@ See `backend/.env.example` for the complete list with descriptions.
 
 ## Next Steps
 
-- [Installation Guide](INSTALLATION.md) - Getting started
-- [Features Overview](FEATURES.md) - What Synaplan can do
-- [WhatsApp Setup](WHATSAPP.md) - Meta Business API integration
+- **[Feature Flags & Module Gates](FEATURE_FLAGS.md)** — Pin or toggle individual capabilities across deployments
+- **[Runtime & Outbound Options](RUNTIME_OPTIONS.md)** — Worker pools, capacity watchdog, and outbound HTTP switches
+- **[Day-2 Operations & Governance](ADMIN.md)** — User management, group policies, backups, and scheduler lanes
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (3/8)**  
+> **← Previous:** [1.2 Installation & Deployment](INSTALLATION.md) · **Next:** [1.4 Feature Flags & Module Gates →](FEATURE_FLAGS.md)

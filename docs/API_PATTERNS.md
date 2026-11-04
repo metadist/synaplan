@@ -1,4 +1,13 @@
-# API Patterns
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (6/11)**  
+> **← Previous:** [5.5 Frontend Vue & TypeScript Conventions](FRONTEND_CONVENTIONS.md) · **Next:** [5.7 Realtime WebSocket Architecture →](REALTIME.md)
+
+# OpenAPI & Zod Schema Pipeline
+
+> **In this guide:** How Synaplan keeps backend PHP controllers and frontend TypeScript API clients in lockstep—writing `@OA\*` attributes in Symfony, generating Zod schemas into `frontend/src/generated/api-schemas.ts`, and validating every response at runtime through `httpClient`.
+
+```
+PHP Controller (#[OA\Response]) ──► /api/doc.json ──► make -C frontend generate-schemas ──► src/generated/api-schemas.ts ──► httpClient({ schema })
+```
 
 ## Frontend: Zod Schema Validation (Required)
 
@@ -99,3 +108,10 @@ The script:
 2. Generates Zod schemas to `src/generated/api-schemas.ts`
 3. Fixes Zod v4 compatibility issues
 4. Creates PascalCase aliases (e.g., `GetWidgetResponseSchema`)
+
+> **CI & E2E parity checks:** CI verifies that the full and minimal stacks emit an identical OpenAPI spec (`OpenAPI identical (full vs minimal)`), and Playwright's `global-setup.ts` fails immediately if `src/generated/api-schemas.ts` has drifted from the backend OpenAPI contract. Always run `make -C frontend generate-schemas` and `docker compose exec -T frontend npm run check:types` after editing controller `@OA\*` annotations.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (6/11)**  
+> **← Previous:** [5.5 Frontend Vue & TypeScript Conventions](FRONTEND_CONVENTIONS.md) · **Next:** [5.7 Realtime WebSocket Architecture →](REALTIME.md)
