@@ -21,6 +21,7 @@
           :badge="child.badge"
           :active="child.key === activeChildKey"
           :test-id="`link-sidebar-v2-${child.key}`"
+          :data-tour="child.key === 'approvals' ? 'tasks-approvals' : undefined"
         />
       </div>
     </section>

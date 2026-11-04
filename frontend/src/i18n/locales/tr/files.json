@@ -244,7 +244,7 @@
     "tabFiles": "Dosyalar",
     "tabSearch": "Arama",
     "tabVectors": "Vektörler",
-    "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür.",
+    "intro": "Yapay zekâ ile aranabilir işaretli dosyalar sohbetlerde ve asistanlarda kullanılabilir.",
     "introCta": "Dosyaları kaynaklarınıza ekleyin…",
     "useInChat": "Sohbette kullan",
     "startedChatWithFolder": "{folder} ile yeni bir sohbet başlatıldı.",
@@ -333,10 +333,10 @@
     "vectorState": {
       "vectorized": "Yapay zekâ ile aranabilir",
       "vectorizedDetail": "Yapay zekâ ile aranabilir · {group} · {count} parça",
-      "processing": "İşleniyor…",
+      "processing": "Okunuyor…",
       "none": "Aranamaz",
       "notApplicable": "Uygulanamaz",
-      "failed": "Başarısız"
+      "failed": "Okunamadı"
     },
     "filter": {
       "source": "Kaynak",

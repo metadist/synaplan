@@ -244,7 +244,7 @@
     "tabFiles": "Archivos",
     "tabSearch": "Búsqueda",
     "tabVectors": "Vectores",
-    "intro": "Los archivos que subes se convierten en conocimiento consultable para tus chats.",
+    "intro": "Los archivos marcados como consultables por IA se pueden usar en chats y asistentes.",
     "introCta": "Añade archivos a tus fuentes…",
     "useInChat": "Usar en el chat",
     "startedChatWithFolder": "Se inició un chat nuevo con {folder}.",
@@ -333,10 +333,10 @@
     "vectorState": {
       "vectorized": "Consultable por IA",
       "vectorizedDetail": "Consultable por IA · {group} · {count} fragmentos",
-      "processing": "Procesando…",
+      "processing": "Leyendo…",
       "none": "No consultable",
       "notApplicable": "No aplicable",
-      "failed": "Falló"
+      "failed": "No se pudo leer"
     },
     "filter": {
       "source": "Origen",
