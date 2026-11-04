@@ -5,7 +5,8 @@ research:
     complete_snippets_only: 'Aucune page n’a pu être ouverte, ce rapport repose donc uniquement sur des résumés de recherche. Il le précise là où c’est important.'
     stopped_by_user: 'Arrêté. Aucun nouveau travail n’a été lancé après votre clic sur Arrêter ; une étape déjà en cours peut encore compter. Ce qui a été trouvé est conservé.'
     stopped_budget: 'Arrêté parce que votre budget IA mensuel est épuisé. Le rapport couvre %covered% points sur %points%.'
-    stopped_limit: 'Arrêté parce que cette recherche a atteint sa limite pour cette profondeur. Ce qui a été trouvé couvre %covered% points sur %points%.'
+    complete_at_limit: 'La collecte s’est arrêtée à la %limit% %depth%, donc cette réponse repose sur ce qui avait été trouvé jusque-là : %covered% points sur %points% ont une réponse étayée. Une personne qui administre cet espace de travail peut la relever sous Réglages → Recherche → Limites pour chaque profondeur.'
+    stopped_limit: 'Arrêté parce que cette recherche %depth% a atteint sa %limit% avant qu’une réponse puisse être écrite. Trouvé jusque-là : %searches% recherches, %sources% sources lues, %covered% points sur %points% traités. Une personne qui administre cet espace de travail peut la relever sous Réglages → Recherche → Limites pour chaque profondeur.'
     stopped_waiting: 'Arrêté parce que le plan n’a pas été confirmé dans la journée. Relancez-la quand vous serez prêt.'
     stopped_by_admin: 'La recherche a été désactivée dans votre espace Synaplan. Ce qui a été trouvé est conservé.'
     answered_without_research: 'Répondu sans l’examen approfondi. Rien n’a été recherché pour cette question.'
@@ -32,6 +33,18 @@ research:
     budget: 'Votre budget d’utilisation pour cette période est épuisé, je réponds donc directement. Un administrateur peut l’augmenter.'
     plan_limit: 'Les recherches de votre offre pour aujourd’hui sont épuisées, je réponds donc directement. Cela fonctionnera à nouveau demain.'
     unavailable: 'La recherche n’est pas disponible pour le moment, je réponds donc directement. Réessayez avec Approfondir la recherche dans quelques minutes.'
+  limit_name:
+    wall: 'limite de temps (%value% minutes)'
+    cost: 'plafond de coût ($%value%)'
+    calls: 'limite d’appels au modèle (%value% appels)'
+    rounds: 'limite de tours (%value% tours)'
+    gather: 'limite de recherches et de sources'
+    limit: 'limite'
+  depth_name:
+    quick: 'Rapide'
+    standard: 'Standard'
+    thorough: 'Approfondie'
+    auto: 'automatique'
   role:
     reading: 'lecture'
     sorting: 'tri'

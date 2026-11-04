@@ -45,7 +45,12 @@
         data-testid="btn-research-steps"
         @click="open = !open"
       >
-        <CheckCircleIcon class="w-3.5 h-3.5 txt-brand flex-shrink-0" aria-hidden="true" />
+        <ExclamationTriangleIcon
+          v-if="badEnd"
+          class="w-3.5 h-3.5 text-red-600 dark:text-red-400 flex-shrink-0"
+          aria-hidden="true"
+        />
+        <CheckCircleIcon v-else class="w-3.5 h-3.5 txt-brand flex-shrink-0" aria-hidden="true" />
         <span class="truncate" data-testid="text-research-summary">{{ summary }}</span>
         <ChevronDownIcon
           class="w-3 h-3 transition-transform flex-shrink-0"
@@ -85,7 +90,11 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CheckCircleIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import {
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/vue/24/outline'
 import { useChatsStore } from '@/stores/chats'
 import { useResearchStore } from '@/stores/research'
 import { fetchResearchEvents } from '@/services/api/researchApi'
@@ -171,6 +180,13 @@ const elapsed = computed(() => {
   if (!progressNarrationSwitches().timings) return ''
   return formatElapsed(now.value - current.startedAt)
 })
+
+/** A stopped or failed run is not a success, whatever it managed to keep. */
+const badEnd = computed(
+  () =>
+    progress.value !== null &&
+    (progress.value.status === 'stopped' || progress.value.status === 'failed')
+)
 
 const summary = computed(() => {
   const current = progress.value

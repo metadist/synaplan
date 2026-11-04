@@ -5,7 +5,8 @@ research:
     complete_snippets_only: 'No se pudo abrir ninguna página, así que este informe se basa solo en resúmenes de búsqueda. Lo indica donde importa.'
     stopped_by_user: 'Detenido. No se inició ningún trabajo nuevo después de pulsar Detener; un paso que ya estaba en curso aún puede contar. Lo encontrado hasta ahora se conserva.'
     stopped_budget: 'Detenido porque se agotó tu presupuesto mensual de IA. El informe cubre %covered% de %points% puntos.'
-    stopped_limit: 'Detenido porque esta investigación alcanzó su límite para esta profundidad. Lo encontrado cubre %covered% de %points% puntos.'
+    complete_at_limit: 'La búsqueda se detuvo al llegar al %limit% de %depth%, así que esta respuesta se basa en lo encontrado hasta entonces: %covered% de %points% puntos tienen una respuesta respaldada. Una persona administradora del espacio de trabajo puede aumentarlo en Ajustes → Investigación → Límites para cada profundidad.'
+    stopped_limit: 'Detenido porque esta investigación %depth% alcanzó su %limit% antes de poder escribir una respuesta. Encontrado hasta entonces: %searches% búsquedas, %sources% fuentes leídas, %covered% de %points% puntos respondidos. Una persona administradora del espacio de trabajo puede aumentarlo en Ajustes → Investigación → Límites para cada profundidad.'
     stopped_waiting: 'Detenido porque el plan no se confirmó en un día. Vuelve a iniciarla cuando estés listo.'
     stopped_by_admin: 'La investigación se desactivó en tu espacio de trabajo de Synaplan. Lo encontrado hasta ahora se conserva.'
     answered_without_research: 'Respondido sin la búsqueda adicional. No se buscó nada para esta pregunta.'
@@ -32,6 +33,18 @@ research:
     budget: 'Tu presupuesto de uso para este periodo se ha agotado, así que respondo directamente. Un administrador puede ampliarlo.'
     plan_limit: 'Las investigaciones de tu plan para hoy se han agotado, así que respondo directamente. Mañana vuelve a funcionar.'
     unavailable: 'La investigación no está disponible ahora, así que respondo directamente. Prueba Investigar a fondo en unos minutos.'
+  limit_name:
+    wall: 'límite de tiempo (%value% minutos)'
+    cost: 'tope de coste ($%value%)'
+    calls: 'límite de llamadas al modelo (%value% llamadas)'
+    rounds: 'límite de rondas (%value% rondas)'
+    gather: 'límite de búsquedas y fuentes'
+    limit: 'límite'
+  depth_name:
+    quick: 'Rápida'
+    standard: 'Estándar'
+    thorough: 'A fondo'
+    auto: 'automática'
   role:
     reading: 'lectura'
     sorting: 'clasificación'

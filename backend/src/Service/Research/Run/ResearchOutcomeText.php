@@ -31,7 +31,11 @@ final readonly class ResearchOutcomeText
             '%open%' => $values['open'],
             '%points%' => $values['points'],
             '%covered%' => $values['covered'],
+            '%searches%' => $values['searches'],
+            '%sources%' => $values['sources'],
             '%role%' => $this->translator->trans('research.role.'.$values['role'], [], self::DOMAIN, $locale),
+            '%limit%' => $this->translator->trans('research.limit_name.'.$values['limit'], ['%value%' => $values['limit_value']], self::DOMAIN, $locale),
+            '%depth%' => $this->translator->trans('research.depth_name.'.$values['depth'], [], self::DOMAIN, $locale),
         ], self::DOMAIN, $locale);
 
         return $sentence === $key ? $outcome->text() : $sentence;

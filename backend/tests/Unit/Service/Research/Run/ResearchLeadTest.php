@@ -14,8 +14,11 @@ use App\Service\Research\Run\Lead\LeadConformance;
 use App\Service\Research\Run\Lead\LeadConversation;
 use App\Service\Research\Run\Lead\ModelLeadCatalog;
 use App\Service\Research\Run\Lead\ScriptedLead;
+use App\Service\Research\Run\Ledger\EvidenceCard;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchConfig;
+use App\Service\Research\Run\ResearchOutcome;
+use App\Service\Research\Run\ResearchStatus;
 use App\Service\Research\Run\Stage\ResearchLeadTurn;
 use App\Tests\Unit\Service\Research\Run\Lead\LeadEngineCases;
 use PHPUnit\Framework\TestCase;
@@ -30,6 +33,51 @@ final class ResearchLeadTest extends TestCase
         self::assertCount(LeadEngineCases::CASES, $results);
         $failed = array_filter($results, static fn (?string $failure): bool => null !== $failure);
         self::assertSame([], $failed);
+    }
+
+    public function testASpentClockSendsTheLeadToTheReportWhenEvidenceExists(): void
+    {
+        $bench = LeadBench::open();
+        $source = $bench->ctx->state->ledger->addSource(Source::web('https://maker.example/price', 'Price list'));
+        $bench->ctx->state->ledger->addEvidence(new EvidenceCard('', $source, 'p1', 'The unit price is 12.40 EUR.', ['§1'], []));
+        $bench->ctx->state->budget->at(new \DateTimeImmutable('2026-10-24T09:06:00+00:00'));
+
+        $result = $bench->stage->run($bench->ctx);
+
+        self::assertSame('write', $result->next);
+        self::assertSame([], $bench->lead->seen, 'the lead is not asked again once the clock is spent');
+        self::assertFalse($bench->ctx->state->status->isTerminal());
+        self::assertNull($bench->ctx->state->outcome);
+        self::assertSame('wall', $bench->ctx->state->limitHit);
+    }
+
+    public function testASpentClockWithNothingFoundEndsNamingTheLimit(): void
+    {
+        $bench = LeadBench::open();
+        $bench->ctx->state->budget->at(new \DateTimeImmutable('2026-10-24T09:06:00+00:00'));
+
+        $result = $bench->stage->run($bench->ctx);
+
+        self::assertSame('done', $result->next);
+        self::assertSame([], $bench->lead->seen);
+        self::assertSame(ResearchStatus::Stopped, $bench->ctx->state->status);
+        self::assertSame(ResearchOutcome::STOPPED_LIMIT, $bench->ctx->state->outcome?->code);
+        self::assertSame('wall', $bench->ctx->state->outcome?->params['limit'] ?? null);
+        self::assertSame(0, $bench->ctx->state->outcome?->params['covered'] ?? null);
+        self::assertSame(1, $bench->ctx->state->outcome?->params['points'] ?? null);
+    }
+
+    public function testTheLastMinuteOfTheClockBelongsToTheReport(): void
+    {
+        $bench = LeadBench::open();
+        $bench->ctx->state->budget->at(new \DateTimeImmutable('2026-10-24T09:05:30+00:00'));
+
+        $result = $bench->stage->run($bench->ctx);
+
+        self::assertSame('write', $result->next);
+        self::assertSame([], $bench->lead->seen);
+        self::assertFalse($bench->ctx->state->status->isTerminal());
+        self::assertSame('wall', $bench->ctx->state->limitHit);
     }
 
     public function testTheConformanceSuiteFailsAModelThatNeverCallsATool(): void
