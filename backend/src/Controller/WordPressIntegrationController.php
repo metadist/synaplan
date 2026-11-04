@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Exception\ApiKeyPlanRequiredException;
 use App\Service\Widget\WordPressIntegrationService;
 use OpenApi\Attributes as OA;
@@ -22,95 +23,103 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/step1', name: 'step1', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/integrations/wordpress/step1', summary: 'WordPress setup: verify the site and create the user', tags: ['WordPress'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step1', summary: 'WordPress setup: verify the site for the signed-in account', security: [['Bearer' => []]], tags: ['WordPress'])]
     public function step1(Request $request): JsonResponse
     {
-        return $this->handle(function () use ($request) {
+        $user = $this->requireUser();
+
+        return $this->handle(function () use ($request, $user) {
             $payload = $this->collectPayload($request);
+            $this->assertOwnAccount($user, $payload);
 
             return $this->integrationService->step1VerifyAndCreateUser($payload);
         });
     }
 
     #[Route('/step2', name: 'step2', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/integrations/wordpress/step2', summary: 'WordPress setup: create an API key', tags: ['WordPress'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step2', summary: 'WordPress setup: create an API key for the signed-in account', security: [['Bearer' => []]], tags: ['WordPress'])]
     public function step2(Request $request): JsonResponse
     {
-        return $this->handle(function () use ($request) {
-            $payload = $this->collectPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
+        unset($request);
+        $user = $this->requireUser();
 
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
-
-            return $this->integrationService->step2CreateApiKey($userId);
+        return $this->handle(function () use ($user) {
+            return $this->integrationService->step2CreateApiKey((int) $user->getId());
         });
     }
 
     #[Route('/step3', name: 'step3', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/integrations/wordpress/step3', summary: 'WordPress setup: upload a file', tags: ['WordPress'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step3', summary: 'WordPress setup: upload a file for the signed-in account', security: [['Bearer' => []]], tags: ['WordPress'])]
     public function step3(Request $request): JsonResponse
     {
-        return $this->handle(function () use ($request) {
-            $payload = $this->collectPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
+        $user = $this->requireUser();
 
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
-
+        return $this->handle(function () use ($request, $user) {
             $file = $request->files->get('file');
             if (null === $file) {
                 throw new \InvalidArgumentException('file upload is required');
             }
 
-            return $this->integrationService->step3UploadFile($userId, $file);
+            return $this->integrationService->step3UploadFile((int) $user->getId(), $file);
         });
     }
 
     #[Route('/step4', name: 'step4', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/integrations/wordpress/step4', summary: 'WordPress setup: turn on file search', tags: ['WordPress'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step4', summary: 'WordPress setup: turn on file search for the signed-in account', security: [['Bearer' => []]], tags: ['WordPress'])]
     public function step4(Request $request): JsonResponse
     {
-        return $this->handle(function () use ($request) {
-            $payload = $this->collectPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
+        unset($request);
+        $user = $this->requireUser();
 
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
-
-            return $this->integrationService->step4EnableFileSearch($userId);
+        return $this->handle(function () use ($user) {
+            return $this->integrationService->step4EnableFileSearch((int) $user->getId());
         });
     }
 
     #[Route('/step5', name: 'step5', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/integrations/wordpress/step5', summary: 'WordPress setup: save the chat widget', tags: ['WordPress'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step5', summary: 'WordPress setup: save the chat widget for the signed-in account', security: [['Bearer' => []]], tags: ['WordPress'])]
     public function step5(Request $request): JsonResponse
     {
-        return $this->handle(function () use ($request) {
-            $payload = $this->collectPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
+        $user = $this->requireUser();
 
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
-
-            return $this->integrationService->step5SaveWidget($userId, $payload);
+        return $this->handle(function () use ($request, $user) {
+            return $this->integrationService->step5SaveWidget((int) $user->getId(), $this->collectPayload($request));
         });
     }
 
     #[Route('/complete', name: 'complete', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/integrations/wordpress/complete', summary: 'WordPress setup: finish the wizard', tags: ['WordPress'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/complete', summary: 'WordPress setup: finish the wizard for the signed-in account', security: [['Bearer' => []]], tags: ['WordPress'])]
     public function complete(Request $request): JsonResponse
     {
-        return $this->handle(function () use ($request) {
-            $payload = $this->collectPayload($request);
-            $files = $request->files->all();
+        $user = $this->requireUser();
 
-            return $this->integrationService->completeWizard($payload, array_values($files));
+        return $this->handle(function () use ($request, $user) {
+            $payload = $this->collectPayload($request);
+            $this->assertOwnAccount($user, $payload);
+
+            return $this->integrationService->completeWizard($payload, array_values($request->files->all()));
         });
+    }
+
+    private function requireUser(): User
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User || (int) $user->getId() <= 0) {
+            throw $this->createAccessDeniedException('Authentication required.');
+        }
+
+        return $user;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function assertOwnAccount(User $user, array $payload): void
+    {
+        $email = strtolower(trim((string) ($payload['email'] ?? '')));
+        if ('' === $email || $email !== strtolower($user->getMail())) {
+            throw new \InvalidArgumentException('WordPress setup can only continue for the signed-in account.');
+        }
     }
 
     /**
