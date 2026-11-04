@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,11 @@ const (
 	metaSuffix = ".json"
 	dataDir    = "data"
 )
+
+// idPathRe is the only directory name a workspace id may be. Crockford
+// base32, 26 characters: no slash, backslash, or dot, so Join cannot climb
+// out of the store root. ParseStrict still checks the ULID overflow nibble.
+var idPathRe = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$`)
 
 // Meta is persisted as <root>/<id>.json, outside the directory that is
 // bind-mounted into the sandbox, so a script can never rewrite owner or quota.
@@ -136,7 +142,10 @@ func (s *Store) HostPath(id string) string {
 func (s *Store) Root() string { return s.root }
 
 func (s *Store) idDir(id string) string {
-	return filepath.Join(s.root, id)
+	if idPathRe.MatchString(id) {
+		return filepath.Join(s.root, id)
+	}
+	return filepath.Join(s.root, "invalid-workspace-id")
 }
 
 func (s *Store) hostPath(id string) string {
@@ -144,7 +153,10 @@ func (s *Store) hostPath(id string) string {
 }
 
 func (s *Store) metaPath(id string) string {
-	return filepath.Join(s.root, id+metaSuffix)
+	if idPathRe.MatchString(id) {
+		return filepath.Join(s.root, id+metaSuffix)
+	}
+	return filepath.Join(s.root, "invalid-workspace-id.json")
 }
 
 // Usage recomputes size from the data tree.
@@ -399,7 +411,7 @@ func (s *Store) readMeta(id string) (*Meta, error) {
 }
 
 func validID(id string) bool {
-	if len(id) != 26 {
+	if !idPathRe.MatchString(id) {
 		return false
 	}
 	_, err := ulid.ParseStrict(id)

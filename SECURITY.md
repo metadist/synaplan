@@ -122,3 +122,5 @@ Every report below made Synaplan safer for everyone who runs it.
 | Date | Reporter | Finding |
 | ---- | -------- | ------- |
 | 2026-10-14 | [@xherogasm](https://github.com/xherogasm) | SSRF via DNS rebinding in `analyze_image`, and the unguarded admin endpoint probe — [GHSA-26f3-684h-hpjh](https://github.com/metadist/synaplan/security/advisories/GHSA-26f3-684h-hpjh) |
+| 2026-11-04 | [@realtasty](https://github.com/realtasty) | Stored same-origin script via a public widget SVG icon — [GHSA-qqg9-qv48-j8m8](https://github.com/metadist/synaplan/security/advisories/GHSA-qqg9-qv48-j8m8) |
+| 2026-11-04 | [@realtasty](https://github.com/realtasty) | Anonymous read of a known private upload through the public `widget-icons/` and `og/` prefixes — [GHSA-2x6x-8r52-pm58](https://github.com/metadist/synaplan/security/advisories/GHSA-2x6x-8r52-pm58) |
