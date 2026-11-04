@@ -271,6 +271,30 @@ func TestWorkspaceRefusesSymlinkEscape(t *testing.T) {
 	}
 }
 
+func TestHostPathStaysUnderRoot(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.HostPath(meta.ID)
+	rel, err := filepath.Rel(s.Root(), got)
+	if err != nil || !filepath.IsLocal(rel) {
+		t.Fatalf("created workspace escaped root: %q", got)
+	}
+	for _, id := range []string{"../etc", "..", "/etc/passwd", `..\windows`, "foo/bar", "not-a-ulid"} {
+		host := s.HostPath(id)
+		rel, err := filepath.Rel(s.Root(), host)
+		if err != nil || !filepath.IsLocal(rel) {
+			t.Fatalf("id %q escaped root: %q", id, host)
+		}
+		if _, err := s.Get(id); err != ErrNotFound {
+			t.Fatalf("Get(%q) = %v, want not found", id, err)
+		}
+	}
+}
+
 func TestCreateRejectsMissingOwner(t *testing.T) {
 	t.Parallel()
 	s := testStore(t)

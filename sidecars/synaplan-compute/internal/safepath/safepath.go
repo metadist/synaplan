@@ -52,6 +52,11 @@ func mapOpenErr(err error) error {
 // O_NOFOLLOW. Intermediate names are opened as directories. The returned
 // *os.File owns the final descriptor.
 func openWalk(root, rel string) (*os.File, os.FileInfo, error) {
+	// A relative path only. filepath.IsLocal rejects absolute paths and any
+	// ".." segment, before a single descriptor is opened.
+	if rel != "" && !filepath.IsLocal(rel) {
+		return nil, nil, os.ErrInvalid
+	}
 	segs, err := splitRel(rel)
 	if err != nil {
 		return nil, nil, err

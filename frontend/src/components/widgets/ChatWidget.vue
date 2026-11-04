@@ -1919,7 +1919,7 @@ const getSessionStorageKey = () => {
 
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
 
-const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+const createSessionId = () => `sess_${createUuid()}`
 
 const handleOpenEvent = (event: Event) => {
   const detail = (event as CustomEvent).detail
@@ -2228,20 +2228,13 @@ function extractCodeBlocks(content: string): { textParts: string[]; codeBlocks: 
   return { textParts, codeBlocks }
 }
 
-// Decode HTML entities using browser's built-in decoder
-function decodeHtmlEntities(html: string): string {
-  const textarea = document.createElement('textarea')
-  textarea.innerHTML = html
-  return textarea.value
-}
-
 // Handle clicks on messages container (for copy buttons)
 async function handleMessagesClick(event: MouseEvent): Promise<void> {
   const target = event.target as HTMLElement
   if (target.classList.contains('widget-copy-btn')) {
     event.preventDefault()
-    const code = target.getAttribute('data-code') || ''
-    const decodedCode = decodeHtmlEntities(code)
+    // getAttribute already decodes the entities written into data-code.
+    const decodedCode = target.getAttribute('data-code') || ''
 
     try {
       await navigator.clipboard.writeText(decodedCode)
