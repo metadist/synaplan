@@ -45,6 +45,8 @@ const lastErrorPath = ref<string | null>(null)
 /** False for one frame while a hot-update remounts the tree. */
 const treeVisible = ref(true)
 let piniaRecoveryAttempts = 0
+/** True until the scheduled remount renders. Errors in that window are one attempt. */
+let piniaRemountPending = false
 
 const activeError = computed<GlobalErrorPayload | null>(
   () => localError.value ?? globalErrorStore.current
@@ -60,17 +62,22 @@ onMounted(() => {
  * A hot update can throw "no active Pinia" once and then be fine. Hide the
  * tree and mount it again before showing the fatal screen. If that second
  * mount throws too, reload — the same recovery a manual refresh already is.
+ * Several descendants throw in the same tick, before that remount flush.
+ * Those errors are one attempt; counting each one reloads and skips the remount.
  * Returns true when the fatal screen must stay hidden.
  */
 function recoverDevPiniaContext(err: unknown): boolean {
   if (!import.meta.env.DEV || !isDevPiniaContextLoss(err)) return false
+  if (piniaRemountPending) return true
   piniaRecoveryAttempts += 1
   if (piniaRecoveryAttempts === 1) {
+    piniaRemountPending = true
     beginDevPiniaRecovery()
     console.warn('Hot update lost the Pinia context. Remounting the page.')
     void nextTick(() => {
       treeVisible.value = false
       void nextTick(() => {
+        piniaRemountPending = false
         treeVisible.value = true
       })
     })

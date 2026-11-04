@@ -1,4 +1,4 @@
-import { defineComponent, h, nextTick } from 'vue'
+import { defineComponent, h, nextTick, type Component } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -22,7 +22,33 @@ function child(message: string, failEveryTime: boolean) {
   })
 }
 
-async function mountBoundary(slot: ReturnType<typeof child>) {
+function childThatFailsOnce(message: string) {
+  let failed = false
+  return defineComponent({
+    name: 'PiniaProbeChild',
+    setup() {
+      if (!failed) {
+        failed = true
+        throw new Error(message)
+      }
+      return () => h('p', { 'data-testid': 'recovered' }, 'ok')
+    },
+  })
+}
+
+/** Two descendants that each throw on first setup and succeed on remount. */
+function piniaErrorBurst() {
+  const first = childThatFailsOnce(PINIA_ERROR)
+  const second = childThatFailsOnce(PINIA_ERROR)
+  return defineComponent({
+    name: 'PiniaErrorBurst',
+    setup() {
+      return () => h('div', [h(first), h(second)])
+    },
+  })
+}
+
+async function mountBoundary(slot: Component) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', component: { template: '<div />' } }],
@@ -63,6 +89,14 @@ describe('ErrorBoundary Pinia hot-update recovery', () => {
 
     expect(wrapper.find('[data-testid="comp-error-boundary"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="recovered"]').exists()).toBe(true)
+    expect(reloads).toBe(0)
+  })
+
+  it('remounts once when several descendants lose the Pinia context in the same tick', async () => {
+    const wrapper = await mountBoundary(piniaErrorBurst())
+
+    expect(wrapper.find('[data-testid="comp-error-boundary"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="recovered"]')).toHaveLength(2)
     expect(reloads).toBe(0)
   })
 
