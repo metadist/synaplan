@@ -67,6 +67,7 @@ final readonly class ToolExecutionGate
         ?array $resolvedRequest = null,
         bool $alreadyApproved = false,
         ?string $forcedRefusal = null,
+        bool $canPause = true,
     ): array {
         $descriptor = $this->registry->get($userId, $toolName);
         if (null === $descriptor && null !== $forcedRefusal && '' !== $forcedRefusal) {
@@ -109,6 +110,12 @@ final readonly class ToolExecutionGate
         );
         if ($requireApproval && PolicyOutcome::Auto === $outcome) {
             $outcome = PolicyOutcome::Approve;
+        }
+        // A chat plan cannot be resumed after a pause. Opening an approval
+        // there would run the tool in the chat continuation and leave the
+        // step waiting. Block still refuses.
+        if (!$canPause && PolicyOutcome::Approve === $outcome) {
+            $outcome = PolicyOutcome::Auto;
         }
 
         if (PolicyOutcome::Block === $outcome) {

@@ -1063,6 +1063,7 @@ final class ToolLoopHarness
                 ?array $resolvedRequest = null,
                 bool $alreadyApproved = false,
                 ?string $forcedRefusal = null,
+                bool $canPause = true,
             ) use ($real): array {
                 try {
                     $decision = $real->inspect(
@@ -1080,6 +1081,7 @@ final class ToolLoopHarness
                         $resolvedRequest,
                         $alreadyApproved,
                         $forcedRefusal,
+                        $canPause,
                     );
                 } catch (ToolNotRegisteredException $e) {
                     $this->gateDecisions[] = ['tool' => $toolName, 'outcome' => 'not_registered', 'approval' => null];

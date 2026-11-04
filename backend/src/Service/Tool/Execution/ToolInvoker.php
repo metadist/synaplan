@@ -118,6 +118,10 @@ final readonly class ToolInvoker
             $resolvedRequest = $request->resolvedRequest;
             $alreadyApproved = $request->alreadyApproved;
         }
+        // A chat fetch has no saved-task run to resume. Opening an approval
+        // would run the tool in the chat continuation and leave the step waiting.
+        $canPause = ToolChannel::MCP_FETCH !== $invocation->caller->channel
+            || !str_starts_with($requestedBy, 'chat:');
 
         $decision = $gate->inspect(
             (int) $actor->getId(),
@@ -133,6 +137,8 @@ final readonly class ToolInvoker
             $requireApproval,
             $resolvedRequest,
             $alreadyApproved,
+            null,
+            $canPause,
         );
         $effect = $decision['descriptor']->sideEffect;
         if (PolicyOutcome::Block === $decision['outcome']) {
