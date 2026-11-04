@@ -103,37 +103,7 @@ class LegacyApiController extends AbstractController
                 return $this->error('Message text cannot be empty', 400);
             }
 
-            // Create Message Entity
-            $message = new Message();
-            $message->setUserId((int) $userId);
-            $message->setText($messageText);
-            $message->setDirect('IN');
-            $message->setStatus('NEW');
-            $message->setUnixTimestamp(time());
-            $message->setDatetime(date('YmdHis'));
-            $message->setMessType('WEB');
-            $message->setTrackId(time());
-
-            // Process
-            $this->preProcessor->process($message);
-            $this->messageRepository->save($message);
-
-            $this->classifier->classify($message);
-            $this->messageRepository->save($message);
-
-            $aiResponse = $this->inferenceRouter->route($message);
-            $this->messageRepository->save($aiResponse);
-
-            // Legacy Response Format
-            return new JsonResponse([
-                'success' => true,
-                'tracking_id' => 'msg_'.$message->getId(),
-                'message_id' => $message->getId(),
-                'response_id' => $aiResponse->getId(),
-                'response' => $aiResponse->getText(),
-                'status' => 'completed',
-                'timestamp' => time(),
-            ]);
+            return $this->acceptLegacyMessage($userId, $messageText);
         } catch (\Exception $e) {
             $this->logger->error('Legacy messageNew failed', [
                 'error' => $e->getMessage(),
@@ -142,6 +112,38 @@ class LegacyApiController extends AbstractController
 
             return $this->error($e->getMessage(), 500);
         }
+    }
+
+    private function acceptLegacyMessage(int $userId, string $messageText): JsonResponse
+    {
+        $message = new Message();
+        $message->setUserId($userId);
+        $message->setText($messageText);
+        $message->setDirect('IN');
+        $message->setStatus('NEW');
+        $message->setUnixTimestamp(time());
+        $message->setDatetime(date('YmdHis'));
+        $message->setMessType('WEB');
+        $message->setTrackId(time());
+
+        $this->preProcessor->process($message);
+        $this->messageRepository->save($message);
+
+        $this->classifier->classify($message);
+        $this->messageRepository->save($message);
+
+        $aiResponse = $this->inferenceRouter->route($message);
+        $this->messageRepository->save($aiResponse);
+
+        return new JsonResponse([
+            'success' => true,
+            'tracking_id' => 'msg_'.$message->getId(),
+            'message_id' => $message->getId(),
+            'response_id' => $aiResponse->getId(),
+            'response' => $aiResponse->getText(),
+            'status' => 'completed',
+            'timestamp' => time(),
+        ]);
     }
 
     /**
