@@ -24,13 +24,14 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Prompt\PromptService;
-use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolChannel;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
@@ -165,16 +166,17 @@ final readonly class McpFetchRunner implements TaskRunner
             return $this->images->attach($server, $tool, $arguments, $this->language($context));
         }
 
+        $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
         $outcome = $this->tools()->invoke(
-            new ToolDescriptor('mcp_fetch', $tool, '', [], SideEffect::Read, ToolSource::Mcp, (int) $userId, null, [
+            new ToolDescriptor($gateName, $tool, '', [], SideEffect::Read, ToolSource::Mcp, (int) $userId, null, [
                 'serverId' => $serverId,
                 'tool' => $tool,
             ]),
             new ToolInvocation(
-                $tool,
+                $gateName,
                 $arguments,
-                new ToolCaller((int) $userId, ToolChannel::MCP_FETCH),
-                GateMode::AsTodayNever,
+                new ToolCaller((int) $userId, ToolChannel::MCP_FETCH, requestId: 'chat:'.(int) $context->message->getId()),
+                decision: new GateRequest(null, PolicyContext::Interactive, 'chat:'.(int) $context->message->getId()),
             ),
         );
         if (true === ($outcome->details['transport'] ?? false)) {

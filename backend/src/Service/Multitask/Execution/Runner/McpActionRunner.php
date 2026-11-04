@@ -27,7 +27,6 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Prompt\PromptService;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
-use App\Service\Tool\Execution\GateMode;
 use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
@@ -40,7 +39,6 @@ use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolExecutionGate;
-use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Service\Attribute\Required;
@@ -81,7 +79,6 @@ final readonly class McpActionRunner implements TaskRunner
         private LoggerInterface $logger,
         private AtlassianToolArguments $atlassianArguments,
         private ?ToolExecutionGate $executionGate = null,
-        private ?ToolsConfig $toolsConfig = null,
         private ?UserRepository $users = null,
     ) {
         $this->toolInvoker = new ToolInvokerSlot();
@@ -184,12 +181,6 @@ final readonly class McpActionRunner implements TaskRunner
         $gateUserId = $context->userId;
         $approved = $context->isApproved($node->id);
         $actor = null !== $gateUserId ? $this->users?->find($gateUserId) : null;
-        $inspect = null !== $gateUserId
-            && null !== $this->executionGate
-            && null !== $this->toolsConfig
-            && $this->toolsConfig->isApprovalsEnabled($gateUserId)
-            && !$approved
-            && $actor instanceof User;
         $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
         $unattended = true === ($context->options['saved_task'] ?? false);
         $requestedBy = $runId > 0
@@ -206,12 +197,12 @@ final readonly class McpActionRunner implements TaskRunner
                     $gateName,
                     $arguments,
                     new ToolCaller((int) $userId, ToolChannel::MCP_ACTION, unattended: $unattended),
-                    $inspect ? GateMode::AsTodayWhenApprovalsOn : GateMode::AsTodayNever,
                     decision: new GateRequest(
-                        $actor,
+                        $actor instanceof User ? $actor : null,
                         $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
                         $requestedBy,
                         allowUnattended: true === ($context->options['allow_unattended'] ?? false),
+                        alreadyApproved: $approved,
                     ),
                     user: $actor,
                 ),
@@ -611,7 +602,6 @@ final readonly class McpActionRunner implements TaskRunner
         return $this->toolInvoker->get() ?? new ToolInvoker(
             [new McpToolExecutor($this->client, $this->servers)],
             gate: $this->executionGate,
-            toolsConfig: $this->toolsConfig,
         );
     }
 }

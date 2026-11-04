@@ -466,24 +466,37 @@ adapter:
 Every tool call goes through `ToolInvoker`
 (`App\Service\Tool\Execution\`). Chat, the Messages API, the
 OpenAI-compatible API, Saved Tasks, MCP fetch and action, approval resume,
-and memory and file ingest all use it. The invoker asks the gate, runs one
-executor, and shortens the text the model sees to 12,000 characters.
+and memory and file ingest all use it. The invoker asks the gate on every
+call, runs one executor, and shortens the text the model sees to 12,000
+characters.
 
-| Caller | What happens today |
+A write or a destructive call that runs leaves one `tool.executed` row in
+the audit log. The row names the tool, the source, the kind, the outcome
+and how long it took. It does not contain the arguments or the result. A
+read is counted and is not an audit row. A document edit on the person's
+own file is a write with policy auto, so the gate runs and nobody is asked.
+An approval that was already given is not asked again.
+
+The OpenAI-compatible loop and a custom HTTP tool write a `TOOLS` usage
+row. The Messages loop already wrote that row and still does, so a call is
+not counted twice.
+
+| Caller | What the gate does |
 | ------ | ------------------ |
-| Chat and document edits | The tool runs. The approval gate is not asked. |
-| Messages API and OpenAI-compatible API | The gate is asked only when approvals are on. |
-| Saved Tasks and MCP actions | The gate is asked. |
-| File work | The gate is asked here. The file-work runner then runs the code. |
-| Read-only MCP fetch | The gate is not asked. A shared Notion connection is allowed. A write is not. |
-| Resume after someone approves | The gate is not asked again. |
+| Chat and document edits | Asked. An edit of the person's own file is allowed. |
+| Messages API and OpenAI-compatible API | Asked. A read is allowed. A write waits for approval when approvals are on. |
+| Saved Tasks and MCP actions | Asked. An already-approved step is not asked again. |
+| File work | Asked here. The file-work runner then runs the code. |
+| Read-only MCP fetch | Asked. A read is allowed. A shared Notion connection stays allowed. A write is not. |
+| Resume after someone approves | Asked, and the answer is allow, so a second approval is not opened. |
+| Memory and file ingest | Asked. They are the person's own records, so they are allowed and audited. |
 
 A Saved Task keeps the full MCP text for the next step. The 12,000-character
 limit is only for the model.
 
 `backend/tests/Characterization/__snapshots__/tool_loops.json` is the
-contract for stop reasons, gate decisions and result text. Usage rows and
-the `tool.executed` audit line still belong to the caller.
+contract for stop reasons, gate decisions, audit rows, usage rows and
+result text.
 
 ## Lists are tagged collections
 

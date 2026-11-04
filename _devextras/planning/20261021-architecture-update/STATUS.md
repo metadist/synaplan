@@ -1,5 +1,10 @@
 # Architecture update — status
 
+> **2026-11-04 — AU25.** The gate runs on every tool call. A write that
+> runs leaves `tool.executed` (no arguments, no result). The OpenAI loop
+> and custom HTTP gain a `TOOLS` row. A document edit of the person's own
+> file stays allowed. `EGRESS.MODE` stays `off`.
+
 > **2026-11-02 — S4 started.** S3 is on `main` (AU22 merged
 > [#2918](https://github.com/metadist/synaplan/pull/2918)). AU23 records
 > every tool loop on that code. The snapshot shows the gaps AU25 closes:
@@ -92,6 +97,26 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | merged (`acecdf763`) | `app:provider:scaffold`, `AddProviderJourneyTest`, `EgressPolicy` reads the catalog (T23). `EGRESS.MODE` stays `off` |
 | 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | merged (`39a07233d`) | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
 | 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
+| 2026-11-04 | AU25 | open | in progress | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
+
+## 2026-11-04 — AU25: every tool call passes the approval gate and is audited
+
+Started from `main` at `a977e28e2` (AU24 is `926d7e4e3`).
+
+The snapshot diff is only closed gaps. No result text, stop reason,
+executed list, or approval row moved. An edit of the person's own file
+(`chat.document_edit.approvals_on`) is `gate: auto` and still writes the
+cell. A mutating gateway tool while approvals are off is `gate: block`
+and still does not run. Resume and an already-approved step are `auto`,
+so they do not open a second approval, and the write leaves
+`tool.executed`.
+
+The Messages loop still writes its own `TOOLS` row. The invoker writes
+one only when the caller asks (`recordUsage`), which the OpenAI loop and
+custom HTTP now do. A read is not an audit row.
+
+`McpActionRunner`'s constructor dropped the unused approvals config
+(11 → 10 parameters). The size ledger entry is gone.
 
 ## 2026-11-02 — AU24: one tool invoker behind every loop
 

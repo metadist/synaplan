@@ -65,20 +65,36 @@ final readonly class ToolExecutionGate
         ?string $nodeApproval = null,
         bool $requireApproval = false,
         ?array $resolvedRequest = null,
+        bool $alreadyApproved = false,
+        ?string $forcedRefusal = null,
     ): array {
         $descriptor = $this->registry->get($userId, $toolName);
+        if (null === $descriptor && null !== $forcedRefusal && '' !== $forcedRefusal) {
+            $descriptor = new ToolDescriptor($toolName, $toolName, '', [], SideEffect::Write, ToolSource::Mcp, $userId);
+        }
         if (null === $descriptor) {
             throw new ToolNotRegisteredException($toolName);
         }
 
-        $nodeOverride = PolicyOutcome::tryFrom((string) $nodeApproval);
-
-        if (!$this->toolsConfig->isApprovalsEnabled($userId)) {
+        if (null !== $forcedRefusal && '' !== $forcedRefusal) {
             return [
-                'outcome' => PolicyOutcome::Block === $nodeOverride ? PolicyOutcome::Block : PolicyOutcome::Auto,
+                'outcome' => PolicyOutcome::Block,
                 'descriptor' => $descriptor,
                 'approval' => null,
-                'refusal' => PolicyOutcome::Block === $nodeOverride ? self::NODE_BLOCK_REFUSAL : null,
+                'refusal' => $forcedRefusal,
+            ];
+        }
+
+        $nodeOverride = PolicyOutcome::tryFrom((string) $nodeApproval);
+
+        if ($alreadyApproved || !$this->toolsConfig->isApprovalsEnabled($userId)) {
+            $blocked = PolicyOutcome::Block === $nodeOverride;
+
+            return [
+                'outcome' => $blocked ? PolicyOutcome::Block : PolicyOutcome::Auto,
+                'descriptor' => $descriptor,
+                'approval' => null,
+                'refusal' => $blocked ? self::NODE_BLOCK_REFUSAL : null,
             ];
         }
 
