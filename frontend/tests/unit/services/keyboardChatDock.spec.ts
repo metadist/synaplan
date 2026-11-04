@@ -52,11 +52,17 @@ describe('initKeyboardChatDock', () => {
     const send = document.createElement('button')
     field.parentElement?.appendChild(send)
     document.body.appendChild(profile)
+    field.focus()
 
     initKeyboardChatDock()
     field.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: send }))
-    field.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    send.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+    expect(calls).toEqual([true])
+
+    profile.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
     profile.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
 
     expect(calls).toEqual([true, false])
