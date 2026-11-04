@@ -52,7 +52,7 @@ prompting flow.
 | [`20260929-synaplan-federation/`](./20260929-synaplan-federation/00_master_plan.md) | Federation v1.0; first slice shipped, opt-in knowledge link next ([`01_review.md`](./20260929-synaplan-federation/01_review.md)) | paused |
 | `20261014-prompting-flow/` (reserved) | Prompting flow — work on files the way an IDE assistant does: working set, proposed changes as a diff with accept / reject, docked result pane, restore, verify step | queued — plan not yet written |
 | [`20261013-cloud-file-sharing/`](./20261013-cloud-file-sharing/00_master_plan.md) | Nextcloud, ownCloud.online and OpenCloud on one level: copy Synaplan files into the cloud, one identity model (organisation login), the bird indicator, watched folders and automations that run on files picked up from the cloud. Nextcloud first (P1, core API frozen as contract v1), then OpenCloud (P2), then ownCloud.online (P3); all 46 §3 decision rows agreed. Absorbs More-Nextcloud S3 and the folder watch | in progress — copy, pickup, source events and watches on `main` as of 2026-10-28; `cloud_files` off; defects RV4–RV6 are row 31; RV7 locks that an inbound watch upload is not an own write |
-| [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: Integrations catalog, Connect UI, editor / office clients. openDesk meeting notes shipped via [metadist/synaScriber](https://github.com/metadist/synaScriber) | queued |
+| [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: Integrations catalog, Connect UI, editor / office clients. openDesk meeting notes shipped in `plugins/synascriber`; [metadist/synaScriber](https://github.com/metadist/synaScriber) is archived | queued |
 | [`20261003-decision-routing/`](./20261003-decision-routing/00_master_plan.md) | Decision models before the LLM sorter; D1–D2 spike + go / no-go first | queued |
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued — partner |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers (AA1–AA8) | not started |
@@ -80,6 +80,7 @@ prompting flow.
 | [`20261102-permission-aware-connectors/`](./20261102-permission-aware-connectors/00_master_plan.md) | OneDrive and Google Drive as personal sources; SharePoint, shared drives and Confluence with the source's permissions, fail closed (KC0–KC8) | not started (row 40) — phase B after row 35 EI0 |
 | [`20261102-governance-and-privacy/`](./20261102-governance-and-privacy/00_master_plan.md) | Personal-data masking before cloud models, local only per group, agent review before publish, conversation retention, governance overview (GV1–GV7) | not started (row 41) |
 | [`20261102-agent-template-gallery/`](./20261102-agent-template-gallery/00_master_plan.md) | Assistants → New opens a gallery of bundle-v1 templates with requirements, install checklist and CI acceptance runs (TG1–TG6) | not started (row 42) |
+| [`20261104-hosted-plugins/`](./20261104-hosted-plugins/00_master_plan.md) | First-party plugins in `plugins/`, CI, docs, and a way for an administrator to leave one out (HP0–HP10) | not started (row 43) — plan 2026-11-04, §8 unticked |
 
 ## Archive
 
