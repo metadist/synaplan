@@ -17,9 +17,15 @@ export function installAppPinia(app: App): Pinia {
   app.use(pinia)
   if (hot) {
     hot.data.pinia = pinia
-    hot.on('vite:beforeUpdate', () => {
+    const previous = hot.data.reactivatePinia as (() => void) | undefined
+    if (previous) {
+      hot.off('vite:beforeUpdate', previous)
+    }
+    const reactivatePinia = (): void => {
       setActivePinia(pinia)
-    })
+    }
+    hot.data.reactivatePinia = reactivatePinia
+    hot.on('vite:beforeUpdate', reactivatePinia)
   }
   return pinia
 }

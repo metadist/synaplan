@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { reloadAfterDevPiniaContextLoss } from '@/utils/devPiniaContextRecovery'
 
 /**
  * Reason codes that map to a friendlier admin-visible explanation in ErrorView.
@@ -35,6 +36,9 @@ export const useGlobalErrorStore = defineStore('globalError', () => {
   const hasError = computed(() => current.value !== null)
 
   function setError(payload: GlobalErrorPayload | Error): void {
+    if (reloadAfterDevPiniaContextLoss(payload instanceof Error ? payload : payload.message)) {
+      return
+    }
     if (payload instanceof Error) {
       current.value = {
         message: payload.message,

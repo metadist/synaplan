@@ -33,13 +33,6 @@ export function gitkeepPlugin(): Plugin {
 }
 
 /**
- * Dev server only: regenerate src/generated/api-schemas.ts when the backend
- * OpenAPI spec changed (pull, branch switch, edited annotations); Vite reloads
- * the page when the file changes. Runs on full page loads and at most once per
- * interval instead of polling: the dev backend rebuilds the spec on every
- * request (~1s of CPU).
- */
-/**
  * Dev server only. Pinia keeps store state across edits only when the store
  * module accepts its own hot update. Without that, saving a store re-runs
  * every component that imports it, and setup() can throw "no active Pinia"
@@ -72,6 +65,13 @@ export function piniaStoreHmrPlugin(): Plugin {
   }
 }
 
+/**
+ * Dev server only: regenerate src/generated/api-schemas.ts when the backend
+ * OpenAPI spec changed (pull, branch switch, edited annotations); Vite reloads
+ * the page when the file changes. Runs on full page loads and at most once per
+ * interval instead of polling: the dev backend rebuilds the spec on every
+ * request (~1s of CPU).
+ */
 export function openapiSchemaSyncPlugin(): Plugin {
   const CHECK_INTERVAL_MS = 30_000
   let root = ''

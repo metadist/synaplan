@@ -273,6 +273,20 @@ describe('installGlobalErrorHandlers', () => {
     expect(piniaReloads).toBe(1)
   })
 
+  it('reloads when a Pinia context loss is pushed directly to globalErrorStore (e.g. router.onError)', () => {
+    const store = useGlobalErrorStore()
+
+    store.setError({
+      message:
+        '[🍍]: "getActivePinia()" was called but there was no active Pinia. Are you trying to use a store before calling "app.use(pinia)"?',
+      reason: 'router_navigation',
+      source: 'router:onError',
+    })
+
+    expect(store.hasError).toBe(false)
+    expect(piniaReloads).toBe(1)
+  })
+
   it('is idempotent — re-installing replaces previous listeners cleanly', () => {
     installGlobalErrorHandlers(app)
     installGlobalErrorHandlers(app)
