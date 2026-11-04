@@ -137,6 +137,43 @@ final class MediaJobMessageSyncTest extends TestCase
         self::assertSame('a fox', $this->syncedMessage->getMeta('media_prompt'));
     }
 
+    public function testMultitaskPlaceholderReplyIsReplacedWithTheStorageMarker(): void
+    {
+        $this->fileRegistrar->method('register')->willReturn(new File());
+        $job = $this->completedJob(MediaJob::TYPE_IMAGE, 'a fox', '/api/v1/files/uploads/7/2026/07/fox.png');
+        $job->setNodeId('n1');
+        $this->syncedMessage->setText("I couldn't fully complete that request.");
+
+        $this->sync->syncTerminalState($job);
+
+        self::assertSame('__IMAGE_GENERATED__', $this->syncedMessage->getText());
+        self::assertSame('a fox', $this->syncedMessage->getMeta('media_prompt'));
+    }
+
+    public function testMultitaskAssembledProseIsNotReplaced(): void
+    {
+        $this->fileRegistrar->method('register')->willReturn(new File());
+        $job = $this->completedJob(MediaJob::TYPE_IMAGE, 'a fox', '/api/v1/files/uploads/7/2026/07/fox.png');
+        $job->setNodeId('n1');
+        $this->syncedMessage->setText('Here is your parrot.');
+
+        $this->sync->syncTerminalState($job);
+
+        self::assertSame('Here is your parrot.', $this->syncedMessage->getText());
+        self::assertNull($this->syncedMessage->getMeta('media_prompt'));
+    }
+
+    public function testMultitaskFailedJobClearsAGeneratingPlaceholder(): void
+    {
+        $job = $this->terminalJob(MediaJob::TYPE_IMAGE, MediaJob::STATUS_FAILED, 'a fox');
+        $job->setNodeId('n1');
+        $this->syncedMessage->setText('__IMAGE_GENERATING__');
+
+        $this->sync->syncTerminalState($job);
+
+        self::assertSame('', $this->syncedMessage->getText());
+    }
+
     public function testCompletedAudioJobWithBlankPromptPassesNullFileText(): void
     {
         $captured = [];
@@ -212,12 +249,21 @@ final class MediaJobMessageSyncTest extends TestCase
         string $prompt,
         string $url = '/api/v1/files/uploads/7/2026/07/voice.mp3',
     ): MediaJob {
+        return $this->terminalJob($type, MediaJob::STATUS_COMPLETED, $prompt, $url);
+    }
+
+    private function terminalJob(
+        string $type,
+        string $status,
+        string $prompt,
+        string $url = '/api/v1/files/uploads/7/2026/07/voice.mp3',
+    ): MediaJob {
         $job = (new MediaJob('job-key-1'))
             ->setUserId(7)
             ->setType($type)
             ->setMessageId(55)
             ->setPrompt($prompt)
-            ->setStatus(MediaJob::STATUS_COMPLETED)
+            ->setStatus($status)
             ->setResult([
                 'file' => ['url' => $url, 'type' => $type],
             ]);
@@ -231,7 +277,9 @@ final class MediaJobMessageSyncTest extends TestCase
 
         $this->syncedMessage = $message;
         $this->messageRepository->method('find')->willReturn($message);
-        $this->mediaJobService->method('toStatusArray')->willReturn(['state' => 'completed']);
+        $this->mediaJobService->method('toStatusArray')->willReturn([
+            'state' => MediaJob::STATUS_COMPLETED === $status ? 'completed' : 'failed',
+        ]);
         $this->usageRecorder->method('record')->willReturn(null);
 
         return $job;
