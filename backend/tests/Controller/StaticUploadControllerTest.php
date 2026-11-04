@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaAccessTokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -45,6 +46,13 @@ class StaticUploadControllerTest extends WebTestCase
      * @var list<string>
      */
     private array $diskPaths = [];
+
+    /**
+     * Directories we created during the test, removed in tearDown.
+     *
+     * @var list<string>
+     */
+    private array $diskDirs = [];
 
     /**
      * Database rows we created during the test, removed in tearDown.
@@ -97,6 +105,9 @@ class StaticUploadControllerTest extends WebTestCase
             if (is_file($path)) {
                 @unlink($path);
             }
+        }
+        foreach (array_reverse($this->diskDirs) as $dir) {
+            @rmdir($dir);
         }
 
         static::ensureKernelShutdown();
@@ -298,6 +309,69 @@ class StaticUploadControllerTest extends WebTestCase
     }
 
     /**
+     * `og/` and `widget-icons/` skip the ownership check. A dot segment after
+     * either of them must not reach a private upload that answers 401 on its
+     * own path: the request is refused and the private bytes never leave.
+     */
+    #[DataProvider('publicPrefixesClimbingOut')]
+    public function testAPublicPrefixDoesNotReachAPrivateUpload(string $climb): void
+    {
+        // Random so that a debug error page quoting this source cannot match.
+        $marker = bin2hex(random_bytes(16));
+        $relativePath = $this->createUploadOnDisk('private_'.bin2hex(random_bytes(4)).'.txt', $marker);
+        $file = $this->persistFile($relativePath, 'text', 'text/plain');
+        $message = $this->persistMessage();
+        $message->addFile($file);
+        $this->em->flush();
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+        $this->assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode(), 'The private path itself needs a credential.');
+
+        $this->client->request('GET', '/api/v1/files/uploads/'.$climb.$relativePath);
+
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        $this->assertStringNotContainsString($marker, (string) $this->client->getInternalResponse()->getContent());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function publicPrefixesClimbingOut(): iterable
+    {
+        yield 'widget icons, raw dots' => ['widget-icons/../'];
+        yield 'OG images, raw dots' => ['og/../'];
+        yield 'widget icons, encoded dots' => ['widget-icons/%2e%2e/'];
+        yield 'OG images, encoded dots and slash' => ['og/%2e%2e%2f'];
+        yield 'widget icons, through a current-directory segment' => ['widget-icons/./../'];
+    }
+
+    /**
+     * Crawlers fetch the OG preview of a shared chat and third-party pages
+     * embed the widget icon, both without a credential.
+     */
+    #[DataProvider('publicDirectories')]
+    public function testServesAPublicAssetAnonymously(string $directory): void
+    {
+        $relativePath = $this->writeUpload($directory.'/t'.bin2hex(random_bytes(4)).'/asset.png', 'public-asset');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $this->assertSame('public-asset', $this->client->getInternalResponse()->getContent());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function publicDirectories(): iterable
+    {
+        yield 'OG preview of a shared chat' => ['og'];
+        yield 'chat widget icon' => ['widget-icons'];
+    }
+
+    /**
      * Unknown paths must still return 404 — the new fallback must not
      * accidentally widen the surface to anything on disk.
      */
@@ -323,11 +397,6 @@ class StaticUploadControllerTest extends WebTestCase
 
     private function createUploadOnDisk(string $filename, string $contents): string
     {
-        $uploadDir = $this->client->getContainer()->getParameter('app.upload_dir');
-        if (!is_string($uploadDir)) {
-            $this->fail('app.upload_dir must be a string.');
-        }
-
         // Use the production sharding helper instead of duplicating its
         // modulo math — drift between the test fixture and the real
         // pipeline would silently make the regression test miss real
@@ -335,11 +404,24 @@ class StaticUploadControllerTest extends WebTestCase
         $pathBuilder = $this->client->getContainer()->get(UserUploadPathBuilder::class);
         $userBase = $pathBuilder->buildUserBaseRelativePath($this->user->getId());
 
-        $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$filename;
-        $absolute = $uploadDir.'/'.$relativePath;
+        return $this->writeUpload($userBase.'/'.date('Y').'/'.date('m').'/'.$filename, $contents);
+    }
 
-        if (!is_dir(dirname($absolute))) {
-            mkdir(dirname($absolute), 0o775, true);
+    private function writeUpload(string $relativePath, string $contents): string
+    {
+        $uploadDir = $this->client->getContainer()->getParameter('app.upload_dir');
+        if (!is_string($uploadDir)) {
+            $this->fail('app.upload_dir must be a string.');
+        }
+
+        $absolute = $uploadDir.'/'.$relativePath;
+        $missing = [];
+        for ($dir = dirname($absolute); !is_dir($dir); $dir = dirname($dir)) {
+            $missing[] = $dir;
+        }
+        foreach (array_reverse($missing) as $dir) {
+            mkdir($dir, 0o775);
+            $this->diskDirs[] = $dir;
         }
         file_put_contents($absolute, $contents);
         $this->diskPaths[] = $absolute;
