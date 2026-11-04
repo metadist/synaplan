@@ -35,6 +35,7 @@ final readonly class ResearchTaskHandover
         $finished = in_array($code, [
             ResearchOutcome::COMPLETE,
             ResearchOutcome::COMPLETE_PARTIAL,
+            ResearchOutcome::COMPLETE_AT_LIMIT,
             ResearchOutcome::COMPLETE_SNIPPETS_ONLY,
         ], true);
         if ($finished && '' !== $report) {

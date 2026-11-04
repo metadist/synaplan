@@ -15,6 +15,7 @@ final readonly class ResearchOutcome
 {
     public const COMPLETE = 'complete';
     public const COMPLETE_PARTIAL = 'complete_partial';
+    public const COMPLETE_AT_LIMIT = 'complete_at_limit';
     public const COMPLETE_SNIPPETS_ONLY = 'complete_snippets_only';
     public const STOPPED_BY_USER = 'stopped_by_user';
     public const STOPPED_BUDGET = 'stopped_budget';
@@ -33,6 +34,7 @@ final readonly class ResearchOutcome
         self::ANSWERED_WITHOUT_RESEARCH,
         self::COMPLETE,
         self::COMPLETE_PARTIAL,
+        self::COMPLETE_AT_LIMIT,
         self::COMPLETE_SNIPPETS_ONLY,
         self::STOPPED_BY_USER,
         self::STOPPED_BUDGET,
@@ -61,6 +63,14 @@ final readonly class ResearchOutcome
         'selected' => 'selected',
     ];
 
+    /** @var array<string, string> */
+    private const DEPTHS = [
+        'quick' => 'Quick',
+        'standard' => 'Standard',
+        'thorough' => 'Thorough',
+        'auto' => 'automatic',
+    ];
+
     /**
      * @param array<string, int|string> $params
      */
@@ -86,6 +96,13 @@ final readonly class ResearchOutcome
                 $this->whole('open'),
                 $this->whole('points'),
             ),
+            self::COMPLETE_AT_LIMIT => sprintf(
+                'Gathering stopped at the %s %s, so this answer is based on what was found by then: %d of %d points have a backed answer. A workspace admin can raise it under Settings, Research, Limits for each depth.',
+                $this->depth(),
+                $this->limitPhrase(),
+                $this->whole('covered'),
+                $this->whole('points'),
+            ),
             self::COMPLETE_SNIPPETS_ONLY => 'No page could be opened, so this report is based on search summaries only. It says so where it matters.',
             self::STOPPED_BY_USER => 'Stopped. No new work was started after you pressed Stop; a step that was already underway may still count. What was found so far is kept.',
             self::STOPPED_BUDGET => sprintf(
@@ -94,7 +111,11 @@ final readonly class ResearchOutcome
                 $this->whole('points'),
             ),
             self::STOPPED_LIMIT => sprintf(
-                'Stopped because this research reached its limit for this depth. What was found covers %d of %d points.',
+                'Stopped because this %s research reached its %s before an answer could be written. Found by then: %d searches, %d sources read, %d of %d points answered. A workspace admin can raise it under Settings, Research, Limits for each depth.',
+                $this->depth(),
+                $this->limitPhrase(),
+                $this->whole('searches'),
+                $this->whole('sources'),
                 $this->whole('covered'),
                 $this->whole('points'),
             ),
@@ -118,9 +139,10 @@ final readonly class ResearchOutcome
 
     /**
      * The numbers a translated sentence fills in. The role is a key of
-     * `research.role.*`, never the raw stored value.
+     * `research.role.*`, never the raw stored value. Limit and depth are
+     * keys the same way, so no stored word reaches the person untranslated.
      *
-     * @return array{statements: int, supported: int, open: int, points: int, covered: int, role: string}
+     * @return array{statements: int, supported: int, open: int, points: int, covered: int, searches: int, sources: int, role: string, limit: string, depth: string, limit_value: string}
      */
     public function placeholders(): array
     {
@@ -130,7 +152,12 @@ final readonly class ResearchOutcome
             'open' => $this->whole('open'),
             'points' => $this->whole('points'),
             'covered' => $this->whole('covered'),
+            'searches' => $this->whole('searches'),
+            'sources' => $this->whole('sources'),
             'role' => $this->role(),
+            'limit' => $this->limit(),
+            'depth' => $this->depthKey(),
+            'limit_value' => $this->limitValue(),
         ];
     }
 
@@ -203,5 +230,45 @@ final readonly class ResearchOutcome
         }
 
         return self::ROLES[$role] ?? 'selected';
+    }
+
+    /** The limit key a translation looks up, never the raw stored value. */
+    private function limit(): string
+    {
+        $limit = $this->params['limit'] ?? '';
+
+        return is_string($limit) && in_array($limit, ResearchBudget::LIMIT_REASONS, true) ? $limit : 'limit';
+    }
+
+    private function depthKey(): string
+    {
+        $depth = $this->params['depth'] ?? '';
+
+        return is_string($depth) && isset(self::DEPTHS[$depth]) ? $depth : 'standard';
+    }
+
+    private function depth(): string
+    {
+        return self::DEPTHS[$this->depthKey()];
+    }
+
+    private function limitValue(): string
+    {
+        return (string) ($this->params['limit_value'] ?? '');
+    }
+
+    /** The spent limit with its cap, as the English sentence reads it. */
+    private function limitPhrase(): string
+    {
+        $value = $this->limitValue();
+
+        return match ($this->limit()) {
+            ResearchBudget::LIMIT_WALL => '' === $value ? 'time limit' : 'time limit ('.$value.' minutes)',
+            ResearchBudget::LIMIT_COST => '' === $value ? 'cost cap' : 'cost cap ($'.$value.')',
+            ResearchBudget::LIMIT_CALLS => '' === $value ? 'model-call limit' : 'model-call limit ('.$value.' calls)',
+            ResearchBudget::LIMIT_ROUNDS => '' === $value ? 'round limit' : 'round limit ('.$value.' rounds)',
+            ResearchBudget::LIMIT_GATHER => 'search and source limit',
+            default => 'limit',
+        };
     }
 }

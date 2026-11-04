@@ -7,6 +7,7 @@ namespace App\Service\Research\Run\Lead;
 use App\AI\ToolCalling\ToolCall;
 use App\Service\Research\Run\Ledger\PlainText;
 use App\Service\Research\Run\Ledger\Source;
+use App\Service\Research\Run\ResearchBudget;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchNotes;
 use App\Service\Research\Run\ResearchStatus;
@@ -31,6 +32,9 @@ final readonly class LeadStage
     /** A thought longer than this is cut; the person reads it in one glance. */
     private const THOUGHT_CHARS = 600;
 
+    /** Wall-clock seconds kept for the report, so a lead turn cannot spend the time writing needs. Never the whole clock of a short depth. */
+    private const WRITER_SECONDS = 60;
+
     public function __construct(
         private ResearchLeadCaller $caller,
         private LeadToolbox $tools,
@@ -51,7 +55,9 @@ final readonly class LeadStage
         if ($blocked instanceof StageResult) {
             return $blocked;
         }
-        if (!$ctx->state->budget->canRound() || $ctx->state->budget->callsLeft() <= 2) {
+        if (!$ctx->state->budget->canRound() || $ctx->state->budget->callsLeft() <= 2 || $this->writerTimeIsDue($ctx)) {
+            $ctx->state->noteLimitHit($this->budgetEnd($ctx));
+
             return $this->toReport($ctx);
         }
 
@@ -144,6 +150,7 @@ final readonly class LeadStage
         }
         $this->remember($ctx, $turn, $wires, $results);
         if (!$ctx->state->budget->canRound()) {
+            $ctx->state->noteLimitHit($this->budgetEnd($ctx));
             $this->roundEvent($ctx, 'write');
 
             return $this->toReport($ctx);
@@ -196,6 +203,37 @@ final readonly class LeadStage
         $ctx->state->advance(ResearchStatus::Gathering);
 
         return new StageResult('round');
+    }
+
+    /** The gathering gives its last minute to the report instead of one more turn. */
+    private function writerTimeIsDue(StageContext $ctx): bool
+    {
+        $budget = $ctx->state->budget;
+
+        return $budget->limits()->wallSeconds > self::WRITER_SECONDS && $budget->secondsLeft() <= self::WRITER_SECONDS;
+    }
+
+    /**
+     * Which limit sends the run to the report, when a limit does. A limit
+     * already spent is named by the budget itself; the two near-misses are
+     * judged here, because the run leaves early to keep calls and time
+     * for the report.
+     */
+    private function budgetEnd(StageContext $ctx): ?string
+    {
+        $budget = $ctx->state->budget;
+        $spent = $budget->exhaustedReason();
+        if (null !== $spent) {
+            return $spent;
+        }
+        if ($budget->callsLeft() <= 2) {
+            return ResearchBudget::LIMIT_CALLS;
+        }
+        if ($this->writerTimeIsDue($ctx)) {
+            return ResearchBudget::LIMIT_WALL;
+        }
+
+        return null;
     }
 
     private function toReport(StageContext $ctx): StageResult

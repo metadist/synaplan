@@ -5,7 +5,8 @@ research:
     complete_snippets_only: 'Keine Seite ließ sich öffnen, deshalb beruht dieser Bericht nur auf Suchzusammenfassungen. Wo es wichtig ist, steht das dabei.'
     stopped_by_user: 'Gestoppt. Nach deinem Klick auf Stopp wurde keine neue Arbeit begonnen; ein Schritt, der schon lief, kann noch zählen. Was bisher gefunden wurde, bleibt erhalten.'
     stopped_budget: 'Gestoppt, weil dein monatliches KI-Budget aufgebraucht ist. Der Bericht deckt %covered% von %points% Punkten ab.'
-    stopped_limit: 'Gestoppt, weil diese Recherche ihr Limit für diese Tiefe erreicht hat. Das Gefundene deckt %covered% von %points% Punkten ab.'
+    complete_at_limit: 'Das Sammeln hat das %limit% für %depth% erreicht, deshalb beruht diese Antwort auf dem, was bis dahin gefunden war: %covered% von %points% Punkten haben eine belegte Antwort. Die Verwaltung dieses Arbeitsbereichs kann das Limit unter Einstellungen → Research → Limits je Tiefe anheben.'
+    stopped_limit: 'Gestoppt, weil diese %depth%-Recherche ihr %limit% erreicht hat, bevor eine Antwort geschrieben werden konnte. Bis dahin gefunden: %searches% Suchen, %sources% Quellen gelesen, %covered% von %points% Punkten beantwortet. Die Verwaltung dieses Arbeitsbereichs kann das Limit unter Einstellungen → Research → Limits je Tiefe anheben.'
     stopped_waiting: 'Gestoppt, weil der Plan nicht innerhalb eines Tages bestätigt wurde. Starte sie neu, wenn du so weit bist.'
     stopped_by_admin: 'Die Recherche wurde in deinem Synaplan-Arbeitsbereich ausgeschaltet. Was bisher gefunden wurde, bleibt erhalten.'
     answered_without_research: 'Ohne den genaueren Blick beantwortet. Für diese Frage wurde nichts gesucht.'
@@ -32,6 +33,18 @@ research:
     budget: 'Dein Nutzungsbudget für diesen Zeitraum ist aufgebraucht, deshalb antworte ich direkt. Ein Administrator kann es erhöhen.'
     plan_limit: 'Die Recherchen deines Tarifs für heute sind aufgebraucht, deshalb antworte ich direkt. Morgen geht es wieder.'
     unavailable: 'Die Recherche ist gerade nicht verfügbar, deshalb antworte ich direkt. Versuche es in ein paar Minuten mit Gründlicher nachsehen.'
+  limit_name:
+    wall: 'Zeitlimit (%value% Minuten)'
+    cost: 'Kostenlimit ($%value%)'
+    calls: 'Limit für Modellaufrufe (%value% Aufrufe)'
+    rounds: 'Rundenlimit (%value% Runden)'
+    gather: 'Such- und Quellenlimit'
+    limit: 'Limit'
+  depth_name:
+    quick: 'Kurz'
+    standard: 'Standard'
+    thorough: 'Gründlich'
+    auto: 'automatische'
   role:
     reading: 'Lesen'
     sorting: 'Sortieren'

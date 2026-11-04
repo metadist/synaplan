@@ -13,7 +13,8 @@ use App\Service\Research\Run\ResearchStatus;
  *
  * The research still finishes. A missing brief is the question itself, a
  * missing plan is one search for that question, and a missing report is the
- * evidence already kept. Stop and an exhausted budget are not this path.
+ * evidence already kept. A stop is not this path; a budget spent before
+ * the writer could be paid is, for the report.
  */
 final class ResearchCarryOn
 {
