@@ -1,6 +1,7 @@
 import type { App } from 'vue'
 import { useGlobalErrorStore, type GlobalErrorPayload } from '@/stores/globalError'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { reloadAfterDevPiniaContextLoss } from '@/utils/devPiniaContextRecovery'
 import { useNotification } from '@/composables/useNotification'
 
 /**
@@ -146,6 +147,7 @@ export function installGlobalErrorHandlers(app: App): void {
   const store = useGlobalErrorStore()
 
   app.config.errorHandler = (err, _instance, info) => {
+    if (reloadAfterDevPiniaContextLoss(err)) return
     console.error('Vue errorHandler caught:', err, '\nInfo:', info)
     const message = getErrorMessage(err)
     if (shouldIgnore(message)) return
@@ -160,6 +162,7 @@ export function installGlobalErrorHandlers(app: App): void {
     window.removeEventListener('error', windowErrorHandler)
   }
   windowErrorHandler = (event: ErrorEvent) => {
+    if (reloadAfterDevPiniaContextLoss(event.error ?? event.message)) return
     if (shouldIgnore(event.message)) return
     if (isTransient(event.message) || isTransient(getErrorMessage(event.error))) {
       reportTransient(event.message || 'unknown', 'window:error')
@@ -176,6 +179,10 @@ export function installGlobalErrorHandlers(app: App): void {
   windowRejectionHandler = (event: PromiseRejectionEvent) => {
     const reason = event.reason
     const message = getErrorMessage(reason)
+    if (reloadAfterDevPiniaContextLoss(reason)) {
+      event.preventDefault()
+      return
+    }
     if (shouldIgnore(message)) {
       // Stop Safari/Chrome from also logging "Unhandled Promise Rejection"
       // for noise we have already classified as safe to ignore.
