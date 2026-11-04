@@ -346,10 +346,11 @@ func validateMounts(mounts []mount.Mount, p Policy) error {
 		default:
 			return fmt.Errorf("mount %s: unexpected target", m.Target)
 		}
-		if err := under(root, m.Source); err != nil {
+		checked, err := checkedSource(root, m.Source)
+		if err != nil {
 			return fmt.Errorf("mount %s: %w", m.Target, err)
 		}
-		st, err := os.Lstat(m.Source)
+		st, err := os.Lstat(checked)
 		if err != nil {
 			return fmt.Errorf("mount %s: source %q: %w", m.Target, m.Source, err)
 		}
@@ -366,20 +367,22 @@ func validateMounts(mounts []mount.Mount, p Policy) error {
 	return nil
 }
 
-func under(root, source string) error {
+// checkedSource returns the path to stat and bind. The result is
+// Join(root, rel) where rel is filepath.IsLocal, so a workspace id that
+// climbed out of root with ".." is refused before Lstat or dockerd sees it.
+func checkedSource(root, source string) (string, error) {
 	if root == "" {
-		return fmt.Errorf("no root configured for source %q", source)
+		return "", fmt.Errorf("no root configured for source %q", source)
 	}
 	if !filepath.IsAbs(root) || !filepath.IsAbs(source) {
-		return fmt.Errorf("root and source must be absolute (%q, %q)", root, source)
+		return "", fmt.Errorf("root and source must be absolute (%q, %q)", root, source)
 	}
 	root = filepath.Clean(root)
-	source = filepath.Clean(source)
 	rel, err := filepath.Rel(root, source)
-	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("source %q is not under %q", source, root)
+	if err != nil || rel == "." || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("source %q is not under %q", source, root)
 	}
-	return nil
+	return filepath.Join(root, rel), nil
 }
 
 func containsString(ss []string, want string) bool {

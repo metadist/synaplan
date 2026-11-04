@@ -75,7 +75,8 @@ async function loadPlugin() {
   // Plugin exists in the repo but is not installed for this user: surface a
   // clear message instead of hanging on "Loading plugin…" forever (#1154).
   const activePlugin = configStore.plugins.find((p) => p.name === pluginName.value)
-  if (!activePlugin || !authStore.user?.id) {
+  // Same shape the API requires. A route param outside it must not become a URL segment.
+  if (!activePlugin || !authStore.user?.id || !/^[a-z0-9_-]+$/.test(pluginName.value)) {
     loading.value = false
     error.value = t('plugins.notFound')
     return
@@ -85,7 +86,7 @@ async function loadPlugin() {
   error.value = null
   pluginContainer.value.innerHTML = ''
 
-  const pluginBaseUrl = `${configStore.apiBaseUrl}/api/v1/user/${authStore.user.id}/plugins/${pluginName.value}/assets`
+  const pluginBaseUrl = `${configStore.apiBaseUrl}/api/v1/user/${authStore.user.id}/plugins/${encodeURIComponent(pluginName.value)}/assets`
   const entryUrl = `${pluginBaseUrl}/index.js?v=${Date.now()}`
 
   try {
@@ -105,7 +106,8 @@ async function loadPlugin() {
       if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
       if (!english && !local) {
         console.warn(
-          `Plugin ${pluginName.value} has no locale file; labels stay as the plugin wrote them.`
+          'Plugin has no locale file; labels stay as the plugin wrote them.',
+          pluginName.value
         )
       }
       module.default.mount(pluginContainer.value, {
@@ -121,7 +123,7 @@ async function loadPlugin() {
     }
   } catch (err: unknown) {
     if (!loadGate.isCurrent(generation)) return
-    console.error(`Failed to load plugin ${pluginName.value}:`, err)
+    console.error('Failed to load plugin', pluginName.value, err)
     error.value = `Failed to load plugin: ${getErrorMessage(err) || 'Unknown error'}`
 
     // Fallback: Check for index.html if index.js failed
