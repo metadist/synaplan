@@ -62,7 +62,7 @@ type Docker struct {
 // release. On failure the returned Docker is non-nil with a nil client so
 // health can still serve.
 func Connect(p Policy) *Docker {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.New(client.FromEnv)
 	if err != nil {
 		return &Docker{Policy: p}
 	}
