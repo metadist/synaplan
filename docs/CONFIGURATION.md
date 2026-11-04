@@ -165,12 +165,17 @@ worker mode.
 | `FRANKENPHP_NUM_THREADS` | unset | Total FrankenPHP threads. Leave unset unless you need to cap them |
 | `FRANKENPHP_MAX_THREADS` | unset | Upper bound for threads. Leave unset unless you set it |
 
-A 503 on a long route carries `Retry-After: 5` and a `server_busy` body. The
-chat page's own sentence for that wait is a later step.
+A 503 on a long route carries `Retry-After: 5` and a `server_busy` body. Chat
+and the widget retry three times, then say the server is busy.
 
 Before raising the stream pool on the web nodes, check that Galera
 `max_connections` can take one more connection per stream worker, and change
 one node first.
+
+The capacity watchdog, usage recording and outbound mode sit next to these
+pools. The operator guide is
+[Runtime and outbound traffic](https://docs.synaplan.com/runtime-setup).
+The keys are listed in [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md).
 
 ## Access Policy
 
