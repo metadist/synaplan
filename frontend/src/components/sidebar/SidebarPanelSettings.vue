@@ -38,7 +38,7 @@
       <SidebarNavLink
         :to="deleteLink.to"
         :label="deleteLink.label"
-        :icon="TrashIcon"
+        :icon="deleteLink.icon"
         danger
         :active="isCurrent(deleteLink.path)"
         test-id="link-sidebar-v2-settings-delete"
@@ -51,66 +51,22 @@
 import { computed, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import {
-  ArchiveBoxIcon,
-  ChartBarIcon,
-  ChatBubbleLeftEllipsisIcon,
-  DevicePhoneMobileIcon,
-  HandThumbUpIcon,
-  CreditCardIcon,
-  LightBulbIcon,
-  LockClosedIcon,
-  ScaleIcon,
-  StarIcon,
-  SwatchIcon,
-  TrashIcon,
-  UserCircleIcon,
-} from '@heroicons/vue/24/outline'
+import { ChartBarIcon, HandThumbUpIcon, LightBulbIcon, StarIcon } from '@heroicons/vue/24/outline'
 import SidebarNavLink from './SidebarNavLink.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
-import { useSettingsSections } from '@/composables/useSettingsSections'
+import { useSettingsSectionLinks } from '@/composables/useSettingsSections'
 
 const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
-const { sections } = useSettingsSections()
+const { preferenceLinks, deleteLink } = useSettingsSectionLinks()
 const purchaseAllowed = isPurchaseAllowed()
 
 const headingClass =
   'px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider txt-secondary'
-
-const SECTION_ICONS: Record<string, Component> = {
-  profile: UserCircleIcon,
-  appearance: SwatchIcon,
-  chat: ChatBubbleLeftEllipsisIcon,
-  data: ArchiveBoxIcon,
-  billing: CreditCardIcon,
-  security: LockClosedIcon,
-  app: DevicePhoneMobileIcon,
-  legal: ScaleIcon,
-}
-
-function toLink(item: { slug: string; labelKey: string }) {
-  return {
-    slug: item.slug,
-    label: t(item.labelKey),
-    icon: SECTION_ICONS[item.slug],
-    path: `/settings/${item.slug}`,
-    to: `/settings/${item.slug}`,
-  }
-}
-
-const preferenceLinks = computed(() =>
-  sections.value.filter((item) => item.slug !== 'delete').map(toLink)
-)
-
-const deleteLink = computed(() => {
-  const item = sections.value.find((entry) => entry.slug === 'delete')
-  return item ? toLink(item) : null
-})
 
 const memoriesEnabled = computed(() => authStore.user?.memoriesEnabled !== false)
 const memoryService = computed(() => configStore.features?.memoryService ?? false)

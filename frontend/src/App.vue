@@ -59,6 +59,7 @@ import { initOtaUpdates } from '@/services/otaUpdates'
 import { initBiometricLock } from '@/composables/useBiometricLock'
 import { initNativeStatusBar } from '@/services/nativeStatusBar'
 import { initNativeBackButton } from '@/services/nativeBackButton'
+import { initKeyboardChatDock } from '@/services/keyboardChatDock'
 import { initKeyboardScrollAssist } from '@/services/keyboardScrollAssist'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { initNativeShortcuts } from '@/services/api/nativeShortcuts'
@@ -161,8 +162,10 @@ void initNativeStatusBar()
 void initNativeBackButton()
 // Lift any focused input above the soft keyboard (Keyboard.resize:'none' means
 // the WebView does not shrink, so ordinary form/dialog fields would otherwise
-// stay hidden behind it). No-op on web.
+// stay hidden behind it). The chat composer is the exception: it follows the
+// keyboard frame instead of the scroll assist. Both no-op on web.
 initKeyboardScrollAssist()
+initKeyboardChatDock()
 
 // MOBILE-APP SEAM: iOS Shortcuts that need the composer (dictate / photo)
 // navigate to chat. The pending action itself is consumed in ChatView once

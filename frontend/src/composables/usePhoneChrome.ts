@@ -1,3 +1,5 @@
+import { onMounted, onUnmounted, ref } from 'vue'
+
 /**
  * Phone chrome vs desktop rail.
  *
@@ -22,5 +24,28 @@ export function isPhoneChromeSize(width: number, height: number): boolean {
 }
 
 export function matchesPhoneChrome(): boolean {
+  if (typeof window.matchMedia !== 'function') return false
   return window.matchMedia(PHONE_CHROME_MQ).matches
+}
+
+/** Follows the phone-chrome media query, including resizes. */
+export function usePhoneChrome() {
+  const isPhoneChrome = ref(matchesPhoneChrome())
+
+  const sync = () => {
+    isPhoneChrome.value = matchesPhoneChrome()
+  }
+
+  let media: MediaQueryList | null = null
+  onMounted(() => {
+    if (typeof window.matchMedia !== 'function') return
+    media = window.matchMedia(PHONE_CHROME_MQ)
+    sync()
+    media.addEventListener('change', sync)
+  })
+  onUnmounted(() => {
+    media?.removeEventListener('change', sync)
+  })
+
+  return { isPhoneChrome }
 }
