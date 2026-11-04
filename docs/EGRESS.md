@@ -78,7 +78,7 @@ These services speak binary or non-HTTP protocols directly (the optional egress 
 | **SMTP** | Symfony Mailer | `MAILER_DSN` |
 | **IMAP** | `InboundEmailHandlerService`, `InboundEmailService`, `ImapMailboxSearcher` | Per-mailbox handler settings |
 | **gRPC** | Triton Inference Server (`LocalProviderAvailabilityProbe`) | Triton endpoint in AI settings |
-| **WebSocket** | Live voice sidecar (`sidecars/synaplan-voice`) | `LIVE_VOICE_GATEWAY_URL` (opened by the sidecar, never by PHP) |
+| **WebSocket** | Live voice sidecar's outbound provider sockets (`sidecars/synaplan-voice`) | Built-in provider adapter endpoints (`OPENAI_LIVE_REGION`, Gemini, xAI) and `LIVE_VOICE_COMPATIBLE_WS_URL` (opened by the sidecar, never by PHP; `LIVE_VOICE_GATEWAY_URL` is PHP's internal HTTP URL to the sidecar) |
 
 ### Architecture Gate (`egressInventoryBaseline.json`)
 
