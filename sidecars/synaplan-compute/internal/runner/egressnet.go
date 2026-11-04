@@ -10,11 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
 	"github.com/metadist/synaplan-compute/pkg/contract"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -120,7 +119,7 @@ func (d *Docker) SetupEgress(ctx context.Context, cfg EgressConfig, runID string
 		return nil, err
 	}
 	networkName := EgressNetworkName(runID)
-	netResp, err := d.cli.NetworkCreate(ctx, networkName, network.CreateOptions{
+	netResp, err := d.cli.NetworkCreate(ctx, networkName, client.NetworkCreateOptions{
 		Internal: true,
 		Labels:   map[string]string{runLabelKey: runLabelValue, proxyLabelKey: proxyLabelValue},
 	})
@@ -161,12 +160,12 @@ func (d *Docker) TeardownEgress(ctx context.Context, net *EgressNet) error {
 	var firstErr error
 	if d.Available() {
 		if net.ProxyID != "" {
-			if err := d.cli.ContainerRemove(ctx, net.ProxyID, container.RemoveOptions{Force: true}); err != nil && firstErr == nil {
+			if _, err := d.cli.ContainerRemove(ctx, net.ProxyID, client.ContainerRemoveOptions{Force: true}); err != nil && firstErr == nil {
 				firstErr = err
 			}
 		}
 		if net.NetworkID != "" {
-			if err := d.cli.NetworkRemove(ctx, net.NetworkID); err != nil && firstErr == nil {
+			if _, err := d.cli.NetworkRemove(ctx, net.NetworkID, client.NetworkRemoveOptions{}); err != nil && firstErr == nil {
 				firstErr = err
 			}
 		}
@@ -179,14 +178,14 @@ func (d *Docker) SweepEgressNetworks(ctx context.Context) error {
 	if !d.Available() {
 		return nil
 	}
-	args := filters.NewArgs(filters.Arg("label", proxyLabelKey+"="+proxyLabelValue))
-	nets, err := d.cli.NetworkList(ctx, network.ListOptions{Filters: args})
+	args := make(client.Filters).Add("label", proxyLabelKey+"="+proxyLabelValue)
+	nets, err := d.cli.NetworkList(ctx, client.NetworkListOptions{Filters: args})
 	if err != nil {
 		return err
 	}
 	var firstErr error
-	for _, n := range nets {
-		if err := d.cli.NetworkRemove(ctx, n.ID); err != nil && firstErr == nil {
+	for _, n := range nets.Items {
+		if _, err := d.cli.NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
@@ -211,17 +210,17 @@ func (d *Docker) resolveProxyImage(ctx context.Context, configured string) (stri
 
 // inspectSelf inspects our own container (hostname == container ID, Docker
 // default) for mounts and image resolution.
-func (d *Docker) inspectSelf(ctx context.Context) (types.ContainerJSON, error) {
-	var empty types.ContainerJSON
+func (d *Docker) inspectSelf(ctx context.Context) (container.InspectResponse, error) {
+	var empty container.InspectResponse
 	id, err := os.Hostname()
 	if err != nil || strings.TrimSpace(id) == "" {
 		return empty, fmt.Errorf("cannot determine own container: %w", err)
 	}
-	info, err := d.cli.ContainerInspect(ctx, strings.TrimSpace(id))
+	info, err := d.cli.ContainerInspect(ctx, strings.TrimSpace(id), client.ContainerInspectOptions{})
 	if err != nil {
 		return empty, fmt.Errorf("cannot inspect own container: %w", err)
 	}
-	return info, nil
+	return info.Container, nil
 }
 
 // startProxy runs the policy-carrying proxy on netName and waits for its
@@ -234,8 +233,8 @@ func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, 
 	if err != nil {
 		return "", "", err
 	}
-	resp, err := d.cli.ContainerCreate(ctx,
-		&container.Config{
+	resp, err := d.cli.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
 			Image: image,
 			Cmd:   []string{proxyCmd},
 			Env: append([]string{
@@ -245,7 +244,7 @@ func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, 
 			}, upstream...),
 			Labels: map[string]string{runLabelKey: runLabelValue, proxyLabelKey: proxyLabelValue},
 		},
-		&container.HostConfig{
+		HostConfig: &container.HostConfig{
 			NetworkMode:    container.NetworkMode(networkName),
 			ReadonlyRootfs: true,
 			Tmpfs:          map[string]string{"/tmp": "rw,noexec,nosuid,nodev,size=16m"},
@@ -258,15 +257,13 @@ func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, 
 				PidsLimit:  &pids,
 			},
 		},
-		&network.NetworkingConfig{
+		NetworkingConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
 				networkID:  {},
 				outboundID: {},
 			},
 		},
-		nil,
-		"",
-	)
+	})
 	if err != nil {
 		return "", "", fmt.Errorf("create proxy container: %w", err)
 	}
@@ -276,10 +273,10 @@ func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, 
 		if !started {
 			cctx, cancel := cleanupContext()
 			defer cancel()
-			_ = d.cli.ContainerRemove(cctx, proxyID, container.RemoveOptions{Force: true})
+			_, _ = d.cli.ContainerRemove(cctx, proxyID, client.ContainerRemoveOptions{Force: true})
 		}
 	}()
-	if err := d.cli.ContainerStart(ctx, proxyID, container.StartOptions{}); err != nil {
+	if _, err := d.cli.ContainerStart(ctx, proxyID, client.ContainerStartOptions{}); err != nil {
 		return "", "", fmt.Errorf("start proxy container: %w", err)
 	}
 	ip, err := d.proxyIP(ctx, proxyID, networkID, networkName)
@@ -296,16 +293,16 @@ func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, 
 // proxyIP reads the proxy's address on the run network. Only that network's
 // IP is ever handed to the run container.
 func (d *Docker) proxyIP(ctx context.Context, proxyID, networkID, networkName string) (string, error) {
-	info, err := d.cli.ContainerInspect(ctx, proxyID)
+	info, err := d.cli.ContainerInspect(ctx, proxyID, client.ContainerInspectOptions{})
 	if err != nil {
 		return "", fmt.Errorf("inspect proxy: %w", err)
 	}
-	if info.NetworkSettings == nil {
+	if info.Container.NetworkSettings == nil {
 		return "", fmt.Errorf("proxy has no network settings")
 	}
 	for _, key := range []string{networkName, networkID} {
-		if ep := info.NetworkSettings.Networks[key]; ep != nil && ep.IPAddress != "" {
-			return ep.IPAddress, nil
+		if ep := info.Container.NetworkSettings.Networks[key]; ep != nil && ep.IPAddress.IsValid() {
+			return ep.IPAddress.String(), nil
 		}
 	}
 	return "", fmt.Errorf("proxy has no IP on the run network")
@@ -314,23 +311,23 @@ func (d *Docker) proxyIP(ctx context.Context, proxyID, networkID, networkName st
 // ensureOutboundNetwork returns the shared proxy-egress network, creating
 // it when missing. Refuses to adopt a same-named foreign network.
 func (d *Docker) ensureOutboundNetwork(ctx context.Context) (string, error) {
-	existing, err := d.cli.NetworkInspect(ctx, egressOutboundNetwork, network.InspectOptions{})
+	existing, err := d.cli.NetworkInspect(ctx, egressOutboundNetwork, client.NetworkInspectOptions{})
 	if err == nil {
-		if existing.Labels[outboundLabelKey] != outboundLabelValue || existing.Internal {
+		if existing.Network.Labels[outboundLabelKey] != outboundLabelValue || existing.Network.Internal {
 			return "", fmt.Errorf("network %q exists but is not ours", egressOutboundNetwork)
 		}
-		return existing.ID, nil
+		return existing.Network.ID, nil
 	}
-	resp, err := d.cli.NetworkCreate(ctx, egressOutboundNetwork, network.CreateOptions{
+	resp, err := d.cli.NetworkCreate(ctx, egressOutboundNetwork, client.NetworkCreateOptions{
 		Labels: map[string]string{outboundLabelKey: outboundLabelValue},
 	})
 	if err != nil {
 		// Lost a create race with a concurrent first run: re-inspect once.
-		if existing, rerr := d.cli.NetworkInspect(ctx, egressOutboundNetwork, network.InspectOptions{}); rerr == nil {
-			if existing.Labels[outboundLabelKey] != outboundLabelValue || existing.Internal {
+		if existing, rerr := d.cli.NetworkInspect(ctx, egressOutboundNetwork, client.NetworkInspectOptions{}); rerr == nil {
+			if existing.Network.Labels[outboundLabelKey] != outboundLabelValue || existing.Network.Internal {
 				return "", fmt.Errorf("network %q exists but is not ours", egressOutboundNetwork)
 			}
-			return existing.ID, nil
+			return existing.Network.ID, nil
 		}
 		return "", fmt.Errorf("create outbound network: %w", err)
 	}
@@ -342,7 +339,7 @@ func (d *Docker) ensureOutboundNetwork(ctx context.Context) (string, error) {
 func (d *Docker) waitProxyReady(ctx context.Context, proxyID string) error {
 	deadline := time.Now().Add(proxyReadyTimeout)
 	for {
-		rc, err := d.cli.ContainerLogs(ctx, proxyID, container.LogsOptions{
+		rc, err := d.cli.ContainerLogs(ctx, proxyID, client.ContainerLogsOptions{
 			ShowStdout: true, ShowStderr: true, Tail: "20",
 		})
 		if err == nil {
@@ -351,8 +348,8 @@ func (d *Docker) waitProxyReady(ctx context.Context, proxyID string) error {
 			if strings.Contains(string(body), "proxy: listening") {
 				return nil
 			}
-			info, ierr := d.cli.ContainerInspect(ctx, proxyID)
-			if ierr == nil && info.State != nil && !info.State.Running {
+			info, ierr := d.cli.ContainerInspect(ctx, proxyID, client.ContainerInspectOptions{})
+			if ierr == nil && info.Container.State != nil && !info.Container.State.Running {
 				return fmt.Errorf("proxy exited before listening")
 			}
 		}

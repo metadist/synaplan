@@ -2,15 +2,16 @@ package runner
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-units"
 	"github.com/metadist/synaplan-compute/pkg/contract"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 )
 
 const (
@@ -27,6 +28,10 @@ const (
 	defaultNofile      = 1024
 	dockerSock         = "docker.sock"
 )
+
+// deadResolver is the only nameserver an egress run is allowed. It answers
+// nothing, so the run cannot resolve or exfiltrate over DNS.
+var deadResolver = netip.MustParseAddr("127.0.0.1")
 
 // Spec is the only input Hardened accepts. Docker.Create is the only caller
 // that turns this into a container. Egress is nil for offline runs; when set
@@ -102,13 +107,13 @@ func Hardened(spec Spec) (container.Config, container.HostConfig) {
 	}
 
 	networkMode := networkNone
-	var dns []string
+	var dns []netip.Addr
 	if spec.Egress != nil {
 		networkMode = spec.Egress.Network
 		cfg.Env = ProxyEnv(spec.Egress.ProxyURL)
 		// Dead resolver: the run container must not resolve anything
 		// itself — the proxy dials pinned IPs. Invalidates DNS exfil.
-		dns = []string{"127.0.0.1"}
+		dns = []netip.Addr{deadResolver}
 	}
 
 	mounts := []mount.Mount{
@@ -256,7 +261,7 @@ func validateNetworkMode(cfg container.Config, hc container.HostConfig) error {
 	if !isEgressNetworkName(mode) {
 		return fmt.Errorf("NetworkMode must be none or a per-run egress network, got %q", mode)
 	}
-	if len(hc.DNS) != 1 || hc.DNS[0] != "127.0.0.1" {
+	if len(hc.DNS) != 1 || hc.DNS[0] != deadResolver {
 		return fmt.Errorf("egress Dns must be exactly [127.0.0.1]")
 	}
 	want := map[string]bool{"HTTP_PROXY=": false, "HTTPS_PROXY=": false, "NO_PROXY=": false}

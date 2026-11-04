@@ -9,14 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/metadist/synaplan-compute/internal/perm"
 	"github.com/metadist/synaplan-compute/pkg/contract"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 // ErrUnavailable is returned when dockerd is not reachable. Health still works.
@@ -57,8 +56,11 @@ type Docker struct {
 	Policy Policy
 }
 
-// Connect builds a Docker SDK client from the environment. On failure the
-// returned Docker is non-nil with a nil client so health can still serve.
+// Connect builds a Docker SDK client from the environment. The client is
+// github.com/moby/moby/client: github.com/docker/docker stopped at v28.5.2,
+// which is the vulnerable engine module, and that line has no patched
+// release. On failure the returned Docker is non-nil with a nil client so
+// health can still serve.
 func Connect(p Policy) *Docker {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -66,7 +68,7 @@ func Connect(p Policy) *Docker {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if _, err := cli.Ping(ctx); err != nil {
+	if _, err := cli.Ping(ctx, client.PingOptions{}); err != nil {
 		_ = cli.Close()
 		return &Docker{Policy: p}
 	}
@@ -83,12 +85,12 @@ func (d *Docker) InfoRuntimes(ctx context.Context) (map[string]struct{}, error) 
 	if !d.Available() {
 		return nil, ErrUnavailable
 	}
-	info, err := d.cli.Info(ctx)
+	info, err := d.cli.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]struct{}, len(info.Runtimes))
-	for name := range info.Runtimes {
+	out := make(map[string]struct{}, len(info.Info.Runtimes))
+	for name := range info.Info.Runtimes {
 		out[name] = struct{}{}
 	}
 	return out, nil
@@ -114,14 +116,18 @@ func (d *Docker) Create(ctx context.Context, spec Spec) (string, error) {
 			EndpointsConfig: map[string]*network.EndpointSettings{spec.Egress.Network: {}},
 		}
 	}
-	resp, err := d.cli.ContainerCreate(ctx, &cfg, &hc, networking, nil, "")
+	resp, err := d.cli.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config:           &cfg,
+		HostConfig:       &hc,
+		NetworkingConfig: networking,
+	})
 	if err != nil {
 		return "", err
 	}
-	if err := d.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if _, err := d.cli.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{}); err != nil {
 		cctx, cancel := cleanupContext()
 		defer cancel()
-		_ = d.cli.ContainerRemove(cctx, resp.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
+		_, _ = d.cli.ContainerRemove(cctx, resp.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 		return "", err
 	}
 	return resp.ID, nil
@@ -132,11 +138,11 @@ func (d *Docker) Wait(ctx context.Context, id string) (int, error) {
 	if !d.Available() {
 		return -1, ErrUnavailable
 	}
-	statusCh, errCh := d.cli.ContainerWait(ctx, id, container.WaitConditionNotRunning)
+	wait := d.cli.ContainerWait(ctx, id, client.ContainerWaitOptions{Condition: container.WaitConditionNotRunning})
 	select {
-	case err := <-errCh:
+	case err := <-wait.Error:
 		return -1, err
-	case st := <-statusCh:
+	case st := <-wait.Result:
 		if st.Error != nil && st.Error.Message != "" {
 			return int(st.StatusCode), fmt.Errorf("wait: %s", st.Error.Message)
 		}
@@ -151,14 +157,14 @@ func (d *Docker) Inspect(ctx context.Context, id string) (State, error) {
 	if !d.Available() {
 		return State{}, ErrUnavailable
 	}
-	info, err := d.cli.ContainerInspect(ctx, id)
+	info, err := d.cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		return State{}, err
 	}
-	if info.State == nil {
+	if info.Container.State == nil {
 		return State{}, fmt.Errorf("inspect %s: no state", id)
 	}
-	return State{ExitCode: info.State.ExitCode, OOMKilled: info.State.OOMKilled, Running: info.State.Running}, nil
+	return State{ExitCode: info.Container.State.ExitCode, OOMKilled: info.Container.State.OOMKilled, Running: info.Container.State.Running}, nil
 }
 
 // Kill sends SIGKILL.
@@ -166,7 +172,8 @@ func (d *Docker) Kill(ctx context.Context, id string) error {
 	if !d.Available() {
 		return ErrUnavailable
 	}
-	return d.cli.ContainerKill(ctx, id, "KILL")
+	_, err := d.cli.ContainerKill(ctx, id, client.ContainerKillOptions{Signal: "KILL"})
+	return err
 }
 
 // Remove force-deletes the container and anonymous volumes.
@@ -174,7 +181,8 @@ func (d *Docker) Remove(ctx context.Context, id string) error {
 	if !d.Available() {
 		return ErrUnavailable
 	}
-	return d.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true, RemoveVolumes: true})
+	_, err := d.cli.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	return err
 }
 
 // Logs follows the container's multiplexed log stream and demultiplexes it
@@ -183,7 +191,7 @@ func (d *Docker) Logs(ctx context.Context, id string, stdout, stderr io.Writer) 
 	if !d.Available() {
 		return ErrUnavailable
 	}
-	rc, err := d.cli.ContainerLogs(ctx, id, container.LogsOptions{
+	rc, err := d.cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -209,16 +217,16 @@ func (d *Docker) SweepOrphans(ctx context.Context, scratchDir string) error {
 	if !d.Available() {
 		return firstErr
 	}
-	args := filters.NewArgs(filters.Arg("label", runLabelKey+"="+runLabelValue))
-	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: args})
+	args := make(client.Filters).Add("label", runLabelKey+"="+runLabelValue)
+	list, err := d.cli.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: args})
 	if err != nil {
 		if firstErr == nil {
 			firstErr = err
 		}
 		return firstErr
 	}
-	for _, c := range list {
-		_ = d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
+	for _, c := range list.Items {
+		_, _ = d.cli.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 	}
 	if err := d.SweepEgressNetworks(ctx); err != nil && firstErr == nil {
 		firstErr = err
