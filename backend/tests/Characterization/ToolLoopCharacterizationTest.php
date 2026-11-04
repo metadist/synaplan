@@ -18,9 +18,9 @@ use PHPUnit\Framework\TestCase;
  * the tools that ran, the gate decision or "no gate", approval rows, audit
  * rows, usage rows, the clamped result and the stop reason.
  *
- * Recorded on the untouched code. The known gaps (document tools and MCP
- * reads without a gate, no audit row for an executed tool, no usage row on
- * the OpenAI loop) are in the snapshot on purpose.
+ * AU25 closed the gaps this file was recorded to show: the gate runs,
+ * a write leaves a tool.executed row, and the OpenAI loop writes a TOOLS row.
+ * An edit of the person's own file is allowed without a new approval.
  *
  * Record with UPDATE_TOOL_LOOP_SNAPSHOTS=1.
  */

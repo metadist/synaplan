@@ -19,6 +19,7 @@ use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\ToolExecutionGate;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
@@ -756,11 +757,17 @@ final readonly class GatewayToolLoop
             }
 
             if ($this->catalogAdapter->isMutatingTool($entry['annotations']) && !$this->approvalsOn((int) $user->getId())) {
-                $results[] = $this->toolResultBlock(
-                    $toolUseId,
-                    sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']),
-                    isError: true,
+                $message = sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']);
+                $this->executionGate?->inspect(
+                    (int) $user->getId(),
+                    $name,
+                    $arguments,
+                    $user,
+                    PolicyContext::Interactive,
+                    'chat:0',
+                    forcedRefusal: $message,
                 );
+                $results[] = $this->toolResultBlock($toolUseId, $message, isError: true);
                 continue;
             }
 

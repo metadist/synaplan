@@ -55,6 +55,7 @@ final readonly class CodeExecutionInvoker
             false,
             $messageId,
         );
+        $this->runner->noteFinished($user, $result, 'chat:'.(int) ($messageId ?? 0));
 
         return [
             'text' => json_encode($this->payload($result), \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR),

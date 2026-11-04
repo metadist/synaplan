@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Tool\Execution;
 
 use App\Entity\User;
-use App\Service\Tool\Execution\GateMode;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\SideEffect;
@@ -27,6 +26,6 @@ trait ToolExecutionExamples
      */
     private function invocation(string $channel, string $name = 'tool', array $arguments = [], ?User $user = null): ToolInvocation
     {
-        return new ToolInvocation($name, $arguments, new ToolCaller(7, $channel), GateMode::AsTodayNever, user: $user);
+        return new ToolInvocation($name, $arguments, new ToolCaller(7, $channel), user: $user);
     }
 }
