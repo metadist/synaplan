@@ -163,7 +163,7 @@
     "tabFiles": "Files",
     "tabSearch": "Search",
     "tabVectors": "Vectors",
-    "intro": "Files you upload become searchable knowledge for your chats.",
+    "intro": "Files marked Searchable by AI can be used in chats and assistants.",
     "introCta": "Add files to your sources…",
     "useInChat": "Use in chat",
     "startedChatWithFolder": "Started a new chat with {folder}.",
@@ -251,10 +251,10 @@
     "vectorState": {
       "vectorized": "Searchable by AI",
       "vectorizedDetail": "Searchable by AI · {group} · {count} chunks",
-      "processing": "Processing…",
+      "processing": "Reading…",
       "none": "Not searchable",
       "notApplicable": "Not applicable",
-      "failed": "Failed"
+      "failed": "Couldn't be read"
     },
     "filter": {
       "source": "Source",

@@ -9,7 +9,8 @@ import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
  * column and under the row's action icons. The label keeps the nowrap; the
  * badge itself must be able to shrink.
  *
- * (`FileVectorPill` is icon-only, so it has no label to overflow.)
+ * `FileVectorPill` now shows a word too; it uses the same shrink chain
+ * so a long status does not push the row's actions off-screen.
  */
 describe('file badges shrink instead of overflowing their row', () => {
   const wrapper = () => mount(FileSourceBadge, { props: { source: 'nextcloud' as const } })

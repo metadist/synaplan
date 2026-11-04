@@ -811,94 +811,94 @@
     },
     "chats": {
       "rail": {
-        "title": "Cinq espaces",
-        "body": "Cette barre bascule entre Chats, Bibliothèque, Assistants, Apps et Administration. Chaque espace ouvre son propre menu à côté."
+        "title": "Les espaces",
+        "body": "Ces icônes changent d’espace : Chats, Bibliothèque, Assistants et Apps. Administration n’apparaît que pour les personnes qui gèrent cette installation. Un clic ouvre le menu de cet espace à côté."
       },
       "new": {
-        "title": "Démarrer un nouveau chat",
-        "body": "Chaque chat est enregistré dans la liste ci-dessous pour y revenir plus tard."
+        "title": "Un nouveau chat",
+        "body": "Ce bouton démarre une conversation vide. Ce que vous avez écrit avant reste dans la liste en dessous, et vous pouvez le rouvrir."
       },
       "input": {
-        "title": "Posez votre question",
-        "body": "Saisissez votre question et appuyez sur Entrée. Synaplan choisit un modèle adapté et peut utiliser vos fichiers et souvenirs."
+        "title": "Posez simplement la question",
+        "body": "Vous écrivez ici. Entrée envoie le message, et la réponse apparaît au-dessus."
       },
       "plus": {
-        "title": "Fichiers et outils",
-        "body": "Joignez un fichier ou une photo, ou activez un outil comme la recherche web pour ce message."
+        "title": "Un fichier ou un outil",
+        "body": "Plus joint un fichier ou une photo à ce message. Vous pouvez aussi y ajouter un outil, comme la recherche web."
       },
       "model": {
-        "title": "Choisir le modèle",
-        "body": "Laissez-le en automatique ou choisissez un modèle. Vos réglages par défaut sont sous Assistants › Paramètres IA."
+        "title": "Quel modèle répond",
+        "body": "Le nom ici est le modèle de cette réponse. Appuyez dessus pour en choisir un autre. Ce qui s’applique à tout le monde se règle sous Assistants, dans Réglages IA."
       },
       "search": {
-        "title": "Tout retrouver",
-        "body": "Recherchez chats, fichiers, assistants et pages depuis n’importe où, aussi avec Ctrl+K ou ⌘K."
+        "title": "Retrouver quelque chose",
+        "body": "Ce champ cherche dans les chats, fichiers, assistants et pages. La même recherche s’ouvre de n’importe où avec Ctrl+K ou ⌘K."
       }
     },
     "library": {
       "tabs": {
-        "title": "Tout ce que vous conservez",
-        "body": "Vos fichiers, ce qui arrive des apps, ce que l’IA a généré, plus la recherche et les souvenirs — un onglet chacun."
+        "title": "Ce qu’il y a à gauche",
+        "body": "Parcourir, ce sont les fichiers que vous avez ajoutés. Entrants, c’est ce que d’autres apps ont envoyé. Créés par l'IA, c’est ce que l’IA a produit. Recherche cherche dedans."
       },
       "upload": {
         "title": "Ajouter des fichiers",
-        "body": "Déposez des fichiers ici. Synaplan les lit pour que chats et assistants répondent à partir de leur contenu."
+        "body": "Téléversez des fichiers ici, ou déposez-les. Les réponses n’utilisent que les fichiers marqués recherchables. Pour les photos, les enregistrements et les fichiers créés par l’IA, vous ajoutez cette marque vous-même."
       },
       "use": {
-        "title": "Les utiliser dans un chat",
-        "body": "Dans un chat, choisissez + › Dossier de connaissances pour répondre depuis un dossier, ou posez simplement la question — les fichiers utiles sont trouvés seuls."
+        "title": "Les mêmes fichiers dans un chat",
+        "body": "Dans un chat, ouvrez Plus et choisissez un dossier de connaissances. La réponse vient des fichiers recherchables de ce dossier."
       }
     },
     "assistants": {
       "create": {
         "title": "Créer un assistant",
-        "body": "Un assistant retient ses instructions, fichiers et outils pour que vous n’ayez pas à les répéter à chaque chat."
+        "body": "Un assistant retient les instructions, les fichiers et les outils. Vous les définissez une fois. Chaque chat avec lui les connaît déjà."
       },
       "gallery": {
-        "title": "Vos assistants",
-        "body": "Démarrez un chat avec l’un d’eux, modifiez-le, copiez un modèle ou partagez-le avec votre équipe."
+        "title": "La liste",
+        "body": "Voici les assistants que vous avez déjà. Ouvrez-en un pour discuter, le modifier ou le partager avec votre équipe."
       },
       "more": {
-        "title": "Tâches et approbations",
-        "body": "Le menu Assistants contient aussi les Tâches planifiées, les Approbations en attente et vos paramètres IA."
+        "title": "Aussi dans ce menu",
+        "body": "Les tâches s’exécutent à l’heure que vous choisissez. Les approbations attendent votre oui. Les réglages IA sont ici aussi."
       }
     },
     "tasks": {
       "new": {
-        "title": "Créer une tâche",
-        "body": "Décrivez ce que l’IA doit faire et, si vous le souhaitez, quand. Elle s’exécute ensuite seule."
+        "title": "Décrire une tâche",
+        "body": "Écrivez ce que l’IA doit faire, et quand. Elle ne démarre pas toute seule. La tâche reste éteinte jusqu’à ce que vous l’activiez."
       },
       "approvals": {
-        "title": "Vous gardez la main",
-        "body": "Avant qu’une tâche n’envoie un mail ou ne modifie quelque chose, elle vous le demande sous Approbations. Les résultats figurent dans les exécutions de la tâche."
+        "title": "Vous dites oui",
+        "body": "Avant qu’une tâche n’envoie un mail ou ne change quelque chose, une carte apparaît sous Approbations. Rien ne part sans votre oui. Le résultat figure dans les exécutions de cette tâche."
       }
     },
     "apps": {
       "search": {
         "title": "Trouver une app",
-        "body": "Recherchez par nom ou par usage, par exemple mail ou calendrier."
+        "body": "Tapez un nom dans le champ de recherche, par exemple mail ou calendrier."
       },
       "tabs": {
-        "title": "Toutes ou connectées",
-        "body": "Connectées n’affiche que ce que vous utilisez déjà, pour le vérifier ou le déconnecter vite."
+        "title": "Toutes, ou seulement les vôtres",
+        "body": "Toutes, c’est la liste complète. Connectées n’affiche que les apps que vous avez déjà connectées."
       },
       "list": {
         "title": "Ouvrir une app",
-        "body": "Chaque app explique ce qu’elle fait, se connecte en quelques étapes et se désactive sur la même page."
+        "body": "Ouvrez une app et lisez ce qu’elle fait. La connecter, et la désactiver ensuite, se fait sur la même page."
       }
     },
     "admin": {
       "cards": {
-        "title": "Votre serveur en un coup d’œil",
-        "body": "Utilisateurs, nouvelles inscriptions, fonctions désactivées et modèles à vérifier. Chaque carte ouvre sa page."
+        "title": "Les chiffres",
+        "body": "Chaque carte est un décompte, par exemple les utilisateurs ou les modèles à vérifier. Un clic ouvre cette page."
       },
       "attention": {
-        "title": "Ce qui vous attend",
-        "body": "Les problèmes sont listés ici avec un bouton qui mène directement à la solution."
+        "title": "Ce qui ne va pas",
+        "body": "Voici ce qui demande de l’attention. Chaque ligne a un bouton qui mène à la solution."
       },
       "sections": {
-        "title": "Sections d’administration",
-        "body": "État du système, infrastructure IA, Utilisateurs et Configuration du système. La configuration a sa propre recherche de paramètres."
+        "title": "Les pages d’administration",
+        "body": "D’ici vous atteignez État du système, Infrastructure IA, Utilisateurs et Configuration système. Configuration système a sa propre recherche dans les paramètres."
       }
     },
     "checklist": {

@@ -204,7 +204,7 @@
     "tabFiles": "Dateien",
     "tabSearch": "Suche",
     "tabVectors": "Vektoren",
-    "intro": "Hochgeladene Dateien werden durchsuchbares Wissen für deine Chats.",
+    "intro": "Als KI-durchsuchbar markierte Dateien können in Chats und Assistenten genutzt werden.",
     "introCta": "Füge Dateien zu Deinen Quellen hinzu…",
     "useInChat": "Im Chat nutzen",
     "startedChatWithFolder": "Neuer Chat mit {folder} gestartet.",
@@ -292,10 +292,10 @@
     "vectorState": {
       "vectorized": "KI-durchsuchbar",
       "vectorizedDetail": "KI-durchsuchbar · {group} · {count} Abschnitte",
-      "processing": "Wird verarbeitet…",
+      "processing": "Wird gelesen…",
       "none": "Nicht durchsuchbar",
       "notApplicable": "Nicht zutreffend",
-      "failed": "Fehlgeschlagen"
+      "failed": "Konnte nicht gelesen werden"
     },
     "filter": {
       "source": "Quelle",

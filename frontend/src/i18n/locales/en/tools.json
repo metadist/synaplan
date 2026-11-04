@@ -811,94 +811,94 @@
     },
     "chats": {
       "rail": {
-        "title": "Five areas",
-        "body": "This bar switches between Chats, Library, Assistants, Apps and Admin. Each area opens its own menu next to it."
+        "title": "The areas",
+        "body": "These icons switch area: Chats, Library, Assistants and Apps. Admin appears for people who manage this installation. A click opens that area’s menu beside it."
       },
       "new": {
-        "title": "Start a new chat",
-        "body": "Every chat is saved in the list below, so you can come back to it later."
+        "title": "A new chat",
+        "body": "This button starts an empty conversation. What you wrote before stays in the list below, and you can open it again."
       },
       "input": {
-        "title": "Ask anything",
-        "body": "Type your question and press Enter. Synaplan picks a suitable model and can use your files and memories."
+        "title": "Just ask",
+        "body": "You write here. Enter sends the message, and the answer appears above."
       },
       "plus": {
-        "title": "Files and tools",
-        "body": "Attach a file or a photo, or turn on a tool such as web search for this message."
+        "title": "A file or a tool",
+        "body": "Plus attaches a file or a photo to this message. You can also add a tool there, such as web search."
       },
       "model": {
-        "title": "Choose the model",
-        "body": "Leave it on automatic or pick a model yourself. Your defaults live under Assistants › AI settings."
+        "title": "Which model answers",
+        "body": "The name here is the model for this answer. Tap it to choose another. What applies to everyone is set under Assistants, in AI settings."
       },
       "search": {
-        "title": "Find anything",
-        "body": "Search chats, files, assistants and pages from anywhere, also with Ctrl+K or ⌘K."
+        "title": "Find something again",
+        "body": "This field searches chats, files, assistants and pages. The same search opens from anywhere with Ctrl+K or ⌘K."
       }
     },
     "library": {
       "tabs": {
-        "title": "Everything you keep",
-        "body": "Your files, what arrived from apps, what the AI generated, plus search and memories — one tab each."
+        "title": "What is on the left",
+        "body": "Browse is the files you added. Incoming is what other apps sent. AI-created is what the AI made. Search looks through them."
       },
       "upload": {
         "title": "Add files",
-        "body": "Drop files here. Synaplan reads them so chats and assistants can answer from their content."
+        "body": "Upload files here, or drop them in. Answers can use only files marked searchable. For photos, recordings and files the AI created, you add that mark yourself."
       },
       "use": {
-        "title": "Use them in a chat",
-        "body": "In a chat, choose + › Knowledge folder to answer from a folder, or simply ask — relevant files are found on their own."
+        "title": "The same files in a chat",
+        "body": "In a chat, open Plus and choose a knowledge folder. The answer comes from the searchable files in that folder."
       }
     },
     "assistants": {
       "create": {
         "title": "Create an assistant",
-        "body": "An assistant remembers its instructions, files and tools, so you do not repeat them in every chat."
+        "body": "An assistant remembers instructions, files and tools. You set that once. Every chat with it already knows."
       },
       "gallery": {
-        "title": "Your assistants",
-        "body": "Start a chat with one, edit it, copy a template or share it with your team."
+        "title": "The list",
+        "body": "These are the assistants you already have. Open one to chat, to change it, or to share it with your team."
       },
       "more": {
-        "title": "Tasks and approvals",
-        "body": "The Assistants menu also holds Tasks that run on a schedule, Approvals waiting for you, and your AI settings."
+        "title": "Also in this menu",
+        "body": "Tasks run at a time you choose. Approvals are waiting for your yes. AI settings are here too."
       }
     },
     "tasks": {
       "new": {
-        "title": "Create a task",
-        "body": "Describe what the AI should do and, if you like, when. It then runs on its own."
+        "title": "Describe a task",
+        "body": "Write what the AI should do, and when. It does not start by itself. The task stays off until you turn it on."
       },
       "approvals": {
-        "title": "You stay in control",
-        "body": "Before a task sends a mail or changes something, it asks you under Approvals. Results show up in the task’s runs."
+        "title": "You say yes",
+        "body": "Before a task sends a mail or changes something, a card appears under Approvals. Nothing goes out without your yes. What came of it is listed in that task’s runs."
       }
     },
     "apps": {
       "search": {
         "title": "Find an app",
-        "body": "Search by name or what you want to do, for example mail or calendar."
+        "body": "Type a name in the search field, for example mail or calendar."
       },
       "tabs": {
-        "title": "All or connected",
-        "body": "Connected shows only what you already use, so you can check or disconnect it quickly."
+        "title": "All, or only yours",
+        "body": "All is the full list. Connected shows only the apps you have already connected."
       },
       "list": {
         "title": "Open an app",
-        "body": "Each app explains what it can do, connects in a few steps and can be turned off on the same page."
+        "body": "Open an app and read what it does. Connecting it, and turning it off again, happen on the same page."
       }
     },
     "admin": {
       "cards": {
-        "title": "Your server at a glance",
-        "body": "Users, new sign-ups, switched-off features and models to check. Each card opens the page behind it."
+        "title": "The numbers",
+        "body": "Each card is one count, such as users or models to check. A click opens that page."
       },
       "attention": {
-        "title": "What needs you",
-        "body": "Problems are listed here with a button that takes you straight to the fix."
+        "title": "What is wrong",
+        "body": "This is what needs attention. Each row has a button that takes you to the fix."
       },
       "sections": {
-        "title": "Admin sections",
-        "body": "System status, AI infrastructure, Users and System configuration. The configuration page has its own settings search."
+        "title": "The admin pages",
+        "body": "From here you reach System status, AI infrastructure, Users and System configuration. System configuration has its own search across the settings."
       }
     },
     "checklist": {

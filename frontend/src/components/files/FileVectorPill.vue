@@ -1,24 +1,23 @@
 <template>
-  <!-- Icon-only status: colour carries the meaning (green = searchable,
-       grey = not yet), the label lives in the hover tooltip. A text pill was
-       too loud — the default "not searchable" state applies to most rows, so
-       spelling it out on every row was noise and could wrap on mobile. -->
+  <!-- Word plus colour: the status must be readable without a hover. The
+       glyph is extra on larger screens; on a phone it drops so the row
+       keeps the label on one line. -->
   <span
-    class="inline-flex items-center shrink-0"
+    class="inline-flex items-center gap-1 min-w-0 max-w-full overflow-hidden text-[11px] font-medium"
     :class="variant.color"
     :title="tooltip"
-    :aria-label="label"
-    role="img"
     data-testid="file-vector-pill"
   >
     <CloudGlyph
       v-if="variant.glyph"
+      class="hidden sm:inline-flex shrink-0"
       :eyes="false"
       :badge="variant.badge"
       :size="16"
       :class="variant.spin && 'animate-spin'"
     />
-    <Icon v-else :icon="variant.icon" class="w-4 h-4" />
+    <Icon v-else :icon="variant.icon" class="hidden sm:block w-3.5 h-3.5 shrink-0" />
+    <span class="truncate whitespace-nowrap">{{ label }}</span>
   </span>
 </template>
 
@@ -44,12 +43,11 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
-// Colour + icon per state. Standard palette utilities, dark-mode safe.
 const variant = computed(() => {
   switch (props.state) {
     case 'vectorized':
       return {
-        color: 'text-emerald-600 dark:text-emerald-400',
+        color: 'text-[var(--status-success-text)]',
         icon: 'mdi:check-circle',
         glyph: true,
         badge: null,
@@ -57,7 +55,7 @@ const variant = computed(() => {
       }
     case 'pending':
       return {
-        color: 'text-blue-500 dark:text-blue-400',
+        color: 'text-[var(--status-info)]',
         icon: 'mdi:loading',
         glyph: true,
         badge: 'clock' as const,
@@ -65,7 +63,7 @@ const variant = computed(() => {
       }
     case 'failed':
       return {
-        color: 'text-red-500 dark:text-red-400',
+        color: 'text-[var(--status-error)]',
         icon: 'mdi:alert-circle',
         glyph: true,
         badge: 'alert' as const,
@@ -82,7 +80,6 @@ const variant = computed(() => {
   }
 })
 
-// Short label for screen readers (aria-label).
 const label = computed(() => {
   switch (props.state) {
     case 'vectorized':
@@ -96,7 +93,6 @@ const label = computed(() => {
   }
 })
 
-// Hover tooltip carries the detail (folder + chunk count when searchable).
 const tooltip = computed(() => {
   switch (props.state) {
     case 'vectorized':
