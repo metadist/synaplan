@@ -6,15 +6,22 @@
     :on-go-home="handleGoHome"
     data-testid="comp-error-boundary"
   />
-  <slot v-else />
+  <slot v-else-if="treeVisible" />
 </template>
 
 <script setup lang="ts">
-import { computed, onErrorCaptured, ref, watch } from 'vue'
+import { computed, nextTick, onErrorCaptured, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ErrorView from '@/views/ErrorView.vue'
 import { useGlobalErrorStore, type GlobalErrorPayload } from '@/stores/globalError'
 import { getErrorMessage } from '@/utils/errorMessage'
+import {
+  beginDevPiniaRecovery,
+  finishDevPiniaRecovery,
+  isDevPiniaContextLoss,
+  noteDevPiniaContextHealthy,
+  reloadAfterDevPiniaContextLoss,
+} from '@/utils/devPiniaContextRecovery'
 
 /**
  * App-wide error boundary. We render <ErrorView /> *inline* (replacing the
@@ -35,12 +42,58 @@ const globalErrorStore = useGlobalErrorStore()
 const router = useRouter()
 const route = useRoute()
 const lastErrorPath = ref<string | null>(null)
+/** False for one frame while a hot-update remounts the tree. */
+const treeVisible = ref(true)
+let piniaRecoveryAttempts = 0
 
 const activeError = computed<GlobalErrorPayload | null>(
   () => localError.value ?? globalErrorStore.current
 )
 
+onMounted(() => {
+  void nextTick(() => {
+    if (!activeError.value) noteDevPiniaContextHealthy()
+  })
+})
+
+/**
+ * A hot update can throw "no active Pinia" once and then be fine. Hide the
+ * tree and mount it again before showing the fatal screen. If that second
+ * mount throws too, reload — the same recovery a manual refresh already is.
+ * Returns true when the fatal screen must stay hidden.
+ */
+function recoverDevPiniaContext(err: unknown): boolean {
+  if (!import.meta.env.DEV || !isDevPiniaContextLoss(err)) return false
+  piniaRecoveryAttempts += 1
+  if (piniaRecoveryAttempts === 1) {
+    beginDevPiniaRecovery()
+    console.warn('Hot update lost the Pinia context. Remounting the page.')
+    void nextTick(() => {
+      treeVisible.value = false
+      void nextTick(() => {
+        treeVisible.value = true
+      })
+    })
+    return true
+  }
+  return reloadAfterDevPiniaContextLoss(err)
+}
+
+watch(
+  treeVisible,
+  (visible) => {
+    // Only the scheduled remount (attempt 1) counts as recovered. Attempt 2
+    // has already decided to reload or to show the fatal screen.
+    if (!visible || piniaRecoveryAttempts !== 1 || activeError.value) return
+    piniaRecoveryAttempts = 0
+    finishDevPiniaRecovery()
+  },
+  { flush: 'post' }
+)
+
 onErrorCaptured((err: unknown) => {
+  if (recoverDevPiniaContext(err)) return false
+
   console.error('Component error captured by ErrorBoundary:', err)
 
   const statusFromErr =

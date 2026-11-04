@@ -39,6 +39,39 @@ export function gitkeepPlugin(): Plugin {
  * interval instead of polling: the dev backend rebuilds the spec on every
  * request (~1s of CPU).
  */
+/**
+ * Dev server only. Pinia keeps store state across edits only when the store
+ * module accepts its own hot update. Without that, saving a store re-runs
+ * every component that imports it, and setup() can throw "no active Pinia"
+ * until a manual refresh. One store is exported per file.
+ */
+export function piniaStoreHmrPlugin(): Plugin {
+  return {
+    name: 'pinia-store-hmr',
+    apply: 'serve',
+    transform(code, id) {
+      if (process.env.VITEST) return null
+      const path = id.split('?')[0] ?? id
+      if (!/\/src\/stores\/[^/]+\.ts$/.test(path)) return null
+      if (code.includes('acceptHMRUpdate') || code.includes('__acceptPiniaHmr')) return null
+      const names = [...code.matchAll(/export const (use\w+) = defineStore\(/g)].map(
+        (match) => match[1]
+      )
+      const name = names[0]
+      if (names.length !== 1 || name == null) return null
+      return {
+        code:
+          `import { acceptHMRUpdate as __acceptPiniaHmr } from 'pinia'\n` +
+          `${code}\n` +
+          `if (import.meta.hot) {\n` +
+          `  import.meta.hot.accept(__acceptPiniaHmr(${name}, import.meta.hot))\n` +
+          `}\n`,
+        map: null,
+      }
+    },
+  }
+}
+
 export function openapiSchemaSyncPlugin(): Plugin {
   const CHECK_INTERVAL_MS = 30_000
   let root = ''
@@ -89,7 +122,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: basePath,
-    plugins: [vue(), gitkeepPlugin(), openapiSchemaSyncPlugin()],
+    plugins: [vue(), gitkeepPlugin(), openapiSchemaSyncPlugin(), piniaStoreHmrPlugin()],
     build: {
       outDir: 'dist',
       emptyOutDir: true,
@@ -136,6 +169,13 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
+      // One Vue and one Pinia on the page. A second copy has its own
+      // active-instance flag, so useStore() throws during HMR even though
+      // the app already called app.use(pinia).
+      dedupe: ['vue', 'pinia'],
+    },
+    optimizeDeps: {
+      include: ['vue', 'pinia'],
     },
     server: {
       allowedHosts,
