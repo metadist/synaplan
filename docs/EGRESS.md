@@ -4,7 +4,9 @@ Every byte Synaplan sends to another host, as of the inventory frozen in
 `backend/tests/Architecture/egressInventoryBaseline.json` (S2 AU14). The
 policy that will stand in front of these calls is
 [`03_contracts.md`](../_devextras/planning/20261021-architecture-update/03_contracts.md)
-§3. `EGRESS.MODE` is seeded `off`. `report` lets a call out and records
+§3. Operators change the mode on
+[Runtime and outbound traffic](https://docs.synaplan.com/runtime-setup);
+the keys are in [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md). `EGRESS.MODE` is seeded `off`. `report` lets a call out and records
 `egress.would_block` with the host and port only. `enforce` refuses before
 a socket opens. The extra allowlist is `EGRESS.ALLOW`. `EGRESS_PROXY`
 overrides `HTTPS_PROXY` when it is set; an empty value leaves the

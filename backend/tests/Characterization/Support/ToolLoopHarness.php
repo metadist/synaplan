@@ -95,7 +95,6 @@ use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\StorageQuotaService;
-use App\Tests\Support\DocumentLoopInvoker;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Cache\CacheItemPoolInterface;
@@ -1062,6 +1061,9 @@ final class ToolLoopHarness
                 ?string $nodeApproval = null,
                 bool $requireApproval = false,
                 ?array $resolvedRequest = null,
+                bool $alreadyApproved = false,
+                ?string $forcedRefusal = null,
+                bool $canPause = true,
             ) use ($real): array {
                 try {
                     $decision = $real->inspect(
@@ -1077,6 +1079,9 @@ final class ToolLoopHarness
                         $nodeApproval,
                         $requireApproval,
                         $resolvedRequest,
+                        $alreadyApproved,
+                        $forcedRefusal,
+                        $canPause,
                     );
                 } catch (ToolNotRegisteredException $e) {
                     $this->gateDecisions[] = ['tool' => $toolName, 'outcome' => 'not_registered', 'approval' => null];
@@ -1136,20 +1141,25 @@ final class ToolLoopHarness
 
         $auditRepo = $this->double(AuditLogEntryRepository::class);
         $auditRepo->method('save')->willReturnCallback(function (AuditLogEntry $entry): void {
+            $subject = $entry->getSubject();
+            if (is_array($subject) && array_key_exists('durationMs', $subject)) {
+                $subject['durationMs'] = 0;
+            }
             $this->audit[] = [
                 'actor' => $entry->getActorId(),
                 'action' => $entry->getAction(),
                 'kind' => $entry->getResourceKind(),
                 'id' => $entry->getResourceId(),
-                'subject' => $entry->getSubject(),
+                'subject' => $subject,
             ];
         });
+        $auditWriter = new AuditLogWriter($auditRepo);
         $approvalService = new ApprovalService(
             $approvals,
             new ApprovalArgsRedactor(),
             $toolsConfig,
             $this->double(ApprovalRealtimeNotifier::class),
-            new AuditLogWriter($auditRepo),
+            $auditWriter,
         );
         $this->gate = $this->recordingGate($toolsConfig, new ToolRegistry([new FixedToolSource($this->descriptors())]), $policy, $approvalService);
 
@@ -1299,14 +1309,6 @@ final class ToolLoopHarness
         $docConfig->method('maxIterations')->willReturn(4);
         $docConfig->method('maxOpsPerTurn')->willReturn(8);
         $documentTools = new DocumentToolRegistry([new SetCellsTool(), new LongEchoDocumentTool()]);
-        $this->chat = new ChatToolLoop(
-            $facade,
-            $documentTools,
-            $docConfig,
-            DocumentLoopInvoker::create($documentTools),
-            $registry,
-            $toolsConfig,
-        );
 
         $this->toolCall = new ToolCallRunner(
             $registry,
@@ -1345,7 +1347,7 @@ final class ToolLoopHarness
         $atlassian = new AtlassianToolArguments($mcp, $logger);
         $notion = new NotionFetchArguments($logger);
         $this->mcpFetch = new McpFetchRunner($mcp, $discovery, $servers, $clientConfig, $routing, $prompts, $logger, $atlassian, $notion, $images);
-        $this->mcpAction = new McpActionRunner($mcp, $discovery, $servers, $clientConfig, $routing, $prompts, $logger, $atlassian, $this->gate, $toolsConfig, $users);
+        $this->mcpAction = new McpActionRunner($mcp, $discovery, $servers, $clientConfig, $routing, $prompts, $logger, $atlassian, $this->gate, $users);
 
         $compute = $this->double(ComputeClient::class);
         $compute->method('submitRun')->willReturnCallback(function (): string {
@@ -1448,6 +1450,48 @@ final class ToolLoopHarness
             $logger,
             $this->double(EventRingStore::class),
         );
+
+        $invoker = new \App\Service\Tool\Execution\ToolInvoker(
+            [
+                new \App\Service\Tool\Execution\DocumentToolExecutor($documentTools, $logger),
+                new \App\Service\Tool\Execution\McpToolExecutor($mcp, $servers, $discovery),
+                new \App\Service\Tool\Execution\CustomHttpToolExecutor($logger, $customTools, $http, $toolsConfig),
+                new \App\Service\Tool\Execution\BuiltinToolExecutor(
+                    new NativeToolRegistry($webSearch, $this->double(WebFetchTool::class)),
+                    $image,
+                    $webSearch,
+                ),
+                new \App\Service\Tool\Execution\MemoryAddExecutor($memory, $rates),
+                new \App\Service\Tool\Execution\FileIngestExecutor(
+                    $storage,
+                    $this->double(StorageQuotaService::class),
+                    $vectors,
+                    $em,
+                    $rates,
+                ),
+            ],
+            gate: $this->gate,
+            audit: $auditWriter,
+            rates: $rates,
+            users: $users,
+        );
+        $this->gateway->setToolInvoker($invoker);
+        $this->openai->setToolInvoker($invoker);
+        $this->toolCall->setToolInvoker($invoker);
+        $this->mcpFetch->setToolInvoker($invoker);
+        $this->mcpAction->setToolInvoker($invoker);
+        $this->codeRun->setToolInvoker($invoker);
+        $this->resume->setToolInvoker($invoker);
+        $this->mcpServer->setToolInvoker($invoker);
+        $this->chat = new ChatToolLoop(
+            $facade,
+            $documentTools,
+            $docConfig,
+            $invoker,
+            $registry,
+            $toolsConfig,
+            users: $users,
+        );
     }
 
     /**
@@ -1496,6 +1540,9 @@ final class ToolLoopHarness
             new ToolDescriptor('code_execution', 'File work', 'Run a script', $schema, SideEffect::Write, ToolSource::Compute, self::USER_ID),
             new ToolDescriptor('create_ticket', 'Create ticket', 'Create a ticket', $schema, SideEffect::Write, ToolSource::Custom, self::USER_ID, null, ['toolId' => 4]),
             new ToolDescriptor('code_run', 'File work', 'Run a script', $schema, SideEffect::Write, ToolSource::Compute, self::USER_ID),
+            new ToolDescriptor('mcp:1:search_customers', 'Search customers', 'Find customers', $schema, SideEffect::Read, ToolSource::Mcp, self::USER_ID, null, ['serverId' => 1, 'tool' => 'search_customers', 'allowWrite' => false]),
+            new ToolDescriptor('memory_add', 'Save a memory', 'Store one memory', $schema, SideEffect::Write, ToolSource::Plugin, self::USER_ID, ToolDescriptor::POLICY_OWN_ARTEFACT),
+            new ToolDescriptor('file_ingest', 'Add a file', 'Add a document', $schema, SideEffect::Write, ToolSource::Plugin, self::USER_ID, ToolDescriptor::POLICY_OWN_ARTEFACT),
         ];
     }
 

@@ -31,8 +31,12 @@ use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolExecutionGate;
+use App\Service\Tool\ToolSource;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory as SpreadsheetIOFactory;
 use Psr\Log\LoggerInterface;
@@ -201,8 +205,43 @@ final readonly class CodeRunRunner implements TaskRunner
             true === ($node->params['useWorkspace'] ?? false),
             $this->hostList($node->params['egressHosts'] ?? []),
         );
+        $requestedBy = null !== $savedTaskRunId
+            ? sprintf('task_run:%d:%s', $savedTaskRunId, $node->id)
+            : 'chat:'.(int) $context->message->getId();
+        $this->noteFinished($user, $result, $requestedBy);
 
         return $this->toNodeResult($result);
+    }
+
+    /**
+     * One audit row after the sidecar finishes. The gate check before the
+     * run does not write one.
+     *
+     * @param array<string, mixed> $result
+     */
+    public function noteFinished(User $user, array $result, string $requestedBy): void
+    {
+        $runId = $result['compute_run_id'] ?? null;
+        $outcome = is_string($result['outcome'] ?? null) ? $result['outcome'] : '';
+        if (!is_string($runId) || '' === $runId || !in_array($outcome, ['ok', 'failed'], true)) {
+            return;
+        }
+        $stored = $this->runs->findOneByRunId($runId);
+        $this->toolInvoker->get()?->recordRan(
+            new ToolDescriptor(
+                Capability::CodeRun->value,
+                'File work',
+                '',
+                [],
+                SideEffect::Write,
+                ToolSource::Compute,
+                (int) $user->getId(),
+            ),
+            (int) $user->getId(),
+            $requestedBy,
+            'ok' === $outcome ? ToolOutcomeKind::Done : ToolOutcomeKind::Failed,
+            $stored?->getDurationMs() ?? 0,
+        );
     }
 
     /**

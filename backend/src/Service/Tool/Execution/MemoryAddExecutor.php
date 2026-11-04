@@ -12,8 +12,8 @@ use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
 
 /**
- * `memory_add` on Synaplan's own MCP server. The gate stays off, which
- * is the gap AU25 closes.
+ * `memory_add` on Synaplan's own MCP server. The invoker asks the gate
+ * before this runs. The tool is the user's own memory, so the policy is auto.
  */
 final readonly class MemoryAddExecutor implements ToolExecutorInterface
 {

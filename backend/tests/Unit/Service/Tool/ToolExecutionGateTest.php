@@ -56,6 +56,29 @@ final class ToolExecutionGateTest extends TestCase
         self::assertSame(PolicyOutcome::Auto, $decision['outcome']);
     }
 
+    public function testAChatThatCannotPauseDoesNotOpenAnApproval(): void
+    {
+        $approvals = $this->createMock(ApprovalService::class);
+        $approvals->expects(self::never())->method('request');
+
+        $decision = $this->gate(PolicyOutcome::Approve, $approvals)
+            ->inspect(7, 'mcp:1:search', [], $this->createStub(User::class), PolicyContext::Interactive, 'chat:11', canPause: false);
+
+        self::assertSame(PolicyOutcome::Auto, $decision['outcome']);
+        self::assertNull($decision['approval']);
+    }
+
+    public function testAPauseStillRefusesABlock(): void
+    {
+        $approvals = $this->createMock(ApprovalService::class);
+        $approvals->expects(self::never())->method('request');
+
+        $decision = $this->gate(PolicyOutcome::Block, $approvals)
+            ->inspect(7, 'mcp:1:search', [], $this->createStub(User::class), PolicyContext::Interactive, 'chat:11', canPause: false);
+
+        self::assertSame(PolicyOutcome::Block, $decision['outcome']);
+    }
+
     public function testApprovalsEnabledMirrorsToolsConfig(): void
     {
         $config = $this->createStub(ToolsConfig::class);

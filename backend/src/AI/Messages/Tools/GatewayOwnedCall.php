@@ -10,7 +10,6 @@ use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Execution\BuiltinToolExecutor;
 use App\Service\Tool\Execution\CustomHttpToolExecutor;
-use App\Service\Tool\Execution\GateMode;
 use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
@@ -101,6 +100,8 @@ final readonly class GatewayOwnedCall
         if (null !== $blocked) {
             return $blocked;
         }
+
+        ($this->recordNative)($user, 'CUSTOM_HTTP', (string) $entry['tool'], (string) $entry['tool'], ToolOutcomeKind::Failed === $outcome->kind);
 
         return $this->afterRun(($this->block)($toolUseId, $this->present($outcome->resultText), ToolOutcomeKind::Failed === $outcome->kind), $ping);
     }
@@ -239,7 +240,6 @@ final readonly class GatewayOwnedCall
             $name,
             $arguments,
             new ToolCaller((int) $user->getId(), ToolChannel::MESSAGES),
-            GateMode::AsTodayWhenApprovalsOn,
             decision: new GateRequest($user, PolicyContext::Interactive, 'chat:0'),
             decideOnly: $decideOnly,
             user: $user,
@@ -257,7 +257,6 @@ final readonly class GatewayOwnedCall
                 new BuiltinToolExecutor($this->deps->nativeTools, $this->deps->analyzeImageTool),
             ],
             gate: $this->deps->executionGate,
-            toolsConfig: $this->deps->toolsConfig,
         );
     }
 
