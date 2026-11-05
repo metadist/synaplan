@@ -38,14 +38,30 @@ final class XmpDigitalSource
 
     private function png(string $bytes): ?string
     {
-        $end = strpos($bytes, 'IEND');
-        if (false === $end || $end < 4) {
-            return null;
-        }
-        $chunkStart = $end - 4;
-        $chunk = $this->pngChunk('iTXt', "XML:com.adobe.xmp\x00\x00\x00\x00\x00".$this->packet());
+        $offset = 8;
+        $length = strlen($bytes);
+        while ($offset + 12 <= $length) {
+            $unpacked = unpack('N', substr($bytes, $offset, 4));
+            if (!is_array($unpacked) || !isset($unpacked[1]) || !is_numeric($unpacked[1])) {
+                return null;
+            }
+            $size = (int) $unpacked[1];
+            if ($size < 0) {
+                return null;
+            }
+            $next = $offset + 12 + $size;
+            if ($next > $length) {
+                return null;
+            }
+            if ('IEND' === substr($bytes, $offset + 4, 4)) {
+                $chunk = $this->pngChunk('iTXt', "XML:com.adobe.xmp\x00\x00\x00\x00\x00".$this->packet());
 
-        return substr($bytes, 0, $chunkStart).$chunk.substr($bytes, $chunkStart);
+                return substr($bytes, 0, $offset).$chunk.substr($bytes, $offset);
+            }
+            $offset = $next;
+        }
+
+        return null;
     }
 
     private function jpeg(string $bytes): string

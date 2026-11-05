@@ -28,4 +28,27 @@ final class XmpDigitalSourceTest extends TestCase
         $bytes = base64_decode(self::PNG, true).'c2pa';
         self::assertNull((new XmpDigitalSource())->embed($bytes));
     }
+
+    public function testPngInsertsBeforeTheRealEndChunkWhenIdatContainsTheMarker(): void
+    {
+        $idat = $this->chunk('IDAT', 'xxxxIEND-inside');
+        $iend = $this->chunk('IEND', '');
+        $png = "\x89PNG\r\n\x1a\n".$this->chunk('IHDR', 'ihdr').$idat.$iend;
+
+        $marked = (new XmpDigitalSource())->embed($png);
+
+        self::assertIsString($marked);
+        self::assertStringEndsWith($iend, $marked);
+        self::assertStringContainsString('trainedAlgorithmicMedia', $marked);
+        $decoyAt = strpos($marked, 'xxxxIEND-inside');
+        $packetAt = strpos($marked, 'trainedAlgorithmicMedia');
+        self::assertNotFalse($decoyAt);
+        self::assertNotFalse($packetAt);
+        self::assertLessThan($packetAt, $decoyAt);
+    }
+
+    private function chunk(string $type, string $data): string
+    {
+        return pack('N', strlen($data)).$type.$data.pack('N', 0);
+    }
 }
