@@ -1153,7 +1153,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin:latest@sha256:9feb3b1734e2538ba633c1301ca5d08fc06cc8902428fe578034edef7897792a
+    image: phpmyadmin:latest@sha256:b584de2aba701b0a275c56000abe36f6483b3493d221ee2f7ff005aba85adb66
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db
