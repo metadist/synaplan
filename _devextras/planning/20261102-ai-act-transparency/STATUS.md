@@ -14,7 +14,7 @@ before 2026-12-02 (D1).
 | AT2 | — | in this branch: provider-marked bytes stay identical |
 | AT3 | — | in this branch: pinned c2patool 0.28.4, XMP fallback, key only on the sidecar |
 | AT4 | — | in this branch: file provenance and the chat badge |
-| AT5 | — | not in this repository. Contract is documented. Chart stays in `synaplan-charts` |
+| AT5 | — | [synaplan-charts#106](https://github.com/metadist/synaplan-charts/pull/106). Off by default. Key only via Secret. |
 | AT6 | — | in this branch: "Using AI well", optional confirmation, default off |
 | AT7 | — | not in this branch. TrustMark stays due before 2027-02-02 and is not faked |
 

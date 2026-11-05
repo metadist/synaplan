@@ -54,11 +54,11 @@ An arm64 image has no c2patool binary. `/sign` then returns 503 and Synaplan kee
 
 ## Helm
 
-The chart lives in [synaplan-charts](https://github.com/metadist/synaplan-charts), not in this repository. The values the chart should grow are:
+The chart lives in [synaplan-charts](https://github.com/metadist/synaplan-charts) ([#106](https://github.com/metadist/synaplan-charts/pull/106)), not in this repository. It is off by default. Turning it on needs an image reference and the names of two existing Secrets. The chart does not create a key, does not publish a host port, and does not add an Ingress. No signer image is published yet.
 
 - `c2paSigner.enabled`
 - `c2paSigner.image`
-- `c2paSigner.keySecretRef`
-- `c2paSigner.certSecretRef`
+- `c2paSigner.keySecretRef` — Secret data key `key.pem`, passed as `C2PA_PRIVATE_KEY`
+- `c2paSigner.certSecretRef` — Secret data key `cert.pem`, passed as `C2PA_SIGN_CERT`
 
-A NetworkPolicy should allow only the backend to call the signer. This repository documents that contract. It does not ship the chart.
+`C2PA_SIGNER_URL` stays empty until the signer is enabled. The key and certificate are not given to the Synaplan container. The sidecar runs as uid 65532, with a read-only root filesystem. A NetworkPolicy allows only the Synaplan web, worker and scheduler pods to connect, and the sidecar has no egress. The binary is linux amd64, so the pod selects that architecture. When those two environment variables are set, the sidecar does not write a development key to disk.

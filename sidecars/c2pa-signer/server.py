@@ -49,6 +49,11 @@ authorityKeyIdentifier = keyid,issuer
 
 
 def ensure_dev_cert() -> None:
+    # Kubernetes injects the key as environment variables. Do not create or
+    # chmod a file in that case: the root filesystem is read-only and the
+    # key must not be written to disk a second time.
+    if os.environ.get("C2PA_PRIVATE_KEY") and os.environ.get("C2PA_SIGN_CERT"):
+        return
     parent = os.path.dirname(KEY) or "/certs"
     os.makedirs(parent, exist_ok=True)
     if not (os.path.isfile(KEY) and os.path.isfile(CERT)):
@@ -89,7 +94,10 @@ def ensure_dev_cert() -> None:
                 capture_output=True,
             )
     if os.path.isfile(KEY):
-        os.chmod(KEY, 0o600)
+        try:
+            os.chmod(KEY, 0o600)
+        except OSError:
+            return
 
 
 def algorithm() -> str:
