@@ -28,38 +28,38 @@ Synaplan is a tool an organisation deploys. This note says what the product does
 | AI notice text | Mail handler, WhatsApp, Telegram | A one-sentence default. Empty text is refused. |
 | Company name on the widget | Widget configuration, next to the privacy URL | Empty. The AI sentence still shows. |
 | `C2PA_SIGNER_URL` | Backend environment | Empty. Generated media are not signed. |
-| `C2PA_SIGNER_TOKEN` | Backend and sidecar environment | Required when the signer is enabled. |
+| `C2PA_SIGNER_TOKEN` | Backend, worker and scheduler environment | Required when the signer is enabled. |
 | `AI_LITERACY.REQUIRED` | People, "Ask everyone to read 'Using AI well'" | Off. |
 
-The system status lists the content-credentials module as absent until `C2PA_SIGNER_URL` and `C2PA_SIGNER_TOKEN` point at a healthy sidecar. The sentence there is: "Generated media are not signed. Add the signer to mark images, audio and video as AI-generated."
+The system status lists the content-credentials module as absent until `C2PA_SIGNER_URL` and `C2PA_SIGNER_TOKEN` are set and the signer answers. The sentence there is: "Generated media are not signed. On a linux amd64 server the mark runs inside Synaplan when it is switched on."
 
 ## Do not put an optimiser in front of uploads
 
 Do not run an image optimiser, a resizer, or a format converter in front of `POST /api/v1/files/uploads/`. Those tools rewrite the bytes and drop the content credential. Thumbnails inside Synaplan are separate files. The original stays as it was stored.
 
-## Content-credentials sidecar
+## Content credentials inside Synaplan
 
-The sidecar is the Compose service `c2pa-signer`, profile `c2pa`. It is not started by default.
+There is no extra container. The signer starts inside the backend, the worker and the scheduler when both of these are set:
 
 ```bash
-docker compose --profile c2pa up -d
+C2PA_SIGNER_URL=http://127.0.0.1:8787
+C2PA_SIGNER_TOKEN=<a long random token>
 ```
 
-Then set `C2PA_SIGNER_URL=http://c2pa-signer:8787` and `C2PA_SIGNER_TOKEN` on the backend. No host port is published. Requests to `/sign` and `/verify` require `Authorization: Bearer <C2PA_SIGNER_TOKEN>`.
+It listens on `127.0.0.1` only. Requests to `/sign` and `/verify` require `Authorization: Bearer <C2PA_SIGNER_TOKEN>`. Leave the URL empty to keep signing off. Do not point the URL at another host from this install: a URL that is not localhost does not start the local process.
 
-`POST /sign` takes `{bytes, filename, model, parent}` and returns `{bytes}`. `POST /verify` may return `"watermark": null`. TrustMark is not in this release. It is planned before 2027-02-02 and must not be faked.
+`POST /sign` takes `{bytes, filename, model, parent}` and returns `{bytes}`. `POST /verify` may return `"watermark": null`. TrustMark is not in this release.
 
-The development image installs c2patool 0.28.4 for linux amd64 and checks the archive against `097e9efaff765baf7738a40c640012419cad419ce3e1aa36cf68e0576309c971`. The sample keys inside that archive are not copied into the image. The process runs as uid 65532. When no key is mounted, the sidecar issues a short-lived RSA end-entity certificate and deletes the temporary CA key. The leaf key is mode `0600`. C2PA accepts the `emailProtection` extended key usage, so the development certificate uses that. The manifest algorithm defaults to `ps256`. Set `C2PA_ALG=es256` when the mounted certificate is EC. The key is passed to c2patool through `C2PA_PRIVATE_KEY` and `C2PA_SIGN_CERT`, not written into the manifest file. A certificate that is not in a public trust store still produces a marked file. c2patool may report that signature as untrusted.
+The app image installs c2patool 0.28.4 for linux amd64 and checks the archive against `097e9efaff765baf7738a40c640012419cad419ce3e1aa36cf68e0576309c971`. The sample keys inside that archive are not copied into the image. The process runs as uid 65532. When no key is mounted at `/certs`, it issues a short-lived RSA end-entity certificate and deletes the temporary CA key. That development certificate is not a public trust anchor. Do not use it on web.synaplan.com. The leaf key is mode `0600`. C2PA accepts the `emailProtection` extended key usage, so the development certificate uses that. The manifest algorithm defaults to `ps256`. Set `C2PA_ALG=es256` when the mounted certificate is EC. c2patool receives the key through `C2PA_PRIVATE_KEY` and `C2PA_SIGN_CERT` inside the signer process only. Those variables are not set on PHP. A certificate that is not in a public trust store still produces a marked file. c2patool may report that signature as untrusted.
 
-An arm64 image has no c2patool binary. `/sign` then returns 503 and Synaplan keeps the file and uses the XMP fallback for PNG and JPEG. The Compose service sets `platform: linux/amd64` so an arm host still signs, through emulation. Mount a production key and certificate readable by uid 65532. Do not commit a private key. The published self-host Compose file does not start a signer until an image is published.
+An arm64 image has no c2patool binary. The signer then stays off and PNG and JPEG still get the XMP note. A Mac development machine is arm64, so it does not sign. Production linux amd64 does. Mount a production key and certificate at `/certs/key.pem` and `/certs/cert.pem`, mode `0400`, owner uid 65532. Do not commit a private key. Do not put the key in the environment.
 
 ## Helm
 
-The chart lives in [synaplan-charts](https://github.com/metadist/synaplan-charts) ([#106](https://github.com/metadist/synaplan-charts/pull/106)), not in this repository. It is off by default. Turning it on needs an image reference and the names of two existing Secrets. The chart does not create a key, does not publish a host port, and does not add an Ingress. No signer image is published yet.
+The chart lives in [synaplan-charts](https://github.com/metadist/synaplan-charts) ([#106](https://github.com/metadist/synaplan-charts/pull/106)), not in this repository. It is off by default. Turning it on mounts the key into the Synaplan pods and sets `C2PA_SIGNER_URL` to `http://127.0.0.1:8787`. There is no second Deployment, no host port and no Ingress. The signer binary ships in the Synaplan image. It is linux amd64 only. An arm64 pod does not sign and uses the XMP note for PNG and JPEG.
 
 - `c2paSigner.enabled`
-- `c2paSigner.image`
-- `c2paSigner.keySecretRef` — Secret data key `key.pem`, passed as `C2PA_PRIVATE_KEY`
-- `c2paSigner.certSecretRef` — Secret data key `cert.pem`, passed as `C2PA_SIGN_CERT`
+- `c2paSigner.keySecretRef` — Secret data key `key.pem`, copied to `/certs/key.pem`
+- `c2paSigner.certSecretRef` — Secret data key `cert.pem`, copied to `/certs/cert.pem`
 
-`C2PA_SIGNER_URL` stays empty until the signer is enabled. The key and certificate are not given to the Synaplan container. The sidecar runs as uid 65532, with a read-only root filesystem. A NetworkPolicy allows only the Synaplan web, worker and scheduler pods to connect, and the sidecar has no egress. The binary is linux amd64, so the pod selects that architecture. When those two environment variables are set, the sidecar does not write a development key to disk.
+An init container copies the two files into an empty volume, `chown 65532:65532`, `chmod 0400`. The website user cannot read them. The chart creates the bearer token unless `tokenSecretRef` names an existing Secret. When the files are present, the signer does not write a development key.

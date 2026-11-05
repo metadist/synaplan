@@ -62,6 +62,30 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
     && sed -i 's|^mozilla/emSign_|!mozilla/emSign_|' /etc/ca-certificates.conf \
     && update-ca-certificates
 
+# Content credentials run in this image, not in a second container. c2patool
+# publishes linux amd64 only; an arm64 image keeps the XMP fallback. The
+# process user is 65532 so www-data cannot read a key mounted at /certs.
+ARG C2PATOOL_VERSION=0.28.4
+ARG C2PATOOL_SHA256=097e9efaff765baf7738a40c640012419cad419ce3e1aa36cf68e0576309c971
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 openssl \
+    && arch="$(dpkg --print-architecture)" \
+    && if [ "$arch" = "amd64" ]; then \
+         curl -fsSL -o /tmp/c2patool.tar.gz \
+           "https://github.com/contentauth/c2patool/releases/download/v${C2PATOOL_VERSION}/v${C2PATOOL_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+         && echo "${C2PATOOL_SHA256}  /tmp/c2patool.tar.gz" | sha256sum -c - \
+         && mkdir -p /tmp/c2pa-src \
+         && tar -xzf /tmp/c2patool.tar.gz -C /tmp/c2pa-src c2patool/c2patool \
+         && install -m 0755 /tmp/c2pa-src/c2patool/c2patool /usr/local/bin/c2patool \
+         && rm -rf /tmp/c2pa-src /tmp/c2patool.tar.gz; \
+       fi \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 65532 c2pa \
+    && useradd --system --uid 65532 --gid 65532 --no-create-home --shell /usr/sbin/nologin c2pa \
+    && mkdir -p /certs /usr/local/lib/c2pa-signer \
+    && chown 65532:65532 /certs \
+    && chmod 700 /certs
+
 # ext-redis (phpredis) is provided by the base image (synaplan-base-php >= 1.1.0)
 # for Symfony Messenger's Redis Streams transport (`symfony/redis-messenger`),
 # which the worker's `messenger:consume` speaks via the binary protocol. Cache,
@@ -101,10 +125,12 @@ RUN if [ "$(uname -m)" = "aarch64" ]; then \
 # it the container inherits the base image's default and only launches FrankenPHP,
 # leaving vendor/ unpopulated (which then breaks the worker's bin/console).
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
+COPY _docker/backend/c2pa-signer-start.sh /usr/local/bin/c2pa-signer-start
+COPY sidecars/c2pa-signer/server.py /usr/local/lib/c2pa-signer/server.py
 COPY _docker/backend/container-healthcheck.sh /usr/local/bin/container-healthcheck
 COPY _docker/backend/lib/ /usr/local/bin/lib/
 COPY _docker/backend/synaplan /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/container-healthcheck /usr/local/bin/synaplan
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/c2pa-signer-start /usr/local/bin/container-healthcheck /usr/local/bin/synaplan
 COPY --from=watchdog /synaplan-watchdog /usr/local/bin/synaplan-watchdog
 
 EXPOSE 80

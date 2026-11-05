@@ -343,6 +343,12 @@ fi
 # Completely inert when neither bootstrap variable is set.
 require_valid_bootstrap_admin_config
 
+# Content credentials, same container, localhost only. Missing script or
+# binary does not stop the role: PNG and JPEG still get the XMP note.
+if [ -x /usr/local/bin/c2pa-signer-start ]; then
+    /usr/local/bin/c2pa-signer-start || true
+fi
+
 # Non-web roles share the same environment and filesystem preparation above,
 # but never run migrations or seeders. They wait for the web role to complete
 # database initialization before starting their long-running process.

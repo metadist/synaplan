@@ -11,14 +11,15 @@ use App\Module\Contract\ModuleStatus;
 use App\Module\Probe\SidecarHealthProbeInterface;
 
 /**
- * Content-credentials signer. The key lives only on this sidecar.
+ * Content-credentials signer. It runs inside the Synaplan container on
+ * localhost. The key file is owned by uid 65532 and is not in the PHP environment.
  * Absent means generated media are stored with the XMP fallback and not signed.
  */
 final class C2paSignerModule implements FeatureModuleInterface
 {
     public const ID = 'c2pa_signer';
 
-    public const ABSENT_MESSAGE = 'Generated media are not signed. Add the signer to mark images, audio and video as AI-generated.';
+    public const ABSENT_MESSAGE = 'Generated media are not signed. On a linux amd64 server the mark runs inside Synaplan when it is switched on.';
 
     public function __construct(
         private readonly SidecarHealthProbeInterface $probe,

@@ -96,9 +96,9 @@ final class ServiceReadinessCatalog
         ],
         'c2pa-signer' => [
             'name' => 'Content credentials (AI media)',
-            'compose' => 'c2pa-signer',
-            'dev_only' => true,
-            'profile' => 'c2pa',
+            'compose' => 'backend',
+            'dev_only' => false,
+            'profile' => null,
             'unlocks' => 'Images, audio and video are marked as AI-generated.',
             'effect' => 'Generated media are not signed.',
             'docs' => 'modules/c2pa-signer',

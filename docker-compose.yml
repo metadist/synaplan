@@ -322,6 +322,7 @@ services:
       - ./_docker/backend/synaplan-worker-mode.Caddyfile:/usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile:ro
       - ./_docker/backend/synaplan-php-workers.Caddyfile:/usr/local/etc/php/templates/synaplan-php-workers.Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/c2pa-signer-start.sh:/usr/local/bin/c2pa-signer-start:ro
       - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
@@ -559,6 +560,7 @@ services:
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - whisper_models:/var/www/backend/var/whisper:ro
+      - ./_docker/backend/c2pa-signer-start.sh:/usr/local/bin/c2pa-signer-start:ro
     environment:
       # Worker MUST run in the same APP_ENV as the backend, otherwise the two
       # halves of the system end up in different Redis namespaces
@@ -642,6 +644,10 @@ services:
     command:
       - |
         set -u
+
+        if [ -x /usr/local/bin/c2pa-signer-start ]; then
+          /usr/local/bin/c2pa-signer-start || true
+        fi
 
         # Local AI is opt-in and must resolve to the SAME answer as the backend
         # role, otherwise a queued embedding job would look for an Ollama the
@@ -792,6 +798,7 @@ services:
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/c2pa-signer-start.sh:/usr/local/bin/c2pa-signer-start:ro
       - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - ./_docker/backend/container-healthcheck.sh:/usr/local/bin/container-healthcheck:ro
     environment:
@@ -1065,33 +1072,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
-    networks:
-      - synaplan-network
-
-  # Optional content-credentials signer. The key stays in this container.
-  # Not started by default. Enable with: docker compose --profile c2pa up -d
-  # Then set C2PA_SIGNER_URL=http://c2pa-signer:8787 and C2PA_SIGNER_TOKEN on the backend.
-  # c2patool publishes a linux amd64 binary only, so this service is amd64
-  # even when the host is arm64. No host port is published.
-  c2pa-signer:
-    build: ./sidecars/c2pa-signer
-    image: synaplan-c2pa-signer:local
-    platform: linux/amd64
-    container_name: synaplan-c2pa-signer
-    depends_on:
-      backend:
-        condition: service_healthy
-    profiles: [c2pa]
-    restart: unless-stopped
-    environment:
-      C2PA_SIGNER_ADDR: ":8787"
-      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-synaplan-dev-c2pa-token-change-me-32b}
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     networks:
       - synaplan-network
 

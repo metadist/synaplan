@@ -12,7 +12,7 @@ before 2026-12-02 (D1).
 | AT0 | — | in this branch: `docs/AI_ACT.md`, linked from `docs/ADMIN.md` |
 | AT1 | — | in this branch: mail, WhatsApp, Telegram, widget |
 | AT2 | — | in this branch: provider-marked bytes stay identical |
-| AT3 | — | in this branch: pinned c2patool 0.28.4, XMP fallback, key only on the sidecar |
+| AT3 | — | signer runs inside the app container (uid 65532, localhost). XMP fallback remains. No second container. |
 | AT4 | — | in this branch: file provenance and the chat badge |
 | AT5 | — | [synaplan-charts#106](https://github.com/metadist/synaplan-charts/pull/106). Off by default. Key only via Secret. |
 | AT6 | — | in this branch: "Using AI well", optional confirmation, default off |
@@ -24,3 +24,4 @@ before 2026-12-02 (D1).
 - 2026-11-05 — `/help/using-ai-well`. Title "Using AI well". Ten sections, from "What a model is" through "Who to ask". The page button says the reader has finished.
 - 2026-11-05 — People. The switch reads "Not yet" and the count reads "0 of 124 confirmed". The download action is on the page. The switch was left off.
 - 2026-11-05 — Sidecar image, not the running app. `POST /sign` of a PNG returned a file c2patool can read, with `c2pa.created`, `trainedAlgorithmicMedia`, and the model name. The temporary CA key is not left in `/certs`. The leaf key is mode `0600`. uid 65532. No host port.
+- 2026-11-05 — The extra container is removed. The same signer starts inside the backend, worker and scheduler, on 127.0.0.1, as uid 65532. The key stays a file under `/certs`. linux amd64 only.
