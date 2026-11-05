@@ -694,6 +694,7 @@ This is the list, use only this:
    Examples (assuming the previous assistant turn generated an image):
    - "make the car blue" → BTOPIC: "mediamaker", BMEDIA: "image", BINPUTMODE: "reference_images"
    - "remove the background" → BINPUTMODE: "reference_images"
+   - "lass den zweiten Vogel auch fliegend und schreib SYNAPLAN oben rechts" → BINPUTMODE: "reference_images"
    - "now generate a picture of a house" → BINPUTMODE: "text_only"
 
 10. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
@@ -761,7 +762,9 @@ This is the list, use only this:
      ("save it to my Nextcloud", "lege es in meinen Nextcloud-Account")
    - Running code or a script on the user's files (file work)
      ("run python on this file and tell me ...", "compute the totals with code",
-     "führe das Skript auf dieser Datei aus")
+     "führe das Skript auf dieser Datei aus", "Stempel unten rechts drauf. Das
+     vorhandene Bild, keins neu malen") — NOT a creative redraw of a generated
+     picture ("mach den Vogel fliegend")
 
    Set BMULTI to 0 for everything else, including:
    - Any plain question, greeting or smalltalk
@@ -772,6 +775,8 @@ This is the list, use only this:
    - A song, poem, story or lesson the user only wants to READ (no spoken
      version requested) — that is one "general" answer
    - A request to redo, refine or continue the previous answer
+   - A follow-up that changes a previously generated image (including painting
+     text into the scene) — BTOPIC "mediamaker", BINPUTMODE "reference_images"
    - A general web-search question (that is BWEBSEARCH, not BMULTI)
    - Anything you are unsure about
 
@@ -916,8 +921,12 @@ Allowed topic keys: [KEYLIST]
    run/apply/execute verb) stays a plain `chat` answer.
    A chart/diagram/plot built FROM an attached table (CSV/XLSX — "mach daraus ein
    Balkendiagramm", "make a bar chart from this table") is ALWAYS `code_run`, never
-   `file_analysis`. A pixel edit on an attached image (stamp, watermark, crop, resize —
-   "Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
+   `file_analysis`.    A pixel edit on an attached image that must stay unchanged (stamp, watermark,
+   crop, resize — "Stempel unten rechts drauf. Das vorhandene Bild, keins neu
+   malen") is ALWAYS `code_run`, never `image_generation`. A follow-up that
+   changes what the picture SHOWS (pose, subjects, style, background) is rule 3:
+   `image_generation` PIC2PIC — even when it also asks for text in a corner
+   ("lass den Vogel fliegen und schreib SYNAPLAN oben rechts").
    When the request names neither a runtime nor a script word, this arbitration — not
    the presence of script vocabulary — decides. A grouping, column, or value named
    in the request must be the grouping in the output — never relabel axes or headers
@@ -1225,6 +1234,21 @@ The `image` input on the video node (`$n1.file`) makes it an image-to-video
 render of the generated picture (IMG2VID). Omitting it would animate from text
 only. The same `"image": "$nX.file"` pattern turns a second `image_generation`
 node into an image edit (PIC2PIC).
+
+### Follow-up edit of a generated image ("lass den Vogel fliegen")
+The previous turn already produced the picture. This turn is ONE
+`image_generation` node (rule 11). The runner reuses the latest conversation
+image when `params.input_mode` is `reference_images`. Do NOT emit `code_run`
+just because the user also wants text in a corner.
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Den zweiten Vogel auch fliegend, SYNAPLAN oben rechts, Hintergrund blasser" }, "params": { "input_mode": "reference_images" } }
+  ]
+}
 
 ### Generate media, then describe/analyze it (generate → file_analysis chain)
 User: "Erstelle ein Bild einer Katze und danach beschreibe das erstellte Bild."
