@@ -142,11 +142,27 @@ def manifest(model: str, parent_path: str | None) -> dict:
     return body
 
 
-def safe_name(raw: object) -> str:
-    name = os.path.basename(str(raw or "media.bin"))
-    if name in ("", ".", ".."):
-        return "media.bin"
-    return name
+def file_names(raw: object) -> tuple[str, str, str]:
+    """Return fixed names. The client filename never becomes a path."""
+    leaf = str(raw or "").lower().replace("\\", "/").rsplit("/", 1)[-1]
+    names = {
+        ".png": ("source.png", "signed.png", "parent.png"),
+        ".jpg": ("source.jpg", "signed.jpg", "parent.jpg"),
+        ".jpeg": ("source.jpeg", "signed.jpeg", "parent.jpeg"),
+        ".gif": ("source.gif", "signed.gif", "parent.gif"),
+        ".webp": ("source.webp", "signed.webp", "parent.webp"),
+        ".mp3": ("source.mp3", "signed.mp3", "parent.mp3"),
+        ".wav": ("source.wav", "signed.wav", "parent.wav"),
+        ".ogg": ("source.ogg", "signed.ogg", "parent.ogg"),
+        ".m4a": ("source.m4a", "signed.m4a", "parent.m4a"),
+        ".mp4": ("source.mp4", "signed.mp4", "parent.mp4"),
+        ".webm": ("source.webm", "signed.webm", "parent.webm"),
+        ".mov": ("source.mov", "signed.mov", "parent.mov"),
+    }
+    for suffix, chosen in names.items():
+        if leaf.endswith(suffix):
+            return chosen
+    return ("source.bin", "signed.bin", "parent.bin")
 
 
 def decode_bytes(payload: dict) -> bytes | None:
@@ -165,16 +181,16 @@ def sign(payload: dict) -> bytes | None:
     raw = decode_bytes(payload)
     if tool is None or env is None or raw is None:
         return None
-    filename = safe_name(payload.get("filename"))
+    source_name, signed_name, parent_name = file_names(payload.get("filename"))
     with tempfile.TemporaryDirectory() as tmp:
-        source = os.path.join(tmp, filename)
-        target = os.path.join(tmp, "signed-" + filename)
+        source = os.path.join(tmp, source_name)
+        target = os.path.join(tmp, signed_name)
         manifest_path = os.path.join(tmp, "manifest.json")
         with open(source, "wb") as handle:
             handle.write(raw)
         parent_path = None
         if payload.get("parent") is True:
-            parent_path = os.path.join(tmp, "parent-" + filename)
+            parent_path = os.path.join(tmp, parent_name)
             shutil.copyfile(source, parent_path)
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest(str(payload.get("model") or "model"), parent_path), handle)
