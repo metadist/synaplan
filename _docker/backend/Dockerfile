@@ -65,14 +65,16 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
 # Content credentials run in this image, not in a second container. c2patool
 # publishes linux amd64 only; an arm64 image keeps the XMP fallback. The
 # process user is 65532 so www-data cannot read a key mounted at /certs.
-ARG C2PATOOL_VERSION=0.28.4
-ARG C2PATOOL_SHA256=097e9efaff765baf7738a40c640012419cad419ce3e1aa36cf68e0576309c971
+# Stay on 0.9.12. The 0.28 builds need glibc 2.38, and this base image does
+# not have it, so those binaries exit before they can sign.
+ARG C2PATOOL_VERSION=0.9.12
+ARG C2PATOOL_SHA256=caa336747d5364e21e0eb7a307c108b6680b237ff8b8aa5ed94ab8e43d64214c
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 openssl \
     && arch="$(dpkg --print-architecture)" \
     && if [ "$arch" = "amd64" ]; then \
          curl -fsSL -o /tmp/c2patool.tar.gz \
-           "https://github.com/contentauth/c2patool/releases/download/v${C2PATOOL_VERSION}/v${C2PATOOL_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+           "https://github.com/contentauth/c2patool/releases/download/v${C2PATOOL_VERSION}/c2patool-v${C2PATOOL_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
          && echo "${C2PATOOL_SHA256}  /tmp/c2patool.tar.gz" | sha256sum -c - \
          && mkdir -p /tmp/c2pa-src \
          && tar -xzf /tmp/c2patool.tar.gz -C /tmp/c2pa-src c2patool/c2patool \
