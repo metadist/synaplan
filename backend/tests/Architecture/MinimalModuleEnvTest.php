@@ -49,6 +49,7 @@ final class MinimalModuleEnvTest extends TestCase
         'freeapi' => ['FREEAPI_BASE_URL'],
         'capacity' => ['SYNAPLAN_WATCHDOG'],
         'cloud_files' => ['CLOUD_FILES_ENABLED'],
+        'c2pa_signer' => ['C2PA_SIGNER_URL'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

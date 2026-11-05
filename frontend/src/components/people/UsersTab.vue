@@ -92,6 +92,8 @@
       </form>
     </div>
 
+    <PeopleLiteracyBar :user-ids="users.map((user) => user.id)" @loaded="onLiteracy" />
+
     <div class="surface-card rounded-lg p-6">
       <div v-if="usersLoading" class="text-center py-12">
         <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
@@ -132,6 +134,12 @@
                   class="text-left py-2 px-4 text-sm font-medium txt-secondary"
                 >
                   {{ $t('people.users.identities') }}
+                </th>
+                <th
+                  v-if="literacyRequired"
+                  class="text-left py-2 px-4 text-sm font-medium txt-secondary"
+                >
+                  {{ $t('people.literacy.column') }}
                 </th>
                 <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
                   {{ $t('admin.users.created') }}
@@ -218,6 +226,17 @@
                       >—</span
                     >
                   </div>
+                </td>
+                <td
+                  v-if="literacyRequired"
+                  class="py-3 px-4 text-sm txt-secondary"
+                  :data-label="$t('people.literacy.column')"
+                >
+                  {{
+                    literacyUsers[String(user.id)]
+                      ? $t('people.literacy.confirmed')
+                      : $t('people.literacy.notYet')
+                  }}
                 </td>
                 <td class="py-3 px-4 txt-secondary text-sm" :data-label="$t('admin.users.created')">
                   {{ formatDate(user.created) }}
@@ -363,6 +382,8 @@ import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { adminApi, type AdminUser } from '@/services/api/adminApi'
+import PeopleLiteracyBar from '@/components/people/PeopleLiteracyBar.vue'
+import type { LiteracyAdmin } from '@/services/api/aiLiteracyApi'
 import { useAuthStore } from '@/stores/auth'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useDialog } from '@/composables/useDialog'
@@ -390,6 +411,13 @@ const addingUser = ref(false)
 const newUser = ref({ email: '', displayName: '', password: '', level: 'NEW' })
 
 const users = ref<AdminUser[]>([])
+const literacyRequired = ref(false)
+const literacyUsers = ref<Record<string, boolean>>({})
+
+function onLiteracy(status: LiteracyAdmin): void {
+  literacyRequired.value = status.required
+  literacyUsers.value = status.users
+}
 const usersLoading = ref(false)
 const userSearch = ref('')
 const currentPage = ref(1)

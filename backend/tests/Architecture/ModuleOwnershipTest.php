@@ -59,6 +59,7 @@ final class ModuleOwnershipTest extends TestCase
         'freeapi',
         'capacity',
         'cloud_files',
+        'c2pa_signer',
     ];
 
     /**
@@ -252,7 +253,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(23, self::MODULE_IDS);
+        $this->assertCount(24, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

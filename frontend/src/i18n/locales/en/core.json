@@ -43,6 +43,7 @@
   },
   "pageTitles": {
     "login": "Login",
+    "usingAiWell": "Using AI well",
     "register": "Register",
     "forgotPassword": "Forgot Password",
     "codeSignup": "Invitation code",

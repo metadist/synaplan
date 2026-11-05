@@ -931,6 +931,7 @@
     "toolStepHidden": "Ein Schritt auf diesem Computer ist abgeschlossen.",
     "audioGenerated": "Hier ist die gewünschte Audioausgabe. Du kannst sie unten abspielen oder herunterladen.",
     "imageGenerated": "Hier ist das Bild, das du angefordert hast.",
+    "aiGenerated": "KI-erzeugt",
     "videoGenerated": "Hier ist das Video, das du angefordert hast.",
     "mediaJob": {
       "title": {

@@ -89,6 +89,16 @@
       "dismiss": "Bu bildirimi gizle"
     },
     "searchPlaceholder": "Ada veya anahtar kelimeye göre filtrele...",
+    "provenance": {
+      "generated": "{date} tarihinde {model} tarafından üretildi",
+      "badge": "YZ üretimi",
+      "signed": "Synaplan imzaladı",
+      "signedHelp": "Bir içerik kanıtı eklendi. Dosyayı bir modelin ürettiğini söyler. Görselin doğru olduğunu denetlemez.",
+      "provider": "Sağlayıcı bu dosyayı YZ üretimi olarak işaretledi",
+      "providerHelp": "Model sağlayıcısı dosyayı zaten işaretlemişti. Synaplan bu işareti olduğu gibi bıraktı.",
+      "none": "İmzasız",
+      "noneHelp": "Synaplan imza ekleyemedi. Dosya yine de üretilmiş olarak etiketlidir."
+    },
     "uploadTitle": "RAG Dosyaları Yükle",
     "groupKeyword": "Grup Anahtar Kelimesi:",
     "groupKeywordPlaceholder": "Dosya gruplandırma için anahtar kelime girin",

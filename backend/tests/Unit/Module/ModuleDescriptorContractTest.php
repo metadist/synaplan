@@ -43,6 +43,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'freeapi',
         'capacity',
         'cloud_files',
+        'c2pa_signer',
     ];
 
     public function testTheDescriptorSetIsExactlyThePlan(): void

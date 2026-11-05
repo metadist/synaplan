@@ -84,9 +84,9 @@ export interface WidgetConfig {
   externalApiUrl?: string
   sessionMode?: 'browser' | 'user'
   privacyPolicyUrl?: string
+  disclosureCompany?: string
   dataProcessingAccepted?: boolean
-  // Operator-controlled header subtitle. null = i18n default, '' = hide,
-  // string = render verbatim. See ChatWidget.vue::resolvedSubtitle.
+  // Header subtitle. null = i18n default, '' = hide, string = verbatim.
   widgetSubtitle?: string | null
   // Operator-controlled display name for AI messages. null = i18n default
   // ("AI Assistant" / "KI-Assistent"); non-empty string = render verbatim.

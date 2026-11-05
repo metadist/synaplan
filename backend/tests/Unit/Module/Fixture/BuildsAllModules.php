@@ -20,6 +20,7 @@ use App\Module\Provider\FreeApiModule;
 use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
 use App\Module\Provider\TheHiveModule;
+use App\Module\Sidecar\C2paSignerModule;
 use App\Module\Sidecar\ComputeModule;
 use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LiveVoiceModule;
@@ -75,6 +76,7 @@ trait BuildsAllModules
         $modules = [
             new TikaModule($probe, ''),
             new DoclingModule($probe, ''),
+            new C2paSignerModule($probe, ''),
             new OfficeConvertModule($probe, ''),
             new OfficeEditorModule($probe, '', '', ''),
             new SearxngModule($probe, ''),

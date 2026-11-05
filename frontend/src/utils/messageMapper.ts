@@ -107,16 +107,27 @@ export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobU
 function appendGeneratedMediaPart(message: Message, url: string, type: string): void {
   const normalized = normalizeMediaUrl(url)
   if ('video' === type && !message.parts.some((p) => 'video' === p.type)) {
-    message.parts.push({ partId: generatePartId(), type: 'video', url: normalized })
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'video',
+      url: normalized,
+      generated: true,
+    })
   } else if ('image' === type && !message.parts.some((p) => 'image' === p.type)) {
     message.parts.push({
       partId: generatePartId(),
       type: 'image',
       url: normalized,
       alt: i18n.global.t('message.imageGenerated'),
+      generated: true,
     })
   } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
-    message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'audio',
+      url: normalized,
+      generated: true,
+    })
   }
 }
 
@@ -409,43 +420,34 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   const role = m.direction === 'IN' ? 'user' : 'assistant'
   const parts = parseContentWithThinking(m.text || '', role, m.thinking_seconds ?? null)
 
-  // Add generated file (image/video/audio) as part if present.
-  // Issue #625: assign a stable `partId` on load so the `<audio>` /
-  // `<video>` element keeps its identity if the message later gets
-  // re-parsed (e.g. continuation appends text). Without this, the
-  // index-based fallback key would remount the media player.
-  //
-  // Issue #955: detect audio/image/video by both the generic media
-  // kind (`audio`, `image`, `video` — used by TTS / MEDIAMAKER) and
-  // by the raw file extension (`ogg`, `mp3`, `png`, …) the backend
-  // stores for inbound WhatsApp voice notes and direct uploads.
-  // Without the extension-aware check, a WhatsApp voice reply was
-  // surfaced as a plain text bubble with no player.
-  //
-  // Relative `m.file.path` values (e.g. WhatsApp's `13/.../voice.ogg`)
-  // are first prefixed with the static-serve endpoint so the player
-  // can fetch them; absolute URLs and already-prefixed paths pass
-  // through `buildUploadUrl` unchanged before final normalization.
+  // A generated file becomes a media part. partId keeps the player mounted
+  // across re-parses (#625). Kind and extension both count (#955), and
+  // relative paths are prefixed before they are normalized. Assistant
+  // media is marked generated; a person's upload is not.
   if (m.file && m.file.path) {
     const absoluteUrl = normalizeMediaUrl(buildUploadUrl(m.file.path))
+    const generated = role === 'assistant'
     if (isImageFileType(m.file.type)) {
       parts.push({
         partId: generatePartId(),
         type: 'image',
         url: absoluteUrl,
         alt: i18n.global.t('message.imageGenerated'),
+        generated,
       })
     } else if (isVideoFileType(m.file.type)) {
       parts.push({
         partId: generatePartId(),
         type: 'video',
         url: absoluteUrl,
+        generated,
       })
     } else if (isAudioFileType(m.file.type)) {
       parts.push({
         partId: generatePartId(),
         type: 'audio',
         url: absoluteUrl,
+        generated,
       })
     }
   }

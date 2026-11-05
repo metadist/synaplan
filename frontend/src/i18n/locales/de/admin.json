@@ -1022,6 +1022,19 @@
   "people": {
     "title": "Benutzer",
     "subtitle": "Konten, Gruppen, Richtlinien und gemeldete Inhalte auf diesem Server.",
+    "literacy": {
+      "ask": "Deine Organisation bittet dich, „KI gut nutzen“ zu lesen (8 Minuten).",
+      "read": "Jetzt lesen",
+      "done": "Ich habe das gelesen",
+      "remind": "Morgen erinnern",
+      "switch": "Alle bitten, „KI gut nutzen“ zu lesen",
+      "consequence": "Wenn du das einschaltest, wird jede Person in deiner Organisation einmal gebeten, „KI gut nutzen“ zu lesen. Niemand wird blockiert.",
+      "count": "{confirmed} von {total} bestätigt",
+      "column": "KI gut nutzen",
+      "export": "Bestätigungen herunterladen",
+      "confirmed": "Bestätigt",
+      "notYet": "Noch nicht"
+    },
     "tabs": {
       "users": "Benutzer",
       "groups": "Gruppen",
@@ -1450,6 +1463,9 @@
   "modules": {
     "tika": {
       "label": "Apache Tika (Textextraktion aus Dokumenten)"
+    },
+    "c2pa_signer": {
+      "label": "Inhaltsnachweise (KI-Medien kennzeichnen)"
     },
     "docling": {
       "label": "Docling (Dokumentkonvertierung)"

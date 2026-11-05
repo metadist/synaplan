@@ -28,6 +28,7 @@ final readonly class InternalEmailService
         private LoggerInterface $logger,
         private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
         private ?MailerConfig $mailerConfig = null,
+        private ?AiResponseEmailBody $emailBodies = null,
     ) {
     }
 
@@ -211,6 +212,8 @@ final readonly class InternalEmailService
         ?string $mediaType = null,
         ?array $additionalAttachmentPaths = null,
         ?string $locale = null,
+        ?int $ownerId = null,
+        bool $disclose = true,
     ): void {
         $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? SmartEmailHelper::getBaseAddress();
         $smartAddress = ($originalRecipient && SmartEmailHelper::isValidSmartAddress($originalRecipient))
@@ -220,62 +223,23 @@ final readonly class InternalEmailService
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
         $replyToEmail = $smartAddress;
 
-        $hasInlineImage = false;
-
         $formatter = new MarkdownEmailFormatter();
-        $htmlBody = $formatter->toFragment($bodyText);
-
-        // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
-        if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
-            $imageAlt = htmlspecialchars(
-                $this->imageAlt($locale),
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8',
-            );
-            $htmlBody .= '<br><br><img src="cid:generated-image" alt="'.$imageAlt.'" style="max-width: 100%; border-radius: 8px;">';
-            $hasInlineImage = true;
-        }
-
-        // Add metadata footer if available
-        if ($provider || $model || null !== $processingTime) {
-            $metadataParts = [];
-            if ($provider) {
-                $metadataParts[] = 'Service: '.htmlspecialchars($provider);
-            }
-            if ($model) {
-                $metadataParts[] = 'Model: '.htmlspecialchars($model);
-            }
-            if (null !== $processingTime) {
-                $metadataParts[] = sprintf('Processing time: %.2f seconds', $processingTime);
-            }
-
-            if (!empty($metadataParts)) {
-                $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
-                $htmlBody .= implode(' &middot; ', $metadataParts);
-                $htmlBody .= '<br><a href="https://www.synaplan.com/" style="color: #888888;">www.synaplan.com</a>';
-                $htmlBody .= '</div>';
-            }
-        }
-
-        // Create plain text version (use original markdown for better readability)
-        $textBody = $bodyText;
-        // Add metadata footer to plain text as well
-        if ($provider || $model || null !== $processingTime) {
-            $metadataText = [];
-            if ($provider) {
-                $metadataText[] = 'Service: '.$provider;
-            }
-            if ($model) {
-                $metadataText[] = 'Model: '.$model;
-            }
-            if (null !== $processingTime) {
-                $metadataText[] = sprintf('Processing time: %.2f seconds', $processingTime);
-            }
-            if (!empty($metadataText)) {
-                $textBody .= "\n\n---\n".implode(' | ', $metadataText);
-                $textBody .= "\nhttps://www.synaplan.com/";
-            }
-        }
+        $composed = ($this->emailBodies ?? new AiResponseEmailBody())->compose(
+            $bodyText,
+            $provider,
+            $model,
+            $processingTime,
+            'image' === $mediaType && is_string($attachmentPath) && file_exists($attachmentPath),
+            $this->imageAlt($locale),
+            $locale,
+            $fromName,
+            $ownerId,
+            $originalRecipient,
+            $disclose,
+        );
+        $htmlBody = $composed['html'];
+        $textBody = $composed['text'];
+        $hasInlineImage = $composed['inline'];
 
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))

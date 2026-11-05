@@ -332,6 +332,10 @@ tests pass.
 
 ## Security
 
+### AI Act transparency
+
+People who talk to Synaplan over mail, WhatsApp, Telegram, or a website widget are told they are talking to an AI. Generated images, audio, and video are marked. The optional reading "Using AI well" never blocks anyone. Roles, settings, and the content-credentials signer are in [AI_ACT.md](AI_ACT.md).
+
 ### Token Rotation
 
 Rotate health monitor API-Key:

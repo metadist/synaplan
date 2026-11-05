@@ -61,7 +61,7 @@
                     "messaging_product": "whatsapp",
                     "recipient_type": "individual",
                     "text": {
-                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "body": "Hi, I am Synaplan, an AI assistant.\n\nSamstags von 9 bis 14 Uhr.",
                         "preview_url": true
                     },
                     "to": "491513371174",
@@ -205,7 +205,7 @@
                 "/1098765/messages",
                 {
                     "image": {
-                        "caption": "Hier ist deine Katze.",
+                        "caption": "Hi, I am Synaplan, an AI assistant.\n\nHier ist deine Katze.",
                         "link": "https://app.characterization.test/api/v1/files/uploads/2/generated/cat.png"
                     },
                     "messaging_product": "whatsapp",
@@ -380,7 +380,7 @@
                     "messaging_product": "whatsapp",
                     "recipient_type": "individual",
                     "text": {
-                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "body": "Hi, I am Synaplan, an AI assistant.\n\nSamstags von 9 bis 14 Uhr.",
                         "preview_url": true
                     },
                     "to": "491516582378",
@@ -549,7 +549,7 @@
                     "messaging_product": "whatsapp",
                     "recipient_type": "individual",
                     "text": {
-                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "body": "Hi, I am Synaplan, an AI assistant.\n\nSamstags von 9 bis 14 Uhr.",
                         "preview_url": true
                     },
                     "to": "491510175175",
@@ -953,7 +953,7 @@
                     "messaging_product": "whatsapp",
                     "recipient_type": "individual",
                     "text": {
-                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "body": "Hi, I am Synaplan, an AI assistant.\n\nSamstags von 9 bis 14 Uhr.",
                         "preview_url": true
                     },
                     "to": "491519008199",
@@ -1224,7 +1224,7 @@
             {
                 "format": "mp3",
                 "language": "en",
-                "text": "Samstags von 9 bis 14 Uhr."
+                "text": "Hi, I am Synaplan, an AI assistant.\n\nSamstags von 9 bis 14 Uhr."
             }
         ],
         "stored": {
@@ -1367,7 +1367,7 @@
                     "messaging_product": "whatsapp",
                     "recipient_type": "individual",
                     "text": {
-                        "body": "Hier ist das Neueste.\n\n🔗 _Quellen:_\n_[1] News_\nhttps://news.example/today",
+                        "body": "Hi, I am Synaplan, an AI assistant.\n\nHier ist das Neueste.\n\n🔗 _Quellen:_\n_[1] News_\nhttps://news.example/today",
                         "preview_url": true
                     },
                     "to": "491518439294",

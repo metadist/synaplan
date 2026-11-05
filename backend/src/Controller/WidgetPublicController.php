@@ -308,7 +308,7 @@ class WidgetPublicController extends AbstractController
             'detectTheme',
             'sessionMode',
             'widgetSubtitle',
-            'aiAssistantName',
+            'aiAssistantName', 'disclosureCompany',
         ];
 
         $public = \array_intersect_key($config, \array_flip($allowed));

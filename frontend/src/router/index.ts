@@ -16,6 +16,7 @@ import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
 import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
+import { aiLiteracyRoutes } from '@/router/aiLiteracyRoutes'
 import { codeSignupRoutes } from '@/router/codeSignupRoutes'
 import { loginLinkRoutes } from '@/router/loginLinkRoutes'
 import { resolveRegistrationRedirect } from '@/router/registrationGate'
@@ -499,6 +500,7 @@ const router = createRouter({
     { path: '/tools/mail-handler', redirect: '/apps/mailbox' },
     { path: '/ai/summarizer', redirect: { path: '/', query: { tool: 'summarize' } } },
     { path: '/tools/doc-summary', redirect: { path: '/', query: { tool: 'summarize' } } },
+    ...aiLiteracyRoutes,
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',

@@ -22,6 +22,9 @@
              real env vars beat values without it, so the local suite would send
              mail, call paid AI APIs with the developer's keys and see live sidecars. -->
         <env name="MAILER_DSN" value="null://null" force="true" />
+        <!-- The dev container's APP_SENDER_NAME beats .env.test. The mail
+             disclosure names this sender, so CI and the local suite must match. -->
+        <env name="APP_SENDER_NAME" value="Synaplan Test" force="true" />
         <env name="AI_DEFAULT_PROVIDER" value="test" force="true" />
         <env name="LOG_LEVEL" value="error" force="true" />
         <!-- Docker/backend/.env may set flock:///var/www/uploads (not writable for www-data under bind mounts). -->

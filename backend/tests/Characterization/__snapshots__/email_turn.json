@@ -39,7 +39,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-debug-sender@metadist.onmicrosoft.com"
                         ]
@@ -173,7 +173,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-distinct-mails-with-a-boolean-message-id@example.com"
                         ]
@@ -219,7 +219,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-distinct-mails-with-a-boolean-message-id@example.com"
                         ]
@@ -415,7 +415,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-duplicate-by-fingerprint@example.com"
                         ]
@@ -559,7 +559,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-duplicate-by-message-id@example.com"
                         ]
@@ -715,7 +715,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "Here is your cat.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "Here is your cat.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-generated-image@example.com"
                         ]
@@ -882,7 +882,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-keyword-address@example.com"
                         ]
@@ -1038,7 +1038,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-new-sender@example.com"
                         ]
@@ -1176,7 +1176,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-plain-mail@example.com"
                         ]
@@ -1341,7 +1341,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.\n\n---\nService: test | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.\n\n---\nService: test | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-processor-failure@example.com"
                         ]
@@ -1474,7 +1474,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-raw-mime-body@example.com"
                         ]
@@ -1608,7 +1608,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
                         "to": [
                             "person-voice-attachment@example.com"
                         ]

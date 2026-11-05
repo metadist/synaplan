@@ -96,6 +96,7 @@ export interface Part {
   thinkingStartedAt?: number
   isStreaming?: boolean // For reasoning parts that are still being streamed
   autoplay?: boolean // Auto-play audio (voice reply)
+  generated?: boolean // Synaplan produced this media. User uploads stay unmarked.
 }
 
 export interface MessageFile {

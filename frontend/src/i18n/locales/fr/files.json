@@ -7,6 +7,16 @@
       "dismiss": "Masquer cette bannière"
     },
     "searchPlaceholder": "Filtrer par nom ou mot-clé…",
+    "provenance": {
+      "generated": "Généré par {model} le {date}",
+      "badge": "Généré par IA",
+      "signed": "Signé par Synaplan",
+      "signedHelp": "Une preuve de contenu a été ajoutée. Elle dit que ce fichier a été fait par un modèle. Ce n'est pas une vérification que l'image est vraie.",
+      "provider": "Le fournisseur a marqué ce fichier comme généré par IA",
+      "providerHelp": "Le fournisseur du modèle avait déjà marqué le fichier. Synaplan a laissé cette marque telle quelle.",
+      "none": "Non signé",
+      "noneHelp": "Synaplan n'a pas pu ajouter de signature. Le fichier reste étiqueté comme généré."
+    },
     "uploadTitle": "Téléverser des fichiers",
     "groupKeyword": "Dossier :",
     "groupKeywordPlaceholder": "Saisissez un nom de dossier",

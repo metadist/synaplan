@@ -1,5 +1,14 @@
 <template>
   <component :is="componentType" v-bind="componentProps" />
+  <p
+    v-if="
+      part.generated && (part.type === 'image' || part.type === 'video' || part.type === 'audio')
+    "
+    class="mt-1 text-xs txt-secondary"
+    data-testid="badge-ai-generated"
+  >
+    {{ $t('message.aiGenerated') }}
+  </p>
 </template>
 
 <script setup lang="ts">

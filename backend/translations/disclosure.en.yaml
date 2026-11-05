@@ -1,0 +1,4 @@
+disclosure:
+  mail: 'This reply was written by an AI assistant of %sender%.'
+  chat: 'Hi, I am %name%, an AI assistant.'
+  empty: 'The AI notice cannot be empty. Write at least one sentence.'

@@ -17,6 +17,7 @@
 
     <div v-else-if="status === 'connected'" class="space-y-4" data-testid="text-telegram-connected">
       <TelegramChannelFacts :bot-username="state?.botUsername" />
+      <AiNoticeField channel="telegram" :binding-id="0" />
       <p v-if="lastMessage" class="text-sm txt-secondary">
         {{ t('channels.telegram.lastMessage', { time: lastMessage }) }}
       </p>
@@ -95,6 +96,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import TelegramChannelFacts from '@/components/config/TelegramChannelFacts.vue'
+import AiNoticeField from '@/components/channels/AiNoticeField.vue'
 import TelegramConnectForm from '@/components/config/TelegramConnectForm.vue'
 import TelegramPairingPanel from '@/components/config/TelegramPairingPanel.vue'
 import { useDialog } from '@/composables/useDialog'
