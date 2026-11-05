@@ -37,6 +37,22 @@ RUN go mod download
 COPY sidecars/synaplan-watchdog/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /synaplan-watchdog ./cmd/synaplan-watchdog
 
+# Prebuilt c2patool 0.28 binaries link against glibc 2.38, while the bookworm
+# base image ships glibc 2.36. Compile 0.28.4 on bookworm so the binary matches
+# the runtime libc on both amd64 and arm64.
+FROM rust:1.96-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663 AS c2patool
+ARG C2PATOOL_VERSION=0.28.4
+ARG C2PATOOL_SHA256=2ed01103cdcb65184dfcaa6f522beac4c715291b51a44e503b572fa9b5255aba
+WORKDIR /src
+RUN curl -fsSL -o /tmp/c2patool.tar.gz \
+        "https://github.com/contentauth/c2patool/archive/refs/tags/v${C2PATOOL_VERSION}.tar.gz" \
+    && echo "${C2PATOOL_SHA256}  /tmp/c2patool.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/c2patool.tar.gz --strip-components=1 -C /src \
+    && rm /tmp/c2patool.tar.gz \
+    && cargo build --release --locked --bin c2patool \
+    && strip target/release/c2patool \
+    && install -m 0755 target/release/c2patool /c2patool
+
 FROM base AS runtime
 
 ARG APP_VERSION=dev
@@ -62,23 +78,10 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
     && sed -i 's|^mozilla/emSign_|!mozilla/emSign_|' /etc/ca-certificates.conf \
     && update-ca-certificates
 
-# Content credentials run in this image, not in a second container. c2patool
-# publishes linux amd64 only; an arm64 image keeps the XMP fallback. The
+# Content credentials run in this image, not in a second container. The
 # process user is 65532 so www-data cannot read a key mounted at /certs.
-ARG C2PATOOL_VERSION=0.28.4
-ARG C2PATOOL_SHA256=097e9efaff765baf7738a40c640012419cad419ce3e1aa36cf68e0576309c971
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 openssl \
-    && arch="$(dpkg --print-architecture)" \
-    && if [ "$arch" = "amd64" ]; then \
-         curl -fsSL -o /tmp/c2patool.tar.gz \
-           "https://github.com/contentauth/c2patool/releases/download/v${C2PATOOL_VERSION}/v${C2PATOOL_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
-         && echo "${C2PATOOL_SHA256}  /tmp/c2patool.tar.gz" | sha256sum -c - \
-         && mkdir -p /tmp/c2pa-src \
-         && tar -xzf /tmp/c2patool.tar.gz -C /tmp/c2pa-src c2patool/c2patool \
-         && install -m 0755 /tmp/c2pa-src/c2patool/c2patool /usr/local/bin/c2patool \
-         && rm -rf /tmp/c2pa-src /tmp/c2patool.tar.gz; \
-       fi \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 65532 c2pa \
     && useradd --system --uid 65532 --gid 65532 --no-create-home --shell /usr/sbin/nologin c2pa \
@@ -132,6 +135,7 @@ COPY _docker/backend/lib/ /usr/local/bin/lib/
 COPY _docker/backend/synaplan /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/c2pa-signer-start /usr/local/bin/container-healthcheck /usr/local/bin/synaplan
 COPY --from=watchdog /synaplan-watchdog /usr/local/bin/synaplan-watchdog
+COPY --from=c2patool /c2patool /usr/local/bin/c2patool
 
 EXPOSE 80
 
