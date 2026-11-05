@@ -215,13 +215,7 @@
                 />
               </svg>
               <div class="flex-1">
-                <span>
-                  {{
-                    externalUserId
-                      ? $t('widget.privacyNoticePersonalized')
-                      : $t('widget.privacyNotice')
-                  }}
-                </span>
+                <span>{{ privacyNoticeText }}</span>
                 <a
                   v-if="privacyPolicyUrl"
                   :href="privacyPolicyUrl"
@@ -705,6 +699,7 @@ interface Props {
   allowFullscreen?: boolean
   externalUserId?: string
   privacyPolicyUrl?: string
+  disclosureCompany?: string
   sessionMode?: 'browser' | 'user'
   humanHandoffEnabled?: boolean
   testMode?: boolean
@@ -749,6 +744,7 @@ const props = withDefaults(defineProps<Props>(), {
   allowFullscreen: false,
   externalUserId: undefined,
   privacyPolicyUrl: undefined,
+  disclosureCompany: undefined,
   sessionMode: 'browser',
   humanHandoffEnabled: false,
   testMode: false,
@@ -924,6 +920,17 @@ const handoffSubmitting = ref(false)
 
 const isMobile = ref(false)
 const { t } = useI18n()
+const companyName = computed(() => (props.disclosureCompany || '').trim())
+const privacyNoticeText = computed(() => {
+  const company = companyName.value
+  if (company && props.externalUserId) {
+    return t('widget.privacyNoticeNamedPersonalized', { company })
+  }
+  if (company) {
+    return t('widget.privacyNoticeNamed', { company })
+  }
+  return props.externalUserId ? t('widget.privacyNoticePersonalized') : t('widget.privacyNotice')
+})
 const { formatTime, formatDateTime } = useDateFormat()
 
 const allowFileUploads = computed(

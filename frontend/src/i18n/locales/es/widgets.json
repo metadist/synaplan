@@ -43,8 +43,10 @@
     "exportAttachment": "Archivo adjunto",
     "exportAttachments": "Archivos adjuntos",
     "exportFooter": "Exportado desde el widget de chat de Synaplan",
-    "privacyNotice": "Este chat funciona con IA. Los mensajes se procesan para generar respuestas.",
-    "privacyNoticePersonalized": "Este chat funciona con IA y usa los datos de tu perfil para ofrecerte respuestas personalizadas.",
+    "privacyNotice": "Estás hablando con un asistente de IA. Las respuestas pueden ser incorrectas.",
+    "privacyNoticePersonalized": "Estás hablando con un asistente de IA y este chat usa tu perfil. Las respuestas pueden ser incorrectas.",
+    "privacyNoticeNamed": "Estás hablando con un asistente de IA de {company}. Las respuestas pueden ser incorrectas.",
+    "privacyNoticeNamedPersonalized": "Estás hablando con un asistente de IA de {company} y este chat usa tu perfil. Las respuestas pueden ser incorrectas.",
     "privacyPolicyLink": "Política de privacidad",
     "dismissPrivacy": "Cerrar aviso de privacidad",
     "you": "Tú",
@@ -117,7 +119,10 @@
   },
   "widgets": {
     "advancedConfig": {
-      "proRequired": "Se requiere suscripción PRO"
+      "proRequired": "Se requiere suscripción PRO",
+      "disclosureCompany": "Nombre de la empresa en el aviso de IA",
+      "disclosureCompanyHelp": "Aparece en la primera frase que ven las visitas. La frase de que es una IA se queda. Puedes añadir el nombre de la empresa. No puedes quitar la frase.",
+      "disclosureCompanyPlaceholder": "Acme"
     },
     "title": "Widgets de Chat",
     "subtitle": "Integra widgets de chat con IA en tu sitio web",

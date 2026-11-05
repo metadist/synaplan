@@ -43,8 +43,10 @@
     "exportAttachment": "Ek",
     "exportAttachments": "Ekler",
     "exportFooter": "Synaplan sohbet widget'ından dışa aktarıldı",
-    "privacyNotice": "Bu sohbet yapay zeka ile çalışır. Yanıt üretmek için mesajlar işlenir.",
-    "privacyNoticePersonalized": "Bu sohbet yapay zeka ile çalışır ve size kişiselleştirilmiş yanıtlar sunmak için profil verilerinizi kullanır.",
+    "privacyNotice": "Bir yapay zeka asistanıyla yazışıyorsunuz. Yanıtlar yanlış olabilir.",
+    "privacyNoticePersonalized": "Bir yapay zeka asistanıyla yazışıyorsunuz ve bu sohbet profilinizi kullanır. Yanıtlar yanlış olabilir.",
+    "privacyNoticeNamed": "{company} adlı bir yapay zeka asistanıyla yazışıyorsunuz. Yanıtlar yanlış olabilir.",
+    "privacyNoticeNamedPersonalized": "{company} adlı bir yapay zeka asistanıyla yazışıyorsunuz ve bu sohbet profilinizi kullanır. Yanıtlar yanlış olabilir.",
     "privacyPolicyLink": "Gizlilik Politikası",
     "dismissPrivacy": "Gizlilik bildirimini kapat",
     "you": "Siz",
@@ -117,7 +119,10 @@
   },
   "widgets": {
     "advancedConfig": {
-      "proRequired": "PRO aboneliği gerekli"
+      "proRequired": "PRO aboneliği gerekli",
+      "disclosureCompany": "YZ bildirimindeki şirket adı",
+      "disclosureCompanyHelp": "Ziyaretçilerin ilk gördüğü cümlede yer alır. Bunun bir yapay zeka olduğunu söyleyen cümle kalır. Şirket adını ekleyebilirsiniz. Cümleyi kaldıramazsınız.",
+      "disclosureCompanyPlaceholder": "Acme"
     },
     "title": "Sohbet Widgetları",
     "subtitle": "AI destekli sohbet widgetlarını web sitenize yerleştirin",

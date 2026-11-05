@@ -302,6 +302,18 @@ class File
     #[ORM\Column(name: 'BEPHEMERAL', type: 'boolean', options: ['default' => 0])]
     private bool $ephemeral = false;
 
+    /** True once this row was produced by a model. */
+    #[ORM\Column(name: 'BGENERATED', type: 'boolean', options: ['default' => 0])]
+    private bool $generated = false;
+
+    /** Model name shown on the file, from the model row. */
+    #[ORM\Column(name: 'BGENMODEL', length: 96, nullable: true)]
+    private ?string $generatedModel = null;
+
+    /** none, signed, provider, or both. */
+    #[ORM\Column(name: 'BCREDENTIALS', length: 16, nullable: true)]
+    private ?string $credentials = null;
+
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
 
@@ -739,5 +751,41 @@ class File
     {
         return in_array(strtolower($this->fileType), self::MEDIA_TYPES, true)
             || 'generated' === $this->source && null !== $this->originKind && 'document' !== $this->originKind;
+    }
+
+    public function isGenerated(): bool
+    {
+        return $this->generated;
+    }
+
+    public function setGenerated(bool $generated): self
+    {
+        $this->generated = $generated;
+
+        return $this;
+    }
+
+    public function getGeneratedModel(): ?string
+    {
+        return $this->generatedModel;
+    }
+
+    public function setGeneratedModel(?string $generatedModel): self
+    {
+        $this->generatedModel = $generatedModel;
+
+        return $this;
+    }
+
+    public function getCredentials(): ?string
+    {
+        return $this->credentials;
+    }
+
+    public function setCredentials(?string $credentials): self
+    {
+        $this->credentials = $credentials;
+
+        return $this;
     }
 }

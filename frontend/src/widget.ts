@@ -68,6 +68,7 @@ interface WidgetConfig {
   detectTheme?: boolean
   externalUserId?: string
   privacyPolicyUrl?: string
+  disclosureCompany?: string
   sessionMode?: 'browser' | 'user'
   /** Populated from /api/v1/widget/{id}/config — never sent in by callers. */
   realtime?: WidgetRealtimeConfig
@@ -485,7 +486,6 @@ class SynaplanWidget {
         ? this.detectHostTheme()
         : this.config!.defaultTheme
 
-      // Mount Vue app into Shadow DOM root
       this.app = createApp(ChatWidget.default, {
         widgetId: this.config!.widgetId,
         position: this.config!.position,
@@ -508,6 +508,7 @@ class SynaplanWidget {
         allowFullscreen: this.config!.allowFullscreen,
         externalUserId: this.config!.externalUserId,
         privacyPolicyUrl: this.config!.privacyPolicyUrl,
+        disclosureCompany: this.config!.disclosureCompany,
         sessionMode: this.config!.sessionMode,
         humanHandoffEnabled: this.config!.humanHandoffEnabled,
         buttonIcon: this.config!.buttonIcon,

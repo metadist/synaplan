@@ -1022,6 +1022,19 @@
   "people": {
     "title": "Users",
     "subtitle": "Accounts, groups, policies and reported content on this server.",
+    "literacy": {
+      "ask": "Your organisation asks you to read 'Using AI well' (8 minutes).",
+      "read": "Read now",
+      "done": "I've read this",
+      "remind": "Remind me tomorrow",
+      "switch": "Ask everyone to read 'Using AI well'",
+      "consequence": "Turning this on asks everyone in your organisation to read 'Using AI well' once. Nobody is blocked.",
+      "count": "{confirmed} of {total} confirmed",
+      "column": "Using AI well",
+      "export": "Download confirmations",
+      "confirmed": "Confirmed",
+      "notYet": "Not yet"
+    },
     "tabs": {
       "users": "Users",
       "groups": "Groups",
@@ -1450,6 +1463,9 @@
   "modules": {
     "tika": {
       "label": "Apache Tika (document text extraction)"
+    },
+    "c2pa_signer": {
+      "label": "Content credentials (AI media marking)"
     },
     "docling": {
       "label": "Docling (document conversion)"

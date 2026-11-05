@@ -1435,9 +1435,10 @@ SynaplanWidget.init({
                 v-model="config.privacyPolicyUrl"
                 type="url"
                 :placeholder="$t('widgets.advancedConfig.privacyPolicyUrlPlaceholder')"
-                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-privacy-url"
               />
+              <WidgetDisclosureCompany v-model="config.disclosureCompany" />
             </div>
 
             <!-- Data processed summary -->
@@ -1886,6 +1887,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
+import WidgetDisclosureCompany from '@/components/widgets/WidgetDisclosureCompany.vue'
 import { useAuthStore } from '@/stores/auth'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
@@ -2060,13 +2062,10 @@ const config = reactive<widgetsApi.WidgetConfig>({
   externalApiUrl: '',
   sessionMode: 'browser' as 'browser' | 'user',
   privacyPolicyUrl: '',
+  disclosureCompany: '',
   dataProcessingAccepted: false,
-  // Subtitle: null = i18n default ("We typically reply in minutes"), '' = hide,
-  // string = operator-provided text (verbatim, not translated)
+  // Subtitle and assistant name: null keeps the translated default. Empty subtitle hides the line.
   widgetSubtitle: null,
-  // AI assistant display name shown next to AI message timestamps
-  // ("Acme Bot · 03:58 PM"). null = fall back to the i18n default
-  // ("AI Assistant" / "KI-Assistent"); empty input collapses to null.
   aiAssistantName: null,
   // Human handoff: Slack webhook + trigger phrases for auto-escalation. The
   // webhook URL stays on the server (sanitizer validates it's an
@@ -2972,6 +2971,7 @@ onMounted(async () => {
     externalApiUrl: widgetConfig.externalApiUrl || '',
     sessionMode: widgetConfig.sessionMode || (widgetConfig.externalApiUrl ? 'user' : 'browser'),
     privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
+    disclosureCompany: widgetConfig.disclosureCompany ?? '',
     dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
     // Header text overrides — `??` (not `||`) so an intentional empty
     // string ('' = "hide the subtitle line") survives the round-trip

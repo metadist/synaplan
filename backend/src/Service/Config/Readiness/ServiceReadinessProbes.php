@@ -6,6 +6,7 @@ namespace App\Service\Config\Readiness;
 
 use App\Module\ModuleRegistry;
 use App\Module\Probe\SidecarHealthProbeInterface;
+use App\Module\Sidecar\C2paSignerModule;
 use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
@@ -28,6 +29,7 @@ final readonly class ServiceReadinessProbes
         'tts' => PiperTtsModule::ID,
         'tika' => TikaModule::ID,
         'docling' => DoclingModule::ID,
+        'c2pa-signer' => C2paSignerModule::ID,
         'searxng' => SearxngModule::ID,
         'collabora' => OfficeConvertModule::ID,
     ];

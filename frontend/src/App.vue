@@ -25,6 +25,7 @@
     <Dialog />
     <SmartSearchPalette v-if="authStore.isAuthenticated" :key="authStore.user?.id" />
     <AnnouncementModal />
+    <AiLiteracyCard />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />
     <ForceUpdateScreen />
@@ -47,6 +48,7 @@ import { ensureAccountTimezone, resetAccountTimezone } from '@/composables/useAc
 import { clearSearchRecents } from '@/composables/search/useSearchRecents'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AnnouncementModal from '@/components/AnnouncementModal.vue'
+import AiLiteracyCard from '@/components/literacy/AiLiteracyCard.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
 import BiometricLockScreen from '@/components/BiometricLockScreen.vue'

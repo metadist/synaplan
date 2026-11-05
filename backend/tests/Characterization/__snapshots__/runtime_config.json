@@ -102,6 +102,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "c2pa_signer": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "capacity": {
                     "configured": "bool",
                     "gated": "bool"
@@ -340,6 +344,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "c2pa_signer": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "capacity": {
                     "configured": "bool",
                     "gated": "bool"
@@ -578,6 +586,10 @@
                 "updateRequired": "bool"
             },
             "modules": {
+                "c2pa_signer": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "capacity": {
                     "configured": "bool",
                     "gated": "bool"

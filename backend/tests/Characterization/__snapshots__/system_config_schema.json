@@ -4497,6 +4497,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_C2PA_SIGNER": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "FEATURE_MODULES_GATE_CAPACITY": {
                 "isMasked": false,
                 "isSet": false,
@@ -6295,6 +6301,17 @@
                 "tab": "features",
                 "type": "boolean"
             },
+            "FEATURE_MODULES_GATE_C2PA_SIGNER": {
+                "dbGroup": "MODULES",
+                "dbKey": "GATE_C2PA_SIGNER",
+                "default": "false",
+                "description": "Hide the \"c2pa_signer\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. Off (the shipped default) keeps the module visible with a \"needs setup\" state. Configure the module first — see Operate → System status.",
+                "section": "modules",
+                "sensitive": false,
+                "source": "database",
+                "tab": "features",
+                "type": "boolean"
+            },
             "FEATURE_MODULES_GATE_CAPACITY": {
                 "dbGroup": "MODULES",
                 "dbKey": "GATE_CAPACITY",
@@ -8074,6 +8091,7 @@
                     },
                     {
                         "fields": [
+                            "FEATURE_MODULES_GATE_C2PA_SIGNER",
                             "FEATURE_MODULES_GATE_CAPACITY",
                             "FEATURE_MODULES_GATE_CHAT_ARTIFACTS",
                             "FEATURE_MODULES_GATE_CLOUD_FILES",
@@ -8839,6 +8857,12 @@
                 "value": "true"
             },
             "FEATURE_IAM_USER_SEARCH_ENABLED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
+            "FEATURE_MODULES_GATE_C2PA_SIGNER": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
@@ -12528,6 +12552,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "FEATURE_MODULES_GATE_C2PA_SIGNER": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "FEATURE_MODULES_GATE_CAPACITY": {
                 "isMasked": false,
                 "isSet": false,
@@ -13837,6 +13867,12 @@
                 "value": "true"
             },
             "FEATURE_IAM_USER_SEARCH_ENABLED": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
+            "FEATURE_MODULES_GATE_C2PA_SIGNER": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,

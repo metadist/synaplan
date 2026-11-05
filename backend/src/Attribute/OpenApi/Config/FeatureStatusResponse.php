@@ -124,7 +124,7 @@ final class FeatureStatusResponse extends OA\Response
             items: new OA\Items(
                 required: ['id', 'name', 'state', 'unlocks', 'effect', 'recovery', 'since', 'percent', 'model', 'minutes_left', 'profile', 'docs_anchor'],
                 properties: [
-                    new OA\Property(property: 'id', type: 'string', enum: ['ollama', 'qdrant', 'whisper', 'tts', 'tika', 'docling', 'searxng', 'collabora', 'centrifugo'], example: 'ollama'),
+                    new OA\Property(property: 'id', type: 'string', enum: ['ollama', 'qdrant', 'whisper', 'tts', 'tika', 'docling', 'searxng', 'collabora', 'c2pa-signer', 'centrifugo'], example: 'ollama'),
                     new OA\Property(property: 'name', type: 'string', example: 'Ollama (local AI)'),
                     new OA\Property(property: 'state', type: 'string', enum: ['starting', 'downloading', 'ready', 'off', 'unavailable', 'failed'], example: 'downloading'),
                     new OA\Property(property: 'unlocks', type: 'string', description: 'What the service unlocks, one sentence', example: 'Private chat and embeddings on this machine.'),

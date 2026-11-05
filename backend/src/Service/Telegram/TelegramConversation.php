@@ -335,6 +335,7 @@ final readonly class TelegramConversation
         $generated = $this->claimGeneratedFiles($inbound, $alreadyAttached);
         $hasAnswer = '' !== $stored || [] !== $files || [] !== $jobs || [] !== $generated;
         $storedText = $hasAnswer ? $stored : $this->say($turn, 'empty_reply');
+        $opening = $this->copy->openingSentence($turn, (int) $chat->getId());
         $outbound = $this->store->store($turn, $chat, $storedText, 'OUT', 'complete', null, $classification, $files[0] ?? null, [
             TelegramMessageStore::META_REPLY_TO => (string) $inbound->getId(),
         ], $generated);
@@ -349,6 +350,9 @@ final readonly class TelegramConversation
         $text = $this->join($text, implode("\n", $notes));
         if ('' === $text && [] === $files) {
             $text = $this->say($turn, 'empty_reply');
+        }
+        if ('' !== $opening) {
+            $text = '' === trim($text) ? $opening : $opening."\n\n".$text;
         }
 
         $outId = (int) $outbound->getId();
@@ -391,6 +395,7 @@ final readonly class TelegramConversation
     private function finish(TelegramTurn $turn, Chat $chat, Message $inbound, string $sentence, string $status, ?Message $previous = null, ?int $replyTo = null): void
     {
         $this->store->setStatus($inbound, $status);
+        $sentence = $this->copy->withOpening($turn, (int) $chat->getId(), $sentence);
         $outbound = $this->store->store($turn, $chat, $sentence, 'OUT', 'complete', null, [], null, [
             TelegramMessageStore::META_REPLY_TO => (string) $inbound->getId(),
         ]);

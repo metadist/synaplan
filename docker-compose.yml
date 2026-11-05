@@ -371,6 +371,8 @@ services:
       # off outside compose. A down sidecar is unavailable, never a failed upload.
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       # Collabora CODE convert-to. The collabora service starts with this
       # stack. Override OFFICE_CONVERT_URL for an external CODE, or set
@@ -590,6 +592,8 @@ services:
       TIKA_BASE_URL: http://tika:9998
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
@@ -1061,6 +1065,33 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
+    networks:
+      - synaplan-network
+
+  # Optional content-credentials signer. The key stays in this container.
+  # Not started by default. Enable with: docker compose --profile c2pa up -d
+  # Then set C2PA_SIGNER_URL=http://c2pa-signer:8787 and C2PA_SIGNER_TOKEN on the backend.
+  # c2patool publishes a linux amd64 binary only, so this service is amd64
+  # even when the host is arm64. No host port is published.
+  c2pa-signer:
+    build: ./sidecars/c2pa-signer
+    image: synaplan-c2pa-signer:local
+    platform: linux/amd64
+    container_name: synaplan-c2pa-signer
+    depends_on:
+      backend:
+        condition: service_healthy
+    profiles: [c2pa]
+    restart: unless-stopped
+    environment:
+      C2PA_SIGNER_ADDR: ":8787"
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-synaplan-dev-c2pa-token-change-me-32b}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - synaplan-network
 

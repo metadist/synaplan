@@ -194,7 +194,7 @@ final readonly class InboundEmailIntake
     private function tell(string $to, string $subject, string $text, ?string $messageId, string $recipient, string $failureLog): void
     {
         try {
-            $this->mailer->sendAiResponseEmail($to, $subject, $text, $messageId, originalRecipient: $recipient);
+            $this->mailer->sendAiResponseEmail($to, $subject, $text, $messageId, originalRecipient: $recipient, disclose: false);
         } catch (\Exception $e) {
             $this->logger->error($failureLog, ['to' => $to, 'error' => $e->getMessage()]);
         }

@@ -191,6 +191,27 @@
     },
     "modules": [
         {
+            "id": "c2pa_signer",
+            "label_key": "modules.c2pa_signer.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Generated media are not signed. Add the signer to mark images, audio and video as AI-generated.",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "C2PA_SIGNER_URL",
+                    "C2PA_SIGNER_TOKEN"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/c2pa-signer",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "capacity",
             "label_key": "modules.capacity.label",
             "state": "absent",

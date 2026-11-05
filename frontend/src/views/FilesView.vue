@@ -1267,7 +1267,12 @@
     </div>
 
     <!-- File Content Modal -->
-    <FileContentModal :is-open="isModalOpen" :file-id="selectedFileId" @close="closeModal" />
+    <FileContentModal
+      :is-open="isModalOpen"
+      :file-id="selectedFileId"
+      :file="selectedFile"
+      @close="closeModal"
+    />
     <ShareModal
       :is-open="isShareModalOpen"
       :file-id="shareFileId"
@@ -2624,6 +2629,10 @@ const confirmDeleteFolder = async () => {
     folderToDelete.value = null
   }
 }
+
+const selectedFile = computed(
+  () => files.value.find((file) => file.id === selectedFileId.value) ?? null
+)
 
 const viewFileContent = (fileId: number) => {
   selectedFileId.value = fileId

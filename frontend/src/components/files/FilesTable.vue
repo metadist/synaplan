@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
+import FileProvenanceLine from '@/components/files/FileProvenanceLine.vue'
 import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import { previewBadgeClass, previewIconForName } from '@/services/filePreview'
@@ -149,6 +150,7 @@ function sizeOf(bytes: number): string {
         </td>
         <td class="hidden px-3 py-2.5 text-xs txt-secondary lg:table-cell">
           {{ file.uploaded_date }}
+          <FileProvenanceLine :file="file" />
         </td>
         <td class="px-3 py-2.5">
           <div

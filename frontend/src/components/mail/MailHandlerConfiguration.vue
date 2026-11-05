@@ -16,7 +16,6 @@
         </button>
       </template>
     </PageHeader>
-
     <!-- Handler Name & Status -->
     <div class="surface-card p-6" data-testid="section-handler-name">
       <div class="flex items-start justify-between gap-6">
@@ -63,7 +62,7 @@
         </div>
       </div>
     </div>
-
+    <AiNoticeField v-if="handlerId" channel="mail" :binding-id="Number(handlerId)" />
     <!-- Step Indicator -->
     <div class="surface-card p-6" data-testid="section-stepper">
       <div class="flex items-center justify-between">
@@ -763,6 +762,7 @@ import {
   FunnelIcon,
 } from '@heroicons/vue/24/outline'
 import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
+import AiNoticeField from '@/components/channels/AiNoticeField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import type {
   MailConfig,

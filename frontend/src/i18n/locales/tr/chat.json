@@ -938,6 +938,7 @@
     "toolStepHidden": "Bu bilgisayardaki bir adım tamamlandı.",
     "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",
     "imageGenerated": "İstediğiniz görsel burada.",
+    "aiGenerated": "YZ üretimi",
     "videoGenerated": "İstediğiniz video burada.",
     "mediaJob": {
       "title": {
