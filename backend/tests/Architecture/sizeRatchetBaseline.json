@@ -1,7 +1,7 @@
 {
     "_comment": "Size ratchet ledger (tests/Architecture/SizeRatchetTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
     "recorded": "2026-10-14",
-    "updated": "2026-10-28",
+    "updated": "2026-11-05",
     "limits": {
         "fileLines": 800,
         "constructorParams": 10,
@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 47,
         "constructorParams": 63,
-        "methodLines": 117
+        "methodLines": 115
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1025,
@@ -211,7 +211,6 @@
         "src/Service/ModelDiscovery/ModelDiscoveryService.php::ModelDiscoveryService::run": 148,
         "src/Service/ModelDiscovery/ModelFamilyClassifier.php::ModelFamilyClassifier::classify": 129,
         "src/Service/Multitask/Execution/ResultAssembler.php::ResultAssembler::assemble": 218,
-        "src/Service/Multitask/Execution/Runner/CalendarEventRunner.php::CalendarEventRunner::run": 139,
         "src/Service/Multitask/Execution/Runner/ChatRunner.php::ChatRunner::run": 129,
         "src/Service/Multitask/Execution/Runner/CodeRunRunner.php::CodeRunRunner::executeDirect": 234,
         "src/Service/Multitask/Execution/Runner/MediaGenerationRunner.php::MediaGenerationRunner::run": 187,
