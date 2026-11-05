@@ -201,6 +201,22 @@ def decode_bytes(payload: dict) -> bytes | None:
     return raw
 
 
+def log_tool_error(stderr: bytes | None) -> None:
+    detail = (stderr or b"").decode("utf-8", "replace").strip().splitlines()
+    if detail:
+        print(f"c2pa: sign failed: {detail[-1][:300]}", flush=True)
+
+
+def manifest_is_valid(stdout: bytes | None) -> bool:
+    if not stdout:
+        return False
+    try:
+        report = json.loads(stdout.decode("utf-8", "replace"))
+    except json.JSONDecodeError:
+        return False
+    return isinstance(report, dict) and report.get("validation_state") != "Invalid"
+
+
 def sign(payload: dict) -> bytes | None:
     tool = tool_path()
     env = signing_env()
@@ -220,21 +236,25 @@ def sign(payload: dict) -> bytes | None:
             shutil.copyfile(source, parent_path)
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest(str(payload.get("model") or "model"), parent_path), handle)
-        result = subprocess.run(
-            [tool, source, "-m", manifest_path, "-o", target, "-f"],
-            capture_output=True,
-            env=env,
-        )
+        try:
+            result = subprocess.run(
+                [tool, source, "-m", manifest_path, "-o", target, "-f"],
+                capture_output=True,
+                env=env,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            print("c2pa: sign failed: timed out", flush=True)
+            return None
         if not os.path.isfile(target):
-            detail = (result.stderr or b"").decode("utf-8", "replace").strip().splitlines()
-            if detail:
-                print(f"c2pa: sign failed: {detail[-1][:300]}", flush=True)
+            log_tool_error(result.stderr)
             return None
         signed = Path(target).read_bytes()
         # c2patool writes the manifest, then returns an error when the
         # certificate is not in its public trust store. The bytes are still
-        # the marked file. An empty or unmarked file is a real failure.
-        if b"c2pa" not in signed:
+        # the marked file. An empty, unmarked, or invalid manifest is a real failure.
+        if b"c2pa" not in signed or (result.returncode != 0 and not manifest_is_valid(result.stdout)):
+            log_tool_error(result.stderr)
             return None
         return signed
 
@@ -246,8 +266,11 @@ def looks_signed(raw: bytes) -> bool:
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "media.bin")
         Path(path).write_bytes(raw)
-        result = subprocess.run([tool, path], capture_output=True)
-        return result.returncode == 0
+        try:
+            result = subprocess.run([tool, path], capture_output=True, timeout=15)
+        except subprocess.TimeoutExpired:
+            return False
+        return result.returncode == 0 and manifest_is_valid(result.stdout)
 
 
 def is_ready() -> bool:
@@ -268,7 +291,11 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             self.respond(401, {"error": "unauthorized"})
             return
-        length = int(self.headers.get("Content-Length", "0") or "0")
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            self.send_error(400)
+            return
         if length < 0 or length > MAX_BODY:
             self.send_error(413)
             return

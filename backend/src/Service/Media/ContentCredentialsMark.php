@@ -76,7 +76,7 @@ final readonly class ContentCredentialsMark
         if (!is_string($current) || '' === $current) {
             return;
         }
-        $signed = $this->signer->sign($current, basename($absolute), $label, false);
+        $signed = $this->signer->sign($current, basename($absolute), $label, true);
         if (is_string($signed)) {
             file_put_contents($absolute, $signed);
             $file->setFileSize(strlen($signed));
