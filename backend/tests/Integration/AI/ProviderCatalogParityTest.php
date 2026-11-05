@@ -427,6 +427,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['anthropic', 'claude-haiku-4-5-20251001', null],
         ['meta', 'muse-spark-1.3', ['minimal', 'low', 'medium', 'high', 'xhigh', 'max']],
         ['huggingface', 'moonshotai/Kimi-K3', ['low', 'high', 'max']],
+        ['huggingface', 'moonshotai/Kimi-K3.1-Pro', ['low', 'high', 'max']],
         ['huggingface', 'moonshotai/Kimi-K2.6-deepinfra', ['low', 'high', 'max']],
         ['cerebras', 'qwen-3.8-27b', ['none', 'low', 'medium', 'high']],
         ['cerebras', 'gpt-oss-120b', ['low', 'medium', 'high']],

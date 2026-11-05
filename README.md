@@ -374,7 +374,7 @@ A new OpenAI-compatible provider is one class. Names, icons, the key check and t
 | [Cerebras](https://cloud.cerebras.ai/) | `CEREBRAS_API_KEY` | Qwen 3.8 27B (+ vision), GPT OSS 120B — very fast inference (~2,000–3,000 tokens/s) |
 | [TrustedTokens](https://trustedtokens.eu/) 🇩🇪 | `TRUSTEDTOKENS_API_KEY` | GLM 5.2 / 5.3 (+ Flash vision), Chimera, Qwen3.6 35B (+ vision), GPT OSS 120B — sovereign inference on German GPUs (TNG), zero data retention |
 | [A2Agent](https://a2agent.me/) 🇨🇳 | `A2AGENT_API_KEY` | Qwen3.8 MAX / Flash (+ vision), DeepSeek V4 Pro / Flash, MiniMax M3 — Chinese frontier models via the A2Agent gateway |
-| HuggingFace | `HUGGINGFACE_API_KEY` | Kimi K3 / K2.5 / K2.6 / K2.7 Code (chat + vision) |
+| HuggingFace | `HUGGINGFACE_API_KEY` | Kimi K3.1 Pro / K3 / K2.5 / K2.6 / K2.7 Code (chat + vision) |
 | TheHive | `THEHIVE_API_KEY` | Flux Schnell, SDXL |
 | Higgsfield | `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | Soul, Reve, DoP, Kling 2.1 |
 | Cloudflare Workers AI | `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` | bge-m3 embeddings (also usable as embedding fallback) |
