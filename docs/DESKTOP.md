@@ -1,4 +1,9 @@
-# Synaplan Desktop (agent client)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (5/11)**  
+> **← Previous:** [4.4 Anthropic-Compatible Messages API (`/v1/messages`)](ANTHROPIC_COMPATIBLE_API.md) · **Next:** [4.6 Embeddable Website Chat Widget →](WIDGET.md)
+
+# Synaplan Desktop (Agent Client Protocol)
+
+> **In this guide:** How the Tauri-based Synaplan Desktop client pairs with a workspace, how `desktop:*` scoped API keys isolate device permissions, how the machine companion API (`/v1/models/catalog`, `/v1/assistants`) works, and how the frozen `protocol: 1` pull-based job contract prevents remote code execution by construction.
 
 > **Status.** The server half (pairing, scoped keys, job queue, check-in
 > contract) ships in this app behind `DESKTOP_AGENT.ENABLED` (on by default
@@ -327,3 +332,8 @@ for the frozen-contract details.
 - OpenAI-compatible API: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
 - File work (secure compute on the server): [COMPUTE.md](./COMPUTE.md)
 - Plan of record: `synaplan-desktop/_extras/planning/20260829-desktop-agent-client/` (Phase B); the frozen Phase A source is `_devextras/planning/2026-archive/20260829-desktop-agent-client/`
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (5/11)**  
+> **← Previous:** [4.4 Anthropic-Compatible Messages API (`/v1/messages`)](ANTHROPIC_COMPATIBLE_API.md) · **Next:** [4.6 Embeddable Website Chat Widget →](WIDGET.md)

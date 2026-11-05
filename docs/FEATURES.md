@@ -1,158 +1,105 @@
-# Features Overview
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (1/8)**  
+> **← Previous:** [Documentation Index](README.md) · **Next:** [1.2 Installation & Deployment →](INSTALLATION.md)
 
-Everything Synaplan can do.
+# Platform Capabilities & Mental Model
 
-## AI Chat
+> **In this guide:** A tour of what Synaplan does and how its pieces fit together—from multi-provider chat and DAG task planning to RAG document search, long-term memory, isolated file work, external channels, and team governance.
+
+---
+
+## How the Workspace Is Organized
+
+Synaplan separates everyday work from configuration and administration along five rail areas (see [UX Contract](UX_CONTRACT.md)):
+
+| Rail Area | Who Sees It | What Lives There |
+| --------- | ----------- | ---------------- |
+| **Chats** | Everyone | Everyday conversations, live voice, research reports, generated media, and the **Incoming chats** inbox for shared threads. |
+| **Library** | Everyone | Uploaded documents, knowledge folders, generated media gallery, persistent **Workspace** files from Python/Node runs, and shared folders. |
+| **Assistants** | Everyone | Custom AI assistants (instructions, knowledge folders, tools, triggers), **Saved Tasks** (scheduled or webhook workflows), and the **Approvals** inbox. |
+| **Apps** | Everyone | Connected external systems (Microsoft 365, Dropbox, Nextcloud/WebDAV, CalDAV, IMAP, MCP servers), **Chat Widgets**, **WhatsApp**, **Email**, **Synaplan Desktop**, and **Coding Clients** (`/v1` & `/v1/messages`). |
+| **Admin** (*Operate*) | Administrators | System overview, **System status** (`/admin/features`), **AI infrastructure** (provider keys, model health, extraction, RAG, reranking), **Users & groups**, and **System configuration**. |
+
+---
+
+## 1. AI Chat, Cost Transparency & Effort Routing
 
 ![Chat Interface](images/tour/chat.webp)
 
-Multi-provider AI conversations:
+Instead of locking a workspace to one vendor, Synaplan routes each capability slot (`CHAT`, `PIC2TEXT`, `TEXT2PIC`, `TEXT2VID`, `SOUND2TEXT`, `TEXT2SOUND`, `VECTORIZE`, `SORT`, `ANALYZE`) independently:
 
-- **Local**: Ollama (gpt-oss, llama, mistral, etc.)
-- **Cloud**: OpenAI, Anthropic, Groq, Google Gemini, Perplexity
-- **Switching**: Change models per conversation
-- **Context**: Maintains conversation history
-- **Streaming**: Token-by-token responses over SSE
-- **Web search**: Admin picks Brave, SearXNG (self-hosted), Tavily, Exa, Firecrawl or Perplexity; optional fallback; users may pick their own provider when allowed. Next chat search uses the new provider with no restart.
+- **14+ Cloud & Local Providers** — OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, Meta, Cerebras, TrustedTokens (German sovereign GPUs), A2Agent, HuggingFace, TheHive, Higgsfield, Cloudflare Workers AI, and local **Ollama** (`gpt-oss`, `llama`, `bge-m3`, etc.).
+- **Real Cost on Every Answer** — Every model carries its official provider rate (`priceIn` / `priceOut` per 1M tokens, or per image/second/character). The model picker displays a **Free / Low / Mid / High** badge, and every chat reply records the exact cost in USD.
+- **Adaptive Effort Routing** — On each message, the sorter (`tools:sort`) decides whether the question needs a direct **answer**, a quick web **lookup**, or a multi-round **[Deep Research](RESEARCH.md)** run with cross-model fact checking.
+- **Web Search Plugs** — Administrators choose between Brave, self-hosted **SearXNG**, Tavily, Exa, Firecrawl, or Perplexity under **Operate → System configuration → Web search**, with an optional fallback and per-user override.
+- **Self-Aware `/help` Assistant** — Ask *"What can you do here?"* or type `/help`; the assistant answers from a live capability inventory of this specific installation (`PlatformCapabilityInventory`) and the synced documentation corpus, never from a generic brochure.
 
-## Multi-Task Routing
+---
 
-Complex requests are decomposed into a plan instead of a single AI call:
+## 2. Multi-Task DAG Routing & Saved Tasks
 
-- **AI planner** — splits a message into capability nodes (extract → summarize → generate media → compose reply) as a small task DAG
-- **Live task cards** — each step streams its progress into the chat UI while it runs
-- **Step graph** — a completed multi-step plan can be viewed as a simple step list in chat
-- **Smart classification** — rule-based routing (per-topic task prompts) plus an AI sorter for topic + language detection
-- **Multi-file delivery** — a single request can return several generated files, across chat, WhatsApp, email, and webhooks
-- **Safe rollout** — shadow mode plans without executing; existing installs keep the classic single-handler path until enabled
-- **Step graph** — completed multi-task turns can show the executed plan as a read-only step graph in chat (disclosure next to the task cards)
+When a prompt asks for several steps at once (*"Find the latest email from Acme, summarize the attached PDF, and save a briefing in my Nextcloud"*), Synaplan does not hope a single LLM call will improvise everything:
 
-Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-task-routing-bconfig)
+```
+User Message → MessageClassifier / MessageSorter (tools:sort)
+  ├─ Single-step → ChatHandler | MediaGenerationHandler | FileAnalysisHandler
+  └─ Multi-step  → TaskPlanner (tools:plan) → DagExecutor → ResultAssembler
+```
 
-## Saved Tasks
+- **AI Task Planner** — Decomposes complex requests into a directed acyclic graph (DAG) of data nodes (`web_search`, `url_fetch`, `mcp_fetch`, `mcp_action`, `email_search`, `rag_query`) and generator nodes (chat, summarize, image/video/audio, Office documents, `code_run`). See [Multi-Task Data Nodes](MULTITASK_DATA_NODES.md).
+- **Live Task Cards & Step Graph** — Each node streams its progress over SSE (`plan`, `task_update`, `task_chunk`, `task_file`) and renders as a live card and an inspectable step graph in chat.
+- **Saved Tasks & Webhooks** — Any multi-step plan or custom instruction can be pinned as a **Saved Task** and run on demand, on a schedule (hourly, daily, weekdays), or via an HMAC-signed inbound webhook (`POST /api/v1/webhooks/saved-tasks/{token}`). Three consecutive failures auto-pause the task. See [n8n and Saved Tasks](N8N.md).
 
-Pin a Task Prompt as a **Saved Task** and run it on demand or on a weekday / daily / hourly schedule. Overview: **Manage → Automations → Saved tasks**. After a multi-step chat plan finishes, a clock on the plan saves it there. You can also pin a custom instruction on **AI Instructions**. Behind `SAVEDTASKS / ENABLED` (off when no BCONFIG row exists; seeded on for new/local installs). Three consecutive failures auto-pause the task. The chat widget never runs Saved Tasks. Connections (mailboxes, MCP, folders) are listed under **Manage → Connections**.
+Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-task-routing-bconfig) and [CONFIGURATION.md → Saved Tasks](CONFIGURATION.md#saved-tasks-bconfig).
 
-Configuration: [CONFIGURATION.md → Saved Tasks](CONFIGURATION.md#saved-tasks-bconfig)
+---
 
-## RAG System
+## 3. Knowledge Base (RAG), Session Files & Memory
 
-Semantic document search and retrieval:
+Synaplan combines three distinct memory layers so the assistant can read your documents, keep track of files in the current thread, and remember facts across months of conversations:
 
-- Upload any document format
-- Automatic text extraction (Tika)
-- Vector embeddings (bge-m3, 1024 dim)
-- Cosine similarity search
-- AI-augmented answers
+| Layer | Scope | How It Works | Guide |
+| ----- | ----- | ------------ | ----- |
+| **Knowledge Base (RAG)** | Uploaded files & shared folders | Extracts text via **Apache Tika** (or optional **Docling** for tables/headings), OCRs images (Tesseract/Vision), transcribes audio (Whisper), embeds chunks with `bge-m3` (1024-dim), and searches **MariaDB VECTOR** or **Qdrant** (hybrid BM25 + vector + optional reranker). | [RAG.md](RAG.md) |
+| **Session Files** | Current conversation | `ConversationFileCatalog` tracks every uploaded and generated file in the thread (`Files in this chat`) so follow-ups like *"check the whole contract"* or *"make the car blue"* automatically target the right file. | [SESSION_FILES.md](SESSION_FILES.md) |
+| **Rolling Summary & Deep Memory** | Long threads & all past chats | Long threads are compressed into a rolling markdown summary (`BCHATSUMMARIES`) in the background. A daily job (`app:digest:run`) indexes key facts and decisions into Qdrant (`BMESSAGEDIGESTS`) with recency-weighted retrieval and `[Message:ID]` citations. | [CONVERSATION_CONTINUITY.md](CONVERSATION_CONTINUITY.md) |
 
-→ [Full RAG documentation](RAG.md)
+---
 
-## Chat Widget
+## 4. Tools, Approvals, File Work & Office Documents
 
-Embeddable chat for any website:
+Every tool execution across the platform passes through a single gate (`ToolInvoker`):
 
-- Single script tag embed
-- Customizable appearance
-- Lazy loading
-- Rate limiting
-- Domain whitelisting
-- Live support: human takeover + typing indicators (WebSockets)
+- **Unified Tool Registry & Approvals** — Built-in tools, connected MCP servers, and user-defined HTTP/OpenAPI tools share one policy engine. Read-only calls run immediately; write-class actions pause with an approval card in chat and in the **Approvals** inbox, and record a `tool.executed` row in the audit log.
+- **File Work (Secure Compute)** — The assistant can run short Python or Node scripts on *copies* of user-selected files inside an isolated container sidecar (`sidecars/synaplan-compute`), returning generated charts, spreadsheets, or archives to chat and the user's persistent **Workspace**. See [COMPUTE.md](COMPUTE.md).
+- **Office Document Engine** — Generates and revises `.docx`, `.xlsx`, and `.pptx` files step by step. When the optional **Collabora CODE** sidecar is running, Synaplan adds thumbnails, inline preview, "Download as PDF", "Combine as PDF", and browser editing.
 
-→ [Full Widget documentation](WIDGET.md)
+---
 
-## Live Support & Realtime
+## 5. Channels, Gateways & Companion Apps
 
-WebSocket layer built on **Centrifugo + Redis**:
+The same assistant, knowledge folders, and model policies are reachable from every surface your team uses:
 
-- **Human takeover** — operators can take over any widget conversation from the AI, live
-- **Typing indicators** — visitors and operators see each other typing in real time
-- **Operator notifications** — instant alerts for new widget messages
-- **Same-origin WebSockets** — browsers connect via `/connection/websocket`, no CORS setup
-- **Cluster-ready** — all nodes share one Redis, so events reach browsers on any node
+| Surface | What It Does | Guide |
+| ------- | ------------ | ----- |
+| **Chat Widget & Live Support** | Single-script Shadow DOM widget for any website, with domain whitelisting and live human operator takeover over **Centrifugo + Redis** WebSockets. | [WIDGET.md](WIDGET.md) · [REALTIME.md](REALTIME.md) |
+| **WhatsApp Business** | Bidirectional messaging via Meta's Cloud API: up to 20 phone numbers, voice-note transcription, media generation, and optional phone verification. | [WHATSAPP.md](WHATSAPP.md) |
+| **Email Channel** | Inbound email webhook and IMAP polling with `smart+keyword@` topic threading, plus live read-only mailbox search across IMAP and Microsoft 365. | [EMAIL.md](EMAIL.md) |
+| **External Connections** | OAuth and app-password connectors for **Microsoft 365** (Outlook mail & calendar), **Dropbox**, **Nextcloud / ownCloud / WebDAV**, **CalDAV**, and **Jira & Confluence** (MCP). | [CONNECTIONS.md](CONNECTIONS.md) |
+| **OpenAI-Compatible API (`/v1`)** | Drop-in `/v1/chat/completions`, `/v1/models`, and one-shot or multi-session streaming `/v1/audio/transcriptions` for OpenAI SDKs, Cursor, and Continue. | [OPENAI_COMPATIBLE_API.md](OPENAI_COMPATIBLE_API.md) |
+| **Anthropic Messages API (`/v1/messages`)** | Native gateway for **Claude Code** and coding clients, with server-side `web_search`, `web_fetch`, vision routing, pinned knowledge tools, and multi-provider aliases. | [ANTHROPIC_COMPATIBLE_API.md](ANTHROPIC_COMPATIBLE_API.md) |
+| **Synaplan Desktop** | Tauri desktop app (Windows, macOS, Linux) that pairs via a one-time code, receives a restricted `desktop:*` API key, and executes local Agent Skills over the frozen `protocol: 1` contract. | [DESKTOP.md](DESKTOP.md) |
+| **Live Voice & Meeting Notes** | Full-duplex speech-to-speech (`LIVE_VOICE.md`), self-hosted Realtime websockets (`LIVE_VOICE_SELF_HOSTED.md`), and Jitsi/Element transcription (`OPENDESK_MEETING_NOTES.md`). | [LIVE_VOICE.md](LIVE_VOICE.md) · [OPENDESK_MEETING_NOTES.md](OPENDESK_MEETING_NOTES.md) |
 
-→ [Full Realtime documentation](REALTIME.md)
+---
 
-## WhatsApp Integration
+## 6. Users, Groups, Sharing & Governance
 
-Meta Business API support:
+- **Groups & Directory Sync (`IAM`)** — Create manual groups or sync memberships automatically from OIDC `groups` claims on sign-in.
+- **Resource Sharing** — Share conversations, knowledge folders, AI assistants, Saved Tasks, and chat widgets with specific people, groups, or the whole instance (**Can view** vs. **Can use**).
+- **Group Policies & Locked Defaults** — Assign default models, allowed model allowlists, feature switches, and rate-limit tiers per group, or lock instance-wide defaults so users cannot override them.
+- **Privacy by Default** — Administrators manage users, quotas, and audited impersonation (`View as user`), but cannot read another user's private chats, files, or assistants unless shared. See [ADMIN.md](ADMIN.md#users-and-groups).
 
-- Send and receive messages
-- Multi-phone number support
-- Media handling
-- Audio transcription
-- Anonymous usage
+---
 
-→ [Full WhatsApp documentation](WHATSAPP.md)
-
-## Email Channel
-
-AI-powered email responses:
-
-- Topic-based routing
-- Chat context management
-- Spam protection
-- Rate limiting
-
-→ [Full Email documentation](EMAIL.md)
-
-## Document Processing
-
-Extract content from:
-
-| Format | Engine |
-|--------|--------|
-| PDF, Word, Excel, PowerPoint | Apache Tika (optional Docling for tables and headings) |
-| Images (PNG, JPEG, etc.) | Tesseract OCR |
-| Audio (MP3, WAV, etc.) | Whisper.cpp |
-
-## External speech-to-text API
-
-Local programs can transcribe against any configured SOUND2TEXT model (whisper.cpp, Groq, OpenAI, Mistral, …) with a Synaplan API key:
-
-- **One-shot** — OpenAI-compatible `POST /v1/audio/transcriptions`
-- **Streaming sessions** — `client_id` + `api_key_id` so client 123 and client 321 on the same key stay isolated; audio chunks in, SSE or poll for transcripts
-
-→ [OpenAI-compatible API](OPENAI_COMPATIBLE_API.md)
-
-Meeting notes for an openDesk install use that same speech-to-text API. A sidecar speaks Jitsi’s caption socket and Element voice messages, then throws the audio away. It stays off until `OPENDESK_STT_URL` is set.
-
-→ [Meeting notes](OPENDESK_MEETING_NOTES.md)
-
-## File Management
-
-- Upload and organize files
-- Private by default
-- Public sharing with tokens
-- Expiry dates
-- Group organization
-
-## User Management
-
-- JWT authentication
-- Role-based access
-- Subscription tiers
-- Rate limiting
-- API keys for integrations
-
-## Navigation
-
-Everyday work lives on the rail (New, History, Sources). Assistants, channels
-and automations sit under **Manage**. Installation administration sits under
-**Operate** (administrators only). There is no Easy / Advanced mode toggle.
-
-## AI Memories & Qdrant
-
-Qdrant is included in `docker-compose.yml` and powers:
-
-- **User profiling** — Track preferences, interests, interaction patterns
-- **Conversation memory** — Persistent context across chat sessions
-- **Semantic search** — Vector-based memory and document retrieval
-- **Feedback system** — False-positive detection and learning
-
-### Configuration
-
-In `backend/.env`:
-
-Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `.env`.
-
-**This is optional** — Synaplan works fully without it (memories and vector search will be disabled).
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (1/8)**  
+> **← Previous:** [Documentation Index](README.md) · **Next:** [1.2 Installation & Deployment →](INSTALLATION.md)

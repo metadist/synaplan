@@ -15,12 +15,16 @@ final readonly class C2paSignerClient
     public function __construct(
         private HttpClientInterface $http,
         private string $baseUrl,
+        private string $token = '',
     ) {
     }
 
     public function isConfigured(): bool
     {
-        return '' !== $this->baseUrl && 'disabled' !== $this->baseUrl;
+        $url = trim($this->baseUrl);
+        $token = trim($this->token);
+
+        return '' !== $url && 'disabled' !== $url && '' !== $token;
     }
 
     public function sign(string $bytes, string $filename, string $modelLabel, bool $hasParent): ?string
@@ -29,9 +33,16 @@ final readonly class C2paSignerClient
             return null;
         }
 
+        $headers = [];
+        $token = trim($this->token);
+        if ('' !== $token) {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
         try {
             $response = $this->http->request('POST', rtrim($this->baseUrl, '/').'/sign', [
-                'timeout' => 20,
+                'timeout' => 5,
+                'headers' => $headers,
                 'json' => [
                     'bytes' => base64_encode($bytes),
                     'filename' => $filename,

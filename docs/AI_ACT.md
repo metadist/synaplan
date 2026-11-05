@@ -28,9 +28,10 @@ Synaplan is a tool an organisation deploys. This note says what the product does
 | AI notice text | Mail handler, WhatsApp, Telegram | A one-sentence default. Empty text is refused. |
 | Company name on the widget | Widget configuration, next to the privacy URL | Empty. The AI sentence still shows. |
 | `C2PA_SIGNER_URL` | Backend environment | Empty. Generated media are not signed. |
+| `C2PA_SIGNER_TOKEN` | Backend and sidecar environment | Required when the signer is enabled. |
 | `AI_LITERACY.REQUIRED` | People, "Ask everyone to read 'Using AI well'" | Off. |
 
-The system status lists the content-credentials module as absent until `C2PA_SIGNER_URL` points at a healthy sidecar. The sentence there is: "Generated media are not signed. Add the signer to mark images, audio and video as AI-generated."
+The system status lists the content-credentials module as absent until `C2PA_SIGNER_URL` and `C2PA_SIGNER_TOKEN` point at a healthy sidecar. The sentence there is: "Generated media are not signed. Add the signer to mark images, audio and video as AI-generated."
 
 ## Do not put an optimiser in front of uploads
 
@@ -44,7 +45,7 @@ The sidecar is the Compose service `c2pa-signer`, profile `c2pa`. It is not star
 docker compose --profile c2pa up -d
 ```
 
-Then set `C2PA_SIGNER_URL=http://c2pa-signer:8787` on the backend. No host port is published. Only the backend should reach it.
+Then set `C2PA_SIGNER_URL=http://c2pa-signer:8787` and `C2PA_SIGNER_TOKEN` on the backend. No host port is published. Requests to `/sign` and `/verify` require `Authorization: Bearer <C2PA_SIGNER_TOKEN>`.
 
 `POST /sign` takes `{bytes, filename, model, parent}` and returns `{bytes}`. `POST /verify` may return `"watermark": null`. TrustMark is not in this release. It is planned before 2027-02-02 and must not be faked.
 

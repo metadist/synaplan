@@ -93,8 +93,13 @@ interface ParsedRoute {
 }
 
 function parseRoutes(): ParsedRoute[] {
-  const routerFile = resolve(srcRoot, 'router/index.ts')
-  const routerSrc = readFileSync(routerFile, 'utf8')
+  const routerDir = resolve(srcRoot, 'router')
+  const routerFile = resolve(routerDir, 'index.ts')
+  // Route tables live in sibling modules (settingsRoutes.ts) as well as index.
+  const routerSrc = readdirSync(routerDir)
+    .filter((name) => name.endsWith('.ts'))
+    .map((name) => readFileSync(resolve(routerDir, name), 'utf8'))
+    .join('\n')
   const staticComponents = new Map<string, string>()
   for (const match of routerSrc.matchAll(/import\s+(\w+)\s+from\s*['"]([^'"]+)['"]/g)) {
     staticComponents.set(match[1], match[2])

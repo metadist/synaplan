@@ -35,12 +35,38 @@ final class ContentCredentialsMarkTest extends TestCase
         }
     }
 
+    public function testProviderMarkedFileStaysByteIdenticalEvenWhenTheSignerIsConfigured(): void
+    {
+        $dir = $this->directory();
+        $png = (string) base64_decode(self::PNG, true).'c2pa';
+        file_put_contents($dir.'/cat.png', $png);
+        $file = $this->file('cat.png');
+
+        $files = $this->createMock(FileRepository::class);
+        $files->expects($this->once())->method('save');
+        $http = new MockHttpClient(static function (): never {
+            throw new \LogicException('The signer must not be called for provider-marked bytes');
+        });
+        $mark = new ContentCredentialsMark(
+            $files,
+            new C2paSignerClient($http, 'http://c2pa-signer:8787', 'secret-token'),
+            new XmpDigitalSource(),
+            $dir,
+        );
+
+        $mark->apply($file);
+
+        self::assertSame($png, file_get_contents($dir.'/cat.png'));
+        self::assertSame(ContentCredentialsMark::PROVIDER, $file->getCredentials());
+    }
+
     public function testUnsignedPngGetsTheXmpFallback(): void
     {
         $dir = $this->directory();
         $png = (string) base64_decode(self::PNG, true);
         file_put_contents($dir.'/plain.png', $png);
         $file = $this->file('plain.png');
+        $file->setFileSize(strlen($png));
 
         $this->marker($dir, 1)->apply($file);
 
@@ -49,6 +75,7 @@ final class ContentCredentialsMarkTest extends TestCase
         self::assertNotSame($png, $stored);
         self::assertStringContainsString('trainedAlgorithmicMedia', $stored);
         self::assertSame(ContentCredentialsMark::NONE, $file->getCredentials());
+        self::assertSame(strlen($stored), $file->getFileSize());
     }
 
     private function marker(string $dir, int $saves): ContentCredentialsMark

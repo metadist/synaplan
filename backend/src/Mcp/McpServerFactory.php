@@ -30,7 +30,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Tool\Execution\FileIngestExecutor;
-use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\MemoryAddExecutor;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolChannel;
@@ -38,6 +38,7 @@ use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\Execution\ToolOutcomeKind;
+use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
@@ -979,7 +980,7 @@ final class McpServerFactory
                 $name,
                 $arguments,
                 new ToolCaller((int) $user->getId(), ToolChannel::MCP_SERVER),
-                GateMode::AsTodayNever,
+                decision: new GateRequest($user, PolicyContext::Interactive, 'mcp:'.$name),
                 user: $user,
             ),
         );

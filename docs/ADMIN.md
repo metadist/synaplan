@@ -1,6 +1,17 @@
-# Administration Guide
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (1/9)**  
+> **← Previous:** [1.8 Updating on AWS Marketplace](UPDATE_AWS.md) · **Next:** [2.2 Health Probes & Uptime Monitoring →](HEALTH_MONITORING.md)
 
-Operations reference for self-hosted deployments.
+# Administration & Governance Guide
+
+> **In this guide:** Day-2 operations for self-hosted Synaplan deployments—secrets and first-admin recovery, health probes, the 5-lane background scheduler, consistent backups and restores, session persistence, signup abuse protection, user/group governance (`IAM`), sharing policies, self-awareness sync, linked platforms, and AI plugs.
+
+**On this page:**
+- [Production Setup & Admin Password Recovery](#production-setup) — [Secrets](#environment-and-secrets) · [First Administrator](#first-administrator) · [Lost Administrator Password](#lost-administrator-password)
+- [Monitoring & Background Scheduler](#monitoring) — [Health Endpoints](#health-check-endpoint) · [Recent Errors](#recent-errors) · [Background Jobs (Scheduler)](#background-jobs-scheduler)
+- [Backups, Restore & Updates](#backups) — [Restore](#restore) · [Updates](#updates) · [Elestio Cleanup](#elestio-trial-cleanup)
+- [Security, Sessions & Signup Protection](#security) — [Token Rotation](#token-rotation) · [Sessions Survive Restarts](#sessions-survive-restarts) · [Signup Limits & Human Check](#account-creation-limits-human-check-kill-switch) · [Open vs. Admission Mode](#who-may-create-an-account-open-or-admission)
+- [User Management & The Operate Area](#user-management) — [Operate Navigation](#the-operate-area) · [Users and Groups](#users-and-groups) · [Sharing](#sharing) · [Group Policies & Locked Defaults](#group-policies-and-locked-defaults)
+- [Self-Awareness (`SELF_AWARE`)](#self-awareness-self_aware) · [Integrations, Linked Platforms & AI Plugs](#integrations) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -994,3 +1005,8 @@ make up
 ```
 
 **Do not run `docker compose down -v` on production systems.**
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (1/9)**  
+> **← Previous:** [1.8 Updating on AWS Marketplace](UPDATE_AWS.md) · **Next:** [2.2 Health Probes & Uptime Monitoring →](HEALTH_MONITORING.md)

@@ -1,4 +1,9 @@
-# AWS Marketplace listing
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (9/9)**  
+> **← Previous:** [2.8 Resolving Model Price Drift](PRICE_DRIFT_PROCEDURE.md) · **Next:** [3.1 Knowledge Base & RAG →](RAG.md)
+
+# AWS Marketplace Listing & AMI Operations
+
+> **In this guide:** How the official free AWS Marketplace AMI for Synaplan (`deploy/aws/`) is registered, built with Packer, verified in CloudFormation, and published automatically via the AWS Marketplace Catalog API.
 
 Everything needed to submit Synaplan as a **free AMI product**, in the order it
 has to happen. The engineering side is done and lives in
@@ -476,3 +481,8 @@ any retention window would keep.
 
 Dispatch the workflow with **Only report what would be deleted** to read its
 reasoning before it acts.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (9/9)**  
+> **← Previous:** [2.8 Resolving Model Price Drift](PRICE_DRIFT_PROCEDURE.md) · **Next:** [3.1 Knowledge Base & RAG →](RAG.md)

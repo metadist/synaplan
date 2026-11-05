@@ -1341,7 +1341,7 @@
                             "<relay recipient>"
                         ],
                         "subject": "Re: Opening hours",
-                        "text": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.\n\n---\nService: test | Processing time: <time> seconds\nhttps://www.synaplan.com/\n\nThis reply was written by an AI assistant of Synaplan Test.",
+                        "text": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.\n\n---\nService: test | Processing time: <time> seconds\nhttps://www.synaplan.com/",
                         "to": [
                             "person-processor-failure@example.com"
                         ]

@@ -61,6 +61,16 @@ final class ResearchReportDeliveryTest extends ResearchUnitCase
         self::assertSame("> de:research.outcome.stopped_by_user\n\nPartial findings.", $this->posted[0]->getText());
     }
 
+    public function testAReportCutShortByALimitSaysSoAboveTheAnswer(): void
+    {
+        $state = $this->finished(ResearchStatus::Complete, ResearchOutcome::COMPLETE_AT_LIMIT, 'Partial findings.', 11);
+
+        $this->delivery()->deliver($state);
+
+        self::assertCount(1, $this->posted);
+        self::assertSame("> de:research.outcome.complete_at_limit\n\nPartial findings.", $this->posted[0]->getText());
+    }
+
     public function testARunWithoutAReportPostsOnlyTheReasonAndNoFile(): void
     {
         $state = $this->finished(ResearchStatus::Failed, ResearchOutcome::FAILED_INTERRUPTED, null, 11);

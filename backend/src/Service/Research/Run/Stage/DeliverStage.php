@@ -21,6 +21,12 @@ final readonly class DeliverStage implements ResearchStage
         $grouped = EvidenceWindow::cards($ledger, $ctx->roles->checkerSameFamily);
         $report = $ledger->report();
         if ([] === $ledger->evidenceForWriter() || null === $report || '' === trim($report)) {
+            // A run the limit stopped with nothing writable says so, with
+            // the limit named, instead of claiming nothing was there.
+            if (null !== $ctx->state->limitHit) {
+                return StageEnds::finish($ctx, ResearchStatus::Stopped, StageEnds::limitOutcome($ctx), 'stopped');
+            }
+
             return StageEnds::nothingFound($ctx);
         }
 
@@ -43,7 +49,20 @@ final readonly class DeliverStage implements ResearchStage
             $ctx->events->append($ctx->state->ref->id, 'point', ['id' => $point->id, 'status' => $status]);
         }
 
-        if ($open > 0) {
+        $limit = $ctx->state->limitHit;
+        if (null !== $limit && $open > 0) {
+            // The answer stands, and the sentence above it names the limit
+            // that cut the gathering short. A limit that left no point
+            // open did not hurt the answer and stays unmentioned.
+            $outcome = new ResearchOutcome(ResearchOutcome::COMPLETE_AT_LIMIT, [
+                'covered' => count($ledger->points()) - $open,
+                'points' => count($ledger->points()),
+                'open' => $open,
+                'limit' => $limit,
+                'depth' => $ctx->state->effectiveDepth()->value,
+                'limit_value' => $ctx->state->budget->limitValue($limit),
+            ]);
+        } elseif ($open > 0) {
             $outcome = new ResearchOutcome(ResearchOutcome::COMPLETE_PARTIAL, [
                 'open' => $open,
                 'points' => count($ledger->points()),

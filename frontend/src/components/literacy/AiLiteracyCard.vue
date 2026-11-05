@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -39,18 +39,29 @@ const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const due = ref(false)
+let loadVersion = 0
 
-onMounted(async () => {
-  if (!auth.isAuthenticated) {
-    return
-  }
-  try {
-    const status = await myAiLiteracy()
-    due.value = status.due
-  } catch {
+watch(
+  () => (auth.isAuthenticated ? (auth.user?.id ?? 'authenticated') : null),
+  async (principal) => {
+    const token = ++loadVersion
     due.value = false
-  }
-})
+    if (principal == null) {
+      return
+    }
+    try {
+      const status = await myAiLiteracy()
+      if (token === loadVersion) {
+        due.value = status.due
+      }
+    } catch {
+      if (token === loadVersion) {
+        due.value = false
+      }
+    }
+  },
+  { immediate: true }
+)
 
 function readNow(): void {
   due.value = false

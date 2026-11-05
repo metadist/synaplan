@@ -6,12 +6,14 @@ namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\Research\Run\ResearchLease;
+use App\Service\Research\Run\ResearchStatus;
 
 /**
  * One paid call, and a single retry when the answer is not the JSON shape.
- * Stop and an exhausted budget end the run. A model that does not answer
- * does not: the reply comes back unusable and the stage continues with
- * what the run already has. A model that cannot be resolved is not retried.
+ * Stop ends the run; an exhausted budget ends the gathering and sends it
+ * to the report. A model that does not answer does not end it either: the
+ * reply comes back unusable and the stage continues with what the run
+ * already has. A model that cannot be resolved is not retried.
  */
 final readonly class StageCall
 {
@@ -68,6 +70,16 @@ final readonly class StageCall
         ?StructuredOutputSchema $schema,
         ?\Closure $onText = null,
     ): ResearchModelReply|StageResult {
+        // Writing and checking keep the run alive on a spent budget: no
+        // new paid call goes over the cap, and the caller falls back to
+        // what the run already has. A stop still ends the run below.
+        if (!$ctx->stop->requested()
+            && !$ctx->state->budget->canCall()
+            && in_array($ctx->state->status, [ResearchStatus::Writing, ResearchStatus::Checking], true)) {
+            $ctx->state->noteLimitHit();
+
+            return ResearchModelReply::failed();
+        }
         $blocked = StageEnds::beforeCall($ctx);
         if ($blocked instanceof StageResult) {
             return $blocked;

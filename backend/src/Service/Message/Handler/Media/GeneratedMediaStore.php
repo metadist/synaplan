@@ -128,16 +128,21 @@ final readonly class GeneratedMediaStore
         if (!$file instanceof File || null === $this->credentials) {
             return;
         }
+        $this->credentials->label($file, $this->modelLabel($request));
+    }
+
+    private function modelLabel(MediaTurnRequest $request): string
+    {
         $name = trim((string) $request->model->name);
         $provider = trim((string) $request->model->provider);
         if ('' === $name) {
-            $label = $provider;
-        } elseif ('' === $provider || str_contains(strtolower($name), strtolower($provider))) {
-            $label = $name;
-        } else {
-            $label = $provider.' '.$name;
+            return $provider;
         }
-        $this->credentials->label($file, $label);
+        if ('' === $provider || str_contains(strtolower($name), strtolower($provider))) {
+            return $name;
+        }
+
+        return $provider.' '.$name;
     }
 
     /**

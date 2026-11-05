@@ -216,8 +216,10 @@ final readonly class ChannelReplyNotice
     }
 
     /**
-     * Same name the mail-handler form shows in its default sentence:
-     * the handler name, otherwise the owner's mailbox name.
+     * Same name the mail-handler form shows in its default sentence when a
+     * handler exists: the handler name, otherwise the handler owner's mailbox
+     * name. Replies without an inbound mail handler (smart@synaplan.net) keep
+     * the system sender name.
      */
     private function sentenceName(int $ownerId, ?InboundEmailHandler $handler, string $fallback): string
     {
@@ -226,14 +228,14 @@ final readonly class ChannelReplyNotice
             if ('' !== $name) {
                 return $name;
             }
-        }
 
-        $owner = $this->users->find($ownerId);
-        if ($owner instanceof User) {
-            $mail = $owner->getMail();
-            $at = strpos($mail, '@');
+            $owner = $this->users->find($ownerId);
+            if ($owner instanceof User) {
+                $mail = $owner->getMail();
+                $at = strpos($mail, '@');
 
-            return false === $at ? 'Synaplan' : substr($mail, 0, $at);
+                return false === $at ? 'Synaplan' : substr($mail, 0, $at);
+            }
         }
 
         $fallback = trim($fallback);

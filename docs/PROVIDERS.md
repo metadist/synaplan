@@ -1,4 +1,9 @@
-# Adding an AI provider
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (3/11)**  
+> **← Previous:** [5.2 Backend Architecture & Request Lifecycle](ARCHITECTURE.md) · **Next:** [5.4 Backend PHP Conventions →](PHP_CONVENTIONS.md)
+
+# Adding an AI Provider
+
+> **In this guide:** How `ProviderDescriptor` (`App\AI\Catalog\`) acts as the single source of truth for every AI provider in Synaplan, and how to scaffold a new OpenAI-compatible provider—including its key store, model listing, outbound allowlist, and unit test—in one command (`app:provider:scaffold`).
 
 One provider is one class. The class carries a `ProviderDescriptor`
 (`App\AI\Catalog\`), and every table the installation keeps reads that
@@ -114,3 +119,8 @@ reCAPTCHA, Cloudflare challenges). The provider hosts are
 of every described provider. A provider you add is allowed in `enforce`
 mode the moment its class exists; nothing is edited in the egress code. See
 [`EGRESS.md`](EGRESS.md).
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (3/11)**  
+> **← Previous:** [5.2 Backend Architecture & Request Lifecycle](ARCHITECTURE.md) · **Next:** [5.4 Backend PHP Conventions →](PHP_CONVENTIONS.md)

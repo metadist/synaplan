@@ -14,10 +14,11 @@ final class ResearchOutcomeTest extends TestCase
         $samples = [
             ResearchOutcome::COMPLETE => ['statements' => 35, 'supported' => 33],
             ResearchOutcome::COMPLETE_PARTIAL => ['open' => 2, 'points' => 5],
+            ResearchOutcome::COMPLETE_AT_LIMIT => ['covered' => 3, 'points' => 5, 'limit' => 'wall', 'depth' => 'standard', 'limit_value' => '6'],
             ResearchOutcome::COMPLETE_SNIPPETS_ONLY => [],
             ResearchOutcome::STOPPED_BY_USER => [],
             ResearchOutcome::STOPPED_BUDGET => ['covered' => 3, 'points' => 5],
-            ResearchOutcome::STOPPED_LIMIT => ['covered' => 3, 'points' => 5],
+            ResearchOutcome::STOPPED_LIMIT => ['covered' => 0, 'points' => 4, 'limit' => 'wall', 'depth' => 'standard', 'limit_value' => '6', 'searches' => 4, 'sources' => 5],
             ResearchOutcome::STOPPED_WAITING => [],
             ResearchOutcome::FAILED_NO_SOURCES => [],
             ResearchOutcome::FAILED_NOTHING_FOUND => [],
@@ -35,6 +36,51 @@ final class ResearchOutcomeTest extends TestCase
             self::assertStringNotContainsString('stack', $text);
             self::assertDoesNotMatchRegularExpression('/\b[45]\d\d\b/', $text);
         }
+    }
+
+    public function testTheLimitEndingsNameTheLimitTheDepthAndTheWayToRaiseIt(): void
+    {
+        $stopped = (new ResearchOutcome(ResearchOutcome::STOPPED_LIMIT, [
+            'covered' => 0,
+            'points' => 4,
+            'limit' => 'wall',
+            'depth' => 'standard',
+            'limit_value' => '6',
+            'searches' => 4,
+            'sources' => 5,
+        ]))->text();
+
+        self::assertStringContainsString('time limit (6 minutes)', $stopped);
+        self::assertStringContainsString('4 searches, 5 sources read', $stopped);
+        self::assertStringContainsString('0 of 4 points answered', $stopped);
+        self::assertStringContainsString('Settings, Research, Limits for each depth', $stopped);
+        self::assertStringNotContainsString('covers', $stopped);
+
+        $delivered = (new ResearchOutcome(ResearchOutcome::COMPLETE_AT_LIMIT, [
+            'covered' => 3,
+            'points' => 4,
+            'limit' => 'cost',
+            'depth' => 'standard',
+            'limit_value' => '1',
+        ]))->text();
+
+        self::assertStringContainsString('cost cap ($1)', $delivered);
+        self::assertStringContainsString('3 of 4 points have a backed answer', $delivered);
+    }
+
+    public function testAStrayLimitOrDepthNeverReachesTheSentence(): void
+    {
+        $outcome = new ResearchOutcome(ResearchOutcome::STOPPED_LIMIT, [
+            'covered' => 1,
+            'points' => 2,
+            'limit' => "wall\nException",
+            'depth' => 'huge',
+            'limit_value' => '6',
+        ]);
+
+        self::assertSame('limit', $outcome->placeholders()['limit']);
+        self::assertSame('standard', $outcome->placeholders()['depth']);
+        self::assertStringNotContainsString('Exception', $outcome->text());
     }
 
     public function testStopDoesNotPretendTheWorkWasFree(): void

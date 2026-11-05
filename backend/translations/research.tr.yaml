@@ -5,7 +5,8 @@ research:
     complete_snippets_only: 'Hiçbir sayfa açılamadı, bu yüzden bu rapor yalnızca arama özetlerine dayanıyor. Önemli olduğu yerlerde bunu belirtiyor.'
     stopped_by_user: 'Durduruldu. Durdur''a bastıktan sonra yeni bir iş başlatılmadı; zaten süren bir adım yine de sayılabilir. Şimdiye kadar bulunanlar saklanıyor.'
     stopped_budget: 'Aylık AI bütçen tükendiği için durduruldu. Rapor %points% noktadan %covered% tanesini kapsıyor.'
-    stopped_limit: 'Bu araştırma bu derinlik için sınırına ulaştığı için durduruldu. Bulunanlar %points% noktadan %covered% tanesini kapsıyor.'
+    complete_at_limit: 'Toplama, %depth% için %limit% sınırına ulaştığı için durdu; bu yanıt o ana kadar bulunanlara dayanıyor: %points% noktadan %covered% tanesinin dayanaklı bir yanıtı var. Çalışma alanının yöneticisi bunu Ayarlar → Araştırma → Her derinlik için sınırlar altında yükseltebilir.'
+    stopped_limit: 'Bu %depth% araştırması, bir yanıt yazılamadan %limit% sınırına ulaştığı için durduruldu. O ana kadar bulunanlar: %searches% arama, %sources% kaynak okundu, %points% noktadan %covered% tanesi yanıtlandı. Çalışma alanının yöneticisi bunu Ayarlar → Araştırma → Her derinlik için sınırlar altında yükseltebilir.'
     stopped_waiting: 'Plan bir gün içinde onaylanmadığı için durduruldu. Hazır olduğunda yeniden başlat.'
     stopped_by_admin: 'Araştırma Synaplan çalışma alanında kapatıldı. Şimdiye kadar bulunanlar saklanıyor.'
     answered_without_research: 'Ek inceleme yapılmadan yanıtlandı. Bu soru için hiçbir şey aranmadı.'
@@ -32,6 +33,18 @@ research:
     budget: 'Bu dönem için kullanım bütçeniz doldu, bu yüzden doğrudan yanıtlıyorum. Bir yönetici artırabilir.'
     plan_limit: 'Planınızın bugünkü araştırmaları doldu, bu yüzden doğrudan yanıtlıyorum. Yarın yeniden çalışır.'
     unavailable: "Araştırma şu anda kullanılamıyor, bu yüzden doğrudan yanıtlıyorum. Birkaç dakika sonra Daha derin bak'ı deneyin."
+  limit_name:
+    wall: 'süre sınırı (%value% dakika)'
+    cost: 'maliyet üst sınırı ($%value%)'
+    calls: 'model çağrısı sınırı (%value% çağrı)'
+    rounds: 'tur sınırı (%value% tur)'
+    gather: 'arama ve kaynak sınırı'
+    limit: 'sınır'
+  depth_name:
+    quick: 'Kısa'
+    standard: 'Standart'
+    thorough: 'Ayrıntılı'
+    auto: 'otomatik'
   role:
     reading: 'okuma'
     sorting: 'sıralama'

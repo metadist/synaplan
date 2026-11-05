@@ -15,6 +15,16 @@ namespace App\Service\Research\Run;
  */
 final class ResearchBudget
 {
+    /** The limits that can end the gathering of one run, in the order they are judged. */
+    public const LIMIT_CALLS = 'calls';
+    public const LIMIT_WALL = 'wall';
+    public const LIMIT_COST = 'cost';
+    public const LIMIT_ROUNDS = 'rounds';
+    public const LIMIT_GATHER = 'gather';
+
+    /** @var list<string> */
+    public const LIMIT_REASONS = [self::LIMIT_CALLS, self::LIMIT_WALL, self::LIMIT_COST, self::LIMIT_ROUNDS, self::LIMIT_GATHER];
+
     private int $searches = 0;
     private int $sourcesRead = 0;
     private int $rounds = 0;
@@ -63,6 +73,46 @@ final class ResearchBudget
         return $this->calls < $this->limits->maxModelCalls
             && $this->spentMicro < self::micro($this->limits->costCap)
             && $this->secondsLeft() > 0;
+    }
+
+    /**
+     * Which limit of this depth is spent, if any. The hard stop comes
+     * first, in the order the loop rules judge it. A rounds cap of zero
+     * is how a quick run is built, so it never counts as spent; searches
+     * and sources count only when both are gone, because either one
+     * alone can still feed a round.
+     */
+    public function exhaustedReason(): ?string
+    {
+        if ($this->calls >= $this->limits->maxModelCalls) {
+            return self::LIMIT_CALLS;
+        }
+        if (0 === $this->secondsLeft()) {
+            return self::LIMIT_WALL;
+        }
+        if ($this->spentMicro >= self::micro($this->limits->costCap)) {
+            return self::LIMIT_COST;
+        }
+        if ($this->limits->rounds > 0 && $this->rounds >= $this->limits->rounds) {
+            return self::LIMIT_ROUNDS;
+        }
+        if (!$this->canSearch() && !$this->canRead()) {
+            return self::LIMIT_GATHER;
+        }
+
+        return null;
+    }
+
+    /** The cap of one limit as a person reads it: minutes, dollars, or a count. Empty for the gather pair. */
+    public function limitValue(string $reason): string
+    {
+        return match ($reason) {
+            self::LIMIT_WALL => (string) max(1, (int) ceil($this->limits->wallSeconds / 60)),
+            self::LIMIT_COST => rtrim(rtrim(number_format($this->limits->costCap, 2, '.', ''), '0'), '.'),
+            self::LIMIT_CALLS => (string) $this->limits->maxModelCalls,
+            self::LIMIT_ROUNDS => (string) $this->limits->rounds,
+            default => '',
+        };
     }
 
     public function spend(string $counter, int $n = 1): void

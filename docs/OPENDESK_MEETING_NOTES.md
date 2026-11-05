@@ -1,4 +1,9 @@
-# Meeting notes
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (11/11)**  
+> **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+
+# openDesk Meeting Notes (Jitsi & Element Matrix)
+
+> **In this guide:** How the `synaplan-transcriber` sidecar provides live Jitsi meeting captions and Element (Matrix) voice-message transcription against Synaplan's `/v1/audio/transcriptions` API while discarding raw audio after each window.
 
 Meeting notes turn speech into text for an [openDesk](https://www.opendesk.eu/en/product) installation.
 
@@ -110,3 +115,8 @@ The sentence at the end says what was saved. A destination that was configured a
 - It does not transcribe Element Call live.
 - It does not translate live, keep the audio, or record the video.
 - It does not use Nextcloud Talk. Talk is a different product.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (11/11)**  
+> **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)

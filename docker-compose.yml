@@ -372,6 +372,7 @@ services:
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
       C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       # Collabora CODE convert-to. The collabora service starts with this
       # stack. Override OFFICE_CONVERT_URL for an external CODE, or set
@@ -592,6 +593,7 @@ services:
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
       C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
@@ -1068,7 +1070,7 @@ services:
 
   # Optional content-credentials signer. The key stays in this container.
   # Not started by default. Enable with: docker compose --profile c2pa up -d
-  # Then set C2PA_SIGNER_URL=http://c2pa-signer:8787 on the backend.
+  # Then set C2PA_SIGNER_URL=http://c2pa-signer:8787 and C2PA_SIGNER_TOKEN on the backend.
   # c2patool publishes a linux amd64 binary only, so this service is amd64
   # even when the host is arm64. No host port is published.
   c2pa-signer:
@@ -1080,6 +1082,7 @@ services:
     restart: unless-stopped
     environment:
       C2PA_SIGNER_ADDR: ":8787"
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-synaplan-dev-c2pa-token-change-me-32b}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health')"]
       interval: 30s

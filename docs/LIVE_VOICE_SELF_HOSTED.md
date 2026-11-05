@@ -1,4 +1,9 @@
-# A live voice model you host yourself
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (10/11)**  
+> **← Previous:** [4.9 Live Voice (Full-Duplex Speech)](LIVE_VOICE.md) · **Next:** [4.11 openDesk Meeting Notes (Jitsi & Matrix) →](OPENDESK_MEETING_NOTES.md)
+
+# Self-Hosted Live Voice Endpoints
+
+> **In this guide:** How to point Synaplan's live voice sidecar at your own OpenAI-Realtime-compatible WebSocket server (`LIVE_VOICE_COMPATIBLE_WS_URL`)—including vLLM-Omni (`Qwen3-Omni`), Azure OpenAI Realtime, and Qwen Cloud.
 
 Synaplan can speak through one OpenAI-Realtime-compatible websocket that you run or rent. The browser still talks only to Synaplan. The sidecar opens the upstream socket.
 
@@ -47,3 +52,8 @@ Qwen's realtime API is the same shape as OpenAI Realtime. Set the websocket URL 
 ## No GPU
 
 Without a realtime model, the chat still reads an answer aloud and listens with the usual microphone. While that answer is playing, speech on a microphone the person has already allowed stops the reading and starts dictation. The page does not ask for the microphone just to do that.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (10/11)**  
+> **← Previous:** [4.9 Live Voice (Full-Duplex Speech)](LIVE_VOICE.md) · **Next:** [4.11 openDesk Meeting Notes (Jitsi & Matrix) →](OPENDESK_MEETING_NOTES.md)

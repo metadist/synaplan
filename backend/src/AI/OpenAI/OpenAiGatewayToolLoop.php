@@ -19,7 +19,6 @@ use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Execution\BuiltinToolExecutor;
-use App\Service\Tool\Execution\GateMode;
 use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
@@ -28,6 +27,7 @@ use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\Execution\ToolOutcomeKind;
+use App\Service\Tool\Execution\ToolUsageRecorder;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
@@ -458,7 +458,17 @@ final readonly class OpenAiGatewayToolLoop
             }
 
             if ($this->mcpCatalogAdapter->isMutatingTool($entry['annotations']) && !$this->approvalsOn((int) $user->getId())) {
-                $results[] = $this->toolMessage($id, sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']));
+                $message = sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']);
+                $this->executionGate?->inspect(
+                    (int) $user->getId(),
+                    $name,
+                    $arguments,
+                    $user,
+                    PolicyContext::Interactive,
+                    'chat:0',
+                    forcedRefusal: $message,
+                );
+                $results[] = $this->toolMessage($id, $message);
                 continue;
             }
 
@@ -570,6 +580,14 @@ final readonly class OpenAiGatewayToolLoop
                 $assistant?->promptId,
             );
             $notes[] = '[code_execution]';
+            (new ToolUsageRecorder($this->rateLimitService, $this->logger))->record(
+                $user,
+                'COMPUTE_RUNS',
+                'synaplan',
+                'tool:'.$tool,
+                'file_work',
+                $result['isError'],
+            );
 
             return $this->toolMessage($id, $result['text']);
         }
@@ -632,7 +650,7 @@ final readonly class OpenAiGatewayToolLoop
             $name,
             $arguments,
             new ToolCaller((int) $user->getId(), ToolChannel::OPENAI),
-            GateMode::AsTodayWhenApprovalsOn,
+            recordUsage: !$decideOnly,
             decision: new GateRequest($user, PolicyContext::Interactive, 'chat:0'),
             decideOnly: $decideOnly,
             user: $user,
@@ -648,7 +666,7 @@ final readonly class OpenAiGatewayToolLoop
                 new BuiltinToolExecutor(webSearch: $this->webSearchTool),
             ],
             gate: $this->executionGate,
-            toolsConfig: $this->toolsConfig,
+            rates: $this->rateLimitService,
         );
     }
 

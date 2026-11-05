@@ -393,9 +393,8 @@
                 </template>
 
                 <!--
-                  Preferences is the single settings page. Theme stays on the
-                  device, so the entry is offered to guests as well as signed-in
-                  users. /profile is the old URL and still counts as this row.
+                  Preferences opens the phone settings list. Theme stays on the
+                  device, so guests reach it too. /profile still counts as this row.
                 -->
                 <button
                   class="v2-drawer-account"

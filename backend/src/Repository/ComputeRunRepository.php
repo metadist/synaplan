@@ -34,6 +34,13 @@ class ComputeRunRepository extends ServiceEntityRepository
             ->execute();
     }
 
+    public function findOneByRunId(string $runId): ?ComputeRun
+    {
+        $found = $this->findOneBy(['runId' => $runId]);
+
+        return $found instanceof ComputeRun ? $found : null;
+    }
+
     public function findQueuedByApproval(int $approvalId): ?ComputeRun
     {
         $found = $this->findOneBy([

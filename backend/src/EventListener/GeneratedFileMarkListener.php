@@ -31,7 +31,7 @@ final class GeneratedFileMarkListener
     public function postPersist(PostPersistEventArgs $event): void
     {
         $file = $event->getObject();
-        if ($file instanceof File && 'generated' === $file->getSource() && !$file->isGenerated()) {
+        if ($file instanceof File && 'generated' === $file->getSource() && 'generated' === $file->getStatus() && !$file->isGenerated()) {
             $this->pending[] = $file;
         }
     }

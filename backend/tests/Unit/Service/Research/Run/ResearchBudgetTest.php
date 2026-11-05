@@ -64,6 +64,66 @@ final class ResearchBudgetTest extends TestCase
         self::assertFalse($fresh->canCall());
     }
 
+    public function testExhaustedReasonNamesTheSpentLimitInTheOrderTheLoopJudgesIt(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $fresh = static function () use ($start): ResearchBudget {
+            $budget = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $start);
+            $budget->at($start);
+
+            return $budget;
+        };
+
+        self::assertNull($fresh()->exhaustedReason());
+
+        $calls = $fresh();
+        $calls->spend('calls', 60);
+        self::assertSame(ResearchBudget::LIMIT_CALLS, $calls->exhaustedReason());
+
+        $wall = $fresh();
+        $wall->at($start->modify('+360 seconds'));
+        self::assertSame(ResearchBudget::LIMIT_WALL, $wall->exhaustedReason());
+
+        $cost = $fresh();
+        $cost->addCost(1.0);
+        self::assertSame(ResearchBudget::LIMIT_COST, $cost->exhaustedReason());
+
+        $rounds = $fresh();
+        $rounds->spend('rounds', 3);
+        self::assertSame(ResearchBudget::LIMIT_ROUNDS, $rounds->exhaustedReason());
+
+        $gather = $fresh();
+        $gather->spend('searches', 10);
+        self::assertNull($gather->exhaustedReason(), 'searches alone still leave sources to read');
+        $gather->spend('sources', 15);
+        self::assertSame(ResearchBudget::LIMIT_GATHER, $gather->exhaustedReason());
+    }
+
+    public function testAQuickRunNeverBlamesItsZeroRoundCap(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $budget = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $start);
+        $budget->at($start);
+
+        self::assertFalse($budget->canRound());
+        self::assertNull($budget->exhaustedReason());
+    }
+
+    public function testLimitValueReadsLikeTheCapItNames(): void
+    {
+        $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');
+        $standard = ResearchBudget::for(ResearchDepth::Standard, ResearchBudgetConfig::defaults(ResearchDepth::Standard), $start);
+
+        self::assertSame('6', $standard->limitValue(ResearchBudget::LIMIT_WALL));
+        self::assertSame('1', $standard->limitValue(ResearchBudget::LIMIT_COST));
+        self::assertSame('60', $standard->limitValue(ResearchBudget::LIMIT_CALLS));
+        self::assertSame('3', $standard->limitValue(ResearchBudget::LIMIT_ROUNDS));
+        self::assertSame('', $standard->limitValue(ResearchBudget::LIMIT_GATHER));
+
+        $quick = ResearchBudget::for(ResearchDepth::Quick, ResearchBudgetConfig::defaults(ResearchDepth::Quick), $start);
+        self::assertSame('0.1', $quick->limitValue(ResearchBudget::LIMIT_COST));
+    }
+
     public function testARoundTripKeepsWhatWasSpent(): void
     {
         $start = new \DateTimeImmutable('2026-10-24T10:00:00+00:00');

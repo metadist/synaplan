@@ -200,7 +200,8 @@
             "details": [],
             "configured_by": {
                 "env": [
-                    "C2PA_SIGNER_URL"
+                    "C2PA_SIGNER_URL",
+                    "C2PA_SIGNER_TOKEN"
                 ],
                 "bconfig": [],
                 "providers": [],

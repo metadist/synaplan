@@ -24,13 +24,15 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Prompt\PromptService;
-use App\Service\Tool\Execution\GateMode;
+use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolChannel;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolOutcomeKind;
+use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
@@ -165,18 +167,56 @@ final readonly class McpFetchRunner implements TaskRunner
             return $this->images->attach($server, $tool, $arguments, $this->language($context));
         }
 
+        return $this->callTool($context, $node, $server, $serverId, $tool, $arguments, (int) $userId);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function callTool(
+        NodeContext $context,
+        TaskNode $node,
+        McpServerConfig $server,
+        int $serverId,
+        string $tool,
+        array $arguments,
+        int $userId,
+    ): NodeResult {
+        $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
+        $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
+        $unattended = $runId > 0 || true === ($context->options['saved_task'] ?? false);
+        // Only a saved-task run can resume the waiting step. A chat label
+        // would run the fetch in the chat continuation and leave the step waiting.
+        $requestedBy = $runId > 0
+            ? sprintf('task_run:%d:%s', $runId, $node->id)
+            : 'chat:'.(int) $context->message->getId();
         $outcome = $this->tools()->invoke(
-            new ToolDescriptor('mcp_fetch', $tool, '', [], SideEffect::Read, ToolSource::Mcp, (int) $userId, null, [
+            new ToolDescriptor($gateName, $tool, '', [], SideEffect::Read, ToolSource::Mcp, $userId, null, [
                 'serverId' => $serverId,
                 'tool' => $tool,
             ]),
             new ToolInvocation(
-                $tool,
+                $gateName,
                 $arguments,
-                new ToolCaller((int) $userId, ToolChannel::MCP_FETCH),
-                GateMode::AsTodayNever,
+                new ToolCaller($userId, ToolChannel::MCP_FETCH, unattended: $unattended, requestId: $requestedBy),
+                decision: new GateRequest(
+                    null,
+                    $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
+                    $requestedBy,
+                    allowUnattended: true === ($context->options['allow_unattended'] ?? false),
+                    alreadyApproved: $context->isApproved($node->id),
+                ),
             ),
         );
+        if (ToolOutcomeKind::NeedsApproval === $outcome->kind && null !== $outcome->approvalId) {
+            return NodeResult::waitingApproval($outcome->approvalId, $arguments, [
+                'tool' => $gateName,
+                'side_effect' => SideEffect::Read->value,
+            ]);
+        }
+        if (ToolOutcomeKind::Refused === $outcome->kind) {
+            return NodeResult::failed($outcome->resultText);
+        }
         if (true === ($outcome->details['transport'] ?? false)) {
             $status = $outcome->details['httpStatus'] ?? null;
 

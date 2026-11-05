@@ -133,16 +133,30 @@ final class AiLiteracyController extends AbstractController
     public function export(): Response
     {
         $lines = ['id,email,version,confirmed'];
-        $version = $this->literacy->version();
+        $version = $this->csvCell($this->literacy->version());
+        $filenameVersion = preg_replace('/[^A-Za-z0-9._-]/', '-', $this->literacy->version()) ?: 'current';
         foreach ($this->literacy->exportRows() as $row) {
-            $email = str_replace('"', '""', $row['email']);
-            $lines[] = $row['id'].',"'.$email.'",'.$version.','.$row['confirmed'];
+            $lines[] = implode(',', [
+                (string) $row['id'],
+                $this->csvCell($row['email']),
+                $version,
+                $this->csvCell($row['confirmed']),
+            ]);
         }
 
         return new Response(implode("\n", $lines)."\n", Response::HTTP_OK, [
             'Content-Type' => 'text/csv; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="ai-literacy-'.$version.'.csv"',
+            'Content-Disposition' => 'attachment; filename="ai-literacy-'.$filenameVersion.'.csv"',
         ]);
+    }
+
+    private function csvCell(string $value): string
+    {
+        if ('' !== $value && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            $value = "'".$value;
+        }
+
+        return '"'.str_replace('"', '""', $value).'"';
     }
 
     /**

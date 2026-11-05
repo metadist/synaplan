@@ -211,8 +211,9 @@ parameters:
     env(DOCLING_BASE_URL): ''
     env(DOCLING_TIMEOUT_MS): '120000'
     env(DOCLING_MAX_BYTES): '52428800'
-    # Content-credentials signer. Empty = not signed (XMP fallback on images).
+    # Content-credentials signer. Empty URL or token = not signed (XMP fallback on images).
     env(C2PA_SIGNER_URL): ''
+    env(C2PA_SIGNER_TOKEN): ''
     # SearXNG sidecar. Empty = off (OSS / fresh-install default).
     env(SEARXNG_BASE_URL): ''
     # HTML/SVG chat preview. Empty = off. The dev compose defaults this to 1.
@@ -1227,10 +1228,12 @@ services:
     App\Module\Sidecar\C2paSignerModule:
         arguments:
             $baseUrl: '%env(C2PA_SIGNER_URL)%'
+            $token: '%env(C2PA_SIGNER_TOKEN)%'
 
     App\Service\Media\C2paSignerClient:
         arguments:
             $baseUrl: '%env(C2PA_SIGNER_URL)%'
+            $token: '%env(C2PA_SIGNER_TOKEN)%'
 
     App\Module\Sidecar\OfficeConvertModule:
         arguments:

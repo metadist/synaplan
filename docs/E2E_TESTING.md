@@ -1,4 +1,9 @@
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (10/11)**  
+> **← Previous:** [5.9 UX Contract (Rules U1–U12)](UX_CONTRACT.md) · **Next:** [5.11 Reviewing Renovate Dependency PRs →](DEPENDENCY_UPDATES.md)
+
 # Playwright E2E Test Guidelines
+
+> **In this guide:** How to write and run fast, deterministic Playwright end-to-end specs in `frontend/tests/e2e/`—covering `@ci` and matrix tags (`@crossbrowser`, `@layout`, `@oidc`, `@ollama`, `@minimal`, `@busy`), central `selectors.ts` rules, terminal-state racing, worker-scoped authentication, and known local-only differences between the dev stack and the CI test stack.
 
 Goal: simple, readable, stable tests that fail fast.
 No over-engineering. No unnecessary abstractions.
@@ -523,3 +528,8 @@ research run and does not call a model. The dev stack keeps research off.
 The spec stubs `GET /api/v1/research/capabilities`, start, events and cancel
 with `page.route`, including a 320 px viewport. A 404 from capabilities hides
 the menu entry.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (10/11)**  
+> **← Previous:** [5.9 UX Contract (Rules U1–U12)](UX_CONTRACT.md) · **Next:** [5.11 Reviewing Renovate Dependency PRs →](DEPENDENCY_UPDATES.md)

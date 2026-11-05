@@ -23,6 +23,7 @@ final class C2paSignerModule implements FeatureModuleInterface
     public function __construct(
         private readonly SidecarHealthProbeInterface $probe,
         private readonly string $baseUrl,
+        private readonly string $token = '',
     ) {
     }
 
@@ -38,12 +39,15 @@ final class C2paSignerModule implements FeatureModuleInterface
 
     public function configuredBy(): ConfiguredBy
     {
-        return ConfiguredBy::env('C2PA_SIGNER_URL');
+        return ConfiguredBy::env('C2PA_SIGNER_URL', 'C2PA_SIGNER_TOKEN');
     }
 
     public function isConfigured(): bool
     {
-        return '' !== $this->baseUrl && 'disabled' !== $this->baseUrl;
+        $url = trim($this->baseUrl);
+        $token = trim($this->token);
+
+        return '' !== $url && 'disabled' !== $url && '' !== $token;
     }
 
     public function status(): ModuleStatus

@@ -16,6 +16,7 @@ services:
       TIKA_URL: ""
       DOCLING_BASE_URL: ""
       C2PA_SIGNER_URL: ""
+      C2PA_SIGNER_TOKEN: ""
       OFFICE_CONVERT_URL: ""
       OFFICE_PUBLIC_URL: ""
       OFFICE_WOPI_URL: ""

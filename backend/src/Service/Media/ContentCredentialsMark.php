@@ -55,27 +55,51 @@ final readonly class ContentCredentialsMark
         if ('' === $modelLabel) {
             return;
         }
+        $previous = $file->getGeneratedModel();
+        $next = mb_substr($modelLabel, 0, 96);
         $file->setGenerated(true);
-        $file->setGeneratedModel(mb_substr($modelLabel, 0, 96));
+        $file->setGeneratedModel($next);
+        if ($previous !== $next && self::SIGNED === $file->getCredentials()) {
+            $this->reSign($file, $next);
+        }
         $this->files->save($file);
+    }
+
+    private function reSign(File $file, string $label): void
+    {
+        $relative = ltrim($file->getFilePath(), '/');
+        $absolute = $this->uploadDir.'/'.$relative;
+        if (!is_file($absolute) || !is_readable($absolute)) {
+            return;
+        }
+        $current = file_get_contents($absolute);
+        if (!is_string($current) || '' === $current) {
+            return;
+        }
+        $signed = $this->signer->sign($current, basename($absolute), $label, false);
+        if (is_string($signed)) {
+            file_put_contents($absolute, $signed);
+            $file->setFileSize(strlen($signed));
+        }
     }
 
     private function markBytes(string $absolute, string $original, File $file): string
     {
-        $hasProvider = str_contains($original, 'c2pa') || str_contains($original, 'trainedAlgorithmicMedia');
+        if (str_contains($original, 'c2pa') || str_contains($original, 'trainedAlgorithmicMedia')) {
+            return self::PROVIDER;
+        }
         $label = $file->getGeneratedModel() ?: ($file->getProvider() ?: 'model');
-        $signed = $this->signer->sign($original, basename($absolute), (string) $label, $hasProvider);
+        $signed = $this->signer->sign($original, basename($absolute), (string) $label, false);
         if (is_string($signed)) {
             file_put_contents($absolute, $signed);
+            $file->setFileSize(strlen($signed));
 
-            return $hasProvider ? self::BOTH : self::SIGNED;
-        }
-        if ($hasProvider) {
-            return self::PROVIDER;
+            return self::SIGNED;
         }
         $embedded = $this->xmp->embed($original);
         if (is_string($embedded)) {
             file_put_contents($absolute, $embedded);
+            $file->setFileSize(strlen($embedded));
         }
 
         return self::NONE;

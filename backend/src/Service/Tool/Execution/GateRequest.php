@@ -8,9 +8,10 @@ use App\Entity\User;
 use App\Service\Tool\Policy\PolicyContext;
 
 /**
- * The arguments {@see ToolExecutionGate::inspect()} receives today.
- * Each caller copies its current call. AU25 drops this and the invoker
- * fills the request itself.
+ * The arguments {@see ToolExecutionGate::inspect()} receives.
+ *
+ * The invoker always inspects. `alreadyApproved` is a decision that was
+ * already made, so inspect answers Auto and does not open a second approval.
  */
 final readonly class GateRequest
 {
@@ -28,7 +29,7 @@ final readonly class GateRequest
         public ?array $assistantTools = null,
         public ?string $assistantKey = null,
         public ?array $resolvedRequest = null,
-        public bool $skip = false,
+        public bool $alreadyApproved = false,
     ) {
     }
 }

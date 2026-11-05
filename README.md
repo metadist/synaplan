@@ -484,7 +484,8 @@ make lint
 
 ## Documentation
 
-User-facing and API docs live at **[docs.synaplan.com](https://docs.synaplan.com/)**. Source: [`metadist/synaplan-docs`](https://github.com/metadist/synaplan-docs).
+- **Public user & product docs:** **[docs.synaplan.com](https://docs.synaplan.com/)** (source: [`metadist/synaplan-docs`](https://github.com/metadist/synaplan-docs))
+- **In-repository technical manual & learning path:** **[`docs/README.md`](docs/README.md)** — organized into five sequential tracks with previous/next navigation in every guide.
 
 Changing this codebase? Start with one of these two:
 
@@ -493,26 +494,15 @@ Changing this codebase? Start with one of these two:
 | Add an AI provider | [PROVIDERS.md](docs/PROVIDERS.md) — one class, one command |
 | Follow a tool call | [ARCHITECTURE.md](docs/ARCHITECTURE.md#tool-path) — one invoker for chat, the APIs, Saved Tasks and MCP |
 
-The rest of the in-repo guides:
+### Learning Tracks in [`docs/`](docs/README.md)
 
-| Guide | Description |
-|-------|-------------|
-| [Installation](docs/INSTALLATION.md) | Local development stack and production self-hosting (`deploy/`) |
-| [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
-| [Feature flags](docs/FEATURE_FLAGS.md) | Every wave feature (people & sharing, assistants, tools, saved-task steps, desktop, file work, …): admin toggle, `FEATURE_*` env pin, defaults |
-| [File work / compute](docs/COMPUTE.md) | Optional sidecar: flags, compose profile, quotas, workspaces |
-| [Connections](docs/CONNECTIONS.md) | Microsoft 365, Dropbox, Nextcloud / WebDAV, CalDAV, Jira / Confluence |
-| [AI Model Pricing](docs/PRICING_MAINTENANCE.md) | Model catalog, provider prices, retiring a model |
-| [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
-| [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
-| [Observability](docs/OBSERVABILITY.md) | Request correlation ids, redacted event ring, admin logs API |
-| [Office documents](https://docs.synaplan.com/index.php/office-documents) | Optional Collabora CODE sidecar (PDF export, previews, convert-to) |
-| [RAG System](docs/RAG.md) | Document search and processing |
-| [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
-| [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |
-| [Email](docs/EMAIL.md) | Email channel integration |
-| [Anthropic-compatible API](docs/ANTHROPIC_COMPATIBLE_API.md) | Claude Code / Messages API gateway (`POST /v1/messages`) |
-| [Secure compute (user docs)](https://docs.synaplan.com/modules/compute) | What people see: File work card, Workspace, quotas |
+| Track | Guides |
+| ----- | ------ |
+| **1. Getting Started & Deployment** | [Platform Capabilities](docs/FEATURES.md) → [Installation](docs/INSTALLATION.md) → [Configuration & AI Providers](docs/CONFIGURATION.md) → [Feature Flags](docs/FEATURE_FLAGS.md) → [Runtime & Outbound Options](docs/RUNTIME_OPTIONS.md) → [Update Self-Hosted](docs/UPDATE_SELFHOST.md) · [Elestio](docs/UPDATE_ELESTIO.md) · [AWS](docs/UPDATE_AWS.md) |
+| **2. Administration, Security & Billing** | [Day-2 Operations & Governance](docs/ADMIN.md) → [Health Probes](docs/HEALTH_MONITORING.md) → [Observability](docs/OBSERVABILITY.md) → [Outbound Traffic & Egress](docs/EGRESS.md) → [Self-Hosted Billing](docs/BILLING_SELFHOST.md) → [Payment Channels & IAP](docs/PAYMENTS_CHANNELS.md) → [Model Pricing](docs/PRICING_MAINTENANCE.md) → [Price Drift Procedure](docs/PRICE_DRIFT_PROCEDURE.md) → [AWS Marketplace AMI](docs/AWS_MARKETPLACE_LISTING.md) |
+| **3. AI Engine, Knowledge & Execution** | [Knowledge Base & RAG](docs/RAG.md) → [Conversation Continuity & Memory](docs/CONVERSATION_CONTINUITY.md) → [Session Files & Edits](docs/SESSION_FILES.md) → [Multi-Task Data Nodes](docs/MULTITASK_DATA_NODES.md) → [Deep & Automatic Research](docs/RESEARCH.md) → [Secure Compute (File Work)](docs/COMPUTE.md) |
+| **4. Channels, Gateways & Integrations** | [External Connections](docs/CONNECTIONS.md) → [Saved Tasks & n8n](docs/N8N.md) → [OpenAI-Compatible API (`/v1`)](docs/OPENAI_COMPATIBLE_API.md) → [Anthropic Messages API (`/v1/messages`)](docs/ANTHROPIC_COMPATIBLE_API.md) → [Synaplan Desktop Protocol](docs/DESKTOP.md) → [Chat Widget](docs/WIDGET.md) → [WhatsApp](docs/WHATSAPP.md) → [Email](docs/EMAIL.md) → [Live Voice](docs/LIVE_VOICE.md) → [Self-Hosted Voice](docs/LIVE_VOICE_SELF_HOSTED.md) → [openDesk Meeting Notes](docs/OPENDESK_MEETING_NOTES.md) |
+| **5. Developer & Contributor Guide** | [Local Development](docs/DEVELOPMENT.md) → [Backend Architecture](docs/ARCHITECTURE.md) → [Adding an AI Provider](docs/PROVIDERS.md) → [PHP Conventions](docs/PHP_CONVENTIONS.md) → [Frontend Conventions](docs/FRONTEND_CONVENTIONS.md) → [OpenAPI & Zod Patterns](docs/API_PATTERNS.md) → [Realtime WebSockets](docs/REALTIME.md) → [Migrations & Seeders](docs/MIGRATIONS.md) → [UX Contract (U1–U12)](docs/UX_CONTRACT.md) → [E2E Testing](docs/E2E_TESTING.md) → [Renovate PR Review](docs/DEPENDENCY_UPDATES.md) |
 
 ## Related Repositories
 

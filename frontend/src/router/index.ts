@@ -36,7 +36,8 @@ import {
 } from '@/i18n'
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
-import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
+import { settingsLocationFor } from '@/composables/useSettingsSections'
+import { settingsRoutes } from '@/router/settingsRoutes'
 import { assistantsRouteGuard } from '@/router/assistantGuards'
 import { capacityRoute } from '@/router/capacityRoute'
 import { aiModelsTabRedirect, routingRedirect, topicsRedirect } from '@/router/aiSettingsRedirects'
@@ -608,26 +609,7 @@ const router = createRouter({
       component: () => import('@/views/ChatsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.allChats', i18n: ['chat', 'files'] },
     },
-    {
-      // Bare /settings and old hashes (#profile, #memories, #app) pick a section.
-      path: '/settings',
-      name: 'settings',
-      redirect: (to) => settingsLocationFor(to),
-    },
-    {
-      // Theme stays on the device. Language is also saved on the account from
-      // this page. Guests only reach appearance; each signed-in section is its
-      // own page, listed in the profile sidebar.
-      path: '/settings/:section',
-      name: 'settings-section',
-      component: () => import('@/views/SettingsView.vue'),
-      beforeEnter: (to) => normalizeSettingsRoute(to),
-      meta: {
-        requiresAuth: false,
-        titleKey: 'pageTitles.settings',
-        i18n: ['settings', 'config', 'tools', ...BUNDLE_PANEL_I18N_NAMESPACES],
-      },
-    },
+    ...settingsRoutes,
     {
       path: '/testv',
       name: 'test',

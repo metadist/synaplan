@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hmac
 import json
 import os
 import shutil
@@ -25,6 +26,7 @@ from pathlib import Path
 ADDR = os.environ.get("C2PA_SIGNER_ADDR", ":8787")
 KEY = os.environ.get("C2PA_KEY", "/certs/key.pem")
 CERT = os.environ.get("C2PA_CERT", "/certs/cert.pem")
+TOKEN = os.environ.get("C2PA_SIGNER_TOKEN", "").strip()
 MAX_BODY = 64 * 1024 * 1024
 ALLOWED_ALG = {"es256", "ps256", "ps384", "ps512", "ed25519"}
 
@@ -229,19 +231,24 @@ def looks_signed(raw: bytes) -> bool:
         return result.returncode == 0
 
 
+def is_ready() -> bool:
+    return bool(TOKEN) and shutil.which("c2patool") is not None and signing_env() is not None
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         if self.path.split("?", 1)[0] != "/health":
             self.send_error(404)
             return
-        body = b'{"status":"ok"}'
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        if not is_ready():
+            self.respond(503, {"status": "unavailable"})
+            return
+        self.respond(200, {"status": "ok"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self.authorized():
+            self.respond(401, {"error": "unauthorized"})
+            return
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length < 0 or length > MAX_BODY:
             self.send_error(413)
@@ -267,6 +274,15 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(503, {"error": "signer unavailable"})
             return
         self.respond(200, {"bytes": base64.b64encode(signed).decode("ascii")})
+
+    def authorized(self) -> bool:
+        if not TOKEN:
+            return False
+        header = self.headers.get("Authorization") or ""
+        if not header.startswith("Bearer "):
+            return False
+        provided = header[7:].strip()
+        return bool(provided) and hmac.compare_digest(provided, TOKEN)
 
     def respond(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")

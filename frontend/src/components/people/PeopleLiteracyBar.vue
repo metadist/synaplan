@@ -8,7 +8,7 @@
         data-testid="toggle-ai-literacy"
         @click="onToggle"
       >
-        {{ required ? t('people.literacy.confirmed') : t('people.literacy.notYet') }}
+        {{ required ? t('common.enabled') : t('common.disabled') }}
       </button>
       <span>
         <span class="block text-sm font-medium txt-primary">{{ t('people.literacy.switch') }}</span>

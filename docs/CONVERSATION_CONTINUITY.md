@@ -1,4 +1,9 @@
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (2/6)**  
+> **← Previous:** [3.1 Knowledge Base & RAG](RAG.md) · **Next:** [3.3 Session Files & Follow-Up Edits →](SESSION_FILES.md)
+
 # Conversation Continuity & Deep Memory
+
+> **In this guide:** How Synaplan keeps a single chat coherent across hundreds of turns using asynchronous rolling summaries (`BCHATSUMMARIES`), and how it recalls facts, dates, and decisions from months ago across all of a user's chats using daily message digests (`BMESSAGEDIGESTS` + Qdrant).
 
 How Synaplan keeps a conversation coherent over hundreds of turns and makes
 messages from months ago findable again. Two complementary mechanisms:
@@ -165,3 +170,8 @@ thresholds before changing the BCONFIG rows.
 - Qdrant `user_message_digests` — point id `dig_{userId}_{digestId}`
   (UUIDv5-mapped), payload carries user/chat/message ids, title, source date,
   `active` flag, embedding provenance.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 3: AI Engine, Knowledge & Execution (2/6)**  
+> **← Previous:** [3.1 Knowledge Base & RAG](RAG.md) · **Next:** [3.3 Session Files & Follow-Up Edits →](SESSION_FILES.md)
