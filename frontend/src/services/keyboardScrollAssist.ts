@@ -166,13 +166,13 @@ function reservePadding(el: HTMLElement): void {
 }
 
 function scrollByDelta(el: HTMLElement, delta: number): void {
-  const scroller = findScrollableAncestor(el)
-  const before = el.getBoundingClientRect().top
-  scroller.scrollBy({ top: delta, behavior: 'auto' })
-  if (Math.abs(el.getBoundingClientRect().top - before) >= 1) return
-  const doc = document.scrollingElement
-  if (doc instanceof HTMLElement && doc !== scroller) {
-    doc.scrollBy({ top: delta, behavior: 'auto' })
+  let remaining = delta
+  for (const scroller of scrollableAncestors(el)) {
+    if (Math.abs(remaining) < 1) return
+    const before = el.getBoundingClientRect().top
+    scroller.scrollBy({ top: remaining, behavior: 'auto' })
+    const moved = before - el.getBoundingClientRect().top
+    remaining -= moved
   }
 }
 
