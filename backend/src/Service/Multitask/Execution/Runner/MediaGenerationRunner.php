@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
 use App\Service\File\FileHelper;
+use App\Service\Media\ImageFollowUpPlan;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -45,7 +46,15 @@ final readonly class MediaGenerationRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::ImageGeneration, 'Generate or edit an image from a prompt and/or reference images.'),
+            new SkillDescriptor(
+                Capability::ImageGeneration,
+                'Generate or edit an image from a prompt and/or reference images. A follow-up that changes what a conversation image shows (pose, subjects, style, background, text painted into the scene) is this node — never code_run. The runner reuses the latest conversation image when params.input_mode is reference_images.',
+                planAdjuster: static function (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array {
+                    unset($userId, $allowed, $topic);
+
+                    return ImageFollowUpPlan::adjustPlan($payload, $messageText);
+                },
+            ),
             new SkillDescriptor(Capability::VideoGeneration, 'Generate a video clip (params.duration, params.resolution).'),
         ];
     }
@@ -70,20 +79,7 @@ final readonly class MediaGenerationRunner implements TaskRunner
         // media-type guess — essential here because a multi-task prompt can be
         // ambiguous (e.g. "an image of a dog AND an mp3") and would otherwise be
         // undecidable.
-        $classification = [
-            'topic' => 'video' === $mediaType ? 'tools:vid' : 'tools:pic',
-            'intent' => 'image_generation',
-            'media_type' => $mediaType,
-            'language' => $language,
-        ];
-        if ('video' === $mediaType) {
-            if (isset($node->params['duration']) && is_numeric($node->params['duration'])) {
-                $classification['duration'] = (int) $node->params['duration'];
-            }
-            if (isset($node->params['resolution']) && is_string($node->params['resolution'])) {
-                $classification['resolution'] = $node->params['resolution'];
-            }
-        }
+        $classification = $this->handlerClassification($node, $context, $mediaType, $language);
 
         // Live progress: forward the handler's media-generation status updates to
         // the node's progress sink so the task card renders a moving bar.
@@ -272,6 +268,35 @@ final readonly class MediaGenerationRunner implements TaskRunner
         }
 
         return $m;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function handlerClassification(TaskNode $node, NodeContext $context, string $mediaType, string $language): array
+    {
+        $classification = [
+            'topic' => 'video' === $mediaType ? 'tools:vid' : 'tools:pic',
+            'intent' => 'image_generation',
+            'media_type' => $mediaType,
+            'language' => $language,
+        ];
+        $inputMode = is_string($node->params['input_mode'] ?? null)
+            ? $node->params['input_mode']
+            : (is_string($context->classification['input_mode'] ?? null) ? $context->classification['input_mode'] : '');
+        if ('reference_images' === $inputMode || 'text_only' === $inputMode) {
+            $classification['input_mode'] = $inputMode;
+        }
+        if ('video' === $mediaType) {
+            if (isset($node->params['duration']) && is_numeric($node->params['duration'])) {
+                $classification['duration'] = (int) $node->params['duration'];
+            }
+            if (isset($node->params['resolution']) && is_string($node->params['resolution'])) {
+                $classification['resolution'] = $node->params['resolution'];
+            }
+        }
+
+        return $classification;
     }
 
     /**
