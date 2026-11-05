@@ -9,6 +9,7 @@ use App\Repository\ConfigRepository;
 use App\Service\ModelConfigService;
 use App\Service\PluginDataService;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * Rolling profiles of mailing partners.
@@ -54,6 +55,7 @@ final readonly class ContactProfileService
         private ModelConfigService $models,
         private AiFacade $ai,
         private LoggerInterface $logger,
+        private LockFactory $locks,
     ) {
     }
 
@@ -95,21 +97,48 @@ final readonly class ContactProfileService
     {
         $email = $this->requireEmail($rawEmail);
         $turn = $this->turnFromPayload($payload);
-        $existing = $this->pluginData->get($userId, self::PLUGIN, self::DATA_TYPE, $this->profileKey($email))
-            ?? $this->emptyProfile($email);
-        $narrative = $this->mergeNarrative($userId, $existing, $email, $turn);
-        $profile = $this->withDeterministicFields($existing, $narrative, $email, $turn);
 
-        $this->pluginData->set($userId, self::PLUGIN, self::DATA_TYPE, $this->profileKey($email), $profile);
+        return $this->exclusive($userId, $email, function () use ($userId, $email, $turn): array {
+            $existing = $this->pluginData->get($userId, self::PLUGIN, self::DATA_TYPE, $this->profileKey($email))
+                ?? $this->emptyProfile($email);
+            $narrative = $this->mergeNarrative($userId, $existing, $email, $turn);
+            $profile = $this->withDeterministicFields($existing, $narrative, $email, $turn);
+            $this->pluginData->set($userId, self::PLUGIN, self::DATA_TYPE, $this->profileKey($email), $profile);
 
-        return $profile;
+            return $profile;
+        });
     }
 
     public function delete(int $userId, string $rawEmail): bool
     {
         $email = $this->requireEmail($rawEmail);
 
-        return $this->pluginData->delete($userId, self::PLUGIN, self::DATA_TYPE, $this->profileKey($email));
+        return $this->exclusive(
+            $userId,
+            $email,
+            fn (): bool => $this->pluginData->delete($userId, self::PLUGIN, self::DATA_TYPE, $this->profileKey($email)),
+        );
+    }
+
+    /**
+     * One contact is merged or deleted at a time, including the model call,
+     * so a second email cannot overwrite the first.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    private function exclusive(int $userId, string $email, callable $work): mixed
+    {
+        $lock = $this->locks->createLock(self::PLUGIN.'-'.$userId.'-'.$this->profileKey($email));
+        $lock->acquire(true);
+        try {
+            return $work();
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -119,18 +148,37 @@ final readonly class ContactProfileService
      */
     private function turnFromPayload(array $payload): array
     {
-        $body = trim((string) ($payload['body'] ?? ''));
+        $body = $this->stringField($payload, 'body');
         if ('' === $body) {
             throw new ProfileException('Field "body" is required', 400);
         }
+        $direction = $this->stringField($payload, 'direction', 'inbound');
+        if ('inbound' !== $direction && 'outbound' !== $direction) {
+            throw new ProfileException('Field "direction" must be inbound or outbound', 400);
+        }
 
         return [
-            'subject' => trim((string) ($payload['subject'] ?? '')),
+            'subject' => $this->stringField($payload, 'subject'),
             'body' => $body,
-            'direction' => 'outbound' === ($payload['direction'] ?? 'inbound') ? 'outbound' : 'inbound',
-            'date' => $this->normalizeDate((string) ($payload['date'] ?? '')),
-            'name' => trim((string) ($payload['name'] ?? '')),
+            'direction' => $direction,
+            'date' => $this->normalizeDate($this->stringField($payload, 'date')),
+            'name' => $this->stringField($payload, 'name'),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function stringField(array $payload, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $payload) || null === $payload[$key]) {
+            return $default;
+        }
+        if (!is_string($payload[$key])) {
+            throw new ProfileException(sprintf('Field "%s" must be a string', $key), 400);
+        }
+
+        return trim($payload[$key]);
     }
 
     /**
@@ -152,8 +200,13 @@ final readonly class ContactProfileService
             ['role' => 'user', 'content' => $prompt],
         ];
 
+        $options = $this->modelOptions($userId);
+        if ([] === $options) {
+            throw new ProfileException('No permitted chat model is available', 403);
+        }
+
         try {
-            $result = $this->ai->chat($messages, $userId, $this->modelOptions($userId));
+            $result = $this->ai->chat($messages, $userId, $options);
         } catch (\Throwable $e) {
             $this->logger->error('Synamail profile merge failed', ['userId' => $userId, 'error' => $e->getMessage()]);
 
@@ -180,8 +233,8 @@ final readonly class ContactProfileService
      */
     private function withDeterministicFields(array $existing, array $narrative, string $email, array $turn): array
     {
-        $now = (new \DateTimeImmutable())->format(\DATE_ATOM);
-        $seenAt = $turn['date'] ?? $now;
+        $now = new \DateTimeImmutable();
+        $seenAt = null !== $turn['date'] ? new \DateTimeImmutable($turn['date']) : $now;
         $profile = $existing;
         $profile['email'] = $email;
         $profile['summary'] = $narrative['summary'];
@@ -189,17 +242,14 @@ final readonly class ContactProfileService
         $profile['facts'] = array_slice($narrative['facts'], 0, self::MAX_FACTS);
         $profile['openLoops'] = array_slice($narrative['openLoops'], 0, self::MAX_OPEN_LOOPS);
         $profile['emailCount'] = (int) ($existing['emailCount'] ?? 0) + 1;
-        $profile['firstSeen'] = $existing['firstSeen'] ?? $seenAt;
-        if ('inbound' === $turn['direction']) {
-            $profile['lastInbound'] = $seenAt;
-        } else {
-            $profile['lastOutbound'] = $seenAt;
-        }
+        $profile['firstSeen'] = $this->earliest($this->instant($existing['firstSeen'] ?? null), $seenAt)->format(\DATE_ATOM);
+        $directionKey = 'inbound' === $turn['direction'] ? 'lastInbound' : 'lastOutbound';
+        $profile[$directionKey] = $this->latest($this->instant($existing[$directionKey] ?? null), $seenAt)->format(\DATE_ATOM);
         if ('' !== $turn['name']) {
             $profile['name'] = $turn['name'];
         }
         $profile['org'] = $this->orgFromEmail($email);
-        $profile['updatedAt'] = $now;
+        $profile['updatedAt'] = $now->format(\DATE_ATOM);
 
         return $profile;
     }
@@ -295,7 +345,10 @@ final readonly class ContactProfileService
             return null;
         }
 
-        $summary = trim((string) ($parsed['summary'] ?? ''));
+        if (!isset($parsed['summary']) || !is_string($parsed['summary'])) {
+            return null;
+        }
+        $summary = trim($parsed['summary']);
         if ('' === $summary) {
             return null;
         }
@@ -334,21 +387,40 @@ final readonly class ContactProfileService
     /** @return array<string, string> */
     private function modelOptions(int $userId): array
     {
-        foreach ([$userId, 0] as $uid) {
-            $modelId = $this->models->getDefaultModel('CHAT', $uid);
-            if (null === $modelId || 0 === $modelId) {
-                continue;
-            }
-            $name = $this->models->getModelName($modelId);
-            $provider = $this->models->getProviderForModel($modelId);
-            if (null === $name || '' === $name || null === $provider || '' === $provider) {
-                continue;
-            }
-
-            return ['model' => $name, 'provider' => $provider];
+        $modelId = $this->models->getDefaultModel('CHAT', $userId);
+        if (null === $modelId || 0 === $modelId) {
+            return [];
+        }
+        $name = $this->models->getModelName($modelId);
+        $provider = $this->models->getProviderForModel($modelId);
+        if (null === $name || '' === $name || null === $provider || '' === $provider) {
+            return [];
         }
 
-        return [];
+        return ['model' => $name, 'provider' => $provider];
+    }
+
+    private function instant(mixed $value): ?\DateTimeImmutable
+    {
+        if (!is_string($value) || '' === trim($value)) {
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    private function earliest(?\DateTimeImmutable $stored, \DateTimeImmutable $seen): \DateTimeImmutable
+    {
+        return null === $stored || $seen < $stored ? $seen : $stored;
+    }
+
+    private function latest(?\DateTimeImmutable $stored, \DateTimeImmutable $seen): \DateTimeImmutable
+    {
+        return null === $stored || $seen > $stored ? $seen : $stored;
     }
 
     private function configValue(int $userId, string $key, string $default): string

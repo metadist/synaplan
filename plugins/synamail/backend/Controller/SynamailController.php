@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Plugin\Synamail\Controller;
 
 use App\Entity\User;
+use App\Service\Plugin\PluginManager;
 use OpenApi\Attributes as OA;
 use Plugin\Synamail\Service\ContactProfileService;
 use Plugin\Synamail\Service\ProfileException;
@@ -24,6 +25,7 @@ final class SynamailController extends AbstractController
 {
     public function __construct(
         private readonly ContactProfileService $profiles,
+        private readonly PluginManager $plugins,
     ) {
     }
 
@@ -156,8 +158,22 @@ final class SynamailController extends AbstractController
         if (!$this->profiles->isEnabled($userId)) {
             return $this->json(['success' => false, 'error' => 'The profile service is off'], Response::HTTP_FORBIDDEN);
         }
+        if (!$this->installedFor($userId)) {
+            return $this->json(['success' => false, 'error' => 'Not installed'], Response::HTTP_NOT_FOUND);
+        }
 
         return null;
+    }
+
+    private function installedFor(int $userId): bool
+    {
+        foreach ($this->plugins->listInstalledPlugins($userId) as $manifest) {
+            if ('synamail' === $manifest->name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function rejected(ProfileException $e): JsonResponse

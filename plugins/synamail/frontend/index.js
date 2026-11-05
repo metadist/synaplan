@@ -29,8 +29,12 @@ const state = {
 }
 
 function api(path, options = {}) {
-  const { userId, apiBaseUrl } = state.ctx
-  return fetch(`${apiBaseUrl}/api/v1/user/${userId}/plugins/synamail${path}`, {
+  const { userId, apiBaseUrl, request } = state.ctx
+  const route = `/api/v1/user/${userId}/plugins/synamail${path}`
+  if (typeof request === 'function') {
+    return request(route, options)
+  }
+  return fetch(`${apiBaseUrl}${route}`, {
     credentials: 'include',
     headers: { Accept: 'application/json', ...(options.headers ?? {}) },
     ...options,
@@ -38,9 +42,12 @@ function api(path, options = {}) {
 }
 
 function esc(value) {
-  const div = document.createElement('div')
-  div.textContent = String(value ?? '')
-  return div.innerHTML
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function fmtDate(iso) {

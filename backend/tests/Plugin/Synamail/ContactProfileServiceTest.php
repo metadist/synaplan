@@ -12,6 +12,8 @@ use PHPUnit\Framework\TestCase;
 use Plugin\Synamail\Service\ContactProfileService;
 use Plugin\Synamail\Service\ProfileException;
 use Psr\Log\NullLogger;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class ContactProfileServiceTest extends TestCase
@@ -177,6 +179,72 @@ final class ContactProfileServiceTest extends TestCase
         self::assertSame([], $this->chatCalls);
     }
 
+    public function testAnOlderEmailDoesNotMoveTheLatestDateBackwards(): void
+    {
+        $service = $this->service('{"summary":"Updated.","tone":"direct","facts":[],"openLoops":[]}');
+        $service->update(7, self::EMAIL, [
+            'body' => 'The later mail.',
+            'date' => '2026-06-10T14:32:00Z',
+            'direction' => 'inbound',
+        ]);
+        $profile = $service->update(7, self::EMAIL, [
+            'body' => 'The earlier mail.',
+            'date' => '2026-06-01T09:00:00Z',
+            'direction' => 'inbound',
+        ]);
+
+        self::assertSame('2026-06-01T09:00:00+00:00', $profile['firstSeen']);
+        self::assertSame('2026-06-10T14:32:00+00:00', $profile['lastInbound']);
+        self::assertSame(2, $profile['emailCount']);
+    }
+
+    public function testANonStringBodyIsRefusedBeforeTheModel(): void
+    {
+        $service = $this->service('{"summary":"unused"}');
+
+        try {
+            $service->update(7, self::EMAIL, ['body' => ['not a string']]);
+            self::fail('A non-string body must be refused.');
+        } catch (ProfileException $e) {
+            self::assertSame(400, $e->httpStatus);
+        }
+
+        self::assertSame([], $this->chatCalls);
+    }
+
+    public function testANonStringSummaryLeavesTheStoredProfile(): void
+    {
+        $service = $this->service('{"summary":[]}');
+        $this->rows[ContactProfileService::DATA_TYPE][$this->key(self::EMAIL)] = $this->stored('Keep me.', '2026-06-01T00:00:00+00:00');
+
+        try {
+            $service->update(7, self::EMAIL, ['body' => 'Hello.']);
+            self::fail('A non-string summary must be refused.');
+        } catch (ProfileException $e) {
+            self::assertSame(502, $e->httpStatus);
+        }
+
+        self::assertSame('Keep me.', $this->rows[ContactProfileService::DATA_TYPE][$this->key(self::EMAIL)]['summary']);
+    }
+
+    public function testNoPermittedModelRefusesTheUpdate(): void
+    {
+        $models = $this->createStub(ModelConfigService::class);
+        $models->method('getDefaultModel')->willReturn(null);
+        $ai = $this->createStub(AiFacade::class);
+        $ai->method('chat')->willReturnCallback(function (): array {
+            self::fail('The model must not be called.');
+        });
+        $service = $this->service(ai: $ai, models: $models);
+
+        try {
+            $service->update(7, self::EMAIL, ['body' => 'Hello.']);
+            self::fail('A user with no permitted model must be refused.');
+        } catch (ProfileException $e) {
+            self::assertSame(403, $e->httpStatus);
+        }
+    }
+
     public function testDeleteRemovesTheStoredProfile(): void
     {
         $service = $this->service();
@@ -224,7 +292,7 @@ final class ContactProfileServiceTest extends TestCase
         self::assertSame('https://docs.synaplan.com/synamail', $manifest['homepage']);
     }
 
-    private function service(?string $content = null, ?AiFacade $ai = null): ContactProfileService
+    private function service(?string $content = null, ?AiFacade $ai = null, ?ModelConfigService $models = null): ContactProfileService
     {
         if (!$ai instanceof AiFacade) {
             $reply = $content ?? '{"summary":"unused"}';
@@ -241,12 +309,21 @@ final class ContactProfileServiceTest extends TestCase
             fn (int $owner, string $group, string $setting): ?string => $this->config[$setting] ?? null,
         );
 
-        $models = $this->createStub(ModelConfigService::class);
-        $models->method('getDefaultModel')->willReturn(4);
-        $models->method('getModelName')->willReturn('test-chat');
-        $models->method('getProviderForModel')->willReturn('test');
+        if (!$models instanceof ModelConfigService) {
+            $models = $this->createStub(ModelConfigService::class);
+            $models->method('getDefaultModel')->willReturn(4);
+            $models->method('getModelName')->willReturn('test-chat');
+            $models->method('getProviderForModel')->willReturn('test');
+        }
 
-        return new ContactProfileService($this->pluginData(), $config, $models, $ai, new NullLogger());
+        return new ContactProfileService(
+            $this->pluginData(),
+            $config,
+            $models,
+            $ai,
+            new NullLogger(),
+            new LockFactory(new InMemoryStore()),
+        );
     }
 
     private function pluginData(): PluginDataService
