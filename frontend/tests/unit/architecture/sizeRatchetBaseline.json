@@ -7,7 +7,7 @@
     "functionLines": 100
   },
   "counts": {
-    "fileLines": 28,
+    "fileLines": 27,
     "functionLines": 79
   },
   "fileLines": {
@@ -33,7 +33,6 @@
     "src/utils/messageMapper.ts": 860,
     "src/views/ChatView.vue": 4470,
     "src/views/FilesView.vue": 2989,
-    "src/views/LoginView.vue": 812,
     "src/views/NeuroExplorerView.vue": 1434,
     "src/views/WidgetDetailView.vue": 2091,
     "src/views/WidgetSessionsView.vue": 2391,

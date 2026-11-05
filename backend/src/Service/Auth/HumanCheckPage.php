@@ -29,10 +29,10 @@ final readonly class HumanCheckPage
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <meta name="referrer" content="no-referrer" />
+            <meta name="referrer" content="strict-origin-when-cross-origin" />
             <title>Human check</title>
             <style>
-              html, body { margin: 0; background: transparent; }
+              html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
               #challenge { min-height: 65px; }
             </style>
           </head>
@@ -50,8 +50,12 @@ final readonly class HumanCheckPage
                 var params = new URLSearchParams(location.search)
                 var requested = params.get('parent') || ''
                 var origins = location.ancestorOrigins
+                var singleParent = !origins || !origins.length || origins.length === 1
                 var actual = origins && origins.length ? origins[0] : ''
-                var target = ALLOWED[requested] && window.parent !== window && (!actual || actual === requested)
+                var customScheme = requested === 'capacitor://localhost' || requested === 'ionic://localhost'
+                var ancestorMatches = !actual || actual === requested || (customScheme && actual === 'null')
+                var framed = window.parent !== window && window.top === window.parent && window.origin !== 'null'
+                var target = ALLOWED[requested] && framed && singleParent && ancestorMatches
                   ? requested
                   : ''
 
@@ -62,6 +66,10 @@ final readonly class HumanCheckPage
                     for (var key in extra) {
                       if (Object.prototype.hasOwnProperty.call(extra, key)) payload[key] = extra[key]
                     }
+                  }
+                  if (customScheme) {
+                    window.parent.postMessage(payload, '*')
+                    return
                   }
                   window.parent.postMessage(payload, target)
                 }
@@ -83,6 +91,7 @@ final readonly class HumanCheckPage
                 var scriptReady = new Promise(function (resolve, reject) {
                   var script = document.createElement('script')
                   script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+                  script.nonce = '__NONCE__'
                   script.async = true
                   script.onload = function () {
                     if (window.turnstile) resolve(window.turnstile)
@@ -132,7 +141,7 @@ final readonly class HumanCheckPage
         $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
         $response->headers->set('Content-Security-Policy', $this->policy($nonce));
         $response->headers->set('Cache-Control', 'no-store');
-        $response->headers->set('Referrer-Policy', 'no-referrer');
+        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->remove('X-Frame-Options');
 
@@ -148,7 +157,7 @@ final readonly class HumanCheckPage
             ."connect-src 'self' https://challenges.cloudflare.com; "
             .'frame-src https://challenges.cloudflare.com; '
             .'worker-src blob:; '
-            .'frame-ancestors capacitor://localhost ionic://localhost https://localhost; '
+            .'frame-ancestors capacitor://localhost ionic://localhost https://localhost capacitor: ionic:; '
             ."base-uri 'none'; form-action 'none'";
     }
 }

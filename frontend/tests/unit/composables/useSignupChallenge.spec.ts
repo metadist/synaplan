@@ -137,4 +137,24 @@ describe('useSignupChallenge', () => {
     expect(document.getElementById('synaplan-human-check-frame')).toBeNull()
     expect(recaptchaGetToken).not.toHaveBeenCalled()
   })
+
+  it('shares an in-flight hosted check for the same action instead of cancelling it', async () => {
+    native.app = true
+    config.turnstile = { enabled: true, siteKey: '0xSITE' }
+    const challenge = useSignupChallenge()
+    const first = challenge.getToken('login')
+    const iframe = document.getElementById('synaplan-human-check-frame') as HTMLIFrameElement
+    const second = challenge.getToken('login')
+    expect(document.getElementById('synaplan-human-check-frame')).toBe(iframe)
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://web.synaplan.com',
+        source: iframe.contentWindow,
+        data: { source: 'synaplan-human-check', status: 'token', token: 'shared-token' },
+      })
+    )
+
+    await expect(Promise.all([first, second])).resolves.toEqual(['shared-token', 'shared-token'])
+  })
 })

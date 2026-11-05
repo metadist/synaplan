@@ -1,3 +1,4 @@
+import { getCurrentScope, onScopeDispose } from 'vue'
 import { i18n } from '@/i18n'
 import { getNativeApiBaseUrl, isNativeApp } from '@/services/api/nativeRuntime'
 import { useConfigStore } from '@/stores/config'
@@ -181,11 +182,18 @@ function challengeLanguage(): string {
   return /^[a-z]{2}$/.test(code) ? code : 'auto'
 }
 
+function parentOrigin(): string {
+  if (window.location.origin && window.location.origin !== 'null') {
+    return window.location.origin
+  }
+  return `${window.location.protocol}//${window.location.host}`
+}
+
 function hostedPageUrl(action: string): string {
   const base = getNativeApiBaseUrl().replace(/\/$/, '')
   const params = new URLSearchParams({
     action,
-    parent: window.location.origin,
+    parent: parentOrigin(),
     theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
     lang: challengeLanguage(),
   })
@@ -193,24 +201,33 @@ function hostedPageUrl(action: string): string {
 }
 
 /**
- * One hosted check at a time. A second call cancels the first so a leftover
- * frame cannot answer the wrong attempt.
+ * One hosted check at a time. A repeat call for the same action shares the
+ * in-flight check so a double tap neither destroys the frame nor resolves
+ * the first submit with an empty token. A different action cancels the old
+ * check first.
  */
-let cancelHosted: (() => void) | null = null
+let activeHosted: {
+  action: string
+  promise: Promise<string>
+  cancel: () => void
+} | null = null
 
 /**
  * Token from the site page. The frame stays invisible (and does not catch
  * taps) until Cloudflare asks for an interaction.
  */
 function hostedTurnstileToken(action: string): Promise<string> {
-  cancelHosted?.()
+  if (activeHosted) {
+    if (activeHosted.action === action) return activeHosted.promise
+    activeHosted.cancel()
+  }
 
   const pageUrl = hostedPageUrl(action)
   const origin = new URL(pageUrl).origin
   const frame = document.createElement('iframe')
   frame.id = HOSTED_FRAME_ID
   frame.title = i18n.global.t('auth.signupBlocked.challengeTitle')
-  frame.setAttribute('referrerpolicy', 'no-referrer')
+  frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
   frame.style.position = 'fixed'
   frame.style.right = 'max(1rem, env(safe-area-inset-right))'
   frame.style.bottom =
@@ -226,21 +243,21 @@ function hostedTurnstileToken(action: string): Promise<string> {
   document.getElementById(HOSTED_FRAME_ID)?.remove()
   document.body.appendChild(frame)
 
-  return new Promise<string>((resolve) => {
+  let cancel = () => {}
+  const promise = new Promise<string>((resolve) => {
     let settled = false
     let sawReady = false
     const finish = (token: string) => {
       if (settled) return
       settled = true
-      if (cancelHosted === cancel) cancelHosted = null
+      if (activeHosted?.cancel === cancel) activeHosted = null
       window.removeEventListener('message', onMessage)
       window.clearTimeout(readyTimer)
       window.clearTimeout(tokenTimer)
       frame.remove()
       resolve(token)
     }
-    const cancel = () => finish('')
-    cancelHosted = cancel
+    cancel = () => finish('')
 
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== origin) return
@@ -279,6 +296,8 @@ function hostedTurnstileToken(action: string): Promise<string> {
     // before we are listening.
     frame.src = pageUrl
   })
+  activeHosted = { action, promise, cancel }
+  return promise
 }
 
 export const useSignupChallenge = () => {
@@ -286,6 +305,12 @@ export const useSignupChallenge = () => {
   const recaptcha = useRecaptcha()
   const turnstileSiteKey = config.turnstile.siteKey
   const turnstileEnabled = config.turnstile.enabled && turnstileSiteKey !== ''
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      activeHosted?.cancel()
+    })
+  }
 
   /**
    * A token for `action` ('register', 'login', 'signup' before an OAuth
