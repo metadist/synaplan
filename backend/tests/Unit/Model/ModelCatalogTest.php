@@ -1382,6 +1382,36 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Kimi K3.1 Pro via the HF router. Unlike earlier Kimi rows, DeepInfra was
+     * not on the HF inference mapping on 2026-11-05 (only Together was live),
+     * so the pin is `:together` at Together's $2.00/$10.00 rate.
+     */
+    public function testKimiK31ProModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $rows = ModelCatalog::find('huggingface:moonshotai/Kimi-K3.1-Pro-together');
+
+        $this->assertCount(2, $rows, 'Expected Kimi K3.1 Pro chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($rows, 'tag'));
+        $this->assertSame(402, ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3.1-Pro-together:chat'));
+        $this->assertSame(403, ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3.1-Pro-together:pic2text'));
+
+        foreach ($rows as $variant) {
+            $this->assertSame('HuggingFace', $variant['service']);
+            $this->assertSame('moonshotai/Kimi-K3.1-Pro:together', $variant['providerId']);
+            $this->assertSame('moonshotai/Kimi-K3.1-Pro:together', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertTrue($variant['json']['meta']['forced_thinking'] ?? false, 'K3.1 Pro always thinks — sampling is forced for the Kimi-K3 fragment');
+        }
+
+        $chat = ModelCatalog::find('huggingface:moonshotai/Kimi-K3.1-Pro-together:chat')[0];
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+        $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+        $this->assertSame('1048576', $chat['json']['meta']['context_window'] ?? null);
+    }
+
+    /**
      * The pre-4.8 Claude generations were retired in favour of Opus 4.8 and the
      * 5-series (deactivated in existing installs by Version20260727120000). Their
      * BIDs must never come back: BMESSAGES rows still reference them, and the

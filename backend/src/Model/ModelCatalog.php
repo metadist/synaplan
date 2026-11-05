@@ -4140,6 +4140,58 @@ class ModelCatalog
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
             ],
         ],
+        [
+            // Snapshot 2026-11-05 (https://huggingface.co/moonshotai/Kimi-K3.1-Pro).
+            // Text/image in, text out only — no text2pic variant is possible.
+            // HF inferenceProviderMapping listed only Together as live; DeepInfra
+            // serves the weights on its own API but was not on the HF router, so
+            // a :deepinfra pin would not route. Together list price $2.00/$10.00
+            // per 1M, cache-read $0.20 (Moonshot / Together).
+            'id' => 402,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K3.1 Pro',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K3.1-Pro:together',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K3.1 Pro via HuggingFace - 2.8T parameter MoE (104B active) with native vision, always-on thinking, and a 1M-token context window. Pinned to Together, the only live HF inference partner on 2026-11-05.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'moonshotai/Kimi-K3.1-Pro:together'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'cache_read_price_per_1M' => 0.20,
+                'meta' => ['context_window' => '1048576', 'max_output' => '32768', 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
+        [
+            'id' => 403,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K3.1 Pro (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K3.1-Pro:together',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K3.1 Pro via HuggingFace for image analysis and vision tasks. Native multimodal (MoonViT-V2). Pinned to Together.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'moonshotai/Kimi-K3.1-Pro:together'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.20,
+                'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
         // ==================== THEHIVE MODELS ====================
         [
             'id' => 130,

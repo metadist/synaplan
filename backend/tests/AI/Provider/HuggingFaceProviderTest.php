@@ -280,6 +280,34 @@ class HuggingFaceProviderTest extends TestCase
         $this->assertSame('moonshotai/Kimi-K3:deepinfra', $captured['model']);
     }
 
+    public function testKimiK31ProUsesTheSameForcedSamplingAsK3(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode([
+                'choices' => [['message' => ['content' => 'ok']]],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ]), ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            [
+                'model' => 'moonshotai/Kimi-K3.1-Pro:together',
+                'temperature' => 0.0,
+                'top_p' => 0.1,
+                'reasoning_effort' => 'max',
+            ],
+        );
+
+        $this->assertSame(1.0, $captured['temperature']);
+        $this->assertSame(0.95, $captured['top_p']);
+        $this->assertSame('max', $captured['reasoning_effort']);
+        $this->assertSame('moonshotai/Kimi-K3.1-Pro:together', $captured['model']);
+    }
+
     // ==================== STRUCTURED OUTPUT (Phase 2a) ====================
 
     public function testChatForwardsStructuredOutputAsOpenAiJsonSchema(): void

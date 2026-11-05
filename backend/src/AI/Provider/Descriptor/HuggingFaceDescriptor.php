@@ -60,7 +60,8 @@ final class HuggingFaceDescriptor implements DescribesProviderInterface
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
                 catalogToolUse: true,
-                // Kimi K3 accepts low|high|max; K2 rows that advertise reasoning share it.
+                // Kimi K3 and K3.1 Pro accept low|high|max; K2 rows that advertise reasoning share it.
+                // The kimi-k3 fragment also matches kimi-k3.1-pro.
                 reasoning: new ReasoningLadder([
                     new ReasoningLevelRule(ReasoningMatch::Contains, ['kimi-k3', 'kimi-k2'], ['low', 'high', 'max']),
                 ]),

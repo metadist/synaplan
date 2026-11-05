@@ -119,6 +119,16 @@ Same DeepInfra pin. HF partners serving K3 on 08-20: DeepInfra, Together, Firewo
 | **DeepInfra (PINNED)** | $2.85 / $14.25 | cache-read $0.285, native MXFP4 |
 | Together / Fireworks / Novita | $3.00 / $15.00 | Moonshot first-party list price |
 
+### Kimi K3.1 Pro (BIDs 402/403) — snapshot 2026-11-05
+
+Same HF router, different pin. `inferenceProviderMapping` on `moonshotai/Kimi-K3.1-Pro` listed only **Together** as `live`. DeepInfra hosts the weights on its own API, but it was not an HF inference partner for this model, so `:deepinfra` would not route. Catalog is pinned to `:together`.
+
+| Provider | K3.1 Pro | Notes |
+| -------- | -------- | ----- |
+| **Together (PINNED)** | $2.00 / $10.00 | cache-read $0.20; only live HF partner |
+| Moonshot first-party | $2.00 / $10.00 | `kimi-k3.1-pro`; highspeed is $4.00 / $20.00 and is not offered |
+| DeepInfra (own API, not on HF router) | $1.90 / $9.50 shown beside $2.00 / $10.00 | do not pin until the HF mapping lists it |
+
 ## Discontinuation detection — `app:models:check-availability`
 
 Providers retire models without telling us, and until now we found out when a user hit a provider error. This command finds it first.
