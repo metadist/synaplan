@@ -1,5 +1,7 @@
 import { computed, toValue, type MaybeRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { LocationQuery, RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
+import { SETTINGS_SECTION_ICONS } from '@/components/settings/settingsSectionIcons'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isNativeServerControlAvailable, isPurchaseAllowed } from '@/services/api/nativeServer'
@@ -56,6 +58,47 @@ export function useSettingsSections(profileLoadFailed: MaybeRef<boolean> = false
   )
 
   return { sections, showApp, showBilling }
+}
+
+/** Labelled rows for the desktop sidebar and the phone settings list. */
+export function useSettingsSectionLinks(profileLoadFailed: MaybeRef<boolean> = false) {
+  const { t } = useI18n()
+  const { sections } = useSettingsSections(profileLoadFailed)
+
+  function toLink(item: SettingsSectionLink) {
+    return {
+      slug: item.slug,
+      label: t(item.labelKey),
+      icon: SETTINGS_SECTION_ICONS[item.slug],
+      path: `/settings/${item.slug}`,
+      to: `/settings/${item.slug}`,
+    }
+  }
+
+  const preferenceLinks = computed(() =>
+    sections.value.filter((item) => item.slug !== 'delete').map(toLink)
+  )
+
+  const deleteLink = computed(() => {
+    const item = sections.value.find((entry) => entry.slug === 'delete')
+    return item ? toLink(item) : null
+  })
+
+  return { preferenceLinks, deleteLink }
+}
+
+/**
+ * Phone chrome opens a section list at bare /settings. Desktop, guests, and
+ * bookmarks that name a section (hash or highlight/tab) still land on one page.
+ */
+export function shouldShowSettingsHub(
+  to: Pick<RouteLocationNormalized, 'hash' | 'query' | 'params'>,
+  phoneChrome: boolean
+): boolean {
+  if (!phoneChrome || !useAuthStore().isAuthenticated) return false
+  if (to.hash && to.hash !== '#') return false
+  if (to.query.highlight != null || to.query.tab != null) return false
+  return typeof to.params.section !== 'string' || to.params.section === ''
 }
 
 /** Section element id for a settings hash, including the older aliases. */

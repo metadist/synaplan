@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Telegram;
 
+use App\Service\Disclosure\AiDisclosure;
+use App\Service\Disclosure\ChannelReplyNotice;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -13,8 +15,45 @@ final readonly class TelegramCopy
 {
     private const DOMAIN = 'telegram';
 
-    public function __construct(private TranslatorInterface $translator)
+    public function __construct(
+        private TranslatorInterface $translator,
+        private ?ChannelReplyNotice $notices = null,
+    ) {
+    }
+
+    /**
+     * The AI sentence when this chat is due for one, or an empty string.
+     * Call this before the outbound message is stored.
+     */
+    public function openingSentence(TelegramTurn $turn, int $chatId): string
     {
+        if (null === $this->notices) {
+            return '';
+        }
+
+        $name = trim($turn->bot->getBotUsername());
+        $sample = $this->notices->prependIfDue(
+            AiDisclosure::TELEGRAM,
+            (int) $turn->owner->getId(),
+            $chatId,
+            $turn->tgChatId,
+            $turn->locale,
+            '' !== $name ? $name : 'assistant',
+            '',
+        );
+
+        return $sample;
+    }
+
+    public function withOpening(TelegramTurn $turn, int $chatId, string $text): string
+    {
+        $opening = $this->openingSentence($turn, $chatId);
+        if ('' === $opening) {
+            return $text;
+        }
+        $text = trim($text);
+
+        return '' === $text ? $opening : $opening."\n\n".$text;
     }
 
     /**

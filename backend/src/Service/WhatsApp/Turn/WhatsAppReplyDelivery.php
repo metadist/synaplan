@@ -4,6 +4,9 @@ namespace App\Service\WhatsApp\Turn;
 
 use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
+use App\Entity\Message;
+use App\Service\Disclosure\AiDisclosure;
+use App\Service\Disclosure\ChannelReplyNotice;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
 use App\Service\Notification\DiscordNotificationService;
@@ -29,6 +32,7 @@ final readonly class WhatsAppReplyDelivery
         private LoggerInterface $logger,
         private string $appUrl,
         private string $uploadsDir,
+        private ?ChannelReplyNotice $notices = null,
     ) {
     }
 
@@ -37,6 +41,7 @@ final readonly class WhatsAppReplyDelivery
      */
     public function deliver(InboundWhatsApp $turn, StoredWhatsAppMessage $stored, WhatsAppAnswer $answer): bool
     {
+        $answer = $this->withNotice($turn, $stored, $answer);
         $responseSent = false;
         if ($answer->file()) {
             $responseSent = $this->sendGeneratedMedia($turn, $stored, $answer);
@@ -50,6 +55,38 @@ final readonly class WhatsAppReplyDelivery
         }
 
         return $responseSent;
+    }
+
+    private function withNotice(InboundWhatsApp $turn, StoredWhatsAppMessage $stored, WhatsAppAnswer $answer): WhatsAppAnswer
+    {
+        if (null === $this->notices) {
+            return $answer;
+        }
+
+        $locale = $stored->message->getLanguage();
+        if ('' === $locale || Message::UNKNOWN_LANGUAGE === $locale) {
+            $locale = $turn->user->getLocale();
+        }
+        $channel = $this->notices->prependIfDue(
+            AiDisclosure::WHATSAPP,
+            $turn->effectiveUserId,
+            (int) $stored->chat->getId(),
+            null,
+            $locale,
+            'Synaplan',
+            $answer->channelText,
+        );
+        $withSources = $this->notices->prependIfDue(
+            AiDisclosure::WHATSAPP,
+            $turn->effectiveUserId,
+            (int) $stored->chat->getId(),
+            null,
+            $locale,
+            'Synaplan',
+            $answer->textWithSources,
+        );
+
+        return new WhatsAppAnswer($answer->text, $channel, $withSources, $answer->metadata, $answer->classification, $answer->searchResults);
     }
 
     /**

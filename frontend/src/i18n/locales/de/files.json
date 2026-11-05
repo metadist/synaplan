@@ -48,6 +48,16 @@
       "dismiss": "Hinweis ausblenden"
     },
     "searchPlaceholder": "Nach Name oder Stichwort filtern...",
+    "provenance": {
+      "generated": "Erzeugt von {model} am {date}",
+      "badge": "KI-erzeugt",
+      "signed": "Von Synaplan signiert",
+      "signedHelp": "Ein Inhaltsnachweis wurde ergänzt. Er sagt, dass ein Modell die Datei erzeugt hat. Er prüft nicht, ob das Bild wahr ist.",
+      "provider": "Der Anbieter hat diese Datei als KI-erzeugt markiert",
+      "providerHelp": "Der Modellanbieter hatte die Datei schon markiert. Synaplan hat diese Markierung gelassen.",
+      "none": "Nicht signiert",
+      "noneHelp": "Synaplan konnte keine Signatur ergänzen. Die Datei ist trotzdem als erzeugt gekennzeichnet."
+    },
     "uploadTitle": "Dateien hochladen",
     "groupKeyword": "Ordner:",
     "groupKeywordPlaceholder": "Ordnernamen eingeben",

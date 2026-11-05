@@ -1,0 +1,4 @@
+disclosure:
+  mail: 'Diese Antwort wurde von einem KI-Assistenten von %sender% geschrieben.'
+  chat: 'Hallo, ich bin %name%, ein KI-Assistent.'
+  empty: 'Der KI-Hinweis darf nicht leer sein. Schreib mindestens einen Satz.'

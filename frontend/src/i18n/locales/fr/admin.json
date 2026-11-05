@@ -1022,6 +1022,19 @@
   "people": {
     "title": "Utilisateurs",
     "subtitle": "Comptes, groupes, règles et contenus signalés sur ce serveur.",
+    "literacy": {
+      "ask": "Votre organisation vous demande de lire « Bien utiliser l'IA » (8 minutes).",
+      "read": "Lire maintenant",
+      "done": "J'ai lu ceci",
+      "remind": "Me le rappeler demain",
+      "switch": "Demander à tout le monde de lire « Bien utiliser l'IA »",
+      "consequence": "L'activer demande à chaque personne de votre organisation de lire « Bien utiliser l'IA » une fois. Personne n'est bloqué.",
+      "count": "{confirmed} sur {total} confirmés",
+      "column": "Bien utiliser l'IA",
+      "export": "Télécharger les confirmations",
+      "confirmed": "Confirmé",
+      "notYet": "Pas encore"
+    },
     "tabs": {
       "users": "Utilisateurs",
       "groups": "Groupes",
@@ -1450,6 +1463,9 @@
   "modules": {
     "tika": {
       "label": "Apache Tika (extraction de texte des documents)"
+    },
+    "c2pa_signer": {
+      "label": "Crédits de contenu (marquage des médias IA)"
     },
     "docling": {
       "label": "Docling (conversion de documents)"

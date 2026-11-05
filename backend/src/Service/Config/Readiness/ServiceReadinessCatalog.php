@@ -94,6 +94,15 @@ final class ServiceReadinessCatalog
             'effect' => 'Office files open read-only.',
             'docs' => 'modules/office-convert',
         ],
+        'c2pa-signer' => [
+            'name' => 'Content credentials (AI media)',
+            'compose' => 'backend',
+            'dev_only' => false,
+            'profile' => null,
+            'unlocks' => 'Images, audio and video are marked as AI-generated.',
+            'effect' => 'Generated media are not signed.',
+            'docs' => 'modules/c2pa-signer',
+        ],
         'centrifugo' => [
             'name' => 'Centrifugo (live updates)',
             'compose' => 'centrifugo',

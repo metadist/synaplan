@@ -20,6 +20,7 @@
               <h2 class="text-2xl font-semibold txt-primary truncate">
                 {{ fileData?.filename || 'File Content' }}
               </h2>
+              <FileProvenanceLine v-if="file" :file="file" class="mt-1" />
               <div class="flex items-center gap-3 mt-2 text-sm txt-secondary">
                 <span class="pill px-2 py-0.5">{{
                   fileData?.file_type?.toUpperCase() || 'N/A'
@@ -161,13 +162,15 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch, toRef } from 'vue'
-import { getFileContent } from '@/services/filesService'
+import { getFileContent, type FileItem } from '@/services/filesService'
+import FileProvenanceLine from '@/components/files/FileProvenanceLine.vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
 
 interface Props {
   isOpen: boolean
   fileId: number | null
+  file?: FileItem | null
 }
 
 const props = defineProps<Props>()

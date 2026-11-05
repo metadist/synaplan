@@ -322,6 +322,7 @@ services:
       - ./_docker/backend/synaplan-worker-mode.Caddyfile:/usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile:ro
       - ./_docker/backend/synaplan-php-workers.Caddyfile:/usr/local/etc/php/templates/synaplan-php-workers.Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/c2pa-signer-start.sh:/usr/local/bin/c2pa-signer-start:ro
       - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
@@ -371,6 +372,8 @@ services:
       # off outside compose. A down sidecar is unavailable, never a failed upload.
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       # Collabora CODE convert-to. The collabora service starts with this
       # stack. Override OFFICE_CONVERT_URL for an external CODE, or set
@@ -557,6 +560,7 @@ services:
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - whisper_models:/var/www/backend/var/whisper:ro
+      - ./_docker/backend/c2pa-signer-start.sh:/usr/local/bin/c2pa-signer-start:ro
     environment:
       # Worker MUST run in the same APP_ENV as the backend, otherwise the two
       # halves of the system end up in different Redis namespaces
@@ -590,6 +594,8 @@ services:
       TIKA_BASE_URL: http://tika:9998
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_TOKEN: ${C2PA_SIGNER_TOKEN:-}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
@@ -638,6 +644,10 @@ services:
     command:
       - |
         set -u
+
+        if [ -x /usr/local/bin/c2pa-signer-start ]; then
+          /usr/local/bin/c2pa-signer-start || true
+        fi
 
         # Local AI is opt-in and must resolve to the SAME answer as the backend
         # role, otherwise a queued embedding job would look for an Ollama the
@@ -788,6 +798,7 @@ services:
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/c2pa-signer-start.sh:/usr/local/bin/c2pa-signer-start:ro
       - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - ./_docker/backend/container-healthcheck.sh:/usr/local/bin/container-healthcheck:ro
     environment:

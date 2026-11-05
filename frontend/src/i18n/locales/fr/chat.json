@@ -932,6 +932,7 @@
     "toolStepHidden": "Une étape sur cet ordinateur est terminée.",
     "audioGenerated": "Voici l’audio que vous avez demandé. Vous pouvez le lire ou le télécharger ci-dessous.",
     "imageGenerated": "Voici l’image que vous avez demandée.",
+    "aiGenerated": "Généré par IA",
     "videoGenerated": "Voici la vidéo que vous avez demandée.",
     "mediaJob": {
       "title": {

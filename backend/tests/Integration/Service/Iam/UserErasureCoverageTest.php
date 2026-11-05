@@ -22,7 +22,7 @@ final class UserErasureCoverageTest extends KernelTestCase
         'UsageLogEraser', 'WidgetEraser', 'ShareEraser', 'AgentEraser',
         'ApprovalEraser', 'SavedTaskEraser', 'CloudWatchEraser', 'UrlWatchEraser', 'NotionEraser', 'ConversationEraser',
         'VoiceSessionEraser', 'FileEraser', 'ComputeEraser', 'InboxEraser',
-        'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'SignupCodeUseEraser',
+        'ConfigEraser', 'PromptEraser', 'DisclosureEraser', 'AccountRecordsEraser', 'SignupCodeUseEraser',
         'MemoryEraser', 'IdentityEraser', 'CredentialEraser', 'ResearchEraser',
     ];
 

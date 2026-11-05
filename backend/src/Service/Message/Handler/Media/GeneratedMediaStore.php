@@ -6,6 +6,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\File\ThumbnailService;
+use App\Service\Media\ContentCredentialsMark;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\ProgressCallback;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,7 @@ final readonly class GeneratedMediaStore
         #[Autowire('%kernel.project_dir%/var/uploads')]
         private string $uploadDir,
         private ?RequestedFolderDelivery $folderDelivery = null,
+        private ?ContentCredentialsMark $credentials = null,
     ) {
     }
 
@@ -79,6 +81,7 @@ final readonly class GeneratedMediaStore
             $result['provider'] ?? $provider,
             ephemeral: !empty($request->options['incognito']),
         );
+        $this->rememberModel($registeredFile, $request);
 
         $thumbnailPath = null;
         if ('video' === $mediaType) {
@@ -108,7 +111,7 @@ final readonly class GeneratedMediaStore
      */
     public function keepSpeech(MediaTurnRequest $request, string $relativePath, ?string $provider): void
     {
-        $this->generatedFileRegistrar->register(
+        $registered = $this->generatedFileRegistrar->register(
             $request->message->getUserId(),
             $relativePath,
             $request->mediaType,
@@ -117,6 +120,29 @@ final readonly class GeneratedMediaStore
             ephemeral: !empty($request->options['incognito']),
             fileText: $request->prompt,
         );
+        $this->rememberModel($registered, $request);
+    }
+
+    private function rememberModel(?File $file, MediaTurnRequest $request): void
+    {
+        if (!$file instanceof File || null === $this->credentials) {
+            return;
+        }
+        $this->credentials->label($file, $this->modelLabel($request));
+    }
+
+    private function modelLabel(MediaTurnRequest $request): string
+    {
+        $name = trim((string) $request->model->name);
+        $provider = trim((string) $request->model->provider);
+        if ('' === $name) {
+            return $provider;
+        }
+        if ('' === $provider || str_contains(strtolower($name), strtolower($provider))) {
+            return $name;
+        }
+
+        return $provider.' '.$name;
     }
 
     /**

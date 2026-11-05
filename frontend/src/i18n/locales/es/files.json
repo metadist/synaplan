@@ -89,6 +89,16 @@
       "dismiss": "Ocultar este banner"
     },
     "searchPlaceholder": "Filtrar por nombre o palabra clave...",
+    "provenance": {
+      "generated": "Generado por {model} el {date}",
+      "badge": "Generado por IA",
+      "signed": "Firmado por Synaplan",
+      "signedHelp": "Se añadió una credencial de contenido. Dice que un modelo creó el archivo. No comprueba que la imagen sea cierta.",
+      "provider": "El proveedor marcó este archivo como generado por IA",
+      "providerHelp": "El proveedor del modelo ya había marcado el archivo. Synaplan dejó esa marca como estaba.",
+      "none": "Sin firmar",
+      "noneHelp": "Synaplan no pudo añadir una firma. El archivo sigue etiquetado como generado."
+    },
     "uploadTitle": "Subir Archivos RAG",
     "groupKeyword": "Palabra Clave del Grupo:",
     "groupKeywordPlaceholder": "Ingresa palabra clave para agrupar archivos",

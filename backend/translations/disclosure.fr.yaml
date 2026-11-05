@@ -1,0 +1,4 @@
+disclosure:
+  mail: 'Cette réponse a été rédigée par un assistant IA de %sender%.'
+  chat: 'Bonjour, je suis %name%, un assistant IA.'
+  empty: 'La mention IA ne peut pas être vide. Écrivez au moins une phrase.'

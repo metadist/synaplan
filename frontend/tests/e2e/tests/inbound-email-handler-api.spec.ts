@@ -182,4 +182,15 @@ test.describe('@ci @api Inbound-Email-Handler API', () => {
       expect(json.message.length).toBeGreaterThan(0)
     })
   })
+
+  test('an empty AI notice is refused', async ({ request }) => {
+    const auth = await getAuthHeaders(request)
+    const res = await request.put(`${getApiUrl()}/api/v1/channels/mail/notice`, {
+      headers: auth,
+      data: { text: '   ', bindingId: 0 },
+    })
+    expect(res.status()).toBe(422)
+    const json = await res.json()
+    expect(json.success).toBe(false)
+  })
 })

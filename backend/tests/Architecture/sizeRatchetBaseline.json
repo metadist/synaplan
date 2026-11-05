@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 47,
         "constructorParams": 63,
-        "methodLines": 118
+        "methodLines": 117
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1025,
@@ -182,7 +182,6 @@
         "src/Service/Email/InboundEmailHandlerService.php::InboundEmailHandlerService::processHandler": 197,
         "src/Service/Email/InboundEmailHandlerService.php::InboundEmailHandlerService::routeEmailToDepartment": 135,
         "src/Service/Email/InboundEmailService.php::InboundEmailService::processGmailImapEmails": 155,
-        "src/Service/Email/InternalEmailService.php::InternalEmailService::sendAiResponseEmail": 127,
         "src/Service/Embedding/EmbeddingReindexService.php::EmbeddingReindexService::reindexDocuments": 111,
         "src/Service/Embedding/EmbeddingReindexService.php::EmbeddingReindexService::reindexMemories": 126,
         "src/Service/Feedback/FeedbackExampleService.php::FeedbackExampleService::previewFalsePositive": 132,

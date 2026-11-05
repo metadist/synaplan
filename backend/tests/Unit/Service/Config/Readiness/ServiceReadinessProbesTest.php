@@ -8,6 +8,7 @@ use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Contract\ModuleStatus;
 use App\Module\ModuleRegistry;
 use App\Module\Probe\SidecarHealthProbeInterface;
+use App\Module\Sidecar\C2paSignerModule;
 use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
@@ -50,7 +51,7 @@ final class ServiceReadinessProbesTest extends TestCase
         bool $centrifugoReachable = true,
     ): ServiceReadinessProbes {
         $factories = [];
-        foreach ([LocalAiModule::ID, PiperTtsModule::ID, TikaModule::ID, DoclingModule::ID, SearxngModule::ID, OfficeConvertModule::ID] as $id) {
+        foreach ([LocalAiModule::ID, PiperTtsModule::ID, TikaModule::ID, DoclingModule::ID, C2paSignerModule::ID, SearxngModule::ID, OfficeConvertModule::ID] as $id) {
             $status = $statuses[$id] ?? new ModuleStatus(configured: true, healthy: true, message: 'ok');
             $module = $this->createStub(FeatureModuleInterface::class);
             $module->method('status')->willReturn($status);
@@ -93,7 +94,7 @@ final class ServiceReadinessProbesTest extends TestCase
     {
         $kinds = array_map(static fn (ReadinessObservation $o): string => $o->kind, $this->probes()->observeAll());
 
-        self::assertSame(['ollama', 'qdrant', 'whisper', 'tts', 'tika', 'docling', 'searxng', 'collabora', 'centrifugo'], array_keys($kinds));
+        self::assertSame(['ollama', 'qdrant', 'whisper', 'tts', 'tika', 'docling', 'searxng', 'collabora', 'c2pa-signer', 'centrifugo'], array_keys($kinds));
         self::assertSame([ReadinessObservation::READY], array_values(array_unique($kinds)));
     }
 

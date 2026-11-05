@@ -35,12 +35,26 @@ final readonly class UploadOptions
     ) {
     }
 
+    public const UPLOAD_SOURCES = [
+        'web_upload',
+        'chat_attachment',
+        'outlook',
+        'nextcloud',
+        'opencloud',
+        'owncloud',
+        'whatsapp',
+        'telegram',
+        'widget',
+        'api',
+        'notion',
+    ];
+
     /**
-     * Normalize a raw provenance source to the whitelist, mirroring
-     * {@see File::setSource()} so callers never persist an invalid value.
+     * Normalize a raw provenance source to the upload whitelist, refusing
+     * server-only sources ('generated', 'compute') from client uploads.
      */
     public static function normalizeSource(string $source): string
     {
-        return in_array($source, File::SOURCES, true) ? $source : 'web_upload';
+        return in_array($source, self::UPLOAD_SOURCES, true) ? $source : 'web_upload';
     }
 }

@@ -1,0 +1,4 @@
+disclosure:
+  mail: 'Bu yanıt %sender% adlı bir yapay zeka asistanı tarafından yazıldı.'
+  chat: 'Merhaba, ben %name%, bir yapay zeka asistanıyım.'
+  empty: 'YZ bildirimi boş olamaz. En az bir cümle yazın.'

@@ -17,6 +17,7 @@
           @update:model-value="saveAssistant"
         />
       </div>
+      <AiNoticeField channel="whatsapp" :binding-id="0" />
     </template>
   </div>
 </template>
@@ -25,6 +26,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
+import AiNoticeField from '@/components/channels/AiNoticeField.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
 import FeatureNotConfiguredNotice from '@/components/common/FeatureNotConfiguredNotice.vue'
 import {

@@ -426,26 +426,19 @@ HTML;
 
         // Header subtitle: keep null (i18n default), empty string (hide),
         // or a trimmed non-empty string (max 200 chars). Reject non-string values.
-        if (null === $config['widgetSubtitle']) {
-            // explicit "use i18n default" — keep as-is
-        } elseif (is_string($config['widgetSubtitle'])) {
-            $config['widgetSubtitle'] = mb_substr(trim($config['widgetSubtitle']), 0, 200);
-        } else {
-            $config['widgetSubtitle'] = null;
-        }
+        $config['widgetSubtitle'] = is_string($config['widgetSubtitle'])
+            ? mb_substr(trim($config['widgetSubtitle']), 0, 200)
+            : null;
 
         // AI assistant display name. Unlike `widgetSubtitle`, the "hide"
         // option is meaningless here (the timestamp line always renders a
         // sender label), so empty string collapses to null = i18n default.
         // Max 50 chars keeps mobile widgets readable.
-        if (null === $config['aiAssistantName']) {
-            // keep null
-        } elseif (is_string($config['aiAssistantName'])) {
-            $trimmedName = trim($config['aiAssistantName']);
-            $config['aiAssistantName'] = '' === $trimmedName ? null : mb_substr($trimmedName, 0, 50);
-        } else {
-            $config['aiAssistantName'] = null;
-        }
+        $trimmedName = is_string($config['aiAssistantName']) ? trim($config['aiAssistantName']) : '';
+        $config['aiAssistantName'] = '' === $trimmedName ? null : mb_substr($trimmedName, 0, 50);
+        $config['disclosureCompany'] = is_string($config['disclosureCompany'] ?? null)
+            ? mb_substr(trim($config['disclosureCompany']), 0, 120)
+            : '';
 
         // Slack webhook URL: only accept the canonical Slack incoming-webhook
         // hostname over HTTPS. Reject anything else (including http://, empty

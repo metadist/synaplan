@@ -208,9 +208,11 @@ export const fileItemSchema = z.object({
   /** Provenance: where the file came from (§3.1, §4.4). */
   source: fileSourceSchema.optional(),
   origin_kind: fileOriginKindSchema.nullable().optional(),
-  /** True while a freshly-arrived external push awaits triage (§3.3). */
   incoming: z.boolean().optional(),
   provider: z.string().nullable().optional(),
+  generated: z.boolean().optional(),
+  generated_model: z.string().nullable().optional(),
+  credentials: z.string().nullable().optional(),
   thumb_url: z.string().nullable().optional(),
   text_preview: z.string(),
   /** Length of the stored extract; 0 on a failed row means nothing was readable. */

@@ -211,7 +211,7 @@ class FileController extends AbstractController
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
                         new OA\Property(property: 'group_key', type: 'string', example: 'customer-support', description: 'Knowledge folder. An upload from nextcloud, opencloud or owncloud that names a folder other than DEFAULT skips the Incoming inbox; without one it lands there.'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
-                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'owncloud', 'whatsapp', 'telegram', 'widget', 'api', 'generated', 'compute', 'notion'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/ownCloud.online/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
+                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'owncloud', 'whatsapp', 'telegram', 'widget', 'api', 'notion'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/ownCloud.online/Outlook) should set this so the file is labelled by source.'),
                         new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
                         new OA\Property(property: 'source_id', type: 'string', example: '12345', description: 'Stable external id of the file at its source (e.g. the Nextcloud file id). Enables overwrite-in-place and bulk stale checks. Sent with a single file per request.'),
                         new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
@@ -244,10 +244,7 @@ class FileController extends AbstractController
 
         // Provenance (03_file-management.md §3.1): integrations declare where the
         // file came from + its original name. Web uploads omit these → web_upload.
-        $source = (string) $request->request->get('source', 'web_upload');
-        if (!in_array($source, File::SOURCES, true)) {
-            $source = 'web_upload';
-        }
+        $source = UploadOptions::normalizeSource((string) $request->request->get('source', 'web_upload'));
         $originalName = $request->request->get('original_name');
         $originalName = is_string($originalName) && '' !== trim($originalName) ? trim($originalName) : null;
 

@@ -280,7 +280,6 @@ class WidgetPublicController extends AbstractController
 
     /**
      * Return only runtime-safe config keys needed by the widget frontend.
-     * Sensitive fields (API tokens, internal flags) are excluded.
      *
      * @param array<string, mixed> $config
      *
@@ -289,29 +288,17 @@ class WidgetPublicController extends AbstractController
     private static function buildPublicConfig(array $config): array
     {
         static $allowed = [
-            'position',
-            'primaryColor',
-            'iconColor',
-            'buttonIcon',
-            'buttonIconUrl',
-            'defaultTheme',
-            'autoOpen',
-            'autoMessage',
-            'messageLimit',
-            'maxFileSize',
-            'allowFileUpload',
-            'fileUploadLimit',
-            'fullscreenMode',
-            'allowFullscreen',
-            'hideButton',
-            'privacyPolicyUrl',
-            'detectTheme',
-            'sessionMode',
-            'widgetSubtitle',
-            'aiAssistantName',
+            'position', 'primaryColor', 'iconColor', 'buttonIcon', 'buttonIconUrl',
+            'defaultTheme', 'autoOpen', 'autoMessage', 'messageLimit', 'maxFileSize',
+            'allowFileUpload', 'fileUploadLimit', 'fullscreenMode', 'allowFullscreen',
+            'hideButton', 'privacyPolicyUrl', 'detectTheme', 'sessionMode',
+            'widgetSubtitle', 'aiAssistantName', 'disclosureCompany',
         ];
 
         $public = \array_intersect_key($config, \array_flip($allowed));
+        if (isset($public['disclosureCompany'])) {
+            $public['disclosureCompany'] = \is_string($public['disclosureCompany']) ? mb_substr(trim($public['disclosureCompany']), 0, 120) : '';
+        }
 
         // Surface only the derived enabled-flag, never the raw Slack webhook
         // URL or the trigger phrases. Both are server-side secrets/policy and

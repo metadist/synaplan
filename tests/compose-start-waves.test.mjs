@@ -14,7 +14,7 @@ const read = (...parts) => readFileSync(join(ROOT, ...parts), 'utf8')
 
 const WAVE_1 = new Set(['db', 'redis', 'centrifugo', 'backend', 'worker', 'scheduler', 'tika', 'frontend', 'frontend-widgets', 'startup-notes'])
 const WAVE_2 = new Set([
-  'ollama', 'qdrant', 'whisper-models', 'tts', 'docling', 'searxng', 'collabora',
+  'ollama', 'qdrant', 'whisper-models', 'tts', 'docling', 'c2pa-signer', 'searxng', 'collabora',
   'compute', 'compute-node', 'compute-python', 'voice', 'transcriber',
   'phpmyadmin', 'mailhog', 'keycloak', 'keycloak_certs',
 ])

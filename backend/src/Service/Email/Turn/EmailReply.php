@@ -116,7 +116,7 @@ final readonly class EmailReply
         }
 
         try {
-            $this->mailer->sendAiResponseEmail($email->fromEmail, $email->subject, $view->userText, $email->thread->messageId, $result['provider'] ?? null, null, $processingTime, null, $email->toEmail);
+            $this->mailer->sendAiResponseEmail($email->fromEmail, $email->subject, $view->userText, $email->thread->messageId, $result['provider'] ?? null, null, $processingTime, null, $email->toEmail, ownerId: (int) $email->user->getId(), disclose: false);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send email error response', ['to' => $email->fromEmail, 'error' => $e->getMessage()]);
         }
@@ -150,6 +150,7 @@ final readonly class EmailReply
                 $metadata['media_type'] ?? null,
                 $this->files->additional($metadata),
                 $language ?: $email->user->getLocale(),
+                (int) $email->user->getId(),
             );
             $this->logger->info('Email response sent', [
                 'to' => $email->fromEmail,

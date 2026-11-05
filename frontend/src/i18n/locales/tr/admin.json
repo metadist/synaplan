@@ -1018,6 +1018,19 @@
   "people": {
     "title": "Kullanıcılar",
     "subtitle": "Bu sunucudaki hesaplar, gruplar, kurallar ve bildirilen içerikler.",
+    "literacy": {
+      "ask": "Kuruluşunuz «Yapay zekayı iyi kullanmak» metnini okumanızı istiyor (8 dakika).",
+      "read": "Şimdi oku",
+      "done": "Bunu okudum",
+      "remind": "Yarın hatırlat",
+      "switch": "Herkesten «Yapay zekayı iyi kullanmak» metnini okumasını iste",
+      "consequence": "Bunu açmak, kuruluşunuzdaki herkesten «Yapay zekayı iyi kullanmak» metnini bir kez okumasını ister. Kimse engellenmez.",
+      "count": "{total} kişiden {confirmed} onayladı",
+      "column": "Yapay zekayı iyi kullanmak",
+      "export": "Onayları indir",
+      "confirmed": "Onaylandı",
+      "notYet": "Henüz değil"
+    },
     "tabs": {
       "users": "Kullanıcılar",
       "groups": "Gruplar",
@@ -1446,6 +1459,9 @@
   "modules": {
     "tika": {
       "label": "Apache Tika (belge metni çıkarma)"
+    },
+    "c2pa_signer": {
+      "label": "İçerik kimlik bilgileri (YZ medya işaretleme)"
     },
     "docling": {
       "label": "Docling (belge dönüştürme)"

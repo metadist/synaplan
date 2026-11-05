@@ -98,6 +98,7 @@
           </div>
           <FileSentTo :rows="copiesFor(file.id)" />
           <p class="text-[10px] txt-secondary truncate mt-0.5">{{ file.uploaded_date }}</p>
+          <FileProvenanceLine :file="file" />
           <!--
             Every control is the same height as Download, and the icon buttons
             are squares of that height. On a phone the word takes the first
@@ -268,6 +269,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import EmptyState from '@/components/common/EmptyState.vue'
 import FilePreview from '@/components/files/FilePreview.vue'
+import FileProvenanceLine from '@/components/files/FileProvenanceLine.vue'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
 import FilePushMenu from '@/components/files/FilePushMenu.vue'
 import FileSentTo from '@/components/files/FileSentTo.vue'

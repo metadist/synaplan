@@ -16,6 +16,7 @@ import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
 import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
+import { aiLiteracyRoutes } from '@/router/aiLiteracyRoutes'
 import { codeSignupRoutes } from '@/router/codeSignupRoutes'
 import { loginLinkRoutes } from '@/router/loginLinkRoutes'
 import { resolveRegistrationRedirect } from '@/router/registrationGate'
@@ -35,7 +36,8 @@ import {
 } from '@/i18n'
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
-import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
+import { settingsLocationFor } from '@/composables/useSettingsSections'
+import { settingsRoutes } from '@/router/settingsRoutes'
 import { assistantsRouteGuard } from '@/router/assistantGuards'
 import { capacityRoute } from '@/router/capacityRoute'
 import { aiModelsTabRedirect, routingRedirect, topicsRedirect } from '@/router/aiSettingsRedirects'
@@ -499,6 +501,7 @@ const router = createRouter({
     { path: '/tools/mail-handler', redirect: '/apps/mailbox' },
     { path: '/ai/summarizer', redirect: { path: '/', query: { tool: 'summarize' } } },
     { path: '/tools/doc-summary', redirect: { path: '/', query: { tool: 'summarize' } } },
+    ...aiLiteracyRoutes,
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',
@@ -606,26 +609,7 @@ const router = createRouter({
       component: () => import('@/views/ChatsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.allChats', i18n: ['chat', 'files'] },
     },
-    {
-      // Bare /settings and old hashes (#profile, #memories, #app) pick a section.
-      path: '/settings',
-      name: 'settings',
-      redirect: (to) => settingsLocationFor(to),
-    },
-    {
-      // Theme stays on the device. Language is also saved on the account from
-      // this page. Guests only reach appearance; each signed-in section is its
-      // own page, listed in the profile sidebar.
-      path: '/settings/:section',
-      name: 'settings-section',
-      component: () => import('@/views/SettingsView.vue'),
-      beforeEnter: (to) => normalizeSettingsRoute(to),
-      meta: {
-        requiresAuth: false,
-        titleKey: 'pageTitles.settings',
-        i18n: ['settings', 'config', 'tools', ...BUNDLE_PANEL_I18N_NAMESPACES],
-      },
-    },
+    ...settingsRoutes,
     {
       path: '/testv',
       name: 'test',

@@ -213,6 +213,28 @@ test.describe('@ci @smoke Widget', () => {
       expect(aiText.length).toBeGreaterThan(0)
     })
   })
+
+  test('shows the AI notice and keeps a dismissal', async ({ page, request, credentials }) => {
+    const widgetName = WIDGET_NAMES.unique('Test Widget AI Notice')
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: URLS.TEST_PAGE_URL,
+      config: { disclosureCompany: 'Northwind' },
+    })
+    const apiUrl = getApiUrl()
+    await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+    const notice = page.locator(selectors.widget.host).locator('[data-testid="privacy-notice"]')
+    await expect(notice).toBeVisible()
+    await expect(notice).toContainText('AI assistant')
+    await expect(notice).toContainText('Northwind')
+    await notice.getByRole('button', { name: 'Dismiss privacy notice' }).click()
+    await expect(notice).toHaveCount(0)
+    await page.reload()
+    await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+    await expect(
+      page.locator(selectors.widget.host).locator('[data-testid="privacy-notice"]')
+    ).toHaveCount(0)
+    await deleteWidgetViaApi(request, credentials, widgetInfo.widgetId)
+  })
 })
 
 test.describe('@ci Widget visitor chrome', () => {

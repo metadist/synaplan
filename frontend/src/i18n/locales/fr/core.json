@@ -44,6 +44,7 @@
   "pageTitles": {
     "desktop": "Synaplan Desktop",
     "login": "Connexion",
+    "usingAiWell": "Bien utiliser l'IA",
     "register": "Inscription",
     "forgotPassword": "Mot de passe oublié",
     "codeSignup": "Code d'invitation",
