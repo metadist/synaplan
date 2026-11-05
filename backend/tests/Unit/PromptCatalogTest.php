@@ -295,6 +295,8 @@ final class PromptCatalogTest extends TestCase
         // no runtime — and producing a new file is never a "question" (rule 6).
         $this->assertStringContainsString('built FROM an attached table', $plan['prompt']);
         $this->assertStringContainsString('pixel edit on an attached image', $plan['prompt']);
+        $this->assertStringContainsString('lass den Vogel fliegen', $plan['prompt']);
+        $this->assertStringContainsString('SYNAPLAN oben rechts', $plan['prompt']);
         $this->assertStringContainsString('Producing a NEW file from a document', $plan['prompt']);
         // Issue #2048: the script must compute the requested grouping, not
         // relabel its output to match the request.

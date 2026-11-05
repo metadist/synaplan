@@ -979,6 +979,38 @@ final class RunnersTest extends TestCase
         self::assertContains('1/000/dog.png', $capturedOptions['reference_image_paths'] ?? []);
     }
 
+    public function testMediaGenerationRunnerForwardsFollowUpInputMode(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $capturedClassification = null;
+        $handler->method('handle')->willReturnCallback(
+            function ($msg, $thread, $classification) use (&$capturedClassification): array {
+                $capturedClassification = $classification;
+
+                return [
+                    'content' => 'Generated image',
+                    'metadata' => [
+                        'file' => ['path' => '/api/v1/files/uploads/1/000/birds.png', 'type' => 'image'],
+                        'local_path' => '1/000/birds.png',
+                    ],
+                ];
+            }
+        );
+
+        $runner = new MediaGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::ImageGeneration, [], [
+            'prompt' => 'Den zweiten Vogel auch fliegend',
+        ], [
+            'input_mode' => 'reference_images',
+        ]);
+
+        $result = $runner->run($node, $this->context($this->message('lass den vogel fliegen')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('reference_images', $capturedClassification['input_mode'] ?? null);
+        self::assertSame('image', $capturedClassification['media_type'] ?? null);
+    }
+
     private function calendarRunner(): CalendarEventRunner
     {
         $storage = $this->createMock(FileStorageService::class);
