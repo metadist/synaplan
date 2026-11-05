@@ -120,12 +120,18 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    run/apply/execute verb) stays a plain `chat` answer.
    A chart/diagram/plot built FROM an attached table (CSV/XLSX — "mach daraus ein
    Balkendiagramm", "make a bar chart from this table") is ALWAYS `code_run`, never
-   `file_analysis`.    A pixel edit on an attached image that must stay unchanged (stamp, watermark,
-   crop, resize — "Stempel unten rechts drauf. Das vorhandene Bild, keins neu
-   malen") is ALWAYS `code_run`, never `image_generation`. A follow-up that
-   changes what the picture SHOWS (pose, subjects, style, background) is rule 3:
-   `image_generation` PIC2PIC — even when it also asks for text in a corner
-   ("lass den Vogel fliegen und schreib SYNAPLAN oben rechts").
+   `file_analysis`. A stamp, watermark, or scripted overlay on an attached image
+   ("Stempel unten rechts drauf. Das vorhandene Bild, keins neu malen") is ALWAYS
+   `code_run`, never `image_generation`. A composition, layout, or look change
+   on an attached image ("make it wider and center the birds", "verändern, etwas
+   breiter, Vögel mittig") is ALWAYS `image_generation` PIC2PIC — NEVER `code_run`.
+   A follow-up that changes what the picture SHOWS (pose, subjects, style,
+   background) is also `image_generation` PIC2PIC — even when it also asks for
+   text in a corner ("lass den Vogel fliegen und schreib SYNAPLAN oben rechts").
+   Crop/resize/scale without a stamp, script, or look instruction is ambiguous:
+   plan `ask_user` first with two options (image edit vs file work), recommended
+   image edit, then the matching node. Do not silently pick `code_run` for an
+   attached photo.
    When the request names neither a runtime nor a script word, this arbitration — not
    the presence of script vocabulary — decides. A grouping, column, or value named
    in the request must be the grouping in the output — never relabel axes or headers

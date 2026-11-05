@@ -294,7 +294,9 @@ final class PromptCatalogTest extends TestCase
         // attached images arbitrate to code_run even when the request names
         // no runtime — and producing a new file is never a "question" (rule 6).
         $this->assertStringContainsString('built FROM an attached table', $plan['prompt']);
-        $this->assertStringContainsString('pixel edit on an attached image', $plan['prompt']);
+        $this->assertStringContainsString('stamp, watermark, or scripted overlay', $plan['prompt']);
+        $this->assertStringContainsString('composition, layout, or look change', $plan['prompt']);
+        $this->assertStringContainsString('plan `ask_user` first', $plan['prompt']);
         $this->assertStringContainsString('lass den Vogel fliegen', $plan['prompt']);
         $this->assertStringContainsString('SYNAPLAN oben rechts', $plan['prompt']);
         $this->assertStringContainsString('Producing a NEW file from a document', $plan['prompt']);

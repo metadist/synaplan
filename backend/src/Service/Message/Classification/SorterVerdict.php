@@ -28,6 +28,7 @@ final readonly class SorterVerdict
         private AgentPinRoute $agentPinRoute,
         private AttachmentIntent $attachments,
         private LoggerInterface $logger,
+        private ?ImageEditIntent $imageEdits = null,
     ) {
     }
 
@@ -174,7 +175,7 @@ final readonly class SorterVerdict
             $classification['input_mode'] = $inputMode;
         }
 
-        return $classification;
+        return $this->withImageEditRouting($classification, $message, $text);
     }
 
     /**
@@ -241,6 +242,40 @@ final readonly class SorterVerdict
                 'sorter_topic' => $classification['topic'],
             ]);
 
+            $classification['multi_step'] = true;
+        }
+
+        return $classification;
+    }
+
+    /**
+     * An attached photo plus a look-change ("breiter", "Vögel mittig") is
+     * PIC2PIC, not file work. Crop/resize without more context still needs
+     * the planner so it can ask before it picks `code_run`.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function withImageEditRouting(array $classification, Message $message, string $text): array
+    {
+        $kind = ($this->imageEdits ?? new ImageEditIntent())->kind($message, $text);
+        if (ImageEditKind::Aesthetic === $kind) {
+            $this->logger->info('MessageClassifier: attached-image look-change goes to PIC2PIC, not file work', [
+                'message_id' => $message->getId(),
+            ]);
+            $classification['topic'] = 'mediamaker';
+            $classification['intent'] = 'image_generation';
+            $classification['media_type'] = 'image';
+            $classification['input_mode'] = 'reference_images';
+            $classification['multi_step'] = false;
+
+            return $classification;
+        }
+        if (ImageEditKind::Ambiguous === $kind) {
+            $this->logger->info('MessageClassifier: attached-image size change asks before file work', [
+                'message_id' => $message->getId(),
+            ]);
             $classification['multi_step'] = true;
         }
 

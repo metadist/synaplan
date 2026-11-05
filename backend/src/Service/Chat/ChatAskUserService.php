@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContextRehydrator;
 use App\Service\Multitask\Plan\Capability;
+use App\Service\Multitask\Plan\ImageFileWorkArbitration;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
@@ -67,6 +68,7 @@ final readonly class ChatAskUserService
         }
 
         $context = $this->rehydrator->fromMessage($message);
+        $plan = (new ImageFileWorkArbitration())->withChosenWork($plan, $nodeId, $text);
         $assembled = $this->dagExecutor->resume($plan, $context, $nodeId, ['answer' => $text]);
         $content = trim($assembled['content']);
         if ('' !== $content) {

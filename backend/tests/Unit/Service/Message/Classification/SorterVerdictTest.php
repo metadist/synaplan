@@ -86,6 +86,33 @@ final class SorterVerdictTest extends TestCase
         self::assertSame([true, true, null], [$code['multi_step'], $spoken['multi_step'], $speechModel['multi_step']]);
     }
 
+    public function testALookChangeOnAnAttachedPhotoGoesToPic2Pic(): void
+    {
+        $route = $this->verdict(['topic' => 'general', 'language' => 'de', 'multi_step' => true])
+            ->classify(
+                $this->message('Kannst du das Bild so verändern, dass die Vögel mittig sind?', ['scene.png']),
+                'Kannst du das Bild so verändern, dass die Vögel mittig sind?',
+                [],
+                null,
+                false,
+                false,
+            );
+
+        self::assertSame(
+            ['mediamaker', 'image_generation', 'image', 'reference_images', false],
+            [$route['topic'], $route['intent'], $route['media_type'], $route['input_mode'], $route['multi_step']],
+        );
+    }
+
+    public function testABareResizeOnAnAttachedPhotoStillPlans(): void
+    {
+        $route = $this->verdict(['topic' => 'general', 'language' => 'en', 'multi_step' => false])
+            ->classify($this->message('Resize this image to half.', ['scene.png']), 'Resize this image to half.', [], null, false, false);
+
+        self::assertTrue($route['multi_step']);
+        self::assertSame('general', $route['topic']);
+    }
+
     /**
      * @param array<string, mixed> $sorterResult
      */

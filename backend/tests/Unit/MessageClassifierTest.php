@@ -2590,6 +2590,19 @@ class MessageClassifierTest extends TestCase
         $this->assertTrue($result['multi_step']);
     }
 
+    public function testAestheticImageEditOnAttachedPngSkipsPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Kannst du das Bild so verändern, dass es etwas breiter wird und die Vögel mittig platziert sind?',
+            fileType: 'png',
+        );
+
+        $this->assertFalse($result['multi_step']);
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertSame('reference_images', $result['input_mode']);
+    }
+
     public function testSpanishChartRequestForcesPlanner(): void
     {
         $result = $this->classifyWithFile(
