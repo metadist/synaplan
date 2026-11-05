@@ -22,6 +22,7 @@ final readonly class TurnstileVerifier
 {
     private const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
     private const TIMEOUT_SECONDS = 5.0;
+    private const MAX_TOKEN_LENGTH = 2048;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -40,8 +41,9 @@ final readonly class TurnstileVerifier
         if (!$this->isConfigured()) {
             return false;
         }
-        if ('' === trim($token)) {
-            $this->logger->info('Turnstile: no token supplied');
+        $trimmed = trim($token);
+        if ('' === $trimmed || strlen($trimmed) > self::MAX_TOKEN_LENGTH) {
+            $this->logger->info('Turnstile: missing or oversized token');
 
             return false;
         }

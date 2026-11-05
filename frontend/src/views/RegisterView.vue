@@ -377,12 +377,12 @@
                 type="submit"
                 class="auth-submit-btn btn-primary"
                 :disabled="
-                  loading || (!!password && !!confirmPassword && password !== confirmPassword)
+                  busy || (!!password && !!confirmPassword && password !== confirmPassword)
                 "
                 data-testid="btn-register"
               >
                 <Transition name="btn-content" mode="out-in">
-                  <span v-if="loading" key="loading" class="flex items-center justify-center gap-2">
+                  <span v-if="busy" key="loading" class="flex items-center justify-center gap-2">
                     <span
                       class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
                     />
@@ -504,24 +504,13 @@ const showConfirmPassword = ref(false)
 const focusedField = ref<string | null>(null)
 const currentLanguage = computed(() => locale.value)
 
-const cycleLanguage = () => {
-  void cycleLocale()
-}
-
+const cycleLanguage = () => void cycleLocale()
 const toggleTheme = () => themeStore.cycleTheme()
-
-// The native shell has no browser back button, so auth pages would otherwise be a
-// dead end for guests. Go back in history when possible, else fall back to the
-// chat home so the user is never stranded.
-const goBack = () => {
-  if (window.history.state?.back) {
-    router.back()
-  } else {
-    router.push('/')
-  }
-}
+const goBack = () => (window.history.state?.back ? router.back() : router.push('/'))
 
 const { register, error: authError, errorCode: authErrorCode, loading, clearError } = useAuth()
+const checkingHuman = ref(false)
+const busy = computed(() => loading.value || checkingHuman.value)
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
@@ -559,6 +548,7 @@ onMounted(() => {
 })
 
 const handleRegister = async () => {
+  if (busy.value) return
   clearError()
   passwordErrors.value = []
   emailError.value = ''
@@ -576,14 +566,25 @@ const handleRegister = async () => {
 
   if (password.value !== confirmPassword.value) return
 
-  const challengeToken = await getChallengeToken('register')
-  const result = await register(email.value, password.value, challengeToken, String(locale.value), {
-    plan: admissionChoice.value?.plan || undefined,
-    code: admissionChoice.value?.code || undefined,
-  })
-  if (result.success) {
-    registrationNeedsAdmin.value = !result.mailDelivered
-    registrationSuccess.value = true
+  checkingHuman.value = true
+  try {
+    const challengeToken = await getChallengeToken('register')
+    const result = await register(
+      email.value,
+      password.value,
+      challengeToken,
+      String(locale.value),
+      {
+        plan: admissionChoice.value?.plan || undefined,
+        code: admissionChoice.value?.code || undefined,
+      }
+    )
+    if (result.success) {
+      registrationNeedsAdmin.value = !result.mailDelivered
+      registrationSuccess.value = true
+    }
+  } finally {
+    checkingHuman.value = false
   }
 }
 

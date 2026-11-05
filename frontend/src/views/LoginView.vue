@@ -321,10 +321,10 @@
                 type="submit"
                 class="auth-submit-btn btn-primary"
                 :class="{
-                  'auth-submit-btn--loading': loading,
+                  'auth-submit-btn--loading': busy,
                   'auth-submit-btn--success': loginSuccess,
                 }"
-                :disabled="loading || loginSuccess"
+                :disabled="busy || loginSuccess"
                 data-testid="btn-login"
               >
                 <Transition name="btn-content" mode="out-in">
@@ -336,7 +336,7 @@
                     <Icon icon="mdi:check" class="w-5 h-5" />
                   </span>
                   <span
-                    v-else-if="loading"
+                    v-else-if="busy"
                     key="loading"
                     class="flex items-center justify-center gap-2"
                   >
@@ -419,21 +419,15 @@ import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
-import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
-import { startNativeOAuth } from '@/services/api/nativeOAuth'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { useSocialAuth } from '@/composables/useSocialAuth'
 import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
 import LoginEmailLink from '@/components/auth/LoginEmailLink.vue'
 import RegistrationClosedHint from '@/components/auth/RegistrationClosedHint.vue'
 import UnverifiedLoginHint from '@/components/verification/UnverifiedLoginHint.vue'
 import { FIRST_RUN_ADMIN_EMAIL, FIRST_RUN_ADMIN_PASSWORD } from '@/constants/firstRunAdmin'
 import { firstRunLandingPath } from '@/composables/useFirstRunSetup'
-import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
-import { useAuthStore } from '@/stores/auth'
-import {
-  consumePendingRedirect,
-  isSafeRedirectPath,
-  setPendingRedirect,
-} from '@/utils/pendingAuthRedirect'
+import { consumePendingRedirect, isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
 
 const router = useRouter()
 const route = useRoute()
@@ -441,7 +435,6 @@ const { locale, t } = useI18n()
 const themeStore = useTheme()
 const { getToken: getChallengeToken } = useSignupChallenge()
 const config = useConfigStore()
-const authStore = useAuthStore()
 
 const isDark = themeStore.isDark
 
@@ -472,9 +465,15 @@ const goBack = () => {
 }
 
 const { login, error: authError, errorCode: authErrorCode, loading, clearError } = useAuth()
+const checkingHuman = ref(false)
+const busy = computed(() => loading.value || checkingHuman.value)
 const emailError = ref('')
-// Native OAuth errors surface through the same banner as password-login errors.
-const socialError = ref('')
+const {
+  providers: socialProviders,
+  loadProviders: loadSocialProviders,
+  signInWith,
+  error: socialError,
+} = useSocialAuth()
 const error = computed(() => socialError.value || blockedOrAuthError())
 const blockedOrAuthError = () => signupBlockedText(t, authErrorCode.value, authError.value)
 const emailNotVerified = computed(
@@ -486,16 +485,6 @@ const onEmailBlur = () => {
   emailError.value = !validateEmail(email.value) && email.value ? 'Invalid email format' : ''
 }
 
-interface SocialProvider {
-  id: string
-  name: string
-  enabled: boolean
-  icon: string
-  auto_redirect?: boolean
-  custom_label?: boolean
-}
-
-const socialProviders = ref<SocialProvider[]>([])
 const enterpriseSsoLabel = computed(() => {
   const provider = socialProviders.value.find((item) => item.id === 'keycloak')
   if (!provider) return t('auth.enterpriseSso')
@@ -504,17 +493,6 @@ const enterpriseSsoLabel = computed(() => {
 const oidcAutoRedirect = ref(false)
 const sessionExpired = ref(false)
 const justRegistered = ref(false)
-
-const loadSocialProviders = async () => {
-  try {
-    const response = await fetch(`${config.appBaseUrl}/api/v1/auth/providers`)
-    const data = await response.json()
-    socialProviders.value = data.providers || []
-  } catch (e) {
-    console.error('Failed to load social providers:', e)
-    socialProviders.value = []
-  }
-}
 
 watch(
   () => config.setup.demoLoginHint,
@@ -595,6 +573,7 @@ const continueAsDemoAdmin = async () => {
 }
 
 const handleLogin = async () => {
+  if (busy.value || loginSuccess.value) return
   clearError()
   emailError.value = ''
   if (!validateEmail(email.value)) {
@@ -603,57 +582,30 @@ const handleLogin = async () => {
   }
   if (!password.value) return
 
-  const challengeToken = await getChallengeToken('login')
-  const success = await login(email.value, password.value, challengeToken)
-  if (success) {
-    loginSuccess.value = true
-    // Short delay so the success checkmark animation can play before nav.
-    setTimeout(() => {
-      const fromQuery = router.currentRoute.value.query.redirect as string | undefined
-      const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
-      router.push(queryPath ?? consumePendingRedirect() ?? '/')
-    }, 400)
+  checkingHuman.value = true
+  try {
+    const challengeToken = await getChallengeToken('login')
+    const success = await login(email.value, password.value, challengeToken)
+    if (success) {
+      loginSuccess.value = true
+      // Short delay so the success checkmark animation can play before nav.
+      setTimeout(() => {
+        const fromQuery = router.currentRoute.value.query.redirect as string | undefined
+        const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
+        router.push(queryPath ?? consumePendingRedirect() ?? '/')
+      }, 400)
+    }
+  } finally {
+    checkingHuman.value = false
   }
 }
 
 const handleSocialLogin = async (provider: string) => {
-  // OAuth round-trip strips the SPA's URL state, so stash the intent
-  // for OAuthCallback to pick up. setPendingRedirect validates internally.
   const redirect = route.query.redirect as string | undefined
-  if (redirect) setPendingRedirect(redirect)
-
-  // Native shell: providers block embedded WebViews, so run OAuth in the system
-  // browser and complete via a deep-link handoff (no full-page redirect).
-  if (isNativeApp()) {
-    socialError.value = ''
-    // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8); every
-    // other provider (and Apple on Android) uses the system-browser OAuth flow.
-    const result =
-      'apple' === provider && 'ios' === getNativePlatform()
-        ? await startNativeAppleSignIn()
-        : await startNativeOAuth(provider)
-    if (!result.success) {
-      // A user-dismissed browser is a silent cancellation, not an error.
-      if (!result.cancelled) {
-        socialError.value = result.error || 'Login failed'
-      }
-      return
-    }
-    // Tokens are stored — verify the session via the store so the reactive
-    // auth state + config (guest → authenticated) update everywhere.
-    const ok = await authStore.handleOAuthCallback()
-    if (ok) {
-      const queryPath = isSafeRedirectPath(redirect) ? redirect : null
-      router.push(queryPath ?? consumePendingRedirect() ?? '/')
-    } else {
-      socialError.value = 'Login failed'
-    }
-    return
+  if (await signInWith(provider, redirect)) {
+    const queryPath = isSafeRedirectPath(redirect) ? redirect : null
+    router.push(queryPath ?? consumePendingRedirect() ?? '/')
   }
-
-  const params = new URLSearchParams({ language: String(locale.value) })
-  params.set('challenge', await getChallengeToken('signup'))
-  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
 }
 </script>
 
