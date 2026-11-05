@@ -492,6 +492,10 @@
     padding-bottom: 0;
   }
 
+  html.synaplan-keyboard-dock .chat-top-edge {
+    transform: translateY(var(--keyboard-inset-height, 0px));
+  }
+
   /* Web fallback: mobile browsers DO shrink visualViewport, so useKeyboardOpen
      flips this class — collapse the inset there too (the native inset var stays
      0 on the web build). */

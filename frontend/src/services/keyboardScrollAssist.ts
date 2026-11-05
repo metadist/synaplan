@@ -26,7 +26,13 @@
  * fires there.
  */
 import { isNativeApp } from '@/services/api/nativeRuntime'
-import { isFieldShovedToTop, keyboardRevealDelta } from '@/services/keyboardReveal'
+import {
+  editableFieldFrom,
+  isEditableField,
+  isFieldShovedToTop,
+  keyboardRevealDelta,
+  keyboardVisibleBottom,
+} from '@/services/keyboardReveal'
 
 let initialized = false
 /** Current soft-keyboard height in px (0 when hidden). */
@@ -55,28 +61,6 @@ let revealTimers: ReturnType<typeof setTimeout>[] = []
 const REVEAL_DELAYS_MS = [50, 150, 320]
 const MAX_VIEWPORT_CORRECTIONS = 8
 
-/** Input types that never show a keyboard — never treat these as editable. */
-const NON_TEXT_INPUT_TYPES = new Set([
-  'button',
-  'submit',
-  'reset',
-  'checkbox',
-  'radio',
-  'range',
-  'color',
-  'file',
-  'image',
-  'hidden',
-])
-
-function isEditable(el: Element | null): el is HTMLElement {
-  if (!(el instanceof HTMLElement)) return false
-  if (el.isContentEditable) return true
-  if (el instanceof HTMLTextAreaElement) return true
-  if (el instanceof HTMLInputElement) return !NON_TEXT_INPUT_TYPES.has(el.type)
-  return false
-}
-
 /** The chat composer manages its own keyboard float — never fight it. */
 function isChatComposerField(el: Element): boolean {
   return el.closest('.chat-composer-sticky') !== null
@@ -104,12 +88,6 @@ function restoreScrollerPadding(): void {
     paddedScroller = null
     paddedScrollerOriginalPadding = ''
   }
-}
-
-function editableFrom(target: EventTarget | null): HTMLElement | null {
-  if (!(target instanceof Element)) return null
-  const el = target.closest('input, textarea, [contenteditable]')
-  return isEditable(el) ? el : null
 }
 
 /** Every scrollable ancestor, plus the document. Samsung may pan any of them. */
@@ -160,13 +138,14 @@ function updateLocks(): void {
 function visibleBand(): { top: number; bottom: number } {
   const vv = window.visualViewport
   const visualHeight = vv && vv.height > 0 ? vv.height : window.innerHeight
-  const keyboardCoversVisual = window.innerHeight - visualHeight < 8
-  const bottom = keyboardCoversVisual
-    ? window.innerHeight - keyboardHeight - REVEAL_MARGIN_PX
-    : visualHeight - REVEAL_MARGIN_PX
   return {
     top: REVEAL_MARGIN_PX,
-    bottom: Math.max(REVEAL_MARGIN_PX + 1, bottom),
+    bottom: keyboardVisibleBottom({
+      innerHeight: window.innerHeight,
+      visualHeight,
+      cssInset,
+      marginPx: REVEAL_MARGIN_PX,
+    }),
   }
 }
 
@@ -212,9 +191,9 @@ function revealActiveField(fromViewport = false): void {
   if (fromViewport && corrections >= MAX_VIEWPORT_CORRECTIONS) return
   const active = document.activeElement
   const field =
-    anchorEl && document.contains(anchorEl) && isEditable(anchorEl)
+    anchorEl && document.contains(anchorEl) && isEditableField(anchorEl)
       ? anchorEl
-      : isEditable(active)
+      : isEditableField(active)
         ? active
         : null
   if (!field) return
@@ -280,7 +259,7 @@ function onKeyboardInset(event: Event): void {
 
 /** Record the resting position before the keyboard (or a field change) pans. */
 function onPointerDown(event: PointerEvent): void {
-  const el = editableFrom(event.target)
+  const el = editableFieldFrom(event.target)
   if (!el) return
   corrections = 0
   rememberField(el)
@@ -289,7 +268,7 @@ function onPointerDown(event: PointerEvent): void {
 /** Re-run when focus jumps to another field while the keyboard is already up. */
 function onFocusIn(): void {
   const el = document.activeElement
-  if (!isEditable(el)) return
+  if (!isEditableField(el)) return
   if (el !== anchorEl) {
     corrections = 0
     rememberField(el)

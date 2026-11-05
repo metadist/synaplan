@@ -3,6 +3,7 @@ import {
   isFieldShovedToTop,
   keyboardRevealDelta,
   keyboardRevealTarget,
+  keyboardVisibleBottom,
 } from '@/services/keyboardReveal'
 
 const band = { visibleTop: 16, visibleBottom: 400 }
@@ -67,5 +68,29 @@ describe('isFieldShovedToTop', () => {
 
   it('leaves a field the user tapped near the top', () => {
     expect(isFieldShovedToTop(4, 30)).toBe(false)
+  })
+})
+
+describe('keyboardVisibleBottom', () => {
+  it('subtracts the CSS inset when the keyboard overlays a full-height viewport', () => {
+    expect(
+      keyboardVisibleBottom({
+        innerHeight: 800,
+        visualHeight: 800,
+        cssInset: 350,
+        marginPx: 16,
+      })
+    ).toBe(434)
+  })
+
+  it('does not subtract the keyboard a second time when the WebView already shrank', () => {
+    expect(
+      keyboardVisibleBottom({
+        innerHeight: 450,
+        visualHeight: 450,
+        cssInset: 0,
+        marginPx: 16,
+      })
+    ).toBe(434)
   })
 })

@@ -6,6 +6,7 @@
  * the field being edited. Other inputs stay on the overlay scroll-assist.
  * Absent bridge (plain web): no-op.
  */
+import { editableFieldFrom } from '@/services/keyboardReveal'
 
 const COMPOSER_SELECTOR = '.chat-composer-sticky'
 /**
@@ -31,22 +32,19 @@ function chatKeyboardApi(): ChatKeyboardApi | null {
   return null
 }
 
+/** True only for an editable text field inside the chat composer. */
 export function isChatComposerTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(COMPOSER_SELECTOR) !== null
+  const field = editableFieldFrom(target)
+  return field !== null && field.closest(COMPOSER_SELECTOR) !== null
 }
 
-/** Tap landed in the field that already has focus, so this is not chrome. */
-function pointerHitsFocusedField(target: EventTarget | null): boolean {
-  if (!(target instanceof Node)) return false
-  const active = document.activeElement
-  if (
-    !(active instanceof Element) ||
-    active === document.body ||
-    active === document.documentElement
-  ) {
-    return false
-  }
-  return active === target || active.contains(target)
+/** True for non-editable controls (send, attach, mic, etc.) inside the composer bar. */
+function isChatComposerChrome(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest(COMPOSER_SELECTOR) !== null &&
+    !isChatComposerTarget(target)
+  )
 }
 
 let installed = false
@@ -57,29 +55,85 @@ export function initKeyboardChatDock(): void {
   installed = true
   let docked = false
   let chromePointerAt = 0
+  let chromeBlurTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearChromeBlurTimer = (): void => {
+    if (chromeBlurTimer !== null) {
+      clearTimeout(chromeBlurTimer)
+      chromeBlurTimer = null
+    }
+  }
+
   const setDocked = (enabled: boolean): void => {
     if (docked === enabled) return
     docked = enabled
     chatKeyboardApi()?.setDocked(enabled)
   }
 
+  window.addEventListener('synaplan:keyboardinset', (event: Event) => {
+    const detail = (event as CustomEvent<{ height?: number; keyboardHeight?: number }>).detail
+    const height = detail?.keyboardHeight ?? detail?.height ?? 0
+    if (height <= 0) {
+      clearChromeBlurTimer()
+      docked = false
+    }
+  })
+
   document.addEventListener(
     'pointerdown',
     (event: PointerEvent) => {
-      const inside = isChatComposerTarget(event.target)
-      if (inside) setDocked(true)
-      chromePointerAt = inside && !pointerHitsFocusedField(event.target) ? Date.now() : 0
+      if (isChatComposerTarget(event.target)) {
+        clearChromeBlurTimer()
+        chromePointerAt = 0
+        setDocked(true)
+        return
+      }
+      if (docked && isChatComposerChrome(event.target)) {
+        chromePointerAt = Date.now()
+        return
+      }
+      clearChromeBlurTimer()
+      chromePointerAt = 0
     },
     true
   )
   document.addEventListener('focusin', (event: FocusEvent) => {
-    setDocked(isChatComposerTarget(event.target))
+    if (isChatComposerTarget(event.target)) {
+      clearChromeBlurTimer()
+      setDocked(true)
+      return
+    }
+    if (
+      docked &&
+      isChatComposerChrome(event.target) &&
+      Date.now() - chromePointerAt < CHROME_BLUR_MS
+    ) {
+      return
+    }
+    clearChromeBlurTimer()
+    chromePointerAt = 0
+    setDocked(false)
   })
   document.addEventListener('focusout', (event: FocusEvent) => {
-    const fromChrome = Date.now() - chromePointerAt < CHROME_BLUR_MS
+    const fromChrome =
+      isChatComposerChrome(event.relatedTarget) ||
+      (event.relatedTarget === null && Date.now() - chromePointerAt < CHROME_BLUR_MS)
     chromePointerAt = 0
-    if (isChatComposerTarget(event.relatedTarget)) return
-    if (event.relatedTarget === null && fromChrome && isChatComposerTarget(event.target)) return
+    if (isChatComposerTarget(event.relatedTarget)) {
+      clearChromeBlurTimer()
+      return
+    }
+    if (fromChrome && isChatComposerTarget(event.target)) {
+      clearChromeBlurTimer()
+      chromeBlurTimer = setTimeout(() => {
+        chromeBlurTimer = null
+        if (!isChatComposerTarget(document.activeElement)) {
+          setDocked(false)
+        }
+      }, CHROME_BLUR_MS)
+      return
+    }
+    clearChromeBlurTimer()
     setDocked(false)
   })
 }

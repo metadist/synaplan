@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { initKeyboardChatDock, isChatComposerTarget } from '@/services/keyboardChatDock'
 
 function composerField(): HTMLTextAreaElement {
@@ -17,6 +17,16 @@ describe('isChatComposerTarget', () => {
 
   it('matches a field inside the chat composer', () => {
     expect(isChatComposerTarget(composerField())).toBe(true)
+  })
+
+  it('ignores composer buttons and file inputs', () => {
+    const field = composerField()
+    const send = document.createElement('button')
+    const fileInput = document.createElement('input')
+    fileInput.type = 'file'
+    field.parentElement?.append(send, fileInput)
+    expect(isChatComposerTarget(send)).toBe(false)
+    expect(isChatComposerTarget(fileInput)).toBe(false)
   })
 
   it('ignores a profile field', () => {
@@ -39,32 +49,63 @@ describe('initKeyboardChatDock', () => {
   })
 
   it('docks only while the chat composer is the active field', () => {
-    const calls: boolean[] = []
-    ;(
-      globalThis as { SynaplanChatKeyboard?: { setDocked: (enabled: boolean) => void } }
-    ).SynaplanChatKeyboard = {
-      setDocked: (enabled) => {
-        calls.push(enabled)
-      },
+    vi.useFakeTimers()
+    try {
+      const calls: boolean[] = []
+      ;(
+        globalThis as { SynaplanChatKeyboard?: { setDocked: (enabled: boolean) => void } }
+      ).SynaplanChatKeyboard = {
+        setDocked: (enabled) => {
+          calls.push(enabled)
+        },
+      }
+      const field = composerField()
+      const profile = document.createElement('input')
+      const send = document.createElement('button')
+      field.parentElement?.appendChild(send)
+      document.body.appendChild(profile)
+
+      initKeyboardChatDock()
+
+      // Tapping composer buttons before the textarea is focused must not dock.
+      send.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      send.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      expect(calls).toEqual([])
+
+      field.focus()
+      field.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: send }))
+      send.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      expect(calls).toEqual([true])
+
+      profile.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      profile.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+
+      expect(calls).toEqual([true, false])
+
+      // If a composer button blurs the textarea and never refocuses it, undock after the gesture.
+      field.focus()
+      field.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      expect(calls).toEqual([true, false, true])
+      send.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      send.focus()
+      field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      vi.advanceTimersByTime(400)
+      expect(calls).toEqual([true, false, true, false])
+
+      // If the OS hides the keyboard while the textarea stays focused, tapping again re-docks.
+      field.focus()
+      field.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      expect(calls).toEqual([true, false, true, false, true])
+      window.dispatchEvent(
+        new CustomEvent('synaplan:keyboardinset', { detail: { height: 0, keyboardHeight: 0 } })
+      )
+      field.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      expect(calls).toEqual([true, false, true, false, true, true])
+    } finally {
+      vi.useRealTimers()
     }
-    const field = composerField()
-    const profile = document.createElement('input')
-    const send = document.createElement('button')
-    field.parentElement?.appendChild(send)
-    document.body.appendChild(profile)
-    field.focus()
-
-    initKeyboardChatDock()
-    field.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: send }))
-    send.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
-    expect(calls).toEqual([true])
-
-    profile.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
-    profile.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-
-    expect(calls).toEqual([true, false])
   })
 })

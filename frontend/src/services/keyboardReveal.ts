@@ -1,6 +1,34 @@
 /** Ignore sub-pixel noise so a settled field does not scroll again. */
 export const KEYBOARD_REVEAL_EPSILON_PX = 2
 
+/** Input types that never show a soft keyboard — never treat these as text fields. */
+const NON_TEXT_INPUT_TYPES = new Set([
+  'button',
+  'submit',
+  'reset',
+  'checkbox',
+  'radio',
+  'range',
+  'color',
+  'file',
+  'image',
+  'hidden',
+])
+
+export function isEditableField(el: Element | null): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false
+  if (el.isContentEditable) return true
+  if (el instanceof HTMLTextAreaElement) return true
+  if (el instanceof HTMLInputElement) return !NON_TEXT_INPUT_TYPES.has(el.type)
+  return false
+}
+
+export function editableFieldFrom(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Element)) return null
+  const el = target.closest('input, textarea, [contenteditable]')
+  return isEditableField(el) ? el : null
+}
+
 /**
  * Where the focused field should sit while the keyboard is open.
  *
@@ -39,4 +67,25 @@ export function keyboardRevealDelta(args: {
  */
 export function isFieldShovedToTop(fieldTop: number, anchorTop: number): boolean {
   return fieldTop < 8 && anchorTop - fieldTop > 64
+}
+
+/**
+ * Bottom of the visible band in visual-viewport coordinates.
+ *
+ * When the WebView already shrank (`cssInset <= 0`), `innerHeight` and
+ * `visualHeight` shrank together and must not subtract the keyboard a second
+ * time. An overlay keyboard (`cssInset > 0` and visual height still matching
+ * `innerHeight`) subtracts `cssInset`.
+ */
+export function keyboardVisibleBottom(args: {
+  innerHeight: number
+  visualHeight: number
+  cssInset: number
+  marginPx: number
+}): number {
+  const keyboardCoversVisual = args.cssInset > 0 && args.innerHeight - args.visualHeight < 8
+  const bottom = keyboardCoversVisual
+    ? args.innerHeight - args.cssInset - args.marginPx
+    : args.visualHeight - args.marginPx
+  return Math.max(args.marginPx + 1, bottom)
 }
