@@ -73,7 +73,7 @@
       >
         <div
           role="menu"
-          class="fixed w-52 dropdown-panel origin-bottom-left"
+          class="fixed w-80 dropdown-panel origin-bottom-left"
           :style="userDropdownStyle"
           data-testid="dropdown-sidebar-v2-user"
           @click.stop
@@ -105,6 +105,21 @@
           </template>
 
           <template v-else>
+            <div
+              class="flex items-center gap-2.5 px-3 py-2.5"
+              data-testid="text-sidebar-v2-signed-in"
+            >
+              <span
+                class="sidebar-avatar w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-[13px] font-semibold"
+                aria-hidden="true"
+              >
+                {{ initials }}
+              </span>
+              <span class="min-w-0 flex-1 text-sm font-medium txt-primary truncate">
+                {{ authStore.user?.email }}
+              </span>
+            </div>
+            <div class="account-menu-rule" role="separator"></div>
             <button
               type="button"
               role="menuitem"
@@ -112,7 +127,9 @@
               data-testid="btn-sidebar-v2-profile"
               @click="go('/settings/profile')"
             >
-              <UserCircleIcon class="w-4 h-4" />
+              <span class="account-menu-well account-menu-well--profile" aria-hidden="true">
+                <UserCircleIcon class="w-4 h-4" />
+              </span>
               <span>{{ $t('nav.profile') }}</span>
             </button>
             <p
@@ -129,13 +146,19 @@
               data-testid="btn-sidebar-v2-website-eu"
               @click="userMenuOpen = false"
             >
-              <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span class="min-w-0">
-                <span class="block truncate">{{ $t('nav.websiteTeams') }}</span>
-                <span class="block truncate text-xs txt-secondary">{{
+              <span class="account-menu-well account-menu-well--teams" aria-hidden="true">
+                <BuildingOffice2Icon class="w-4 h-4" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium leading-snug">{{ $t('nav.websiteTeams') }}</span>
+                <span class="block text-xs txt-secondary leading-snug">{{
                   $t('nav.websiteTeamsHint')
                 }}</span>
               </span>
+              <ArrowTopRightOnSquareIcon
+                class="w-3.5 h-3.5 shrink-0 txt-secondary"
+                aria-hidden="true"
+              />
             </a>
             <a
               class="dropdown-item"
@@ -146,23 +169,32 @@
               data-testid="btn-sidebar-v2-website-tech"
               @click="userMenuOpen = false"
             >
-              <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span class="min-w-0">
-                <span class="block truncate">{{ $t('nav.websiteTech') }}</span>
-                <span class="block truncate text-xs txt-secondary">{{
+              <span class="account-menu-well account-menu-well--tech" aria-hidden="true">
+                <CommandLineIcon class="w-4 h-4" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium leading-snug">{{ $t('nav.websiteTech') }}</span>
+                <span class="block text-xs txt-secondary leading-snug">{{
                   $t('nav.websiteTechHint')
                 }}</span>
               </span>
+              <ArrowTopRightOnSquareIcon
+                class="w-3.5 h-3.5 shrink-0 txt-secondary"
+                aria-hidden="true"
+              />
             </a>
+            <div class="account-menu-rule" role="separator"></div>
             <button
               v-if="!isImpersonating"
               type="button"
               role="menuitem"
-              class="dropdown-item text-red-500 dark:text-red-400"
+              class="dropdown-item dropdown-item--danger"
               data-testid="btn-sidebar-v2-logout"
               @click="handleLogout"
             >
-              <ArrowRightOnRectangleIcon class="w-4 h-4" />
+              <span class="account-menu-well account-menu-well--danger" aria-hidden="true">
+                <ArrowRightOnRectangleIcon class="w-4 h-4" />
+              </span>
               <span>{{ $t('settings.logout') }}</span>
             </button>
           </template>
@@ -178,7 +210,9 @@ import { useRouter } from 'vue-router'
 import {
   ArrowRightOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
+  BuildingOffice2Icon,
   ChevronUpIcon,
+  CommandLineIcon,
   MagnifyingGlassIcon,
   RocketLaunchIcon,
   UserCircleIcon,
@@ -228,7 +262,7 @@ const toggleUserMenu = () => {
   triggerHapticImpact('light')
   if (!userMenuOpen.value && userBtnRef.value) {
     const rect = userBtnRef.value.getBoundingClientRect()
-    const width = 208
+    const width = 320
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8)
     userDropdownStyle.value = {
       left: `${left}px`,
@@ -318,5 +352,41 @@ onBeforeUnmount(() => {
 
 .dark .sidebar-avatar {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.account-menu-rule {
+  height: 1px;
+  margin: 0.25rem 0.5rem;
+  background: var(--divider);
+}
+
+.account-menu-well {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-menu-well--profile {
+  background: var(--brand-alpha-light);
+  color: var(--brand);
+}
+
+.account-menu-well--teams {
+  background: color-mix(in srgb, var(--plan-business-accent) 16%, transparent);
+  color: var(--plan-business-ink);
+}
+
+.account-menu-well--tech {
+  background: color-mix(in srgb, var(--plan-team-accent) 16%, transparent);
+  color: var(--plan-team-ink);
+}
+
+.account-menu-well--danger {
+  background: var(--status-error-muted);
+  color: var(--status-error);
 }
 </style>

@@ -88,4 +88,19 @@ describe('SidebarPanelFooter account menu', () => {
     expect(menuLink('btn-sidebar-v2-website-eu').textContent).toContain('Fachbereiche & Verwaltung')
     expect(menuLink('btn-sidebar-v2-website-tech').textContent).toContain('IT & Entwicklung')
   })
+
+  it('shows the signed-in email in the menu and keeps logout separate', async () => {
+    await openMenu()
+
+    const identity = document.querySelector('[data-testid="text-sidebar-v2-signed-in"]')
+    expect(identity?.textContent).toContain('admin@synaplan.com')
+
+    const logout = menuLink('btn-sidebar-v2-logout')
+    expect(logout.className).toContain('dropdown-item--danger')
+
+    const eu = menuLink('btn-sidebar-v2-website-eu')
+    expect(eu.querySelector('.account-menu-well--teams')).not.toBeNull()
+    expect(eu.textContent).not.toContain('…')
+    expect(eu.className).not.toMatch(/truncate/)
+  })
 })
