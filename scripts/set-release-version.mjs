@@ -270,7 +270,11 @@ const QUICKSTART_IMAGE_LINE =
   /^(x-app-image:\s*&app-image\s+ghcr\.io\/metadist\/synaplan:\$\{SYNAPLAN_VERSION:-)([^}]*)(\}\s*)$/
 const QUICKSTART_APP_VERSION_LINE = /^(\s*APP_VERSION:\s*\$\{SYNAPLAN_VERSION:-)([^}]*)(\}\s*)$/
 
-export const applyQuickstartComposeVersion = (text, version) => {
+export const applyQuickstartComposeVersion = (
+  text,
+  version,
+  path = 'deploy/quickstart/compose.yaml'
+) => {
   let imageReplaced = 0
   let appVersionReplaced = 0
 
@@ -294,14 +298,12 @@ export const applyQuickstartComposeVersion = (text, version) => {
     .join('\n')
 
   if (imageReplaced !== 1) {
-    throw new Error(
-      `deploy/quickstart/compose.yaml: expected exactly one x-app-image default, found ${imageReplaced}`
-    )
+    throw new Error(`${path}: expected exactly one x-app-image default, found ${imageReplaced}`)
   }
 
   if (appVersionReplaced !== 1) {
     throw new Error(
-      `deploy/quickstart/compose.yaml: expected exactly one APP_VERSION default, found ${appVersionReplaced}`
+      `${path}: expected exactly one APP_VERSION default, found ${appVersionReplaced}`
     )
   }
 
@@ -427,39 +429,46 @@ export const readCasaosComposeVersion = (text) => {
 const TARGETS = [
   { path: 'elestio.yml', apply: (text, version) => applyElestioVersion(text, version) },
   {
-    path: join('deploy', 'selfhost.env.example'),
+    path: 'deploy/selfhost.env.example',
     apply: (text, version) => applyEnvExampleVersion(text, version),
   },
   {
-    path: join('deploy', 'umbrel', 'synaplan', 'umbrel-app.yml'),
+    path: 'deploy/umbrel/synaplan/umbrel-app.yml',
     apply: (text, version) => applyUmbrelAppVersion(text, version),
   },
   {
-    path: join('deploy', 'umbrel', 'synaplan', 'docker-compose.yml'),
+    path: 'deploy/umbrel/synaplan/docker-compose.yml',
     apply: (text, version, digest) => applyUmbrelComposeVersion(text, version, digest),
     needsDigest: true,
   },
   {
-    path: join('deploy', 'casaos', 'Synaplan', 'docker-compose.yml'),
+    path: 'deploy/casaos/Synaplan/docker-compose.yml',
     apply: (text, version) => applyCasaosComposeVersion(text, version),
   },
   {
-    path: join('deploy', 'aws', 'packer', 'synaplan.pkr.hcl'),
+    path: 'deploy/aws/packer/synaplan.pkr.hcl',
     apply: (text, version) => applyPackerVersion(text, version),
   },
   {
-    path: join('deploy', 'quickstart', 'compose.yaml'),
-    apply: (text, version) => applyQuickstartComposeVersion(text, version),
+    path: 'deploy/quickstart/compose.yaml',
+    apply: (text, version) =>
+      applyQuickstartComposeVersion(text, version, 'deploy/quickstart/compose.yaml'),
   },
   {
-    path: join('deploy', 'quickstart', 'compose.lite.yaml'),
-    apply: (text, version) => applyQuickstartComposeVersion(text, version),
+    path: 'deploy/quickstart/compose.lite.yaml',
+    apply: (text, version) =>
+      applyQuickstartComposeVersion(text, version, 'deploy/quickstart/compose.lite.yaml'),
   },
   {
     path: 'server.json',
     apply: (text, version) => applyServerJsonVersion(text, version),
   },
 ]
+
+// The reader publishes the same files as CATALOG_PATHS. The rollout allowlist
+// and the parity test both take this list, so a pin added only on one side
+// cannot hold the next release back.
+export const RELEASE_PIN_PATHS = TARGETS.map((target) => target.path)
 
 export const runCli = (arguments_) => {
   const readOption = (name) => {

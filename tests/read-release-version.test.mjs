@@ -6,6 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { CATALOG_PATHS, readPinnedRelease } from '../scripts/read-release-version.mjs'
+import { RELEASE_PIN_PATHS, runCli as writePinnedRelease } from '../scripts/set-release-version.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -140,6 +141,29 @@ test('refuses an Umbrel package without a published image digest', () => {
   )
 
   assert.throws(() => readPinnedRelease(root), /image digest/)
+})
+
+// Guard 4 allows exactly the files the reader names. Those have to be the
+// files the writer changes, or the next new pin is held back the way
+// compose.lite.yaml held 5.7.1.
+test('the writer and the reader name the same catalog files, and every file is checked', () => {
+  assert.deepEqual([...RELEASE_PIN_PATHS].sort(), [...CATALOG_PATHS].sort())
+
+  const original = catalog()
+  const bumpedRoot = writeCatalog(original)
+  writePinnedRelease(['--version', '4.4.2', '--digest', DIGEST, '--root', bumpedRoot])
+  assert.deepEqual(readPinnedRelease(bumpedRoot), { version: '4.4.2', digest: DIGEST })
+
+  for (const laggingPath of CATALOG_PATHS) {
+    const partialRoot = writeCatalog(original)
+    writePinnedRelease(['--version', '4.4.2', '--digest', DIGEST, '--root', partialRoot])
+    writeFileSync(join(partialRoot, laggingPath), original[laggingPath])
+    assert.throws(
+      () => readPinnedRelease(partialRoot),
+      /pins more than one version/,
+      `expected reader to catch stale version in ${laggingPath}`
+    )
+  }
 })
 
 // The rollout workflow collects exactly these paths from a pull request instead
