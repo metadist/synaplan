@@ -297,6 +297,8 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('stamp, watermark, or scripted overlay', $plan['prompt']);
         $this->assertStringContainsString('composition, layout, or look change', $plan['prompt']);
         $this->assertStringContainsString('plan `ask_user` first', $plan['prompt']);
+        $this->assertStringContainsString('lass den Vogel fliegen', $plan['prompt']);
+        $this->assertStringContainsString('SYNAPLAN oben rechts', $plan['prompt']);
         $this->assertStringContainsString('Producing a NEW file from a document', $plan['prompt']);
         // Issue #2048: the script must compute the requested grouping, not
         // relabel its output to match the request.

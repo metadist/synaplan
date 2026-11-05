@@ -55,7 +55,7 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "web_search": Search the web for current information. For research questions that need figures, named companies or quotes (and the user did not paste a URL), set params.read_pages to 2 or 3 so the top result pages are fetched and dumped into the answering prompt. Set params.read_pages to 0 when snippets suffice (weather, ticker, simple yes/no).
 - "url_fetch": Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Set inputs.compare to true to save one snapshot per URL and return the difference versus the last fetch. Use when the answer depends on that page's content; prefer web_search when no concrete URL is given.
 - "file_analysis": Analyze/describe/OCR an image or document — attached now, already present in this conversation, or produced by a prior node ($nX.file) — and answer about it. Plan this even when the current turn has no new attachment if the user asks about a file listed in the conversation.
-- "image_generation": Generate or edit an image from a prompt and/or reference images.
+- "image_generation": Generate or edit an image from a prompt and/or reference images. A follow-up that changes what a conversation image shows (pose, subjects, style, background, text painted into the scene) is this node — never code_run. The runner reuses the latest conversation image when params.input_mode is reference_images.
 - "video_generation": Generate a video clip (params.duration, params.resolution).
 - "text2sound": Synthesize speech/audio from text (params.format, e.g. mp3).
 - "document_generation": Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
@@ -121,13 +121,17 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    A chart/diagram/plot built FROM an attached table (CSV/XLSX — "mach daraus ein
    Balkendiagramm", "make a bar chart from this table") is ALWAYS `code_run`, never
    `file_analysis`. A stamp, watermark, or scripted overlay on an attached image
-   ("Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
-   A composition, layout, or look change on an attached image ("make it wider and
-   center the birds", "verändern, etwas breiter, Vögel mittig") is ALWAYS
-   `image_generation` PIC2PIC — NEVER `code_run`. Crop/resize/scale without a
-   stamp, script, or look instruction is ambiguous: plan `ask_user` first with
-   two options (image edit vs file work), recommended image edit, then the
-   matching node. Do not silently pick `code_run` for an attached photo.
+   ("Stempel unten rechts drauf. Das vorhandene Bild, keins neu malen") is ALWAYS
+   `code_run`, never `image_generation`. A composition, layout, or look change
+   on an attached image ("make it wider and center the birds", "verändern, etwas
+   breiter, Vögel mittig") is ALWAYS `image_generation` PIC2PIC — NEVER `code_run`.
+   A follow-up that changes what the picture SHOWS (pose, subjects, style,
+   background) is also `image_generation` PIC2PIC — even when it also asks for
+   text in a corner ("lass den Vogel fliegen und schreib SYNAPLAN oben rechts").
+   Crop/resize/scale without a stamp, script, or look instruction is ambiguous:
+   plan `ask_user` first with two options (image edit vs file work), recommended
+   image edit, then the matching node. Do not silently pick `code_run` for an
+   attached photo.
    When the request names neither a runtime nor a script word, this arbitration — not
    the presence of script vocabulary — decides. A grouping, column, or value named
    in the request must be the grouping in the output — never relabel axes or headers
@@ -435,6 +439,21 @@ The `image` input on the video node (`$n1.file`) makes it an image-to-video
 render of the generated picture (IMG2VID). Omitting it would animate from text
 only. The same `"image": "$nX.file"` pattern turns a second `image_generation`
 node into an image edit (PIC2PIC).
+
+### Follow-up edit of a generated image ("lass den Vogel fliegen")
+The previous turn already produced the picture. This turn is ONE
+`image_generation` node (rule 11). The runner reuses the latest conversation
+image when `params.input_mode` is `reference_images`. Do NOT emit `code_run`
+just because the user also wants text in a corner.
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Den zweiten Vogel auch fliegend, SYNAPLAN oben rechts, Hintergrund blasser" }, "params": { "input_mode": "reference_images" } }
+  ]
+}
 
 ### Generate media, then describe/analyze it (generate → file_analysis chain)
 User: "Erstelle ein Bild einer Katze und danach beschreibe das erstellte Bild."
