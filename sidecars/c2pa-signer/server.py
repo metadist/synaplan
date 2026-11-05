@@ -102,6 +102,16 @@ def ensure_dev_cert() -> None:
             return
 
 
+def tool_path() -> str | None:
+    found = shutil.which("c2patool")
+    if found:
+        return found
+    bundled = "/usr/local/bin/c2patool"
+    if os.access(bundled, os.X_OK):
+        return bundled
+    return None
+
+
 def algorithm() -> str:
     alg = os.environ.get("C2PA_ALG", "ps256").strip().lower()
     return alg if alg in ALLOWED_ALG else "ps256"
@@ -129,7 +139,13 @@ def manifest(model: str, parent_path: str | None) -> dict:
                 "label": "c2pa.actions",
                 "data": {
                     "actions": [
-                        {"action": "c2pa.created", "softwareAgent": model or "model"},
+                        {
+                            "action": "c2pa.created",
+                            "softwareAgent": model or "model",
+                            # c2patool 0.28 rejects c2pa.created without this field
+                            # and then does not return a signed file.
+                            "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+                        },
                     ],
                 },
             },
@@ -186,7 +202,7 @@ def decode_bytes(payload: dict) -> bytes | None:
 
 
 def sign(payload: dict) -> bytes | None:
-    tool = shutil.which("c2patool")
+    tool = tool_path()
     env = signing_env()
     raw = decode_bytes(payload)
     if tool is None or env is None or raw is None:
@@ -210,6 +226,9 @@ def sign(payload: dict) -> bytes | None:
             env=env,
         )
         if not os.path.isfile(target):
+            detail = (result.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+            if detail:
+                print(f"c2pa: sign failed: {detail[-1][:300]}", flush=True)
             return None
         signed = Path(target).read_bytes()
         # c2patool writes the manifest, then returns an error when the
@@ -221,7 +240,7 @@ def sign(payload: dict) -> bytes | None:
 
 
 def looks_signed(raw: bytes) -> bool:
-    tool = shutil.which("c2patool")
+    tool = tool_path()
     if tool is None or not raw:
         return b"c2pa" in raw or b"trainedAlgorithmicMedia" in raw
     with tempfile.TemporaryDirectory() as tmp:
@@ -232,7 +251,7 @@ def looks_signed(raw: bytes) -> bool:
 
 
 def is_ready() -> bool:
-    return bool(TOKEN) and shutil.which("c2patool") is not None and signing_env() is not None
+    return bool(TOKEN) and tool_path() is not None and signing_env() is not None
 
 
 class Handler(BaseHTTPRequestHandler):
