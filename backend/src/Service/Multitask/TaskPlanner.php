@@ -24,6 +24,7 @@ use App\Service\File\FileTypeResolver;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\Message\SpokenInput;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Plan\ImageFileWorkArbitration;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanNormalizer;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -163,6 +164,7 @@ final readonly class TaskPlanner
 
         $decoded = $this->withInferredDependencies($decoded);
         $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, $adjustTopic);
+        $decoded = (new ImageFileWorkArbitration())->adjust($decoded, $message, $allowed);
         $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
             $this->logger->info('TaskPlanner: plan failed validation, falling back', [

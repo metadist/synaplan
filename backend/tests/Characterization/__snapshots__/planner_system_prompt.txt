@@ -120,8 +120,14 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    run/apply/execute verb) stays a plain `chat` answer.
    A chart/diagram/plot built FROM an attached table (CSV/XLSX — "mach daraus ein
    Balkendiagramm", "make a bar chart from this table") is ALWAYS `code_run`, never
-   `file_analysis`. A pixel edit on an attached image (stamp, watermark, crop, resize —
-   "Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
+   `file_analysis`. A stamp, watermark, or scripted overlay on an attached image
+   ("Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
+   A composition, layout, or look change on an attached image ("make it wider and
+   center the birds", "verändern, etwas breiter, Vögel mittig") is ALWAYS
+   `image_generation` PIC2PIC — NEVER `code_run`. Crop/resize/scale without a
+   stamp, script, or look instruction is ambiguous: plan `ask_user` first with
+   two options (image edit vs file work), recommended image edit, then the
+   matching node. Do not silently pick `code_run` for an attached photo.
    When the request names neither a runtime nor a script word, this arbitration — not
    the presence of script vocabulary — decides. A grouping, column, or value named
    in the request must be the grouping in the output — never relabel axes or headers
