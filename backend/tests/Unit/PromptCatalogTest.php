@@ -319,6 +319,8 @@ final class PromptCatalogTest extends TestCase
         // Issue #2050: a generator node must consume the url_fetch output and
         // never invent content when the named source was not read.
         $this->assertStringContainsString('never invent rows or', $plan['prompt']);
+        $this->assertStringContainsString('invent 09:00', $plan['prompt']);
+        $this->assertStringContainsString('$n1.text', $plan['prompt']);
     }
 
     public function testPlanPromptRequiresFolderFetchForConnectedFolderContent(): void
