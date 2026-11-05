@@ -6,6 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { CATALOG_PATHS, readPinnedRelease } from '../scripts/read-release-version.mjs'
+import { RELEASE_PIN_PATHS } from '../scripts/set-release-version.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -140,6 +141,13 @@ test('refuses an Umbrel package without a published image digest', () => {
   )
 
   assert.throws(() => readPinnedRelease(root), /image digest/)
+})
+
+// Guard 4 allows exactly the files the reader names. Those have to be the
+// files the writer changes, or the next new pin is held back the way
+// compose.lite.yaml held 5.7.1.
+test('the writer and the reader name the same catalog files', () => {
+  assert.deepEqual([...RELEASE_PIN_PATHS].sort(), [...CATALOG_PATHS].sort())
 })
 
 // The rollout workflow collects exactly these paths from a pull request instead

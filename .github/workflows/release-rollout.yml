@@ -155,6 +155,23 @@ jobs:
               echo ""
               echo "[Pull request #${NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${NUMBER}) was not merged: ${reason}"
             } >> "$GITHUB_STEP_SUMMARY"
+
+            # The Actions log and Discord already say why. The pull request
+            # itself stayed silent when 5.7.1 was held back, so the hold looked
+            # like auto-merge had been removed. One comment per reason, so a
+            # later run of the same hold does not pile on.
+            body="Release rollout held this pull request back: ${reason}"
+            # Compared as JSON, so a quoted or multi-line body cannot look like
+            # a new reason and stack another comment on the next run.
+            found="$(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" \
+                | jq -s --arg body "$body" 'any(.[]; if type == "array" then any(.[]; .body == $body) else false end)'
+            )" || found=false
+            if [ "$found" != true ]; then
+              gh pr comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "$body" \
+                || echo "::warning::Could not comment on #${NUMBER}"
+            fi
+
             exit 0
           }
 
@@ -205,20 +222,16 @@ jobs:
           fi
 
           # Guard 4: nothing but the deployment pins may travel to the default
-          # branch on this automation branch.
+          # branch on this automation branch. The allowed paths are the catalog
+          # the reader already publishes, so a new pin cannot be forgotten here
+          # the way a hand-written list forgot compose.lite.yaml and held 5.7.1.
+          # Exact files, not directory prefixes: the writer only touches the
+          # catalog, and anything else on this branch must stay held back.
+          allowed="$(node scripts/read-release-version.mjs --paths | jq -Rsc 'split("\n") | map(select(length > 0))')"
+          files="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '[.files[].path]')"
           unexpected="$(
-            gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '
-              [.files[].path]
-              | map(select(
-                  test("^elestio\\.yml$") == false and
-                  test("^deploy/selfhost\\.env\\.example$") == false and
-                  test("^deploy/umbrel/synaplan/") == false and
-                  test("^deploy/casaos/Synaplan/") == false and
-                  test("^deploy/aws/packer/synaplan\\.pkr\\.hcl$") == false and
-                  test("^deploy/quickstart/compose\\.yaml$") == false and
-                  test("^server\\.json$") == false
-                ))
-              | join(", ")
+            jq -rn --argjson allowed "$allowed" --argjson files "$files" '
+              [$files[] | select(. as $path | ($allowed | index($path)) == null)] | join(", ")
             '
           )"
           if [ -n "$unexpected" ]; then
@@ -318,6 +331,7 @@ jobs:
             echo "- \`deploy/casaos/Synaplan/\` for the CasaOS / ZimaOS AppStore package"
             echo "- \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI"
             echo "- \`deploy/quickstart/compose.yaml\` for the one-file quickstart"
+            echo "- \`deploy/quickstart/compose.lite.yaml\` for the smaller quickstart"
             echo "- \`server.json\` for the official MCP Registry"
             echo ""
             echo "Elestio instances that track the default branch are redeploying now."

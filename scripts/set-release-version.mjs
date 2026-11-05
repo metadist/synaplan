@@ -461,6 +461,11 @@ const TARGETS = [
   },
 ]
 
+// The reader publishes the same files as CATALOG_PATHS. The rollout allowlist
+// and the parity test both take this list, so a pin added only on one side
+// cannot hold the next release back.
+export const RELEASE_PIN_PATHS = TARGETS.map((target) => target.path)
+
 export const runCli = (arguments_) => {
   const readOption = (name) => {
     const index = arguments_.indexOf(name)
