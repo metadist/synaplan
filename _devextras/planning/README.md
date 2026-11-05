@@ -80,7 +80,7 @@ prompting flow.
 | [`20261102-permission-aware-connectors/`](./20261102-permission-aware-connectors/00_master_plan.md) | OneDrive and Google Drive as personal sources; SharePoint, shared drives and Confluence with the source's permissions, fail closed (KC0–KC8) | not started (row 40) — phase B after row 35 EI0 |
 | [`20261102-governance-and-privacy/`](./20261102-governance-and-privacy/00_master_plan.md) | Personal-data masking before cloud models, local only per group, agent review before publish, conversation retention, governance overview (GV1–GV7) | not started (row 41) |
 | [`20261102-agent-template-gallery/`](./20261102-agent-template-gallery/00_master_plan.md) | Assistants → New opens a gallery of bundle-v1 templates with requirements, install checklist and CI acceptance runs (TG1–TG6) | not started (row 42) |
-| [`20261104-hosted-plugins/`](./20261104-hosted-plugins/00_master_plan.md) | First-party plugins in `plugins/`, CI, docs, and a way for an administrator to leave one out (HP0–HP10) | not started (row 43) — plan 2026-11-04, §8 unticked |
+| [`20261104-hosted-plugins/`](./20261104-hosted-plugins/00_master_plan.md) | First-party plugins in `plugins/`, CI, docs, and a way for an administrator to leave one out (HP0–HP10). Synamail profiles first | worked on (row 43) — HP4, 2026-11-05 |
 
 ## Archive
 
