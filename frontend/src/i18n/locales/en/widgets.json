@@ -115,7 +115,6 @@
     "fileUploadError": "Failed to upload file",
     "fileUploadLimitReached": "File upload limit reached for this session.",
     "fileUploadFailed": "File upload failed. Please try again.",
-    "fileUploadDefaultMessage": "Please review the attached file.",
     "sendFailed": "Sorry, I encountered an error. Please try again.",
     "chatUnavailable": "Chat is currently unavailable.",
     "busy": "Synaplan is busy — your answer starts in a moment.",

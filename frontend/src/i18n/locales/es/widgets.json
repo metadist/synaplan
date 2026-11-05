@@ -17,7 +17,6 @@
     "fileUploadError": "Error al subir archivo",
     "fileUploadLimitReached": "Límite de subida de archivos alcanzado para esta sesión.",
     "fileUploadFailed": "Error al subir archivo. Por favor intenta de nuevo.",
-    "fileUploadDefaultMessage": "Por favor revisa el archivo adjunto.",
     "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
     "chatUnavailable": "El chat no está disponible en este momento.",
     "busy": "Synaplan está ocupado: tu respuesta empezará en un momento.",

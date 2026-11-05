@@ -2052,8 +2052,11 @@ const hasPartialAnswer = computed(() => {
 const researchTurn = useResearchTurn(() => props.researchRunId)
 const visibleContentParts = computed(() => {
   if (researchTurn.running.value) return []
-  if (!props.errorReason || hasPartialAnswer.value) return contentParts.value
-  return contentParts.value.filter((part) => part.type !== 'text')
+  const parts =
+    !props.errorReason || hasPartialAnswer.value
+      ? contentParts.value
+      : contentParts.value.filter((part) => part.type !== 'text')
+  return parts.filter((part) => part.type !== 'text' || (part.content ?? '').trim() !== '')
 })
 
 const aiConfigStoreForCost = useAiConfigStore()

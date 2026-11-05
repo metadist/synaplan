@@ -1551,14 +1551,9 @@ const sendMessage = async () => {
     }
   }
 
-  const trimmedInput = inputMessage.value.trim()
-  let userMessage = trimmedInput
+  const userMessage = inputMessage.value.trim()
 
-  if (!userMessage && fileIds.length > 0) {
-    userMessage = t('widget.fileUploadDefaultMessage')
-  }
-
-  if (!userMessage) {
+  if (!userMessage && fileIds.length === 0) {
     return
   }
 

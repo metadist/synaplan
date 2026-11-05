@@ -755,6 +755,7 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId } from '@/utils/mediaParts'
 import { applyReadAloudFailed } from '@/utils/voiceReply'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
+import { fileOnlyTurnMessages } from '@/utils/fileOnlyTurn'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { groupMessagesByDay, lookDeeperInput, userTextBefore } from '@/utils/chatTurns'
 import { shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
@@ -2754,31 +2755,24 @@ const handleSendMessage = async (
     }
   }
 
-  // File-only submission: provide a default message when no text but files are attached.
-  // Issue #955: an audio-only submission (e.g. voice note from mobile, drag & drop of an
-  // .ogg/.mp3) used to inherit the generic "Please review the attached file." default,
-  // which made the LLM treat the recording as a document to summarise and produced
-  // meta-commentary like "The OGG audio file contains…".
-  //
-  // For audio-only uploads we keep the localized voice placeholder for the
-  // optimistic user bubble (so the chat doesn't show an empty row while the
-  // transcription/streaming is in flight), but the value sent to the backend
-  // is an empty string. `FileAnalysisHandler::isGenericAudioPlaceholder()`
-  // matches the empty prompt structurally and routes the request through
-  // the conversational voice path — no language-specific magic strings on
-  // either side.
-  const hasFiles = options?.fileIds && options.fileIds.length > 0
+  // File-only send: do not invent a user instruction. "Please review the
+  // attached file." was a new command and stole the previous question
+  // (a screenshot of a how-to became File analysis). Audio already sends
+  // empty text (#955); images and documents follow that contract. The
+  // bubble shows the file chip. Voice notes keep a short placeholder so
+  // the row is not blank before the player appears; that string is not
+  // forwarded.
+  const hasFiles = Boolean(options?.fileIds && options.fileIds.length > 0)
   const hasOnlyAudioFiles =
     hasFiles &&
     (files?.length ?? 0) > 0 &&
     files!.every((f) => isAudioFileType(f.fileType, f.fileMime))
-  const displayMessage =
-    !content.trim() && hasFiles
-      ? hasOnlyAudioFiles
-        ? t('chat.voiceMessageDefaultMessage')
-        : t('chat.fileOnlyDefaultMessage')
-      : content
-  const backendMessage = !content.trim() && hasOnlyAudioFiles ? '' : displayMessage
+  const { display: displayMessage, backend: backendMessage } = fileOnlyTurnMessages(
+    content,
+    hasFiles,
+    hasOnlyAudioFiles,
+    t('chat.voiceMessageDefaultMessage')
+  )
   const messageToSend = displayMessage
 
   // Prepare webSearch metadata for user message
@@ -2824,7 +2818,9 @@ const handleSendMessage = async (
   // badge). Without this the only visible artifact of a voice upload was
   // the transcribed text — there was no way to replay the original
   // recording from the web chat.
-  const optimisticParts: Part[] = parseContentWithThinking(displayContent, 'user')
+  const optimisticParts: Part[] = displayContent.trim()
+    ? parseContentWithThinking(displayContent, 'user')
+    : []
   if (files && files.length > 0) {
     for (const file of files) {
       if (!isAudioFileType(file.fileType, file.fileMime)) continue

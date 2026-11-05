@@ -344,7 +344,7 @@ class WidgetPublicController extends AbstractController
             required: ['sessionId', 'text'],
             properties: [
                 new OA\Property(property: 'sessionId', type: 'string', example: 'sess_xyz123...'),
-                new OA\Property(property: 'text', type: 'string', example: 'Hello, I need help!'),
+                new OA\Property(property: 'text', type: 'string', example: 'Hello, I need help!', description: 'Visitor message. Empty when the visitor sent only files.'),
                 new OA\Property(property: 'chatId', type: 'integer', nullable: true),
                 new OA\Property(property: 'files', type: 'array', items: new OA\Items(type: 'integer')),
             ]

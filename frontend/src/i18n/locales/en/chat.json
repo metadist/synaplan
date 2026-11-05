@@ -180,7 +180,6 @@
       "deleted": "{name} is no longer in this chat. The file is still in your files.",
       "deleteFailed": "{name} is still in this chat. Nothing was removed. Try again."
     },
-    "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message.",
     "conversation": "conversation",
     "conversations": "conversations",

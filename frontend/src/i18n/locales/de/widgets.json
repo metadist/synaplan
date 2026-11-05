@@ -808,7 +808,6 @@
     "fileUploadError": "Datei-Upload fehlgeschlagen",
     "fileUploadLimitReached": "Datei-Upload-Limit für diese Sitzung erreicht.",
     "fileUploadFailed": "Datei-Upload fehlgeschlagen. Bitte versuchen Sie es erneut.",
-    "fileUploadDefaultMessage": "Bitte prüfen Sie die angehängte Datei.",
     "sendFailed": "Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     "chatUnavailable": "Der Chat ist derzeit nicht verfügbar.",
     "busy": "Synaplan ist ausgelastet — die Antwort beginnt gleich.",

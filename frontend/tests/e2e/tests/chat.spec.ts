@@ -66,6 +66,31 @@ test.describe('@ci @smoke Chat', () => {
   })
 })
 
+test.describe('@ci Chat — file-only send', () => {
+  test('an attached file without typed text does not invent a review command', async ({ page }) => {
+    await openApp(page)
+    const chat = new ChatHelper(page)
+    await chat.startNewChat()
+    await chat.attachFile({
+      name: 'vision-1x1.png',
+      mimeType: 'image/png',
+      buffer: VISION_FIXTURE,
+    })
+
+    const sendBtn = page.locator(selectors.chat.sendBtn)
+    await expect(sendBtn).toBeEnabled()
+    await sendBtn.click()
+
+    const userRow = page
+      .locator(selectors.chat.messageContainer)
+      .filter({ has: page.getByTestId('message-user') })
+      .last()
+    await expect(userRow).toContainText('vision-1x1.png')
+    await expect(userRow).not.toContainText('Please review the attached file')
+    await expect(userRow).not.toContainText('Bitte prüfe die angehängte Datei')
+  })
+})
+
 test.describe('@ci Chat — math formulas', () => {
   test('formulas in a message render with KaTeX styles and fonts', async ({ page }) => {
     await openApp(page)

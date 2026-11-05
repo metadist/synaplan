@@ -180,7 +180,6 @@
       "deleted": "{name} n’est plus dans cette conversation. Le fichier reste dans vos fichiers.",
       "deleteFailed": "{name} est encore dans cette conversation. Rien n’a été retiré. Réessayez."
     },
-    "fileOnlyDefaultMessage": "Veuillez examiner le fichier joint.",
     "voiceMessageDefaultMessage": "Veuillez répondre à mon message vocal.",
     "conversation": "conversation",
     "conversations": "conversations",

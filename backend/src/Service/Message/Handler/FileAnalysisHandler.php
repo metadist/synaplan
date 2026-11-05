@@ -111,7 +111,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             case 'audio':
                 return $this->voiceMessages->reply($context, $route['audio'] ?? []);
             case 'images':
-                return $this->images->analyze($context, $route['images'] ?? []);
+                return $this->images->analyze($context, $route['images'] ?? [], $thread);
             default:
                 $this->logger->warning('FileAnalysisHandler: Unsupported file types only', [
                     'message_id' => $message->getId(),
