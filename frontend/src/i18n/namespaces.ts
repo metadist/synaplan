@@ -109,7 +109,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
   ],
   files: ['fileMention', 'fileSelection', 'files', 'rag', 'storage', 'vectorStorage'],
   knowledge: ['feedback', 'memories'],
-  assistants: ['assistants', 'bundle'],
+  assistants: ['assistants', 'bundle', 'templates'],
   widgets: ['liveSupport', 'widget', 'widgetSessions', 'widgets'],
   admin: [
     'admin',

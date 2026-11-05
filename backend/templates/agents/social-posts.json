@@ -1,0 +1,84 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "social-posts",
+    "version": "2026.11.1",
+    "titleKey": "templates.socialPosts.title",
+    "summaryKey": "templates.socialPosts.summary",
+    "category": "sales",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      }
+    ],
+    "tryIt": [
+      "templates.socialPosts.try1",
+      "templates.socialPosts.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "social-posts",
+          "name": "Social posts",
+          "description": "Drafts three posts from a press release, without adding facts.",
+          "icon": "mdi:bullhorn-outline",
+          "instruction": "You draft short social posts from a press release or announcement the person pastes. Write three options: one short, one with a question, and one more formal. Do not add facts that are not in the text. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": false,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.7,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "Write three posts from this press release.",
+                "Make a shorter version of the second post."
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

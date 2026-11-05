@@ -1,0 +1,36 @@
+id: social-posts
+version: "2026.11.1"
+mustMention:
+  - "Do not add facts"
+  - "Answer in the user's language."
+toolsOffered: []
+toolsNotOffered:
+  - files
+  - internet
+cases:
+  - utterance: "Write three posts from this press release."
+    knowledge: |
+      press-release.txt
+      The office opens on Monday.
+    expects:
+      answerContains:
+        - "1. The office opens on Monday."
+        - "2. The office opens on Monday."
+        - "3. The office opens on Monday."
+      answerOmits:
+        - "Tuesday"
+        - "Source:"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Make a shorter version of the second post."
+    knowledge: |
+      press-release.txt
+      The office opens on Monday.
+    expects:
+      answerContains:
+        - "The office opens on Monday."
+      answerOmits:
+        - "Tuesday"
+        - "Source:"
+      toolCalled: null
+      approvalRequested: false

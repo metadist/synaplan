@@ -9,6 +9,7 @@ import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import { useApprovalsStore } from '@/stores/approvals'
 import { useNotification } from '@/composables/useNotification'
 import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
+import { ApiError } from '@/services/api/httpClient'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 
@@ -70,24 +71,46 @@ const openContext = (approval: Approval) => {
       path: '/tasks',
       query: { task: String(ref.taskId), run: String(ref.runId ?? '') },
     })
+    return
+  }
+  if (ref.kind === 'agent_publish' && ref.agentId) {
+    void router.push({ path: `/ai/assistants/${ref.agentId}` })
   }
 }
 
 const onApprove = async (id: number, alwaysAllow = false) => {
+  const row = rows.value.find((item) => item.id === id)
   try {
     await store.approve(id, alwaysAllow)
-    success(t('approvals.approvedToast'))
-  } catch {
-    showError(t('approvals.decideFailed'))
+    success(
+      row?.tool === 'agent.publish'
+        ? t('approvals.sharedWithEveryone')
+        : t('approvals.approvedToast')
+    )
+  } catch (err) {
+    showError(
+      err instanceof ApiError && err.status === 409
+        ? t('approvals.sharingOff')
+        : err instanceof ApiError && err.status === 403
+          ? t('approvals.waitingForAnotherAdmin')
+          : t('approvals.decideFailed')
+    )
   }
 }
 
 const onReject = async (id: number, reason?: string) => {
+  const row = rows.value.find((item) => item.id === id)
   try {
     await store.reject(id, reason)
-    success(t('approvals.rejectedToast'))
-  } catch {
-    showError(t('approvals.decideFailed'))
+    success(
+      row?.tool === 'agent.publish' ? t('approvals.sentBackToast') : t('approvals.rejectedToast')
+    )
+  } catch (err) {
+    showError(
+      err instanceof ApiError && err.status === 403
+        ? t('approvals.waitingForAnotherAdmin')
+        : t('approvals.decideFailed')
+    )
   }
 }
 

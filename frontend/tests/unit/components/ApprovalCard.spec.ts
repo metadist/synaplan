@@ -20,6 +20,7 @@ function approval(overrides: Partial<Approval> = {}): Approval {
     created: Math.floor(Date.now() / 1000),
     requestedBy: { kind: 'chat', chatId: 12, messageId: 99 },
     canAlwaysAllow: true,
+    canDecide: true,
     ...overrides,
   }
 }
@@ -71,5 +72,40 @@ describe('ApprovalCard', () => {
     const wrapper = mountCard(approval())
     await wrapper.get('[data-testid="approval-reject"]').trigger('click')
     expect(wrapper.emitted('rejected')?.[0]).toEqual([3, 'not this one'])
+  })
+
+  it('lets another admin share an assistant and hides that choice from the author', () => {
+    const reviewer = mountCard(
+      approval({
+        tool: 'agent.publish',
+        preview: 'Offer writer',
+        canDecide: true,
+        canAlwaysAllow: true,
+      })
+    )
+    expect(reviewer.get('[data-testid="approval-share-assistant"]').text()).toContain(
+      'Share Offer writer with everyone'
+    )
+    expect(reviewer.get('[data-testid="approval-approve"]').text()).toBe('Approve')
+    expect(reviewer.get('[data-testid="approval-reject"]').text()).toBe('Send back')
+    expect(reviewer.find('[data-testid="approval-expires"]').exists()).toBe(false)
+    expect(reviewer.find('[data-testid="approval-always-allow"]').exists()).toBe(false)
+
+    const author = mountCard(
+      approval({
+        tool: 'agent.publish',
+        preview: 'Offer writer',
+        canDecide: false,
+        canAlwaysAllow: false,
+      })
+    )
+    expect(author.get('[data-testid="approval-share-assistant"]').text()).toContain(
+      'Offer writer is not shared yet'
+    )
+    expect(author.get('[data-testid="approval-waiting-other-admin"]').text()).toContain(
+      'cannot approve your own'
+    )
+    expect(author.find('[data-testid="approval-approve"]').exists()).toBe(false)
+    expect(author.find('[data-testid="approval-reject"]').exists()).toBe(false)
   })
 })

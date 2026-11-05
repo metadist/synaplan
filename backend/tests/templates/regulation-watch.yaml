@@ -1,0 +1,47 @@
+id: regulation-watch
+version: "2026.11.1"
+mustMention:
+  - "do not invent a change"
+  - "nothing material changed"
+  - "not legal advice"
+  - "Answer in the user's language."
+toolsOffered: []
+toolsNotOffered:
+  - files
+  - internet
+cases:
+  - utterance: "What changed on the pages I watch?"
+    knowledge: |
+      fees.txt
+      The fee is now 12 euro.
+    expects:
+      answerContains:
+        - "12 euro"
+        - "Source: fees.txt"
+        - "This is not legal advice."
+      answerOmits:
+        - "Nothing material changed."
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Did the fee schedule change, or is it unchanged?"
+    knowledge: |
+      fees.txt
+      unchanged
+    expects:
+      answerContains:
+        - "Nothing material changed."
+        - "Source: fees.txt"
+        - "This is not legal advice."
+      answerOmits:
+        - "12 euro"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "What changed on the pages I watch?"
+    expects:
+      answerContains:
+        - "still needs to add a page"
+        - "This is not legal advice."
+      answerOmits:
+        - "12 euro"
+      toolCalled: null
+      approvalRequested: false

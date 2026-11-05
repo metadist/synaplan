@@ -1,0 +1,42 @@
+id: tender-response
+version: "2026.11.1"
+mustMention:
+  - "Cite the file"
+  - "Answer in the user's language."
+toolsOffered:
+  - files
+toolsNotOffered:
+  - internet
+cases:
+  - utterance: "Answer the question about our support hours, and cite the file."
+    knowledge: |
+      support-hours.txt
+      Support hours are 09:00 to 17:00.
+    expects:
+      answerContains:
+        - "09:00 to 17:00"
+        - "Source: support-hours.txt"
+      answerOmits:
+        - "ISO 27001"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Which documents do we still need for this tender?"
+    knowledge: |
+      support-hours.txt
+      Support hours are 09:00 to 17:00.
+    expects:
+      answerContains:
+        - "09:00 to 17:00"
+        - "Source: support-hours.txt"
+      answerOmits:
+        - "ISO 27001"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Answer the question about our support hours, and cite the file."
+    expects:
+      answerContains:
+        - "tender documents"
+      answerOmits:
+        - "09:00"
+      toolCalled: null
+      approvalRequested: false

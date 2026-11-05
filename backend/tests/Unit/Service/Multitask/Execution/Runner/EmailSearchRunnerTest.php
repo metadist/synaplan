@@ -94,6 +94,7 @@ final class EmailSearchRunnerTest extends TestCase
         $message = $this->createMock(Message::class);
         $message->method('getText')->willReturn('search my emails for the acme offer');
         $message->method('getUserId')->willReturn(self::USER_ID);
+        $message->method('getLanguage')->willReturn('en');
         $message->method('getFiles')->willReturn(new ArrayCollection([]));
         $message->method('getFileText')->willReturn('');
 
@@ -136,8 +137,9 @@ final class EmailSearchRunnerTest extends TestCase
     {
         $result = $this->runner([])->run($this->node(), $this->context());
 
-        self::assertFalse($result->isSuccessful());
-        self::assertStringContainsString('no email account is connected', (string) $result->error);
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('No mailbox is connected, so no mail was read.', $result->text);
+        self::assertSame(0, $result->metadata['results_count']);
     }
 
     public function testNoHitsIsASuccessfulHonestAnswerNotAFailure(): void
@@ -241,8 +243,8 @@ final class EmailSearchRunnerTest extends TestCase
 
         $result = $runner->run($this->node(), $this->context());
 
-        self::assertFalse($result->isSuccessful());
-        self::assertStringContainsString('no email account is connected', (string) $result->error);
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('No mailbox is connected, so no mail was read.', $result->text);
     }
 
     public function testAvailabilityNoteListsTheM365Source(): void

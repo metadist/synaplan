@@ -12,7 +12,7 @@ final class BundleEnvelopeValidator
     public const MAX_SECTIONS = 20;
     public const MAX_ITEMS = 200;
 
-    private const ENVELOPE_KEYS = ['schema', 'createdAt', 'sourceInstance', 'sourceVersion', 'scope', 'sections'];
+    private const ENVELOPE_KEYS = ['schema', 'createdAt', 'sourceInstance', 'sourceVersion', 'scope', 'template', 'sections'];
     private const SECTION_KEYS = ['kind', 'version', 'items'];
 
     /**
@@ -22,6 +22,7 @@ final class BundleEnvelopeValidator
      *   sourceInstance: string,
      *   sourceVersion: string,
      *   scope: string,
+     *   template: array<string, mixed>|null,
      *   sections: list<array{kind: string, version: int, items: list<array<string, mixed>>}>
      * }
      */
@@ -68,6 +69,11 @@ final class BundleEnvelopeValidator
             throw new BundleEnvelopeException('$.scope', 'must be user or instance');
         }
 
+        $template = null;
+        if (array_key_exists('template', $decoded)) {
+            $template = (new TemplateBlockParser())->parse($decoded['template']);
+        }
+
         $sections = $decoded['sections'] ?? null;
         if (!is_array($sections) || !array_is_list($sections)) {
             throw new BundleEnvelopeException('$.sections', 'must be an array');
@@ -76,6 +82,27 @@ final class BundleEnvelopeValidator
             throw new BundleEnvelopeException('$.sections', 'at most '.self::MAX_SECTIONS.' sections');
         }
 
+        $out = $this->sections($sections, $registeredKinds);
+
+        return [
+            'schema' => self::SCHEMA,
+            'createdAt' => $createdAt,
+            'sourceInstance' => $sourceInstance,
+            'sourceVersion' => $sourceVersion,
+            'scope' => $scope,
+            'template' => $template,
+            'sections' => $out,
+        ];
+    }
+
+    /**
+     * @param list<mixed>  $sections
+     * @param list<string> $registeredKinds
+     *
+     * @return list<array{kind: string, version: int, items: list<array<string, mixed>>}>
+     */
+    private function sections(array $sections, array $registeredKinds): array
+    {
         $out = [];
         foreach ($sections as $i => $section) {
             $path = '$.sections['.$i.']';
@@ -116,14 +143,7 @@ final class BundleEnvelopeValidator
             ];
         }
 
-        return [
-            'schema' => self::SCHEMA,
-            'createdAt' => $createdAt,
-            'sourceInstance' => $sourceInstance,
-            'sourceVersion' => $sourceVersion,
-            'scope' => $scope,
-            'sections' => $out,
-        ];
+        return $out;
     }
 
     private function isIso8601(string $value): bool

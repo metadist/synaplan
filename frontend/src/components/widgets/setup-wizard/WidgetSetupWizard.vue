@@ -195,6 +195,10 @@ defineOptions({
   inheritAttrs: false,
 })
 
+const props = defineProps<{
+  initialAgentId?: number | null
+}>()
+
 const emit = defineEmits<{
   close: []
   created: [widget: widgetsApi.Widget]
@@ -221,7 +225,7 @@ const linkedFiles = ref<LinkedFileRef[]>([])
 const autoMessage = ref('')
 const autoOpen = ref(false)
 const allowFileUpload = ref(false)
-const agentId = ref<number | null>(null)
+const agentId = ref<number | null>(props.initialAgentId ?? null)
 
 const currentStep = ref(0)
 const creating = ref(false)

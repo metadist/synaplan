@@ -44,6 +44,46 @@ final class BundleEnvelopeValidatorTest extends TestCase
         $this->validator->parse(json_encode($doc, JSON_THROW_ON_ERROR), ['prompts']);
     }
 
+    public function testAcceptsOptionalTemplateBlock(): void
+    {
+        $doc = json_decode($this->document(), true, 512, JSON_THROW_ON_ERROR);
+        $doc['template'] = [
+            'id' => 'offer-writer',
+            'version' => '2026.11.1',
+            'titleKey' => 'templates.offerWriter.title',
+            'summaryKey' => 'templates.offerWriter.summary',
+            'category' => 'sales',
+            'requires' => [
+                ['kind' => 'capability', 'value' => 'chat'],
+                ['kind' => 'knowledgeFolder', 'hintKey' => 'templates.offerWriter.needsPriceList'],
+            ],
+            'tryIt' => ['templates.offerWriter.try1'],
+        ];
+
+        $parsed = $this->validator->parse(json_encode($doc, JSON_THROW_ON_ERROR), ['prompts']);
+
+        self::assertSame('offer-writer', $parsed['template']['id']);
+        self::assertNull($this->validator->parse($this->document(), ['prompts'])['template']);
+    }
+
+    public function testRejectsUnknownTemplateKey(): void
+    {
+        $this->expectException(BundleEnvelopeException::class);
+        $this->expectExceptionMessage('$.template.acceptance');
+        $doc = json_decode($this->document(), true, 512, JSON_THROW_ON_ERROR);
+        $doc['template'] = [
+            'id' => 'offer-writer',
+            'version' => '2026.11.1',
+            'titleKey' => 'templates.offerWriter.title',
+            'summaryKey' => 'templates.offerWriter.summary',
+            'category' => 'sales',
+            'requires' => [],
+            'tryIt' => ['templates.offerWriter.try1'],
+            'acceptance' => 'nope',
+        ];
+        $this->validator->parse(json_encode($doc, JSON_THROW_ON_ERROR), ['prompts']);
+    }
+
     public function testRejectsUnknownSectionKind(): void
     {
         $this->expectException(BundleEnvelopeException::class);

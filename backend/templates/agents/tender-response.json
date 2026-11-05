@@ -1,0 +1,88 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "tender-response",
+    "version": "2026.11.1",
+    "titleKey": "templates.tenderResponse.title",
+    "summaryKey": "templates.tenderResponse.summary",
+    "category": "sales",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "knowledgeFolder",
+        "hintKey": "templates.tenderResponse.needsFolder"
+      }
+    ],
+    "tryIt": [
+      "templates.tenderResponse.try1",
+      "templates.tenderResponse.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "tender-response",
+          "name": "Tender response",
+          "description": "Drafts answers to tender questions and cites the source file.",
+          "icon": "mdi:file-certificate-outline",
+          "instruction": "You draft answers to tender questions using only the files in your knowledge. Cite the file for every claim. If the files do not contain the answer, say what is missing instead of guessing. If no folder is chosen, say that the person still needs to choose the folder with the tender documents. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.3,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "Answer the question about our support hours, and cite the file.",
+                "Which documents do we still need for this tender?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

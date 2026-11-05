@@ -86,6 +86,14 @@ class AgentRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<Agent>
+     */
+    public function findBySource(string $source): array
+    {
+        return $this->findBy(['source' => $source], ['id' => 'ASC']);
+    }
+
+    /**
      * Published assistants the router may offer. Callers must still filter
      * by {@see \App\Service\Iam\Permission::Use} for the viewing user.
      *
@@ -117,6 +125,35 @@ class AgentRepository extends ServiceEntityRepository
             ->orderBy('a.updated', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    public function findInstalledTemplate(int $ownerId, string $sourcePrefix): ?Agent
+    {
+        $agent = $this->createQueryBuilder('a')
+            ->where('a.ownerId = :ownerId')
+            ->andWhere('a.source LIKE :prefix')
+            ->andWhere('a.status != :archived')
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('prefix', $sourcePrefix.'%')
+            ->setParameter('archived', Agent::STATUS_ARCHIVED)
+            ->orderBy('a.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $agent instanceof Agent ? $agent : null;
+    }
+
+    public function countTemplateOwners(string $sourcePrefix): int
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(DISTINCT a.ownerId)')
+            ->where('a.source LIKE :prefix')
+            ->andWhere('a.status != :archived')
+            ->setParameter('prefix', $sourcePrefix.'%')
+            ->setParameter('archived', Agent::STATUS_ARCHIVED)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     public function slugTaken(int $ownerId, string $slug, ?int $exceptId = null): bool

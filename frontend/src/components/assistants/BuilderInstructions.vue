@@ -21,15 +21,18 @@ import { useAgentsStore } from '@/stores/agents'
 const store = useAgentsStore()
 const text = ref('')
 let loadedPromptId: number | null = null
+let loadedSource: string | null = null
 
 async function load(): Promise<void> {
   const promptId = store.current?.promptId
   if (!promptId) {
     return
   }
+  const source = store.current?.source ?? null
   const prompt = await promptsApi.getPrompt(promptId)
   text.value = prompt.prompt
   loadedPromptId = promptId
+  loadedSource = source
 }
 
 async function save(): Promise<void> {
@@ -45,9 +48,9 @@ onMounted(() => {
 })
 
 watch(
-  () => store.current?.promptId,
-  (id) => {
-    if (id && id !== loadedPromptId) {
+  () => [store.current?.promptId, store.current?.source] as const,
+  ([id, source]) => {
+    if (id && (id !== loadedPromptId || source !== loadedSource)) {
       void load()
     }
   }

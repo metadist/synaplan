@@ -11,6 +11,7 @@ final readonly class ApprovalReference
 {
     public const KIND_CHAT = 'chat';
     public const KIND_TASK_RUN = 'task_run';
+    public const KIND_AGENT_PUBLISH = 'agent_publish';
 
     public function __construct(
         public string $kind,
@@ -20,6 +21,7 @@ final readonly class ApprovalReference
         public ?string $nodeId = null,
         public ?int $chatId = null,
         public ?int $taskId = null,
+        public ?int $agentId = null,
     ) {
     }
 
@@ -48,12 +50,21 @@ final readonly class ApprovalReference
 
             return new self(self::KIND_TASK_RUN, $requestedBy, runId: $runId, nodeId: $nodeId);
         }
+        if (str_starts_with($requestedBy, 'agent_publish:')) {
+            $id = substr($requestedBy, strlen('agent_publish:'));
+
+            return new self(
+                self::KIND_AGENT_PUBLISH,
+                $requestedBy,
+                agentId: ctype_digit($id) ? (int) $id : null,
+            );
+        }
 
         return new self('unknown', $requestedBy);
     }
 
     /**
-     * @return array{kind: string, chatId: int|null, messageId: int|null, taskId: int|null, runId: int|null, nodeId: string|null}
+     * @return array{kind: string, chatId: int|null, messageId: int|null, taskId: int|null, runId: int|null, nodeId: string|null, agentId: int|null}
      */
     public function toArray(): array
     {
@@ -64,16 +75,17 @@ final readonly class ApprovalReference
             'taskId' => $this->taskId,
             'runId' => $this->runId,
             'nodeId' => $this->nodeId,
+            'agentId' => $this->agentId,
         ];
     }
 
     public function withChatId(?int $chatId): self
     {
-        return new self($this->kind, $this->raw, $this->messageId, $this->runId, $this->nodeId, $chatId, $this->taskId);
+        return new self($this->kind, $this->raw, $this->messageId, $this->runId, $this->nodeId, $chatId, $this->taskId, $this->agentId);
     }
 
     public function withTaskId(?int $taskId): self
     {
-        return new self($this->kind, $this->raw, $this->messageId, $this->runId, $this->nodeId, $this->chatId, $taskId);
+        return new self($this->kind, $this->raw, $this->messageId, $this->runId, $this->nodeId, $this->chatId, $taskId, $this->agentId);
     }
 }
