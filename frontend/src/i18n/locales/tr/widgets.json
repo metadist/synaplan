@@ -17,7 +17,6 @@
     "fileUploadError": "Dosya yüklenemedi",
     "fileUploadLimitReached": "Bu oturum için dosya yükleme limitine ulaşıldı.",
     "fileUploadFailed": "Dosya yükleme başarısız. Lütfen tekrar deneyin.",
-    "fileUploadDefaultMessage": "Lütfen ekli dosyayı inceleyin.",
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
     "chatUnavailable": "Sohbet şu anda kullanılamıyor.",
     "busy": "Synaplan meşgul — yanıtınız birazdan başlayacak.",

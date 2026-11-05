@@ -43,7 +43,11 @@ final readonly class WidgetTurnGate
         if (null === $data) {
             throw WidgetRequestRefused::json(['error' => 'Invalid JSON in request body'], Response::HTTP_BAD_REQUEST);
         }
-        if (!is_array($data) || empty($data['sessionId']) || empty($data['text']) || !is_scalar($data['sessionId']) || !is_scalar($data['text'])) {
+        if (!is_array($data) || empty($data['sessionId']) || !is_scalar($data['sessionId']) || !\array_key_exists('text', $data) || !is_scalar($data['text'])) {
+            throw WidgetRequestRefused::json(['error' => 'Missing required fields: sessionId, text'], Response::HTTP_BAD_REQUEST);
+        }
+        $files = !empty($data['files']) && is_array($data['files']) ? $data['files'] : [];
+        if (empty($data['text']) && [] === $files) {
             throw WidgetRequestRefused::json(['error' => 'Missing required fields: sessionId, text'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -70,7 +74,7 @@ final readonly class WidgetTurnGate
             session: $session,
             config: $config,
             text: (string) $data['text'],
-            files: !empty($data['files']) && is_array($data['files']) ? $data['files'] : [],
+            files: $files,
             chatId: !empty($data['chatId']) ? (int) $data['chatId'] : null,
             externalUserId: isset($data['externalUserId']) && \is_string($data['externalUserId']) ? trim($data['externalUserId']) : '',
             heldForOperator: $heldForOperator,
