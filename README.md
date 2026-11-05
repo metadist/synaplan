@@ -297,6 +297,8 @@ Everything below is the same platform, packaged for different homes. Pick what f
 | **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
 | **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |
 
+**Public sector & sovereign cloud (EU/CH):** [synaplan.eu](https://www.synaplan.eu/) covers openDesk, Nextcloud and OpenCloud deployments, on-premises or in an EU cloud.
+
 A plain `docker compose up -d` starts the same stack but `:5173` stays silent until every image is pulled. `make up` answers within seconds, then finishes chat before it downloads the optional images.
 
 No AI weights are downloaded by default, so the first boot is dominated by the Docker images and `npm ci`. `COMPOSE_PROFILES=local-ai` is the same switch a self-hosted install uses in `deploy/.env`, and it pulls the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
@@ -323,6 +325,8 @@ Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API
 | admin@synaplan.com | admin123 | ADMIN |
 | demo@synaplan.com | demo123 | PRO |
 | test@example.com | test123 | NEW (unverified) |
+
+> ⚠️ These logins are public knowledge — anyone who can open your instance can use them. Change the admin password after your first login, and never expose an install that still uses them to a network others can reach. For a server, use [On a server](#on-a-server): the installer generates its own admin password.
 
 ---
 
@@ -479,6 +483,18 @@ make test
 # Code quality
 make lint
 ```
+
+---
+
+## Troubleshooting
+
+| Problem | What to do |
+|---------|------------|
+| "Port already in use" on start | A host port Synaplan needs is taken — the list and how to move one are in [Port conflicts](docs/INSTALLATION.md#port-conflicts) |
+| Containers stop right after start | Give Docker at least 8 GB RAM (see [Prerequisites](#prerequisites)), then look at `docker compose logs -f backend` |
+| Chat gives no answers | Use the Synaplan Demo, paste one provider key, or add the `local-ai` profile — all three are in the [quickstart](#quickstart) |
+| First start seems stuck | The first start downloads all images and takes 5–15 minutes; `docker compose logs -f startup-notes` shows where it is |
+| Anything else | Ask in [Discord](https://discord.com/invite/kQB3eDjWfF) or open a [GitHub issue](https://github.com/metadist/synaplan/issues) |
 
 ---
 
