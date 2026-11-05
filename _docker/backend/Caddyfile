@@ -39,10 +39,19 @@
 		not path /connection/*
 	}
 	header @not_realtime {
-		X-Frame-Options "SAMEORIGIN"
 		X-Content-Type-Options "nosniff"
 		X-XSS-Protection "1; mode=block"
 		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	# The human-check page is framed by the native shell (capacitor://localhost
+	# and https://localhost). SAMEORIGIN would block that frame. The page's
+	# own frame-ancestors policy is the allowlist; every other document stays
+	# SAMEORIGIN.
+	@framed_document {
+		not path /connection/* /api/v1/auth/human-check
+	}
+	header @framed_document {
+		X-Frame-Options "SAMEORIGIN"
 	}
 
 	# Service Worker must never be cached by browsers or proxies

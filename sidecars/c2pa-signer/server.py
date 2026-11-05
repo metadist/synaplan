@@ -102,6 +102,16 @@ def ensure_dev_cert() -> None:
             return
 
 
+def tool_path() -> str | None:
+    found = shutil.which("c2patool")
+    if found:
+        return found
+    bundled = "/usr/local/bin/c2patool"
+    if os.access(bundled, os.X_OK):
+        return bundled
+    return None
+
+
 def algorithm() -> str:
     alg = os.environ.get("C2PA_ALG", "ps256").strip().lower()
     return alg if alg in ALLOWED_ALG else "ps256"
@@ -129,7 +139,13 @@ def manifest(model: str, parent_path: str | None) -> dict:
                 "label": "c2pa.actions",
                 "data": {
                     "actions": [
-                        {"action": "c2pa.created", "softwareAgent": model or "model"},
+                        {
+                            "action": "c2pa.created",
+                            "softwareAgent": model or "model",
+                            # c2patool 0.28 rejects c2pa.created without this field
+                            # and then does not return a signed file.
+                            "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+                        },
                     ],
                 },
             },
@@ -185,8 +201,24 @@ def decode_bytes(payload: dict) -> bytes | None:
     return raw
 
 
+def log_tool_error(stderr: bytes | None) -> None:
+    detail = (stderr or b"").decode("utf-8", "replace").strip().splitlines()
+    if detail:
+        print(f"c2pa: sign failed: {detail[-1][:300]}", flush=True)
+
+
+def manifest_is_valid(stdout: bytes | None) -> bool:
+    if not stdout:
+        return False
+    try:
+        report = json.loads(stdout.decode("utf-8", "replace"))
+    except json.JSONDecodeError:
+        return False
+    return isinstance(report, dict) and report.get("validation_state") != "Invalid"
+
+
 def sign(payload: dict) -> bytes | None:
-    tool = shutil.which("c2patool")
+    tool = tool_path()
     env = signing_env()
     raw = decode_bytes(payload)
     if tool is None or env is None or raw is None:
@@ -204,35 +236,45 @@ def sign(payload: dict) -> bytes | None:
             shutil.copyfile(source, parent_path)
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest(str(payload.get("model") or "model"), parent_path), handle)
-        result = subprocess.run(
-            [tool, source, "-m", manifest_path, "-o", target, "-f"],
-            capture_output=True,
-            env=env,
-        )
+        try:
+            result = subprocess.run(
+                [tool, source, "-m", manifest_path, "-o", target, "-f"],
+                capture_output=True,
+                env=env,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            print("c2pa: sign failed: timed out", flush=True)
+            return None
         if not os.path.isfile(target):
+            log_tool_error(result.stderr)
             return None
         signed = Path(target).read_bytes()
         # c2patool writes the manifest, then returns an error when the
         # certificate is not in its public trust store. The bytes are still
-        # the marked file. An empty or unmarked file is a real failure.
-        if b"c2pa" not in signed:
+        # the marked file. An empty, unmarked, or invalid manifest is a real failure.
+        if b"c2pa" not in signed or (result.returncode != 0 and not manifest_is_valid(result.stdout)):
+            log_tool_error(result.stderr)
             return None
         return signed
 
 
 def looks_signed(raw: bytes) -> bool:
-    tool = shutil.which("c2patool")
+    tool = tool_path()
     if tool is None or not raw:
         return b"c2pa" in raw or b"trainedAlgorithmicMedia" in raw
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "media.bin")
         Path(path).write_bytes(raw)
-        result = subprocess.run([tool, path], capture_output=True)
-        return result.returncode == 0
+        try:
+            result = subprocess.run([tool, path], capture_output=True, timeout=15)
+        except subprocess.TimeoutExpired:
+            return False
+        return result.returncode == 0 and manifest_is_valid(result.stdout)
 
 
 def is_ready() -> bool:
-    return bool(TOKEN) and shutil.which("c2patool") is not None and signing_env() is not None
+    return bool(TOKEN) and tool_path() is not None and signing_env() is not None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -249,7 +291,11 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             self.respond(401, {"error": "unauthorized"})
             return
-        length = int(self.headers.get("Content-Length", "0") or "0")
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            self.send_error(400)
+            return
         if length < 0 or length > MAX_BODY:
             self.send_error(413)
             return

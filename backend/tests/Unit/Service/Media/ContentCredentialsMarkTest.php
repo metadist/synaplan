@@ -11,6 +11,7 @@ use App\Service\Media\ContentCredentialsMark;
 use App\Service\Media\XmpDigitalSource;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class ContentCredentialsMarkTest extends TestCase
 {
@@ -76,6 +77,48 @@ final class ContentCredentialsMarkTest extends TestCase
         self::assertStringContainsString('trainedAlgorithmicMedia', $stored);
         self::assertSame(ContentCredentialsMark::NONE, $file->getCredentials());
         self::assertSame(strlen($stored), $file->getFileSize());
+    }
+
+    public function testReSignPassesParentWhenTheModelLabelIsRefined(): void
+    {
+        $dir = $this->directory();
+        $png = (string) base64_decode(self::PNG, true);
+        file_put_contents($dir.'/generated.png', $png);
+        $file = $this->file('generated.png');
+
+        $calls = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$calls, $png): MockResponse {
+            self::assertSame('POST', $method);
+            self::assertSame('http://127.0.0.1:8787/sign', $url);
+            $body = json_decode((string) ($options['body'] ?? '{}'), true);
+            self::assertIsArray($body);
+            $calls[] = $body;
+
+            return new MockResponse(
+                (string) json_encode(['bytes' => base64_encode($png.'jumdc2pa-'.count($calls))]),
+            );
+        });
+
+        $files = $this->createMock(FileRepository::class);
+        $files->expects($this->exactly(2))->method('save');
+        $mark = new ContentCredentialsMark(
+            $files,
+            new C2paSignerClient($http, 'http://127.0.0.1:8787', 'secret-token'),
+            new XmpDigitalSource(),
+            $dir,
+        );
+
+        $mark->apply($file);
+        self::assertSame(ContentCredentialsMark::SIGNED, $file->getCredentials());
+        self::assertSame('gpt-image', $file->getGeneratedModel());
+
+        $mark->label($file, 'openai gpt-image-1');
+        self::assertSame('openai gpt-image-1', $file->getGeneratedModel());
+        self::assertCount(2, $calls);
+        self::assertFalse($calls[0]['parent']);
+        self::assertSame('gpt-image', $calls[0]['model']);
+        self::assertTrue($calls[1]['parent']);
+        self::assertSame('openai gpt-image-1', $calls[1]['model']);
     }
 
     private function marker(string $dir, int $saves): ContentCredentialsMark
