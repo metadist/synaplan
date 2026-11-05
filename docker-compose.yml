@@ -1078,6 +1078,9 @@ services:
     image: synaplan-c2pa-signer:local
     platform: linux/amd64
     container_name: synaplan-c2pa-signer
+    depends_on:
+      backend:
+        condition: service_healthy
     profiles: [c2pa]
     restart: unless-stopped
     environment:
