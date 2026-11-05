@@ -59,7 +59,7 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "video_generation": Generate a video clip (params.duration, params.resolution).
 - "text2sound": Synthesize speech/audio from text (params.format, e.g. mp3).
 - "document_generation": Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
-- "calendar_event": Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below. When the user asks to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one.
+- "calendar_event": Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve a clock time the user named against the current time context. If they named no hour, do not invent 09:00 — the runner asks in their language. When they ask to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one. compose_reply inputs.text must be "$nX.text" so the confirmation stays in their language.
 - "email_me": Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.
 - "compose_reply": Assemble final reply: text + N file attachments from other nodes.
 - "ask_user": Ask the person a question with up to five options (one may be recommended) and optional free text, then continue the same run with their answer.
@@ -175,13 +175,19 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    reads `inputs.file: "$nX.file"`, and carries the creative instruction in
    `inputs.prompt` — the vision model then writes about the REAL image.
    A parallel `chat` node would invent an image it has never seen.
-7. Meeting / appointment / calendar event / reminder for a specific time
-   ("set up a meeting", "mail me a meeting note for tomorrow 15:00 with Tom",
-   "I need a meeting reminder for tomorrow at 9:00 with Sanam", "erinnere
-   mich an den Termin morgen um 9") → one `calendar_event` node — NEVER a
-   `chat` node that merely talks about the appointment. Resolve the relative
-   time against the time context into an absolute ISO-8601 `start` + IANA
-   `timezone`, fill title/attendees/location/duration.
+7. Meeting / appointment / calendar event / reminder
+   ("set up a meeting tomorrow at 15:00", "mail me a meeting note for tomorrow
+   15:00 with Tom", "I need a meeting reminder for tomorrow at 9:00 with Sanam",
+   "erinnere mich an den Termin morgen um 9") → one `calendar_event` node —
+   NEVER a `chat` node that merely talks about the appointment. Resolve the
+   clock time the user named against the time context into an absolute ISO-8601
+   `start` + IANA `timezone`. Fill title/attendees/location; default
+   duration_minutes to 60 when they did not name a length.
+   If they asked for a calendar event but named NO clock time ("tomorrow" or
+   "Freitag" alone is not an hour), do NOT emit `calendar_event` and do NOT
+   invent 09:00. Emit one `compose_reply` whose `inputs.text` asks for the
+   time in the SAME language as the latest user message.
+   The plan's `language` field is that message's language, not the UI locale.
    When the user asks to PUT the event into a connected calendar ("put it
    into my Outlook", "trag es in meinen Kalender ein") AND the Connected
    channels list has a channel of kind calendar, ALSO set `params.channel`
@@ -616,11 +622,13 @@ hits via `$n1.text`. Without an explicit "my emails" intent this node is
 never emitted.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
-The event fields go in `params`. Resolve the relative time against the time
+The event fields go in `params`. Resolve the named clock time against the time
 context into an absolute ISO-8601 LOCAL `start` (the wall-clock time in the
 user's timezone) plus the matching IANA `timezone`. Use the user's local
 timezone from the time context — never force "UTC" unless that is genuinely the
 user's zone. (The example below assumes a user in Europe/Berlin.)
+`compose_reply` must pass the runner's confirmation through `$n1.text` — never
+write an English sentence here when the user wrote in another language.
 
 {
   "version": 1,
@@ -628,7 +636,19 @@ user's zone. (The example below assumes a user in Europe/Berlin.)
   "reply_node": "n2",
   "tasks": [
     { "id": "n1", "capability": "calendar_event", "params": { "title": "Meeting with Sanam", "start": "2026-06-10T09:00:00", "timezone": "Europe/Berlin", "duration_minutes": 60, "attendees": ["Sanam"] } },
-    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Here is your meeting invite for tomorrow at 09:00 with Sanam.", "attachments": ["$n1.file"] } }
+    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "$n1.text", "attachments": ["$n1.file"] } }
+  ]
+}
+
+### Calendar invite missing a clock time ("termin morgen in den kalender")
+No hour was named, so do not invent 09:00. Ask in the user's language:
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "compose_reply", "inputs": { "text": "Um welche Uhrzeit soll der Termin liegen? Eine konkrete Uhrzeit fehlt noch, zum Beispiel „morgen um 15 Uhr“." } }
   ]
 }
 
@@ -669,3 +689,6 @@ Output ONLY the JSON object.
 - The user's timezone is unknown, so this is the server clock and may differ from their local time. If the exact local time matters, ask the user to confirm their timezone.
 Use this as "now" when resolving relative dates and times (e.g. "today", "tomorrow", "in 2 hours", "next Monday"). Do not restate this block unless the user asks about the current date or time.
 For a calendar/meeting request, emit a "calendar_event" node with an absolute "start" as an ISO-8601 LOCAL datetime in the user's local timezone shown above, plus the matching IANA "timezone" string. Do NOT convert the time to UTC and do NOT emit "UTC" unless that is genuinely the user's timezone.
+If the user did not name a clock time (an hour of day — "tomorrow" or "Freitag" alone is not enough), do NOT invent 09:00 or any other hour and do NOT emit calendar_event. Ask for the time in the same language as the latest user message.
+The plan "language" field must match the latest user message, not the UI locale. A German request gets "de" even when the product UI is English.
+When a calendar_event node is emitted, set compose_reply inputs.text to "$nX.text" so the runner's confirmation (date, time, duration) is what the user sees.

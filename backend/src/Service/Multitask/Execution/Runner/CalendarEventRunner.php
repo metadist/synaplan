@@ -6,6 +6,8 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Repository\UserRepository;
 use App\Service\Calendar\CalendarEventService;
+use App\Service\Calendar\CalendarEventSpeech;
+use App\Service\Calendar\UserNamedClockTime;
 use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -15,6 +17,7 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Prompt\UserUtteranceLanguage;
 use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 
@@ -44,6 +47,9 @@ use Psr\Log\LoggerInterface;
  *                      e.g. "outlook", "calendar" — delivers the event into
  *                      that connected calendar)
  *
+ * Clock time: if the user named no hour of day, the runner asks instead of
+ * writing — the planner's favourite 09:00 is not a substitute.
+ *
  * Timezone precedence (a wall-clock time is meaningless without its zone):
  *   1. A zone the user named outright in THIS message (IANA identifier or
  *      bare UTC/GMT token) — wins for this event, even over a stored profile
@@ -57,32 +63,6 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class CalendarEventRunner implements TaskRunner
 {
-    /**
-     * User-facing confirmation line, keyed by detected message language
-     * (frontend-supported set, English fallback). The datetime is rendered
-     * in a locale-neutral ISO shape on purpose — no intl dependency.
-     */
-    private const INVITE_TEXT = [
-        'en' => 'Calendar invite "%s" — %s (%s).',
-        'de' => 'Kalendereinladung "%s" — %s (%s).',
-        'es' => 'Invitación de calendario "%s" — %s (%s).',
-        'tr' => 'Takvim daveti "%s" — %s (%s).',
-    ];
-
-    /**
-     * Asked instead of writing the event when no timezone can be trusted.
-     * Returned as a successful text-only result (not failed()): reply nodes
-     * only see `.text`, so a failure here would hide the recovery behind a
-     * generic fallback and the user would never learn what to provide.
-     */
-    private const UNKNOWN_TIMEZONE_TEXT = [
-        'en' => 'I did not create "%s": your timezone is unknown, so I cannot place the requested time. Set your timezone in your profile, or name one in your message (e.g. "tomorrow at 10, Europe/Berlin").',
-        'de' => 'Ich habe "%s" nicht erstellt: Deine Zeitzone ist unbekannt, daher kann ich die gewünschte Zeit nicht einordnen. Stelle deine Zeitzone im Profil ein oder nenne eine in deiner Nachricht (z. B. "morgen um 10, Europe/Berlin").',
-        'es' => 'No he creado "%s": tu zona horaria es desconocida, así que no puedo situar la hora solicitada. Configura tu zona horaria en tu perfil o indícala en tu mensaje (p. ej., "mañana a las 10, Europe/Berlin").',
-        'fr' => 'Je n\'ai pas créé "%s" : votre fuseau horaire est inconnu, je ne peux donc pas situer l\'heure demandée. Définissez votre fuseau horaire dans votre profil ou indiquez-en un dans votre message (par ex. "demain à 10h, Europe/Berlin").',
-        'tr' => '"%s" oluşturulmadı: saat diliminiz bilinmiyor, bu yüzden istenen saati yerleştiremiyorum. Saat diliminizi profilinizde ayarlayın ya da mesajınızda belirtin (örn. "yarın 10\'da, Europe/Berlin").',
-    ];
-
     public function __construct(
         private CalendarEventService $calendarService,
         private FileStorageService $fileStorage,
@@ -105,7 +85,15 @@ final readonly class CalendarEventRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::CalendarEvent, 'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below. When the user asks to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one.'),
+            new SkillDescriptor(
+                Capability::CalendarEvent,
+                'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve a clock time the user named against the current time context. If they named no hour, do not invent 09:00 — the runner asks in their language. When they ask to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one. compose_reply inputs.text must be "$nX.text" so the confirmation stays in their language.',
+                planAdjuster: static function (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array {
+                    unset($userId, $allowed, $topic);
+
+                    return CalendarEventSpeech::adjustPlan($payload, $messageText);
+                },
+            ),
         ];
     }
 
@@ -121,29 +109,22 @@ final readonly class CalendarEventRunner implements TaskRunner
             ? trim($params['title'])
             : 'Meeting';
 
-        $language = is_string($context->classification['language'] ?? null)
-            ? $context->classification['language']
-            : ($context->message->getLanguage() ?: 'en');
-
+        $messageText = (string) $context->message->getText();
+        $language = $this->utteranceLanguage($context, $messageText);
         $ownerId = (int) ($context->userId ?? $context->message->getUserId());
+
+        $ask = $this->askInsteadOfWriting($messageText, $language, $title, $params, $ownerId);
+        if (null !== $ask) {
+            return $ask;
+        }
 
         $startStr = is_string($params['start'] ?? null) ? trim($params['start']) : '';
         if ('' === $startStr) {
             return NodeResult::failed('calendar event: missing start time');
         }
 
-        $resolved = $this->resolveTimezone($params, (string) $context->message->getText(), $ownerId);
-        if (null === $resolved) {
-            $template = self::UNKNOWN_TIMEZONE_TEXT[$language] ?? self::UNKNOWN_TIMEZONE_TEXT['en'];
-
-            return NodeResult::ok(sprintf($template, $title), [], [
-                'calendar_event' => [
-                    'title' => $title,
-                    'created' => false,
-                    'reason' => 'unknown_timezone',
-                ],
-            ]);
-        }
+        $resolved = $this->resolveTimezone($params, $messageText, $ownerId)
+            ?? throw new \RuntimeException('calendar event: timezone unresolved');
         [$tz, $tzName, $stripExplicitOffset] = $resolved;
 
         try {
@@ -155,7 +136,7 @@ final readonly class CalendarEventRunner implements TaskRunner
         $end = $this->resolveEnd($params, $start, $tz, $stripExplicitOffset);
 
         $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
-        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
+        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar($messageText);
         if ('' === $channel && $userAsked) {
             $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
         }
@@ -200,8 +181,130 @@ final readonly class CalendarEventRunner implements TaskRunner
             'local_path' => $stored['path'],
         ];
 
-        $template = self::INVITE_TEXT[$language] ?? self::INVITE_TEXT['en'];
-        $text = sprintf($template, $title, $start->format('Y-m-d H:i'), $tzName);
+        return $this->confirmStoredEvent(
+            $context,
+            $file,
+            $stored['path'],
+            $filename,
+            $title,
+            $start,
+            $end,
+            $tzName,
+            $language,
+            $ownerId,
+            $channel,
+            $userAsked,
+        );
+    }
+
+    private function utteranceLanguage(NodeContext $context, string $messageText): string
+    {
+        $classified = is_string($context->classification['language'] ?? null)
+            ? $context->classification['language']
+            : ($context->message->getLanguage() ?: 'en');
+
+        return UserUtteranceLanguage::detect($messageText, $classified);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function askInsteadOfWriting(
+        string $messageText,
+        string $language,
+        string $title,
+        array $params,
+        int $ownerId,
+    ): ?NodeResult {
+        if (!UserNamedClockTime::in($messageText)) {
+            return NodeResult::ok(CalendarEventSpeech::askForTime($language), [], [
+                'calendar_event' => [
+                    'title' => $title,
+                    'created' => false,
+                    'reason' => 'missing_clock_time',
+                ],
+            ]);
+        }
+
+        $startStr = is_string($params['start'] ?? null) ? trim($params['start']) : '';
+        if ('' === $startStr) {
+            return NodeResult::failed('calendar event: missing start time');
+        }
+
+        if (null !== $this->resolveTimezone($params, $messageText, $ownerId)) {
+            return null;
+        }
+
+        return NodeResult::ok(CalendarEventSpeech::unknownTimezone($language, $title), [], [
+            'calendar_event' => [
+                'title' => $title,
+                'created' => false,
+                'reason' => 'unknown_timezone',
+            ],
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $file
+     */
+    private function confirmStoredEvent(
+        NodeContext $context,
+        array $file,
+        string $storedPath,
+        string $filename,
+        string $title,
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+        string $tzName,
+        string $language,
+        int $ownerId,
+        string $channel,
+        bool $userAsked,
+    ): NodeResult {
+        $durationMinutes = (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60);
+        $webLink = null;
+        $deliveryMeta = null;
+        $deliveryNote = '';
+
+        if ('' !== $channel) {
+            $delivery = $this->calendarDelivery->send(
+                $ownerId,
+                rtrim($this->uploadDir, '/').'/'.ltrim($storedPath, '/'),
+                $filename,
+                (int) ($context->message->getId() ?? 0),
+                $channel,
+            );
+            $webLink = $delivery['ok'] ? $delivery['webLink'] : null;
+            $deliveryMeta = [
+                'ok' => $delivery['ok'],
+                'channel' => $delivery['channel'],
+                'connection' => $delivery['connection'],
+                'created' => $delivery['created'],
+                'skipped' => $delivery['skipped'],
+            ];
+            if (!$delivery['ok']) {
+                $deliveryNote = ' '.$delivery['message'];
+            }
+        } elseif ($userAsked) {
+            $deliveryMeta = [
+                'ok' => false,
+                'channel' => null,
+                'connection' => null,
+                'created' => 0,
+                'skipped' => 0,
+            ];
+            $deliveryNote = ' '.CalendarEventSpeech::notDelivered($language);
+        }
+
+        $deliveredChannel = (true === ($deliveryMeta['ok'] ?? false)) ? $channel : '';
+        $text = CalendarEventSpeech::confirmed(
+            $language,
+            $start,
+            max(1, $durationMinutes),
+            $deliveredChannel,
+            $webLink,
+            $title,
+        ).$deliveryNote;
 
         $metadata = [
             'media_type' => 'document',
@@ -212,38 +315,8 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'timezone' => $tzName,
             ],
         ];
-
-        if ('' !== $channel) {
-            $delivery = $this->calendarDelivery->send(
-                $ownerId,
-                rtrim($this->uploadDir, '/').'/'.ltrim($stored['path'], '/'),
-                $filename,
-                (int) ($context->message->getId() ?? 0),
-                $channel,
-            );
-            $text .= ' '.$delivery['message'];
-            if (null !== $delivery['webLink']) {
-                $text .= ' '.$delivery['webLink'];
-            }
-            $metadata['calendar_delivery'] = [
-                'ok' => $delivery['ok'],
-                'channel' => $delivery['channel'],
-                'connection' => $delivery['connection'],
-                'created' => $delivery['created'],
-                'skipped' => $delivery['skipped'],
-            ];
-            $context->streamChunk($delivery['message']);
-        } elseif ($userAsked) {
-            $note = 'The event was not added to a calendar — the .ics is attached. Connect a calendar under Settings → Connections.';
-            $text .= ' '.$note;
-            $metadata['calendar_delivery'] = [
-                'ok' => false,
-                'channel' => null,
-                'connection' => null,
-                'created' => 0,
-                'skipped' => 0,
-            ];
-            $context->streamChunk($note);
+        if (null !== $deliveryMeta) {
+            $metadata['calendar_delivery'] = $deliveryMeta;
         }
 
         return NodeResult::ok($text, [$file], $metadata);

@@ -1039,7 +1039,7 @@ final class RunnersTest extends TestCase
             'attendees' => ['Sanam'],
         ]);
 
-        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+        $result = $this->calendarRunner()->run($node, $this->context($this->message('Meeting with Sanam tomorrow at 09:00')));
 
         self::assertTrue($result->isSuccessful());
         self::assertCount(1, $result->files);
@@ -1055,7 +1055,7 @@ final class RunnersTest extends TestCase
             'timezone' => 'Europe/Berlin',
         ]);
 
-        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+        $result = $this->calendarRunner()->run($node, $this->context($this->message('Sync tomorrow at 15:00')));
 
         self::assertTrue($result->isSuccessful());
         self::assertCount(1, $result->files);
@@ -1098,7 +1098,7 @@ final class RunnersTest extends TestCase
             'timezone' => 'Europe/Berlin',
         ]);
 
-        $result = $runner->run($node, $this->context($this->message()));
+        $result = $runner->run($node, $this->context($this->message('Sync tomorrow at 15:00')));
 
         self::assertTrue($result->isWaitingApproval());
         self::assertSame(5, $result->metadata['approval_id']);
@@ -1177,11 +1177,13 @@ final class RunnersTest extends TestCase
                 'channel' => 'outlook',
             ]);
 
-            $result = $runner->run($node, $this->context($this->message()));
+            $result = $runner->run($node, $this->context($this->message(
+                'Create a meeting reminder for tomorrow at 10:00 and put it into my Outlook'
+            )));
 
             self::assertTrue($result->isSuccessful(), (string) $result->error);
             self::assertCount(1, $result->files, 'the .ics download stays attached');
-            self::assertStringContainsString('Added the event to outlook', (string) $result->text);
+            self::assertStringContainsString('to Outlook', (string) $result->text);
             self::assertStringContainsString('https://outlook.office.com/evt', (string) $result->text);
             self::assertTrue($result->metadata['calendar_delivery']['ok'] ?? false);
             self::assertSame('outlook', $result->metadata['calendar_delivery']['channel'] ?? null);
@@ -1230,7 +1232,7 @@ final class RunnersTest extends TestCase
                 'channel' => 'invented',
             ]);
 
-            $result = $runner->run($node, $this->context($this->message()));
+            $result = $runner->run($node, $this->context($this->message('Sync tomorrow at 15:00')));
 
             self::assertTrue($result->isSuccessful(), 'delivery failure must not sink the node');
             self::assertCount(1, $result->files);
@@ -1319,7 +1321,7 @@ final class RunnersTest extends TestCase
 
             self::assertTrue($result->isSuccessful(), (string) $result->error);
             self::assertCount(1, $result->files);
-            self::assertStringContainsString('Added the event to calendar', (string) $result->text);
+            self::assertStringContainsString('to your calendar', (string) $result->text);
             self::assertTrue($result->metadata['calendar_delivery']['ok'] ?? false);
             self::assertSame('calendar', $result->metadata['calendar_delivery']['channel'] ?? null);
             self::assertSame(9, $provider->lastParams['connection_id'] ?? null);
@@ -1373,7 +1375,7 @@ final class RunnersTest extends TestCase
             self::assertTrue($result->isSuccessful());
             self::assertCount(1, $result->files);
             self::assertStringContainsString('was not added to a calendar', (string) $result->text);
-            self::assertStringContainsString('Settings → Connections', (string) $result->text);
+            self::assertStringContainsString('Apps → Microsoft 365', (string) $result->text);
             self::assertFalse($result->metadata['calendar_delivery']['ok'] ?? true);
         } finally {
             array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
@@ -1416,17 +1418,59 @@ final class RunnersTest extends TestCase
             'timezone' => 'Europe/Berlin',
         ]);
 
-        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+        $result = $this->calendarRunner()->run($node, $this->context($this->message('From params tomorrow at 09:00')));
 
         self::assertTrue($result->isSuccessful());
         self::assertSame('From params', $result->metadata['calendar_event']['title'] ?? null);
+    }
+
+    public function testCalendarEventAsksWhenTheUserNamedNoClockTime(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Bahnfahrt',
+            'start' => '2026-11-06T09:00:00',
+            'timezone' => 'Europe/Berlin',
+        ]);
+
+        $result = $this->calendarRunner()->run(
+            $node,
+            $this->context($this->message('stelle mir einen termin für eine bahnfahrt morgen in meinen kalender')),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(0, $result->files);
+        self::assertSame('missing_clock_time', $result->metadata['calendar_event']['reason'] ?? null);
+        self::assertStringContainsString('Uhrzeit', (string) $result->text);
+        self::assertStringNotContainsString('09:00', (string) $result->text);
+    }
+
+    public function testCalendarEventConfirmsInTheUtteranceLanguage(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Bahnfahrt',
+            'start' => '2026-11-06T15:00:00',
+            'timezone' => 'Europe/Berlin',
+        ]);
+
+        $result = $this->calendarRunner()->run(
+            $node,
+            $this->context($this->message('stelle mir einen termin für eine bahnfahrt morgen um 15 Uhr')),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+        self::assertStringContainsString('Kalendereintrag', (string) $result->text);
+        self::assertStringContainsString('Bahnfahrt', (string) $result->text);
+        self::assertStringContainsString('15:00 Uhr', (string) $result->text);
+        self::assertStringContainsString('eine Stunde', (string) $result->text);
+        self::assertStringNotContainsString('I added', (string) $result->text);
     }
 
     public function testCalendarEventFailsWhenStartMissingEverywhere(): void
     {
         $node = new TaskNode('n1', Capability::CalendarEvent, [], ['title' => 'No time']);
 
-        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+        $result = $this->calendarRunner()->run($node, $this->context($this->message('Meeting tomorrow at 15:00')));
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('missing start time', (string) $result->error);

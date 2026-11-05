@@ -180,7 +180,6 @@
       "deleted": "{name} artık bu sohbette değil. Dosya dosyalarınızda duruyor.",
       "deleteFailed": "{name} hâlâ bu sohbette. Hiçbir şey çıkarılmadı. Yeniden deneyin."
     },
-    "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",
     "conversation": "sohbet",
     "conversations": "sohbetler",

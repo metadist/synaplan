@@ -115,7 +115,6 @@
     "fileUploadError": "Échec du téléversement du fichier",
     "fileUploadLimitReached": "Limite de téléversement de fichiers atteinte pour cette session.",
     "fileUploadFailed": "Le téléversement du fichier a échoué. Veuillez réessayer.",
-    "fileUploadDefaultMessage": "Veuillez examiner le fichier joint.",
     "sendFailed": "Désolé, une erreur s’est produite. Veuillez réessayer.",
     "chatUnavailable": "Le chat est actuellement indisponible.",
     "busy": "Synaplan est occupé — votre réponse commence dans un instant.",

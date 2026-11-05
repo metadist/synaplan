@@ -107,6 +107,17 @@ final class WidgetTurnGateTest extends TestCase
         self::assertSame([500, ['error' => 'Widget owner not found']], $this->refusal($this->gate(), 'wdg_1', $this->body()));
     }
 
+    public function testAFileOnlyTurnWithEmptyTextIsAdmitted(): void
+    {
+        $turn = $this->gate()->admit('wdg_1', $this->request(json_encode([
+            'sessionId' => 'sess',
+            'text' => '',
+            'files' => [9],
+        ], JSON_THROW_ON_ERROR)));
+
+        self::assertSame(['', [9]], [$turn->text, $turn->files]);
+    }
+
     public function testAnAdmittedTurnCarriesWhatTheVisitorSent(): void
     {
         $turn = $this->gate()->admit('wdg_1', $this->request(json_encode([

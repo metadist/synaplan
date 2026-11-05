@@ -175,7 +175,6 @@
       "deleted": "{name} ist nicht mehr in diesem Chat. Die Datei bleibt in deinen Dateien.",
       "deleteFailed": "{name} ist noch in diesem Chat. Es wurde nichts entfernt. Versuche es erneut."
     },
-    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
     "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht.",
     "conversation": "Unterhaltung",
     "conversations": "Unterhaltungen",
